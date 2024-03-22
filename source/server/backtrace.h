@@ -48,13 +48,13 @@ public:
    * during startup, to avoid performing the lookup during the
    * crash process.
    *
-   * @return a string representing the memory offset from ASLR of the
+   * @return a string representing the memory offset from `ASLR` of the
    * current process, or an empty string if the information is not
    * available.
    * The format of this line is
-   *   [startaddr]-[endaddr] [path_to_binary]
+   *   `[start_addr]-[end_addr] [path_to_binary]`
    * e.g.
-   *   7d34ce028000-7d34ce1bd000 /build/foo/bar/source/exe/envoy-static
+   *   `7d34ce028000-7d34ce1bd000 /build/foo/bar/source/exe/envoy-static`
    */
   static const std::string& addrMapping();
 
