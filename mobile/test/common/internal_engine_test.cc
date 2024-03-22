@@ -493,7 +493,7 @@ TEST_F(InternalEngineTest, SetLogger) {
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
   Platform::EngineSharedPtr engine =
-      engine_builder.addLogLevel(Platform::LogLevel::debug)
+      engine_builder.setLogLevel(Logger::Logger::debug)
           .setLogger(std::move(logger))
           .setOnEngineRunning([&] { engine_running.Notify(); })
           .addNativeFilter(
