@@ -8,8 +8,11 @@ namespace Envoy {
 
 bool BackwardsTrace::log_to_stderr_ = false;
 
-const std::string& BackwardsTrace::addrMapping() {
-  CONSTRUCT_ON_FIRST_USE(std::string, []() -> std::string {
+const std::string& BackwardsTrace::addrMapping(bool setup) {
+  CONSTRUCT_ON_FIRST_USE(std::string, [setup]() -> std::string {
+    if (!setup) {
+      return "";
+    }
 #ifndef WIN32
     std::ifstream maps("/proc/self/maps");
     if (maps.fail()) {
