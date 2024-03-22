@@ -11,8 +11,10 @@
 # In each case this script will add file and line information to any backtrace log
 # lines found and echo back all non-Backtrace lines untouched.
 #
-# This has been found to work best if envoy was built with gcc, and with
+# This has been found to work best if the envoy binary was built with gcc, and with
 # bazel option -c dbg
+# This can be used to decode a stack trace produced by a non-debug gcc build, if
+# the debug build passed to stack_decode.py is otherwise identical.
 
 import re
 import subprocess
