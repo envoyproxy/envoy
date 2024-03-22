@@ -142,7 +142,6 @@ TEST_F(FilterTest, ExistingUsernameHeader) {
             filter_->decodeHeaders(request_headers_user1, true));
   EXPECT_EQ("user1", request_headers_user1.get_("x-username"));
 }
-}
 
 } // namespace BasicAuth
 } // namespace HttpFilters
