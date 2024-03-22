@@ -74,7 +74,7 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kOrFilter:
     return FilterPtr{new OrFilter(config.or_filter(), context)};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kHeaderFilter:
-    return FilterPtr{new HeaderFilter(config.header_filter())};
+    return FilterPtr{new HeaderFilter(config.header_filter(), context.serverFactoryContext())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kResponseFlagFilter:
     MessageUtil::validate(config, validation_visitor);
     return FilterPtr{new ResponseFlagFilter(config.response_flag_filter())};
@@ -207,8 +207,9 @@ bool NotHealthCheckFilter::evaluate(const Formatter::HttpFormatterContext&,
   return !info.healthCheck();
 }
 
-HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config)
-    : header_data_(std::make_unique<Http::HeaderUtility::HeaderData>(config.header())) {}
+HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config,
+                           Server::Configuration::CommonFactoryContext& context)
+    : header_data_(std::make_unique<Http::HeaderUtility::HeaderData>(config.header(), context)) {}
 
 bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
                             const StreamInfo::StreamInfo&) const {

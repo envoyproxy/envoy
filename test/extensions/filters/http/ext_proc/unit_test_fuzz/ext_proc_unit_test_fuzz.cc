@@ -5,8 +5,8 @@
 #include "test/extensions/filters/http/ext_proc/unit_test_fuzz/mocks.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -47,7 +47,7 @@ public:
   NiceMock<Http::TestResponseTrailerMapImpl> response_trailers_;
   NiceMock<Buffer::OwnedImpl> buffer_;
   NiceMock<StreamInfo::MockStreamInfo> async_client_stream_info_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
 };
 
 DEFINE_PROTO_FUZZER(
@@ -87,7 +87,7 @@ DEFINE_PROTO_FUZZER(
         proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "",
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-        mocks.local_info_);
+        mocks.factory_context_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during ext_proc filter config validation: {}", e.what());
     return;

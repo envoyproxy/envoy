@@ -101,7 +101,7 @@ void UdpListenerImpl::handleReadCallback() {
   cb_.onReadReady();
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
       socket_->ioHandle(), *socket_->connectionInfoProvider().localAddress(), *this, time_source_,
-      config_.prefer_gro_, packets_dropped_);
+      config_.prefer_gro_, /*allow_mmsg=*/true, packets_dropped_);
   if (result == nullptr) {
     // No error. The number of reads was limited by read rate. There are more packets to read.
     // Register to read more in the next event loop.

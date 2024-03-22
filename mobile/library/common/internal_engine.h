@@ -1,17 +1,16 @@
 #pragma once
 
 #include "envoy/server/lifecycle_notifier.h"
-#include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/posix/thread_impl.h"
 #include "source/common/common/thread.h"
 
-#include "absl/base/call_once.h"
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
 #include "library/common/http/client.h"
+#include "library/common/internal_engine_types.h"
 #include "library/common/logger/logger_delegate.h"
 #include "library/common/network/connectivity_manager.h"
 #include "library/common/types/c_types.h"
@@ -26,7 +25,7 @@ public:
    * @param logger, the callbacks to use for engine logging.
    * @param event_tracker, the event tracker to use for the emission of events.
    */
-  InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
+  InternalEngine(std::unique_ptr<InternalEngineCallbacks> callbacks, envoy_logger logger,
                  envoy_event_tracker event_tracker);
 
   /**
@@ -123,7 +122,7 @@ public:
 private:
   GTEST_FRIEND_CLASS(InternalEngineTest, ThreadCreationFailed);
 
-  InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
+  InternalEngine(std::unique_ptr<InternalEngineCallbacks> callbacks, envoy_logger logger,
                  envoy_event_tracker event_tracker, Thread::PosixThreadFactoryPtr thread_factory);
 
   envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
@@ -134,7 +133,7 @@ private:
   Event::Dispatcher* event_dispatcher_{};
   Stats::ScopeSharedPtr client_scope_;
   Stats::StatNameSetPtr stat_name_set_;
-  envoy_engine_callbacks callbacks_;
+  std::unique_ptr<InternalEngineCallbacks> callbacks_;
   envoy_logger logger_;
   envoy_event_tracker event_tracker_;
   Assert::ActionRegistrationPtr assert_handler_registration_;

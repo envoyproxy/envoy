@@ -3,6 +3,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/matcher/matcher.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -15,6 +16,7 @@ namespace {
 
 class MatcherTestBase {
 public:
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::vector<MatcherPtr> matchers_;
   Matcher::MatchStatusVector statuses_;
   envoy::config::common::matcher::v3::MatchPredicate config_;
@@ -52,7 +54,7 @@ any_match: true
 )EOF";
 
   TestUtility::loadFromYaml(matcher_yaml, config_);
-  buildMatcher(config_, matchers_);
+  buildMatcher(config_, matchers_, context_);
   EXPECT_EQ(1, matchers_.size());
   statuses_.resize(matchers_.size());
   matchers_[0]->onNewStream(statuses_);
@@ -75,7 +77,7 @@ not_match:
 )EOF";
 
   TestUtility::loadFromYaml(matcher_yaml, config_);
-  buildMatcher(config_, matchers_);
+  buildMatcher(config_, matchers_, context_);
   EXPECT_EQ(2, matchers_.size());
   statuses_.resize(matchers_.size());
   matchers_[0]->onNewStream(statuses_);
@@ -103,7 +105,7 @@ and_match:
 )EOF";
 
   TestUtility::loadFromYaml(matcher_yaml, config_);
-  buildMatcher(config_, matchers_);
+  buildMatcher(config_, matchers_, context_);
   EXPECT_EQ(2, matchers_.size());
   statuses_.resize(matchers_.size());
   matchers_[0]->onNewStream(statuses_);
@@ -148,7 +150,7 @@ http_request_generic_body_match:
     - string_match: lay
 )EOF";
   TestUtility::loadFromYaml(matcher_yaml, config_);
-  buildMatcher(config_, matchers_);
+  buildMatcher(config_, matchers_, context_);
   EXPECT_EQ(1, matchers_.size());
   statuses_.resize(matchers_.size());
   matchers_[0]->onNewStream(statuses_);
@@ -214,7 +216,7 @@ TEST_P(TapMatcherGenericBodyTest, GenericBodyTest) {
   }
 
   TestUtility::loadFromYaml(matcher_yaml, config_);
-  buildMatcher(config_, matchers_);
+  buildMatcher(config_, matchers_, context_);
   EXPECT_EQ(1, matchers_.size());
   statuses_.resize(matchers_.size());
   matchers_[0]->onNewStream(statuses_);
@@ -478,7 +480,7 @@ http_request_generic_body_match:
 
     // Initialize matcher.
     TestUtility::loadFromYaml(matcher_yaml, config_);
-    buildMatcher(config_, matchers_);
+    buildMatcher(config_, matchers_, context_);
     EXPECT_EQ(1, matchers_.size());
     statuses_.resize(matchers_.size());
     matchers_[0]->onNewStream(statuses_);

@@ -12,9 +12,11 @@ namespace RocketmqProxy {
 namespace Router {
 
 RouteEntryImpl::RouteEntryImpl(
-    const envoy::extensions::filters::network::rocketmq_proxy::v3::Route& route)
+    const envoy::extensions::filters::network::rocketmq_proxy::v3::Route& route,
+    Server::Configuration::CommonFactoryContext& context)
     : topic_name_(route.match().topic()), cluster_name_(route.route().cluster()),
-      config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())) {
+      config_headers_(
+          Http::HeaderUtility::buildHeaderDataVector(route.match().headers(), context)) {
 
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
@@ -46,9 +48,10 @@ bool RouteEntryImpl::headersMatch(const Http::HeaderMap& headers) const {
   return Http::HeaderUtility::matchHeaders(headers, config_headers_);
 }
 
-RouteMatcher::RouteMatcher(const RouteConfig& config) {
+RouteMatcher::RouteMatcher(const RouteConfig& config,
+                           Server::Configuration::CommonFactoryContext& context) {
   for (const auto& route : config.routes()) {
-    routes_.emplace_back(std::make_shared<RouteEntryImpl>(route));
+    routes_.emplace_back(std::make_shared<RouteEntryImpl>(route, context));
   }
   ENVOY_LOG(debug, "rocketmq route matcher: routes list size {}", routes_.size());
 }

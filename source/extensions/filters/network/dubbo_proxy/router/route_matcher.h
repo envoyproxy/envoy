@@ -33,7 +33,8 @@ class RouteEntryImplBase : public RouteEntry,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            public Logger::Loggable<Logger::Id::dubbo> {
 public:
-  RouteEntryImplBase(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route);
+  RouteEntryImplBase(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route,
+                     Server::Configuration::CommonFactoryContext& context);
   ~RouteEntryImplBase() override = default;
 
   // Router::RouteEntry
@@ -92,7 +93,8 @@ using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBas
 
 class ParameterRouteEntryImpl : public RouteEntryImplBase {
 public:
-  ParameterRouteEntryImpl(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route);
+  ParameterRouteEntryImpl(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route,
+                          Server::Configuration::CommonFactoryContext& context);
   ~ParameterRouteEntryImpl() override;
 
   struct ParameterData {
@@ -118,7 +120,8 @@ private:
 
 class MethodRouteEntryImpl : public RouteEntryImplBase {
 public:
-  MethodRouteEntryImpl(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route);
+  MethodRouteEntryImpl(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route,
+                       Server::Configuration::CommonFactoryContext& context);
   ~MethodRouteEntryImpl() override;
 
   // RoutEntryImplBase
@@ -126,7 +129,8 @@ public:
                               uint64_t random_value) const override;
 
 private:
-  const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> method_name_;
+  const Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>
+      method_name_;
   std::shared_ptr<ParameterRouteEntryImpl> parameter_route_;
 };
 

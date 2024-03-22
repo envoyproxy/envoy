@@ -9,7 +9,7 @@ import android.os.Build;
 import android.os.StrictMode;
 import android.util.Log;
 import androidx.test.platform.app.InstrumentationRegistry;
-import io.envoyproxy.envoymobile.LogLevel;
+
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import java.io.File;
 import java.lang.annotation.Annotation;
@@ -24,9 +24,7 @@ import org.chromium.net.ApiVersion;
 import org.chromium.net.CronetEngine;
 import org.chromium.net.ExperimentalCronetEngine;
 import org.chromium.net.UrlResponseInfo;
-import org.chromium.net.impl.CronvoyEngineBuilderImpl;
 import org.chromium.net.impl.NativeCronvoyProvider;
-import org.chromium.net.impl.CronvoyUserAgent;
 import org.junit.Assert;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;

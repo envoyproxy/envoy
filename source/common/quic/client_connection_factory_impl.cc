@@ -1,5 +1,7 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -45,7 +47,8 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   ASSERT(!quic_versions.empty());
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
-      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, options, generator);
+      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, options, generator,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prefer_quic_client_udp_gro"));
 
   // TODO (danzh) move this temporary config and initial RTT configuration to h3 pool.
   quic::QuicConfig config = info_impl->quic_config_;
