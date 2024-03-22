@@ -3,6 +3,7 @@
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -155,6 +156,7 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
 
 // Headers in the exclusion list are not canonicalized
 TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Http::TestRequestHeaderMapImpl headers{
       {":authority", "example.com"},          {"x-forwarded-for", "1.2.3.4"},
       {"x-forwarded-proto", "https"},         {"x-amz-date", "20130708T220855Z"},
@@ -167,16 +169,18 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
     envoy::type::matcher::v3::StringMatcher config;
     config.set_exact(str);
     exclusion_list.emplace_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config));
+        std::make_unique<
+            Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+            config, context));
   }
   std::vector<std::string> prefixes = {"x-envoy"};
   for (auto& match_str : prefixes) {
     envoy::type::matcher::v3::StringMatcher config;
     config.set_prefix(match_str);
     exclusion_list.emplace_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config));
+        std::make_unique<
+            Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+            config, context));
   }
   const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
   EXPECT_THAT(map,

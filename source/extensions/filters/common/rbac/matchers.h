@@ -257,8 +257,9 @@ private:
 
 class FilterStateMatcher : public Matcher {
 public:
-  FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher)
-      : matcher_(matcher) {}
+  FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
+                     Server::Configuration::CommonFactoryContext& context)
+      : matcher_(matcher, context) {}
 
   bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                const StreamInfo::StreamInfo& info) const override;
@@ -290,8 +291,9 @@ public:
  */
 class PathMatcher : public Matcher {
 public:
-  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path_matcher)
-      : path_matcher_(path_matcher) {}
+  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path_matcher,
+              Server::Configuration::CommonFactoryContext& context)
+      : path_matcher_(path_matcher, context) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;

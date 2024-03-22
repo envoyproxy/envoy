@@ -522,9 +522,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   stats_store_.setTagProducer(
       Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags()));
   stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
-      bootstrap_.stats_config(), stats_store_.symbolTable()));
+      bootstrap_.stats_config(), stats_store_.symbolTable(), server_contexts_));
   stats_store_.setHistogramSettings(
-      std::make_unique<Stats::HistogramSettingsImpl>(bootstrap_.stats_config()));
+      std::make_unique<Stats::HistogramSettingsImpl>(bootstrap_.stats_config(), server_contexts_));
 
   const std::string server_stats_prefix = "server.";
   const std::string server_compilation_settings_stats_prefix = "server.compilation_settings";

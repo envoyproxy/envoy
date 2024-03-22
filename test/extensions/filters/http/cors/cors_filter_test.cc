@@ -6,6 +6,7 @@
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 
@@ -23,17 +24,21 @@ namespace Cors {
 namespace {
 
 Matchers::StringMatcherPtr makeExactStringMatcher(const std::string& exact_match) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::type::matcher::v3::StringMatcher config;
   config.set_exact(exact_match);
-  return std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-      config);
+  return std::make_unique<
+      Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(config,
+                                                                                       context);
 }
 
 Matchers::StringMatcherPtr makeStdRegexStringMatcher(const std::string& regex) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::type::matcher::v3::StringMatcher config;
   config.MergeFrom(TestUtility::createRegexMatcher(regex));
-  return std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-      config);
+  return std::make_unique<
+      Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(config,
+                                                                                       context);
 }
 
 } // namespace

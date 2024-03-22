@@ -140,10 +140,11 @@ TEST(RequestMatchInputMatcherTest, RequestMatchInputMatcherTest) {
 }
 
 TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   // Empty matcher.
   {
     RequestMatcherProto matcher_proto;
-    RequestMatchInputMatcher matcher(matcher_proto);
+    RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
     EXPECT_TRUE(matcher.match(request));
@@ -160,7 +161,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
 
-    RequestMatchInputMatcher matcher(matcher_proto);
+    RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "another_fake_host";
@@ -180,7 +181,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
 
-    RequestMatchInputMatcher matcher(matcher_proto);
+    RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "fake_host";
@@ -203,7 +204,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
 
-    RequestMatchInputMatcher matcher(matcher_proto);
+    RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "fake_host";
@@ -231,7 +232,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
 
-    RequestMatchInputMatcher matcher(matcher_proto);
+    RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "fake_host";
@@ -260,7 +261,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
 
-    RequestMatchInputMatcher matcher(matcher_proto);
+    RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "fake_host";
