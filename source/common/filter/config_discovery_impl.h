@@ -523,14 +523,12 @@ private:
     auto config_dump = std::make_unique<envoy::admin::v3::EcdsConfigDump>();
     for (const auto& subscription : subscriptions_) {
       const auto& ecds_filter = subscription.second.lock();
-      if (!ecds_filter || !name_matcher.match(ecds_filter->name())) {
+      if (!ecds_filter || !ecds_filter->lastConfig() || !name_matcher.match(ecds_filter->name())) {
         continue;
       }
       envoy::config::core::v3::TypedExtensionConfig filter_config;
       filter_config.set_name(ecds_filter->name());
-      if (ecds_filter->lastConfig()) {
-        MessageUtil::packFrom(*filter_config.mutable_typed_config(), *ecds_filter->lastConfig());
-      }
+      MessageUtil::packFrom(*filter_config.mutable_typed_config(), *ecds_filter->lastConfig());
       auto& filter_config_dump = *config_dump->mutable_ecds_filters()->Add();
       filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
       filter_config_dump.set_version_info(ecds_filter->lastVersionInfo());
