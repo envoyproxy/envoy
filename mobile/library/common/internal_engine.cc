@@ -15,11 +15,13 @@ static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
-InternalEngine::InternalEngine(std::unique_ptr<InternalEngineCallbacks> callbacks,
-                               envoy_logger logger, envoy_event_tracker event_tracker,
+InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
+                               std::unique_ptr<EnvoyLogger> logger,
+                               envoy_event_tracker event_tracker,
                                Thread::PosixThreadFactoryPtr thread_factory)
-    : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)), logger_(logger),
-      event_tracker_(event_tracker), dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
+    : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
+      logger_(std::move(logger)), event_tracker_(event_tracker),
+      dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
   ExtensionRegistry::registerFactories();
 
   // TODO(Augustyniak): Capturing an address of event_tracker_ and registering it in the API
@@ -33,9 +35,10 @@ InternalEngine::InternalEngine(std::unique_ptr<InternalEngineCallbacks> callback
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
-InternalEngine::InternalEngine(std::unique_ptr<InternalEngineCallbacks> callbacks,
-                               envoy_logger logger, envoy_event_tracker event_tracker)
-    : InternalEngine(std::move(callbacks), logger, event_tracker,
+InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
+                               std::unique_ptr<EnvoyLogger> logger,
+                               envoy_event_tracker event_tracker)
+    : InternalEngine(std::move(callbacks), std::move(logger), event_tracker,
                      Thread::PosixThreadFactory::create()) {}
 
 envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
@@ -81,9 +84,9 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
       }
 
       // We let the thread clean up this log delegate pointer
-      if (logger_.log) {
-        log_delegate_ptr_ =
-            std::make_unique<Logger::LambdaDelegate>(logger_, Logger::Registry::getSink());
+      if (logger_ != nullptr) {
+        log_delegate_ptr_ = std::make_unique<Logger::LambdaDelegate>(std::move(logger_),
+                                                                     Logger::Registry::getSink());
       } else {
         log_delegate_ptr_ =
             std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
