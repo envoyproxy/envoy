@@ -645,6 +645,12 @@ FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
 
 FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "encodeHeaders end_stream = {}", end_stream);
+
+  if (on_local_reply_called_ && disable_forwarding_on_local_reply_) {
+    ENVOY_LOG(trace, "encodeHeaders: Skipped header processing for local reply");
+    return FilterHeadersStatus::Continue;
+  }
+
   // Try to merge the route config again in case the decodeHeaders() is not called when processing
   // local reply.
   mergePerRouteConfig();

@@ -54,6 +54,7 @@ struct ConfigOptions {
   bool add_logging_filter = false;
   bool http1_codec = false;
   bool add_metadata = false;
+  bool send_local_reply_filter = false;
 };
 
 // These tests exercise the ext_proc filter through Envoy's integration test
@@ -182,6 +183,17 @@ protected:
         logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
 
         config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
+      }
+
+      // Add send_local_reply fitler to the front.
+      if (config_option.send_local_reply_filter) {
+        config_helper_.prependFilter(fmt::format(R"EOF(
+          name: send_local_reply_filter
+          typed_config:
+            "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+            prefix: "/call_send_local_reply"
+            code: 404
+            )EOF"));
       }
 
       // Parameterize with defer processing to prevent bit rot as filter made
@@ -762,6 +774,19 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamOnResponse) {
   processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
   verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SkipProcessingOnLocalReply) {
+  ConfigOptions config_option = {};
+  config_option.send_local_reply_filter = true;
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(
+      [](Http::RequestHeaderMap& headers) { headers.setPath("/call_send_local_reply"); });
+
+  EXPECT_EQ(test_server_->counter("cluster.ext_proc_server_0.upstream_cx_total")->value(), 0);
+  verifyDownstreamResponse(*response, 404);
 }
 
 // Test the filter using the default configuration by connecting to

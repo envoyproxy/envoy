@@ -138,6 +138,7 @@ public:
         filter_metadata_(config.filter_metadata()),
         allow_mode_override_(config.allow_mode_override()),
         disable_immediate_response_(config.disable_immediate_response()),
+        disable_forwarding_on_local_reply_(config.disable_forwarding_on_local_reply()),
         allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
         disallowed_headers_(
             initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
@@ -203,6 +204,7 @@ private:
   }
   const bool failure_mode_allow_;
   const bool disable_clear_route_cache_;
+  const bool disable_forwarding_on_local_reply_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
 
@@ -325,7 +327,10 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
-
+  Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override {
+    on_local_reply_called_ = true;
+    return ::Envoy::Http::LocalErrorStatus::Continue;
+  }
   // ExternalProcessorCallbacks
   void onReceiveMessage(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
@@ -400,6 +405,9 @@ private:
 
   // Set to true when the mergePerRouteConfig() method has been called.
   bool route_config_merged_ = false;
+
+  // Set to true when `onLocalReply()` has been invoked.
+  bool on_local_reply_called_ = false;
 
   std::vector<std::string> untyped_forwarding_namespaces_{};
   std::vector<std::string> typed_forwarding_namespaces_{};
