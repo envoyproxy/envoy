@@ -88,35 +88,26 @@ public:
 };
 
 StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config,
-                                           ThreadLocal::SlotAllocator& tls, Api::Api& api);
+                                           Server::Configuration::CommonFactoryContext& context);
 
 template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
-class PrivateStringMatcherImpl : public ValueMatcher, public StringMatcher {
+class StringMatcherImplWithContext : public ValueMatcher, public StringMatcher {
 public:
-  // TODO(ggreenway): convert all but the first parameter into
-  // `Server::Configuration::CommonFactoryContext`.
-  explicit PrivateStringMatcherImpl(const StringMatcherType& matcher, Regex::Engine* regex_engine,
-                                    ThreadLocal::SlotAllocator* tls, Api::Api* api)
+  explicit StringMatcherImplWithContext(const StringMatcherType& matcher,
+                                        Server::Configuration::CommonFactoryContext& context)
       : matcher_(matcher) {
     if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kSafeRegex) {
       if (matcher.ignore_case()) {
         ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
       }
-      if (regex_engine != nullptr) {
-        regex_ = Regex::Utility::parseRegex(matcher_.safe_regex(), *regex_engine);
-      } else {
-        // TODO(ggreenway): remove this branch when we always have an engine. This is only
-        // needed to make tests not complain about dereferencing a null pointer, even though
-        // the reference isn't actually used.
-        regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
-      }
+      regex_ = Regex::Utility::parseRegex(matcher_.safe_regex(), context.regexEngine());
     } else if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kContains) {
       if (matcher_.ignore_case()) {
         // Cache the lowercase conversion of the Contains matcher for future use
         lowercase_contains_match_ = absl::AsciiStrToLower(matcher_.contains());
       }
     } else if (matcher.has_custom()) {
-      custom_ = getExtensionStringMatcher(matcher.custom(), *tls, *api);
+      custom_ = getExtensionStringMatcher(matcher.custom(), context);
     }
   }
 
@@ -180,34 +171,11 @@ private:
   StringMatcherPtr custom_;
 };
 
-// Temporarily create two separate types with different constructors, inheriting from the same
-// implementation, to make it easier to find and replace all usage of the old one.
-// TODO(ggreenway): delete these two extra classes, make `PrivateStringMatcherImpl` back into
-// `StringMatcherImpl`.
-template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
-class StringMatcherImplWithContext : public PrivateStringMatcherImpl<StringMatcherType> {
-public:
-  explicit StringMatcherImplWithContext(const StringMatcherType& matcher,
-                                        Server::Configuration::CommonFactoryContext& context)
-      : PrivateStringMatcherImpl<StringMatcherType>(matcher, &context.regexEngine(),
-                                                    &context.threadLocal(), &context.api()) {}
-};
-
-template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
-class StringMatcherImpl : public PrivateStringMatcherImpl<StringMatcherType> {
-public:
-  explicit StringMatcherImpl(const StringMatcherType& matcher)
-      : PrivateStringMatcherImpl<StringMatcherType>(
-            matcher, Regex::EngineSingleton::getExisting(),
-            InjectableSingleton<ThreadLocal::SlotAllocator>::getExisting(),
-            InjectableSingleton<Api::Api>::getExisting()) {}
-};
-
 class StringMatcherExtensionFactory : public Config::TypedFactory {
 public:
-  // TODO(ggreenway): Convert all but first parameter to `CommonFactoryContext`.
-  virtual StringMatcherPtr createStringMatcher(const ProtobufWkt::Any& config,
-                                               ThreadLocal::SlotAllocator& tls, Api::Api& api) PURE;
+  virtual StringMatcherPtr
+  createStringMatcher(const Protobuf::Message& config,
+                      Server::Configuration::CommonFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.string_matcher"; }
 };

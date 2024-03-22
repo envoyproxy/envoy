@@ -220,9 +220,11 @@ bool PathMatcher::match(const absl::string_view path) const {
 }
 
 StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config,
-                                           ThreadLocal::SlotAllocator& tls, Api::Api& api) {
+                                           Server::Configuration::CommonFactoryContext& context) {
   auto factory = Config::Utility::getAndCheckFactory<StringMatcherExtensionFactory>(config, false);
-  return factory->createStringMatcher(config.typed_config(), tls, api);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      config, context.messageValidationContext().staticValidationVisitor(), *factory);
+  return factory->createStringMatcher(*message, context);
 }
 
 } // namespace Matchers
