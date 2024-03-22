@@ -5,6 +5,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/post_io_action.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 
