@@ -210,7 +210,7 @@ message ExternalProcessor {
   // If set to true, local reply message will not be forwared to external processing server, even if
   // :ref:`processing_mode
   // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>` is configured
-  // as `SEND`.
+  // as SEND.
   bool disable_forwarding_on_local_reply = 17;
 }
 

@@ -185,7 +185,7 @@ protected:
         config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
       }
 
-      // Add send_local_reply fitler to the front.
+      // Add send_local_reply filter to the front.
       if (config_option.send_local_reply_filter) {
         config_helper_.prependFilter(fmt::format(R"EOF(
           name: send_local_reply_filter
