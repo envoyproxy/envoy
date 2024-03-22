@@ -14,8 +14,8 @@
 
 namespace Envoy {
 
-/** The callbacks for the `InternalEngine`. */
-struct InternalEngineCallbacks {
+/** The callbacks for the Envoy Engine. */
+struct EngineCallbacks {
   std::function<void()> on_engine_running = [] {};
   std::function<void()> on_exit = [] {};
 };
