@@ -307,17 +307,20 @@ Stats::Store& InternalEngine::getStatsStore() {
 
 void InternalEngine::logInterfaces(absl::string_view event,
                                    std::vector<Network::InterfacePair>& interfaces) {
-  std::vector<std::string> names;
-  names.resize(interfaces.size());
-  std::transform(interfaces.begin(), interfaces.end(), names.begin(),
-                 [](Network::InterfacePair& pair) { return std::get<0>(pair); });
+  auto all_names_printer = [](std::vector<Network::InterfacePair>& interfaces) -> std::string {
+    std::vector<std::string> names;
+    names.resize(interfaces.size());
+    std::transform(interfaces.begin(), interfaces.end(), names.begin(),
+                   [](Network::InterfacePair& pair) { return std::get<0>(pair); });
 
-  auto unique_end = std::unique(names.begin(), names.end());
-  std::string all_names = std::accumulate(names.begin(), unique_end, std::string{},
-                                          [](std::string acc, std::string next) {
-                                            return acc.empty() ? next : std::move(acc) + "," + next;
-                                          });
-  ENVOY_LOG_EVENT(debug, event, all_names);
+    auto unique_end = std::unique(names.begin(), names.end());
+    std::string all_names = std::accumulate(
+        names.begin(), unique_end, std::string{}, [](std::string acc, std::string next) {
+          return acc.empty() ? next : std::move(acc) + "," + next;
+        });
+    return all_names;
+  };
+  ENVOY_LOG_EVENT(debug, event, "{}", all_names_printer(interfaces));
 }
 
 } // namespace Envoy
