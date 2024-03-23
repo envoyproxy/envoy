@@ -698,6 +698,11 @@ public:
 
   Http::CodecType httpType() { return http_type_; }
 
+  void closeSocket() {
+    ENVOY_LOG(debug, "closing socket: {}", localAddress()->asString());
+    socket_->close();
+  }
+
   // Returns the new connection via the connection argument.
   ABSL_MUST_USE_RESULT
   testing::AssertionResult

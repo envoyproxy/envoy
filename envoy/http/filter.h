@@ -702,6 +702,9 @@ public:
    *
    * if (desired_limit > decoderBufferLimit()) {setDecoderBufferLimit(desired_limit);}
    *
+   * It is also recommended to only call this function only on setDecoderFilterCallbacks or on
+   * decodeHeaders.
+   *
    * @param limit supplies the desired buffer limit.
    */
   virtual void setDecoderBufferLimit(uint32_t limit) PURE;

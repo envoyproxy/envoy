@@ -64,6 +64,9 @@ public:
   RetryDecision wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers,
                                       const Http::RequestHeaderMap& original_request,
                                       bool& disable_early_data) override;
+  bool shouldRetryOnConnectionFailure() const override {
+    return retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+  }
   RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason, Http3Used http3_used,
                                DoRetryResetCallback callback) override;
   RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) override;

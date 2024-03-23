@@ -297,14 +297,16 @@ using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
  */
 class Filter : Logger::Loggable<Logger::Id::router>,
                public Http::StreamDecoderFilter,
+               public Http::UpstreamCallbacks,
                public Upstream::LoadBalancerContextBase,
                public RouterFilterInterface {
 public:
   Filter(FilterConfig& config, FilterStats& stats)
       : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
-        request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
-                                               "envoy.reloadable_features.streaming_shadow")) {}
+        wait_for_connect_(false), request_buffer_overflowed_(false),
+        streaming_shadows_(
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.streaming_shadow")) {}
 
   ~Filter() override;
 
@@ -474,6 +476,7 @@ public:
   bool downstreamEndStream() const override { return downstream_end_stream_; }
   uint32_t attemptCount() const override { return attempt_count_; }
   const std::list<UpstreamRequestPtr>& upstreamRequests() const { return upstream_requests_; }
+  void onUpstreamConnectionEstablished() override;
 
   TimeSource& timeSource() { return config_.timeSource(); }
   const Route* route() const { return route_.get(); }
@@ -516,6 +519,7 @@ private:
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request,
                        TimeoutRetry is_timeout_retry);
+  void giveUpRetryAndShadow();
   uint32_t numRequestsAwaitingHeaders();
   void onGlobalTimeout();
   void onRequestComplete();
@@ -592,8 +596,10 @@ private:
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  uint32_t retry_connection_failure_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
+  uint32_t original_buffer_limit_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;
   bool grpc_request_ : 1;
@@ -601,6 +607,9 @@ private:
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
+  bool wait_for_connect_ : 1;
+  // Set to true when retrying on connection error, buffer limit has been exceeded and
+  // the router hasn't got any connection with upstream.
   bool include_attempt_count_in_request_ : 1;
   bool include_timeout_retry_header_in_request_ : 1;
   bool request_buffer_overflowed_ : 1;

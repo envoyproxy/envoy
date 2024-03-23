@@ -45,7 +45,14 @@ public:
       ON_CALL(*retry_state_, wouldRetryFromRetriableStatusCode(Http::Code::TooEarly))
           .WillByDefault(Return(true));
     }
+    if (retry_connection_failure) {
+      ON_CALL(*retry_state_, shouldRetryOnConnectionFailure()).WillByDefault(Return(true));
+    }
     return RetryStatePtr{retry_state_};
+  }
+
+  void setRetryShadowBufferLimit(uint32_t retry_shadow_buffer_limit) {
+    Filter::setRetryShadowBufferLimit(retry_shadow_buffer_limit);
   }
 
   const Network::Connection* downstreamConnection() const override {
@@ -56,6 +63,7 @@ public:
   MockRetryState* retry_state_{};
   bool reject_all_hosts_ = false;
   bool retry_425_response_ = false;
+  bool retry_connection_failure = false;
 };
 
 class RouterTestBase : public testing::Test {
