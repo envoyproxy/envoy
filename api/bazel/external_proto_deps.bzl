@@ -28,8 +28,8 @@ EXTERNAL_PROTO_GO_BAZEL_DEP_MAP = {
     # TODO(https://github.com/bazelbuild/rules_go/issues/1986): update to
     #    @com_google_googleapis when the bug is resolved. Also see the note to
     #    go_googleapis in https://github.com/bazelbuild/rules_go/blob/master/go/dependencies.rst#overriding-dependencies
-    "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto": "@go_googleapis//google/api/expr/v1alpha1:expr_go_proto",
-    "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@go_googleapis//google/api/expr/v1alpha1:expr_go_proto",
+    "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto": "@org_golang_google_genproto_googleapis_api//expr/v1alpha1",
+    "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@org_golang_google_genproto_googleapis_api//expr/v1alpha1",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_go",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_and_config_proto_go",
     "@opentelemetry_proto//:trace": "@opentelemetry_proto//:trace_go_proto",
