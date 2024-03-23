@@ -161,14 +161,16 @@ private:
  */
 template <class ProtoType> class CorsPolicyImplBase : public CorsPolicy {
 public:
-  CorsPolicyImplBase(const ProtoType& config, Runtime::Loader& loader)
-      : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
+  CorsPolicyImplBase(const ProtoType& config,
+                     Server::Configuration::CommonFactoryContext& factory_context)
+      : config_(config), loader_(factory_context.runtime()), allow_methods_(config.allow_methods()),
         allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
         max_age_(config.max_age()) {
     for (const auto& string_match : config.allow_origin_string_match()) {
       allow_origins_.push_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              string_match));
+          std::make_unique<
+              Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+              string_match, factory_context));
     }
     if (config.has_allow_credentials()) {
       allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
@@ -176,6 +178,11 @@ public:
     if (config.has_allow_private_network_access()) {
       allow_private_network_access_ =
           PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
+    }
+
+    if (config.has_forward_not_matching_preflights()) {
+      forward_not_matching_preflights_ =
+          PROTOBUF_GET_WRAPPED_REQUIRED(config, forward_not_matching_preflights);
     }
   }
 
@@ -207,6 +214,9 @@ public:
     }
     return false;
   };
+  const absl::optional<bool>& forwardNotMatchingPreflights() const override {
+    return forward_not_matching_preflights_;
+  }
 
 private:
   const ProtoType config_;
@@ -218,6 +228,7 @@ private:
   const std::string max_age_;
   absl::optional<bool> allow_credentials_{};
   absl::optional<bool> allow_private_network_access_{};
+  absl::optional<bool> forward_not_matching_preflights_{};
 };
 using CorsPolicyImpl = CorsPolicyImplBase<envoy::config::route::v3::CorsPolicy>;
 

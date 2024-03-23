@@ -19,9 +19,7 @@ namespace Envoy {
 
 using testing::_;
 using testing::ByMove;
-using testing::HasSubstr;
 using testing::Return;
-using testing::ReturnRef;
 
 // This config is the minimal envoy mobile config that allows for running the engine.
 const std::string MINIMAL_TEST_CONFIG = R"(
@@ -107,7 +105,7 @@ struct EngineTestContext {
   absl::Notification on_engine_running;
   absl::Notification on_exit;
   absl::Notification on_log;
-  absl::Notification on_logger_release;
+  absl::Notification on_log_exit;
   absl::Notification on_event;
 };
 
@@ -229,23 +227,15 @@ TEST_F(InternalEngineTest, RecordCounter) {
 
 TEST_F(InternalEngineTest, Logger) {
   EngineTestContext test_context{};
-
-  envoy_logger logger{[](envoy_log_level, envoy_data data, const void* context) -> void {
-                        auto* test_context =
-                            static_cast<EngineTestContext*>(const_cast<void*>(context));
-                        release_envoy_data(data);
-                        if (!test_context->on_log.HasBeenNotified()) {
-                          test_context->on_log.Notify();
-                        }
-                      } /* log */,
-                      [](const void* context) -> void {
-                        auto* test_context =
-                            static_cast<EngineTestContext*>(const_cast<void*>(context));
-                        test_context->on_logger_release.Notify();
-                      } /* release */,
-                      &test_context};
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log = [&](Logger::Logger::Levels, const std::string&) {
+    if (!test_context.on_log.HasBeenNotified()) {
+      test_context.on_log.Notify();
+    }
+  };
+  logger->on_exit = [&] { test_context.on_log_exit.Notify(); };
   std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), logger, {}));
+      new InternalEngine(createDefaultEngineCallbacks(test_context), std::move(logger), {}));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
@@ -253,7 +243,7 @@ TEST_F(InternalEngineTest, Logger) {
 
   engine->terminate();
   engine.reset();
-  ASSERT_TRUE(test_context.on_logger_release.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_log_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 
@@ -493,68 +483,6 @@ TEST_F(InternalEngineTest, ResetConnectivityState) {
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 
-TEST_F(InternalEngineTest, SetLogger) {
-  std::atomic<bool> logging_was_called{false};
-  envoy_logger logger;
-  logger.log = [](envoy_log_level, envoy_data data, const void* context) {
-    std::atomic<bool>* logging_was_called =
-        const_cast<std::atomic<bool>*>(static_cast<const std::atomic<bool>*>(context));
-    *logging_was_called = true;
-    release_envoy_data(data);
-  };
-  logger.release = envoy_noop_const_release;
-  logger.context = &logging_was_called;
-
-  absl::Notification engine_running;
-  Platform::EngineBuilder engine_builder;
-  Platform::EngineSharedPtr engine =
-      engine_builder.addLogLevel(Platform::LogLevel::debug)
-          .setLogger(logger)
-          .setOnEngineRunning([&] { engine_running.Notify(); })
-          .addNativeFilter(
-              "test_remote_response",
-              "{'@type': "
-              "type.googleapis.com/"
-              "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse}")
-          .build();
-  engine_running.WaitForNotification();
-
-  int actual_status_code = 0;
-  bool actual_end_stream = false;
-  absl::Notification stream_complete;
-  auto stream_prototype = engine->streamClient()->newStreamPrototype();
-  auto stream = (*stream_prototype)
-                    .setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream,
-                                      envoy_stream_intel) {
-                      actual_status_code = headers->httpStatus();
-                      actual_end_stream = end_stream;
-                    })
-                    .setOnData([&](envoy_data data, bool end_stream) {
-                      actual_end_stream = end_stream;
-                      release_envoy_data(data);
-                    })
-                    .setOnComplete([&](envoy_stream_intel, envoy_final_stream_intel) {
-                      stream_complete.Notify();
-                    })
-                    .setOnError([&](Platform::EnvoyErrorSharedPtr, envoy_stream_intel,
-                                    envoy_final_stream_intel) { stream_complete.Notify(); })
-                    .setOnCancel([&](envoy_stream_intel, envoy_final_stream_intel) {
-                      stream_complete.Notify();
-                    })
-                    .start();
-
-  auto request_headers =
-      Platform::RequestHeadersBuilder(Platform::RequestMethod::GET, "https", "example.com", "/")
-          .build();
-  stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
-  stream_complete.WaitForNotification();
-
-  EXPECT_EQ(actual_status_code, 200);
-  EXPECT_EQ(actual_end_stream, true);
-  EXPECT_TRUE(logging_was_called.load());
-  EXPECT_EQ(engine->terminate(), ENVOY_SUCCESS);
-}
-
 TEST_F(InternalEngineTest, ThreadCreationFailed) {
   EngineTestContext test_context{};
   auto thread_factory = std::make_unique<Thread::MockPosixThreadFactory>();
@@ -565,57 +493,6 @@ TEST_F(InternalEngineTest, ThreadCreationFailed) {
   EXPECT_EQ(status, ENVOY_FAILURE);
   // Calling `terminate()` should not crash.
   EXPECT_EQ(engine->terminate(), ENVOY_FAILURE);
-}
-
-TEST_F(InternalEngineTest, SetEngineCallbacks) {
-  absl::Notification engine_running;
-  auto engine_callbacks = std::make_unique<EngineCallbacks>();
-  engine_callbacks->on_engine_running = [&] { engine_running.Notify(); };
-  Platform::EngineBuilder engine_builder;
-  Platform::EngineSharedPtr engine =
-      engine_builder.addLogLevel(Platform::LogLevel::debug)
-          .setEngineCallbacks(std::move(engine_callbacks))
-          .addNativeFilter(
-              "test_remote_response",
-              "{'@type': "
-              "type.googleapis.com/"
-              "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse}")
-          .build();
-  engine_running.WaitForNotification();
-
-  int actual_status_code = 0;
-  bool actual_end_stream = false;
-  absl::Notification stream_complete;
-  auto stream_prototype = engine->streamClient()->newStreamPrototype();
-  auto stream = (*stream_prototype)
-                    .setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream,
-                                      envoy_stream_intel) {
-                      actual_status_code = headers->httpStatus();
-                      actual_end_stream = end_stream;
-                    })
-                    .setOnData([&](envoy_data data, bool end_stream) {
-                      actual_end_stream = end_stream;
-                      release_envoy_data(data);
-                    })
-                    .setOnComplete([&](envoy_stream_intel, envoy_final_stream_intel) {
-                      stream_complete.Notify();
-                    })
-                    .setOnError([&](Platform::EnvoyErrorSharedPtr, envoy_stream_intel,
-                                    envoy_final_stream_intel) { stream_complete.Notify(); })
-                    .setOnCancel([&](envoy_stream_intel, envoy_final_stream_intel) {
-                      stream_complete.Notify();
-                    })
-                    .start();
-
-  auto request_headers =
-      Platform::RequestHeadersBuilder(Platform::RequestMethod::GET, "https", "example.com", "/")
-          .build();
-  stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
-  stream_complete.WaitForNotification();
-
-  EXPECT_EQ(actual_status_code, 200);
-  EXPECT_EQ(actual_end_stream, true);
-  EXPECT_EQ(engine->terminate(), ENVOY_SUCCESS);
 }
 
 } // namespace Envoy

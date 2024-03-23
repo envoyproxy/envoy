@@ -15,12 +15,13 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
-maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config) {
+absl::optional<Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>
+maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config,
+                         Server::Configuration::CommonFactoryContext& context) {
   switch (config.query_parameter_match_specifier_case()) {
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       kStringMatch:
-    return Matchers::StringMatcherImpl(config.string_match());
+    return Matchers::StringMatcherImplWithContext(config.string_match(), context);
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       kPresentMatch:
     return absl::nullopt;
@@ -35,8 +36,9 @@ maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& 
 } // namespace
 
 ConfigUtility::QueryParameterMatcher::QueryParameterMatcher(
-    const envoy::config::route::v3::QueryParameterMatcher& config)
-    : name_(config.name()), matcher_(maybeCreateStringMatcher(config)) {}
+    const envoy::config::route::v3::QueryParameterMatcher& config,
+    Server::Configuration::CommonFactoryContext& context)
+    : name_(config.name()), matcher_(maybeCreateStringMatcher(config, context)) {}
 
 bool ConfigUtility::QueryParameterMatcher::matches(
     const Http::Utility::QueryParamsMulti& request_query_params) const {

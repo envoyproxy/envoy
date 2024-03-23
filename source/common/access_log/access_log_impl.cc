@@ -82,7 +82,7 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
     MessageUtil::validate(config, validation_visitor);
     return FilterPtr{new GrpcStatusFilter(config.grpc_status_filter())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kMetadataFilter:
-    return FilterPtr{new MetadataFilter(config.metadata_filter())};
+    return FilterPtr{new MetadataFilter(config.metadata_filter(), context.serverFactoryContext())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kLogTypeFilter:
     return FilterPtr{new LogTypeFilter(config.log_type_filter())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kExtensionFilter:
@@ -290,7 +290,8 @@ bool LogTypeFilter::evaluate(const Formatter::HttpFormatterContext& context,
   return exclude_ ? !found : found;
 }
 
-MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config)
+MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config,
+                               Server::Configuration::CommonFactoryContext& context)
     : default_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_config, match_if_key_not_found, true)),
       filter_(filter_config.matcher().filter()) {
 
@@ -303,13 +304,13 @@ MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilte
 
     // Matches if the value equals the configured 'MetadataMatcher' value.
     const auto& val = matcher_config.value();
-    value_matcher_ = Matchers::ValueMatcher::create(val);
+    value_matcher_ = Matchers::ValueMatcher::create(val, context);
   }
 
   // Matches if the value is present in dynamic metadata
   auto present_val = envoy::type::matcher::v3::ValueMatcher();
   present_val.set_present_match(true);
-  present_matcher_ = Matchers::ValueMatcher::create(present_val);
+  present_matcher_ = Matchers::ValueMatcher::create(present_val, context);
 }
 
 bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,

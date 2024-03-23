@@ -81,4 +81,7 @@ envoy_cc_library(
         "engine_types.h",
     ],
     repository = "@envoy",
+    deps = [
+        "@envoy//source/common/common:base_logger_lib",
+    ],
 )

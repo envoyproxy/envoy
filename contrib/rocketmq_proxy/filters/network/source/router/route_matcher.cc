@@ -14,7 +14,7 @@ namespace Router {
 RouteEntryImpl::RouteEntryImpl(
     const envoy::extensions::filters::network::rocketmq_proxy::v3::Route& route,
     Server::Configuration::CommonFactoryContext& context)
-    : topic_name_(route.match().topic()), cluster_name_(route.route().cluster()),
+    : topic_name_(route.match().topic(), context), cluster_name_(route.route().cluster()),
       config_headers_(
           Http::HeaderUtility::buildHeaderDataVector(route.match().headers(), context)) {
 
