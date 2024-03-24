@@ -168,7 +168,7 @@ public:
 
   bool allowModeOverride() const { return allow_mode_override_; }
   bool disableImmediateResponse() const { return disable_immediate_response_; }
-
+  bool disableForwardingOnLocalReply() const { return disable_forwarding_on_local_reply_; }
   const Filters::Common::MutationRules::Checker& mutationChecker() const {
     return mutation_checker_;
   }

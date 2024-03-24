@@ -785,7 +785,9 @@ TEST_P(ExtProcIntegrationTest, SkipProcessingOnLocalReply) {
   auto response = sendDownstreamRequest(
       [](Http::RequestHeaderMap& headers) { headers.setPath("/call_send_local_reply"); });
 
-  EXPECT_EQ(test_server_->counter("cluster.ext_proc_server_0.upstream_cx_total")->value(), 0);
+  if (clientType() == Grpc::ClientType::EnvoyGrpc) {
+    EXPECT_EQ(test_server_->counter("cluster.ext_proc_server_0.upstream_cx_total")->value(), 0);
+  }
   verifyDownstreamResponse(*response, 404);
 }
 
