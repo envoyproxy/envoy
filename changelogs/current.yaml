@@ -386,3 +386,9 @@ deprecated:
     deprecated :ref:`split_spans_for_request <envoy_v3_api_field_config.trace.v3.ZipkinConfig.split_spans_for_request>`
     in favor of :ref:`spawn_upstream_span
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`.
+- area: grpc
+  change: |
+    Added maximum gRPC message size that is allowed to be received in Envoy gRPC. If a message over this limit is received,
+    the gRPC stream is terminated with the RESOURCE_EXHAUSTED error. This limit is applied to individual messages in the
+    streaming response and not the total size of streaming response. Defaults to 0, which means unlimited.
+
