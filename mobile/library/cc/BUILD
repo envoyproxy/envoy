@@ -41,7 +41,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
-        "@envoy_mobile//library/common:internal_engine_types_lib",
+        "@envoy_mobile//library/common:engine_types_lib",
         "@envoy_mobile//library/common/config:certificates_lib",
         "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/local_error:filter_cc_proto",

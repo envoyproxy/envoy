@@ -20,17 +20,6 @@
 - (std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>)generateBootstrap;
 @end
 
-static void ios_on_log(envoy_log_level log_level, envoy_data data, const void *context) {
-  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
-  // is necessary to act as a breaker for any Objective-C allocation that happens.
-  @autoreleasepool {
-    EnvoyLogger *logger = (__bridge EnvoyLogger *)context;
-    logger.log(log_level, to_ios_string(data));
-  }
-}
-
-static void ios_on_logger_release(const void *context) { CFRelease(context); }
-
 static const void *ios_http_filter_init(const void *context) {
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
   // is necessary to act as a breaker for any Objective-C allocation that happens.
@@ -394,15 +383,14 @@ static void ios_track_event(envoy_map map, const void *context) {
     return nil;
   }
 
-  self.onEngineRunning = onEngineRunning;
-  std::unique_ptr<Envoy::InternalEngineCallbacks> native_callbacks =
-      std::make_unique<Envoy::InternalEngineCallbacks>();
-  native_callbacks->on_engine_running = [self] {
+  std::unique_ptr<Envoy::EngineCallbacks> native_callbacks =
+      std::make_unique<Envoy::EngineCallbacks>();
+  native_callbacks->on_engine_running = [onEngineRunning = std::move(onEngineRunning)] {
     // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool
     // block is necessary to act as a breaker for any Objective-C allocation that happens.
     @autoreleasepool {
-      if (self.onEngineRunning) {
-        self.onEngineRunning();
+      if (onEngineRunning) {
+        onEngineRunning();
       }
     }
   };
@@ -414,12 +402,16 @@ static void ios_track_event(envoy_map map, const void *context) {
     }
   };
 
-  envoy_logger native_logger = {NULL, NULL, NULL};
+  std::unique_ptr<Envoy::EnvoyLogger> native_logger = std::make_unique<Envoy::EnvoyLogger>();
   if (logger) {
-    EnvoyLogger *objcLogger = [[EnvoyLogger alloc] initWithLogClosure:logger];
-    native_logger.log = ios_on_log;
-    native_logger.release = ios_on_logger_release;
-    native_logger.context = CFBridgingRetain(objcLogger);
+    native_logger->on_log = [logger = std::move(logger)](Envoy::Logger::Logger::Levels level,
+                                                         const std::string &message) {
+      // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool
+      // block is necessary to act as a breaker for any Objective-C allocation that happens.
+      @autoreleasepool {
+        logger(level, @(message.c_str()));
+      }
+    };
   }
 
   // TODO(Augustyniak): Everything here leaks, but it's all tied to the life of the engine.
@@ -432,8 +424,8 @@ static void ios_track_event(envoy_map map, const void *context) {
     native_event_tracker.context = CFBridgingRetain(objcEventTracker);
   }
 
-  _engine =
-      new Envoy::InternalEngine(std::move(native_callbacks), native_logger, native_event_tracker);
+  _engine = new Envoy::InternalEngine(std::move(native_callbacks), std::move(native_logger),
+                                      native_event_tracker);
   _engineHandle = reinterpret_cast<envoy_engine_t>(_engine);
 
   if (networkMonitoringMode == 1) {

@@ -12,13 +12,11 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
-#include "direct_response_testing.h"
 #include "library/cc/engine.h"
 #include "library/cc/key_value_store.h"
 #include "library/cc/log_level.h"
 #include "library/cc/string_accessor.h"
-#include "library/common/internal_engine_types.h"
-#include "library/common/types/matcher_data.h"
+#include "library/common/engine_types.h"
 
 namespace Envoy {
 namespace Platform {
@@ -126,9 +124,13 @@ public:
   EngineBuilder(EngineBuilder&&) = default;
   virtual ~EngineBuilder() = default;
 
-  EngineBuilder& addLogLevel(LogLevel log_level);
-  EngineBuilder& setLogger(envoy_logger envoy_logger);
-  EngineBuilder& setOnEngineRunning(std::function<void()> closure);
+  [[deprecated("Use EngineBuilder::setLogLevel instead")]] EngineBuilder&
+  addLogLevel(LogLevel log_level);
+  EngineBuilder& setLogLevel(Logger::Logger::Levels log_level);
+  EngineBuilder& setLogger(std::unique_ptr<EnvoyLogger> logger);
+  EngineBuilder& setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks);
+  [[deprecated("Use EngineBuilder::setEngineCallbacks instead")]] EngineBuilder&
+  setOnEngineRunning(std::function<void()> closure);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
@@ -214,9 +216,9 @@ private:
     std::string typed_config_;
   };
 
-  LogLevel log_level_ = LogLevel::info;
-  absl::optional<envoy_logger> envoy_logger_;
-  std::unique_ptr<InternalEngineCallbacks> callbacks_;
+  Logger::Logger::Levels log_level_ = Logger::Logger::Levels::info;
+  std::unique_ptr<EnvoyLogger> logger_{nullptr};
+  std::unique_ptr<EngineCallbacks> callbacks_;
 
   int connect_timeout_seconds_ = 30;
   int dns_refresh_seconds_ = 60;

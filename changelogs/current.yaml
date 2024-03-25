@@ -51,6 +51,11 @@ minor_behavior_changes:
   change: |
     Make each upstream connection to read as many as 32 packets in each event loop. This feature can be disabled by setting
     ``envoy.reloadable_features.quic_upstream_reads_fixed_number_packets`` to false.
+- area: stats
+  change: |
+    ``thread_local_cluster_manager.worker_0.*`` metrics are now parsed to use the
+    ``worker_id`` tag like other metrics with ``worker_id`` do, when
+    :ref:`use_all_default_tags <envoy_v3_api_field_config.metrics.v3.StatsConfig.use_all_default_tags>` is true.
 - area: aws
   change: |
     AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
@@ -184,6 +189,16 @@ bug_fixes:
   change: |
     When performing a token refresh and forwarding tokens upstream, replace existing token cookies rather than appending as
     another Cookie header.
+- area: oauth
+  change: |
+    The refresh and access tokens are not expired simultaneously so the access token can be updated using
+    the refresh token. The expiration time of the refresh token is taken from the exp claim of jwt by default.
+    If the claim is ommited in the jwt then :ref:`default_refresh_token_expires_in
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.default_refresh_token_expires_in>`
+    specifies the lifetime of the refresh token. The default value is ``604800`` seconds (a week).
+- area: admin
+  change: |
+    Removing the ECDS config entry from the config dump when it does not exist (or has expired).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -354,10 +369,21 @@ new_features:
     Update ``aws_request_signing`` filter to support optionally sending the aws signature in query parameters rather than headers,
     by specifying the :ref:`query_string <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string>`
     configuration section.
+- area: formatters
+  change: |
+    Added :ref:`formatters <envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.formatters>`
+    to Fluentd access logger to allow adding extension commands when formatter access logs.
 - area: rbac
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
     to allow adding custom prefix to the stats emitted by rules.
+- area: tracing
+  change: |
+    Dynatrace sampler fetches configuration from Dynatrace API.
+- area: cors
+  change: |
+    Added :ref:`configuration option <envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.forward_not_matching_preflights>`
+    to return local response when CORS preflight's origin does not match allowed origin.
 
 deprecated:
 - area: listener

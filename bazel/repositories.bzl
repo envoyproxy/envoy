@@ -358,7 +358,11 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_perfetto()
     _utf8_range()
     _rules_ruby()
-    external_http_archive("com_github_google_flatbuffers")
+    external_http_archive(
+        "com_github_google_flatbuffers",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:flatbuffers.patch"],
+    )
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")

@@ -138,19 +138,31 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const
 }
 #endif
 
-EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<InternalEngineCallbacks>()) {
+EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<EngineCallbacks>()) {
 #ifndef ENVOY_ENABLE_QUIC
   enable_http3_ = false;
 #endif
 }
 
 EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
+  // Envoy::Platform::LogLevel is essentially the same as Logger::Logger::Levels, so we can
+  // safely cast it.
+  log_level_ = static_cast<Logger::Logger::Levels>(log_level);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setLogger(envoy_logger envoy_logger) {
-  envoy_logger_.emplace(envoy_logger);
+EngineBuilder& EngineBuilder::setLogger(std::unique_ptr<EnvoyLogger> logger) {
+  logger_ = std::move(logger);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks) {
+  callbacks_ = std::move(callbacks);
   return *this;
 }
 
@@ -892,16 +904,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  envoy_logger null_logger;
-  null_logger.log = nullptr;
-  null_logger.release = envoy_noop_const_release;
-  null_logger.context = nullptr;
-
   envoy_event_tracker null_tracker{};
 
   InternalEngine* envoy_engine =
-      new InternalEngine(std::move(callbacks_),
-                         (envoy_logger_.has_value()) ? *envoy_logger_ : null_logger, null_tracker);
+      new InternalEngine(std::move(callbacks_), std::move(logger_), null_tracker);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
@@ -934,7 +940,10 @@ EngineSharedPtr EngineBuilder::build() {
   if (bootstrap) {
     options->setConfigProto(std::move(bootstrap));
   }
-  ENVOY_BUG(options->setLogLevel(logLevelToString(log_level_)).ok(), "invalid log level");
+  ENVOY_BUG(
+      options->setLogLevel(logLevelToString(static_cast<Envoy::Platform::LogLevel>(log_level_)))
+          .ok(),
+      "invalid log level");
   options->setConcurrency(1);
   envoy_engine->run(options);
 

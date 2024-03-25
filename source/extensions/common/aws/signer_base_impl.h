@@ -76,8 +76,7 @@ public:
         short_date_formatter_(std::string(SignatureConstants::ShortDateFormat)) {
     for (const auto& matcher : matcher_config) {
       excluded_header_matchers_.emplace_back(
-          std::make_unique<
-              Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
               matcher, context));
     }
   }
@@ -139,8 +138,7 @@ protected:
       envoy::type::matcher::v3::StringMatcher m;
       m.set_exact(header);
       matcher_ptrs.emplace_back(
-          std::make_unique<
-              Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
               m, context));
     }
     return matcher_ptrs;
