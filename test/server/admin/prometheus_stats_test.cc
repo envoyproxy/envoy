@@ -297,7 +297,8 @@ TEST_F(PrometheusStatsFormatterTest, SummaryWithNoValuesAndNoTags) {
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+        params, custom_namespaces);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 summary
