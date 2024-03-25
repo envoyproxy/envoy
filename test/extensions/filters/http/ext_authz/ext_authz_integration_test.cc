@@ -229,7 +229,8 @@ public:
     EXPECT_EQ("value_2", attributes->destination().labels().at("label_2"));
 
     if (encodeRawHeaders()) {
-      // verify headers in check request, making sure that duplicate headers
+      EXPECT_FALSE(http_request->headers_size());
+      // Verify headers in check request, making sure that duplicate headers
       // are not merged (since we are encoding the raw headers).
       std::vector<std::pair<absl::string_view, absl::optional<absl::string_view>>> expected_headers{
           {"allowed-prefix-one", "one"},
@@ -274,6 +275,7 @@ public:
                                            key, value == std::nullopt ? "*" : *value);
       }
     } else {
+      EXPECT_FALSE(http_request->has_header_map());
       // verify headers in check request, making sure that duplicate headers
       // are merged.
       EXPECT_EQ("one", (*http_request->mutable_headers())["allowed-prefix-one"]);
