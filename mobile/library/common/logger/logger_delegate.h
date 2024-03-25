@@ -1,12 +1,12 @@
 #pragma once
 
 #include <iostream>
-#include <string>
 
 #include "source/common/common/logger.h"
 
 #include "absl/strings/string_view.h"
 #include "library/common/api/external.h"
+#include "library/common/engine_types.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
@@ -28,7 +28,7 @@ private:
 using EventTrackingDelegatePtr = std::unique_ptr<EventTrackingDelegate>;
 class LambdaDelegate : public EventTrackingDelegate {
 public:
-  LambdaDelegate(envoy_logger logger, DelegatingLogSinkSharedPtr log_sink);
+  LambdaDelegate(std::unique_ptr<EnvoyLogger> logger, DelegatingLogSinkSharedPtr log_sink);
   ~LambdaDelegate() override;
 
   // SinkDelegate
@@ -37,7 +37,7 @@ public:
   void flush() override{};
 
 private:
-  envoy_logger logger_;
+  std::unique_ptr<EnvoyLogger> logger_{nullptr};
 };
 
 // A default log delegate that logs to stderr, mimicking the default used by Envoy

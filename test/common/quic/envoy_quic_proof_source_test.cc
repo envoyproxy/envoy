@@ -9,6 +9,7 @@
 
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/test_runtime.h"
 
@@ -17,6 +18,7 @@
 #include "quiche/quic/core/crypto/certificate_view.h"
 #include "quiche/quic/test_tools/test_certificates.h"
 
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
@@ -71,7 +73,7 @@ public:
     const absl::optional<envoy::config::core::v3::TypedExtensionConfig> nullopt = absl::nullopt;
     ON_CALL(cert_validation_ctx_config_, customValidatorConfig()).WillByDefault(ReturnRef(nullopt));
     auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
-        *store_.rootScope(), client_context_config_, time_system_);
+        *store_.rootScope(), client_context_config_, server_factory_context_);
     ON_CALL(verify_context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(verify_context_, transportSocketOptions())
         .WillByDefault(ReturnRef(transport_socket_options_));
@@ -105,6 +107,7 @@ private:
   NiceMock<Stats::MockStore> store_;
   Event::GlobalTimeSystem time_system_;
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<Ssl::MockCertificateValidationContextConfig> cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
   NiceMock<Ssl::MockContextManager> tls_context_manager_;
@@ -224,7 +227,8 @@ protected:
   Network::MockFilterChainManager filter_chain_manager_;
   Network::MockListenSocket listen_socket_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{time_system_};
+  Server::Configuration::MockServerFactoryContext factory_context_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{factory_context_};
   Ssl::MockServerContextConfig* mock_context_config_;
   std::function<void()> secret_update_callback_;
   std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
@@ -306,10 +310,10 @@ f/lOd5zz2e7Tu2pUtx1sX1tlKph1D0ANpJwxRV78R2hjmynLSl7h4Ual9NMubqkD
 x96rVeUbRJ/qU4//nNM/XQa9vIAIcTZ0jFhmb0c3R4rmoqqC3vkSDwtaE5yuS5T4
 GUy+n0vQNB0cXGzgcGI=
 -----END CERTIFICATE-----)"};
-  EXPECT_THROW_WITH_MESSAGE(expectCertChainAndPrivateKey(cert_with_rsa_1024, false, true),
-                            EnvoyException,
-                            "Failed to load certificate chain from , only RSA certificates with "
-                            "2048-bit or larger keys are supported");
+  EXPECT_THAT_THROWS_MESSAGE(
+      expectCertChainAndPrivateKey(cert_with_rsa_1024, false, true), EnvoyException,
+      HasSubstr("Failed to load certificate chain from , only RSA certificates with "
+                "2048-bit"));
 }
 
 TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {
@@ -391,7 +395,9 @@ protected:
   Network::MockFilterChainManager filter_chain_manager_;
   Network::MockListenSocket listen_socket_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{time_system_};
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{
+      server_factory_context_};
   Ssl::MockServerContextConfig* mock_context_config_;
   std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
   Ssl::MockTlsCertificateConfig tls_cert_config_;

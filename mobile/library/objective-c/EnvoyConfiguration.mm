@@ -1,6 +1,7 @@
 #import "library/objective-c/EnvoyEngine.h"
 
 #import "library/cc/engine_builder.h"
+#import "library/cc/direct_response_testing.h"
 #include "source/common/protobuf/utility.h"
 
 @implementation NSString (CXX)

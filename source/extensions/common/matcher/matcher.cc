@@ -8,7 +8,8 @@ namespace Common {
 namespace Matcher {
 
 void buildMatcher(const envoy::config::common::matcher::v3::MatchPredicate& match_config,
-                  std::vector<MatcherPtr>& matchers) {
+                  std::vector<MatcherPtr>& matchers,
+                  Server::Configuration::CommonFactoryContext& context) {
   // In order to store indexes and build our matcher tree inline, we must reserve a slot where
   // the matcher we are about to create will go. This allows us to know its future index and still
   // construct more of the tree in each called constructor (e.g., multiple OR/AND conditions).
@@ -20,33 +21,33 @@ void buildMatcher(const envoy::config::common::matcher::v3::MatchPredicate& matc
   switch (match_config.rule_case()) {
   case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kOrMatch:
     new_matcher = std::make_unique<SetLogicMatcher>(match_config.or_match(), matchers,
-                                                    SetLogicMatcher::Type::Or);
+                                                    SetLogicMatcher::Type::Or, context);
     break;
   case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kAndMatch:
     new_matcher = std::make_unique<SetLogicMatcher>(match_config.and_match(), matchers,
-                                                    SetLogicMatcher::Type::And);
+                                                    SetLogicMatcher::Type::And, context);
     break;
   case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kNotMatch:
-    new_matcher = std::make_unique<NotMatcher>(match_config.not_match(), matchers);
+    new_matcher = std::make_unique<NotMatcher>(match_config.not_match(), matchers, context);
     break;
   case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kAnyMatch:
     new_matcher = std::make_unique<AnyMatcher>(matchers);
     break;
   case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kHttpRequestHeadersMatch:
     new_matcher = std::make_unique<HttpRequestHeadersMatcher>(
-        match_config.http_request_headers_match(), matchers);
+        match_config.http_request_headers_match(), matchers, context);
     break;
   case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kHttpRequestTrailersMatch:
     new_matcher = std::make_unique<HttpRequestTrailersMatcher>(
-        match_config.http_request_trailers_match(), matchers);
+        match_config.http_request_trailers_match(), matchers, context);
     break;
   case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kHttpResponseHeadersMatch:
     new_matcher = std::make_unique<HttpResponseHeadersMatcher>(
-        match_config.http_response_headers_match(), matchers);
+        match_config.http_response_headers_match(), matchers, context);
     break;
   case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kHttpResponseTrailersMatch:
     new_matcher = std::make_unique<HttpResponseTrailersMatcher>(
-        match_config.http_response_trailers_match(), matchers);
+        match_config.http_response_trailers_match(), matchers, context);
     break;
   case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kHttpRequestGenericBodyMatch:
     new_matcher = std::make_unique<HttpRequestGenericBodyMatcher>(
@@ -66,11 +67,12 @@ void buildMatcher(const envoy::config::common::matcher::v3::MatchPredicate& matc
 
 SetLogicMatcher::SetLogicMatcher(
     const envoy::config::common::matcher::v3::MatchPredicate::MatchSet& configs,
-    std::vector<MatcherPtr>& matchers, Type type)
+    std::vector<MatcherPtr>& matchers, Type type,
+    Server::Configuration::CommonFactoryContext& context)
     : LogicMatcherBase(matchers), matchers_(matchers), type_(type) {
   for (const auto& config : configs.rules()) {
     indexes_.push_back(matchers_.size());
-    buildMatcher(config, matchers_);
+    buildMatcher(config, matchers_, context);
   }
 }
 
@@ -100,9 +102,10 @@ void SetLogicMatcher::updateLocalStatus(MatchStatusVector& statuses,
 }
 
 NotMatcher::NotMatcher(const envoy::config::common::matcher::v3::MatchPredicate& config,
-                       std::vector<MatcherPtr>& matchers)
+                       std::vector<MatcherPtr>& matchers,
+                       Server::Configuration::CommonFactoryContext& context)
     : LogicMatcherBase(matchers), matchers_(matchers), not_index_(matchers.size()) {
-  buildMatcher(config, matchers);
+  buildMatcher(config, matchers, context);
 }
 
 void NotMatcher::updateLocalStatus(MatchStatusVector& statuses,
@@ -118,9 +121,9 @@ void NotMatcher::updateLocalStatus(MatchStatusVector& statuses,
 
 HttpHeaderMatcherBase::HttpHeaderMatcherBase(
     const envoy::config::common::matcher::v3::HttpHeadersMatch& config,
-    const std::vector<MatcherPtr>& matchers)
+    const std::vector<MatcherPtr>& matchers, Server::Configuration::CommonFactoryContext& context)
     : SimpleMatcher(matchers),
-      headers_to_match_(Http::HeaderUtility::buildHeaderDataVector(config.headers())) {}
+      headers_to_match_(Http::HeaderUtility::buildHeaderDataVector(config.headers(), context)) {}
 
 void HttpHeaderMatcherBase::matchHeaders(const Http::HeaderMap& headers,
                                          MatchStatusVector& statuses) const {
