@@ -3790,7 +3790,7 @@ TEST_F(HttpHealthCheckerImplTest, InvalidHost) {
     )EOF";
 
   EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
-                            "Proto constraint validation failed*")
+                          "Proto constraint validation failed*")
 }
 
 TEST_F(HttpHealthCheckerImplTest, InvalidPath) {
@@ -3807,7 +3807,7 @@ TEST_F(HttpHealthCheckerImplTest, InvalidPath) {
     )EOF";
 
   EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
-                            "Proto constraint validation failed*")
+                          "Proto constraint validation failed*")
 }
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {

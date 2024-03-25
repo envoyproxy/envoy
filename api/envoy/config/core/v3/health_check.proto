@@ -99,8 +99,7 @@ message HealthCheck {
 
     // Specifies the HTTP path that will be requested during health checking. For example
     // ``/healthcheck``.
-    string path = 2
-        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE}];
+    string path = 2 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE}];
 
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
