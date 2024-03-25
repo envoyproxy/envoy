@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.access_loggers.fluentd.v3;
 
 import "envoy/config/core/v3/backoff.proto";
+import "envoy/config/core/v3/extension.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -24,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the Fluentd Forward Protocol as described in: `Fluentd Forward Protocol Specification
 // <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 // [#extension: envoy.access_loggers.fluentd]
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message FluentdAccessLogConfig {
   message RetryOptions {
     // The number of times the logger will attempt to connect to the upstream during reconnects.
@@ -85,4 +86,9 @@ message FluentdAccessLogConfig {
   // as specified in the :ref:`RetryOptions <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions>`
   // configuration.
   RetryOptions retry_options = 7;
+
+  // Specifies a collection of Formatter plugins that can be called from the access log configuration.
+  // See the formatters extensions documentation for details.
+  // [#extension-category: envoy.formatter]
+  repeated config.core.v3.TypedExtensionConfig formatters = 8;
 }

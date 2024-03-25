@@ -310,7 +310,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
-    _com_github_intel_ipp_crypto_crypto_mb_fips()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
@@ -359,7 +358,11 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_perfetto()
     _utf8_range()
     _rules_ruby()
-    external_http_archive("com_github_google_flatbuffers")
+    external_http_archive(
+        "com_github_google_flatbuffers",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:flatbuffers.patch"],
+    )
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
@@ -543,33 +546,7 @@ def _com_github_unicode_org_icu():
 def _com_github_intel_ipp_crypto_crypto_mb():
     external_http_archive(
         name = "com_github_intel_ipp_crypto_crypto_mb",
-        # Patch removes from CMakeLists.txt instructions to
-        # to create dynamic *.so library target. Linker fails when linking
-        # with boringssl_fips library. Envoy uses only static library
-        # anyways, so created dynamic library would not be used anyways.
-        patches = [
-            "@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch",
-            "@envoy//bazel/foreign_cc:ipp-crypto-bn2lebinpad.patch",
-        ],
-        patch_args = ["-p1"],
         build_file_content = BUILD_ALL_CONTENT,
-    )
-
-def _com_github_intel_ipp_crypto_crypto_mb_fips():
-    # Temporary fix for building ipp-crypto when boringssl-fips is used.
-    # Build will fail if bn2lebinpad patch is applied. Remove this archive
-    # when upstream dependency fixes this issue.
-    external_http_archive(
-        name = "com_github_intel_ipp_crypto_crypto_mb_fips",
-        # Patch removes from CMakeLists.txt instructions to
-        # to create dynamic *.so library target. Linker fails when linking
-        # with boringssl_fips library. Envoy uses only static library
-        # anyways, so created dynamic library would not be used anyways.
-        patches = ["@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch"],
-        patch_args = ["-p1"],
-        build_file_content = BUILD_ALL_CONTENT,
-        # Use existing ipp-crypto repository location name to avoid redefinition.
-        location_name = "com_github_intel_ipp_crypto_crypto_mb",
     )
 
 def _com_github_intel_qatlib():

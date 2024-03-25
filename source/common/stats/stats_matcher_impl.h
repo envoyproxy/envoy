@@ -20,8 +20,8 @@ namespace Stats {
  */
 class StatsMatcherImpl : public StatsMatcher {
 public:
-  StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig& config,
-                   SymbolTable& symbol_table);
+  StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig& config, SymbolTable& symbol_table,
+                   Server::Configuration::CommonFactoryContext& context);
 
   // Default constructor simply allows everything.
   StatsMatcherImpl() = default;
@@ -52,7 +52,8 @@ private:
   OptRef<SymbolTable> symbol_table_;
   std::unique_ptr<StatNamePool> stat_name_pool_;
 
-  std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>> matchers_;
+  std::vector<Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>
+      matchers_;
   std::vector<StatName> prefixes_;
 };
 

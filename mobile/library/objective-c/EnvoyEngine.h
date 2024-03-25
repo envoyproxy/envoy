@@ -94,8 +94,6 @@ NS_ASSUME_NONNULL_BEGIN
 // Concrete implementation of the `EnvoyEngine` interface.
 @interface EnvoyEngineImpl : NSObject <EnvoyEngine>
 
-@property (nonatomic, copy, nullable) void (^onEngineRunning)();
-
 @end
 
 NS_ASSUME_NONNULL_END

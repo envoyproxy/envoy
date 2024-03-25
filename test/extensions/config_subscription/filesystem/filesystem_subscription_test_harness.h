@@ -71,7 +71,7 @@ public:
     const std::string temp_path = TestEnvironment::writeStringToFileForTest("eds.json.tmp", json);
     TestEnvironment::renameFile(temp_path, path_.path());
     if (run_dispatcher) {
-      on_changed_cb_(Filesystem::Watcher::Events::MovedTo);
+      THROW_IF_NOT_OK(on_changed_cb_(Filesystem::Watcher::Events::MovedTo));
     }
   }
 

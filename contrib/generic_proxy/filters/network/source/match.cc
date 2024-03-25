@@ -17,23 +17,24 @@ REGISTER_FACTORY(PropertyMatchDataInputFactory, Matcher::DataInputFactory<Reques
 
 REGISTER_FACTORY(RequestMatchDataInputFactory, Matcher::DataInputFactory<Request>);
 
-using StringMatcherImpl = Matchers::StringMatcherImpl<StringMatcherProto>;
+using StringMatcherImpl = Matchers::StringMatcherImplWithContext<StringMatcherProto>;
 
-RequestMatchInputMatcher::RequestMatchInputMatcher(const RequestMatcherProto& proto_config) {
+RequestMatchInputMatcher::RequestMatchInputMatcher(
+    const RequestMatcherProto& proto_config, Server::Configuration::CommonFactoryContext& context) {
 
   if (proto_config.has_host()) {
-    host_ = std::make_unique<StringMatcherImpl>(proto_config.host());
+    host_ = std::make_unique<StringMatcherImpl>(proto_config.host(), context);
   }
   if (proto_config.has_path()) {
-    path_ = std::make_unique<StringMatcherImpl>(proto_config.path());
+    path_ = std::make_unique<StringMatcherImpl>(proto_config.path(), context);
   }
   if (proto_config.has_method()) {
-    method_ = std::make_unique<StringMatcherImpl>(proto_config.method());
+    method_ = std::make_unique<StringMatcherImpl>(proto_config.method(), context);
   }
 
   for (const auto& property : proto_config.properties()) {
     properties_.push_back(
-        {property.name(), std::make_unique<StringMatcherImpl>(property.string_match())});
+        {property.name(), std::make_unique<StringMatcherImpl>(property.string_match(), context)});
   }
 }
 
@@ -96,8 +97,8 @@ Matcher::InputMatcherFactoryCb RequestMatchDataInputMatcherFactory::createInputM
   const auto& proto_config = MessageUtil::downcastAndValidate<const RequestMatcherProto&>(
       config, factory_context.messageValidationVisitor());
 
-  return [proto_config]() -> Matcher::InputMatcherPtr {
-    return std::make_unique<RequestMatchInputMatcher>(proto_config);
+  return [proto_config, &factory_context]() -> Matcher::InputMatcherPtr {
+    return std::make_unique<RequestMatchInputMatcher>(proto_config, factory_context);
   };
 }
 

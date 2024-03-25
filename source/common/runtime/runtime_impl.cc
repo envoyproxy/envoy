@@ -576,9 +576,9 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       if (watcher_ == nullptr) {
         watcher_ = dispatcher.createFilesystemWatcher();
       }
-      creation_status = watcher_->addWatch(
-          layer.disk_layer().symlink_root(), Filesystem::Watcher::Events::MovedTo,
-          [this](uint32_t) -> void { THROW_IF_NOT_OK(loadNewSnapshot()); });
+      creation_status = watcher_->addWatch(layer.disk_layer().symlink_root(),
+                                           Filesystem::Watcher::Events::MovedTo,
+                                           [this](uint32_t) { return loadNewSnapshot(); });
       if (!creation_status.ok()) {
         return;
       }

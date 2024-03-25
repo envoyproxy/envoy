@@ -100,7 +100,8 @@ DECLARE_FACTORY(MobileHttpConnectionManagerFilterConfigFactory);
 class InternalAddressConfig : public Http::InternalAddressConfig {
 public:
   InternalAddressConfig(const envoy::extensions::filters::network::http_connection_manager::v3::
-                            HttpConnectionManager::InternalAddressConfig& config);
+                            HttpConnectionManager::InternalAddressConfig& config,
+                        absl::Status& creation_status);
 
   bool isInternalAddress(const Network::Address::Instance& address) const override {
     if (address.type() == Network::Address::Type::Pipe) {
@@ -134,7 +135,7 @@ public:
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
       Tracing::TracerManager& tracer_manager,
-      FilterConfigProviderManager& filter_config_provider_manager);
+      FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status);
 
   // Http::FilterChainFactory
   bool createFilterChain(
@@ -406,9 +407,9 @@ public:
    * @param date_provider the singleton used in config creation.
    * @param route_config_provider_manager the singleton used in config creation.
    * @param scoped_routes_config_provider_manager the singleton used in config creation.
-   * @return a shared_ptr to the created config object.
+   * @return a shared_ptr to the created config object or a creation error
    */
-  static std::shared_ptr<HttpConnectionManagerConfig> createConfig(
+  static absl::StatusOr<std::shared_ptr<HttpConnectionManagerConfig>> createConfig(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,

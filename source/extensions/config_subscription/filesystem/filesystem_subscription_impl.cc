@@ -32,6 +32,7 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
           if (started_) {
             refresh();
           }
+          return absl::OkStatus();
         }));
   } else {
     directory_watcher_ =
@@ -40,6 +41,7 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
       if (started_) {
         refresh();
       }
+      return absl::OkStatus();
     });
   }
 }

@@ -77,16 +77,5 @@ public:
 
 using ContextManagerPtr = std::unique_ptr<ContextManager>;
 
-class ContextManagerFactory : public Config::UntypedFactory {
-public:
-  ~ContextManagerFactory() override = default;
-  virtual ContextManagerPtr
-  createContextManager(Server::Configuration::CommonFactoryContext& factory_context) PURE;
-
-  // There could be only one factory thus the name is static.
-  std::string name() const override { return "ssl_context_manager"; }
-  std::string category() const override { return "envoy.ssl_context_manager"; }
-};
-
 } // namespace Ssl
 } // namespace Envoy

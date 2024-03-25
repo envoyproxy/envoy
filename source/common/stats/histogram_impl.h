@@ -20,7 +20,8 @@ namespace Stats {
 class HistogramSettingsImpl : public HistogramSettings {
 public:
   HistogramSettingsImpl() = default;
-  HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config);
+  HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                        Server::Configuration::CommonFactoryContext& context);
 
   // HistogramSettings
   const ConstSupportedBuckets& buckets(absl::string_view stat_name) const override;
@@ -28,8 +29,9 @@ public:
   static ConstSupportedBuckets& defaultBuckets();
 
 private:
-  using Config = std::pair<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>,
-                           ConstSupportedBuckets>;
+  using Config =
+      std::pair<Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>,
+                ConstSupportedBuckets>;
   const std::vector<Config> configs_{};
 };
 

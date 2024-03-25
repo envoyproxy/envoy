@@ -17,15 +17,15 @@ namespace Envoy {
 namespace Http {
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Stats::Store& stats_store, Event::Dispatcher& dispatcher,
-                                 const LocalInfo::LocalInfo& local_info,
-                                 Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                                 Random::RandomGenerator& random,
+                                 Upstream::ClusterManager& cm,
+                                 Server::Configuration::CommonFactoryContext& factory_context,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context, Router::Context& router_context)
-    : singleton_manager_(cm.clusterManagerFactory().singletonManager()), cluster_(cluster),
-      config_(http_context.asyncClientStatPrefix(), local_info, *stats_store.rootScope(), cm,
-              runtime, random, std::move(shadow_writer), true, false, false, false, false, false,
-              {}, dispatcher.timeSource(), http_context, router_context),
+    : factory_context_(factory_context), cluster_(cluster),
+      config_(factory_context, http_context.asyncClientStatPrefix(), factory_context.localInfo(),
+              *stats_store.rootScope(), cm, factory_context.runtime(),
+              factory_context.api().randomGenerator(), std::move(shadow_writer), true, false, false,
+              false, false, false, {}, dispatcher.timeSource(), http_context, router_context),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -77,11 +77,14 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
 }
 
 std::unique_ptr<const Router::RetryPolicy>
-createRetryPolicy(AsyncClientImpl& parent, const AsyncClient::StreamOptions& options) {
+createRetryPolicy(AsyncClientImpl& parent, const AsyncClient::StreamOptions& options,
+                  Server::Configuration::CommonFactoryContext& context) {
   if (options.retry_policy.has_value()) {
-    Upstream::RetryExtensionFactoryContextImpl factory_context(parent.singleton_manager_);
-    return std::make_unique<Router::RetryPolicyImpl>(
-        options.retry_policy.value(), ProtobufMessage::getNullValidationVisitor(), factory_context);
+    Upstream::RetryExtensionFactoryContextImpl factory_context(
+        parent.factory_context_.singletonManager());
+    return std::make_unique<Router::RetryPolicyImpl>(options.retry_policy.value(),
+                                                     ProtobufMessage::getNullValidationVisitor(),
+                                                     factory_context, context);
   }
   if (options.parsed_retry_policy == nullptr) {
     return std::make_unique<Router::RetryPolicyImpl>();
@@ -96,7 +99,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
               parent.config_.async_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),
-      retry_policy_(createRetryPolicy(parent, options)),
+      retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_)),
       route_(std::make_shared<NullRouteImpl>(
           parent_.cluster_->name(),
           retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy, options.timeout,

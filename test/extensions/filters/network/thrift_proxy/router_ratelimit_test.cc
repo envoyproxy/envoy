@@ -320,10 +320,11 @@ public:
     envoy::config::route::v3::RateLimit rate_limit;
     TestUtility::loadFromYaml(yaml, rate_limit);
 
-    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(rate_limit);
+    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(rate_limit, context_);
     descriptors_.clear();
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
   MessageMetadata metadata_;
   NiceMock<MockRouteEntry> route_;
