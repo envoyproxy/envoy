@@ -33,7 +33,7 @@ If there is a protocol error or an unsupported address family
 Statistics
 ----------
 
-This filter emits the following general statistics, rooted at *listener.<stat_prefix>.downstream_cx_proxy_proto*
+This filter emits the following general statistics, rooted at *downstream_cx_proxy_proto*
 
 .. csv-table::
   :header: Name, Type, Description
@@ -43,7 +43,7 @@ This filter emits the following general statistics, rooted at *listener.<stat_pr
   not_found_allowed, Counter, "Total number of connections that don't contain the PROXY protocol header, but are allowed due to :ref:`allow_requests_without_proxy_protocol <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>`."
 
 
-The filter also emits the statistics rooted at *listener.<stat_prefix>.downstream_cx_proxy_proto.versions.<version>*
+The filter also emits the statistics rooted at *downstream_cx_proxy_proto.versions.<version>*
 for each matched PROXY protocol version. Proxy protocol versions include ``v1`` and ``v2``.
 
 .. csv-table::
@@ -64,4 +64,4 @@ The filter also emits the following legacy statistics, rooted at its own scope:
 
 .. attention::
   The legacy statistics are deprecated and kept for backwards compatibility.
-  Prefer using the other statistics above, which are emitted on a per-listener basis and are more detailed.
+  Prefer using the other statistics above, which are more detailed.

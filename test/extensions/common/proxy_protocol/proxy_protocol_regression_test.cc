@@ -80,9 +80,7 @@ public:
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
   bool continueOnListenerFiltersTimeout() const override { return false; }
-  Stats::Scope& listenerScope() override {
-    return *stats_store_.createScope("listener.test_listener");
-  }
+  Stats::Scope& listenerScope() override { return *stats_store_.rootScope(); }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
   Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
@@ -122,7 +120,7 @@ public:
               nullptr,
               std::make_unique<ListenerFilters::ProxyProtocol::Filter>(
                   std::make_shared<ListenerFilters::ProxyProtocol::Config>(
-                      *stats_store_.rootScope(), listenerScope(),
+                      listenerScope(),
                       envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol())));
           maybeExitDispatcher();
           return true;

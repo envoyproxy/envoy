@@ -466,11 +466,8 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   Tag proxy_protocol_version;
   proxy_protocol_version.name_ = tag_names.PROXY_PROTOCOL_VERSION;
   proxy_protocol_version.value_ = "v2";
-
-  listener_address.value_ = "[__1]_443";
-  regex_tester.testRegex("listener.[__1]_443.downstream_cx_proxy_proto.versions.v2.error",
-                         "listener.downstream_cx_proxy_proto.versions.error",
-                         {listener_address, proxy_protocol_version});
+  regex_tester.testRegex("downstream_cx_proxy_proto.versions.v2.error",
+                         "downstream_cx_proxy_proto.versions.error", {proxy_protocol_version});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {

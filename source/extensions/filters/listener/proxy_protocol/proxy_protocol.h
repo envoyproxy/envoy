@@ -28,12 +28,13 @@ enum class ProxyProtocolVersion { NotFound = 0, V1 = 1, V2 = 2 };
 enum class ReadOrParseState { Done, TryAgainLater, Error, Denied };
 
 /**
- * Legacy stats that are under the root scope. Kept for backwards compatibility.
+ * Legacy stats that are under the root scope, not under the filter's scope.
+ * Kept for backwards compatibility.
  * @deprecated Use GeneralProxyProtocolStats instead.
  * @see stats_macros.h
  */
 // clang-format off
-#define LEGACY_PROXY_PROTOCOL_STATS(COUNTER)                                                          \
+#define LEGACY_PROXY_PROTOCOL_STATS(COUNTER)                                          \
   COUNTER(downstream_cx_proxy_proto_error)
 // clang-format on
 
@@ -42,11 +43,11 @@ struct LegacyProxyProtocolStats {
 };
 
 /**
- * Stats reported for the filter.
+ * Stats reported for the filter, rooted under the filter's scope.
  * @see stats_macros.h
  */
 // clang-format off
-#define GENERAL_PROXY_PROTOCOL_STATS(COUNTER)                                                          \
+#define GENERAL_PROXY_PROTOCOL_STATS(COUNTER)                                         \
   COUNTER(not_found_allowed)                                                          \
   COUNTER(not_found_disallowed)
 // clang-format on
@@ -66,8 +67,8 @@ struct GeneralProxyProtocolStats {
  */
 // clang-format off
 #define VERSIONED_PROXY_PROTOCOL_STATS(COUNTER)  \
-  COUNTER(found)                               \
-  COUNTER(disallowed)                                \
+  COUNTER(found)                                 \
+  COUNTER(disallowed)                            \
   COUNTER(error)
 // clang-format on
 
@@ -92,10 +93,10 @@ struct ProxyProtocolStats {
   /**
    * Create an instance of the stats struct with all stats for the filter.
    *
-   * For backwards compatibility, the legacy stats are rooted at this filter's own scope.
-   * The general and versioned stats are correctly rooted at the listener's scope.
+   * For backwards compatibility, the legacy stats are rooted under their own scope.
+   * The general and versioned stats are correctly rooted at this filter's own scope.
    */
-  static ProxyProtocolStats create(Stats::Scope& scope, Stats::Scope& listener_scope);
+  static ProxyProtocolStats create(Stats::Scope& scope);
 };
 
 /**
@@ -104,7 +105,7 @@ struct ProxyProtocolStats {
 class Config : public Logger::Loggable<Logger::Id::filter> {
 public:
   Config(
-      Stats::Scope& scope, Stats::Scope& listener_scope,
+      Stats::Scope& scope,
       const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config);
 
   ProxyProtocolStats stats_;
