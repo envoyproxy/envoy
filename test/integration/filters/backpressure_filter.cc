@@ -11,8 +11,8 @@
 namespace Envoy {
 
 // A filter triggers above watermark when it receives request headers from
-// the downstream, and triggers below watermark if the response body has
-// passed through the filter or the filter is being destroyed.
+// the downstream, and triggers below watermark when the response body has
+// passed through the filter or when the filter is being destroyed.
 class BackpressureFilter : public Http::PassThroughFilter {
 public:
   void onDestroy() override {
