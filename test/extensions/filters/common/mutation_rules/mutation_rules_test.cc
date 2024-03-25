@@ -26,12 +26,15 @@ struct MutationTestCase {
   CheckResult special_result;
 };
 
-using EmptyRulesTest = testing::TestWithParam<MutationTestCase>;
+class EmptyRulesTest : public testing::TestWithParam<MutationTestCase> {
+public:
+  Regex::GoogleReEngine regex_engine_;
+};
 
 TEST_P(EmptyRulesTest, TestDefaultConfig) {
   const auto& test_case = GetParam();
   HeaderMutationRules rules;
-  Checker checker(rules);
+  Checker checker(rules, regex_engine_);
   EXPECT_EQ(
       checker.check(test_case.op, LowerCaseString(test_case.header_name), test_case.header_value),
       test_case.default_result);
@@ -41,7 +44,7 @@ TEST_P(EmptyRulesTest, TestDisallowAll) {
   const auto& test_case = GetParam();
   HeaderMutationRules rules;
   rules.mutable_disallow_all()->set_value(true);
-  Checker checker(rules);
+  Checker checker(rules, regex_engine_);
   // With this config, no headers are allowed
   EXPECT_EQ(
       checker.check(test_case.op, LowerCaseString(test_case.header_name), test_case.header_value),
@@ -53,7 +56,7 @@ TEST_P(EmptyRulesTest, TestDisallowAllAndFail) {
   HeaderMutationRules rules;
   rules.mutable_disallow_all()->set_value(true);
   rules.mutable_disallow_is_error()->set_value(true);
-  Checker checker(rules);
+  Checker checker(rules, regex_engine_);
   // With this config, no headers are allowed
   EXPECT_EQ(
       checker.check(test_case.op, LowerCaseString(test_case.header_name), test_case.header_value),
@@ -64,7 +67,7 @@ TEST_P(EmptyRulesTest, TestAllowRouting) {
   const auto& test_case = GetParam();
   HeaderMutationRules rules;
   rules.mutable_allow_all_routing()->set_value(true);
-  Checker checker(rules);
+  Checker checker(rules, regex_engine_);
   EXPECT_EQ(
       checker.check(test_case.op, LowerCaseString(test_case.header_name), test_case.header_value),
       test_case.allow_routing_result);
@@ -74,7 +77,7 @@ TEST_P(EmptyRulesTest, TestNoSystem) {
   const auto& test_case = GetParam();
   HeaderMutationRules rules;
   rules.mutable_disallow_system()->set_value(true);
-  Checker checker(rules);
+  Checker checker(rules, regex_engine_);
   EXPECT_EQ(
       checker.check(test_case.op, LowerCaseString(test_case.header_name), test_case.header_value),
       test_case.no_system_result);
@@ -84,7 +87,7 @@ TEST_P(EmptyRulesTest, TestAllowEnvoy) {
   const auto& test_case = GetParam();
   HeaderMutationRules rules;
   rules.mutable_allow_envoy()->set_value(true);
-  Checker checker(rules);
+  Checker checker(rules, regex_engine_);
   EXPECT_EQ(
       checker.check(test_case.op, LowerCaseString(test_case.header_name), test_case.header_value),
       test_case.allow_envoy_result);
@@ -97,7 +100,7 @@ TEST_P(EmptyRulesTest, TestSpecial) {
   rules.mutable_disallow_expression()->set_regex("^x-special-one$");
   rules.mutable_allow_expression()->mutable_google_re2();
   rules.mutable_allow_expression()->set_regex("^x-special-two$");
-  Checker checker(rules);
+  Checker checker(rules, regex_engine_);
   EXPECT_EQ(
       checker.check(test_case.op, LowerCaseString(test_case.header_name), test_case.header_value),
       test_case.special_result);

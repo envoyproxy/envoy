@@ -74,10 +74,12 @@ absl::flat_hash_set<std::string> generateAllowContentTypes(
 }
 
 Regex::CompiledMatcherPtr generateAllowContentTypeRegexs(
-    const envoy::type::matcher::v3::RegexMatcher& proto_allow_content_types_regex) {
+    const envoy::type::matcher::v3::RegexMatcher& proto_allow_content_types_regex,
+    Regex::Engine& regex_engine) {
 
   Regex::CompiledMatcherPtr allow_content_types_regex;
-  allow_content_types_regex = Regex::Utility::parseRegex(proto_allow_content_types_regex);
+  allow_content_types_regex =
+      Regex::Utility::parseRegex(proto_allow_content_types_regex, regex_engine);
 
   return allow_content_types_regex;
 }
@@ -106,7 +108,7 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
-    Stats::Scope& scope)
+    Stats::Scope& scope, Regex::Engine& regex_engine)
     : rqstats_{ALL_JSON_TO_METADATA_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "json_to_metadata.rq"))},
       respstats_{
@@ -122,12 +124,12 @@ FilterConfig::FilterConfig(
       request_allow_content_types_regex_(
           proto_config.request_rules().has_allow_content_types_regex()
               ? generateAllowContentTypeRegexs(
-                    proto_config.request_rules().allow_content_types_regex())
+                    proto_config.request_rules().allow_content_types_regex(), regex_engine)
               : nullptr),
       response_allow_content_types_regex_(
           proto_config.response_rules().has_allow_content_types_regex()
               ? generateAllowContentTypeRegexs(
-                    proto_config.response_rules().allow_content_types_regex())
+                    proto_config.response_rules().allow_content_types_regex(), regex_engine)
               : nullptr) {
   if (request_rules_.empty() && response_rules_.empty()) {
     throw EnvoyException("json_to_metadata_filter: Per filter configs must at least specify "

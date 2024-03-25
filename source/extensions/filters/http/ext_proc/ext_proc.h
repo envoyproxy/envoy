@@ -122,6 +122,27 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
 };
 
+// Changes to headers are normally tested against the MutationRules supplied
+// with configuration. When writing an immediate response message, however,
+// we want to support a more liberal set of rules so that filters can create
+// custom error messages, and we want to prevent the MutationRules in the
+// configuration from making that impossible. This is a fixed, permissive
+// set of rules for that purpose.
+class ImmediateMutationChecker {
+public:
+  ImmediateMutationChecker(Regex::Engine& regex_engine) {
+    envoy::config::common::mutation_rules::v3::HeaderMutationRules rules;
+    rules.mutable_allow_all_routing()->set_value(true);
+    rules.mutable_allow_envoy()->set_value(true);
+    rule_checker_ = std::make_unique<Filters::Common::MutationRules::Checker>(rules, regex_engine);
+  }
+
+  const Filters::Common::MutationRules::Checker& checker() const { return *rule_checker_; }
+
+private:
+  std::unique_ptr<Filters::Common::MutationRules::Checker> rule_checker_;
+};
+
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
@@ -134,7 +155,8 @@ public:
         disable_clear_route_cache_(config.disable_clear_route_cache()),
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-        processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
+        processing_mode_(config.processing_mode()),
+        mutation_checker_(config.mutation_rules(), context.regexEngine()),
         filter_metadata_(config.filter_metadata()),
         allow_mode_override_(config.allow_mode_override()),
         disable_immediate_response_(config.disable_immediate_response()),
@@ -151,7 +173,8 @@ public:
             config.metadata_options().receiving_namespaces().untyped().begin(),
             config.metadata_options().receiving_namespaces().untyped().end()),
         expression_manager_(builder, context.localInfo(), config.request_attributes(),
-                            config.response_attributes()) {}
+                            config.response_attributes()),
+        immediate_mutation_checker_(context.regexEngine()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -195,6 +218,10 @@ public:
     return untyped_receiving_namespaces_;
   }
 
+  const ImmediateMutationChecker& immediateMutationChecker() const {
+    return immediate_mutation_checker_;
+  }
+
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
@@ -225,6 +252,8 @@ private:
   const std::vector<std::string> untyped_receiving_namespaces_;
 
   const ExpressionManager expression_manager_;
+
+  const ImmediateMutationChecker immediate_mutation_checker_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

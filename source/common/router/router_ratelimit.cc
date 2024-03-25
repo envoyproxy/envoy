@@ -229,11 +229,12 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
 }
 
 HeaderValueMatchAction::HeaderValueMatchAction(
-    const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action)
+    const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
+    Server::Configuration::CommonFactoryContext& context)
     : descriptor_value_(action.descriptor_value()),
       descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "header_match"),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
-      action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers())) {}
+      action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers(), context)) {}
 
 bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                                 const std::string&,
@@ -248,11 +249,12 @@ bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& desc
 }
 
 QueryParameterValueMatchAction::QueryParameterValueMatchAction(
-    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action)
+    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
+    Server::Configuration::CommonFactoryContext& context)
     : descriptor_value_(action.descriptor_value()),
       descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "query_match"),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
-      action_query_parameters_(buildQueryParameterMatcherVector(action)) {}
+      action_query_parameters_(buildQueryParameterMatcherVector(action, context)) {}
 
 bool QueryParameterValueMatchAction::populateDescriptor(
     RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
@@ -270,10 +272,11 @@ bool QueryParameterValueMatchAction::populateDescriptor(
 
 std::vector<ConfigUtility::QueryParameterMatcherPtr>
 QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
-    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action) {
+    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
+    Server::Configuration::CommonFactoryContext& context) {
   std::vector<ConfigUtility::QueryParameterMatcherPtr> ret;
   for (const auto& query_parameter : action.query_parameters()) {
-    ret.push_back(std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter));
+    ret.push_back(std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, context));
   }
   return ret;
 }
@@ -307,7 +310,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       actions_.emplace_back(new MetaDataAction(action.metadata()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kHeaderValueMatch:
-      actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));
+      actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match(), context));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kExtension: {
       ProtobufMessage::ValidationVisitor& validator = context.messageValidationVisitor();
@@ -346,7 +349,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::
         kQueryParameterValueMatch:
       actions_.emplace_back(
-          new QueryParameterValueMatchAction(action.query_parameter_value_match()));
+          new QueryParameterValueMatchAction(action.query_parameter_value_match(), context));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
       PANIC_DUE_TO_CORRUPT_ENUM;

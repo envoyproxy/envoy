@@ -162,9 +162,10 @@ TagNameValues::TagNameValues() {
   // listener.<address|stat_prefix>.(worker_<id>.)*
   // listener_manager.(worker_<id>.)*
   // server.(worker_<id>.)*
+  // thread_local_cluster_manager.(worker_<id>.)*
   addRe2(
       WORKER_ID,
-      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)\.|server\.|listener_manager\.)worker_((\d+)\.))",
+      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)|server|listener_manager|thread_local_cluster_manager)\.worker_((\d+)\.))",
       "");
 
   // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
