@@ -189,8 +189,7 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalCache> tls_;
   // async fetcher
   JwksAsyncFetcherPtr async_fetcher_;
-  absl::optional<Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>
-      sub_matcher_;
+  absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>> sub_matcher_;
   absl::optional<absl::Duration> max_exp_;
 };
 
