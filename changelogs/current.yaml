@@ -239,7 +239,7 @@ new_features:
     signatures after the forwarding stage has completed, particularly if the path element is modified.
 - area: aws_lambda
   change: |
-    Refactor aws_lambda configuration to move signer inside the config. This allows to add signature algorithm and
+    Refactor aws_lambda configuration to make signer part of filter setting. This allows to add signature algorithm and
     other providers configurations.
 - area: grpc reverse bridge
   change: |
