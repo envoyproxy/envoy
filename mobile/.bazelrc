@@ -50,7 +50,7 @@ build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
 # Disable global index store to work around https://github.com/buildbuddy-io/rules_xcodeproj/issues/1878
 build:rules_xcodeproj --features=-swift.use_global_index_store
 
-# Override PGV validation with NOP functions
+# Override PGV validation with NOP functions for binary size savings.
 build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
 
 build:mobile-dbg-common --compilation_mode=dbg
@@ -264,7 +264,6 @@ test:mobile-remote-ci-android --config=mobile-remote-ci
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
-test:mobile-remote-ci-cc --copt=-DUSE_API_LISTENER
 
 build:mobile-remote-ci-cc-no-yaml --config=mobile-remote-ci
 build:mobile-remote-ci-cc-no-yaml --define=envoy_yaml=disabled
@@ -279,18 +278,15 @@ build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
 build:mobile-remote-ci-cc-test --config=mobile-remote-ci
 test:mobile-remote-ci-cc-test --test_output=all
 test:mobile-remote-ci-cc-test --config=mobile-remote-ci
-test:mobile-remote-ci-cc-test --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
 test:mobile-remote-ci-cc-test --define=envoy_yaml=disabled
 
 build:mobile-remote-ci-macos-kotlin --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-kotlin --fat_apk_cpu=x86_64
 build:mobile-remote-ci-macos-kotlin --define=envoy_yaml=disabled
-build:mobile-remote-ci-macos-kotlin --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
 
 build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-swift --config=mobile-test-ios
 build:mobile-remote-ci-macos-swift --@envoy//bazel:http3=False
-build:mobile-remote-ci-macos-swift --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
 
 build:mobile-remote-ci-core --config=mobile-remote-ci
 test:mobile-remote-ci-core --build_tests_only
