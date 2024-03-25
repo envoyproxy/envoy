@@ -379,7 +379,7 @@ new_features:
     to enforce the filter only matches specific PROXY protocol versions.
 - area: proxy_protocol
   change: |
-    Added new statistics to the proxy protocol filter to track connections allowed/denied/error by PROXY protocol version.
+    Added new statistics to the proxy protocol filter to track connections found/disallowed/errored by PROXY protocol version.
 - area: rbac
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
