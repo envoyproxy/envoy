@@ -33,24 +33,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
 
 // JniLibrary
 
-static void jvm_on_log(envoy_log_level log_level, envoy_data data, const void* context) {
-  if (context == nullptr) {
-    return;
-  }
-
-  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
-  Envoy::JNI::LocalRefUniquePtr<jstring> str = Envoy::JNI::envoyDataToJavaString(jni_helper, data);
-
-  jobject j_context = static_cast<jobject>(const_cast<void*>(context));
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmLoggerContext =
-      jni_helper.getObjectClass(j_context);
-  jmethodID jmid_onLog =
-      jni_helper.getMethodId(jcls_JvmLoggerContext.get(), "log", "(ILjava/lang/String;)V");
-  jni_helper.callVoidMethod(j_context, jmid_onLog, log_level, str.get());
-
-  release_envoy_data(data);
-}
-
 static void jvm_on_track(envoy_map events, const void* context) {
   if (context == nullptr) {
     return;
@@ -70,20 +52,18 @@ static void jvm_on_track(envoy_map events, const void* context) {
   release_envoy_map(events);
 }
 
-extern "C" JNIEXPORT jint JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jclass, jint level) {
   Envoy::Logger::Context::changeAllLogLevels(static_cast<spdlog::level::level_enum>(level));
-  return 0;
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(
     JNIEnv* env, jclass, jobject on_start_context, jobject envoy_logger_context,
     jobject j_event_tracker) {
-  std::unique_ptr<Envoy::InternalEngineCallbacks> callbacks =
-      std::make_unique<Envoy::InternalEngineCallbacks>();
 
   jobject retained_on_start_context =
       env->NewGlobalRef(on_start_context); // Required to keep context in memory
+  std::unique_ptr<Envoy::EngineCallbacks> callbacks = std::make_unique<Envoy::EngineCallbacks>();
   callbacks->on_engine_running = [retained_on_start_context] {
     Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
     Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmonEngineRunningContext =
@@ -97,7 +77,6 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
     jni_helper.getEnv()->DeleteGlobalRef(retained_on_start_context);
   };
-
   callbacks->on_exit = [] {
     // Note that this is not dispatched because the thread that
     // needs to be detached is the engine thread.
@@ -107,10 +86,22 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   };
 
   const jobject retained_logger_context = env->NewGlobalRef(envoy_logger_context);
-  envoy_logger logger = {nullptr, nullptr, nullptr};
-  if (envoy_logger_context != nullptr) {
-    logger = envoy_logger{jvm_on_log, Envoy::JNI::jniDeleteConstGlobalRef, retained_logger_context};
-  }
+  std::unique_ptr<Envoy::EnvoyLogger> logger = std::make_unique<Envoy::EnvoyLogger>();
+  logger->on_log = [retained_logger_context](Envoy::Logger::Logger::Levels level,
+                                             const std::string& message) {
+    Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
+    Envoy::JNI::LocalRefUniquePtr<jstring> java_message = jni_helper.newStringUtf(message.c_str());
+    jint java_level = static_cast<jint>(level);
+    Envoy::JNI::LocalRefUniquePtr<jclass> java_envoy_logger_class =
+        jni_helper.getObjectClass(retained_logger_context);
+    jmethodID java_log_method_id =
+        jni_helper.getMethodId(java_envoy_logger_class.get(), "log", "(ILjava/lang/String;)V");
+    jni_helper.callVoidMethod(retained_logger_context, java_log_method_id, java_level,
+                              java_message.get());
+  };
+  logger->on_exit = [retained_logger_context] {
+    Envoy::JNI::getEnv()->DeleteGlobalRef(retained_logger_context);
+  };
 
   envoy_event_tracker event_tracker = {nullptr, nullptr};
   if (j_event_tracker != nullptr) {
@@ -122,7 +113,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   }
 
   return reinterpret_cast<intptr_t>(
-      new Envoy::InternalEngine(std::move(callbacks), logger, event_tracker));
+      new Envoy::InternalEngine(std::move(callbacks), std::move(logger), event_tracker));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(

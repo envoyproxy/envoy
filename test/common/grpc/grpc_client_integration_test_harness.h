@@ -335,14 +335,14 @@ public:
     EXPECT_CALL(*mock_host_, cluster())
         .WillRepeatedly(ReturnRef(*cm_.thread_local_cluster_.cluster_.info_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
-    http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, random_, host_ptr_,
-                                                    Upstream::ResourcePriority::Default, nullptr,
-                                                    nullptr, state_);
+    http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, api_->randomGenerator(),
+                                                    host_ptr_, Upstream::ResourcePriority::Default,
+                                                    nullptr, nullptr, state_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, local_info_, cm_,
-        runtime_, random_, std::move(shadow_writer_ptr_), http_context_, router_context_);
+        cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, cm_,
+        server_factory_context_, std::move(shadow_writer_ptr_), http_context_, router_context_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .WillRepeatedly(ReturnRef(*http_async_client_));
     envoy::config::core::v3::GrpcService config;
@@ -507,12 +507,9 @@ public:
   // Fake/mock infrastructure for Grpc::AsyncClientImpl upstream.
   Upstream::ClusterConnectivityState state_;
   Network::TransportSocketPtr async_client_transport_socket_{new Network::RawBufferSocket()};
-  Upstream::MockClusterManager cm_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Runtime::MockLoader runtime_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
-  NiceMock<Random::MockRandomGenerator> random_;
+  Upstream::MockClusterManager& cm_{server_factory_context_.cluster_manager_};
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
   Http::ContextImpl http_context_;
@@ -534,6 +531,7 @@ public:
   GrpcSslClientIntegrationTest() {
     ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(server_factory_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(*dispatcher_));
   }
   void TearDown() override {
     // Reset some state in the superclass before we destruct context_manager_ in our destructor, it

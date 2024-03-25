@@ -125,7 +125,7 @@ bool shouldIncludeEdsInDump(const Http::Utility::QueryParamsMulti& params) {
 }
 
 absl::StatusOr<Matchers::StringMatcherPtr>
-buildNameMatcher(const Http::Utility::QueryParamsMulti& params) {
+buildNameMatcher(const Http::Utility::QueryParamsMulti& params, Regex::Engine& engine) {
   const auto name_regex = params.getFirstValue("name_regex");
   if (!name_regex.has_value() || name_regex->empty()) {
     return std::make_unique<Matchers::UniversalStringMatcher>();
@@ -134,7 +134,7 @@ buildNameMatcher(const Http::Utility::QueryParamsMulti& params) {
   *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
   matcher.set_regex(*name_regex);
   TRY_ASSERT_MAIN_THREAD
-  return Regex::Utility::parseRegex(matcher);
+  return Regex::Utility::parseRegex(matcher, engine);
   END_TRY
   catch (EnvoyException& e) {
     return absl::InvalidArgumentError(
@@ -154,7 +154,8 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
   const auto resource = query_params.getFirstValue("resource");
   const auto mask = query_params.getFirstValue("mask");
   const bool include_eds = shouldIncludeEdsInDump(query_params);
-  const absl::StatusOr<Matchers::StringMatcherPtr> name_matcher = buildNameMatcher(query_params);
+  const absl::StatusOr<Matchers::StringMatcherPtr> name_matcher =
+      buildNameMatcher(query_params, server_.regexEngine());
   if (!name_matcher.ok()) {
     response.add(name_matcher.status().ToString());
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
