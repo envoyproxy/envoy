@@ -229,7 +229,8 @@ TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
   EXPECT_EQ(1, envoy_quic_session_->GetNumActiveStreams());
   EXPECT_EQ(16, envoy_quic_session_->numPacketsExpectedPerEventLoop());
 
-  EnvoyQuicClientStream& stream2 = sendGetRequest(response_decoder, stream_callbacks);
+  NiceMock<Http::MockStreamCallbacks> stream_callbacks2;
+  EnvoyQuicClientStream& stream2 = sendGetRequest(response_decoder, stream_callbacks2);
   EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ("200", decoded_headers->getStatusValue());

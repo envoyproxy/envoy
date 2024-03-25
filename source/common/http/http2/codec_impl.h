@@ -310,7 +310,7 @@ protected:
     // sendPendingFrames so pending outbound frames have one final chance to be flushed. If we
     // submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
     virtual bool useDeferredReset() const PURE;
-    virtual OptRef<StreamDecoder> decoder() PURE;
+    virtual StreamDecoder& decoder() PURE;
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
     virtual HeaderMapPtr cloneTrailers(const HeaderMap& trailers) PURE;
@@ -515,28 +515,13 @@ protected:
   /**
    * Client side stream (request).
    */
-  struct ClientStreamImpl : public StreamImpl,
-                            public RequestEncoder,
-                            public StreamDecoder::DestructionCallback {
+  struct ClientStreamImpl : public StreamImpl, public RequestEncoder {
     ClientStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit,
                      ResponseDecoder& response_decoder)
-        : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder),
+        : StreamImpl(parent, buffer_limit), response_decoder_handle_(response_decoder.getHandle()),
           headers_or_trailers_(
-              ResponseHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_)) {
-      response_decoder.setDestructionCallback(this);
-    }
+              ResponseHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_)) {}
 
-    ~ClientStreamImpl() override {
-      if (response_decoder_.has_value()) {
-        response_decoder_->setDestructionCallback(nullptr);
-      }
-    }
-
-    // StreamDecoder::DestructionCallback
-    void onDecoderDestruction(DestructionStatePtr state) override {
-      response_decoder_.reset();
-      StreamDecoder::DestructionCallback::onDecoderDestruction(std::move(state));
-    }
     // Http::MultiplexedStreamImplBase
     // Client streams do not need a flush timer because we currently assume that any failure
     // to flush would be covered by a request/stream/etc. timeout.
@@ -552,7 +537,12 @@ protected:
     HeadersState headersState() const override { return headers_state_; }
     // Do not use deferred reset on upstream connections.
     bool useDeferredReset() const override { return false; }
-    OptRef<StreamDecoder> decoder() override { return response_decoder_; }
+    StreamDecoder& decoder() override {
+      RELEASE_ASSERT(
+          response_decoder_handle_ != nullptr && response_decoder_handle_->ptr() != nullptr,
+          "Trying to access to the decoder without a handle or the decoder has been destroyed.");
+      return *response_decoder_handle_->ptr();
+    }
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
@@ -587,7 +577,7 @@ protected:
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
 
-    OptRef<ResponseDecoder> response_decoder_;
+    ResponseDecoderHandleSharedPtr response_decoder_handle_;
     absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
     std::string upgrade_type_;
     HeadersState headers_state_ = HeadersState::Response;
@@ -598,19 +588,12 @@ protected:
   /**
    * Server side stream (response).
    */
-  struct ServerStreamImpl : public StreamImpl,
-                            public ResponseEncoder,
-                            public StreamDecoder::DestructionCallback {
+  struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
         : StreamImpl(parent, buffer_limit),
           headers_or_trailers_(
               RequestHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_)) {}
 
-    ~ServerStreamImpl() override {
-      if (request_decoder_ != nullptr) {
-        request_decoder_->setDestructionCallback(nullptr);
-      }
-    }
     // StreamImpl
     void destroy() override;
     void submitHeaders(const HeaderMap& headers, bool end_stream) override;
@@ -621,7 +604,12 @@ protected:
     // written out before force resetting the stream, assuming there is enough H2 connection flow
     // control window is available.
     bool useDeferredReset() const override { return true; }
-    OptRef<StreamDecoder> decoder() override { return makeOptRefFromPtr(request_decoder_); }
+    StreamDecoder& decoder() override {
+      RELEASE_ASSERT(
+          request_decoder_handle_ != nullptr && request_decoder_handle_->ptr() != nullptr,
+          "Trying to access to the decoder without a handle or the decoder has been destroyed.");
+      return *request_decoder_handle_->ptr();
+    }
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
@@ -640,11 +628,6 @@ protected:
     }
     void resetStream(StreamResetReason reason) override;
 
-    // StreamDecoder::DestructionCallback
-    void onDecoderDestruction(DestructionStatePtr state) override {
-      request_decoder_ = nullptr;
-      StreamDecoder::DestructionCallback::onDecoderDestruction(std::move(state));
-    }
     // ResponseEncoder
     void encode1xxHeaders(const ResponseHeaderMap& headers) override;
     void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
@@ -652,8 +635,7 @@ protected:
       encodeTrailersBase(trailers);
     }
     void setRequestDecoder(Http::RequestDecoder& decoder) override {
-      request_decoder_ = &decoder;
-      decoder.setDestructionCallback(this);
+      request_decoder_handle_ = decoder.getHandle();
     }
     void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
                                               Http::ResponseHeaderMapConstSharedPtr,
@@ -670,7 +652,7 @@ protected:
     }
 
   private:
-    RequestDecoder* request_decoder_{};
+    RequestDecoderHandleSharedPtr request_decoder_handle_;
     HeadersState headers_state_ = HeadersState::Request;
   };
 

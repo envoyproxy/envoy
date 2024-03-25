@@ -253,7 +253,8 @@ public:
     driveToCompletion();
 
     EXPECT_CALL(server_callbacks_, newStream(_, _))
-        .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        .Times(testing::AtMost(1))
+        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
@@ -1407,6 +1408,15 @@ TEST_P(Http2CodecImplTest, IdlePing) {
   // alarm enabled.
   RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
   client_connection_.dispatcher_.globalTimeSystem().advanceTimeAsyncImpl(std::chrono::seconds(2));
+  MockStreamCallbacks server_stream_callbacks2;
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder_ = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks2);
+        encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
+        request_decoder_.setResponseEncoder(response_encoder_);
+        return request_decoder_;
+      }));
   EXPECT_CALL(*timeout_timer, enableTimer(_, _)).Times(0);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   EXPECT_TRUE(request_encoder2->encodeHeaders(request_headers, true).ok());
@@ -2510,11 +2520,12 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   setupDefaultConnectionMocks();
   driveToCompletion();
   for (int i = 0; i < 101; ++i) {
+    MockStreamCallbacks server_stream_callbacks;
     request_encoder_ = &client_->newStream(response_decoder_);
     EXPECT_CALL(server_callbacks_, newStream(_, _))
         .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
-          encoder.getStream().addCallbacks(server_stream_callbacks_);
+          encoder.getStream().addCallbacks(server_stream_callbacks);
           return request_decoder_;
         }));
 
@@ -4047,6 +4058,15 @@ TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProc
   ResponseEncoder* response_encoder1 = response_encoder_;
 
   RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
+  MockStreamCallbacks server_stream_callbacks2;
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder_ = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks2);
+        encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
+        request_decoder_.setResponseEncoder(response_encoder_);
+        return request_decoder_;
+      }));
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   EXPECT_TRUE(request_encoder2->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
@@ -4344,15 +4364,16 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointIsOnlyConsultedOncePerDisp
   response_encoders.reserve(num_streams_to_create);
   for (int i = 0; i < num_streams_to_create; ++i) {
     request_encoders.push_back(&client_->newStream(response_decoder_));
-    EXPECT_CALL(server_callbacks_, newStream(_, _))
-        .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-          response_encoders.push_back(&encoder);
-          encoder.getStream().addCallbacks(server_stream_callbacks_);
-          return request_decoder_;
-        }));
-
     EXPECT_TRUE(request_encoders[i]->encodeHeaders(request_headers, true).ok());
   }
+  int i = 0;
+  std::vector<MockStreamCallbacks> server_stream_callbacks(num_streams_to_create);
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoders.push_back(&encoder);
+        encoder.getStream().addCallbacks(server_stream_callbacks[i++]);
+        return request_decoder_;
+      }));
 
   // All the newly created streams are queued in the connection buffer.
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).Times(num_streams_to_create);

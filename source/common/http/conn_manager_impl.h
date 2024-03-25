@@ -178,12 +178,9 @@ private:
                               public Tracing::Config,
                               public ScopeTrackedObject,
                               public FilterManagerCallbacks,
-                              public DownstreamStreamFilterCallbacks,
-                              public StreamEncoder::DestructionCallback {
+                              public DownstreamStreamFilterCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
                  Buffer::BufferMemoryAccountSharedPtr account);
-
-    ~ActiveStream() override;
 
     // Event::DeferredDeletable
     void deleteIsPending() override {
@@ -210,9 +207,6 @@ private:
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeMetadata(MetadataMapPtr&&) override;
 
-    // StreamEncoder::DestructionCallback
-    void onEncoderDestruction(DestructionStatePtr state) override;
-
     // Mark that the last downstream byte is received, and the downstream stream is complete.
     void maybeEndDecode(bool end_stream);
 
@@ -237,9 +231,9 @@ private:
     // using a shared pointer. See
     // https://github.com/envoyproxy/envoy/pull/23648#discussion_r1066095564 for more details.
     void deferHeadersAndTrailers() {
-      if (response_encoder_ != nullptr) {
-        response_encoder_->setDeferredLoggingHeadersAndTrailers(request_headers_, response_headers_,
-                                                                response_trailers_, streamInfo());
+      if (ResponseEncoder* encoder = getResponseEncoder(); encoder != nullptr) {
+        encoder->setDeferredLoggingHeadersAndTrailers(request_headers_, response_headers_,
+                                                      response_trailers_, streamInfo());
       }
     }
 
@@ -448,6 +442,10 @@ private:
 
     std::weak_ptr<bool> stillAlive() { return {still_alive_}; }
 
+    ResponseEncoder* getResponseEncoder() {
+      return response_encoder_handle_ == nullptr ? nullptr : response_encoder_handle_->ptr();
+    }
+
     // Dispatch deferred headers, body and trailers to the filter manager.
     // Return true if this stream was deferred and dispatched pending headers, body and trailers (if
     // present). Return false if this stream was not deferred.
@@ -471,7 +469,7 @@ private:
     DownstreamFilterManager filter_manager_;
 
     Tracing::SpanPtr active_span_;
-    ResponseEncoder* response_encoder_{};
+    ResponseEncoderHandleSharedPtr response_encoder_handle_{};
     Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout. This timer gets reset whenever activity occurs on the stream, and,
     // when triggered, will close the stream.

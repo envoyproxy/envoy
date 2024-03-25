@@ -1,4 +1,3 @@
-#include "envoy_quic_server_stream.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 
 #include <openssl/bio.h>
@@ -26,7 +25,15 @@ namespace Quic {
 namespace {
 
 struct QuicStreamDestructionState : public Http::DestructionState {
-  std::string destruction_state_str;
+  bool reset_callbacks_started_;
+  bool local_end_stream_;
+  bool rst_received_;
+  bool rst_sent_;
+  bool fin_received_;
+  bool fin_buffered_;
+  bool fin_sent_;
+  bool reading_stopped_;
+  quic::QuicRstStreamErrorCode stream_error_;
 };
 
 } // namespace
@@ -54,27 +61,20 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
 }
 
 EnvoyQuicServerStream::~EnvoyQuicServerStream() {
-  if (destruction_callback_ != nullptr && !destruction_callback_->called()) {
+  if (handle_ != nullptr && handle_->ptr() != nullptr) {
     // Trigger callback with its own destruction state.
     auto destruction_state = std::make_unique<QuicStreamDestructionState>();
-    destruction_state->destruction_state_str =
-        fmt::format("Envoy stream state: reset_callbacks_started_ {}, local_end_stream_{}. "
-                    "QuicStream state: rst_received {}, rst_sent {}, fin_received {}, "
-                    "fin_buffered {}, fin_sent {}, reading_stopped {}, stream_error {}",
-                    reset_callbacks_started_, local_end_stream_, rst_received(), rst_sent(),
-                    fin_received(), fin_buffered(), fin_sent(), reading_stopped(),
-                    quic::QuicRstStreamErrorCodeToString(stream_error()));
-    destruction_callback_->onEncoderDestruction(std::move(destruction_state));
+    destruction_state->reset_callbacks_started_ = reset_callbacks_started_;
+    destruction_state->local_end_stream_ = local_end_stream_;
+    destruction_state->rst_received_ = rst_received();
+    destruction_state->rst_sent_ = rst_sent();
+    destruction_state->fin_received_ = fin_received();
+    destruction_state->fin_buffered_ = fin_buffered();
+    destruction_state->fin_sent_ = fin_sent();
+    destruction_state->reading_stopped_ = reading_stopped();
+    destruction_state->stream_error_ = stream_error();
+    handle_->onObjectDestroyed(std::move(destruction_state));
   }
-  if (request_decoder_.has_value()) {
-    // No longer interested in the decoder destruction.
-    request_decoder_->setDestructionCallback(nullptr);
-  }
-}
-
-void EnvoyQuicServerStream::onDecoderDestruction(Http::DestructionStatePtr state) {
-  request_decoder_.reset();
-  Http::StreamDecoder::DestructionCallback::onDecoderDestruction(std::move(state));
 }
 
 void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
@@ -236,8 +236,8 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 #endif
 
-  if (request_decoder_.has_value()) {
-    request_decoder_->decodeHeaders(std::move(headers), /*end_stream=*/fin);
+  if (getRequestDecoder()) {
+    getRequestDecoder()->decodeHeaders(std::move(headers), /*end_stream=*/fin);
   }
   ConsumeHeaderList();
 }
@@ -286,8 +286,8 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
       // A stream error has occurred, stop processing.
       return;
     }
-    if (request_decoder_.has_value()) {
-      request_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
+    if (getRequestDecoder()) {
+      getRequestDecoder()->decodeData(*buffer, fin_read_and_no_trailers);
     }
   }
 
@@ -340,8 +340,8 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
       onStreamError(close_connection_upon_invalid_header_, rst);
       return;
     }
-    if (request_decoder_.has_value()) {
-      request_decoder_->decodeTrailers(std::move(trailers));
+    if (getRequestDecoder()) {
+      getRequestDecoder()->decodeTrailers(std::move(trailers));
     }
     MarkTrailersConsumed();
   }
@@ -527,8 +527,8 @@ bool EnvoyQuicServerStream::hasPendingData() {
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 void EnvoyQuicServerStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  ASSERT(request_decoder_.has_value());
-  http_datagram_handler_->setStreamDecoder(request_decoder_.ptr());
+  ASSERT(getRequestDecoder());
+  http_datagram_handler_->setStreamDecoder(getRequestDecoder());
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif

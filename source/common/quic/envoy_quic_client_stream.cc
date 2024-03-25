@@ -1,4 +1,3 @@
-#include "envoy_quic_client_stream.h"
 #include "source/common/quic/envoy_quic_client_stream.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -199,13 +198,12 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   // Therefore, these need to be transformed into their HTTP/1 form.
 
   // In UHV mode the :status header at this point can be malformed, as it is validated
-  // later on in the response_decoder_.decodeHeaders() call.
+  // later on in the decodeHeaders() call.
   // Account for this here.
   if (!optional_status.has_value()) {
-    if (response_decoder_.has_value()) {
-      // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail
-      // the request
-      response_decoder_->decodeHeaders(std::move(headers), fin);
+    if (getResponseDecoder()) {
+      // In case the status is invalid or missing, the decodeHeaders() will fail the request.
+      getResponseDecoder()->decodeHeaders(std::move(headers), fin);
     }
     ConsumeHeaderList();
     return;
@@ -223,13 +221,13 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (is_special_1xx && !decoded_1xx_) {
     // This is 100 Continue, only decode it once to support Expect:100-Continue header.
     decoded_1xx_ = true;
-    if (response_decoder_.has_value()) {
-      response_decoder_->decode1xxHeaders(std::move(headers));
+    if (getResponseDecoder()) {
+      getResponseDecoder()->decode1xxHeaders(std::move(headers));
     }
   } else if (!is_special_1xx) {
-    if (response_decoder_.has_value()) {
-      response_decoder_->decodeHeaders(std::move(headers),
-                                       /*end_stream=*/fin);
+    if (getResponseDecoder()) {
+      getResponseDecoder()->decodeHeaders(std::move(headers),
+                                          /*end_stream=*/fin);
     }
     if (status == enumToInt(Http::Code::NotModified)) {
       got_304_response_ = true;
@@ -301,8 +299,8 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
       // A stream error has occurred, stop processing.
       return;
     }
-    if (response_decoder_.has_value()) {
-      response_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
+    if (getResponseDecoder()) {
+      getResponseDecoder()->decodeData(*buffer, fin_read_and_no_trailers);
     }
   }
 
@@ -349,8 +347,8 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
       onStreamError(close_connection_upon_invalid_header_, transform_rst);
       return;
     }
-    if (response_decoder_.has_value()) {
-      response_decoder_->decodeTrailers(std::move(trailers));
+    if (getResponseDecoder()) {
+      getResponseDecoder()->decodeTrailers(std::move(trailers));
     }
     MarkTrailersConsumed();
   }
@@ -449,18 +447,13 @@ bool EnvoyQuicClientStream::hasPendingData() { return BufferedDataBytes() > 0; }
 // connect-udp".
 void EnvoyQuicClientStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  http_datagram_handler_->setStreamDecoder(response_decoder_.ptr());
+  http_datagram_handler_->setStreamDecoder(getResponseDecoder());
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif
 
 void EnvoyQuicClientStream::OnInvalidHeaders() {
   onStreamError(absl::nullopt, quic::QUIC_BAD_APPLICATION_PAYLOAD);
-}
-
-void EnvoyQuicClientStream::onDecoderDestruction(Http::DestructionStatePtr state) {
-  response_decoder_.reset();
-  Http::StreamDecoder::DestructionCallback::onDecoderDestruction(std::move(state));
 }
 
 } // namespace Quic

@@ -76,9 +76,70 @@ using Http1StreamEncoderOptionsOptRef =
     absl::optional<std::reference_wrapper<Http1StreamEncoderOptions>>;
 
 // Placeholder for subclasses to implement their own states.
-struct DestructionState {};
+struct DestructionState {
+  virtual ~DestructionState() = default;
+};
 
 using DestructionStatePtr = std::unique_ptr<DestructionState>;
+
+/**
+ * Wraps a pointer to encoder/decoder object during the life time of the object.
+ */
+template <class T> class ObjectHandle {
+public:
+  explicit ObjectHandle(T* object) : object_(object) {}
+
+  /**
+   * Return nullptr if the wrapped decoder reaches the end of its lifetime.
+   */
+  T* ptr() { return object_; }
+
+  /**
+   * Called one and only once by RequestDecoder during destruction.
+   * @param state the state of the decoder before its destruction.
+   */
+  void onObjectDestroyed(DestructionStatePtr state) {
+    object_ = nullptr;
+    destruction_state_ = std::move(state);
+  }
+
+private:
+  T* object_{nullptr};
+  DestructionStatePtr destruction_state_;
+};
+
+// A template to hold and provide a single shared handle of an object during its life time.
+// request/response encoder and decoder
+template <class ObjectType> class ObjectHandleProvider {
+public:
+  // Subclasses can override this to provide a meaningful destruction state.
+  virtual ~ObjectHandleProvider() {
+    if (handle_ && handle_->ptr()) {
+      handle_->onObjectDestroyed(nullptr);
+    }
+  }
+
+  /**
+   * Called to get a shared handle to the underlying object.
+   */
+  std::shared_ptr<ObjectHandle<ObjectType>> getHandle() {
+    if (handle_ == nullptr) {
+      // Lazy create the shared handle.
+      handle_ = createHandle();
+    }
+    return handle_;
+  }
+
+protected:
+  /**
+   * Called one and only once from getHandle().
+   * @return a shared handle to be latched to handle_.
+   */
+  virtual std::shared_ptr<ObjectHandle<ObjectType>> createHandle() PURE;
+
+  // Nullptr if getHandle() has never been called.
+  std::shared_ptr<ObjectHandle<ObjectType>> handle_;
+};
 
 /**
  * Encodes an HTTP stream. This interface contains methods common to both the request and response
@@ -88,25 +149,7 @@ using DestructionStatePtr = std::unique_ptr<DestructionState>;
  */
 class StreamEncoder {
 public:
-  class DestructionCallback {
-  public:
-    virtual ~DestructionCallback() = default;
-
-    // Called during encoder destruction.
-    virtual void onEncoderDestruction(DestructionStatePtr /*state*/) { called_ = true; }
-
-    bool called() const { return called_; }
-
-  private:
-    bool called_{false};
-  };
-
-  virtual ~StreamEncoder() {
-    if (destruction_callback_ != nullptr && !destruction_callback_->called()) {
-      // Call destruction callback if subclasses hadn't do so.
-      destruction_callback_->onEncoderDestruction(nullptr);
-    }
-  }
+  virtual ~StreamEncoder() = default;
 
   /**
    * Encode a data frame.
@@ -131,28 +174,13 @@ public:
    * absl::nullopt.
    */
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
-
-  /**
-   * Add or remove destruction callback to this encoder.
-   * @param callback, if not nullptr, expects its onEncoderDestruction() to be called during the
-   * destruction of this encoder. If nullptr, removes the existing callback.
-   */
-  void setDestructionCallback(DestructionCallback* callback) {
-    ASSERT(destruction_callback_ == nullptr || callback == nullptr);
-    destruction_callback_ = callback;
-  }
-
-protected:
-  // Called during destruction. Implementations should call into it if they want
-  // to supply a meaningful destruction state.
-  DestructionCallback* destruction_callback_{nullptr};
 };
 
 /**
  * Stream encoder used for sending a request (client to server). Virtual inheritance is required
  * due to a parallel implementation split between the shared base class and the derived class.
  */
-class RequestEncoder : public virtual StreamEncoder {
+class RequestEncoder : public virtual StreamEncoder, public ObjectHandleProvider<RequestEncoder> {
 public:
   /**
    * Encode headers, optionally indicating end of stream.
@@ -173,13 +201,20 @@ public:
    * Enable TCP Tunneling.
    */
   virtual void enableTcpTunneling() PURE;
+
+protected:
+  std::shared_ptr<ObjectHandle<RequestEncoder>> createHandle() override {
+    return std::make_shared<ObjectHandle<RequestEncoder>>(this);
+  }
 };
+
+using RequestEncoderHandleSharedPtr = std::shared_ptr<ObjectHandle<RequestEncoder>>;
 
 /**
  * Stream encoder used for sending a response (server to client). Virtual inheritance is required
  * due to a parallel implementation split between the shared base class and the derived class.
  */
-class ResponseEncoder : public virtual StreamEncoder {
+class ResponseEncoder : public virtual StreamEncoder, public ObjectHandleProvider<ResponseEncoder> {
 public:
   /**
    * Encode supported 1xx headers.
@@ -231,7 +266,14 @@ public:
                                        Http::ResponseHeaderMapConstSharedPtr response_header_map,
                                        Http::ResponseTrailerMapConstSharedPtr response_trailer_map,
                                        StreamInfo::StreamInfo& stream_info) PURE;
+
+protected:
+  std::shared_ptr<ObjectHandle<ResponseEncoder>> createHandle() override {
+    return std::make_shared<ObjectHandle<ResponseEncoder>>(this);
+  }
 };
+
+using ResponseEncoderHandleSharedPtr = std::shared_ptr<ObjectHandle<ResponseEncoder>>;
 
 /**
  * Decodes an HTTP stream. These are callbacks fired into a sink. This interface contains methods
@@ -241,25 +283,7 @@ public:
  */
 class StreamDecoder {
 public:
-  // A callback notifying StreamDecoder destruction.
-  class DestructionCallback {
-  public:
-    virtual ~DestructionCallback() = default;
-
-    // Called one and only once in decoder object's destructor.
-    virtual void onDecoderDestruction(DestructionStatePtr /*state*/) { called_ = true; }
-
-    bool called() const { return called_; }
-
-  private:
-    bool called_{false};
-  };
-
-  virtual ~StreamDecoder() {
-    if (destruction_callback_ != nullptr && !destruction_callback_->called()) {
-      destruction_callback_->onDecoderDestruction(nullptr);
-    }
-  }
+  virtual ~StreamDecoder() = default;
 
   /**
    * Called with a decoded data frame.
@@ -273,21 +297,13 @@ public:
    * @param decoded METADATA.
    */
   virtual void decodeMetadata(MetadataMapPtr&& metadata_map) PURE;
-
-  void setDestructionCallback(DestructionCallback* callback) {
-    ASSERT(destruction_callback_ == nullptr || callback == nullptr);
-    destruction_callback_ = callback;
-  }
-
-protected:
-  DestructionCallback* destruction_callback_{nullptr};
 };
 
 /**
  * Stream decoder used for receiving a request (client to server). Virtual inheritance is required
  * due to a parallel implementation split between the shared base class and the derived class.
  */
-class RequestDecoder : public virtual StreamDecoder {
+class RequestDecoder : public virtual StreamDecoder, public ObjectHandleProvider<RequestDecoder> {
 public:
   /**
    * Called with decoded headers, optionally indicating end of stream.
@@ -324,13 +340,20 @@ public:
    * @return List of shared pointers to access loggers for this stream.
    */
   virtual std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() PURE;
+
+protected:
+  std::shared_ptr<ObjectHandle<RequestDecoder>> createHandle() override {
+    return std::make_shared<ObjectHandle<RequestDecoder>>(this);
+  }
 };
+
+using RequestDecoderHandleSharedPtr = std::shared_ptr<ObjectHandle<RequestDecoder>>;
 
 /**
  * Stream decoder used for receiving a response (server to client). Virtual inheritance is required
  * due to a parallel implementation split between the shared base class and the derived class.
  */
-class ResponseDecoder : public virtual StreamDecoder {
+class ResponseDecoder : public virtual StreamDecoder, public ObjectHandleProvider<ResponseDecoder> {
 public:
   /**
    * Called with decoded 1xx headers.
@@ -361,7 +384,14 @@ public:
    * This function is called on Envoy fatal errors so should avoid memory allocation.
    */
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+protected:
+  std::shared_ptr<ObjectHandle<ResponseDecoder>> createHandle() override {
+    return std::make_shared<ObjectHandle<ResponseDecoder>>(this);
+  }
 };
+
+using ResponseDecoderHandleSharedPtr = std::shared_ptr<ObjectHandle<ResponseDecoder>>;
 
 /**
  * Callbacks that fire against a stream.
@@ -375,6 +405,7 @@ public:
 
     void addCallbacksHelper(StreamCallbacks& callbacks) {
       registerStreamCallbacks(callbacks);
+      ASSERT(callbacks.registry_ == nullptr);
       callbacks.registry_ = this;
     }
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <type_traits>
+
 #include "source/common/quic/envoy_quic_stream.h"
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
@@ -15,8 +17,7 @@ namespace Quic {
 // This class is a quic stream and also a response encoder.
 class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase,
                               public EnvoyQuicStream,
-                              public Http::ResponseEncoder,
-                              public Http::StreamDecoder::DestructionCallback {
+                              public Http::ResponseEncoder {
 public:
   EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
@@ -27,13 +28,9 @@ public:
   ~EnvoyQuicServerStream() override;
 
   void setRequestDecoder(Http::RequestDecoder& decoder) override {
-    request_decoder_ = makeOptRef(decoder);
-    decoder.setDestructionCallback(this);
-    stats_gatherer_->setAccessLogHandlers(request_decoder_->accessLogHandlers());
+    request_decoder_handle_ = decoder.getHandle();
+    stats_gatherer_->setAccessLogHandlers(decoder.accessLogHandlers());
   }
-
-  // Http::StreamDecoder::DestructionCallback
-  void onDecoderDestruction(Http::DestructionStatePtr state) override;
 
   // Http::StreamEncoder
   void encode1xxHeaders(const Http::ResponseHeaderMap& headers) override;
@@ -110,6 +107,10 @@ protected:
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();
 
+  Http::RequestDecoder* getRequestDecoder() {
+    return request_decoder_handle_ ? request_decoder_handle_->ptr() : nullptr;
+  }
+
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
@@ -120,7 +121,7 @@ private:
   void useCapsuleProtocol();
 #endif
 
-  OptRef<Http::RequestDecoder> request_decoder_{};
+  Http::RequestDecoderHandleSharedPtr request_decoder_handle_;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
 

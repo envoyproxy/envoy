@@ -374,10 +374,11 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_ERROR_PROCESSING_STREAM")
                     ->value());
 
+  Http::MockStreamCallbacks stream_callbacks2;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
-      .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
-                                                             bool) -> Http::RequestDecoder& {
-        encoder.getStream().addCallbacks(stream_callbacks);
+      .WillOnce(Invoke([&request_decoder, &stream_callbacks2](Http::ResponseEncoder& encoder,
+                                                              bool) -> Http::RequestDecoder& {
+        encoder.getStream().addCallbacks(stream_callbacks2);
         return request_decoder;
       }));
   quic::QuicStream* stream2 = envoy_quic_session_.GetOrCreateStream(stream1->id() + 4u);
@@ -386,7 +387,7 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   quic::QuicStopSendingFrame stop_sending2(/*control_frame_id=*/1u, stream2->id(),
                                            quic::QUIC_REFUSED_STREAM);
   // Receiving both STOP_SENDING and RESET_STREAM should close the stream.
-  EXPECT_CALL(stream_callbacks,
+  EXPECT_CALL(stream_callbacks2,
               onResetStream(Http::StreamResetReason::RemoteRefusedStreamReset, _));
   EXPECT_CALL(*quic_connection_, SendControlFrame(_))
       .WillOnce(Invoke([stream_id = stream2->id()](const quic::QuicFrame& frame) {
@@ -401,10 +402,11 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM")
                     ->value());
 
+  Http::MockStreamCallbacks stream_callbacks3;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
-      .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
-                                                             bool) -> Http::RequestDecoder& {
-        encoder.getStream().addCallbacks(stream_callbacks);
+      .WillOnce(Invoke([&request_decoder, &stream_callbacks3](Http::ResponseEncoder& encoder,
+                                                              bool) -> Http::RequestDecoder& {
+        encoder.getStream().addCallbacks(stream_callbacks3);
         return request_decoder;
       }));
   quic::QuicStream* stream3 = envoy_quic_session_.GetOrCreateStream(stream1->id() + 8u);
@@ -413,7 +415,7 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   quic::QuicStopSendingFrame stop_sending3(/*control_frame_id=*/1u, stream3->id(),
                                            quic::QUIC_REFUSED_STREAM);
   // Receiving both STOP_SENDING and RESET_STREAM should close the stream.
-  EXPECT_CALL(stream_callbacks,
+  EXPECT_CALL(stream_callbacks3,
               onResetStream(Http::StreamResetReason::RemoteRefusedStreamReset, _));
   envoy_quic_session_.OnRstStream(rst3);
   envoy_quic_session_.OnStopSendingFrame(stop_sending3);

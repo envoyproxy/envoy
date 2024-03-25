@@ -16,31 +16,20 @@ namespace Quic {
 // This class is a quic stream and also a request encoder.
 class EnvoyQuicClientStream : public quic::QuicSpdyClientStream,
                               public EnvoyQuicStream,
-                              public Http::RequestEncoder,
-                              public Http::StreamDecoder::DestructionCallback {
+                              public Http::RequestEncoder {
 public:
   EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
 
-  ~EnvoyQuicClientStream() override {
-    if (response_decoder_.has_value()) {
-      response_decoder_->setDestructionCallback(nullptr);
-    }
-  }
-
   void setResponseDecoder(Http::ResponseDecoder& decoder) {
-    response_decoder_ = makeOptRef(decoder);
-    decoder.setDestructionCallback(this);
+    response_decoder_handle_ = decoder.getHandle();
   }
 
   // Http::StreamEncoder
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return absl::nullopt;
   }
-
-  // Http::StreamDecoder::DestructionCallback
-  void onDecoderDestruction(Http::DestructionStatePtr state) override;
 
   // Http::RequestEncoder
   Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) override;
@@ -98,7 +87,11 @@ private:
   void useCapsuleProtocol();
 #endif
 
-  OptRef<Http::ResponseDecoder> response_decoder_;
+  Http::ResponseDecoder* getResponseDecoder() {
+    return response_decoder_handle_ ? response_decoder_handle_->ptr() : nullptr;
+  }
+
+  Http::ResponseDecoderHandleSharedPtr response_decoder_handle_;
   bool decoded_1xx_{false};
 
   // When an HTTP Upgrade is requested, this contains the protocol upgrade type, e.g. "websocket".
