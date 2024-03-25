@@ -1302,8 +1302,8 @@ sphinxext-rediraffe==0.2.7 \
     --hash=sha256:651dcbfae5ffda9ffd534dfb8025f36120e5efb6ea1a33f5420023862b9f725d \
     --hash=sha256:9e430a52d4403847f4ffb3a8dd6dfc34a9fe43525305131f52ed899743a5fd8c
     # via envoy-docs-sphinx-runner
-thrift==0.16.0 \
-    --hash=sha256:2b5b6488fcded21f9d312aa23c9ff6a0195d0f6ae26ddbd5ad9e3e25dfc14408
+thrift==0.20.0 \
+    --hash=sha256:4dd662eadf6b8aebe8a41729527bd69adf6ceaa2a8681cbef64d1273b3e8feba
     # via -r requirements.in
 tomli==2.0.1 \
     --hash=sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc \
