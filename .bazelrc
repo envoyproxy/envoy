@@ -58,6 +58,7 @@ test --test_verbose_timeout_warnings
 
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
+common --noenable_bzlmod
 
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)

@@ -1,0 +1,206 @@
+module(
+    name = "envoy",
+    version = "0.0.0",
+)
+
+bazel_dep(
+    name = "aspect_bazel_lib",
+    version = "2.4.2",
+)
+bazel_dep(
+    name = "bazel_skylib",
+    version = "1.5.0",
+)
+bazel_dep(
+    name = "envoy_api",
+    version = "0.0.0",
+)
+bazel_dep(
+    name = "gazelle",
+    version = "0.31.0",
+    repo_name = "bazel_gazelle",
+)
+bazel_dep(
+    name = "rules_apple",
+    version = "3.1.1",
+    repo_name = "build_bazel_rules_apple",
+)
+bazel_dep(
+    name = "rules_cc",
+    version = "0.0.9",
+)
+bazel_dep(
+    name = "rules_foreign_cc",
+    version = "0.10.1",
+)
+bazel_dep(
+    name = "rules_go",
+    version = "0.39.1",
+    repo_name = "io_bazel_rules_go",
+)
+bazel_dep(
+    name = "rules_pkg",
+    version = "0.10.1",
+)
+bazel_dep(
+    name = "rules_proto",
+    version = "5.3.0-21.7",
+)
+bazel_dep(
+    name = "rules_python",
+    version = "0.31.0",
+)
+bazel_dep(
+    name = "rules_rust",
+    version = "0.35.0",
+)
+bazel_dep(
+    name = "rules_shellcheck",
+    version = "0.3.3",
+    repo_name = "com_github_aignas_rules_shellcheck",
+)
+# -- bazel_dep definitions -- #
+
+local_path_override(
+    module_name = "envoy_api",
+    path = "api",
+)
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.11")
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    extra_pip_args = ["--require-hashes"],
+    hub_name = "base_pip3",
+    python_version = "3.11",
+    requirements_lock = "@envoy//tools/base:requirements.txt",
+)
+pip.parse(
+    extra_pip_args = ["--require-hashes"],
+    hub_name = "dev_pip3",
+    python_version = "3.11",
+    requirements_lock = "@envoy//tools/dev:requirements.txt",
+)
+pip.parse(
+    extra_pip_args = ["--require-hashes"],
+    hub_name = "fuzzing_pip3",
+    python_version = "3.11",
+    requirements_lock = "@rules_fuzzing//fuzzing:requirements.txt",
+)
+use_repo(
+    pip,
+    "base_pip3",
+    "dev_pip3",
+    "fuzzing_pip3",
+)
+
+envoy_toolshed_dependencies = use_extension("@envoy//bazel/extensions:envoy_toolshed_dependencies.bzl", "envoy_toolshed_dependencies_extension")
+use_repo(
+    envoy_toolshed_dependencies,
+    "pip3",
+)
+
+
+envoy_api_dependencies_extension = use_extension("@envoy//bazel/extensions:envoy_api_dependencies.bzl", "envoy_api_dependencies_extension")
+use_repo(
+    envoy_api_dependencies_extension,
+    "com_github_grpc_grpc",
+    "com_google_googleapis",
+    "envoy_toolshed",
+    "rules_proto_grpc",
+)
+
+envoy_dependencies_extension = use_extension("@envoy//bazel/extensions:envoy_dependencies.bzl", "envoy_dependencies_extension")
+use_repo(
+    envoy_dependencies_extension,
+    "bazel_compdb",
+    "bazel_toolchains",
+    "boringssl",
+    "boringssl_fips",
+    "com_github_alibaba_hessian2_codec",
+    "com_github_axboe_liburing",
+    "com_github_bazelbuild_buildtools",
+    "com_github_c_ares_c_ares",
+    "com_github_curl",
+    "com_github_cyan4973_xxhash",
+    "com_github_datadog_dd_trace_cpp",
+    "com_github_envoyproxy_sqlparser",
+    "com_github_facebook_zstd",
+    "com_github_fdio_vpp_vcl",
+    "com_github_fmtlib_fmt",
+    "com_github_gabime_spdlog",
+    "com_github_google_benchmark",
+    "com_github_google_flatbuffers",
+    "com_github_google_jwt_verify",
+    "com_github_google_libprotobuf_mutator",
+    "com_github_google_libsxg",
+    "com_github_google_perfetto",
+    "com_github_google_quiche",
+    "com_github_google_tcmalloc",
+    "com_github_gperftools_gperftools",
+    "com_github_intel_ipp_crypto_crypto_mb",
+    "com_github_intel_ipp_crypto_crypto_mb_fips",
+    "com_github_intel_qatlib",
+    "com_github_intel_qatzip",
+    "com_github_jbeder_yaml_cpp",
+    "com_github_libevent_libevent",
+    "com_github_luajit_luajit",
+    "com_github_lz4_lz4",
+    "com_github_maxmind_libmaxminddb",
+    "com_github_mirror_tclap",
+    "com_github_msgpack_cpp",
+    "com_github_ncopa_suexec",
+    "com_github_nghttp2_nghttp2",
+    "com_github_nlohmann_json",
+    "com_github_openhistogram_libcircllhist",
+    "com_github_rules_proto_grpc",
+    "com_github_skyapm_cpp2sky",
+    "com_github_tencent_rapidjson",
+    "com_github_unicode_org_icu",
+    "com_github_wamr",
+    "com_github_wasm_c_api",
+    "com_github_wasmtime",
+    "com_github_wavm_wavm",
+    "com_github_zlib_ng_zlib_ng",
+    "com_google_cel_cpp",
+    "com_google_googleapis_imports",
+    "com_google_googletest",
+    "com_google_protobuf",
+    "com_google_protoconverter",
+    "com_google_protofieldextraction",
+    "com_googlesource_chromium_base_trace_event_common",
+    "com_googlesource_code_re2",
+    "com_googlesource_googleurl",
+    "confluentinc_librdkafka",
+    "emsdk",
+    "envoy_build_config",
+    "envoy_build_tools",
+    "envoy_repo",
+    "grpc_httpjson_transcoding",
+    "intel_dlb",
+    "io_hyperscan",
+    "io_opencensus_cpp",
+    "io_opentelemetry_cpp",
+    "io_opentracing_cpp",
+    "io_vectorscan",
+    "kafka_python_client",
+    "kafka_server_binary",
+    "kafka_source",
+    "net_colm_open_source_colm",
+    "net_colm_open_source_ragel",
+    "net_zlib",
+    "ocp",
+    "org_boost",
+    "org_brotli",
+    "org_llvm_llvm",
+    "org_llvm_releases_compiler_rt",
+    "proxy_wasm_cpp_host",
+    "proxy_wasm_cpp_sdk",
+    "proxy_wasm_rust_sdk",
+    "rules_fuzzing",
+    "skywalking_data_collect_protocol",
+    "upb",
+    "utf8_range",
+    "v8",
+)
