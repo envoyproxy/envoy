@@ -684,7 +684,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       route_stat_name_storage_("tcpproxy_tunneling", context.scope().symbolTable()),
       // TODO(vikaschoudhary16): figure out which of the following router_config_ members are
       // not required by tcp_proxy and move them to a different class
-      router_config_(route_stat_name_storage_.statName(),
+      router_config_(context.serverFactoryContext(), route_stat_name_storage_.statName(),
                      context.serverFactoryContext().localInfo(), stats_scope,
                      context.serverFactoryContext().clusterManager(),
                      context.serverFactoryContext().runtime(),
