@@ -3780,8 +3780,8 @@ TEST_F(HttpHealthCheckerImplTest, InvalidHost) {
       path: "/aaa"
     )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(allocHealthChecker(yaml), EnvoyException,
-                            "host: \a in http health check is not valid.")
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
+                            "Proto constraint validation failed*")
 }
 
 TEST_F(HttpHealthCheckerImplTest, InvalidPath) {
@@ -3797,8 +3797,8 @@ TEST_F(HttpHealthCheckerImplTest, InvalidPath) {
       path: "\x08"
     )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(allocHealthChecker(yaml), EnvoyException,
-                            "path: \b in http health check is not valid.")
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
+                            "Proto constraint validation failed*")
 }
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {

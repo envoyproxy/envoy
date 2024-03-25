@@ -74,23 +74,13 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                            static_cast<uint64_t>(Http::Code::OK)),
       codec_client_type_(codecClientType(config.http_health_check().codec_client_type())),
       random_generator_(random) {
+  // TODO(boteng): introduce additional validation for the authority and path headers
+  // based on the default UHV when it is available.
   auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.http_health_check().receive());
   THROW_IF_STATUS_NOT_OK(bytes_or_error, throw);
   receive_bytes_ = bytes_or_error.value();
   if (config.http_health_check().has_service_name_matcher()) {
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
-  }
-
-  // TODO(boteng): introduce additional validation for the authority and path headers
-  // based on the default UHV when it is available.
-  if (!Http::HeaderUtility::authorityIsValid(host_value_)) {
-    THROW_IF_NOT_OK(absl::InvalidArgumentError(
-        fmt::format("host: {} in http health check is not valid.", host_value_)));
-  }
-
-  if (!Http::HeaderUtility::pathIsValid(path_)) {
-    THROW_IF_NOT_OK(absl::InvalidArgumentError(
-        fmt::format("path: {} in http health check is not valid.", path_)));
   }
 
   if (response_buffer_size_ != 0 && !receive_bytes_.empty()) {
