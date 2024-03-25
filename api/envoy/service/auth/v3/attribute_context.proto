@@ -117,7 +117,10 @@ message AttributeContext {
     // The HTTP request headers. If multiple headers share the same key, they
     // must be merged according to the HTTP spec. All header keys must be
     // lower-cased, because HTTP header keys are case-insensitive.
-    // Header value is encoded as string. This does not work for non-utf8 characters, and therefore they will be replaced by "!".
+    // Header value is encoded as UTF-8 string. Non-UTF-8 characters will be replaced by "!".
+    // This field will not be set if
+    // :ref:`encode_raw_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`
+    // is set to true.
     map<string, string> headers = 3
         [(udpa.annotations.field_migrate).oneof_promotion = "headers_type"];
 
