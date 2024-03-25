@@ -35,7 +35,7 @@ class SendDataTest {
       EngineBuilder(Standard())
         .addNativeFilter(
           "envoy.filters.http.assertion",
-          "{'@type': $ASSERTION_FILTER_TYPE, match_config: {http_request_generic_body_match: {patterns: [{string_match: $REQUEST_STRING_MATCH}]}}}"
+          "[$ASSERTION_FILTER_TYPE] { match_config { http_request_generic_body_match { patterns { string_match: '$REQUEST_STRING_MATCH'}}}}"
         )
         .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
         .build()
