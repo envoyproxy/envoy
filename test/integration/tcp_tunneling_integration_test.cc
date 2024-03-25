@@ -6,9 +6,9 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
-#include "test/integration/tcp_tunneling_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/integration/tcp_tunneling_integration.h"
 
 #include "gtest/gtest.h"
 

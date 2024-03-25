@@ -70,7 +70,6 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
   return ret;
 }
 
-
 std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
     const ::testing::TestParamInfo<HttpProtocolTestParams>& params) {
   return absl::StrCat((params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
