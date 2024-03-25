@@ -22,11 +22,13 @@ public:
   MOCK_METHOD(void, onDecodingFailure, ());
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
   MOCK_METHOD(OptRef<Network::Connection>, connection, ());
+  MOCK_METHOD(OptRef<const Upstream::ClusterInfo>, upstreamCluster, (), (const));
 };
 
 class MockEncodingCallbacks : public EncodingCallbacks {
 public:
   MOCK_METHOD(void, onEncodingSuccess, (Buffer::Instance & buffer, bool end_stream));
+  MOCK_METHOD(OptRef<const RouteEntry>, routeEntry, (), (const));
 };
 
 class MockServerCodec : public ServerCodec {

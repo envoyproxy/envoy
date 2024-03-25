@@ -19,7 +19,6 @@ envoy_cc_library(
     ],
     deps = [
         "//contrib/generic_proxy/filters/network/source:tracing_lib",
-        "//contrib/generic_proxy/filters/network/source:upstream_lib",
         "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
         "//contrib/generic_proxy/filters/network/source/interface:config_interface",
         "//contrib/generic_proxy/filters/network/source/interface:filter_interface",
