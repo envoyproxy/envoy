@@ -88,9 +88,9 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
       total += bytes.size();
     }
     if (total > response_buffer_size_) {
-      THROW_IF_NOT_OK(absl::InvalidArgumentError(fmt::format(
+      throw EnvoyException(fmt::format(
           "The expected response length '{}' is over than http health response buffer size '{}'",
-          total, response_buffer_size_)));
+          total, response_buffer_size_));
     }
   }
 }
