@@ -148,10 +148,9 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigWrongClusterMetadata) {
   TestUtility::loadFromYaml(metadata_yaml, cluster_metadata);
   metadata.mutable_filter_metadata()->insert({"WrongMetadataKey", cluster_metadata});
 
-  auto route_settings =
-      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true /*passthrough*/, "");
+  FilterSettingsMock route_settings{InvocationMode::Synchronous, true /*passthrough*/, ""};
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(Return(route_settings.get()));
+      .WillByDefault(Return(&route_settings));
 
   ON_CALL(*decoder_callbacks_.cluster_info_, metadata()).WillByDefault(ReturnRef(metadata));
   Http::TestRequestHeaderMapImpl headers;
@@ -172,10 +171,9 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigWrongClusterMetadata) {
 TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectClusterMetadata) {
   setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "");
 
-  auto route_settings =
-      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true /*passthrough*/, "");
+  FilterSettingsMock route_settings{InvocationMode::Synchronous, true /*passthrough*/, ""};
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(Return(route_settings.get()));
+      .WillByDefault(Return(&route_settings));
 
   Http::TestRequestHeaderMapImpl headers;
   const auto result = filter_->decodeHeaders(headers, false /*end_stream*/);
@@ -189,14 +187,13 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectClusterMetadata) {
 TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectRegionForSigning) {
   setupDownstreamFilter(InvocationMode::Synchronous, false /*passthrough*/, "");
   const absl::string_view override_region = "us-west-1";
-  auto route_settings =
-      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true /*passthrough*/, "");
-  route_settings->arn_ =
+  FilterSettingsMock route_settings{InvocationMode::Synchronous, true /*passthrough*/, ""};
+  route_settings.arn_ =
       parseArn(fmt::format("arn:aws:lambda:{}:1337:function:fun", override_region)).value();
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(Return(route_settings.get()));
+      .WillByDefault(Return(&route_settings));
 
-  EXPECT_CALL(*route_settings->signer_,
+  EXPECT_CALL(*route_settings.signer_,
               signEmptyPayload(An<Http::RequestHeaderMap&>(), override_region));
   Http::TestRequestHeaderMapImpl headers;
   const auto result = filter_->decodeHeaders(headers, true /*end_stream*/);
@@ -268,12 +265,11 @@ TEST_F(AwsLambdaFilterTest, DecodeDataSigningWithPerRouteConfig) {
   setupDownstreamFilter(InvocationMode::Synchronous, false /*passthrough*/, "");
 
   const absl::string_view override_region = "us-west-1";
-  auto route_settings =
-      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true /*passthrough*/, "");
-  route_settings->arn_ =
+  FilterSettingsMock route_settings{InvocationMode::Synchronous, true /*passthrough*/, ""};
+  route_settings.arn_ =
       parseArn(fmt::format("arn:aws:lambda:{}:1337:function:fun", override_region)).value();
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(Return(route_settings.get()));
+      .WillByDefault(Return(&route_settings));
 
   Http::TestRequestHeaderMapImpl headers;
   const auto header_result = filter_->decodeHeaders(headers, false /*end_stream*/);
@@ -283,7 +279,7 @@ TEST_F(AwsLambdaFilterTest, DecodeDataSigningWithPerRouteConfig) {
   InSequence seq;
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
-  EXPECT_CALL(*route_settings->signer_,
+  EXPECT_CALL(*route_settings.signer_,
               sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(), override_region));
 
   const auto data_result = filter_->decodeData(buffer, true /*end_stream*/);
@@ -775,10 +771,10 @@ TEST_F(AwsLambdaFilterTest, SignWithHostRewrite) {
 TEST_F(AwsLambdaFilterTest, SignWithHostRewritePerRoute) {
   setupDownstreamFilter(InvocationMode::Synchronous, false /*passthrough*/, "new_host");
 
-  auto route_settings = std::make_shared<FilterSettingsMock>(
-      InvocationMode::Synchronous, false /*passthrough*/, "new_host_per_route");
+  FilterSettingsMock route_settings{InvocationMode::Synchronous, false /*passthrough*/,
+                                    "new_host_per_route"};
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(Return(route_settings.get()));
+      .WillByDefault(Return(&route_settings));
 
   Http::TestRequestHeaderMapImpl headers;
   headers.setHost("any_host");
