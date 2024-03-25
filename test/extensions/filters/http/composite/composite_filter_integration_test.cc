@@ -36,10 +36,17 @@ using test::integration::filters::SetResponseCodeFilterConfig;
 using test::integration::filters::SetResponseCodePerRouteFilterConfig;
 using xds::type::matcher::v3::Matcher_OnMatch;
 
-class CompositeFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+struct CompositeFilterTestParams {
+  Network::Address::IpVersion version;
+  bool is_downstream;
+};
+
+class CompositeFilterIntegrationTest : public testing::TestWithParam<CompositeFilterTestParams>,
                                        public HttpIntegrationTest {
 public:
-  CompositeFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  CompositeFilterIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().version),
+        downstream_filter_(GetParam().is_downstream) {}
 
   ExtensionWithMatcherPerRoute createPerRouteConfig(
       std::function<void(envoy::config::core::v3::TypedExtensionConfig*)> base_action_function) {
@@ -223,7 +230,8 @@ resources:
                             type_urls:
                             - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
     )EOF",
-                                                                             name)));
+                                                                             name)),
+                                 downstream_filter_);
   }
 
   const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "GET"},
@@ -247,45 +255,69 @@ resources:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  void testBasic(bool downstream_filter) {
-    downstream_filter_ = downstream_filter;
-    prependCompositeFilter();
-    setUpstreamProtocol(Http::CodecType::HTTP2);
-    initialize();
-
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-
-    {
-      auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
-      waitForNextUpstreamRequest();
-
-      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-      ASSERT_TRUE(response->waitForEndStream());
-      EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  static std::vector<CompositeFilterTestParams> getValuesForCompositeFilterTest() {
+    std::vector<CompositeFilterTestParams> ret;
+    for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+      CompositeFilterTestParams params;
+      params.version = ip_version;
+      params.is_downstream = true;
+      ret.push_back(params);
+      params.version = ip_version;
+      params.is_downstream = false;
+      ret.push_back(params);
     }
+    return ret;
+  }
 
-    {
-      auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
-      ASSERT_TRUE(response->waitForEndStream());
-      EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
-    }
+  static std::string CompositeFilterTestParamsToString(
+      const ::testing::TestParamInfo<CompositeFilterTestParams>& params) {
+    return absl::StrCat(
+        (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+        params.param.is_downstream ? "Downstream" : "Upstream");
   }
 
   bool downstream_filter_{true};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, CompositeFilterIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, CompositeFilterIntegrationTest,
+    testing::ValuesIn(CompositeFilterIntegrationTest::getValuesForCompositeFilterTest()),
+    CompositeFilterIntegrationTest::CompositeFilterTestParamsToString);
 
 // Verifies that if we don't match the match action the request is proxied as normal, while if the
 // match action is hit we apply the specified filter to the stream.
-TEST_P(CompositeFilterIntegrationTest, TestBasic) { testBasic(true); }
+TEST_P(CompositeFilterIntegrationTest, TestBasic) {
+  prependCompositeFilter();
+  if (!downstream_filter_) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+    waitForNextUpstreamRequest();
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  }
+
+  {
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
+  }
+}
 
 // Verifies that if we don't match the match action the request is proxied as normal, while if the
 // match action is hit we apply the specified dynamic filter to the stream.
 TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
+  if (!downstream_filter_) {
+    return;
+  }
   prependCompositeDynamicFilter("composite-dynamic");
+
   initialize();
   test_server_->waitForCounterGe(
       "extension_config_discovery.http_filter.set-response-code.config_reload", 1);
@@ -313,6 +345,9 @@ TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
 // Verifies that if ECDS response is not sent, the missing filter config is applied that returns
 // 500.
 TEST_P(CompositeFilterIntegrationTest, TestMissingDynamicFilter) {
+  if (!downstream_filter_) {
+    return;
+  }
   prependMissingCompositeDynamicFilter("composite-dynamic-missing");
 
   initialize();
@@ -332,6 +367,9 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRoute) {
   prependCompositeFilter();
   addPerRouteResponseCodeFilter(/*filter_name=*/"composite", /*route_prefix=*/"/somepath",
                                 /*code=*/401);
+  if (!downstream_filter_) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -348,6 +386,9 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteResponseCodeConfig) {
   addResponseCodeFilterPerRouteConfig(/*filter_name=*/top_level_filter_name,
                                       /*route_prefix=*/"/somepath",
                                       /*code=*/406);
+  if (!downstream_filter_) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -367,9 +408,13 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcher) {
           name: composite
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
-    )EOF");
+    )EOF",
+                               downstream_filter_);
   addPerRouteResponseCodeFilter(/*filter_name=*/"composite", /*route_prefix=*/"/somepath",
                                 /*code=*/402);
+  if (!downstream_filter_) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
@@ -387,7 +432,8 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcherMultipleFilters) 
           name: composite
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
-    )EOF");
+    )EOF",
+                               downstream_filter_);
   config_helper_.prependFilter(R"EOF(
       name: composite
       typed_config:
@@ -396,12 +442,16 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcherMultipleFilters) 
           name: composite
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
-    )EOF");
+    )EOF",
+                               downstream_filter_);
 
   addPerRouteResponseCodeFilter(/*filter_name=*/"composite", /*route_prefix=*/"/somepath",
                                 /*code=*/407, /*response_prefix=*/true);
   addPerRouteResponseCodeFilter(/*filter_name=*/"composite_2", /*route_prefix=*/"/somepath",
                                 /*code=*/402);
+  if (!downstream_filter_) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -409,9 +459,6 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcherMultipleFilters) 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
 }
-
-// Test the basic functionality when installing the composite filter in the upstream filter chain.
-TEST_P(CompositeFilterIntegrationTest, TestBasicUpstreamFilter) { testBasic(false); }
 
 } // namespace
 class CompositeFilterSeverContextIntegrationTest
