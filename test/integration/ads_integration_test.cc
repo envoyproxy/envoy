@@ -236,8 +236,10 @@ TEST_P(AdsIntegrationTest, ClusterInitializationUpdateOneOfThe2Warming) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
 }
 
+// Verify that Delta SDS Removals don't result in a NACK.
 TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
-  // This test is for delta only
+  // SOTW delivery doesn't track individual resources, so only
+  // run this test for delta xDS.
   if (sotw_or_delta_ != Grpc::SotwOrDelta::Delta &&
       sotw_or_delta_ != Grpc::SotwOrDelta::UnifiedDelta) {
     GTEST_SKIP_("This test is for delta only");
