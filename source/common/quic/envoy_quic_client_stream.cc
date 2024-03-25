@@ -427,8 +427,8 @@ void EnvoyQuicClientStream::OnMetadataComplete(size_t /*frame_len*/,
     onStreamError(true, quic::QUIC_HEADERS_TOO_LARGE);
     return;
   }
-  if (!header_list.empty()) {
-    response_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
+  if (!header_list.empty() && getResponseDecoder() != nullptr) {
+    getResponseDecoder()->decodeMetadata(metadataMapFromHeaderList(header_list));
   }
 }
 
