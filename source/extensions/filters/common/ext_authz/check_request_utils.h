@@ -109,7 +109,7 @@ public:
    */
   static void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
                              envoy::service::auth::v3::CheckRequest& request,
-                             bool include_peer_certificate,
+                             bool include_peer_certificate, bool include_tls_session,
                              const Protobuf::Map<std::string, std::string>& destination_labels);
 
   static MatcherSharedPtr toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,

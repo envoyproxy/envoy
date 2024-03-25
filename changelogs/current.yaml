@@ -384,6 +384,10 @@ new_features:
   change: |
     Added :ref:`configuration option <envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.forward_not_matching_preflights>`
     to return local response when CORS preflight's origin does not match allowed origin.
+- area: ext_authz
+  change: |
+    Added support for populating the :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`
+    check request attribute for network ext_authz by setting :ref:`include_tls_session <config_network_filters_ext_authz>` to true.
 
 deprecated:
 - area: listener

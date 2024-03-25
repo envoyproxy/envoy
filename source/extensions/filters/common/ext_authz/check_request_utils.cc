@@ -230,7 +230,7 @@ void CheckRequestUtils::createHttpCheck(
 
 void CheckRequestUtils::createTcpCheck(
     const Network::ReadFilterCallbacks* callbacks, envoy::service::auth::v3::CheckRequest& request,
-    bool include_peer_certificate,
+    bool include_peer_certificate, bool include_tls_session,
     const Protobuf::Map<std::string, std::string>& destination_labels) {
 
   auto attrs = request.mutable_attributes();
@@ -242,6 +242,15 @@ void CheckRequestUtils::createTcpCheck(
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), server_name, true,
                      include_peer_certificate);
+  if (include_tls_session) {
+    if (cb->connection().ssl() != nullptr) {
+      attrs->mutable_tls_session();
+      if (!cb->connection().ssl()->sni().empty()) {
+        const std::string server_name(cb->connection().ssl()->sni());
+        attrs->mutable_tls_session()->set_sni(server_name);
+      }
+    }
+  }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
 }
 
