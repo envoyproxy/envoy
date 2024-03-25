@@ -172,7 +172,7 @@ void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reaso
 }
 
 absl::Status SdsApi::validateUpdateSize(uint32_t added_resources_num,
-                                        uint32_t removed_resources_num) {
+                                        uint32_t removed_resources_num) const {
   if (added_resources_num == 0 && removed_resources_num == 0) {
     return absl::InvalidArgumentError(
         fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
