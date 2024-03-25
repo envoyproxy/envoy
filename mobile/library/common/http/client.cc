@@ -368,6 +368,7 @@ void Client::DirectStreamCallbacks::onCancel() {
       http_client_.stats().on_cancel_callback_latency_, http_client_.timeSource());
 
   bridge_callbacks_.on_cancel(streamIntel(), finalStreamIntel(), bridge_callbacks_.context);
+
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
@@ -524,8 +525,7 @@ void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks 
 
   // Note: streams created by Envoy Mobile are tagged as is_internally_created. This means that
   // the Http::ConnectionManager _will not_ sanitize headers when creating a stream.
-  // No need to register a destruction callback to the decoder as the return
-  // value already takes care of the decoder life time.
+  // This interface directly returns a handle which takes care of the decoder life time.
   direct_stream->request_decoder_ =
       api_listener_->newStreamHandle(*direct_stream->callbacks_, true /* is_internally_created */);
 

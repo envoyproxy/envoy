@@ -1,7 +1,5 @@
 #pragma once
 
-#include <type_traits>
-
 #include "source/common/quic/envoy_quic_stream.h"
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS

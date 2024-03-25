@@ -108,8 +108,8 @@ private:
   DestructionStatePtr destruction_state_;
 };
 
-// A template to hold and provide a single shared handle of an object during its life time.
-// request/response encoder and decoder
+// A template to hold and provide a single shared handle of an object of request/response encoder or
+// decoder during its life time.
 template <class ObjectType> class ObjectHandleProvider {
 public:
   // Subclasses can override this to provide a meaningful destruction state.
@@ -203,6 +203,7 @@ public:
   virtual void enableTcpTunneling() PURE;
 
 protected:
+  // Overridden to provide a handle to this object itself.
   std::shared_ptr<ObjectHandle<RequestEncoder>> createHandle() override {
     return std::make_shared<ObjectHandle<RequestEncoder>>(this);
   }
@@ -342,6 +343,7 @@ public:
   virtual std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() PURE;
 
 protected:
+  // Overridden to provide a handle to this object itself.
   std::shared_ptr<ObjectHandle<RequestDecoder>> createHandle() override {
     return std::make_shared<ObjectHandle<RequestDecoder>>(this);
   }
@@ -397,26 +399,40 @@ using ResponseDecoderHandleSharedPtr = std::shared_ptr<ObjectHandle<ResponseDeco
  * Callbacks that fire against a stream.
  */
 class StreamCallbacks {
-
 public:
+  /**
+   * An interface to register StreamCallbacks for its callbacks. And it cross references with
+   * StreamCallbacks to notify each other when the other side gets destroyed.*/
   class StreamCallbacksRegistry {
   public:
     virtual ~StreamCallbacksRegistry() = default;
 
+    /**
+     * Called to register callbacks.
+     */
     void addCallbacksHelper(StreamCallbacks& callbacks) {
       registerStreamCallbacks(callbacks);
       ASSERT(callbacks.registry_ == nullptr);
       callbacks.registry_ = this;
     }
 
+    /**
+     * Called to unregister callbacks if it has been registered.
+     */
     void removeCallbacksHelper(StreamCallbacks& callbacks) {
       unregisterStreamCallbacks(callbacks);
       callbacks.registry_ = nullptr;
     }
 
   protected:
+    /**
+     * Actually do the registration for the given callbacks.
+     */
     virtual void registerStreamCallbacks(StreamCallbacks& callbacks) PURE;
 
+    /**
+     * Actually unregister the given callbacks.
+     */
     virtual void unregisterStreamCallbacks(StreamCallbacks& callbacks) PURE;
   };
 

@@ -1,4 +1,3 @@
-#include "conn_manager_impl.h"
 #include "source/common/http/conn_manager_impl.h"
 
 #include <chrono>
