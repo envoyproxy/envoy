@@ -44,7 +44,6 @@ src_files = glob([
 test_suite(
     name = "ci_tests",
     tests = [
-        "http2_adapter_callback_visitor_test",
         "http2_adapter_event_forwarder_test",
         "http2_adapter_header_validator_test",
         "http2_adapter_impl_comparison_test",
@@ -90,22 +89,6 @@ envoy_cc_library(
         ":http2_adapter_nghttp2_util",
         ":quiche_common_callbacks",
         ":quiche_common_platform_export",
-    ],
-)
-
-envoy_cc_test(
-    name = "http2_adapter_callback_visitor_test",
-    srcs = ["quiche/http2/adapter/callback_visitor_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_callback_visitor",
-        ":http2_adapter_mock_nghttp2_callbacks",
-        ":http2_adapter_nghttp2_adapter",
-        ":http2_adapter_nghttp2_test_utils",
-        ":http2_adapter_test_frame_sequence",
-        ":http2_adapter_test_utils",
-        ":quiche_common_platform_test",
     ],
 )
 
