@@ -509,12 +509,25 @@ void ListenerImpl::buildInternalListener(const envoy::config::listener::v3::List
         parent_.server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
             "internal_listener_registry_singleton");
     if (internal_listener_registry == nullptr) {
-      throw EnvoyException(fmt::format(
-          "error adding listener named '{}': internal listener registry is not initialized.",
-          name_));
+      // The internal listener registry may be uninitialized when in Validate mode.
+      // Hence we check the configuration directly to ensure the bootstrap extension
+      // InternalListener is present.
+      if (absl::c_none_of(
+              listener_factory_context_->serverFactoryContext().bootstrap().bootstrap_extensions(),
+              [=](const auto& extension) {
+                return extension.typed_config().type_url() ==
+                       "type.googleapis.com/"
+                       "envoy.extensions.bootstrap.internal_listener.v3.InternalListener";
+              })) {
+        throw EnvoyException(fmt::format(
+            "error adding listener named '{}': InternalListener bootstrap extension is mandatory",
+            name_));
+      }
+      internal_listener_config_ = nullptr;
+    } else {
+      internal_listener_config_ =
+          std::make_unique<InternalListenerConfigImpl>(*internal_listener_registry);
     }
-    internal_listener_config_ =
-        std::make_unique<InternalListenerConfigImpl>(*internal_listener_registry);
   } else if (config.address().has_envoy_internal_address() ||
              std::any_of(config.additional_addresses().begin(), config.additional_addresses().end(),
                          [](const envoy::config::listener::v3::AdditionalAddress& proto_address) {

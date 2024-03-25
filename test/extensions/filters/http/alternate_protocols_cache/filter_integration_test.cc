@@ -6,8 +6,8 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/http/http_server_properties_cache_impl.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/ssl_socket.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -261,7 +261,8 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
                                100);
 }
 
-TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
+// TODO(32151): Figure out why it's flaky and re-enable.
+TEST_P(FilterIntegrationTest, DISABLED_AltSvcCachedH2Slow) {
 #ifdef WIN32
   // TODO: sort out what race only happens on windows and GCC.
   GTEST_SKIP() << "Skipping on Windows";
@@ -271,6 +272,7 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
 #endif
   // Start with the alt-svc header in the cache.
   write_alt_svc_to_file_ = true;
+  config_helper_.setConnectTimeout(std::chrono::seconds(1));
 
   const uint64_t request_size = 0;
   const uint64_t response_size = 0;

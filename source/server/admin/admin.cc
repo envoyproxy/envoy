@@ -277,7 +277,8 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
       connection, data, callbacks, *server_.stats().rootScope(), server_.api().randomGenerator(),
       http1_codec_stats_, http2_codec_stats_, Http::Http1Settings(),
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions()),
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value(),
       maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
       overload_manager);
 }
@@ -296,7 +297,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
 bool AdminImpl::createFilterChain(Http::FilterChainManager& manager, bool,
                                   const Http::FilterChainOptions&) const {
   Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addStreamFilter(std::make_shared<AdminFilter>(createRequestFunction()));
+    callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
   };
   manager.applyFilterFactoryCb({}, factory);
   return true;
@@ -497,7 +498,7 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
-  AdminFilter filter(createRequestFunction());
+  AdminFilter filter(*this);
 
   auto request_headers = Http::RequestHeaderMapImpl::create();
   request_headers->setMethod(method);

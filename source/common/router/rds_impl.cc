@@ -82,7 +82,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() { config_update_info_.release(); }
 
-void RdsRouteConfigSubscription::beforeProviderUpdate(
+absl::Status RdsRouteConfigSubscription::beforeProviderUpdate(
     std::unique_ptr<Init::ManagerImpl>& noop_init_manager, std::unique_ptr<Cleanup>& resume_rds) {
   if (config_update_info_->protobufConfigurationCast().has_vhds() &&
       config_update_info_->vhdsConfigurationChanged()) {
@@ -92,11 +92,14 @@ void RdsRouteConfigSubscription::beforeProviderUpdate(
     ASSERT(config_update_info_->configInfo().has_value());
     maybeCreateInitManager(routeConfigUpdate()->configInfo().value().version_, noop_init_manager,
                            resume_rds);
-    vhds_subscription_ = std::make_unique<VhdsSubscription>(config_update_info_, factory_context_,
-                                                            stat_prefix_, route_config_provider_);
+    auto subscription_or_error = VhdsSubscription::createVhdsSubscription(
+        config_update_info_, factory_context_, stat_prefix_, route_config_provider_);
+    RETURN_IF_STATUS_NOT_OK(subscription_or_error);
+    vhds_subscription_ = std::move(subscription_or_error.value());
     vhds_subscription_->registerInitTargetWithInitManager(
         noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);
   }
+  return absl::OkStatus();
 }
 
 void RdsRouteConfigSubscription::afterProviderUpdate() {

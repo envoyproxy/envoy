@@ -29,7 +29,35 @@ public:
 
   void TearDown() override { fake_upstream_connection_.reset(); }
 
-  void setupLambdaFilter(bool passthrough) {
+  void addUpstreamProtocolOptions() {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+      protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
+      protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+      ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+    });
+  }
+
+  void replaceRoute() {
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+          vhost->clear_routes();
+          auto route = vhost->add_routes();
+          auto* match = route->mutable_match();
+          match->set_prefix("/api/lambda/");
+          auto* action = route->mutable_route();
+          action->set_cluster("cluster_0");
+          action->set_prefix_rewrite("/new_path/");
+          action->set_host_rewrite_literal("lambda.us-east-2.amazonaws.com");
+        });
+  }
+
+  void setupLambdaFilter(bool passthrough, bool downstream) {
     constexpr absl::string_view filter =
         R"EOF(
             name: envoy.filters.http.aws_lambda
@@ -38,13 +66,18 @@ public:
               arn: "arn:aws:lambda:us-west-2:123456789:function:test"
               payload_passthrough: {}
             )EOF";
-    config_helper_.prependFilter(fmt::format(filter, passthrough));
+    config_helper_.prependFilter(fmt::format(filter, passthrough), downstream);
 
-    constexpr auto metadata_yaml = R"EOF(
+    if (!downstream) {
+      addUpstreamProtocolOptions();
+      replaceRoute();
+    } else {
+      constexpr auto metadata_yaml = R"EOF(
         com.amazonaws.lambda:
           egress_gateway: true
         )EOF";
-    config_helper_.addClusterFilterMetadata(metadata_yaml);
+      config_helper_.addClusterFilterMetadata(metadata_yaml);
+    }
   }
 
   template <typename TMap>
@@ -157,8 +190,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AwsLambdaFilterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(AwsLambdaFilterIntegrationTest, JsonWrappedHeaderOnlyRequest) {
-  setupLambdaFilter(false /*passthrough*/);
+TEST_P(AwsLambdaFilterIntegrationTest, JsonWrappedHeaderOnlyRequestDownstream) {
+  setupLambdaFilter(false /*passthrough*/, true);
   HttpIntegrationTest::initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
@@ -203,7 +236,7 @@ TEST_P(AwsLambdaFilterIntegrationTest, JsonWrappedHeaderOnlyRequest) {
 }
 
 TEST_P(AwsLambdaFilterIntegrationTest, JsonWrappedPlainBody) {
-  setupLambdaFilter(false /*passthrough*/);
+  setupLambdaFilter(false /*passthrough*/, true);
   HttpIntegrationTest::initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
@@ -252,7 +285,7 @@ TEST_P(AwsLambdaFilterIntegrationTest, JsonWrappedPlainBody) {
 }
 
 TEST_P(AwsLambdaFilterIntegrationTest, JsonWrappedBinaryBody) {
-  setupLambdaFilter(false /*passthrough*/);
+  setupLambdaFilter(false /*passthrough*/, true);
   HttpIntegrationTest::initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
@@ -296,6 +329,51 @@ TEST_P(AwsLambdaFilterIntegrationTest, JsonWrappedBinaryBody) {
   std::vector<std::string> expected_response_cookies{"user=John", "session-id=1337"};
   constexpr auto expected_response_body = "AWS Lambda is cheap!";
   runTest(request_headers, request_body, expected_json_request, lambda_response_headers,
+          lambda_response_body, expected_response_headers, expected_response_cookies,
+          expected_response_body);
+}
+
+TEST_P(AwsLambdaFilterIntegrationTest, UpstreamShouldBeProcessedAfterRoute) {
+  setupLambdaFilter(false /*passthrough*/, false);
+  HttpIntegrationTest::initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
+                                                 {":method", "GET"},
+                                                 {":path", "/api/lambda/resize?type=jpg"},
+                                                 {":authority", "host"},
+                                                 {"s3-location", "mybucket/images/123.jpg"}};
+  constexpr auto expected_json_request = R"EOF(
+  {
+    "rawPath": "/new_path/resize?type=jpg",
+    "method": "GET",
+    "headers":{ "s3-location": "mybucket/images/123.jpg"},
+    "queryStringParameters": {"type":"jpg"},
+    "body": "",
+    "isBase64Encoded": false
+  }
+  )EOF";
+
+  const std::string lambda_response_body = R"EOF(
+  {
+      "body": "my-bucket/123-small.jpg",
+      "isBase64Encoded": false,
+      "statusCode": 200,
+      "cookies": ["user=John", "session-id=1337"],
+      "headers": {"x-amz-custom-header": "envoy,proxy"}
+  }
+  )EOF";
+
+  Http::TestResponseHeaderMapImpl lambda_response_headers{
+      {":status", "201"},
+      {"content-type", "application/json"},
+      {"content-length", fmt::format("{}", lambda_response_body.length())}};
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"},
+                                                            {"content-type", "application/json"},
+                                                            {"x-amz-custom-header", "envoy,proxy"}};
+  std::vector<std::string> expected_response_cookies{"user=John", "session-id=1337"};
+  constexpr auto expected_response_body = "my-bucket/123-small.jpg";
+  runTest(request_headers, "" /*request_body*/, expected_json_request, lambda_response_headers,
           lambda_response_body, expected_response_headers, expected_response_cookies,
           expected_response_body);
 }

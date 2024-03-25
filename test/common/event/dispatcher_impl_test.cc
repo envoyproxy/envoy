@@ -1377,8 +1377,8 @@ public:
 TEST_F(TimerUtilsTest, TimerNegativeValueThrows) {
   timeval tv;
   const int negative_sample = -1;
-  EXPECT_THROW_WITH_MESSAGE(
-      TimerUtils::durationToTimeval(std::chrono::seconds(negative_sample), tv), EnvoyException,
+  EXPECT_ENVOY_BUG(
+      TimerUtils::durationToTimeval(std::chrono::seconds(negative_sample), tv),
       fmt::format("Negative duration passed to durationToTimeval(): {}", negative_sample));
 }
 

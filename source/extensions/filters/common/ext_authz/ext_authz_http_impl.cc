@@ -11,10 +11,10 @@
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/codes.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
-#include "check_request_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -103,17 +103,20 @@ struct SuccessResponse {
 
 // Config
 ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-                           uint32_t timeout, absl::string_view path_prefix)
+                           uint32_t timeout, absl::string_view path_prefix,
+                           Server::Configuration::CommonFactoryContext& context)
     : client_header_matchers_(toClientMatchers(
-          config.http_service().authorization_response().allowed_client_headers())),
+          config.http_service().authorization_response().allowed_client_headers(), context)),
       client_header_on_success_matchers_(toClientMatchersOnSuccess(
-          config.http_service().authorization_response().allowed_client_headers_on_success())),
+          config.http_service().authorization_response().allowed_client_headers_on_success(),
+          context)),
       to_dynamic_metadata_matchers_(toDynamicMetadataMatchers(
-          config.http_service().authorization_response().dynamic_metadata_from_headers())),
+          config.http_service().authorization_response().dynamic_metadata_from_headers(), context)),
       upstream_header_matchers_(toUpstreamMatchers(
-          config.http_service().authorization_response().allowed_upstream_headers())),
+          config.http_service().authorization_response().allowed_upstream_headers(), context)),
       upstream_header_to_append_matchers_(toUpstreamMatchers(
-          config.http_service().authorization_response().allowed_upstream_headers_to_append())),
+          config.http_service().authorization_response().allowed_upstream_headers_to_append(),
+          context)),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
@@ -122,20 +125,26 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)) {}
 
 MatcherSharedPtr
-ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  std::vector<Matchers::StringMatcherPtr> matchers(CheckRequestUtils::createStringMatchers(list));
+ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,
+                                        Server::Configuration::CommonFactoryContext& context) {
+  std::vector<Matchers::StringMatcherPtr> matchers(
+      CheckRequestUtils::createStringMatchers(list, context));
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
 
 MatcherSharedPtr
-ClientConfig::toDynamicMetadataMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  std::vector<Matchers::StringMatcherPtr> matchers(CheckRequestUtils::createStringMatchers(list));
+ClientConfig::toDynamicMetadataMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                                        Server::Configuration::CommonFactoryContext& context) {
+  std::vector<Matchers::StringMatcherPtr> matchers(
+      CheckRequestUtils::createStringMatchers(list, context));
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
 
 MatcherSharedPtr
-ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  std::vector<Matchers::StringMatcherPtr> matchers(CheckRequestUtils::createStringMatchers(list));
+ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                               Server::Configuration::CommonFactoryContext& context) {
+  std::vector<Matchers::StringMatcherPtr> matchers(
+      CheckRequestUtils::createStringMatchers(list, context));
 
   // If list is empty, all authorization response headers, except Host, should be added to
   // the client response.
@@ -144,7 +153,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
     matcher.set_exact(Http::Headers::get().Host.get());
     matchers.push_back(
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher));
+            matcher, context));
 
     return std::make_shared<NotHeaderKeyMatcher>(std::move(matchers));
   }
@@ -160,15 +169,16 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
     matcher.set_exact(key.get());
     matchers.push_back(
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher));
+            matcher, context));
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
 
 MatcherSharedPtr
-ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  return std::make_unique<HeaderKeyMatcher>(CheckRequestUtils::createStringMatchers(list));
+ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                                 Server::Configuration::CommonFactoryContext& context) {
+  return std::make_unique<HeaderKeyMatcher>(CheckRequestUtils::createStringMatchers(list, context));
 }
 
 RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)

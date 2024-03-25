@@ -31,21 +31,15 @@ constexpr absl::string_view RouterFilterName = "envoy.filters.generic.router";
 } // namespace
 
 void GenericUpstream::writeToConnection(Buffer::Instance& buffer) {
-  if (is_cleaned_up_) {
-    return;
-  }
-
-  if (owned_conn_data_ != nullptr) {
-    ASSERT(owned_conn_data_->connection().state() == Network::Connection::State::Open);
+  if (owned_conn_data_ != nullptr &&
+      owned_conn_data_->connection().state() == Network::Connection::State::Open) {
     owned_conn_data_->connection().write(buffer, false);
   }
 }
 
 OptRef<Network::Connection> GenericUpstream::connection() {
-  if (is_cleaned_up_) {
-    return {};
-  }
-  if (owned_conn_data_ != nullptr) {
+  if (owned_conn_data_ != nullptr &&
+      owned_conn_data_->connection().state() == Network::Connection::State::Open) {
     return {owned_conn_data_->connection()};
   }
   return {};
@@ -286,7 +280,8 @@ UpstreamRequest::UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr 
   expects_response_ = !options.oneWayStream();
 
   // Set tracing config.
-  if (tracing_config_ = parent_.callbacks_->tracingConfig(); tracing_config_.has_value()) {
+  tracing_config_ = parent_.callbacks_->tracingConfig();
+  if (tracing_config_.has_value() && tracing_config_->spawnUpstreamSpan()) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         tracing_config_.value().get(),
         absl::StrCat("router ", parent_.cluster_->observabilityName(), " egress"),
@@ -300,10 +295,10 @@ void UpstreamRequest::startStream() {
 }
 
 void UpstreamRequest::resetStream(StreamResetReason reason) {
-  if (stream_reset_) {
+  if (reset_or_response_complete_) {
     return;
   }
-  stream_reset_ = true;
+  reset_or_response_complete_ = true;
 
   ENVOY_LOG(debug, "generic proxy upstream request: reset upstream request");
 
@@ -328,9 +323,10 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
 void UpstreamRequest::clearStream(bool close_connection) {
   // Set the upstream response complete flag to true first to ensure the possible
   // connection close event will not be handled.
-  response_complete_ = true;
+  reset_or_response_complete_ = true;
 
-  ENVOY_LOG(debug, "generic proxy upstream request: complete upstream request");
+  ENVOY_LOG(debug, "generic proxy upstream request: complete upstream request ()",
+            close_connection);
 
   if (span_ != nullptr) {
     TraceContextBridge trace_context{*parent_.request_stream_};
@@ -462,12 +458,22 @@ void UpstreamRequest::onDecodingSuccess(StreamFramePtr response) {
   }
 }
 
-void UpstreamRequest::onDecodingFailure() { resetStream(StreamResetReason::ProtocolError); }
+void UpstreamRequest::onDecodingFailure() {
+  // Decoding failure after the response is complete, close the connection.
+  // This should only happen when some special cases, for example:
+  // The HTTP response is complete but the request is not fully sent.
+  // The codec will throw an error after the response is complete.
+  if (reset_or_response_complete_) {
+    generic_upstream_->cleanUp(true);
+    return;
+  }
+  resetStream(StreamResetReason::ProtocolError);
+}
 
 void UpstreamRequest::onConnectionClose(Network::ConnectionEvent event) {
   // If the upstream response is complete or the upstream request is reset then
   // ignore the connection close event.
-  if (response_complete_ || stream_reset_) {
+  if (reset_or_response_complete_) {
     return;
   }
 
@@ -555,20 +561,21 @@ void RouterFilter::resetStream(StreamResetReason reason) {
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::ProtocolError:
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError);
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::ConnectionFailure:
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+    callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::ConnectionTermination:
     callbacks_->streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UpstreamConnectionTermination);
+        StreamInfo::CoreResponseFlag::UpstreamConnectionTermination);
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::Overflow:
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   }
@@ -580,7 +587,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
   auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
     filter_complete_ = true;
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoClusterFound);
     callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"));
     return;
   }
@@ -612,7 +619,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
       auto pool_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
       if (!pool_data.has_value()) {
         filter_complete_ = true;
-        callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
+        callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
         callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"));
         return;
       }
@@ -632,7 +639,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
     auto pool_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
     if (!pool_data.has_value()) {
       filter_complete_ = true;
-      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
+      callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
       callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"));
       return;
     }
@@ -671,7 +678,7 @@ FilterStatus RouterFilter::onStreamDecoded(StreamRequest& request) {
 
   ENVOY_LOG(debug, "No route for current request and send local reply");
   filter_complete_ = true;
-  callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+  callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
   callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "route_not_found"));
   return FilterStatus::StopIteration;
 }

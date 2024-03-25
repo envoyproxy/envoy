@@ -1,12 +1,11 @@
 package test.kotlin.integration
 
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
 class EnvoyEngineSimpleIntegrationTest {
-
   init {
     JniLibrary.loadTestLibrary()
   }

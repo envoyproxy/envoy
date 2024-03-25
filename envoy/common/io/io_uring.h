@@ -450,23 +450,27 @@ public:
 };
 
 /**
- * Abstract factory for IoUring wrappers.
+ * Abstract factory for IoUringWorker wrappers.
  */
-class IoUringFactory {
+class IoUringWorkerFactory {
 public:
-  virtual ~IoUringFactory() = default;
+  virtual ~IoUringWorkerFactory() = default;
 
   /**
-   * Returns an instance of IoUring and creates it if needed for the current
-   * thread.
+   * Returns the current thread's IoUringWorker. If the thread have not registered a IoUringWorker,
+   * an absl::nullopt will be returned.
    */
-  virtual IoUring& getOrCreate() const PURE;
+  virtual OptRef<IoUringWorker> getIoUringWorker() PURE;
 
   /**
-   * Initializes a factory upon server readiness. For example this method can be
-   * used to set TLS.
+   * Initializes a IoUringWorkerFactory upon server readiness. The method is used to set the TLS.
    */
-  virtual void onServerInitialized() PURE;
+  virtual void onWorkerThreadInitialized() PURE;
+
+  /**
+   * Indicates whether the current thread has been registered for a IoUringWorker.
+   */
+  virtual bool currentThreadRegistered() PURE;
 };
 
 } // namespace Io

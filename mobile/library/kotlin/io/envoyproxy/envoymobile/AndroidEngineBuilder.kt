@@ -10,7 +10,13 @@ constructor(context: Context, baseConfiguration: BaseConfiguration = Standard())
   EngineBuilder(baseConfiguration) {
   init {
     addEngineType {
-      AndroidEngineImpl(context, onEngineRunning, logger, eventTracker, enableProxying)
+      AndroidEngineImpl(
+        context,
+        onEngineRunning,
+        { level, msg -> logger?.let { it(LogLevel.from(level), msg) } },
+        eventTracker,
+        enableProxying
+      )
     }
   }
 }

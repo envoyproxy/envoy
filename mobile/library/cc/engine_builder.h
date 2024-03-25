@@ -12,13 +12,11 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
-#include "direct_response_testing.h"
-#include "engine.h"
-#include "engine_callbacks.h"
-#include "key_value_store.h"
-#include "library/common/types/matcher_data.h"
-#include "log_level.h"
-#include "string_accessor.h"
+#include "library/cc/engine.h"
+#include "library/cc/key_value_store.h"
+#include "library/cc/log_level.h"
+#include "library/cc/string_accessor.h"
+#include "library/common/engine_types.h"
 
 namespace Envoy {
 namespace Platform {
@@ -123,10 +121,16 @@ private:
 class EngineBuilder {
 public:
   EngineBuilder();
-  virtual ~EngineBuilder() {}
+  EngineBuilder(EngineBuilder&&) = default;
+  virtual ~EngineBuilder() = default;
 
-  EngineBuilder& addLogLevel(LogLevel log_level);
-  EngineBuilder& setOnEngineRunning(std::function<void()> closure);
+  [[deprecated("Use EngineBuilder::setLogLevel instead")]] EngineBuilder&
+  addLogLevel(LogLevel log_level);
+  EngineBuilder& setLogLevel(Logger::Logger::Levels log_level);
+  EngineBuilder& setLogger(std::unique_ptr<EnvoyLogger> logger);
+  EngineBuilder& setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks);
+  [[deprecated("Use EngineBuilder::setEngineCallbacks instead")]] EngineBuilder&
+  setOnEngineRunning(std::function<void()> closure);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
@@ -154,6 +158,7 @@ public:
   EngineBuilder& setHttp3ClientConnectionOptions(std::string options);
   EngineBuilder& addQuicHint(std::string host, int port);
   EngineBuilder& addQuicCanonicalSuffix(std::string suffix);
+  EngineBuilder& enablePortMigration(bool enable_port_migration);
 #endif
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
@@ -189,6 +194,14 @@ public:
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
   EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
 
+#if defined(__APPLE__)
+  // Right now, this API is only used by Apple (iOS) to register the Apple proxy resolver API for
+  // use in reading and using the system proxy settings.
+  // If/when we move Android system proxy registration to the C++ Engine Builder, we will make this
+  // API available on all platforms.
+  EngineBuilder& respectSystemProxySettings(bool value);
+#endif
+
   // This is separated from build() for the sake of testability
   virtual std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> generateBootstrap() const;
 
@@ -203,8 +216,9 @@ private:
     std::string typed_config_;
   };
 
-  LogLevel log_level_ = LogLevel::info;
-  EngineCallbacksSharedPtr callbacks_;
+  Logger::Logger::Levels log_level_ = Logger::Logger::Levels::info;
+  std::unique_ptr<EnvoyLogger> logger_{nullptr};
+  std::unique_ptr<EngineCallbacks> callbacks_;
 
   int connect_timeout_seconds_ = 30;
   int dns_refresh_seconds_ = 60;
@@ -239,7 +253,12 @@ private:
   std::string http3_client_connection_options_ = "";
   std::vector<std::pair<std::string, int>> quic_hints_;
   std::vector<std::string> quic_suffixes_;
+  bool enable_port_migration_ = false;
   bool always_use_v6_ = false;
+#if defined(__APPLE__)
+  // TODO(abeyad): once stable, consider setting the default to true.
+  bool respect_system_proxy_settings_ = false;
+#endif
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;
 

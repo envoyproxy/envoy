@@ -2782,14 +2782,6 @@ TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
                                         factories_);
 }
 
-TEST_F(DefaultCredentialsProviderChainTest, CredentialsFileDisabled) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_aws_credentials_file", "false"}});
-  EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_))).Times(0);
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _));
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
-                                        factories_);
-}
-
 TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));

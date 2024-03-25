@@ -18,15 +18,6 @@ exports_files([
 ])
 
 go_proto_compiler(
-    name = "pgv_plugin_go",
-    options = ["lang=go"],
-    plugin = "@com_envoyproxy_protoc_gen_validate//:protoc-gen-validate",
-    suffix = ".pb.validate.go",
-    valid_archive = False,
-    visibility = ["//visibility:public"],
-)
-
-go_proto_compiler(
     name = "vtprotobuf_plugin_go",
     options = ["features=marshal_strict+size"],
     plugin = "@com_github_planetscale_vtprotobuf//cmd/protoc-gen-go-vtproto",

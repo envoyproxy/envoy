@@ -27,11 +27,13 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
       stats_(stats), api_(api), validation_visitor_(validation_visitor) {
   if (!path_config_source.has_watched_directory()) {
     file_watcher_ = dispatcher.createFilesystemWatcher();
-    file_watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
-      if (started_) {
-        refresh();
-      }
-    });
+    THROW_IF_NOT_OK(
+        file_watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
+          if (started_) {
+            refresh();
+          }
+          return absl::OkStatus();
+        }));
   } else {
     directory_watcher_ =
         std::make_unique<WatchedDirectory>(path_config_source.watched_directory(), dispatcher);
@@ -39,6 +41,7 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
       if (started_) {
         refresh();
       }
+      return absl::OkStatus();
     });
   }
 }

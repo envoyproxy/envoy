@@ -50,6 +50,10 @@ Since these stats utilize the underlying cluster scope, we prefix with the ``thr
   thrift.upstream_cx_drain_close, Counter, Total upstream connections that were closed due to draining.
   thrift.downstream_cx_partial_response_close, Counter, Total downstream connections that were closed due to the partial response.
   thrift.downstream_cx_underflow_response_close, Counter, Total downstream connections that were closed due to the underflow response.
+  thrift.upstream_resp_exception_local.overflow, Counter, Total responses with the "Exception" message type generated locally by connection pool overflow.
+  thrift.upstream_resp_exception_local.local_connection_failure, Counter, Total responses with the "Exception" message type generated locally by local connection failure.
+  thrift.upstream_resp_exception_local.remote_connection_failure", Counter, Total responses with the "Exception" message type generated locally by remote connection failure.
+  thrift.upstream_resp_exception_local.timeout, Counter, Total responses with the "Exception" message type generated locally by timeout while creating a new connection.
 
 If the service zone is available for both the local service (via :option:`--service-zone`)
 and the :ref:`upstream cluster <arch_overview_service_discovery_types_eds>`,

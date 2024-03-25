@@ -37,8 +37,10 @@ using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
 AccessLog::AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogManager& log_manager,
                      TimeSource& time_source)
     : time_source_(time_source) {
-  file_ = log_manager.createAccessLog(
+  auto file_or_error = log_manager.createAccessLog(
       Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name});
+  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  file_ = file_or_error.value();
 }
 
 void AccessLog::logMessage(const Message& message, bool full,

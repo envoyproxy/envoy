@@ -1,39 +1,27 @@
-package test.kotlin.integration;
+package test.java.integration;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.google.common.truth.Truth.assertThat;
 
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Engine;
-import io.envoyproxy.envoymobile.EnvoyError;
-import io.envoyproxy.envoymobile.FinalStreamIntel;
 import io.envoyproxy.envoymobile.LogLevel;
-import io.envoyproxy.envoymobile.RequestHeaders;
-import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
-import io.envoyproxy.envoymobile.ResponseHeaders;
-import io.envoyproxy.envoymobile.ResponseTrailers;
 import io.envoyproxy.envoymobile.Stream;
-import io.envoyproxy.envoymobile.StreamIntel;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.testing.RequestScenario;
 import io.envoyproxy.envoymobile.engine.testing.Response;
-import java.net.MalformedURLException;
-import java.net.URL;
+
 import java.nio.ByteBuffer;
-import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
@@ -204,7 +192,7 @@ public class AndroidEnvoyExplicitFlowTest {
     assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
     assertThat(response.getBodyAsString()).isEmpty();
     assertThat(response.getEnvoyError()).isNull();
-    assertThat(response.getNbResponseChunks()).isZero();
+    assertThat(response.getNbResponseChunks()).isEqualTo(0);
   }
 
   @Test
@@ -400,7 +388,7 @@ public class AndroidEnvoyExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     assertThat(response.isCancelled()).isTrue();
-    assertThat(response.getRequestChunkSent()).isZero();
+    assertThat(response.getRequestChunkSent()).isEqualTo(0);
     assertThat(response.getEnvoyError()).isNull();
   }
 
@@ -416,7 +404,7 @@ public class AndroidEnvoyExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     assertThat(response.isCancelled()).isTrue();
-    assertThat(response.getRequestChunkSent()).isOne();
+    assertThat(response.getRequestChunkSent()).isEqualTo(1);
     assertThat(response.getEnvoyError()).isNull();
   }
 

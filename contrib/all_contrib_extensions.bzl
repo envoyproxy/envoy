@@ -18,6 +18,7 @@ ARM64_SKIP_CONTRIB_TARGETS = [
     "envoy.tls.key_providers.qat",
     "envoy.network.connection_balance.dlb",
     "envoy.compression.qatzip.compressor",
+    "envoy.compression.qatzstd.compressor",
 ]
 PPC_SKIP_CONTRIB_TARGETS = [
     "envoy.tls.key_providers.cryptomb",
@@ -25,6 +26,11 @@ PPC_SKIP_CONTRIB_TARGETS = [
     "envoy.matching.input_matchers.hyperscan",
     "envoy.network.connection_balance.dlb",
     "envoy.regex_engines.hyperscan",
+    "envoy.compression.qatzip.compressor",
+    "envoy.compression.qatzstd.compressor",
+]
+
+FIPS_LINUX_X86_SKIP_CONTRIB_TARGETS = [
     "envoy.compression.qatzip.compressor",
 ]
 

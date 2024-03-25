@@ -112,7 +112,7 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
    *   made of its exact value.
    * @return this builder.
    */
-  public fun addClusterDiscoveryService(
+  fun addClusterDiscoveryService(
     cdsResourcesLocator: String? = null,
     timeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
   ): XdsBuilder {
@@ -130,12 +130,16 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
 /** Builder used for creating and running a new `Engine` instance. */
 open class EngineBuilder(private val configuration: BaseConfiguration = Standard()) {
   protected var onEngineRunning: (() -> Unit) = {}
-  protected var logger: ((String) -> Unit)? = null
+  protected var logger: ((LogLevel, String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
   private var runtimeGuards = mutableMapOf<String, Boolean>()
   private var engineType: () -> EnvoyEngine = {
-    EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
+    EnvoyEngineImpl(
+      onEngineRunning,
+      { level, msg -> logger?.let { it(LogLevel.from(level), msg) } },
+      eventTracker
+    )
   }
   private var logLevel = LogLevel.INFO
   private var connectTimeoutSeconds = 30
@@ -155,6 +159,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var quicCanonicalSuffixes = mutableListOf<String>()
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
+  private var enablePortMigration = false
   private var enableSocketTagging = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
@@ -320,6 +325,17 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   }
 
   /**
+   * Specify whether to do quic port migration or not. Defaults to false.
+   *
+   * @param enablePortMigration whether or not to allow quic port migration.
+   * @return This builder.
+   */
+  fun enablePortMigration(enablePortMigration: Boolean): EngineBuilder {
+    this.enablePortMigration = enablePortMigration
+    return this
+  }
+
+  /**
    * Specify whether to support socket tagging or not. Defaults to false.
    *
    * @param enableSocketTagging whether or not support socket tagging.
@@ -474,7 +490,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
    * @param closure: The closure to be called.
    * @return This builder.
    */
-  fun setLogger(closure: (String) -> Unit): EngineBuilder {
+  fun setLogger(closure: (LogLevel, String) -> Unit): EngineBuilder {
     this.logger = closure
     return this
   }
@@ -651,6 +667,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         quicCanonicalSuffixes,
         enableGzipDecompression,
         enableBrotliDecompression,
+        enablePortMigration,
         enableSocketTagging,
         enableInterfaceBinding,
         h2ConnectionKeepaliveIdleIntervalMilliseconds,

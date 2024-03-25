@@ -17,6 +17,7 @@ envoy_sh_test(
     data = [
         ":configs",
     ],
+    tags = ["nocoverage"],
 )
 
 envoy_cc_test(

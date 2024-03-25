@@ -158,6 +158,7 @@ envoy_wasm_cc_binary(
         ":test_cc_proto",
         "//source/extensions/common/wasm/ext:declare_property_cc_proto",
         "//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_lib",
+        "//source/extensions/common/wasm/ext:verify_signature_cc_proto",
         "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
     ],
 )
@@ -177,22 +178,3 @@ cc_proto_library(
     name = "test_cc_proto",
     deps = [":test_proto"],
 )
-
-# TODO: FIXME
-#
-#filegroup(
-#    name = "wavm_binary",
-#    srcs = ["//bazel/foreign_cc:wavm"],
-#    output_group = "wavm",
-#)
-#
-#genrule(
-#    name = "test_cpp_wavm_compile",
-#    srcs = [":test_cpp.wasm"],
-#    outs = ["test_cpp.wavm_compiled.wasm"],
-#    cmd = "./$(location wavm_binary) compile $(location test_cpp.wasm) $(location test_cpp.wavm_compiled.wasm)",
-#    tools = [
-#        ":test_cpp.wasm",
-#        ":wavm_binary",
-#    ],
-#)

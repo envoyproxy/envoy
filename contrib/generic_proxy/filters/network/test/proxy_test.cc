@@ -658,8 +658,7 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
   EXPECT_CALL(*server_codec_, respond(_, _, _))
       .WillOnce(Invoke([&](Status status, absl::string_view, const Request&) -> ResponsePtr {
         auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-        response->status_ = {static_cast<uint32_t>(status.code()),
-                             status.code() == StatusCode::kOk};
+        response->status_ = {static_cast<int>(status.code()), status.code() == StatusCode::kOk};
         response->message_ = status.message();
         return response;
       }));
@@ -907,7 +906,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   response->status_ = {234, false}; // Response non-OK.
-  active_stream->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
+  active_stream->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError);
   active_stream->onResponseStart(std::move(response));
 
   EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);

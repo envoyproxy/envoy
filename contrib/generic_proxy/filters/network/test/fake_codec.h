@@ -152,7 +152,7 @@ public:
       }
       // Additional 4 bytes for status.
       encoding_buffer_.writeBEInt<uint32_t>(body.size() + 4);
-      encoding_buffer_.writeBEInt<uint32_t>(static_cast<int32_t>(typed_response->status_.code()));
+      encoding_buffer_.writeBEInt<int>(typed_response->status_.code());
       encoding_buffer_.add(body);
 
       callback.onEncodingSuccess(encoding_buffer_, response.frameFlags().endStream());
@@ -160,8 +160,7 @@ public:
 
     ResponsePtr respond(Status status, absl::string_view, const Request&) override {
       auto response = std::make_unique<FakeResponse>();
-      response->status_ = {static_cast<uint32_t>(status.code()),
-                           status.code() == absl::StatusCode::kOk};
+      response->status_ = {status.raw_code(), status.ok()};
       response->message_ = status.message();
       response->protocol_ = "fake_protocol_for_test";
       return response;
@@ -192,7 +191,7 @@ public:
       }
 
       auto response = std::make_unique<FakeResponse>();
-      response->status_ = {static_cast<uint32_t>(status_code),
+      response->status_ = {status_code,
                            static_cast<absl::StatusCode>(status_code) == absl::StatusCode::kOk};
       response->protocol_ = std::string(result[0]);
       for (absl::string_view pair_str : absl::StrSplit(result[2], ';', absl::SkipEmpty())) {

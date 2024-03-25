@@ -1,6 +1,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
@@ -14,6 +15,38 @@ namespace {
 std::string toUsec(MonotonicTime time) { return absl::StrCat(time.time_since_epoch().count()); }
 
 } // namespace
+
+void addValueHeaders(Http::ResponseHeaderMap& headers, std::string key_prefix,
+                     const ProtobufWkt::Value& val) {
+  switch (val.kind_case()) {
+  case ProtobufWkt::Value::kNullValue:
+    headers.addCopy(Http::LowerCaseString(key_prefix), "null");
+    break;
+  case ProtobufWkt::Value::kNumberValue:
+    headers.addCopy(Http::LowerCaseString(key_prefix), std::to_string(val.number_value()));
+    break;
+  case ProtobufWkt::Value::kStringValue:
+    headers.addCopy(Http::LowerCaseString(key_prefix), val.string_value());
+    break;
+  case ProtobufWkt::Value::kBoolValue:
+    headers.addCopy(Http::LowerCaseString(key_prefix), val.bool_value() ? "true" : "false");
+    break;
+  case ProtobufWkt::Value::kListValue: {
+    const auto& vals = val.list_value().values();
+    for (auto i = 0; i < vals.size(); ++i) {
+      addValueHeaders(headers, key_prefix + "." + std::to_string(i), vals[i]);
+    }
+    break;
+  }
+  case ProtobufWkt::Value::kStructValue:
+    for (const auto& field : val.struct_value().fields()) {
+      addValueHeaders(headers, key_prefix + "." + field.first, field.second);
+    }
+    break;
+  default:
+    break;
+  }
+}
 
 // A filter that sticks stream info into headers for integration testing.
 class StreamInfoToHeadersFilter : public Http::PassThroughFilter {
@@ -97,6 +130,17 @@ public:
                         upstream_timing.connectionPoolCallbackLatency().value().count());
       }
     }
+
+    if (decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata_size() > 0) {
+      const auto& md = decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+      for (const auto& md_entry : md) {
+        std::string key_prefix = md_entry.first;
+        for (const auto& field : md_entry.second.fields()) {
+          addValueHeaders(headers, key_prefix + "." + field.first, field.second);
+        }
+      }
+    }
+
     return Http::FilterHeadersStatus::Continue;
   }
 };

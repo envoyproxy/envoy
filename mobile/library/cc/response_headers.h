@@ -1,7 +1,7 @@
 #pragma once
 
-#include "headers.h"
-#include "response_headers_builder.h"
+#include "library/cc/headers.h"
+#include "library/cc/response_headers_builder.h"
 
 namespace Envoy {
 namespace Platform {

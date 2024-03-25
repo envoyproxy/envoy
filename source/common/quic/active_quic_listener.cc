@@ -234,6 +234,9 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
           : 20000;
   quic_config_.set_max_time_before_crypto_handshake(quic::QuicTime::Delta::FromMilliseconds(
       std::max(quic::kInitialIdleTimeoutSecs * 1000, max_time_before_crypto_handshake_ms)));
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, send_disable_active_migration, false)) {
+    quic_config_.SetDisableConnectionMigration();
+  }
   convertQuicConfig(config.quic_protocol_options(), quic_config_);
 
   // Initialize crypto stream factory.

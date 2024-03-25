@@ -32,6 +32,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/grpc/common.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/matching/data_impl.h"
@@ -243,11 +244,12 @@ HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_time
 
 RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 Upstream::RetryExtensionFactoryContext& factory_context)
-    : retriable_headers_(
-          Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_headers())),
-      retriable_request_headers_(
-          Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_request_headers())),
+                                 Upstream::RetryExtensionFactoryContext& factory_context,
+                                 Server::Configuration::CommonFactoryContext& common_context)
+    : retriable_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
+          retry_policy.retriable_headers(), common_context)),
+      retriable_request_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
+          retry_policy.retriable_request_headers(), common_context)),
       validation_visitor_(&validation_visitor) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
@@ -518,9 +520,15 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           buildRetryPolicy(vhost->retryPolicy(), route.route(), validator, factory_context)),
       internal_redirect_policy_(
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
-      config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
-      dynamic_metadata_(route.match().dynamic_metadata().begin(),
-                        route.match().dynamic_metadata().end()),
+      config_headers_(
+          Http::HeaderUtility::buildHeaderDataVector(route.match().headers(), factory_context)),
+      dynamic_metadata_([&]() {
+        std::vector<Envoy::Matchers::MetadataMatcher> vec;
+        for (const auto& elt : route.match().dynamic_metadata()) {
+          vec.emplace_back(elt, factory_context);
+        }
+        return vec;
+      }()),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       route_tracing_(parseRouteTracing(route)),
       per_filter_configs_(route.typed_per_filter_config(), factory_context, validator),
@@ -614,7 +622,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   for (const auto& query_parameter : route.match().query_parameters()) {
     config_query_parameters_.push_back(
-        std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter));
+        std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, factory_context));
   }
 
   if (!route.route().hash_policy().empty()) {
@@ -627,8 +635,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   }
 
   if (!route.route().rate_limits().empty()) {
-    rate_limit_policy_ =
-        std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(), factory_context);
+    absl::Status creation_status;
+    rate_limit_policy_ = std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(),
+                                                               factory_context, creation_status);
+    THROW_IF_NOT_OK(creation_status);
   }
 
   // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
@@ -638,8 +648,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false);
 
   if (route.route().has_cors()) {
-    cors_policy_ =
-        std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context.runtime());
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context);
   }
   for (const auto& upgrade_config : route.route().upgrade_configs()) {
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
@@ -656,7 +665,14 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
          absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
                                 Http::Headers::get().UpgradeValues.ConnectUdp))) {
-      connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.http_route_connect_proxy_by_default")) {
+        if (upgrade_config.has_connect_config()) {
+          connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
+        }
+      } else {
+        connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
+      }
     } else if (upgrade_config.has_connect_config()) {
       throwEnvoyExceptionOrPanic(absl::StrCat("Non-CONNECT upgrade type ",
                                               upgrade_config.upgrade_type(), " has ConnectConfig"));
@@ -1071,13 +1087,13 @@ std::unique_ptr<RetryPolicyImpl> RouteEntryImplBase::buildRetryPolicy(
   // Route specific policy wins, if available.
   if (route_config.has_retry_policy()) {
     return std::make_unique<RetryPolicyImpl>(route_config.retry_policy(), validation_visitor,
-                                             retry_factory_context);
+                                             retry_factory_context, factory_context);
   }
 
   // If not, we fallback to the virtual host policy if there is one.
   if (vhost_retry_policy.has_value()) {
     return std::make_unique<RetryPolicyImpl>(*vhost_retry_policy, validation_visitor,
-                                             retry_factory_context);
+                                             retry_factory_context, factory_context);
   }
 
   // Otherwise, an empty policy will do.
@@ -1491,8 +1507,8 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, factory_context, validator),
-      path_matcher_(
-          Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive())) {}
+      path_matcher_(Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive(),
+                                                        factory_context)) {}
 
 void PrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                              bool insert_envoy_original_path) const {
@@ -1519,7 +1535,8 @@ PathRouteEntryImpl::PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, factory_context, validator),
-      path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive())) {}
+      path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive(),
+                                                       factory_context)) {}
 
 void PathRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                            bool insert_envoy_original_path) const {
@@ -1547,7 +1564,8 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, factory_context, validator),
-      path_matcher_(Matchers::PathMatcher::createSafeRegex(route.match().safe_regex())) {
+      path_matcher_(
+          Matchers::PathMatcher::createSafeRegex(route.match().safe_regex(), factory_context)) {
   ASSERT(route.match().path_specifier_case() ==
          envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
 }
@@ -1614,7 +1632,7 @@ PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, factory_context, validator),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().path_separated_prefix(),
-                                                        !case_sensitive())) {}
+                                                        !case_sensitive(), factory_context)) {}
 
 void PathSeparatedPrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                           bool insert_envoy_original_path) const {
@@ -1679,8 +1697,10 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   }
 
   if (!virtual_host.rate_limits().empty()) {
-    rate_limit_policy_ =
-        std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(), factory_context);
+    absl::Status creation_status;
+    rate_limit_policy_ = std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(),
+                                                               factory_context, creation_status);
+    THROW_IF_NOT_OK(creation_status);
   }
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());
@@ -1705,13 +1725,13 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
         *vcluster_scope_, factory_context.routerContext().virtualClusterStatNames());
     for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
       virtual_clusters_.push_back(
-          VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
+          VirtualClusterEntry(virtual_cluster, *vcluster_scope_, factory_context,
                               factory_context.routerContext().virtualClusterStatNames()));
     }
   }
 
   if (virtual_host.has_cors()) {
-    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors(), factory_context.runtime());
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors(), factory_context);
   }
 
   if (virtual_host.has_metadata()) {
@@ -1721,7 +1741,7 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
 
 CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::Scope& scope,
-    const VirtualClusterStatNames& stat_names)
+    Server::Configuration::CommonFactoryContext& context, const VirtualClusterStatNames& stat_names)
     : StatNameProvider(virtual_cluster.name(), scope.symbolTable()),
       VirtualClusterBase(virtual_cluster.name(), stat_name_storage_.statName(),
                          scope.scopeFromStatName(stat_name_storage_.statName()), stat_names) {
@@ -1730,7 +1750,7 @@ CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
   }
 
   ASSERT(!virtual_cluster.headers().empty());
-  headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers());
+  headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers(), context);
 }
 
 const CommonConfig& CommonVirtualHostImpl::routeConfig() const { return *global_route_config_; }

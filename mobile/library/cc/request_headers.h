@@ -3,10 +3,10 @@
 #include <optional>
 
 #include "absl/types/optional.h"
-#include "headers.h"
-#include "request_headers_builder.h"
-#include "request_method.h"
-#include "retry_policy.h"
+#include "library/cc/headers.h"
+#include "library/cc/request_headers_builder.h"
+#include "library/cc/request_method.h"
+#include "library/cc/retry_policy.h"
 
 namespace Envoy {
 namespace Platform {

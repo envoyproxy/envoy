@@ -1,7 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
 import java.nio.charset.StandardCharsets;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

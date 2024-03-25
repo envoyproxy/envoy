@@ -5,11 +5,11 @@
 #include <vector>
 
 #include "absl/types/optional.h"
-#include "envoy_error.h"
+#include "library/cc/envoy_error.h"
+#include "library/cc/response_headers.h"
+#include "library/cc/response_trailers.h"
+#include "library/cc/stream.h"
 #include "library/common/types/c_types.h"
-#include "response_headers.h"
-#include "response_trailers.h"
-#include "stream.h"
 
 namespace Envoy {
 namespace Platform {

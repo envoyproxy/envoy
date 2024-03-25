@@ -71,7 +71,7 @@ static_resources:
 
     let engine = EngineBuilder(yaml: config)
       .addLogLevel(.debug)
-      .setLogger { msg in
+      .setLogger { _, msg in
         if msg.contains("starting main dispatch loop") {
           loggingExpectation.fulfill()
         }

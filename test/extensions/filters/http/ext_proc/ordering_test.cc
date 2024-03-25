@@ -9,6 +9,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -70,8 +71,11 @@ protected:
     if (cb) {
       (*cb)(proto_config);
     }
-    config_ = std::make_shared<FilterConfig>(proto_config, kMessageTimeout, kMaxMessageTimeoutMs,
-                                             *stats_store_.rootScope(), "");
+    config_ = std::make_shared<FilterConfig>(
+        proto_config, kMessageTimeout, kMaxMessageTimeoutMs, *stats_store_.rootScope(), "",
+        std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
+        factory_context_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -212,6 +216,7 @@ protected:
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
 };
 
 // A base class for tests that will check that gRPC streams fail while being created

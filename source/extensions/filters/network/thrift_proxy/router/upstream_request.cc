@@ -302,10 +302,9 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
   bool close_downstream = true;
 
   chargeResponseTiming();
-
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
-    stats_.incResponseLocalException(parent_.cluster());
+    stats_.incResponseLocalException(parent_.cluster(), reason);
     parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                         "thrift upstream request: too many connections"),
                            false /* Don't close the downstream connection. */);
@@ -328,7 +327,7 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
       if (response_state_ == ResponseState::Started) {
         stats_.incClosePartialResponse(parent_.cluster());
       }
-      stats_.incResponseLocalException(parent_.cluster());
+      stats_.incResponseLocalException(parent_.cluster(), reason);
       parent_.sendLocalReply(
           AppException(AppExceptionType::InternalError,
                        fmt::format("connection failure before response {}: {} '{}'",

@@ -4,6 +4,7 @@
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "test/extensions/filters/http/ext_proc/utils.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -333,6 +334,7 @@ TEST(MutationUtils, TestAllowHeadersExactCaseSensitive) {
       {"x-something-else", "yes"},
   };
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::config::core::v3::HeaderMap proto_headers;
   // allow_headers is set. disallow_headers is not.
   std::vector<Matchers::StringMatcherPtr> allow_headers;
@@ -341,11 +343,11 @@ TEST(MutationUtils, TestAllowHeadersExactCaseSensitive) {
   string_matcher.set_exact(":method");
   allow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher));
+          string_matcher, context));
   string_matcher.set_exact(":Path");
   allow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher));
+          string_matcher, context));
   MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
 
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"}};
@@ -359,6 +361,7 @@ TEST(MutationUtils, TestAllowHeadersExactIgnoreCase) {
       {"content-type", "text/plain; encoding=UTF8"},
       {"x-something-else", "yes"},
   };
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::config::core::v3::HeaderMap proto_headers;
   // allow_headers is set. disallow_headers is not.
   std::vector<Matchers::StringMatcherPtr> allow_headers;
@@ -367,12 +370,12 @@ TEST(MutationUtils, TestAllowHeadersExactIgnoreCase) {
   string_matcher.set_exact(":method");
   allow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher));
+          string_matcher, context));
   string_matcher.set_exact(":Path");
   string_matcher.set_ignore_case(true);
   allow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher));
+          string_matcher, context));
   MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"}, {":path", "/foo/the/bar?size=123"}};
   EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
@@ -386,6 +389,7 @@ TEST(MutationUtils, TestBothAllowAndDisallowHeadersSet) {
       {"x-something-else", "yes"},
   };
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::config::core::v3::HeaderMap proto_headers;
   // Both allow_headers and disallow_headers are set.
   std::vector<Matchers::StringMatcherPtr> allow_headers;
@@ -396,17 +400,17 @@ TEST(MutationUtils, TestBothAllowAndDisallowHeadersSet) {
   string_matcher.set_exact(":method");
   allow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher));
+          string_matcher, context));
   string_matcher.set_exact(":path");
   allow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher));
+          string_matcher, context));
 
   // Set disallow_headers
   string_matcher.set_exact(":method");
   disallow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher));
+          string_matcher, context));
 
   MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
   Http::TestRequestHeaderMapImpl expected{{":path", "/foo/the/bar?size=123"}};
@@ -421,6 +425,7 @@ TEST(MutationUtils, TestDisallowHeaderSetNotAllowHeader) {
       {"x-something-else", "yes"},
   };
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::config::core::v3::HeaderMap proto_headers;
   // allow_headers not set. disallow_headers set.
   std::vector<Matchers::StringMatcherPtr> allow_headers;
@@ -431,11 +436,11 @@ TEST(MutationUtils, TestDisallowHeaderSetNotAllowHeader) {
   string_matcher.set_exact(":method");
   disallow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher));
+          string_matcher, context));
   string_matcher.set_exact(":path");
   disallow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher));
+          string_matcher, context));
 
   MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
   Http::TestRequestHeaderMapImpl expected{{"content-type", "text/plain; encoding=UTF8"},

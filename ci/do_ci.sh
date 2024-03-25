@@ -310,8 +310,10 @@ case $CI_TARGET in
                 fi
                 # TODO(https://github.com/planetscale/vtprotobuf/pull/122) do this directly in the generator.
                 # Make vtprotobuf opt-in as it has some impact on binary sizes
-                if [[ "$GO_FILE" = *.vtproto.pb.go ]]; then
-                    sed -i '1s;^;//go:build vtprotobuf\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
+                if [[ "$GO_FILE" = *_vtproto.pb.go ]]; then
+                    if ! grep -q 'package ignore' "$GO_FILE"; then
+                        sed -i '1s;^;//go:build vtprotobuf\n// +build vtprotobuf\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
+                    fi
                 fi
             done <<< "$(find "$INPUT_DIR" -name "*.go")"
         done
@@ -425,21 +427,12 @@ case $CI_TARGET in
             "${TEST_TARGETS[@]}" \
             --test_tag_filters=-nofips \
             --build_tests_only
-        echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define wasm=wavm \
-            -c fastbuild \
-            "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips \
-            --build_tests_only
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
-            --define wasm=wavm \
+            --define wasm=wasmtime \
             -c opt \
             @envoy//test/common/common:assert_test \
             @envoy//test/server:server_test
@@ -447,15 +440,15 @@ case $CI_TARGET in
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
-            --define wasm=wavm \
+            --define wasm=wamtime \
             -c opt \
             @envoy//test/common/common:assert_test \
             --define log_fast_debug_assert_in_release=enabled \
             --define log_debug_assert_in_release=disabled
-        echo "Building binary with wasm=wavm... and logging disabled"
+        echo "Building binary with wasm=wasmtime... and logging disabled"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
-            --define wasm=wavm \
+            --define wasm=wasmtime \
             --define enable_logging=disabled \
             -c fastbuild \
             @envoy//source/exe:envoy-static \

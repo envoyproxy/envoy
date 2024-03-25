@@ -40,20 +40,17 @@ public:
 protected:
   // Stores SETTINGS parameters contained in |settings_frame| to make them available via
   // getRemoteSettingsParameterValue().
-  void onSettingsFrame(const nghttp2_settings& settings_frame) {
-    for (uint32_t i = 0; i < settings_frame.niv; ++i) {
-      auto result = settings_.insert(
-          std::make_pair(settings_frame.iv[i].settings_id, settings_frame.iv[i].value));
+  void onSettingsFrame(absl::Span<const http2::adapter::Http2Setting> settings) {
+    for (const auto& [id, value] : settings) {
+      auto result = settings_.insert(std::make_pair(id, value));
       // It is possible to have duplicate settings parameters, each new parameter replaces any
       // existing value.
       // https://tools.ietf.org/html/rfc7540#section-6.5
       if (!result.second) {
-        ENVOY_LOG_MISC(debug, "Duplicated settings parameter {} with value {}",
-                       settings_frame.iv[i].settings_id, settings_frame.iv[i].value);
+        ENVOY_LOG_MISC(debug, "Duplicated settings parameter {} with value {}", id, value);
         settings_.erase(result.first);
         // Guaranteed success here.
-        settings_.insert(
-            std::make_pair(settings_frame.iv[i].settings_id, settings_frame.iv[i].value));
+        settings_.insert(std::make_pair(id, value));
       }
     }
   }
@@ -96,7 +93,9 @@ public:
 
 protected:
   // Overrides ServerConnectionImpl::onSettings().
-  void onSettings(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+  void onSettings(absl::Span<const http2::adapter::Http2Setting> settings) override {
+    onSettingsFrame(settings);
+  }
 
   testing::NiceMock<Random::MockRandomGenerator> random_;
 };
@@ -132,7 +131,9 @@ public:
 
 protected:
   // Overrides ClientConnectionImpl::onSettings().
-  void onSettings(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+  void onSettings(absl::Span<const http2::adapter::Http2Setting> settings) override {
+    onSettingsFrame(settings);
+  }
 };
 
 } // namespace Http2

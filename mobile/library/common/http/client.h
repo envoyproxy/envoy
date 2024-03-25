@@ -151,10 +151,6 @@ private:
     void onError();
     void onSendWindowAvailable();
 
-    // Remove the stream and clear up state if possible, else set up deferred
-    // removal path.
-    void removeStream();
-
     // ResponseEncoder
     void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -188,7 +184,7 @@ private:
     // than bytes_to_send.
     void resumeData(size_t bytes_to_send);
 
-    void setFinalStreamIntel(StreamInfo::StreamInfo& stream_info);
+    void latchError();
 
   private:
     bool hasBufferedData() { return response_data_.get() && response_data_->length() != 0; }
@@ -198,7 +194,6 @@ private:
     void sendErrorToBridge();
     envoy_stream_intel streamIntel();
     envoy_final_stream_intel& finalStreamIntel();
-    envoy_error streamError();
 
     DirectStream& direct_stream_;
     const envoy_http_callbacks bridge_callbacks_;
@@ -239,11 +234,7 @@ private:
     // Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
-    CodecEventCallbacks*
-    registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
-      std::swap(codec_callbacks, codec_callbacks_);
-      return codec_callbacks;
-    }
+    CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override;
 
     void resetStream(StreamResetReason) override;
     Network::ConnectionInfoProvider& connectionInfoProvider() override {

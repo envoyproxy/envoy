@@ -481,6 +481,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
       {{":status", "400"}, {"content-type", "application/x-protobuf"}});
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Status, "200"));
 
   {
     // First few calls should drain the buffer

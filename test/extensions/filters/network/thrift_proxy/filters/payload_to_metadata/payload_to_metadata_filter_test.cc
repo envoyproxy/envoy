@@ -47,11 +47,15 @@ class PayloadToMetadataTest : public testing::Test,
                               public DecoderCallbacks,
                               public PassThroughDecoderEventHandler {
 public:
-  void initializeFilter(const std::string& yaml, bool expect_type_inquiry = true) {
+  void initializeFilter(const std::string& yaml, bool expect_type_inquiry = true,
+                        bool malform_simulate = false) {
     envoy::extensions::filters::network::thrift_proxy::filters::payload_to_metadata::v3::
         PayloadToMetadata proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
     const auto& filter_config = std::make_shared<Config>(proto_config);
+    if (malform_simulate) {
+      filter_config->trie_root_ = nullptr;
+    }
     filter_ = std::make_shared<PayloadToMetadataFilter>(filter_config);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     if (expect_type_inquiry) {
@@ -188,7 +192,7 @@ public:
     decoder->onData(buffer, underflow);
   }
 
-  void writeMessageMultiStruct() {
+  void writeMessageMultiStruct(bool list_of_struct = false) {
     Buffer::OwnedImpl buffer;
     auto metadata_ptr =
         std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
@@ -224,6 +228,25 @@ public:
     proto->writeFieldBegin(msg, "baz", FieldType::String, 1);
     proto->writeString(msg, "qux");
     proto->writeFieldEnd(msg);
+
+    if (list_of_struct) {
+      proto->writeFieldBegin(msg, "list_of_struct", FieldType::List, 2);
+      const int list_size = 4;
+      proto->writeListBegin(msg, FieldType::Struct, 4);
+
+      // In the list of struct, each struct has a single field "check".
+      for (int i = 0; i < list_size; i++) {
+        proto->writeStructBegin(msg, "data");
+        proto->writeFieldBegin(msg, "check", FieldType::String, 1);
+        proto->writeString(msg, "check" + std::to_string(i));
+        proto->writeFieldEnd(msg);
+        proto->writeFieldBegin(msg, "", FieldType::Stop, 0); // data stop field
+        proto->writeStructEnd(msg);
+      }
+
+      proto->writeListEnd(msg);
+      proto->writeFieldEnd(msg);
+    }
 
     proto->writeFieldBegin(msg, "", FieldType::Stop, 0); // request stop field
     proto->writeStructEnd(msg);
@@ -1310,6 +1333,82 @@ request_rules:
 
   writeMessageMultiStruct();
   filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MultipleRulesOnListOfStruct) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: unmatched_foo
+    field_selector:
+      name: request
+      id: 2
+      child:
+        name: baz
+        id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: baz
+  - method_name: unmatched_foo2
+    field_selector:
+      name: request
+      id: 2
+      child:
+        name: baz
+        id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: baz
+  - method_name: foo
+    field_selector:
+      name: request
+      id: 2
+      child:
+        name: baz
+        id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: baz
+)EOF";
+
+  const std::map<std::string, std::string> expected = {{"baz", "qux"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  // Add list of struct
+  writeMessageMultiStruct(true);
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MalformPayloadWontCrash) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: context
+      id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  const std::map<std::string, std::string> expected = {{"missing", "unknown"}};
+
+  EXPECT_ENVOY_BUG(
+      {
+        initializeFilter(request_config_yaml, true, true /* malformed */);
+        EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+        EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+        writeMessage();
+        filter_->onDestroy();
+      },
+      "envoy bug failure: false. Details: decoding error, error_message: payload to "
+      "metadata filter: invalid trie state, node is null, payload: 0A 00 01 00");
 }
 
 } // namespace PayloadToMetadataFilter

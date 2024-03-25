@@ -29,6 +29,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
@@ -46,15 +47,16 @@
 #include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/stats/timespan_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
-#include "source/server/ssl_context_manager.h"
 #include "source/server/utils.h"
 
 namespace Envoy {
@@ -311,13 +313,14 @@ bool canBeRegisteredAsInlineHeader(const Http::LowerCaseString& header_name) {
   return true;
 }
 
-void registerCustomInlineHeadersFromBootstrap(
-    const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+absl::Status
+registerCustomInlineHeadersFromBootstrap(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   for (const auto& inline_header : bootstrap.inline_headers()) {
     const Http::LowerCaseString lower_case_name(inline_header.inline_header_name());
     if (!canBeRegisteredAsInlineHeader(lower_case_name)) {
-      throwEnvoyExceptionOrPanic(fmt::format("Header {} cannot be registered as an inline header.",
-                                             inline_header.inline_header_name()));
+      return absl::InvalidArgumentError(
+          fmt::format("Header {} cannot be registered as an inline header.",
+                      inline_header.inline_header_name()));
     }
     switch (inline_header.inline_header_type()) {
     case envoy::config::bootstrap::v3::CustomInlineHeader::REQUEST_HEADER:
@@ -340,21 +343,21 @@ void registerCustomInlineHeadersFromBootstrap(
       PANIC("not implemented");
     }
   }
+  return absl::OkStatus();
 }
 
 } // namespace
 
-void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                       const Options& options,
-                                       ProtobufMessage::ValidationVisitor& validation_visitor,
-                                       Api::Api& api) {
+absl::Status InstanceUtil::loadBootstrapConfig(
+    envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
 
   // One of config_path and config_yaml or bootstrap should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSizeLong() == 0) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         "At least one of --config-path or --config-yaml or Options::configProto() "
         "should be non-empty");
   }
@@ -364,7 +367,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
 #else
     if (!config_path.empty()) {
-      throwEnvoyExceptionOrPanic("Cannot load from file with YAML disabled\n");
+      return absl::InvalidArgumentError("Cannot load from file with YAML disabled\n");
     }
     UNREFERENCED_PARAMETER(api);
 #endif
@@ -376,13 +379,14 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
 #else
-    throwEnvoyExceptionOrPanic("Cannot load from YAML with YAML disabled\n");
+    return absl::InvalidArgumentError("Cannot load from YAML with YAML disabled\n");
 #endif
   }
   if (config_proto.ByteSizeLong() != 0) {
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);
+  return absl::OkStatus();
 }
 
 void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_address,
@@ -405,7 +409,7 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
     }
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-    initializeOrThrow(std::move(local_address), component_factory);
+    THROW_IF_NOT_OK(initializeOrThrow(std::move(local_address), component_factory));
   }
   END_TRY
   MULTI_CATCH(
@@ -424,8 +428,8 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
       });
 }
 
-void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
-                                     ComponentFactory& component_factory) {
+absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
+                                             ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
             options_.restartEpoch(), restarter_.baseId(), restarter_.version());
 
@@ -435,14 +439,14 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   }
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options_,
-                                    messageValidationContext().staticValidationVisitor(), *api_);
+  RETURN_IF_NOT_OK(InstanceUtil::loadBootstrapConfig(
+      bootstrap_, options_, messageValidationContext().staticValidationVisitor(), *api_));
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   if (bootstrap_.has_application_log_config()) {
-    THROW_IF_NOT_OK(
+    RETURN_IF_NOT_OK(
         Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
-    THROW_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
+    RETURN_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
   }
 
 #ifdef ENVOY_PERFETTO
@@ -466,7 +470,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   tracing_session_ = perfetto::Tracing::NewTrace();
   tracing_fd_ = open(pftrace_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
   if (tracing_fd_ == -1) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("unable to open tracing file {}: {}", pftrace_path, errorDetails(errno)));
   }
   // Configure the tracing session.
@@ -483,7 +487,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   }
 
   // Register Custom O(1) headers from bootstrap.
-  registerCustomInlineHeadersFromBootstrap(bootstrap_);
+  RETURN_IF_NOT_OK(registerCustomInlineHeadersFromBootstrap(bootstrap_));
 
   ENVOY_LOG(info, "HTTP header map info:");
   for (const auto& info : Http::HeaderMapImplUtility::getAllHeaderMapImplInfo()) {
@@ -499,10 +503,12 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_, options_.statsTags()));
-  stats_store_.setStatsMatcher(
-      Config::Utility::createStatsMatcher(bootstrap_, stats_store_.symbolTable()));
-  stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
+  stats_store_.setTagProducer(
+      Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags()));
+  stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
+      bootstrap_.stats_config(), stats_store_.symbolTable(), server_contexts_));
+  stats_store_.setHistogramSettings(
+      std::make_unique<Stats::HistogramSettingsImpl>(bootstrap_.stats_config(), server_contexts_));
 
   const std::string server_stats_prefix = "server.";
   const std::string server_compilation_settings_stats_prefix = "server.compilation_settings";
@@ -533,7 +539,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
     version_int = bootstrap_.stats_server_version_override().value();
   } else {
     if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
-      throwEnvoyExceptionOrPanic("compiled GIT SHA is invalid. Invalid build.");
+      return absl::InvalidArgumentError("compiled GIT SHA is invalid. Invalid build.");
     }
   }
   server_stats_->version_.set(version_int);
@@ -581,7 +587,9 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options_.serviceZone(), options_.serviceClusterName(), options_.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_);
+  absl::Status creation_status;
+  Configuration::InitialImpl initial_config(bootstrap_, creation_status);
+  RETURN_IF_NOT_OK(creation_status);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
@@ -711,7 +719,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
     admin_->startHttpListener(initial_config.admin().accessLogs(), initial_config.admin().address(),
                               initial_config.admin().socketOptions());
 #else
-    throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
+    return absl::InvalidArgumentError("Admin address configured but admin support compiled out");
 #endif
   } else {
     ENVOY_LOG(info, "No admin address given, so no admin HTTP server started.");
@@ -725,7 +733,8 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   }
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
+  ssl_context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(server_contexts_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
@@ -736,7 +745,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
   // is constructed as part of the InstanceBase and then populated once
   // cluster_manager_factory_ is available.
-  config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
+  RETURN_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
@@ -779,6 +788,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // started and before our own run() loop runs.
   main_thread_guard_dog_ = maybeCreateGuardDog("main_thread");
   worker_guard_dog_ = maybeCreateGuardDog("workers");
+  return absl::OkStatus();
 }
 
 void InstanceBase::onClusterManagerPrimaryInitializationComplete() {
@@ -801,22 +811,32 @@ void InstanceBase::onRuntimeReady() {
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames(),
+        *config_.clusterManager(), thread_local_, server_contexts_, grpc_context_.statNames(),
         bootstrap_.grpc_async_client_manager_config());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
+      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, hds_config, *stats_store_.rootScope(), false);
+      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                         *stats_store_.rootScope(), false)
-              ->createUncachedRawAsyncClient(),
-          stats_store_, *ssl_context_manager_, info_factory_);
+          factory_or_error.value()->createUncachedRawAsyncClient(), stats_store_,
+          *ssl_context_manager_, info_factory_);
     }
     END_TRY
     CATCH(const EnvoyException& e, {
       ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
       shutdown();
     });
+  }
+
+  // TODO (nezdolik): Fully deprecate this runtime key in the next release.
+  if (runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
+    ENVOY_LOG(warn,
+              "Usage of the deprecated runtime key {}, consider switching to "
+              "`envoy.resource_monitors.downstream_connections` instead."
+              "This runtime key will be removed in future.",
+              Runtime::Keys::GlobalMaxCxRuntimeKey);
   }
 }
 
@@ -844,10 +864,13 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 #ifdef ENVOY_ENABLE_YAML
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
 #endif
-  return std::make_unique<Runtime::LoaderImpl>(
+  absl::Status creation_status;
+  auto loader = std::make_unique<Runtime::LoaderImpl>(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),
-      server.messageValidationContext().dynamicValidationVisitor(), server.api());
+      server.messageValidationContext().dynamicValidationVisitor(), server.api(), creation_status);
+  THROW_IF_NOT_OK(creation_status);
+  return loader;
 }
 
 void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path) {
@@ -903,8 +926,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
-          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) &&
-      !instance.runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
     ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
                     "connections. Configure a "
                     "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");

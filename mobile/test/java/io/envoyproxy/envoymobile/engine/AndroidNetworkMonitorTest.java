@@ -11,8 +11,8 @@ import androidx.test.filters.MediumTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.rule.GrantPermissionRule;
 import androidx.test.annotation.UiThreadTest;
-import io.envoyproxy.envoymobile.MockEnvoyEngine;
-import org.junit.After;
+import io.envoyproxy.envoymobile.mocks.MockEnvoyEngine;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;

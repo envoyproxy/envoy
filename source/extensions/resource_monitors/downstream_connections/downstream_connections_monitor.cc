@@ -42,7 +42,7 @@ bool ActiveDownstreamConnectionsResourceMonitor::tryDeallocateResource(int64_t d
     // Testing hook.
     synchronizer_.syncPoint("try_deallocate_pre_cas");
     // `current_` value is atomically compared to `current`.
-    // In case values are bitwise equal, `current` value is replaced with `current - increment`.
+    // In case values are bitwise equal, `current` value is replaced with `current - decrement`.
     // The write will be visible to other threads accessing `current_`.
     // If `current` is not equal to value stored in `current_`, `current` will be reloaded with the
     // latest value of `current_` and no synchronization will be imposed on other reads or writes.

@@ -481,18 +481,20 @@ config_setting(
     values = {"define": "boringssl=disabled"},
 )
 
+selects.config_setting_group(
+    name = "boringssl_fips_x86",
+    match_all = [
+        ":boringssl_fips",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
 config_setting(
     name = "zlib_ng",
     constraint_values = [
         "@platforms//os:linux",
     ],
     values = {"define": "zlib=ng"},
-)
-
-# TODO: consider converting WAVM VM support to an extension (https://github.com/envoyproxy/envoy/issues/12574)
-config_setting(
-    name = "wasm_wavm",
-    values = {"define": "wasm=wavm"},
 )
 
 config_setting(
@@ -696,6 +698,15 @@ selects.config_setting_group(
         ":ios_i386",
         ":ios_sim_arm64",
         ":ios_x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "darwin_any",
+    match_any = [
+        ":darwin",
+        ":darwin_arm64",
+        ":darwin_x86_64",
     ],
 )
 

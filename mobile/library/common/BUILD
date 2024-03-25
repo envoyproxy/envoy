@@ -5,38 +5,38 @@ licenses(["notice"])  # Apache 2
 envoy_mobile_package()
 
 envoy_cc_library(
-    name = "envoy_main_interface_lib",
+    name = "internal_engine_lib",
     repository = "@envoy",
     deps = [
         ":engine_common_lib_stamped",
-        ":envoy_main_interface_lib_no_stamp",
+        ":internal_engine_lib_no_stamp",
     ],
 )
 
 envoy_cc_library(
-    name = "envoy_main_interface_lib_no_stamp",
+    name = "internal_engine_lib_no_stamp",
     srcs = [
-        "engine.cc",
-        "engine.h",
-        "main_interface.cc",
+        "internal_engine.cc",
     ],
     hdrs = [
-        "main_interface.h",
+        "internal_engine.h",
     ],
     repository = "@envoy",
     deps = [
         ":engine_common_lib",
+        ":engine_types_lib",
         "//library/common/bridge:utility_lib",
-        "//library/common/common:lambda_logger_delegate_lib",
         "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
+        "//library/common/logger:logger_delegate_lib",
         "//library/common/network:connectivity_manager_lib",
         "//library/common/stats:utility_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/server:lifecycle_notifier_interface",
         "@envoy//envoy/stats:stats_interface",
+        "@envoy//source/common/common:thread_impl_lib_posix",
         "@envoy//source/common/runtime:runtime_lib",
         "@envoy_build_config//:extension_registry",
     ],
@@ -72,5 +72,16 @@ envoy_cc_library(
     deps = [
         ":engine_common_lib",
         "@envoy//source/exe:envoy_stripped_main_base_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "engine_types_lib",
+    hdrs = [
+        "engine_types.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        "@envoy//source/common/common:base_logger_lib",
     ],
 )

@@ -16,9 +16,9 @@
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/common/matchers.h"
 #include "source/common/stats/symbol_table.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher.h"
-#include "source/extensions/transport_sockets/tls/stats.h"
+#include "source/common/tls/cert_validator/cert_validator.h"
+#include "source/common/tls/cert_validator/san_matcher.h"
+#include "source/common/tls/stats.h"
 
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
@@ -35,7 +35,7 @@ public:
   SPIFFEValidator(SslStats& stats, TimeSource& time_source)
       : stats_(stats), time_source_(time_source){};
   SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                  TimeSource& time_source);
+                  Server::Configuration::CommonFactoryContext& context);
   ~SPIFFEValidator() override = default;
 
   // Tls::CertValidator

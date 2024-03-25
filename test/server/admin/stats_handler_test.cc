@@ -9,6 +9,7 @@
 
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/real_threads_test_helper.h"
@@ -51,7 +52,7 @@ public:
     setting.mutable_buckets()->Add(buckets.begin(), buckets.end());
 
     bucket_settings.Add(std::move(setting));
-    store_->setHistogramSettings(std::make_unique<Stats::HistogramSettingsImpl>(config));
+    store_->setHistogramSettings(std::make_unique<Stats::HistogramSettingsImpl>(config, context_));
   }
 
   using CodeResponse = std::pair<Http::Code, std::string>;
@@ -118,6 +119,7 @@ public:
 
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Stats::SymbolTableImpl symbol_table_;
   Stats::StatNamePool pool_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;

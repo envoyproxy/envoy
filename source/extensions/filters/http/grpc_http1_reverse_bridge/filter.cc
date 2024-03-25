@@ -181,6 +181,12 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     // until then.
     grpc_status_ = grpcStatusFromHeaders(headers);
 
+    // gRPC clients expect that the HTTP status will always be 200.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status")) {
+      headers.setStatus(enumToInt(Http::Code::OK));
+    }
+
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response")) {
       // This is a header-only response, and we should prepend the gRPC frame

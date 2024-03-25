@@ -136,7 +136,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       ENVOY_STREAM_LOG(trace, "ext_authz filter is disabled. Deny the request.",
                        *decoder_callbacks_);
       decoder_callbacks_->streamInfo().setResponseFlag(
-          StreamInfo::ResponseFlag::UnauthorizedExternalService);
+          StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
       decoder_callbacks_->sendLocalReply(
           config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
           Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
@@ -152,16 +152,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                  !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
                    Http::Utility::isH2UpgradeRequest(headers));
 
+  max_request_bytes_ = config_->maxRequestBytes();
   if (buffer_data_) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter is buffering the request", *decoder_callbacks_);
 
     allow_partial_message_ = check_settings.has_with_request_body()
                                  ? check_settings.with_request_body().allow_partial_message()
                                  : config_->allowPartialMessage();
-    max_request_bytes_ = check_settings.has_with_request_body()
-                             ? check_settings.with_request_body().max_request_bytes()
-                             : config_->maxRequestBytes();
-
+    if (check_settings.has_with_request_body()) {
+      max_request_bytes_ = check_settings.with_request_body().max_request_bytes();
+    }
     if (!allow_partial_message_) {
       decoder_callbacks_->setDecoderBufferLimit(max_request_bytes_);
     }
@@ -422,7 +422,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     // setResponseFlag must be called before sendLocalReply
     decoder_callbacks_->streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UnauthorizedExternalService);
+        StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
         [&headers = response->headers_to_set,
@@ -467,7 +467,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           trace, "ext_authz filter rejected the request with an error. Response status code: {}",
           *decoder_callbacks_, enumToInt(config_->statusOnError()));
       decoder_callbacks_->streamInfo().setResponseFlag(
-          StreamInfo::ResponseFlag::UnauthorizedExternalService);
+          StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
       decoder_callbacks_->sendLocalReply(
           config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
           Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);

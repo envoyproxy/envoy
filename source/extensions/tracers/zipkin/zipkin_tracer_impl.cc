@@ -77,8 +77,10 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                                 POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
       time_source_(time_source) {
-  Config::Utility::checkCluster("envoy.tracers.zipkin", zipkin_config.collector_cluster(), cm_,
-                                /* allow_added_via_api */ true);
+  THROW_IF_STATUS_NOT_OK(Config::Utility::checkCluster("envoy.tracers.zipkin",
+                                                       zipkin_config.collector_cluster(), cm_,
+                                                       /* allow_added_via_api */ true),
+                         throw);
   cluster_ = zipkin_config.collector_cluster();
   hostname_ = !zipkin_config.collector_hostname().empty() ? zipkin_config.collector_hostname()
                                                           : zipkin_config.collector_cluster();

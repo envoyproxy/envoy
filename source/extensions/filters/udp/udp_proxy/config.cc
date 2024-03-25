@@ -11,17 +11,6 @@ constexpr uint32_t DefaultMaxConnectAttempts = 1;
 constexpr uint32_t DefaultMaxBufferedDatagrams = 1024;
 constexpr uint64_t DefaultMaxBufferedBytes = 16384;
 
-ProtobufTypes::MessagePtr TunnelResponseHeadersOrTrailers::serializeAsProto() const {
-  auto proto_out = std::make_unique<envoy::config::core::v3::HeaderMap>();
-  value().iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
-    auto* new_header = proto_out->add_headers();
-    new_header->set_key(std::string(e.key().getStringView()));
-    new_header->set_value(std::string(e.value().getStringView()));
-    return Http::HeaderMap::Iterate::Continue;
-  });
-  return proto_out;
-}
-
 const std::string& TunnelResponseHeaders::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.udp_proxy.propagate_response_headers");
 }
@@ -33,7 +22,7 @@ const std::string& TunnelResponseTrailers::key() {
 TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
                                          Server::Configuration::FactoryContext& context)
     : header_parser_(Envoy::Router::HeaderParser::configure(config.headers_to_add())),
-      proxy_port_(), target_port_(config.default_target_port()), use_post_(config.use_post()),
+      target_port_(config.default_target_port()), use_post_(config.use_post()),
       post_path_(config.post_path()),
       max_connect_attempts_(config.has_retry_options()
                                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_options(),
@@ -59,7 +48,7 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
 
   if (post_path_.empty()) {
     post_path_ = "/";
-  } else if (post_path_.rfind("/", 0) != 0) {
+  } else if (!absl::StartsWith(post_path_, "/")) {
     throw EnvoyException("Path must start with '/'");
   }
 

@@ -640,5 +640,46 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassAll) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
+TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2ProxyProtocolPassWithTypeLocal) {
+  setup(true, {}, {});
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+
+  // A well-formed proxy protocol v2 header sampled from an AWS NLB healthcheck request, with
+  // command type 'LOCAL' (0 for the low 4 bits of the 13th octet).
+  constexpr uint8_t v2_protocol[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51,
+                                     0x55, 0x49, 0x54, 0x0a, 0x20, 0x00, 0x00, 0x00,
+                                     'm',  'o',  'r',  'e',  'd',  'a',  't',  'a'};
+  Buffer::OwnedImpl buffer(v2_protocol, sizeof(v2_protocol));
+  ASSERT_TRUE(tcp_client->write(buffer.toString()));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
+  std::string header_start;
+  // - signature
+  // - version and command type, address family and protocol, length of addresses
+  // - src address, dest address
+  if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x11, 0x00, 0x0c, 0x7f, 0x00, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01};
+    header_start = std::string(data, sizeof(data));
+  } else {
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x21, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+    header_start = std::string(data, sizeof(data));
+  }
+
+  constexpr absl::string_view more_data("moredata");
+  const size_t offset = header_start.length() + (2 * sizeof(uint16_t)); // Skip over the ports
+  std::string observed_data;
+  ASSERT_TRUE(fake_upstream_connection_->waitForData(offset + more_data.length(), &observed_data));
+  EXPECT_THAT(observed_data, testing::StartsWith(header_start));
+  EXPECT_EQ(more_data, absl::string_view(&observed_data[offset], more_data.length()));
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
 } // namespace
 } // namespace Envoy

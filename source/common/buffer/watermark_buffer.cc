@@ -1,5 +1,4 @@
 #include "source/common/buffer/watermark_buffer.h"
-#include "watermark_buffer.h"
 
 #include <cstdint>
 #include <memory>

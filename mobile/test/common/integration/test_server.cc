@@ -1,10 +1,19 @@
 #include "test_server.h"
 
 #include "source/common/common/random_generator.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
+#include "source/common/listener_manager/listener_manager_impl.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
+#include "source/common/quic/server_codec_impl.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
+#include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
+#include "source/extensions/transport_sockets/raw_buffer/config.h"
+#include "source/extensions/udp_packet_writer/default/config.h"
 #include "source/server/hot_restart_nop_impl.h"
 #include "source/server/instance_impl.h"
 
@@ -16,7 +25,7 @@ namespace Envoy {
 Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsContext(
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{time_system_};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{server_factory_context_};
   tls_context.mutable_common_tls_context()->add_alpn_protocols("h3");
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -69,6 +78,8 @@ TestServer::TestServer()
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope())
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
+  ON_CALL(factory_context_, sslContextManager())
+      .WillByDefault(testing::ReturnRef(context_manager_));
 }
 
 void TestServer::startTestServer(TestServerType test_server_type) {
@@ -81,6 +92,16 @@ void TestServer::startTestServer(TestServerType test_server_type) {
 
   switch (test_server_type) {
   case TestServerType::HTTP3:
+    // Make sure if extensions aren't statically linked QUIC will work.
+    Quic::forceRegisterQuicServerTransportSocketConfigFactory();
+    Network::forceRegisterUdpDefaultWriterFactoryFactory();
+    Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
+    Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
+    Quic::forceRegisterQuicServerTransportSocketConfigFactory();
+    Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
+    Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
+
+    // envoy.quic.crypto_stream.server.quiche
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP3;
     upstream_config_.udp_fake_upstream_ = FakeUpstreamConfig::UdpConfig();
     factory = createQuicUpstreamTlsContext(factory_context_);
@@ -94,6 +115,10 @@ void TestServer::startTestServer(TestServerType test_server_type) {
     factory = Network::Test::createRawBufferDownstreamSocketFactory();
     break;
   case TestServerType::HTTP_PROXY: {
+    Server::forceRegisterDefaultListenerManagerFactoryImpl();
+    Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
+    Server::forceRegisterConnectionHandlerFactoryImpl();
+
     std::string config_path =
         TestEnvironment::writeStringToFileForTest("config.yaml", http_proxy_config);
     test_server_ = IntegrationTestServer::create(config_path, Network::Address::IpVersion::v4,
@@ -103,6 +128,9 @@ void TestServer::startTestServer(TestServerType test_server_type) {
     return;
   }
   case TestServerType::HTTPS_PROXY: {
+    Server::forceRegisterDefaultListenerManagerFactoryImpl();
+    Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
+    Server::forceRegisterConnectionHandlerFactoryImpl();
     std::string config_path =
         TestEnvironment::writeStringToFileForTest("config.yaml", https_proxy_config);
     test_server_ = IntegrationTestServer::create(config_path, Network::Address::IpVersion::v4,

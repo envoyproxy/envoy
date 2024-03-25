@@ -2,13 +2,13 @@
 
 #include <memory>
 
-#include "engine.h"
-#include "envoy_error.h"
+#include "library/cc/engine.h"
+#include "library/cc/envoy_error.h"
+#include "library/cc/response_headers.h"
+#include "library/cc/response_trailers.h"
+#include "library/cc/stream.h"
+#include "library/cc/stream_callbacks.h"
 #include "library/common/types/c_types.h"
-#include "response_headers.h"
-#include "response_trailers.h"
-#include "stream.h"
-#include "stream_callbacks.h"
 
 namespace Envoy {
 namespace Platform {

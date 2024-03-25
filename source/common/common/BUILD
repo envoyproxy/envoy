@@ -52,6 +52,8 @@ envoy_cc_library(
         ":assert_lib",
         "//envoy/common:backoff_strategy_interface",
         "//envoy/common:random_generator_interface",
+        "//source/common/protobuf:utility_lib_header",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -319,6 +321,7 @@ envoy_cc_library(
         "//envoy/common:matchers_interface",
         "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/config:utility_lib",
         "//source/common/http:path_utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -373,8 +376,10 @@ envoy_cc_library(
     name = "scope_tracker",
     hdrs = ["scope_tracker.h"],
     deps = [
+        "//envoy/common:execution_context",
         "//envoy/common:scope_tracker_interface",
         "//envoy/event:dispatcher_interface",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
@@ -382,6 +387,7 @@ envoy_cc_library(
     name = "scope_tracked_object_stack",
     hdrs = ["scope_tracked_object_stack.h"],
     deps = [
+        "//envoy/common:execution_context",
         "//envoy/common:scope_tracker_interface",
     ],
 )

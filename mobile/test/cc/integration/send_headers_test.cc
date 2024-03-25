@@ -38,7 +38,10 @@ TEST(SendHeadersTest, CanSendHeaders) {
                 status.status_code = headers->httpStatus();
                 status.end_stream = end_stream;
               })
-          .setOnData([&](envoy_data, bool end_stream) { status.end_stream = end_stream; })
+          .setOnData([&](envoy_data data, bool end_stream) {
+            status.end_stream = end_stream;
+            data.release(data.context);
+          })
           .setOnComplete(
               [&](envoy_stream_intel, envoy_final_stream_intel) { stream_complete.Notify(); })
           .setOnError([&](Platform::EnvoyErrorSharedPtr, envoy_stream_intel,

@@ -155,14 +155,14 @@ private:
   class RedisShard {
   public:
     RedisShard(Upstream::HostConstSharedPtr primary, Upstream::HostVectorConstSharedPtr replicas,
-               Upstream::HostVectorConstSharedPtr all_hosts)
+               Upstream::HostVectorConstSharedPtr all_hosts, Random::RandomGenerator& random)
         : primary_(std::move(primary)) {
       replicas_.updateHosts(Upstream::HostSetImpl::partitionHosts(
                                 std::move(replicas), Upstream::HostsPerLocalityImpl::empty()),
-                            nullptr, {}, {});
+                            nullptr, {}, {}, random.random());
       all_hosts_.updateHosts(Upstream::HostSetImpl::partitionHosts(
                                  std::move(all_hosts), Upstream::HostsPerLocalityImpl::empty()),
-                             nullptr, {}, {});
+                             nullptr, {}, {}, random.random());
     }
     const Upstream::HostConstSharedPtr primary() const { return primary_; }
     const Upstream::HostSetImpl& replicas() const { return replicas_; }

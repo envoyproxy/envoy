@@ -28,6 +28,7 @@ class XdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVer
                            public HttpIntegrationTest {
 public:
   XdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+    skip_tag_extraction_rule_check_ = false;
     setUpstreamProtocol(Http::CodecType::HTTP2);
   }
 
@@ -192,7 +193,7 @@ public:
     BaseIntegrationTest::initialize();
 
     context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
-        BaseIntegrationTest::timeSystem());
+        server_factory_context_);
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   }
 
@@ -461,8 +462,8 @@ public:
 
     BaseIntegrationTest::initialize();
 
-    context_manager_ =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+    context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+        server_factory_context_);
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
     address_ = Ssl::getSslAddress(version_, lookupPort("http"));
   }

@@ -7,16 +7,6 @@ def envoy_python_dependencies():
     load_packages()
     pip_parse(
         name = "base_pip3",
-        experimental_requirement_cycles = {
-            "sphinx": [
-                "sphinx",
-                "sphinxcontrib-serializinghtml",
-                "sphinxcontrib-qthelp",
-                "sphinxcontrib-htmlhelp",
-                "sphinxcontrib-devhelp",
-                "sphinxcontrib-applehelp",
-            ],
-        },
         python_interpreter_target = interpreter,
         requirements_lock = "@envoy//tools/base:requirements.txt",
         extra_pip_args = ["--require-hashes"],

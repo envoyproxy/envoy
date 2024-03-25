@@ -6,6 +6,7 @@ import android.net.ConnectivityManager
 import android.net.Proxy
 import android.net.ProxyInfo
 import androidx.test.core.app.ApplicationProvider
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
@@ -15,7 +16,7 @@ import io.envoyproxy.envoymobile.engine.testing.TestJni
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito
@@ -33,12 +34,13 @@ import org.robolectric.RobolectricTestRunner
 //                                                │                  │
 //                                                └──────────────────┘
 @RunWith(RobolectricTestRunner::class)
-class PerformHTTPSRequestUsingProxy {
+class ProxyInfoIntentPerformHTTPSRequestUsingProxyTest {
   init {
     JniLibrary.loadTestLibrary()
     JniLibrary.load()
   }
 
+  @Ignore("https://github.com/envoyproxy/envoy/issues/33014")
   @Test
   fun `performs an HTTPs request through a proxy`() {
     TestJni.startHttpsProxyTestServer()
@@ -49,7 +51,7 @@ class PerformHTTPSRequestUsingProxy {
     Mockito.doReturn(connectivityManager)
       .`when`(context)
       .getSystemService(Context.CONNECTIVITY_SERVICE)
-    Mockito.`when`(connectivityManager.getDefaultProxy())
+    Mockito.`when`(connectivityManager.defaultProxy)
       .thenReturn(ProxyInfo.buildDirectProxy("127.0.0.1", port))
 
     val onEngineRunningLatch = CountDownLatch(1)

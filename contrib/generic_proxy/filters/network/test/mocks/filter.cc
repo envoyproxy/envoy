@@ -22,7 +22,9 @@ MockStreamFilterConfig::MockStreamFilterConfig() {
   ON_CALL(*this, createFilterFactoryFromProto(_, _, _))
       .WillByDefault(Return([](FilterChainFactoryCallbacks&) {}));
   ON_CALL(*this, name()).WillByDefault(Return("envoy.filters.generic.mock_filter"));
-  ON_CALL(*this, configTypes()).WillByDefault(Return(std::set<std::string>{}));
+  ON_CALL(*this, configTypes()).WillByDefault(Invoke([this]() {
+    return NamedFilterConfigFactory::configTypes();
+  }));
 }
 
 MockFilterChainManager::MockFilterChainManager() {

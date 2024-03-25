@@ -1077,6 +1077,24 @@ TEST_P(IntegrationTest, MissingDelimiter) {
   EXPECT_THAT(log, Not(HasSubstr("DC")));
 }
 
+TEST_P(IntegrationTest, ConnectionTermination) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  initialize();
+  std::string response;
+  auto tcp_client = makeTcpConnection(lookupPort("http"));
+  ASSERT_TRUE(tcp_client->write("GET / HTTP/1.1\r\nHost: host\r\n\r\n"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
+  tcp_client->close();
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("DC"));
+  EXPECT_THAT(log, HasSubstr("downstream_remote_disconnect"));
+}
+
 TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
   initialize();
   std::string response;
@@ -1556,23 +1574,6 @@ TEST_P(IntegrationTest, AbsolutePathWithMixedScheme) {
       lookupPort("http"), "GET hTtp://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
       &response, true);
   EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
-}
-
-TEST_P(IntegrationTest, AbsolutePathWithMixedSchemeLegacy) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_absolute_url_with_mixed_scheme", "false");
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.handle_uppercase_scheme", "false");
-
-  // Mixed scheme requests will be rejected
-  auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
-  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
-  config_helper_.addVirtualHost(host);
-  initialize();
-  std::string response;
-  sendRawHttpAndWaitForResponse(
-      lookupPort("http"), "GET hTtp://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
-      &response, true);
-  EXPECT_THAT(response, StartsWith("HTTP/1.1 400"));
 }
 
 TEST_P(IntegrationTest, AbsolutePathWithoutPort) {

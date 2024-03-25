@@ -9,6 +9,7 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "re2/re2.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,7 +30,8 @@ class UriTemplateMatcher : public Router::PathMatcher {
 public:
   explicit UriTemplateMatcher(
       const envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig& config)
-      : path_template_(config.path_template()) {}
+      : path_template_(config.path_template()),
+        matching_pattern_regex_(convertPathPatternSyntaxToRegex(path_template_).value()) {}
 
   // Router::PathMatcher
   bool match(absl::string_view path) const override;
@@ -38,6 +40,7 @@ public:
 
 private:
   const std::string path_template_;
+  const RE2 matching_pattern_regex_;
 };
 
 } // namespace Match
