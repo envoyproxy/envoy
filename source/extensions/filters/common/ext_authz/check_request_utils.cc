@@ -46,10 +46,10 @@ bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher
 
 // Convenience function.
 void headerMapAddHeader(envoy::config::core::v3::HeaderMap& mutable_header_map,
-                        absl::string_view key, absl::string_view value) {
+                        const std::string& key, const std::string& value) {
   auto* new_header = mutable_header_map.mutable_headers()->Add();
-  new_header->set_key(std::string(key));
-  new_header->set_raw_value(std::string(value));
+  new_header->set_key(key);
+  new_header->set_raw_value(value);
 }
 
 void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeContext::Peer& peer,
@@ -141,7 +141,7 @@ void CheckRequestUtils::setHttpRequest(
   }
 
   // Fill in the headers.
-  auto* mutable_headers = httpreq.mutable_headers();
+  auto* mutable_headers = !encode_raw_headers ? httpreq.mutable_headers() : nullptr;
   // Calling mutable_header_map() creates the field in the request; only do so when necessary.
   auto* mutable_header_map = encode_raw_headers ? httpreq.mutable_header_map() : nullptr;
 
@@ -158,7 +158,7 @@ void CheckRequestUtils::setHttpRequest(
     }
 
     if (encode_raw_headers) {
-      headerMapAddHeader(*mutable_header_map, key, e.value().getStringView());
+      headerMapAddHeader(*mutable_header_map, key, std::string(e.value().getStringView()));
     } else {
       const std::string sanitized_value =
           MessageUtil::sanitizeUtf8String(e.value().getStringView());
@@ -197,7 +197,7 @@ void CheckRequestUtils::setHttpRequest(
     }
     if (encode_raw_headers) {
       headerMapAddHeader(*mutable_header_map, Headers::get().EnvoyAuthPartialBody.get(),
-                         std::move(partial_body_value));
+                         partial_body_value);
     } else {
       (*mutable_headers)[Headers::get().EnvoyAuthPartialBody.get()] = std::move(partial_body_value);
     }
