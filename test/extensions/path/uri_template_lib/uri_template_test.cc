@@ -183,10 +183,11 @@ TEST_P(PathPatternMatchAndRewrite, IsValidPathGlobMatchPattern) {
 TEST_P(PathPatternMatchAndRewrite, IsValidTextGlobMatchPattern) {
   EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo=**}").ok());
   EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo=**}/doo").ok());
-  EXPECT_TRUE(isValidMatchPattern("/{hoo=*}/bar/{goo=**}").ok());
+  EXPECT_TRUE(isValidMatchPattern("/{foo=*}/bar/{goo=**}").ok());
+  EXPECT_TRUE(isValidMatchPattern("/{*}/bar/{**}").ok());
   EXPECT_TRUE(isValidMatchPattern("/*/bar/**").ok());
 
-  EXPECT_FALSE(isValidMatchPattern("/{hoo=**}/bar/{goo=*}").ok());
+  EXPECT_FALSE(isValidMatchPattern("/{foo=**}/bar/{goo=*}").ok());
   EXPECT_FALSE(isValidMatchPattern("/**/bar/*").ok());
 }
 
