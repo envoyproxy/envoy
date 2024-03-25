@@ -166,7 +166,8 @@ private:
 class HeaderValueMatchAction : public RateLimit::DescriptorProducer {
 public:
   HeaderValueMatchAction(
-      const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action);
+      const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
+      Server::Configuration::CommonFactoryContext& context);
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
@@ -187,7 +188,8 @@ private:
 class QueryParameterValueMatchAction : public RateLimit::DescriptorProducer {
 public:
   QueryParameterValueMatchAction(
-      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action);
+      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
+      Server::Configuration::CommonFactoryContext& context);
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
@@ -196,7 +198,8 @@ public:
                           const StreamInfo::StreamInfo& info) const override;
 
   std::vector<ConfigUtility::QueryParameterMatcherPtr> buildQueryParameterMatcherVector(
-      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action);
+      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
+      Server::Configuration::CommonFactoryContext& context);
 
 private:
   const std::string descriptor_value_;

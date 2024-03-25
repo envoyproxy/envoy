@@ -67,5 +67,20 @@ void ZoneAwareLoadBalancerFuzzBase::addWeightsToHosts() {
   }
 }
 
+bool ZoneAwareLoadBalancerFuzzBase::validateSlowStart(
+    const envoy::config::cluster::v3::Cluster_SlowStartConfig& slow_start_config) {
+  if (slow_start_config.has_aggression()) {
+    const auto& aggression = slow_start_config.aggression();
+    if (aggression.default_value() < 1e-30) {
+      ENVOY_LOG_MISC(
+          warn,
+          "Aggression value ({}) cannot be smaller than 1e-30, error in slow-start validation",
+          aggression.default_value());
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace Upstream
 } // namespace Envoy

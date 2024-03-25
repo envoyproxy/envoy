@@ -3,6 +3,7 @@
 #include "test/common/http/filters/assertion/filter.pb.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -21,12 +22,13 @@ public:
   void setUpFilter(std::string&& proto_str) {
     envoymobile::extensions::filters::http::assertion::Assertion config;
     Protobuf::TextFormat::ParseFromString(proto_str, &config);
-    config_ = std::make_shared<AssertionFilterConfig>(config);
+    config_ = std::make_shared<AssertionFilterConfig>(config, context_);
     filter_ = std::make_unique<AssertionFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   AssertionFilterConfigSharedPtr config_{};
   std::unique_ptr<AssertionFilter> filter_{};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

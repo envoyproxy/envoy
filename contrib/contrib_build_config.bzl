@@ -73,6 +73,7 @@ CONTRIB_EXTENSIONS = {
     #
     "envoy.filters.generic.router":                             "//contrib/generic_proxy/filters/network/source/router:config",
     "envoy.generic_proxy.codecs.dubbo":                         "//contrib/generic_proxy/filters/network/source/codecs/dubbo:config",
+    "envoy.generic_proxy.codecs.http1":                         "//contrib/generic_proxy/filters/network/source/codecs/http1:config",
     "envoy.generic_proxy.codecs.kafka":                         "//contrib/generic_proxy/filters/network/source/codecs/kafka:config",
 
     #

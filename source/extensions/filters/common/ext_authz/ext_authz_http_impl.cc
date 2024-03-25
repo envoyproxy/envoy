@@ -152,8 +152,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(Http::Headers::get().Host.get());
     matchers.push_back(
-        std::make_unique<
-            Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
             matcher, context));
 
     return std::make_shared<NotHeaderKeyMatcher>(std::move(matchers));
@@ -169,8 +168,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
     matchers.push_back(
-        std::make_unique<
-            Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
             matcher, context));
   }
 

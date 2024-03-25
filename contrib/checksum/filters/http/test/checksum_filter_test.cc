@@ -5,6 +5,7 @@
 #include "source/common/http/header_map_impl.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -32,7 +33,7 @@ public:
       // The sha256 of the string "banana"
       entry->set_sha256("b493d48364afe44d11c0165cf470a4164d1e2609911ef998be868d46ade3de4e");
     }
-    config_ = std::make_shared<ChecksumFilterConfig>(config);
+    config_ = std::make_shared<ChecksumFilterConfig>(config, context_);
     filter_ = std::make_unique<ChecksumFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -40,6 +41,7 @@ public:
 
   ~ChecksumFilterTest() override { filter_->onDestroy(); }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::shared_ptr<ChecksumFilterConfig> config_;
   std::unique_ptr<ChecksumFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

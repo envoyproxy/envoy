@@ -185,7 +185,6 @@ TEST_F(JwksCacheTest, TestAudiences) {
 
 // Test subject constraints for JwtProvider
 TEST_F(JwksCacheTest, TestSubjects) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   setupCache(SubjectConfig);
 
   {
@@ -225,7 +224,6 @@ TEST_F(JwksCacheTest, TestSubjects) {
 
 // Test lifetime constraints for JwtProvider
 TEST_F(JwksCacheTest, TestLifetime) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   setupCache(ExpirationConfig);
 
   {
