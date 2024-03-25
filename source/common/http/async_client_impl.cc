@@ -102,8 +102,8 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_)),
       route_(std::make_shared<NullRouteImpl>(
           parent_.cluster_->name(),
-          retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy, options.timeout,
-          options.hash_policy)),
+          retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
+          parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy)),
       account_(options.account_), buffer_limit_(options.buffer_limit_),
       send_xff_(options.send_xff) {
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
