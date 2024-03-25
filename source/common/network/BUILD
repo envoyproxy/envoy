@@ -251,6 +251,7 @@ envoy_cc_library(
         "socket_interface_impl.cc",
         "win32_socket_handle_impl.cc",
     ] + select({
+        "//bazel:android": [],
         "//bazel:linux": [
             "io_uring_socket_handle_impl.cc",
         ],
@@ -262,6 +263,7 @@ envoy_cc_library(
         "socket_interface_impl.h",
         "win32_socket_handle_impl.h",
     ] + select({
+        "//bazel:android": [],
         "//bazel:linux": [
             "io_uring_socket_handle_impl.h",
         ],
