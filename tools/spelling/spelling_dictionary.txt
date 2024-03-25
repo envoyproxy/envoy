@@ -1412,7 +1412,6 @@ upcasts
 upstreams
 uptime
 upvalue
-uring
 urlencoded
 urls
 userdata
