@@ -1,12 +1,12 @@
-#include "test/integration/http_protocol_integration.h"
+#include "test/integration/tcp_tunneling_integration.h"
 
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
-std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTestParams(
+std::vector<TcpTunnelingTestParams> BaseTcpTunnelingIntegrationTest::getProtocolTestParams(
     const std::vector<Http::CodecType>& downstream_protocols,
     const std::vector<Http::CodecType>& upstream_protocols) {
-  std::vector<HttpProtocolTestParams> ret;
+  std::vector<TcpTunnelingTestParams> ret;
 
   bool handled_http2_special_cases_downstream = false;
   bool handled_http2_special_cases_upstream = false;
@@ -50,15 +50,17 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
 #else
         use_header_validator_values.push_back(false);
 #endif
-        for (Http1ParserImpl http1_implementation : http1_implementations) {
-          for (Http2Impl http2_implementation : http2_implementations) {
-            for (bool defer_processing : http2_bool_values) {
-              for (bool deprecate_callback_visitor : http2_bool_values) {
-                for (bool use_header_validator : use_header_validator_values) {
-                  ret.push_back(HttpProtocolTestParams{
-                      ip_version, downstream_protocol, upstream_protocol, http1_implementation,
-                      http2_implementation, defer_processing, use_header_validator,
-                      deprecate_callback_visitor});
+        for (const bool tunneling_with_upstream_filters : {false, true}) {
+          for (Http1ParserImpl http1_implementation : http1_implementations) {
+            for (Http2Impl http2_implementation : http2_implementations) {
+              for (bool defer_processing : http2_bool_values) {
+                for (bool deprecate_callback_visitor : http2_bool_values) {
+                  for (bool use_header_validator : use_header_validator_values) {
+                    ret.push_back(TcpTunnelingTestParams{
+                        ip_version, downstream_protocol, upstream_protocol, http1_implementation,
+                        http2_implementation, defer_processing, use_header_validator,
+                        deprecate_callback_visitor, tunneling_with_upstream_filters});
+                  }
                 }
               }
             }
@@ -70,9 +72,42 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
   return ret;
 }
 
+// absl::string_view upstreamToString(Http::CodecType type) {
+//   switch (type) {
+//   case Http::CodecType::HTTP1:
+//     return "HttpUpstream";
+//   case Http::CodecType::HTTP2:
+//     return "Http2Upstream";
+//   case Http::CodecType::HTTP3:
+//     return "Http3Upstream";
+//   }
+//   return "UnknownUpstream";
+// }
 
-std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
-    const ::testing::TestParamInfo<HttpProtocolTestParams>& params) {
+// absl::string_view downstreamToString(Http::CodecType type) {
+//   switch (type) {
+//   case Http::CodecType::HTTP1:
+//     return "HttpDownstream_";
+//   case Http::CodecType::HTTP2:
+//     return "Http2Downstream_";
+//   case Http::CodecType::HTTP3:
+//     return "Http3Downstream_";
+//   }
+//   return "UnknownDownstream";
+// }
+
+// absl::string_view http2ImplementationToString(Http2Impl impl) {
+//   switch (impl) {
+//   case Http2Impl::Nghttp2:
+//     return "Nghttp2";
+//   case Http2Impl::Oghttp2:
+//     return "Oghttp2";
+//   }
+//   return "UnknownHttp2Impl";
+// }
+
+std::string BaseTcpTunnelingIntegrationTest::protocolTestParamsToString(
+    const ::testing::TestParamInfo<TcpTunnelingTestParams>& params) {
   return absl::StrCat((params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
                       downstreamToString(params.param.downstream_protocol),
                       upstreamToString(params.param.upstream_protocol),
@@ -80,12 +115,14 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
                       http2ImplementationToString(params.param.http2_implementation),
                       params.param.defer_processing_backedup_streams ? "WithDeferredProcessing"
                                                                      : "NoDeferredProcessing",
+                      params.param.use_universal_header_validator ? "Uhv" : "Legacy",
                       params.param.deprecate_callback_visitor ? "WithCallbackVisitor"
                                                               : "NoCallbackVisitor",
-                      params.param.use_universal_header_validator ? "Uhv" : "Legacy");
+                      params.param.tunneling_with_upstream_filters ? "WithUpstreamHttpFilters"
+                                                                   : "WithoutUpstreamHttpFilters");
 }
 
-void HttpProtocolIntegrationTest::setUpstreamOverrideStreamErrorOnInvalidHttpMessage() {
+void BaseTcpTunnelingIntegrationTest::setUpstreamOverrideStreamErrorOnInvalidHttpMessage() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -105,7 +142,7 @@ void HttpProtocolIntegrationTest::setUpstreamOverrideStreamErrorOnInvalidHttpMes
   });
 }
 
-void HttpProtocolIntegrationTest::setDownstreamOverrideStreamErrorOnInvalidHttpMessage() {
+void BaseTcpTunnelingIntegrationTest::setDownstreamOverrideStreamErrorOnInvalidHttpMessage() {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
