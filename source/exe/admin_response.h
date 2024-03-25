@@ -48,6 +48,7 @@ public:
   // In summary:
   //  * MainCommonBase can outlive AdminResponse so we need detachResponse.
   //  * AdminResponse can outlive MainCommonBase, so we need shared_ptr.
+#if 0
   class PtrSet {
   public:
     /**
@@ -80,9 +81,10 @@ public:
     bool accepting_admin_requests_ ABSL_GUARDED_BY(mutex_) = true;
   };
   using SharedPtrSet = std::shared_ptr<PtrSet>;
+#endif
 
-  AdminResponse(Server::Instance& server, absl::string_view path, absl::string_view method,
-                SharedPtrSet response_set);
+  AdminResponse(Server::Instance& server, absl::string_view path, absl::string_view method
+                /*, SharedPtrSet response_set*/);
   ~AdminResponse();
 
   /**
@@ -150,6 +152,7 @@ private:
   void requestNextChunk();
   void sendAbortChunkLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void sendErrorLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  // void clearLifecycleTerminator();
 
   Server::Instance& server_;
   OptRef<Server::Admin> opt_admin_;
@@ -181,7 +184,8 @@ private:
   BodyFn body_fn_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
 
-  SharedPtrSet shared_response_set_;
+  // SharedPtrSet shared_response_set_;
+  Server::ServerLifecycleNotifier::HandlePtr lifecycle_notifier_ ABSL_GUARDED_BY(mutex_);
 };
 using AdminResponseSharedPtr = std::shared_ptr<AdminResponse>;
 

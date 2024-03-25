@@ -8,15 +8,24 @@
 namespace Envoy {
 
 AdminResponse::AdminResponse(Server::Instance& server, absl::string_view path,
-                             absl::string_view method, SharedPtrSet response_set)
-    : server_(server), opt_admin_(server.admin()), shared_response_set_(response_set) {
-  request_headers_->setMethod(method);
-  request_headers_->setPath(path);
+                             absl::string_view method /*, SharedPtrSet response_set*/)
+    : server_(server), opt_admin_(server.admin()),
+      // shared_response_set_(response_set)
+      lifecycle_notifier_(server.lifecycleNotifier().registerCallback(
+          Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this] { terminate(); })) {
+  if (lifecycle_notifier_ == nullptr) {
+    terminate();
+  } else {
+    ENVOY_LOG_MISC(error, "AdminResponse(): {}", static_cast<void*>(this));
+    request_headers_->setMethod(method);
+    request_headers_->setPath(path);
+  }
 }
 
 AdminResponse::~AdminResponse() {
+  ENVOY_LOG_MISC(error, "~AdminResponse(): {}", static_cast<void*>(this));
   cancel();
-  shared_response_set_->detachResponse(this);
+  // shared_response_set_->detachResponse(this);
 }
 
 void AdminResponse::getHeaders(HeadersFn fn) {
@@ -87,10 +96,12 @@ bool AdminResponse::cancelled() const {
 // admin response, and so calls to getHeader and nextChunk remain valid,
 // resulting in 503 and an empty body.
 void AdminResponse::terminate() {
+  ENVOY_LOG_MISC(error, "terminate(): {}", static_cast<void*>(this));
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   absl::MutexLock lock(&mutex_);
   if (!terminated_) {
     terminated_ = true;
+    lifecycle_notifier_.reset();
     sendErrorLockHeld();
     sendAbortChunkLockHeld();
   }
@@ -159,7 +170,7 @@ void AdminResponse::sendErrorLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
   }
 }
 
-void AdminResponse::PtrSet::terminateAdminRequests() {
+/*void AdminResponse::PtrSet::terminateAdminRequests() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
 
   absl::MutexLock lock(&mutex_);
@@ -186,6 +197,6 @@ void AdminResponse::PtrSet::attachResponse(AdminResponse* response) {
 void AdminResponse::PtrSet::detachResponse(AdminResponse* response) {
   absl::MutexLock lock(&mutex_);
   response_set_.erase(response);
-}
+  }*/
 
 } // namespace Envoy
