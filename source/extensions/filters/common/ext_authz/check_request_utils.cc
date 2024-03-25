@@ -260,8 +260,7 @@ CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringM
       envoy::type::matcher::v3::StringMatcher matcher;
       matcher.set_exact(key.get());
       matchers.push_back(
-          std::make_unique<
-              Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
               matcher, context));
     }
   }
@@ -275,8 +274,7 @@ CheckRequestUtils::createStringMatchers(const envoy::type::matcher::v3::ListStri
   std::vector<Matchers::StringMatcherPtr> matchers;
   for (const auto& matcher : list.patterns()) {
     matchers.push_back(
-        std::make_unique<
-            Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
             matcher, context));
   }
   return matchers;

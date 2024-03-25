@@ -420,6 +420,7 @@ TEST(ProxyStatusFromStreamInfo, TestNewAll) {
             ProxyStatusError::ConnectionTerminated},
            {CoreResponseFlag::DownstreamConnectionTermination,
             ProxyStatusError::ConnectionTerminated},
+           {CoreResponseFlag::DownstreamRemoteReset, ProxyStatusError::ConnectionTerminated},
            {CoreResponseFlag::OverloadManager, ProxyStatusError::ConnectionLimitReached},
            {CoreResponseFlag::DropOverLoad, ProxyStatusError::ConnectionLimitReached},
            {CoreResponseFlag::FaultInjected, ProxyStatusError::HttpRequestError},

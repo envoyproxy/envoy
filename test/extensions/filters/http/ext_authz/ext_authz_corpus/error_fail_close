@@ -26,6 +26,4 @@ request_data {
     }
   }
 }
-result {
-  error {}
-}
+result: ERROR

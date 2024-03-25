@@ -77,7 +77,8 @@ public:
                             : absl::nullopt),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
-                ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
+                ? absl::optional<Matchers::MetadataMatcher>(
+                      Matchers::MetadataMatcher(config.filter_enabled_metadata(), factory_context))
                 : absl::nullopt),
         deny_at_disable_(config.has_deny_at_disable()
                              ? absl::optional<Runtime::FeatureFlag>(

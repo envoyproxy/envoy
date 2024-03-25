@@ -428,8 +428,7 @@ const absl::optional<ProxyStatusError>
 ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
   // NB: This mapping from Envoy-specific CoreResponseFlag enum to Proxy-Status
   // error enum is lossy, since CoreResponseFlag is really a bitset of many
-  // CoreResponseFlag enums. Here, we search the list of all known CoreResponseFlag values in
-  // enum order, returning the first matching ProxyStatusError.
+  // CoreResponseFlag enums.
   if (stream_info.hasResponseFlag(CoreResponseFlag::FailedLocalHealthCheck)) {
     return ProxyStatusError::DestinationUnavailable;
   } else if (stream_info.hasResponseFlag(CoreResponseFlag::NoHealthyUpstream)) {
@@ -463,6 +462,8 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
     } else if (stream_info.hasResponseFlag(CoreResponseFlag::FaultInjected)) {
       return ProxyStatusError::HttpRequestError;
     } else if (stream_info.hasResponseFlag(CoreResponseFlag::DownstreamConnectionTermination)) {
+      return ProxyStatusError::ConnectionTerminated;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::DownstreamRemoteReset)) {
       return ProxyStatusError::ConnectionTerminated;
     }
   } else {

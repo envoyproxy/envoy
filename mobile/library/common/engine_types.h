@@ -11,12 +11,22 @@
 // https://github.com/apple/swift/blob/swift-5.7.3-RELEASE/docs/CppInteroperability/CppInteroperabilityStatus.md
 
 #include <functional>
+#include <string>
+
+#include "source/common/common/base_logger.h"
 
 namespace Envoy {
 
-/** The callbacks for the `InternalEngine`. */
-struct InternalEngineCallbacks {
+/** The callbacks for the Envoy Engine. */
+struct EngineCallbacks {
   std::function<void()> on_engine_running = [] {};
+  std::function<void()> on_exit = [] {};
+};
+
+/** The callbacks for Envoy Logger. */
+struct EnvoyLogger {
+  std::function<void(Logger::Logger::Levels, const std::string&)> on_log =
+      [](Logger::Logger::Levels, const std::string&) {};
   std::function<void()> on_exit = [] {};
 };
 

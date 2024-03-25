@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["logical_host_test.cc"],
     deps = [
         "//source/extensions/clusters/common:logical_host_lib",
+        "//test/mocks/network:transport_socket_mocks",
         "//test/mocks/upstream:host_mocks",
     ],
 )
