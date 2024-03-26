@@ -121,7 +121,6 @@ paths:
     - source/common/http/http2/codec_impl.cc
     - source/common/http/hash_policy.cc
     - source/common/http/conn_manager_utility.cc
-    - source/common/http/match_delegate/config.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/visitor.cc
     - source/common/protobuf/utility.cc
