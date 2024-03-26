@@ -138,6 +138,8 @@ private:
                                     const Envoy::Http::RequestHeaderMap& headers,
                                     uint64_t max_request_bytes, bool pack_as_bytes,
                                     const MatcherSharedPtr& request_header_matchers);
+  static void setTLSSession(envoy::service::auth::v3::AttributeContext::TLSSession& session,
+                            const Ssl::ConnectionInfoConstSharedPtr ssl_info);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
   static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);
 };
