@@ -58,7 +58,10 @@ class MockProxyFactory : public ProxyFactory {
 public:
   MockProxyFactory();
 
-  MOCK_METHOD(void, createProxy, (Network::FilterManager&, const FilterConfigSharedPtr&), (const));
+  MOCK_METHOD(void, createProxy,
+              (Server::Configuration::FactoryContext&, Network::FilterManager&,
+               FilterConfigSharedPtr),
+              (const));
 };
 
 class MockStreamCodecFactoryConfig : public CodecFactoryConfig {
@@ -66,9 +69,9 @@ public:
   MockStreamCodecFactoryConfig();
 
   MOCK_METHOD(CodecFactoryPtr, createCodecFactory,
-              (const Protobuf::Message&, Envoy::Server::Configuration::ServerFactoryContext&));
+              (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&));
   MOCK_METHOD(ProxyFactoryPtr, createProxyFactory,
-              (const Protobuf::Message&, Envoy::Server::Configuration::FactoryContext&));
+              (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Struct>();

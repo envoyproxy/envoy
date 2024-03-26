@@ -211,7 +211,7 @@ TEST(FactoryTest, CustomReadFilterFactory) {
 
   auto mock_proxy_factory = std::make_unique<MockProxyFactory>();
   auto raw_mock_proxy_factory = mock_proxy_factory.get();
-  EXPECT_CALL(*raw_mock_proxy_factory, createProxy(_, _));
+  EXPECT_CALL(*raw_mock_proxy_factory, createProxy(_, _, _));
 
   EXPECT_CALL(codec_factory_config, createCodecFactory(_, _))
       .WillOnce(Return(testing::ByMove(std::move(mock_codec_factory))));
