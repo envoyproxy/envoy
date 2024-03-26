@@ -512,7 +512,8 @@ public:
     std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
     config_ = std::make_shared<Config>(tcp_proxy_, factory_context_);
     filter_ =
-        std::make_unique<Filter>(config_, factory_context_.serverFactoryContext().clusterManager());
+        std::make_unique<Filter>(config_, factory_context_.serverFactoryContext().clusterManager(),
+                                 factory_context_.server_factory_context_.regex_engine_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
         *upstream_, std::move(generic_conn_pool));

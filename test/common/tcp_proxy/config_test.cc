@@ -694,8 +694,9 @@ public:
   void initializeFilter() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
 
-    filter_ = std::make_unique<Filter>(config_,
-                                       factory_context_.server_factory_context_.cluster_manager_);
+    filter_ =
+        std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_,
+                                 factory_context_.server_factory_context_.regex_engine_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -747,8 +748,9 @@ public:
                         Network::MockConnection& connection) {
     EXPECT_CALL(filter_callbacks, connection()).WillRepeatedly(testing::ReturnRef(connection));
 
-    filter_ = std::make_unique<Filter>(config_,
-                                       factory_context_.server_factory_context_.cluster_manager_);
+    filter_ =
+        std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_,
+                                 factory_context_.server_factory_context_.regex_engine_);
     filter_->initializeReadFilterCallbacks(filter_callbacks);
   }
 

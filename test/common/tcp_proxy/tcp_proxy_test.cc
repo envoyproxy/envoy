@@ -134,7 +134,8 @@ public:
                 Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
       }
       filter_ = std::make_unique<Filter>(config_,
-                                         factory_context_.server_factory_context_.cluster_manager_);
+                                         factory_context_.server_factory_context_.cluster_manager_,
+                                         factory_context_.server_factory_context_.regex_engine_);
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -252,7 +253,8 @@ TEST_P(TcpProxyTest, BadFactory) {
       .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
 
   filter_ =
-      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_);
+      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_,
+                               factory_context_.server_factory_context_.regex_engine_);
   EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -534,7 +536,8 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   //     .WillRepeatedly(Return(&thread_local_cluster_));
   EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info));
   filter_ =
-      std::make_unique<Filter>(config_, factory_context_.serverFactoryContext().clusterManager());
+      std::make_unique<Filter>(config_, factory_context_.serverFactoryContext().clusterManager(),
+                               factory_context_.server_factory_context_.regex_engine_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   auto stream_decoder_callbacks = Filter::HttpStreamDecoderFilterCallbacks(filter_.get());
   EXPECT_NO_THROW(stream_decoder_callbacks.streamId());
@@ -616,7 +619,8 @@ TEST_P(TcpProxyTest, RouteWithMetadataMatch) {
 
   configure(config);
   filter_ =
-      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_);
+      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_,
+                               factory_context_.server_factory_context_.regex_engine_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -669,8 +673,9 @@ TEST_P(TcpProxyTest, WeightedClusterWithMetadataMatch) {
   // Expect filter to try to open a connection to cluster1.
   {
     NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
-    filter_ = std::make_unique<Filter>(config_,
-                                       factory_context_.server_factory_context_.cluster_manager_);
+    filter_ =
+        std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_,
+                                 factory_context_.server_factory_context_.regex_engine_);
     filter_->initializeReadFilterCallbacks(filter_callbacks);
 
     Upstream::LoadBalancerContext* context;
@@ -700,8 +705,9 @@ TEST_P(TcpProxyTest, WeightedClusterWithMetadataMatch) {
   // Expect filter to try to open a connection to cluster2.
   {
     NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
-    filter_ = std::make_unique<Filter>(config_,
-                                       factory_context_.server_factory_context_.cluster_manager_);
+    filter_ =
+        std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_,
+                                 factory_context_.server_factory_context_.regex_engine_);
     filter_->initializeReadFilterCallbacks(filter_callbacks);
 
     Upstream::LoadBalancerContext* context;
@@ -744,7 +750,8 @@ TEST_P(TcpProxyTest, StreamInfoDynamicMetadata) {
       .WillRepeatedly(ReturnRef(metadata));
 
   filter_ =
-      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_);
+      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_,
+                               factory_context_.server_factory_context_.regex_engine_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   Upstream::LoadBalancerContext* context;
@@ -801,7 +808,8 @@ TEST_P(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
       .WillRepeatedly(ReturnRef(metadata));
 
   filter_ =
-      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_);
+      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_,
+                               factory_context_.server_factory_context_.regex_engine_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   Upstream::LoadBalancerContext* context;
@@ -832,7 +840,8 @@ TEST_P(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
 TEST_P(TcpProxyTest, DisconnectBeforeData) {
   configure(defaultConfig());
   filter_ =
-      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_);
+      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_,
+                               factory_context_.server_factory_context_.regex_engine_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -877,7 +886,8 @@ TEST_P(TcpProxyTest, UpstreamConnectionLimit) {
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
   filter_ =
-      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_);
+      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_,
+                               factory_context_.server_factory_context_.regex_engine_);
   // The downstream connection closes if the proxy can't make an upstream connection.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
