@@ -39,7 +39,6 @@ build --swiftcopt=-wmo
 build --repo_env=JAVA_HOME=../bazel_tools/jdk
 build --define disable_known_issue_asserts=true
 build --define cxxopts=-std=c++17
-build --copt -fno-modules
 # Unset per_object_debug_info. Causes failures on Android Linux release builds.
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
@@ -201,6 +200,7 @@ build:mobile-remote-ci-linux-clang --action_env=CXX=/opt/llvm/bin/clang++
 build:mobile-remote-ci-linux-clang --config=mobile-remote-ci-linux
 # Temporary revert to C++17 for mobile NDK builds.
 build:mobile-remote-ci-linux-clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+build:mobile-remote-ci-linux-clang --copt -fno-modules
 
 #############################################################################
 # mobile-remote-ci-linux-asan: These options are Linux-only using Clang and AddressSanitizer
