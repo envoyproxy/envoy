@@ -131,6 +131,7 @@ public:
   EngineBuilder& setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks);
   [[deprecated("Use EngineBuilder::setEngineCallbacks instead")]] EngineBuilder&
   setOnEngineRunning(std::function<void()> closure);
+  EngineBuilder& setEventTracker(std::unique_ptr<EnvoyEventTracker> event_tracker);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
@@ -219,12 +220,13 @@ private:
   Logger::Logger::Levels log_level_ = Logger::Logger::Levels::info;
   std::unique_ptr<EnvoyLogger> logger_{nullptr};
   std::unique_ptr<EngineCallbacks> callbacks_;
+  std::unique_ptr<EnvoyEventTracker> event_tracker_{nullptr};
 
   int connect_timeout_seconds_ = 30;
   int dns_refresh_seconds_ = 60;
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
-  int dns_query_timeout_seconds_ = 25;
+  int dns_query_timeout_seconds_ = 5;
   bool use_system_resolver_ = true;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;

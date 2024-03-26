@@ -7,6 +7,7 @@
 #include "test/common/http/filters/test_event_tracker/filter.pb.h"
 
 #include "library/common/api/c_types.h"
+#include "library/common/engine_types.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,29 +20,29 @@ public:
       const envoymobile::extensions::filters::http::test_event_tracker::TestEventTracker&
           proto_config);
 
-  std::vector<std::pair<std::string, std::string>> attributes() { return attributes_; };
-  void track(envoy_map event) {
-    if (event_tracker_->track != nullptr) {
-      event_tracker_->track(event, event_tracker_->context);
+  absl::flat_hash_map<std::string, std::string> attributes() { return attributes_; };
+  void track(const absl::flat_hash_map<std::string, std::string>& events) {
+    if (event_tracker_ != nullptr) {
+      (*event_tracker_)->on_track(events);
     }
-  };
+  }
 
 private:
-  std::vector<std::pair<std::string, std::string>> attributes_;
-  const envoy_event_tracker* event_tracker_;
+  absl::flat_hash_map<std::string, std::string> attributes_;
+  const std::unique_ptr<EnvoyEventTracker>* event_tracker_;
 };
 
 using TestEventTrackerFilterConfigSharedPtr = std::shared_ptr<TestEventTrackerFilterConfig>;
 
 // The filter that emits preconfigured events. It's supposed to be used for
 // testing of the event tracking functionality only.
-class TestEventTrackerFilter final : public ::Envoy::Http::PassThroughFilter {
+class TestEventTrackerFilter final : public Http::PassThroughFilter {
 public:
   TestEventTrackerFilter(TestEventTrackerFilterConfigSharedPtr config) : config_(config) {}
 
   // StreamDecoderFilter
-  ::Envoy::Http::FilterHeadersStatus decodeHeaders(::Envoy::Http::RequestHeaderMap& headers,
-                                                   bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
 
 private:
   const TestEventTrackerFilterConfigSharedPtr config_;

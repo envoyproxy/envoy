@@ -26,7 +26,7 @@ public:
    * @param event_tracker, the event tracker to use for the emission of events.
    */
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
-                 envoy_event_tracker event_tracker);
+                 std::unique_ptr<EnvoyEventTracker> event_tracker);
 
   /**
    * InternalEngine destructor.
@@ -123,7 +123,8 @@ private:
   GTEST_FRIEND_CLASS(InternalEngineTest, ThreadCreationFailed);
 
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
-                 envoy_event_tracker event_tracker, Thread::PosixThreadFactoryPtr thread_factory);
+                 std::unique_ptr<EnvoyEventTracker> event_tracker,
+                 Thread::PosixThreadFactoryPtr thread_factory);
 
   envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
@@ -135,7 +136,7 @@ private:
   Stats::StatNameSetPtr stat_name_set_;
   std::unique_ptr<EngineCallbacks> callbacks_;
   std::unique_ptr<EnvoyLogger> logger_;
-  envoy_event_tracker event_tracker_;
+  std::unique_ptr<EnvoyEventTracker> event_tracker_;
   Assert::ActionRegistrationPtr assert_handler_registration_;
   Assert::ActionRegistrationPtr bug_handler_registration_;
   Thread::MutexBasicLockable mutex_;
