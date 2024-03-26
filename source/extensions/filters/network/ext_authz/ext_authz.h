@@ -51,17 +51,18 @@ class Config {
 
 public:
   Config(const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz& config,
-         Stats::Scope& scope, envoy::config::bootstrap::v3::Bootstrap& bootstrap)
+         Stats::Scope& scope, Server::Configuration::ServerFactoryContext& context)
       : stats_(generateStats(config.stat_prefix(), scope)),
         failure_mode_allow_(config.failure_mode_allow()),
         include_peer_certificate_(config.include_peer_certificate()),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
-                ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
+                ? absl::optional<Matchers::MetadataMatcher>(
+                      Matchers::MetadataMatcher(config.filter_enabled_metadata(), context))
                 : absl::nullopt) {
     auto labels_key_it =
-        bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
-    if (labels_key_it != bootstrap.node().metadata().fields().end()) {
+        context.bootstrap().node().metadata().fields().find(config.bootstrap_metadata_labels_key());
+    if (labels_key_it != context.bootstrap().node().metadata().fields().end()) {
       for (const auto& labels_it : labels_key_it->second.struct_value().fields()) {
         destination_labels_[labels_it.first] = labels_it.second.string_value();
       }

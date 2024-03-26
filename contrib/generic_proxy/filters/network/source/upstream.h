@@ -50,7 +50,6 @@ protected:
   Upstream::TcpPoolData tcp_pool_data_;
   ClientCodecPtr client_codec_;
 
-  bool is_cleaned_up_{};
   // Whether the upstream connection is created. This will be set to true when the initialize()
   // is called.
   bool initialized_{};

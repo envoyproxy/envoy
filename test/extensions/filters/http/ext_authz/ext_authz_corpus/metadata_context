@@ -61,9 +61,7 @@ filter_metadata {
   }
 }
 }
-result {
-  ok {}
-}
+result: OK
 request_data {
   headers {
     headers {

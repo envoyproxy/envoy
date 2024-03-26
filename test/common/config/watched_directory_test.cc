@@ -25,8 +25,11 @@ TEST(WatchedDirectory, All) {
       .WillOnce(DoAll(SaveArg<2>(&cb), Return(absl::OkStatus())));
   WatchedDirectory wd(config, dispatcher);
   bool called = false;
-  wd.setCallback([&called] { called = true; });
-  cb(Filesystem::Watcher::Events::MovedTo);
+  wd.setCallback([&called] {
+    called = true;
+    return absl::OkStatus();
+  });
+  EXPECT_TRUE(cb(Filesystem::Watcher::Events::MovedTo).ok());
   EXPECT_TRUE(called);
 }
 

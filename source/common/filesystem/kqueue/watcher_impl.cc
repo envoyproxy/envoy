@@ -165,7 +165,7 @@ void WatcherImpl::onKqueueEvent() {
 
     if (events & file->events_) {
       ENVOY_LOG(debug, "matched callback: file: {}", file->file_);
-      file->callback_(events);
+      THROW_IF_NOT_OK(file->callback_(events));
     }
   }
 }
