@@ -1812,13 +1812,14 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 8,
+    shard_count = 30,
     tags = [
         "cpu:3",
     ],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
+        ":tcp_tunneling_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/upstreams/http/tcp:config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -1826,6 +1827,19 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "tcp_tunneling_integration_lib",
+    srcs = [
+        "tcp_tunneling_integration.cc",
+    ],
+    hdrs = [
+        "tcp_tunneling_integration.h",
+    ],
+    deps = [
+        ":http_integration_lib",
     ],
 )
 
