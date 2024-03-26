@@ -132,7 +132,7 @@ Config::Config(
     }
   }
 
-  // Remove this check if PPv3 ever becomes a standard.
+  // Remove this check if PROXY protocol v3 is ever introduced.
   if (!allow_v1_ && !allow_v2_) {
     throw ProtoValidationException(
         "Proxy Protocol filter is misconfigured: all proxy protocol versions are disallowed.");
