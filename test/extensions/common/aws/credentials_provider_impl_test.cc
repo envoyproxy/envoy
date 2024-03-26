@@ -2860,6 +2860,7 @@ public:
   }
 
   void SetUp() override {
+    // Implicit environment clear for each DefaultCredentialsProviderChainTest
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI");
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI");
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN");
