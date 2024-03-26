@@ -116,21 +116,24 @@ class HandshakerFactoryContextImpl : public Ssl::HandshakerFactoryContext {
 public:
   HandshakerFactoryContextImpl(Api::Api& api, const Server::Options& options,
                                absl::string_view alpn_protocols,
-                               Singleton::Manager& singleton_manager)
+                               Singleton::Manager& singleton_manager,
+                               Server::ServerLifecycleNotifier& lifecycle_notifier)
       : api_(api), options_(options), alpn_protocols_(alpn_protocols),
-        singleton_manager_(singleton_manager) {}
+        singleton_manager_(singleton_manager), lifecycle_notifier_(lifecycle_notifier) {}
 
   // HandshakerFactoryContext
   Api::Api& api() override { return api_; }
   const Server::Options& options() const override { return options_; }
   absl::string_view alpnProtocols() const override { return alpn_protocols_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
+  Server::ServerLifecycleNotifier& lifecycleNotifier() override { return lifecycle_notifier_; }
 
 private:
   Api::Api& api_;
   const Server::Options& options_;
   const std::string alpn_protocols_;
   Singleton::Manager& singleton_manager_;
+  Server::ServerLifecycleNotifier& lifecycle_notifier_;
 };
 
 class HandshakerFactoryImpl : public Ssl::HandshakerFactory {

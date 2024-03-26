@@ -15,13 +15,13 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-absl::optional<Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>
+absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
 maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config,
                          Server::Configuration::CommonFactoryContext& context) {
   switch (config.query_parameter_match_specifier_case()) {
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       kStringMatch:
-    return Matchers::StringMatcherImplWithContext(config.string_match(), context);
+    return Matchers::StringMatcherImpl(config.string_match(), context);
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       kPresentMatch:
     return absl::nullopt;

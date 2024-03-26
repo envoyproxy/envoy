@@ -139,7 +139,6 @@ bool validateConfig(const test::common::router::RouteTestCase& input) {
 DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
   static NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   static NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
-  static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
 
   try {
     if (!validateConfig(input)) {

@@ -193,6 +193,7 @@ TEST_F(HandshakerFactoryTest, HandshakerContextProvidesObjectsFromParentContext)
         // provided to the parent context.
         EXPECT_THAT(context.api(), Ref(mock_factory_ctx.api_));
         EXPECT_THAT(context.options(), Ref(mock_factory_ctx.options_));
+        EXPECT_THAT(context.lifecycleNotifier(), Ref(mock_factory_ctx.lifecycle_notifier_));
       }));
 
   Extensions::TransportSockets::Tls::ClientSslSocketFactory socket_factory(

@@ -87,7 +87,7 @@ response_rules:
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<FilterConfig>(config, *scope_.rootScope());
+    config_ = std::make_shared<FilterConfig>(config, *scope_.rootScope(), regex_engine_);
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -131,6 +131,7 @@ response_rules:
     EXPECT_EQ(expected_result, filter_->encodeData(buffer_, end_stream));
   }
 
+  Regex::GoogleReEngine regex_engine_;
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;

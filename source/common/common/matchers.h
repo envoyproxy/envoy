@@ -91,10 +91,10 @@ StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtension
                                            Server::Configuration::CommonFactoryContext& context);
 
 template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
-class StringMatcherImplWithContext : public ValueMatcher, public StringMatcher {
+class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
-  explicit StringMatcherImplWithContext(const StringMatcherType& matcher,
-                                        Server::Configuration::CommonFactoryContext& context)
+  explicit StringMatcherImpl(const StringMatcherType& matcher,
+                             Server::Configuration::CommonFactoryContext& context)
       : matcher_(matcher) {
     if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kSafeRegex) {
       if (matcher.ignore_case()) {
@@ -263,12 +263,12 @@ public:
                   Server::Configuration::CommonFactoryContext& context);
 
   bool match(const absl::string_view path) const override;
-  const StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>& matcher() const {
+  const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>& matcher() const {
     return matcher_;
   }
 
 private:
-  const StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher> matcher_;
+  const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;
 };
 
 } // namespace Matchers
