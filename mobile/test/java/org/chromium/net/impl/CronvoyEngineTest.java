@@ -8,7 +8,6 @@ import static com.google.common.truth.Truth.assertWithMessage;
 
 import static org.junit.Assert.assertThrows;
 
-import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;

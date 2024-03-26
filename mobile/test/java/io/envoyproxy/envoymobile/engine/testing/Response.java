@@ -1,16 +1,9 @@
 package io.envoyproxy.envoymobile.engine.testing;
 
-import io.envoyproxy.envoymobile.AndroidEngineBuilder;
-import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.EnvoyError;
 import io.envoyproxy.envoymobile.FinalStreamIntel;
-import io.envoyproxy.envoymobile.LogLevel;
-import io.envoyproxy.envoymobile.RequestHeaders;
-import io.envoyproxy.envoymobile.RequestHeadersBuilder;
-import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.ResponseHeaders;
 import io.envoyproxy.envoymobile.ResponseTrailers;
-import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.StreamIntel;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;

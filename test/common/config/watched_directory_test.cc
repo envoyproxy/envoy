@@ -7,6 +7,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::DoAll;
 using testing::Return;
 using testing::SaveArg;
 
@@ -21,7 +22,7 @@ TEST(WatchedDirectory, All) {
   EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
   Filesystem::Watcher::OnChangedCb cb;
   EXPECT_CALL(*watcher, addWatch("foo/bar/", Filesystem::Watcher::Events::MovedTo, _))
-      .WillOnce(SaveArg<2>(&cb));
+      .WillOnce(DoAll(SaveArg<2>(&cb), Return(absl::OkStatus())));
   WatchedDirectory wd(config, dispatcher);
   bool called = false;
   wd.setCallback([&called] { called = true; });

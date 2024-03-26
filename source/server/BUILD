@@ -54,10 +54,10 @@ envoy_cc_library(
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/access_loggers/common:file_access_log_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
     ],
 )
 
@@ -397,6 +397,7 @@ envoy_cc_library(
     hdrs = ["listener_manager_factory.h"],
     deps = [
         "//envoy/server:factory_context_interface",
+        "//envoy/server:instance_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/server:worker_interface",
         "//source/common/quic:quic_stat_names_lib",
