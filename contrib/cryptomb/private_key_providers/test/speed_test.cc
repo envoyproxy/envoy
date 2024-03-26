@@ -3,9 +3,12 @@
 #include "benchmark/benchmark.h"
 #include "crypto_mb/ec_nistp256.h"
 #include "crypto_mb/rsa.h"
+#include "crypto_mb/x25519.h"
 #include "gtest/gtest.h"
+#include "openssl/curve25519.h"
 #include "openssl/evp.h"
 #include "openssl/pem.h"
+#include "openssl/rand.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -47,6 +50,16 @@ AwEHoUQDQgAELp3XvBfkVWQBOKo3ttAaJ6SUaUb8uKqCS504WXHWMO4h89F+nYtC
 Ecgl8EiLXXyc86tawKjGdizcCjrKMiFo3A==
 -----END EC PRIVATE KEY-----
 )EOF";
+
+const uint8_t X25519PeerKey[32] = {115, 37,  104, 170, 129, 2,   28,  127, 31,  23,  65,
+                                   54,  184, 25,  224, 63,  148, 203, 128, 113, 174, 207,
+                                   254, 159, 88,  132, 70,  251, 70,  226, 124, 101};
+
+const uint8_t P256PeerKey[65] = {4,   45,  57,  212, 246, 58, 143, 240, 116, 243, 116, 90,  217,
+                                 1,   33,  251, 173, 110, 73, 189, 99,  212, 82,  128, 8,   43,
+                                 48,  114, 22,  95,  36,  13, 80,  97,  159, 142, 172, 108, 137,
+                                 235, 47,  56,  62,  111, 53, 214, 161, 243, 185, 3,   93,  46,
+                                 148, 243, 156, 70,  178, 39, 220, 210, 93,  220, 70,  228, 9};
 
 bssl::UniquePtr<EVP_PKEY> makeEcdsaKey() {
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(EcdsaKey.data(), EcdsaKey.size()));
@@ -279,5 +292,160 @@ static void BM_RSA_Signing_CryptoMB(benchmark::State& state) {
       benchmark::Counter(state.iterations() * 8, benchmark::Counter::kIsRate);
 }
 BENCHMARK(BM_RSA_Signing_CryptoMB);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_X25519_Computing(benchmark::State& state) {
+  uint8_t ciphertext[32];
+  uint8_t secret[32];
+  for (auto _ : state) { // NOLINT
+    uint8_t priv_key[32];
+    uint8_t public_key[32];
+    X25519_keypair(public_key, priv_key);
+    memcpy(ciphertext, public_key, 32);
+
+    X25519(secret, priv_key, X25519PeerKey);
+  }
+
+  state.counters["Requests"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
+}
+BENCHMARK(BM_X25519_Computing);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_X25519_Computing_CryptoMB(benchmark::State& state) {
+  uint8_t ciphertext[8][32];
+  uint8_t secret[8][32];
+  for (auto _ : state) { // NOLINT
+    uint8_t priv_key[8][32];
+    uint8_t pub_key[8][32];
+    uint8_t shared_key[8][32];
+    for (int i = 0; i < 8; i++) {
+      RAND_bytes(priv_key[i], 32);
+      priv_key[i][0] |= ~248;
+      priv_key[i][31] &= ~64;
+      priv_key[i][31] |= ~127;
+    }
+
+    const uint8_t* pa_priv_key[8];
+    uint8_t* pa_pub_key[8];
+    for (int i = 0; i < 8; i++) {
+      pa_priv_key[i] = priv_key[i];
+      pa_pub_key[i] = pub_key[i];
+    }
+    mbx_x25519_public_key_mb8(pa_pub_key, pa_priv_key);
+
+    uint8_t* pa_shared_key[8];
+    const uint8_t* pa_peer_key[8];
+    for (int i = 0; i < 8; i++) {
+      pa_shared_key[i] = shared_key[i];
+      pa_peer_key[i] = X25519PeerKey;
+    }
+    mbx_x25519_mb8(pa_shared_key, pa_priv_key, pa_peer_key);
+
+    for (int i = 0; i < 8; i++) {
+      memcpy(ciphertext[i], pub_key[i], 32);
+      memcpy(secret[i], pa_shared_key[i], 32);
+    }
+  }
+
+  state.counters["Requests"] =
+      benchmark::Counter(state.iterations() * 8, benchmark::Counter::kIsRate);
+}
+BENCHMARK(BM_X25519_Computing_CryptoMB);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_P256_Computing(benchmark::State& state) {
+  uint8_t ciphertext[65];
+  uint8_t secret[32];
+  for (auto _ : state) { // NOLINT
+    const EC_GROUP* group = EC_group_p256();
+    bssl::UniquePtr<BIGNUM> priv_key(BN_new());
+    BN_rand_range_ex(priv_key.get(), 1, EC_GROUP_get0_order(group));
+    bssl::UniquePtr<EC_POINT> public_key(EC_POINT_new(group));
+    EC_POINT_mul(group, public_key.get(), priv_key.get(), nullptr, nullptr, nullptr);
+    EC_POINT_point2oct(group, public_key.get(), POINT_CONVERSION_UNCOMPRESSED, ciphertext, 65,
+                       nullptr);
+
+    bssl::UniquePtr<EC_POINT> peer_point(EC_POINT_new(group));
+    EC_POINT_oct2point(group, peer_point.get(), P256PeerKey, 65, nullptr);
+    bssl::UniquePtr<EC_POINT> result(EC_POINT_new(group));
+    bssl::UniquePtr<BIGNUM> x(BN_new());
+    EC_POINT_mul(group, result.get(), nullptr, peer_point.get(), priv_key.get(), nullptr);
+    EC_POINT_get_affine_coordinates_GFp(group, result.get(), x.get(), nullptr, nullptr);
+
+    BN_bn2bin_padded(secret, 32, x.get());
+  }
+
+  state.counters["Requests"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
+}
+BENCHMARK(BM_P256_Computing);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_P256_Computing_CryptoMB(benchmark::State& state) {
+  uint8_t ciphertext[8][65];
+  uint8_t secret[8][32];
+  for (auto _ : state) { // NOLINT
+    const EC_GROUP* group = EC_group_p256();
+    bssl::UniquePtr<BIGNUM> priv_key[8];
+    uint8_t out_ciphertext[8][65];
+    uint8_t shared_key[8][32] = {};
+    for (int i = 0; i < 8; i++) {
+      priv_key[i].reset(BN_new());
+      BN_rand_range_ex(priv_key[i].get(), 1, EC_GROUP_get0_order(group));
+    }
+
+    bssl::UniquePtr<BIGNUM> pub_x[8];
+    bssl::UniquePtr<BIGNUM> pub_y[8];
+    BIGNUM* pa_pub_x[8];
+    BIGNUM* pa_pub_y[8];
+    const BIGNUM* pa_priv_key[8];
+    for (int i = 0; i < 8; i++) {
+      pub_x[i].reset(BN_new());
+      pub_y[i].reset(BN_new());
+      pa_pub_x[i] = pub_x[i].get();
+      pa_pub_y[i] = pub_y[i].get();
+      pa_priv_key[i] = priv_key[i].get();
+    }
+    mbx_nistp256_ecpublic_key_ssl_mb8(pa_pub_x, pa_pub_y, nullptr, pa_priv_key, nullptr);
+
+    bssl::UniquePtr<EC_POINT> public_key[8];
+    for (int i = 0; i < 8; i++) {
+      public_key[i].reset(EC_POINT_new(group));
+      EC_POINT_set_affine_coordinates_GFp(group, public_key[i].get(), pub_x[i].get(),
+                                          pub_y[i].get(), nullptr);
+      EC_POINT_point2oct(group, public_key[i].get(), POINT_CONVERSION_UNCOMPRESSED,
+                         out_ciphertext[i], 65, nullptr);
+    }
+
+    bssl::UniquePtr<BIGNUM> peer_x[8];
+    bssl::UniquePtr<BIGNUM> peer_y[8];
+    for (int i = 0; i < 8; i++) {
+      peer_x[i].reset(BN_new());
+      peer_y[i].reset(BN_new());
+      bssl::UniquePtr<EC_POINT> peer_key(EC_POINT_new(group));
+      EC_POINT_oct2point(group, peer_key.get(), P256PeerKey, 65, nullptr);
+      EC_POINT_get_affine_coordinates_GFp(group, peer_key.get(), peer_x[i].get(), peer_y[i].get(),
+                                          nullptr);
+    }
+
+    uint8_t* pa_shared_key[8];
+    BIGNUM* pa_peer_x[8];
+    BIGNUM* pa_peer_y[8];
+    for (int i = 0; i < 8; i++) {
+      pa_shared_key[i] = shared_key[i];
+      pa_peer_x[i] = peer_x[i].get();
+      pa_peer_y[i] = peer_y[i].get();
+    }
+    mbx_nistp256_ecdh_ssl_mb8(pa_shared_key, pa_priv_key, pa_peer_x, pa_peer_y, nullptr, nullptr);
+
+    for (int i = 0; i < 8; i++) {
+      memcpy(ciphertext[i], out_ciphertext[i], 65);
+      memcpy(secret[i], pa_shared_key[i], 32);
+    }
+  }
+
+  state.counters["Requests"] =
+      benchmark::Counter(state.iterations() * 8, benchmark::Counter::kIsRate);
+}
+BENCHMARK(BM_P256_Computing_CryptoMB);
 
 } // namespace Envoy
