@@ -26,8 +26,6 @@
 namespace Envoy {
 namespace Logger {
 
-consteval int f() { return 42; }
-
 #ifdef ENVOY_DISABLE_LOGGING
 const static bool should_log = false;
 #else
