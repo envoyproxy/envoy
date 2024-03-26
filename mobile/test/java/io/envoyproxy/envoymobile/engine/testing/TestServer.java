@@ -3,11 +3,8 @@ package io.envoyproxy.envoymobile.engine.testing;
 import java.util.concurrent.atomic.AtomicBoolean;
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration;
 
-/**
- * Wrapper class for test JNI functions
- */
-public final class TestJni {
-
+/** JNI wrapper for the TestServer. */
+public final class TestServer {
   private static final AtomicBoolean sServerRunning = new AtomicBoolean();
   private static final AtomicBoolean xdsServerRunning = new AtomicBoolean();
 
@@ -165,5 +162,5 @@ public final class TestJni {
 
   private static native String nativeCreateYaml(long bootstrap);
 
-  private TestJni() {}
+  private TestServer() {}
 }

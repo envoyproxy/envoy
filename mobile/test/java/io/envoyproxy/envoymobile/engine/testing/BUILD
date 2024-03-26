@@ -12,7 +12,7 @@ android_library(
     srcs = [
         "RequestScenario.java",
         "Response.java",
-        "TestJni.java",
+        "TestServer.java",
     ],
     visibility = ["//test:__subpackages__"],
     deps = [

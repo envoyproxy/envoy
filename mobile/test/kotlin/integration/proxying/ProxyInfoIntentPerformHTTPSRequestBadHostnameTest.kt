@@ -12,7 +12,7 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.testing.TestJni
+import io.envoyproxy.envoymobile.engine.testing.TestServer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -41,8 +41,8 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
 
   @Test
   fun `attempts an HTTPs request through a proxy using an async DNS resolution that fails`() {
-    TestJni.startHttpsProxyTestServer()
-    val port = TestJni.getServerPort()
+    TestServer.startHttpsProxyTestServer()
+    val port = TestServer.getServerPort()
 
     val context = Mockito.spy(ApplicationProvider.getApplicationContext<Context>())
     val connectivityManager: ConnectivityManager = Mockito.mock(ConnectivityManager::class.java)
@@ -88,6 +88,6 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
     assertThat(onErrorLatch.count).isEqualTo(0)
 
     engine.terminate()
-    TestJni.shutdownTestServer()
+    TestServer.shutdownTestServer()
   }
 }

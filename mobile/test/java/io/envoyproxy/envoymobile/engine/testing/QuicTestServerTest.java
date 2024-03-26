@@ -12,8 +12,6 @@ import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
-import io.envoyproxy.envoymobile.engine.testing.RequestScenario;
-import io.envoyproxy.envoymobile.engine.testing.Response;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -99,10 +97,10 @@ public class QuicTestServerTest {
 
   @Before
   public void setUpEngine() throws Exception {
-    TestJni.startHttp3TestServer();
+    TestServer.startHttp3TestServer();
     CountDownLatch latch = new CountDownLatch(1);
     engine = new AndroidEngineBuilder(appContext,
-                                      new Custom(String.format(CONFIG, TestJni.getServerPort())))
+                                      new Custom(String.format(CONFIG, TestServer.getServerPort())))
                  .addLogLevel(LogLevel.WARN)
                  .setOnEngineRunning(() -> {
                    latch.countDown();
@@ -115,7 +113,7 @@ public class QuicTestServerTest {
   @After
   public void shutdownEngine() {
     engine.terminate();
-    TestJni.shutdownTestServer();
+    TestServer.shutdownTestServer();
   }
 
   @Test
@@ -123,7 +121,7 @@ public class QuicTestServerTest {
     RequestScenario requestScenario = new RequestScenario()
                                           .setHttpMethod(RequestMethod.GET)
                                           .addHeader("no_trailers", "true")
-                                          .setUrl(TestJni.getServerURL() + "/simple.txt");
+                                          .setUrl(TestServer.getServerURL() + "/simple.txt");
 
     Response response = sendRequest(requestScenario);
 

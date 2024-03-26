@@ -8,7 +8,7 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.XdsBuilder
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.testing.TestJni
+import io.envoyproxy.envoymobile.engine.testing.TestServer
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import org.junit.After
@@ -31,7 +31,7 @@ class XdsTest {
   fun setUp() {
     val upstreamCert: String =
       File("../envoy/test/config/integration/certs/upstreamcacert.pem").readText()
-    TestJni.initXdsTestServer()
+    TestServer.initXdsTestServer()
     val latch = CountDownLatch(1)
     engine =
       AndroidEngineBuilder(appContext)
@@ -39,21 +39,21 @@ class XdsTest {
         .setOnEngineRunning { latch.countDown() }
         .setXds(
           XdsBuilder(
-              TestJni.getXdsTestServerHost(),
-              TestJni.getXdsTestServerPort(),
+              TestServer.getXdsTestServerHost(),
+              TestServer.getXdsTestServerPort(),
             )
             .setSslRootCerts(upstreamCert)
             .addClusterDiscoveryService()
         )
         .build()
     latch.await()
-    TestJni.startXdsTestServer()
+    TestServer.startXdsTestServer()
   }
 
   @After
   fun tearDown() {
     engine.terminate()
-    TestJni.shutdownXdsTestServer()
+    TestServer.shutdownXdsTestServer()
   }
 
   @Test
@@ -78,7 +78,7 @@ class XdsTest {
       nonce: nonce1
     """
         .trimIndent()
-    TestJni.sendDiscoveryResponse(cdsResponse)
+    TestServer.sendDiscoveryResponse(cdsResponse)
     // There are now 3 clusters: base, base_cluster, and my_cluster.
     engine.waitForStatGe("cluster_manager.cluster_added", 3)
   }

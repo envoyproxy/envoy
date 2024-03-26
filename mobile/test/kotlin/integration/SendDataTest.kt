@@ -8,7 +8,7 @@ import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.testing.TestJni
+import io.envoyproxy.envoymobile.engine.testing.TestServer
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -27,8 +27,8 @@ class SendDataTest {
 
   @Test
   fun `successful sending data`() {
-    TestJni.startHttp2TestServer()
-    val port = TestJni.getServerPort()
+    TestServer.startHttp2TestServer()
+    val port = TestServer.getServerPort()
 
     val expectation = CountDownLatch(1)
     val engine =
@@ -71,7 +71,7 @@ class SendDataTest {
     expectation.await(10, TimeUnit.SECONDS)
 
     engine.terminate()
-    TestJni.shutdownTestServer()
+    TestServer.shutdownTestServer()
 
     assertThat(expectation.count).isEqualTo(0)
     assertThat(responseStatus).isEqualTo(200)

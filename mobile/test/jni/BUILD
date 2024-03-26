@@ -10,18 +10,18 @@ cc_library(
     name = "envoy_jni_with_test_extensions_lib",
     testonly = True,
     deps = [
-        ":server_envoy_jni_lib",
+        ":jni_test_server_lib",
         "//library/jni:envoy_jni_lib",
         "@envoy_build_config//:test_extensions",
     ],
 )
 
-# Library which contains all the JNI related targets.
+# Library which contains JNI functions for the TestServer.
 cc_library(
-    name = "server_envoy_jni_lib",
+    name = "jni_test_server_lib",
     testonly = True,
     srcs = [
-        "test_jni_impl.cc",
+        "jni_test_server.cc",
     ],
     linkopts = select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
@@ -62,7 +62,7 @@ cc_library(
     name = "envoy_jni_with_test_and_listener_extensions_lib",
     testonly = True,
     deps = [
-        ":server_envoy_jni_lib",
+        ":jni_test_server_lib",
         "//library/jni:envoy_jni_lib",
         "@envoy//source/common/listener_manager:listener_manager_lib",
     ],

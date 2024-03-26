@@ -12,7 +12,7 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.testing.TestJni
+import io.envoyproxy.envoymobile.engine.testing.TestServer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -43,8 +43,8 @@ class ProxyInfoIntentPerformHTTPSRequestUsingProxyTest {
   @Ignore("https://github.com/envoyproxy/envoy/issues/33014")
   @Test
   fun `performs an HTTPs request through a proxy`() {
-    TestJni.startHttpsProxyTestServer()
-    val port = TestJni.getServerPort()
+    TestServer.startHttpsProxyTestServer()
+    val port = TestServer.getServerPort()
 
     val context = Mockito.spy(ApplicationProvider.getApplicationContext<Context>())
     val connectivityManager: ConnectivityManager = Mockito.mock(ConnectivityManager::class.java)
@@ -95,6 +95,6 @@ class ProxyInfoIntentPerformHTTPSRequestUsingProxyTest {
     assertThat(onRespondeHeadersLatch.count).isEqualTo(0)
 
     engine.terminate()
-    TestJni.shutdownTestServer()
+    TestServer.shutdownTestServer()
   }
 }
