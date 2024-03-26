@@ -2,8 +2,8 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/server/filter_config.h"
 
-#include "source/common/http/match_delegate/config.h"
 #include "source/common/http/matching/inputs.h"
+#include "source/extensions/filters/http/match_delegate/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
