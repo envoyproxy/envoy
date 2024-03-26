@@ -1,0 +1,25 @@
+# Pending resolution of https://github.com/google/flatbuffers/issues/7988
+diff --git a/BUILD.bazel b/BUILD.bazel
+index b4f015a0..8cf7a55e 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -1,5 +1,3 @@
+-load("@aspect_rules_js//npm:defs.bzl", "npm_link_package")
+-load("@npm//:defs.bzl", "npm_link_all_packages")
+ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+
+ licenses(["notice"])
+@@ -8,13 +6,6 @@ package(
+     default_visibility = ["//visibility:public"],
+ )
+
+-npm_link_all_packages(name = "node_modules")
+-
+-npm_link_package(
+-    name = "node_modules/flatbuffers",
+-    src = "//ts:flatbuffers",
+-)
+-
+ exports_files([
+     "LICENSE",
+     "tsconfig.json",

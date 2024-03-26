@@ -74,7 +74,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -142,6 +142,13 @@ message OAuth2Config {
   // Automatic access token refresh will be performed for these requests, if enabled.
   // This behavior can be useful for AJAX requests.
   repeated config.route.v3.HeaderMatcher deny_redirect_matcher = 14;
+
+  // The default lifetime in seconds of the refresh token, if the exp (expiration time) claim is omitted in the refresh token or the refresh token is not JWT.
+  //
+  // If this value is not set, it will default to ``604800s``. In this case, the cookie with the refresh token will be expired
+  // in a week.
+  // This setting is only considered if ``use_refresh_token`` is set to true, otherwise the authorization server expiration or ``defaul_expires_in`` is used.
+  google.protobuf.Duration default_refresh_token_expires_in = 15;
 }
 
 // Filter config.

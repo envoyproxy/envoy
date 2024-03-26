@@ -256,9 +256,10 @@ public class JniLibrary {
   /**
    * Update the log level for all active logs
    *
-   * @param log_level The Log level to change to. Must be an integer 0-6.
+   * @param logLevel The Log level to change to. Must be an integer 0-6.
+   *                 See source/common/common/base_logger.h
    */
-  protected static native void setLogLevel(int log_level);
+  protected static native void setLogLevel(int logLevel);
 
   /**
    * Mimic a call to AndroidNetworkLibrary#verifyServerCertificates from native code.

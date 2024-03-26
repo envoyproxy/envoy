@@ -198,7 +198,8 @@ public:
  */
 class FilterConfig : Http::FilterChainFactory {
 public:
-  FilterConfig(Stats::StatName stat_prefix, const LocalInfo::LocalInfo& local_info,
+  FilterConfig(Server::Configuration::CommonFactoryContext& factory_context,
+               Stats::StatName stat_prefix, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
@@ -207,8 +208,9 @@ public:
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
-      : router_context_(router_context), scope_(scope), local_info_(local_info), cm_(cm),
-        runtime_(runtime), default_stats_(router_context_.statNames(), scope_, stat_prefix),
+      : factory_context_(factory_context), router_context_(router_context), scope_(scope),
+        local_info_(local_info), cm_(cm), runtime_(runtime),
+        default_stats_(router_context_.statNames(), scope_, stat_prefix),
         async_stats_(router_context_.statNames(), scope, http_context.asyncClientStatPrefix()),
         random_(random), emit_dynamic_stats_(emit_dynamic_stats),
         start_child_span_(start_child_span), suppress_envoy_headers_(suppress_envoy_headers),
@@ -255,6 +257,7 @@ public:
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
   TimeSource& timeSource() { return time_source_; }
 
+  Server::Configuration::CommonFactoryContext& factory_context_;
   Router::Context& router_context_;
   Stats::Scope& scope_;
   const LocalInfo::LocalInfo& local_info_;
@@ -500,9 +503,9 @@ private:
   virtual RetryStatePtr
   createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                    const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                   RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
-                   Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                   TimeSource& time_source, Upstream::ResourcePriority priority) PURE;
+                   RouteStatsContextOptRef route_stats_context,
+                   Server::Configuration::CommonFactoryContext& context,
+                   Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) PURE;
 
   std::unique_ptr<GenericConnPool>
   createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster);
@@ -614,8 +617,8 @@ private:
                                  const Upstream::ClusterInfo& cluster,
                                  const VirtualCluster* vcluster,
                                  RouteStatsContextOptRef route_stats_context,
-                                 Runtime::Loader& runtime, Random::RandomGenerator& random,
-                                 Event::Dispatcher& dispatcher, TimeSource& time_source,
+                                 Server::Configuration::CommonFactoryContext& context,
+                                 Event::Dispatcher& dispatcher,
                                  Upstream::ResourcePriority priority) override;
 };
 

@@ -313,6 +313,7 @@ ODCDS
 middlewildcard
 monostate
 mpd
+mutators
 na
 oghttp
 OID
@@ -471,7 +472,6 @@ VM
 VPN
 WAITFORONE
 WASM
-WAVM
 WIP
 WKT
 WRONGPASS
