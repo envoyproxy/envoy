@@ -1242,6 +1242,7 @@ public:
 
 // For the standard cache tests from http_cache_implementation_test_common.cc
 // TODO(https://github.com/envoyproxy/envoy/issues/33114) Enable
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(HttpCacheImplementationTest);
 /*
 INSTANTIATE_TEST_SUITE_P(FileSystemHttpCacheTest, HttpCacheImplementationTest,
                          testing::Values(std::make_unique<FileSystemHttpCacheTestDelegate>),
