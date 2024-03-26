@@ -231,9 +231,10 @@ UpstreamDrainManager& Config::drainManager() {
   return upstream_drain_manager_slot_->getTyped<UpstreamDrainManager>();
 }
 
-Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
+Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager,
+               Regex::Engine& regex_engine)
     : tracing_config_(Tracing::EgressConfig::get()), config_(config),
-      cluster_manager_(cluster_manager), downstream_callbacks_(*this),
+      cluster_manager_(cluster_manager), regex_engine_(regex_engine), downstream_callbacks_(*this),
       upstream_callbacks_(new UpstreamCallbacks(this)),
       upstream_decoder_filter_callbacks_(HttpStreamDecoderFilterCallbacks(this)) {
   ASSERT(config != nullptr);
@@ -562,8 +563,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
           "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
     // TODO(vikaschoudhary16): Initialize route_ once per cluster.
     upstream_decoder_filter_callbacks_.route_ = std::make_shared<Http::NullRouteImpl>(
-        cluster.info()->name(),
-        *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()});
+        cluster.info()->name(), Router::DefaultRetryPolicy::get(), regex_engine_);
   }
   generic_conn_pool_ = factory->createGenericConnPool(
       cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,

@@ -395,7 +395,8 @@ class Filter : public Network::ReadFilter,
                protected Logger::Loggable<Logger::Id::filter>,
                public GenericConnectionPoolCallbacks {
 public:
-  Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
+  Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager,
+         Regex::Engine& regex_engine);
   ~Filter() override;
 
   // Network::ReadFilter
@@ -625,6 +626,7 @@ protected:
 
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
+  Regex::Engine& regex_engine_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 
   DownstreamCallbacks downstream_callbacks_;
