@@ -253,6 +253,18 @@ ContextConfigImpl::ContextConfigImpl(
   }
   capabilities_ = handshaker_factory->capabilities();
   sslctx_cb_ = handshaker_factory->sslctxCb(handshaker_factory_context);
+
+  if (config.has_custom_tls_context_provider()) {
+    TlsContextProviderFactoryContextImpl provider_factory_context(api_, options_,
+                                                                  singleton_manager_);
+    // If a custom tls context provider is configured, derive the factory from the config.
+    const auto& provider_config = config.custom_tls_context_provider();
+    Ssl::TlsContextProviderFactory* provider_factory =
+        &Config::Utility::getAndCheckFactory<Ssl::TlsContextProviderFactory>(provider_config);
+    tls_context_provider_factory_cb_ = provider_factory->createTlsContextProviderCb(
+        provider_config.typed_config(), provider_factory_context,
+        factory_context.messageValidationVisitor());
+  }
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
@@ -316,6 +328,10 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
 
 Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
   return handshaker_factory_cb_;
+}
+
+Ssl::TlsContextProviderFactoryCb ContextConfigImpl::createTlsContextProvider() const {
+  return tls_context_provider_factory_cb_;
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(

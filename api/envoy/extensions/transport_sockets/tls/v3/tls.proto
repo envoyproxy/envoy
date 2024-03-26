@@ -158,7 +158,7 @@ message TlsKeyLog {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
@@ -274,6 +274,12 @@ message CommonTlsContext {
   // and ``tls_certificate_provider_instance`` may be used.
   // [#not-implemented-hide:]
   CertificateProviderPluginInstance tls_certificate_provider_instance = 14;
+
+  // Custom TLS context provider.
+  //
+  // Select TLS context based on TLS client hello.
+  // If empty, defaults to native TLS context selection behavior.
+  config.core.v3.TypedExtensionConfig custom_tls_context_provider = 16;
 
   // Certificate provider for fetching TLS certificates.
   // [#not-implemented-hide:]

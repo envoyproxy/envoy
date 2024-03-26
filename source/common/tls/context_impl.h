@@ -193,12 +193,18 @@ private:
 
 enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
 
-class ServerContextImpl : public ContextImpl, public Envoy::Ssl::ServerContext {
+class ServerContextImpl : public ContextImpl,
+                          public Envoy::Ssl::ServerContext,
+                          public Envoy::Ssl::ContextSelectionCallback,
+                          public std::enable_shared_from_this<ServerContextImpl> {
 public:
   ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                     const std::vector<std::string>& server_names,
                     Server::Configuration::CommonFactoryContext& factory_context,
                     Ssl::ContextAdditionalInitFunc additional_init);
+
+  // Ssl::ContextSelectionCallback
+  const std::vector<Ssl::TlsContext>& getTlsContexts() const override { return tls_contexts_; };
 
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
   // ClientHello details. This is made public for use by custom TLS extensions who want to
@@ -213,6 +219,9 @@ public:
                                                                      bool* cert_matched_sni);
 
 private:
+  // Select the TLS certificate context from customer provider.
+  enum ssl_select_cert_result_t
+  selectTlsContextFromProvider(const SSL_CLIENT_HELLO* ssl_client_hello);
   // Currently, at most one certificate of a given key type may be specified for each exact
   // server name or wildcard domain name.
   using PkeyTypesMap = absl::flat_hash_map<int, std::reference_wrapper<Ssl::TlsContext>>;
@@ -235,6 +244,8 @@ private:
 
   SessionContextID generateHashForSessionContextId(const std::vector<std::string>& server_names);
 
+  Ssl::TlsContextProviderFactoryCb tls_context_provider_factory_cb_;
+  Ssl::TlsContextProviderSharedPtr tls_context_provider_;
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
   ServerNamesMap server_names_map_;

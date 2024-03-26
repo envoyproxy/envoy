@@ -812,6 +812,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     populateServerNamesMap(ctx, pkey_id);
   }
 
+  tls_context_provider_factory_cb_ = config.createTlsContextProvider();
+
   // Compute the session context ID hash. We use all the certificate identities,
   // since we should have a common ID for session resumption no matter what cert
   // is used. We do this early because it can throw an EnvoyException.
@@ -1243,6 +1245,54 @@ OcspStapleAction ServerContextImpl::ocspStapleAction(const Ssl::TlsContext& ctx,
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+enum ssl_select_cert_result_t
+ServerContextImpl::selectTlsContextFromProvider(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+      SSL_get_ex_data(ssl_client_hello->ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+
+  auto selection_result = extended_socket_info->CertSelectionResult();
+  switch (selection_result) {
+  case Ssl::CertSelectionStatus::NotStarted:
+    // continue
+    break;
+
+  case Ssl::CertSelectionStatus::Pending:
+    ENVOY_LOG(trace, "already waiting certificate");
+    return ssl_select_cert_retry;
+
+  case Ssl::CertSelectionStatus::Successful:
+    ENVOY_LOG(trace, "wait certificate success");
+    return ssl_select_cert_success;
+
+  default:
+    ENVOY_LOG(trace, "wait certificate failed");
+    return ssl_select_cert_error;
+  }
+
+  ENVOY_LOG(trace, "TLS context selection result: {}, before selectTlsContext",
+            static_cast<int>(selection_result));
+
+  auto result = tls_context_provider_->selectTlsContext(
+      ssl_client_hello, extended_socket_info->createCertSelectionCallback(ssl_client_hello->ssl));
+
+  ENVOY_LOG(trace, "TLS context selection result: {}, after selectTlsContext",
+            static_cast<int>(extended_socket_info->CertSelectionResult()));
+
+  switch (result) {
+  case Ssl::SelectionResult::Continue:
+    RELEASE_ASSERT(extended_socket_info->CertSelectionResult() ==
+                       Ssl::CertSelectionStatus::Successful,
+                   "missing onCertSelectionResult before continue");
+    return ssl_select_cert_success;
+  case Ssl::SelectionResult::Stop:
+    extended_socket_info->setCertSelectionAsync();
+    return ssl_select_cert_retry;
+  default:
+    // Ssl::SelectionResult::Terminate:
+    return ssl_select_cert_error;
+  }
+}
+
 std::pair<const Ssl::TlsContext&, OcspStapleAction>
 ServerContextImpl::findTlsContext(absl::string_view sni, bool client_ecdsa_capable,
                                   bool client_ocsp_capable, bool* cert_matched_sni) {
@@ -1346,6 +1396,13 @@ ServerContextImpl::findTlsContext(absl::string_view sni, bool client_ecdsa_capab
 
 enum ssl_select_cert_result_t
 ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  if (tls_context_provider_factory_cb_ != nullptr) {
+    if (tls_context_provider_ == nullptr) {
+      tls_context_provider_ = tls_context_provider_factory_cb_(shared_from_this());
+    }
+    ASSERT(tls_context_provider_ != nullptr);
+    return selectTlsContextFromProvider(ssl_client_hello);
+  }
   absl::string_view sni = absl::NullSafeStringView(
       SSL_get_servername(ssl_client_hello->ssl, TLSEXT_NAMETYPE_host_name));
   const bool client_ecdsa_capable = isClientEcdsaCapable(ssl_client_hello);
