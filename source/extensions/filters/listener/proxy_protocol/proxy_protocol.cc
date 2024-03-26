@@ -50,7 +50,7 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace ProxyProtocol {
 
-constexpr absl::string_view kProxyProtoStatsPrefix = "downstream_cx_proxy_proto.";
+constexpr absl::string_view kProxyProtoStatsPrefix = "downstream_proxy_proto.";
 constexpr absl::string_view kVersionStatsPrefix = "versions.";
 
 ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope& scope) {
