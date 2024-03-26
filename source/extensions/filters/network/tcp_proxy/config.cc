@@ -20,7 +20,8 @@ Network::FilterFactoryCb ConfigFactory::createFilterFactoryFromProtoTyped(
       std::make_shared<Envoy::TcpProxy::Config>(proto_config, context));
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<Envoy::TcpProxy::Filter>(
-        filter_config, context.serverFactoryContext().clusterManager()));
+        filter_config, context.serverFactoryContext().clusterManager(),
+        context.serverFactoryContext().regexEngine()));
   };
 }
 

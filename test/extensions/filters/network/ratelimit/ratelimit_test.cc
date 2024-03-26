@@ -544,7 +544,8 @@ stat_prefix: name
   tcp_proxy.set_cluster("fake_cluster");
   TcpProxy::ConfigSharedPtr tcp_proxy_config(new TcpProxy::Config(tcp_proxy, factory_context));
   manager.addReadFilter(std::make_shared<TcpProxy::Filter>(
-      tcp_proxy_config, factory_context.server_factory_context_.cluster_manager_));
+      tcp_proxy_config, factory_context.server_factory_context_.cluster_manager_,
+      factory_context.server_factory_context_.regex_engine_));
 
   Extensions::Filters::Common::RateLimit::RequestCallbacks* request_callbacks{};
   EXPECT_CALL(*rl_client, limit(_, "foo",
