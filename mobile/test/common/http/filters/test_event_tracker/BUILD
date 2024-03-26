@@ -24,6 +24,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         "filter_cc_proto",
+        "//library/common:engine_types_lib",
         "//library/common/api:c_types",
         "//library/common/api:external_api_lib",
         "//library/common/bridge:utility_lib",
