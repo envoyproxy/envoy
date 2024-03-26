@@ -254,7 +254,8 @@ private:
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralNetworkFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
-    return factory->createFilterFactoryFromProto(message, factory_context_);
+    return THROW_OR_RETURN_VALUE(factory->createFilterFactoryFromProto(message, factory_context_),
+                                 Network::FilterFactoryCb);
   }
 
 protected:
