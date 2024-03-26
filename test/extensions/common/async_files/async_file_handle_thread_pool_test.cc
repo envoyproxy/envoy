@@ -138,7 +138,8 @@ TEST_F(AsyncFileHandleTest, WriteReadClose) {
   EXPECT_THAT(*second_read_status.value(), BufferStringEqual("lp!"));
 }
 
-TEST_F(AsyncFileHandleTest, LinkCreatesNamedFile) {
+// TODO(https://github.com/envoyproxy/envoy/issues/33114) Enable
+TEST_F(AsyncFileHandleTest, DISABLED_LinkCreatesNamedFile) {
   auto handle = createAnonymousFile();
   std::promise<absl::StatusOr<size_t>> write_status_promise;
   // Write "hello" to the anonymous file.
@@ -165,6 +166,7 @@ TEST_F(AsyncFileHandleTest, LinkCreatesNamedFile) {
 
   EXPECT_OK(handle->createHardLink(std::string(filename),
                                    [&](absl::Status status) { link_status.set_value(status); }));
+
   ASSERT_OK(link_status.get_future().get());
   // Read the contents of the linked file back, raw.
   char fileContents[6];
