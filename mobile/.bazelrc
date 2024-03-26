@@ -81,6 +81,8 @@ build:mobile-test-android --define=static_extension_registration=disabled
 # enabled for //test/kotlin/integration:xds_test and
 # //test/java/io/envoyproxy/envoymobile/engine:envoy_configuration_test
 build:mobile-test-android --define=envoy_mobile_xds=enabled
+# TODO(alyssar) fix
+build:mobile-test-android --define=envoy_yaml=enabled
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
@@ -263,21 +265,23 @@ test:mobile-remote-ci-android --config=mobile-test-android
 test:mobile-remote-ci-android --config=mobile-remote-ci
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
+# Temporary revert to C++17 for mobile NDK builds.
+build:mobile-remote-ci-cc --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
 
-build:mobile-remote-ci-cc-no-yaml --config=mobile-remote-ci
+build:mobile-remote-ci-cc-no-yaml --config=mobile-remote-ci-cc
 build:mobile-remote-ci-cc-no-yaml --define=envoy_yaml=disabled
 build:mobile-remote-ci-cc-no-yaml --define=envoy_full_protos=disabled
 build:mobile-remote-ci-cc-no-yaml --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
-build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci
+build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci-cc
 build:mobile-remote-ci-cc-no-exceptions --define=envoy_yaml=disabled
 build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
 build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
 
-build:mobile-remote-ci-cc-test --config=mobile-remote-ci
+build:mobile-remote-ci-cc-test --config=mobile-remote-ci-cc
 test:mobile-remote-ci-cc-test --test_output=all
-test:mobile-remote-ci-cc-test --config=mobile-remote-ci
+test:mobile-remote-ci-cc-test --config=mobile-remote-ci-cc
 test:mobile-remote-ci-cc-test --define=envoy_yaml=disabled
 
 build:mobile-remote-ci-macos-kotlin --config=mobile-remote-ci-macos
