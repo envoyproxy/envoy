@@ -26,8 +26,7 @@ ValueMatcher::create(const envoy::type::matcher::v3::ValueMatcher& v,
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kDoubleMatch:
     return std::make_shared<const DoubleMatcher>(v.double_match());
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kStringMatch:
-    return std::make_shared<
-        const StringMatcherImplWithContext<std::decay_t<decltype(v.string_match())>>>(
+    return std::make_shared<const StringMatcherImpl<std::decay_t<decltype(v.string_match())>>>(
         v.string_match(), context);
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kBoolMatch:
     return std::make_shared<const BoolMatcher>(v.bool_match());
@@ -128,8 +127,7 @@ StringMatcherPtr valueMatcherFromProto(const envoy::type::matcher::v3::FilterSta
                                        Server::Configuration::CommonFactoryContext& context) {
   switch (matcher.matcher_case()) {
   case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kStringMatch:
-    return std::make_unique<
-        const StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+    return std::make_unique<const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
         matcher.string_match(), context);
     break;
   default:

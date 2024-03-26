@@ -23,7 +23,7 @@ public:
   }
 
 private:
-  const Matchers::StringMatcherImplWithContext<StringMatcherType> matcher_;
+  const Matchers::StringMatcherImpl<StringMatcherType> matcher_;
 };
 
 } // namespace Matcher

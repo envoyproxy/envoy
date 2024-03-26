@@ -168,8 +168,7 @@ public:
         max_age_(config.max_age()) {
     for (const auto& string_match : config.allow_origin_string_match()) {
       allow_origins_.push_back(
-          std::make_unique<
-              Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
               string_match, factory_context));
     }
     if (config.has_allow_credentials()) {

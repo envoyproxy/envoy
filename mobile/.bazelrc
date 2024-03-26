@@ -30,6 +30,8 @@ build --xcode_version=14.1
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
 build --define=google_grpc=disabled
+build --define=envoy_mobile_xds=disabled
+
 # We don't have a ton of Swift in Envoy Mobile, so always build with WMO
 # This also helps work around a bug in rules_swift: https://github.com/bazelbuild/rules_swift/issues/949
 build --swiftcopt=-wmo
@@ -48,7 +50,7 @@ build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
 # Disable global index store to work around https://github.com/buildbuddy-io/rules_xcodeproj/issues/1878
 build:rules_xcodeproj --features=-swift.use_global_index_store
 
-# Override PGV validation with NOP functions
+# Override PGV validation with NOP functions for binary size savings.
 build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
 
 build:mobile-dbg-common --compilation_mode=dbg
@@ -76,6 +78,9 @@ build:mobile-dbg-ios --config=ios
 
 # Default flags for Android tests
 build:mobile-test-android --define=static_extension_registration=disabled
+# enabled for //test/kotlin/integration:xds_test and
+# //test/java/io/envoyproxy/envoymobile/engine:envoy_configuration_test
+build:mobile-test-android --define=envoy_mobile_xds=enabled
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
@@ -140,9 +145,6 @@ build:mobile-release-common --config=sizeopt
 
 # Set default symbols visibility to hidden to reduce .dynstr and the symbol table size
 build:mobile-release-common --copt=-fvisibility=hidden
-
-# Disable envoy_mobile_xds in production by default
-build:mobile-release-common --define=envoy_mobile_xds=disabled
 
 # Enable automatic extension factory registration for release builds
 build:mobile-release-common --define=static_extension_registration=enabled
@@ -262,7 +264,6 @@ test:mobile-remote-ci-android --config=mobile-remote-ci
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
-test:mobile-remote-ci-cc --copt=-DUSE_API_LISTENER
 
 build:mobile-remote-ci-cc-no-yaml --config=mobile-remote-ci
 build:mobile-remote-ci-cc-no-yaml --define=envoy_yaml=disabled
@@ -273,26 +274,19 @@ build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci
 build:mobile-remote-ci-cc-no-exceptions --define=envoy_yaml=disabled
 build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
 build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
-build:mobile-remote-ci-cc-no-exceptions --define=envoy_mobile_xds=disabled
 
 build:mobile-remote-ci-cc-test --config=mobile-remote-ci
 test:mobile-remote-ci-cc-test --test_output=all
 test:mobile-remote-ci-cc-test --config=mobile-remote-ci
-test:mobile-remote-ci-cc-test --define=envoy_mobile_xds=disabled
-test:mobile-remote-ci-cc-test --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
 test:mobile-remote-ci-cc-test --define=envoy_yaml=disabled
 
 build:mobile-remote-ci-macos-kotlin --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-kotlin --fat_apk_cpu=x86_64
-build:mobile-remote-ci-macos-kotlin --define=envoy_mobile_xds=disabled
 build:mobile-remote-ci-macos-kotlin --define=envoy_yaml=disabled
-build:mobile-remote-ci-macos-kotlin --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
 
 build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-swift --config=mobile-test-ios
-build:mobile-remote-ci-macos-swift --define=envoy_mobile_xds=disabled
 build:mobile-remote-ci-macos-swift --@envoy//bazel:http3=False
-build:mobile-remote-ci-macos-swift --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
 
 build:mobile-remote-ci-core --config=mobile-remote-ci
 test:mobile-remote-ci-core --build_tests_only

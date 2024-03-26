@@ -169,8 +169,7 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
     envoy::type::matcher::v3::StringMatcher config;
     config.set_exact(str);
     exclusion_list.emplace_back(
-        std::make_unique<
-            Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
             config, context));
   }
   std::vector<std::string> prefixes = {"x-envoy"};
@@ -178,8 +177,7 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
     envoy::type::matcher::v3::StringMatcher config;
     config.set_prefix(match_str);
     exclusion_list.emplace_back(
-        std::make_unique<
-            Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
             config, context));
   }
   const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);

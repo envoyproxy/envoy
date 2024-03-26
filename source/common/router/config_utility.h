@@ -44,8 +44,7 @@ public:
 
   private:
     const std::string name_;
-    const absl::optional<
-        Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>
+    const absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
         matcher_;
   };
 
