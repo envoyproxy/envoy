@@ -315,6 +315,7 @@ public:
   const OnDemandStats& onDemandStats() const { return shared_config_->onDemandConfig()->stats(); }
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
   bool flushAccessLogOnConnected() const { return shared_config_->flushAccessLogOnConnected(); }
+  Regex::Engine& regexEngine() const { return regex_engine_; }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -367,6 +368,7 @@ private:
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
   Random::RandomGenerator& random_generator_;
   std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
+  Regex::Engine& regex_engine_; // Static lifetime object, safe to store as a reference
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
