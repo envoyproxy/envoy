@@ -181,11 +181,12 @@ TEST_P(AdminInstanceTest, Help) {
       filter: Regular expression (Google re2) for filtering stats
       format: Format to use; One of (html, active-html, text, json)
       type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
-      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, detailed, none)
+      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, detailed, summary)
   /stats/prometheus: print server stats in prometheus format
       usedonly: Only include stats that have been written by system since restart
       text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)
       filter: Regular expression (Google re2) for filtering stats
+      histogram_buckets: Histogram bucket display mode; One of (cumulative, summary)
   /stats/recentlookups: Show recent stat-name lookups
   /stats/recentlookups/clear (POST): clear list of stat-name lookups and counter
   /stats/recentlookups/disable (POST): disable recording of reset stat-name lookup names

@@ -284,6 +284,41 @@ envoy_histogram1_count{} 0
   EXPECT_EQ(expected_output, response.toString());
 }
 
+TEST_F(PrometheusStatsFormatterTest, SummaryWithNoValuesAndNoTags) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  HistogramWrapper h1_interval;
+  Stats::HistogramStatisticsImpl h1_interval_statistics(h1_interval.getHistogram());
+
+  auto histogram = makeHistogram("histogram1", {});
+  ON_CALL(*histogram, intervalStatistics()).WillByDefault(ReturnRef(h1_interval_statistics));
+
+  addHistogram(histogram);
+  StatsParams params = StatsParams();
+  params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
+  Buffer::OwnedImpl response;
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
+      custom_namespaces);
+  EXPECT_EQ(1UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_histogram1 summary
+envoy_histogram1{quantile="0"} nan
+envoy_histogram1{quantile="0.25"} nan
+envoy_histogram1{quantile="0.5"} nan
+envoy_histogram1{quantile="0.75"} nan
+envoy_histogram1{quantile="0.9"} nan
+envoy_histogram1{quantile="0.95"} nan
+envoy_histogram1{quantile="0.99"} nan
+envoy_histogram1{quantile="0.995"} nan
+envoy_histogram1{quantile="0.999"} nan
+envoy_histogram1{quantile="1"} nan
+envoy_histogram1_sum{} 0
+envoy_histogram1_count{} 0
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
 // Replicate bug https://github.com/envoyproxy/envoy/issues/27173 which fails to
 // coalesce stats in different scopes with the same tag-extracted-name.
 TEST_F(PrometheusStatsFormatterTest, DifferentNamedScopeSameStat) {

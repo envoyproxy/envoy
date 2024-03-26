@@ -384,6 +384,10 @@ new_features:
   change: |
     Added :ref:`configuration option <envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.forward_not_matching_preflights>`
     to return local response when CORS preflight's origin does not match allowed origin.
+- area: admin
+  change: |
+    The ``/stats/prometheus`` endpoint can now emit prometheus ``summary`` metric types by explicitly setting the
+    ``histogram_buckets`` query parameter to ``summary``.
 
 deprecated:
 - area: listener

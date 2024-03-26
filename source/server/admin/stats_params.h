@@ -68,7 +68,7 @@ struct StatsParams {
   HiddenFlag hidden_{HiddenFlag::Exclude};
   std::string filter_string_;
   std::shared_ptr<re2::RE2> re2_filter_;
-  Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::NoBuckets};
+  Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::Unset};
   Http::Utility::QueryParamsMulti query_;
 
   /**
