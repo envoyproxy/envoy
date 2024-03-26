@@ -140,7 +140,7 @@ TEST_F(GetAddrInfoDnsImplTest, Failure) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
 
   EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}));
+      .WillOnce(Return(Api::SysCallIntResult{EAI_FAIL, 0}));
   resolver_->resolve(
       "localhost", DnsLookupFamily::All,
       [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
@@ -149,6 +149,45 @@ TEST_F(GetAddrInfoDnsImplTest, Failure) {
 
         dispatcher_->exit();
       });
+
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+}
+
+TEST_F(GetAddrInfoDnsImplTest, TryAgainAndSuccess) {
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
+
+  // 2 calls - one EAGAIN, one success.
+  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+      .Times(2)
+      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  resolver_->resolve(
+      "localhost", DnsLookupFamily::All,
+      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_TRUE(response.empty());
+
+        dispatcher_->exit();
+      });
+
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+}
+
+TEST_F(GetAddrInfoDnsImplTest, TryAgainThenCancel) {
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
+
+  ActiveDnsQuery* query = nullptr;
+  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+      .Times(1)
+      .WillOnce(Invoke([&](const char*, const char*, const addrinfo*, addrinfo**) {
+        std::cerr << "CANCELING CALL\n";
+        query->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
+        dispatcher_->exit();
+        return Api::SysCallIntResult{EAI_AGAIN, 0};
+      }));
+  query =
+      resolver_->resolve("localhost", DnsLookupFamily::All,
+                         [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) { FAIL(); });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }

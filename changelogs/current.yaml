@@ -34,6 +34,10 @@ minor_behavior_changes:
 - area: dns
   change: |
     Allowing <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_min_refresh_rate>` to go as low as 1s.
+- area: dns
+  change: |
+    Fixing a bug in the getaddrinfo resolver where it did not reresolve on EAI_AGAIN. This behavioral change can be temporarily
+    reverted by setting ``envoy.reloadable_features.dns_reresolve_on_eai_again`` to false.
 - area: upstream
   change: |
     Upstream now excludes hosts set to ``DRAINING`` state via EDS from load balancing and panic routing
