@@ -42,7 +42,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/sni_cluster:88.9"
 "source/extensions/filters/network/wasm:76.9"
 "source/extensions/http/cache/simple_http_cache:95.9"
-"source/extensions/http/cache/file_system_http_cache:30.0" # TODO(https://github.com/envoyproxy/envoy/issues/33114)
 "source/extensions/rate_limit_descriptors:95.0"
 "source/extensions/rate_limit_descriptors/expr:95.0"
 "source/extensions/stat_sinks/graphite_statsd:82.8" # Death tests don't report LCOV

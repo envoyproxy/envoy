@@ -139,8 +139,6 @@ TEST_F(AsyncFileHandleTest, WriteReadClose) {
 }
 
 TEST_F(AsyncFileHandleTest, LinkCreatesNamedFile) {
-  // TODO(https://github.com/envoyproxy/envoy/issues/33114) Enable
-  GTEST_SKIP();
   auto handle = createAnonymousFile();
   std::promise<absl::StatusOr<size_t>> write_status_promise;
   // Write "hello" to the anonymous file.
