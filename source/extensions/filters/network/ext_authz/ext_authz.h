@@ -55,6 +55,7 @@ public:
       : stats_(generateStats(config.stat_prefix(), scope)),
         failure_mode_allow_(config.failure_mode_allow()),
         include_peer_certificate_(config.include_peer_certificate()),
+        include_tls_session_(config.include_tls_session()),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
                 ? absl::optional<Matchers::MetadataMatcher>(
@@ -73,6 +74,7 @@ public:
   bool failureModeAllow() const { return failure_mode_allow_; }
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  bool includeTLSSession() const { return include_tls_session_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
   bool filterEnabledMetadata(const envoy::config::core::v3::Metadata& metadata) const {
     return filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
@@ -84,6 +86,7 @@ private:
   bool failure_mode_allow_;
   LabelsMap destination_labels_;
   const bool include_peer_certificate_;
+  const bool include_tls_session_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
 };
 
