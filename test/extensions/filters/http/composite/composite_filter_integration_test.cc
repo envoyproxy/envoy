@@ -9,8 +9,8 @@
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
-#include "source/common/http/match_delegate/config.h"
 #include "source/common/http/matching/inputs.h"
+#include "source/extensions/filters/http/match_delegate/config.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/common.h"

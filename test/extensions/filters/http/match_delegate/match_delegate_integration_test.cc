@@ -2,7 +2,7 @@
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
 
-#include "source/common/http/match_delegate/config.h"
+#include "source/extensions/filters/http/match_delegate/config.h"
 
 #include "test/integration/filters/set_response_code_filter_config.pb.h"
 #include "test/integration/http_integration.h"
