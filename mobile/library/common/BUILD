@@ -82,6 +82,8 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/strings",
         "@envoy//source/common/common:base_logger_lib",
     ],
 )
