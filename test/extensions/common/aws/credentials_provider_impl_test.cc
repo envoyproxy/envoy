@@ -139,7 +139,7 @@ TEST_F(EvironmentCredentialsProviderTest, NoSessionToken) {
 class CredentialsFileCredentialsProviderTest : public testing::Test {
 public:
   CredentialsFileCredentialsProviderTest()
-      : api_(Api::createApiForTest(time_system_)), provider_(*api_) {}
+      : api_(Api::createApiForTest(time_system_)), provider_(*api_, "") {}
 
   ~CredentialsFileCredentialsProviderTest() override {
     TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
@@ -181,6 +181,30 @@ TEST_F(CredentialsFileCredentialsProviderTest, DefaultCredentialsFile) {
   EXPECT_EQ("profile1_acc=ess_key", credentials.accessKeyId().value());
   EXPECT_EQ("profile1_secret", credentials.secretAccessKey().value());
   EXPECT_EQ("profile1_token", credentials.sessionToken().value());
+}
+
+TEST_F(CredentialsFileCredentialsProviderTest, CustomProfileFromConfigShouldBeHonored) {
+  auto file_path =
+      TestEnvironment::writeStringToFileForTest(CREDENTIALS_FILE, CREDENTIALS_FILE_CONTENTS);
+  TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", file_path, 1);
+
+  auto provider = CredentialsFileCredentialsProvider(*api_, "profile4");
+  const auto credentials = provider.getCredentials();
+  EXPECT_EQ("profile4_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile4_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile4_token", credentials.sessionToken().value());
+}
+
+TEST_F(CredentialsFileCredentialsProviderTest, UnexistingCustomProfileFomConfig) {
+  auto file_path =
+      TestEnvironment::writeStringToFileForTest(CREDENTIALS_FILE, CREDENTIALS_FILE_CONTENTS);
+  TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", file_path, 1);
+
+  auto provider = CredentialsFileCredentialsProvider(*api_, "unexistening_profile");
+  const auto credentials = provider.getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, ProfileDoesNotExist) {
