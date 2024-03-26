@@ -37,7 +37,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mDnsRefreshSeconds = 60;
   private final int mDnsFailureRefreshSecondsBase = 2;
   private final int mDnsFailureRefreshSecondsMax = 10;
-  private final int mDnsQueryTimeoutSeconds = 5;
+  private int mDnsQueryTimeoutSeconds = 5;
   private final int mDnsMinRefreshSeconds = 60;
   private final List<String> mDnsPreresolveHostnames = Collections.emptyList();
   private final boolean mEnableDNSCache = false;
