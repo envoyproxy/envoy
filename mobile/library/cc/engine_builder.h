@@ -226,7 +226,7 @@ private:
   int dns_refresh_seconds_ = 60;
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
-  int dns_query_timeout_seconds_ = 25;
+  int dns_query_timeout_seconds_ = 5;
   bool use_system_resolver_ = true;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;
