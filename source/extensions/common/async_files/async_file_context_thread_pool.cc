@@ -200,6 +200,13 @@ AsyncFileContextThreadPool::createHardLink(absl::string_view filename,
 }
 
 absl::Status AsyncFileContextThreadPool::close(std::function<void(absl::Status)> on_complete) {
+  if (path_to_unlink_) {
+    manager().unlink(path_to_unlink_.value(), [path = path_to_unlink_.value()](absl::Status error) {
+      ENVOY_LOG_MISC(error,
+                     fmt::format("Failed to unlink an anonymous file '{}' ({})",
+                                 path, error));
+    });
+  }
   auto status =
       checkFileAndEnqueue(std::make_shared<ActionCloseFile>(handle(), std::move(on_complete)))
           .status();
@@ -235,10 +242,13 @@ AsyncFileContextThreadPool::checkFileAndEnqueue(std::shared_ptr<AsyncFileAction>
   return enqueue(action);
 }
 
-AsyncFileContextThreadPool::AsyncFileContextThreadPool(AsyncFileManager& manager, int fd)
-    : AsyncFileContextBase(manager), file_descriptor_(fd) {}
+AsyncFileContextThreadPool::AsyncFileContextThreadPool(AsyncFileManager& manager, int fd,
+                                                       std::optional<std::string> path_to_unlink)
+    : AsyncFileContextBase(manager), path_to_unlink_(path_to_unlink), file_descriptor_(fd)  {}
 
-AsyncFileContextThreadPool::~AsyncFileContextThreadPool() { ASSERT(file_descriptor_ == -1); }
+AsyncFileContextThreadPool::~AsyncFileContextThreadPool() {
+  ASSERT(file_descriptor_ == -1);
+}
 
 } // namespace AsyncFiles
 } // namespace Common
