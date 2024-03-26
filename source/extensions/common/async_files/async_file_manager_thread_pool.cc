@@ -153,7 +153,8 @@ public:
     // If O_TMPFILE didn't work, fall back to creating a named file and unlinking it.
     // Use a fixed-size buffer because we're going to be using C file functions anyway, and it saves
     // a heap allocation.
-    ENVOY_LOG_MISC(info, "AsyncFileManagerThreadPool discovered O_TMPFILE not supported or not configured");
+    ENVOY_LOG_MISC(
+        info, "AsyncFileManagerThreadPool discovered O_TMPFILE not supported or not configured");
     char filename[4096];
     static const char file_suffix[] = "/buffer.XXXXXX";
     if (path_.size() + sizeof(file_suffix) > sizeof(filename)) {
@@ -167,12 +168,14 @@ public:
     if (open_result.return_value_ == -1) {
       return statusAfterFileError(open_result);
     }
-    ENVOY_LOG_MISC(info, fmt::format("AsyncFileManagerThreadPool created anonymous file with path '{}'",
-                                     filename));
+    ENVOY_LOG_MISC(
+        info,
+        fmt::format("AsyncFileManagerThreadPool created anonymous file with path '{}'", filename));
     // if (posix().unlink(filename).return_value_ != 0) {
     //   // Most likely the problem here is we can't unlink a file while it's open - since that's a
     //   // prerequisite of the desired behavior of this function, and we don't want to accidentally
-    //   // fill a disk with named tmp files, if this happens we close the file, unlink it, and report
+    //   // fill a disk with named tmp files, if this happens we close the file, unlink it, and
+    //   report
     //   // an error.
     //   posix().close(open_result.return_value_);
     //   posix().unlink(filename);
@@ -180,7 +183,8 @@ public:
     //       "AsyncFileManagerThreadPool::createAnonymousFile: not supported for "
     //       "target filesystem (failed to unlink an open file)");
     // }
-    return std::make_shared<AsyncFileContextThreadPool>(manager_, open_result.return_value_, filename);
+    return std::make_shared<AsyncFileContextThreadPool>(manager_, open_result.return_value_,
+                                                        filename);
   }
 
 private:
