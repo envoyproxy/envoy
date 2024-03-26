@@ -317,7 +317,6 @@ TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
     return;
   }
   prependCompositeDynamicFilter("composite-dynamic");
-
   initialize();
   test_server_->waitForCounterGe(
       "extension_config_discovery.http_filter.set-response-code.config_reload", 1);
@@ -349,7 +348,6 @@ TEST_P(CompositeFilterIntegrationTest, TestMissingDynamicFilter) {
     return;
   }
   prependMissingCompositeDynamicFilter("composite-dynamic-missing");
-
   initialize();
   test_server_->waitForCounterGe(
       "extension_config_discovery.http_filter.missing-config.config_fail", 1);

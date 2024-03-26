@@ -150,7 +150,7 @@ private:
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactory(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
       const std::string& prefix, ProtobufMessage::ValidationVisitor& validation,
-      OptRef<Server::Configuration::FactoryContext>& context_opt, FactoryCtx& context,
+      Envoy::Http::Matching::HttpFilterActionContext& action_context, FactoryCtx& context,
       FilterCfgFactory& factory);
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(

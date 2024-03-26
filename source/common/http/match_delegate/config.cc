@@ -275,9 +275,10 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           proto_config.extension_config());
-  OptRef<Server::Configuration::FactoryContext> context_opt = context;
-  return createFilterFactory(proto_config, prefix, context.messageValidationVisitor(), context_opt,
-                             context, factory);
+  Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context, absl::nullopt,
+                                                                context.serverFactoryContext()};
+  return createFilterFactory(proto_config, prefix, context.messageValidationVisitor(),
+                             action_context, context, factory);
 }
 
 absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFactoryFromProtoTyped(
@@ -287,17 +288,19 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::UpstreamHttpFilterConfigFactory>(
           proto_config.extension_config());
-  OptRef<Server::Configuration::FactoryContext> context_opt = absl::nullopt;
+  Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, absl::nullopt, context,
+                                                                context.serverFactoryContext()};
   return createFilterFactory(proto_config, prefix,
-                             context.serverFactoryContext().messageValidationVisitor(), context_opt,
-                             context, factory);
+                             context.serverFactoryContext().messageValidationVisitor(),
+                             action_context, context, factory);
 }
 
 template <class FactoryCtx, class FilterCfgFactory>
 absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFactory(
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
     const std::string& prefix, ProtobufMessage::ValidationVisitor& validation,
-    OptRef<Server::Configuration::FactoryContext>& context_opt, FactoryCtx& context,
+    // OptRef<Server::Configuration::FactoryContext>& context_opt,
+    Envoy::Http::Matching::HttpFilterActionContext& action_context, FactoryCtx& context,
     FilterCfgFactory& factory) {
   auto message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.extension_config().typed_config(), validation, factory);
@@ -308,9 +311,6 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto filter_factory = filter_factory_or_error.value();
 
   Factory::MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
-
-  Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context_opt,
-                                                                context.serverFactoryContext()};
 
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
                             Envoy::Http::Matching::HttpFilterActionContext>
@@ -362,7 +362,7 @@ FilterConfigPerRoute::createFilterMatchTree(
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       fmt::format("http.{}.",
                   server_context.scope().symbolTable().toString(server_context.scope().prefix())),
-      absl::nullopt, server_context};
+      absl::nullopt, absl::nullopt, server_context};
 
   Factory::MatchTreeValidationVisitor validation_visitor(*requirements);
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,

@@ -25,6 +25,11 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   }
 
   if (composite_action.has_dynamic_config()) {
+    if (context.upstream_factory_context_.has_value()) {
+      throw EnvoyException(fmt::format("When composite filter is in upstream, the composite action "
+                                       "config must not be dynamic."));
+    }
+
     if (!context.factory_context_.has_value() || !context.server_factory_context_.has_value()) {
       throw EnvoyException(fmt::format("Failed to get factory context or server factory context."));
     }
