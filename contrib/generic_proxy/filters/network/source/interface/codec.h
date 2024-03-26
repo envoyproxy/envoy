@@ -139,8 +139,9 @@ public:
    * @param context supplies the server context.
    * @return CodecFactoryPtr the codec factory.
    */
-  virtual CodecFactoryPtr createCodecFactory(const Protobuf::Message&,
-                                             Envoy::Server::Configuration::FactoryContext&) PURE;
+  virtual CodecFactoryPtr
+  createCodecFactory(const Protobuf::Message&,
+                     Envoy::Server::Configuration::ServerFactoryContext&) PURE;
 
   /**
    * Create a optional custom proxy factory.

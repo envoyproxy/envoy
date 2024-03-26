@@ -66,7 +66,7 @@ public:
   MockStreamCodecFactoryConfig();
 
   MOCK_METHOD(CodecFactoryPtr, createCodecFactory,
-              (const Protobuf::Message&, Envoy::Server::Configuration::FactoryContext&));
+              (const Protobuf::Message&, Envoy::Server::Configuration::ServerFactoryContext&));
   MOCK_METHOD(ProxyFactoryPtr, createProxyFactory,
               (const Protobuf::Message&, Envoy::Server::Configuration::FactoryContext&));
 

@@ -23,7 +23,7 @@ Factory::factoriesFromProto(const envoy::config::core::v3::TypedExtensionConfig&
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(codec_config.typed_config(),
                                                 context.messageValidationVisitor(), *message);
-  return {factory.createCodecFactory(*message, context),
+  return {factory.createCodecFactory(*message, context.serverFactoryContext()),
           factory.createProxyFactory(*message, context)};
 }
 
