@@ -251,15 +251,13 @@ TEST_F(InternalEngineTest, EventTrackerRegistersDefaultAPI) {
   EngineTestContext test_context{};
 
   std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}));
+      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, nullptr));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   // A default event tracker is registered in external API registry.
-  const auto registered_event_tracker =
-      static_cast<envoy_event_tracker*>(Api::External::retrieveApi(envoy_event_tracker_api_name));
-  EXPECT_TRUE(registered_event_tracker != nullptr);
-  EXPECT_TRUE(registered_event_tracker->track == nullptr);
-  EXPECT_TRUE(registered_event_tracker->context == nullptr);
+  const auto registered_event_tracker = static_cast<std::unique_ptr<EnvoyEventTracker>*>(
+      Api::External::retrieveApi(ENVOY_EVENT_TRACKER_API_NAME));
+  EXPECT_TRUE(registered_event_tracker != nullptr && *registered_event_tracker == nullptr);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
   // Simulate a failed assertion by invoking a debug assertion failure
@@ -275,29 +273,23 @@ TEST_F(InternalEngineTest, EventTrackerRegistersDefaultAPI) {
 TEST_F(InternalEngineTest, EventTrackerRegistersAPI) {
   EngineTestContext test_context{};
 
-  envoy_event_tracker event_tracker{[](envoy_map map, const void* context) -> void {
-                                      const auto new_map = toMap(map);
-                                      if (new_map.count("foo") && new_map.at("foo") == "bar") {
-                                        auto* test_context = static_cast<EngineTestContext*>(
-                                            const_cast<void*>(context));
-                                        test_context->on_event.Notify();
-                                      }
-                                    } /*track*/,
-                                    &test_context /*context*/};
+  auto event_tracker = std::make_unique<EnvoyEventTracker>();
+  event_tracker->on_track = [&](const absl::flat_hash_map<std::string, std::string>& events) {
+    if (events.count("foo") && events.at("foo") == "bar") {
+      test_context.on_event.Notify();
+    }
+  };
 
   std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, event_tracker));
+      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, std::move(event_tracker)));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
-  const auto registered_event_tracker =
-      static_cast<envoy_event_tracker*>(Api::External::retrieveApi(envoy_event_tracker_api_name));
-  EXPECT_TRUE(registered_event_tracker != nullptr);
-  EXPECT_EQ(event_tracker.track, registered_event_tracker->track);
-  EXPECT_EQ(event_tracker.context, registered_event_tracker->context);
+  const auto registered_event_tracker = static_cast<std::unique_ptr<EnvoyEventTracker>*>(
+      Api::External::retrieveApi(ENVOY_EVENT_TRACKER_API_NAME));
+  EXPECT_TRUE(registered_event_tracker != nullptr && *registered_event_tracker != nullptr);
 
-  event_tracker.track(Bridge::Utility::makeEnvoyMap({{"foo", "bar"}}),
-                      registered_event_tracker->context);
+  (*registered_event_tracker)->on_track({{"foo", "bar"}});
 
   ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
   engine->terminate();
@@ -307,19 +299,16 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAPI) {
 TEST_F(InternalEngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
   EngineTestContext test_context{};
 
-  envoy_event_tracker event_tracker{
-      [](envoy_map map, const void* context) -> void {
-        const auto new_map = toMap(map);
-        if (new_map.count("name") && new_map.at("name") == "assertion") {
-          EXPECT_EQ(new_map.at("location"), "foo_location");
-          auto* test_context = static_cast<EngineTestContext*>(const_cast<void*>(context));
-          test_context->on_event.Notify();
-        }
-      } /*track*/,
-      &test_context /*context*/};
+  auto event_tracker = std::make_unique<EnvoyEventTracker>();
+  event_tracker->on_track = [&](const absl::flat_hash_map<std::string, std::string>& events) {
+    if (events.count("name") && events.at("name") == "assertion") {
+      EXPECT_EQ(events.at("location"), "foo_location");
+      test_context.on_event.Notify();
+    }
+  };
 
   std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, event_tracker));
+      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, std::move(event_tracker)));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -337,19 +326,16 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
 TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
   EngineTestContext test_context{};
 
-  envoy_event_tracker event_tracker{[](envoy_map map, const void* context) -> void {
-                                      const auto new_map = toMap(map);
-                                      if (new_map.count("name") && new_map.at("name") == "bug") {
-                                        EXPECT_EQ(new_map.at("location"), "foo_location");
-                                        auto* test_context = static_cast<EngineTestContext*>(
-                                            const_cast<void*>(context));
-                                        test_context->on_event.Notify();
-                                      }
-                                    } /*track*/,
-                                    &test_context /*context*/};
+  auto event_tracker = std::make_unique<EnvoyEventTracker>();
+  event_tracker->on_track = [&](const absl::flat_hash_map<std::string, std::string>& events) {
+    if (events.count("name") && events.at("name") == "bug") {
+      EXPECT_EQ(events.at("location"), "foo_location");
+      test_context.on_event.Notify();
+    }
+  };
 
   std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, event_tracker));
+      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, std::move(event_tracker)));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));

@@ -13,14 +13,15 @@ namespace Logger {
 
 class LambdaDelegateTest : public testing::Test {
 public:
-  static envoy_event_tracker tracker;
+  static std::unique_ptr<EnvoyEventTracker> event_tracker;
 
   static void SetUpTestSuite() {
-    Api::External::registerApi(std::string(envoy_event_tracker_api_name), &tracker);
+    Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker);
   }
 };
 
-envoy_event_tracker LambdaDelegateTest::tracker{};
+std::unique_ptr<EnvoyEventTracker> LambdaDelegateTest::event_tracker =
+    std::make_unique<EnvoyEventTracker>();
 
 TEST_F(LambdaDelegateTest, LogCb) {
   std::string expected_msg = "Hello LambdaDelegate";
