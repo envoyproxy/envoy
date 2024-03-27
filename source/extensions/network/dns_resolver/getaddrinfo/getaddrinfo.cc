@@ -145,8 +145,6 @@ private:
 
     while (true) {
       PendingQuerySharedPtr next_query;
-      const bool reresolve =
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_reresolve_on_eai_again");
       {
         absl::MutexLock guard(&mutex_);
         auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
@@ -159,9 +157,6 @@ private:
 
         next_query = std::move(pending_queries_.front());
         pending_queries_.pop_front();
-        if (reresolve && next_query->cancelled_) {
-          continue;
-        }
       }
 
       ENVOY_LOG(debug, "popped pending query [{}]", next_query->dns_name_);
@@ -183,11 +178,6 @@ private:
         auto addrinfo_wrapper = AddrInfoWrapper(addrinfo_result_do_not_use);
         if (rc.return_value_ == 0) {
           response = processResponse(*next_query, addrinfo_wrapper.get());
-        } else if (reresolve && rc.return_value_ == EAI_AGAIN) {
-          ENVOY_LOG(debug, "retrying query [{}]", next_query->dns_name_);
-          absl::MutexLock guard(&mutex_);
-          pending_queries_.push_back(next_query);
-          continue;
         } else {
           // TODO(mattklein123): Handle some errors differently such as `EAI_NODATA`.
           ENVOY_LOG(debug, "getaddrinfo failed with rc={} errno={}", gai_strerror(rc.return_value_),
