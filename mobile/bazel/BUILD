@@ -1,5 +1,5 @@
-load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
+load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 
 licenses(["notice"])  # Apache 2
 
