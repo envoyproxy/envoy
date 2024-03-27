@@ -200,7 +200,7 @@ build:mobile-remote-ci-linux-clang --action_env=CXX=/opt/llvm/bin/clang++
 build:mobile-remote-ci-linux-clang --config=mobile-remote-ci-linux
 # Temporary revert to C++17 for mobile NDK builds.
 build:mobile-remote-ci-linux-clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
-build:mobile-remote-ci-linux-clang --copt -fno-cxx-modules
+build:mobile-remote-ci-linux-clang --features=-layering_check
 
 #############################################################################
 # mobile-remote-ci-linux-asan: These options are Linux-only using Clang and AddressSanitizer
@@ -256,6 +256,7 @@ build:mobile-remote-ci-macos --xcode_version_config=//ci:xcode_config
 build:mobile-remote-ci-macos --remote_download_toplevel
 build:mobile-remote-ci-macos --config=ci
 build:mobile-remote-ci-macos --config=remote
+build:mobile-remote-ci-macos --features=-layering_check
 
 build:mobile-remote-ci --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci --config=remote-ci
