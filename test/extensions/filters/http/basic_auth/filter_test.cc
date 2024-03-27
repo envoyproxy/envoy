@@ -143,6 +143,42 @@ TEST_F(FilterTest, ExistingUsernameHeader) {
   EXPECT_EQ("user1", request_headers_user1.get_("x-username"));
 }
 
+TEST_F(FilterTest, BasicAuthPerRouteDefaultSettings) {
+  Http::TestRequestHeaderMapImpl empty_request_headers;
+  envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute settings;
+  FilterConfigPerRoute basic_auth_per_route(settings);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(testing::Return(&basic_auth_per_route));
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
+                           std::function<void(Http::ResponseHeaderMap & headers)>,
+                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                           absl::string_view details) {
+        EXPECT_EQ(Http::Code::Unauthorized, code);
+        EXPECT_EQ("User authentication failed. Missing username and password.", body);
+        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(details, "no_credential_for_basic_auth");
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(empty_request_headers, true));
+}
+
+TEST_F(FilterTest, BasicAuthPerRouteDisabled) {
+  Http::TestRequestHeaderMapImpl empty_request_headers;
+  envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute settings;
+  settings.set_disabled(true);
+  FilterConfigPerRoute basic_auth_per_route(settings);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(testing::Return(&basic_auth_per_route));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(empty_request_headers, true));
+}
+
 } // namespace BasicAuth
 } // namespace HttpFilters
 } // namespace Extensions

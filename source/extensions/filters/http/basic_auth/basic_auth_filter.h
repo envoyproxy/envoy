@@ -90,8 +90,6 @@ public:
       : disabled_(config.disabled()) {
   }
 
-  // void merge(const FilterConfigPerRoute& other);
-
   bool disabled() const { return disabled_; }
 
 private:

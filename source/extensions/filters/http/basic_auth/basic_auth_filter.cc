@@ -5,6 +5,7 @@
 #include "source/common/common/base64.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,6 +44,14 @@ bool FilterConfig::validateUser(absl::string_view username, absl::string_view pa
 BasicAuthFilter::BasicAuthFilter(FilterConfigConstSharedPtr config) : config_(std::move(config)) {}
 
 Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  const auto* specific_check_settings =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
+  if (specific_check_settings != nullptr) {
+    if (specific_check_settings->disabled()) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+  }
+
   auto auth_header = headers.get(Http::CustomHeaders::get().Authorization);
 
   if (auth_header.empty()) {
