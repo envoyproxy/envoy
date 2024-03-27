@@ -147,6 +147,8 @@ jobs:
       with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
+        strip-prefix: release/
+        token: ${{ steps.appauth.outputs.token }}
     - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.29
       name: Sync version histories
       with:
@@ -170,7 +172,7 @@ jobs:
         dry-run: ${{ ! inputs.pr }}
         GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
         title: >-
-          ${{ steps.checkout.outputs.branch-name != 'main' && '[${{ steps.checkout.outputs.branch-name }}]' || '' }}
+          ${{ steps.checkout.outputs.branch-name != 'main' && format('[{0}]', steps.checkout.outputs.branch-name) || '' }}
           repo: Sync version histories
 
   ## Triggered actions
