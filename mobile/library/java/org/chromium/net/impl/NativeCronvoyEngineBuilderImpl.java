@@ -37,7 +37,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mDnsRefreshSeconds = 60;
   private final int mDnsFailureRefreshSecondsBase = 2;
   private final int mDnsFailureRefreshSecondsMax = 10;
-  private final int mDnsQueryTimeoutSeconds = 25;
+  private int mDnsQueryTimeoutSeconds = 5;
   private final int mDnsMinRefreshSeconds = 60;
   private final List<String> mDnsPreresolveHostnames = Collections.emptyList();
   private final boolean mEnableDNSCache = false;
@@ -79,6 +79,19 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setEnableDrainPostDnsRefresh(boolean enable) {
     mEnableDrainPostDnsRefresh = enable;
+    return this;
+  }
+
+  /**
+   * Set the DNS query timeout, in seconds, which ensures that DNS queries succeed or fail
+   * within that time range. See the DnsCacheConfig.dns_query_timeout proto field for details.
+   *
+   * The default is 5s.
+   *
+   * @param timeout The DNS query timeout value, in seconds.
+   */
+  public NativeCronvoyEngineBuilderImpl setDnsQueryTimeoutSeconds(int timeout) {
+    mDnsQueryTimeoutSeconds = timeout;
     return this;
   }
 
