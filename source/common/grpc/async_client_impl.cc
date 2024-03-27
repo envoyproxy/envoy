@@ -146,7 +146,7 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
   // decode() currently only returns two types of error:
   // - decoding error is mapped to ResourceExhausted
   // - over-limit error is mapped to Internal.
-  // Other potential errors in the future are mapped to internel for now.
+  // Other potential errors in the future are mapped to internal for now.
   if (status.code() == absl::StatusCode::kResourceExhausted) {
     streamError(Status::WellKnownGrpcStatus::ResourceExhausted);
     return;
