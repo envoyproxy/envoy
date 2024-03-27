@@ -120,11 +120,13 @@ public:
 
   /**
    * Create a custom proxy instance.
+   * @param context supplies the filter chain factory context.
    * @param filter_manager the filter manager of the network filter chain.
    * @param filter_config supplies the read filter config.
    */
-  virtual void createProxy(Network::FilterManager& filter_manager,
-                           const FilterConfigSharedPtr& filter_config) const PURE;
+  virtual void createProxy(Server::Configuration::FactoryContext& context,
+                           Network::FilterManager& filter_manager,
+                           FilterConfigSharedPtr filter_config) const PURE;
 };
 using ProxyFactoryPtr = std::unique_ptr<ProxyFactory>;
 
@@ -140,7 +142,7 @@ public:
    * @return CodecFactoryPtr the codec factory.
    */
   virtual CodecFactoryPtr createCodecFactory(const Protobuf::Message&,
-                                             Envoy::Server::Configuration::FactoryContext&) PURE;
+                                             Server::Configuration::ServerFactoryContext&) PURE;
 
   /**
    * Create a optional custom proxy factory.
@@ -150,7 +152,7 @@ public:
    * custom proxy is needed and the default generic proxy will be used.
    */
   virtual ProxyFactoryPtr createProxyFactory(const Protobuf::Message&,
-                                             Envoy::Server::Configuration::FactoryContext&) {
+                                             Server::Configuration::ServerFactoryContext&) {
     return nullptr;
   }
 
