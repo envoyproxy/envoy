@@ -208,14 +208,7 @@ run:
     - tools/code_format/check_format.py
   mobile-cc:
     paths:
-    - .bazelrc
-    - .bazelversion
-    - .github/config.yml
-    - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
-    - mobile/.bazelrc
-    - mobile/**/*
-    - tools/code_format/check_format.py
+    - "**/*"
   mobile-compile-time-cc:
     paths:
     - "**/*"
