@@ -24,8 +24,9 @@ private:
       Server::Configuration::ServerFactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-      const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig&,
-      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
+      const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig& per_route_config,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor&) override;
 };
 
 using UpstreamAwsLambdaFilterFactory = AwsLambdaFilterFactory;
