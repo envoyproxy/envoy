@@ -176,12 +176,12 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainAndSuccess) {
 TEST_F(GetAddrInfoDnsImplTest, TryAgainThenCancel) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
 
-  ActiveDnsQuery* query = nullptr;
+  std::atomic<ActiveDnsQuery*> query = nullptr;
+
   EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-      .Times(1)
+      .Times(testing::AnyNumber())
       .WillOnce(Invoke([&](const char*, const char*, const addrinfo*, addrinfo**) {
-        std::cerr << "CANCELING CALL\n";
-        query->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
+        query.load()->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
         dispatcher_->exit();
         return Api::SysCallIntResult{EAI_AGAIN, 0};
       }));
@@ -190,6 +190,7 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainThenCancel) {
                          [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) { FAIL(); });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  resolver_.reset();
 }
 
 TEST_F(GetAddrInfoDnsImplTest, All) {
