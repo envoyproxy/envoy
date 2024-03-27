@@ -17,6 +17,8 @@
   /* Envoy only supports RFC-v1 in the long term, so disable IETF draft 29 implementation by       \
    * default. */                                                                                   \
   KEY_VALUE_PAIR(quic_disable_version_draft_29, true)                                              \
+  /* Enable support for HTTP/3 metadata decoding in QUICHE. */                                     \
+  KEY_VALUE_PAIR(quic_enable_http3_metadata_decoding, true)                                        \
   /* This flag enables BBR, otherwise QUIC will use Cubic which is less performant */              \
   KEY_VALUE_PAIR(quic_default_to_bbr, true)
 

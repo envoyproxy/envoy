@@ -274,8 +274,9 @@ void CheckRequestUtils::createTcpCheck(
 
 MatcherSharedPtr
 CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
-                                     bool add_http_headers) {
-  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
+                                     bool add_http_headers,
+                                     Server::Configuration::CommonFactoryContext& context) {
+  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list, context));
 
   if (add_http_headers) {
     const std::vector<Http::LowerCaseString> keys{
@@ -287,7 +288,7 @@ CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringM
       matcher.set_exact(key.get());
       matchers.push_back(
           std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              matcher));
+              matcher, context));
     }
   }
 
@@ -295,12 +296,13 @@ CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringM
 }
 
 std::vector<Matchers::StringMatcherPtr>
-CheckRequestUtils::createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
+CheckRequestUtils::createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                                        Server::Configuration::CommonFactoryContext& context) {
   std::vector<Matchers::StringMatcherPtr> matchers;
   for (const auto& matcher : list.patterns()) {
     matchers.push_back(
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher));
+            matcher, context));
   }
   return matchers;
 }

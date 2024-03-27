@@ -53,6 +53,15 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCa
                    MaxChoiceCountForTest);
     return;
   }
+  // Validate the correctness of the Slow-Start config values.
+  if (input.has_least_request_lb_config() &&
+      input.least_request_lb_config().has_slow_start_config()) {
+    if (!ZoneAwareLoadBalancerFuzzBase::validateSlowStart(
+            input.least_request_lb_config().slow_start_config())) {
+      return;
+    }
+  }
+
   const test::common::upstream::ZoneAwareLoadBalancerTestCase& zone_aware_load_balancer_test_case =
       input.zone_aware_load_balancer_test_case();
 

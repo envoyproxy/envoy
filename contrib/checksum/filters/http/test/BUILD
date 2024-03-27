@@ -16,6 +16,7 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],

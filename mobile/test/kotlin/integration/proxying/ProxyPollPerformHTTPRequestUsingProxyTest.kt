@@ -32,7 +32,7 @@ import org.robolectric.RobolectricTestRunner
 //                                               │                  │
 //                                               └──────────────────┘
 @RunWith(RobolectricTestRunner::class)
-class PerformHTTPRequestUsingProxy {
+class ProxyPollPerformHTTPRequestUsingProxyTest {
   init {
     AndroidJniLibrary.loadTestLibrary()
     JniLibrary.loadTestLibrary()
@@ -49,7 +49,7 @@ class PerformHTTPRequestUsingProxy {
     Mockito.doReturn(connectivityManager)
       .`when`(context)
       .getSystemService(Context.CONNECTIVITY_SERVICE)
-    Mockito.`when`(connectivityManager.getDefaultProxy())
+    Mockito.`when`(connectivityManager.defaultProxy)
       .thenReturn(ProxyInfo.buildDirectProxy("127.0.0.1", port))
 
     val onEngineRunningLatch = CountDownLatch(1)

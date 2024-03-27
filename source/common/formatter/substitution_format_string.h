@@ -22,16 +22,18 @@ namespace Formatter {
  */
 class SubstitutionFormatStringUtils {
 public:
+  using FormattersConfig =
+      ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>;
+
   /**
-   * Generate a formatter object from config SubstitutionFormatString.
+   * Parse list of formatter configurations to commands.
    */
   template <class FormatterContext = HttpFormatterContext>
-  static FormatterBasePtr<FormatterContext>
-  fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config,
+  static std::vector<CommandParserBasePtr<FormatterContext>>
+  parseFormatters(const FormattersConfig& formatters,
                   Server::Configuration::GenericFactoryContext& context) {
-    // Instantiate formatter extensions.
     std::vector<CommandParserBasePtr<FormatterContext>> commands;
-    for (const auto& formatter : config.formatters()) {
+    for (const auto& formatter : formatters) {
       auto* factory =
           Envoy::Config::Utility::getFactory<CommandParserFactoryBase<FormatterContext>>(formatter);
       if (!factory) {
@@ -47,12 +49,24 @@ public:
       commands.push_back(std::move(parser));
     }
 
+    return commands;
+  }
+
+  /**
+   * Generate a formatter object from config SubstitutionFormatString.
+   */
+  template <class FormatterContext = HttpFormatterContext>
+  static FormatterBasePtr<FormatterContext>
+  fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config,
+                  Server::Configuration::GenericFactoryContext& context) {
+    // Instantiate formatter extensions.
+    auto commands = parseFormatters<FormatterContext>(config.formatters(), context);
     switch (config.format_case()) {
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormat:
       return std::make_unique<FormatterBaseImpl<FormatterContext>>(
           config.text_format(), config.omit_empty_values(), commands);
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat:
-      return std::make_unique<JsonFormatterBaseImpl<FormatterContext>>(
+      return createJsonFormatter<FormatterContext>(
           config.json_format(), true, config.omit_empty_values(),
           config.has_json_format_options() ? config.json_format_options().sort_properties() : false,
           commands);
@@ -75,9 +89,10 @@ public:
   template <class FormatterContext = HttpFormatterContext>
   static FormatterBasePtr<FormatterContext>
   createJsonFormatter(const ProtobufWkt::Struct& struct_format, bool preserve_types,
-                      bool omit_empty_values, bool sort_properties) {
+                      bool omit_empty_values, bool sort_properties,
+                      const std::vector<CommandParserBasePtr<FormatterContext>>& commands = {}) {
     return std::make_unique<JsonFormatterBaseImpl<FormatterContext>>(
-        struct_format, preserve_types, omit_empty_values, sort_properties);
+        struct_format, preserve_types, omit_empty_values, sort_properties, commands);
   }
 };
 

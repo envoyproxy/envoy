@@ -33,7 +33,7 @@ message DynatraceSamplerConfig {
   // .. code-block:: yaml
   //
   //    http_uri:
-  //      uri: <tenant>.dev.dynatracelabs.com/api/v2/otlp/v1/traces
+  //      uri: <tenant>.dev.dynatracelabs.com/api/v2/samplingConfiguration
   //      cluster: dynatrace
   //      timeout: 10s
   //

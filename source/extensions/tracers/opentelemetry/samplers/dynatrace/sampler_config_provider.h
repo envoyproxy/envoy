@@ -40,18 +40,33 @@ public:
 };
 
 class SamplerConfigProviderImpl : public SamplerConfigProvider,
-                                  public Logger::Loggable<Logger::Id::tracing> {
+                                  public Logger::Loggable<Logger::Id::tracing>,
+                                  public Http::AsyncClient::Callbacks {
 public:
   SamplerConfigProviderImpl(
       Server::Configuration::TracerFactoryContext& context,
       const envoy::extensions::tracers::opentelemetry::samplers::v3::DynatraceSamplerConfig&
           config);
 
+  void onSuccess(const Http::AsyncClient::Request& request,
+                 Http::ResponseMessagePtr&& response) override;
+
+  void onFailure(const Http::AsyncClient::Request& request,
+                 Http::AsyncClient::FailureReason reason) override;
+
+  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span& /*span*/,
+                                    const Http::ResponseHeaderMap* /*response_headers*/) override{};
+
   const SamplerConfig& getSamplerConfig() const override;
 
-  ~SamplerConfigProviderImpl() override = default;
+  ~SamplerConfigProviderImpl() override;
 
 private:
+  Event::TimerPtr timer_;
+  Upstream::ClusterManager& cluster_manager_;
+  envoy::config::core::v3::HttpUri http_uri_;
+  const std::string authorization_header_value_;
+  Http::AsyncClient::Request* active_request_{};
   SamplerConfig sampler_config_;
 };
 

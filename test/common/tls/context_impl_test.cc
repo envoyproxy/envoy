@@ -112,14 +112,14 @@ public:
     }};
   }
   void loadConfig(ServerContextConfigImpl& cfg) {
-    Envoy::Ssl::ServerContextSharedPtr server_ctx(
-        manager_.createSslServerContext(*store_.rootScope(), cfg, std::vector<std::string>{}));
+    Envoy::Ssl::ServerContextSharedPtr server_ctx(manager_.createSslServerContext(
+        *store_.rootScope(), cfg, std::vector<std::string>{}, nullptr));
     auto cleanup = cleanUpHelper(server_ctx);
   }
 
 protected:
-  Event::SimulatedTimeSystem time_system_;
-  ContextManagerImpl manager_{time_system_};
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  ContextManagerImpl manager_{server_factory_context_};
 };
 
 TEST_F(SslContextImplTest, TestCipherSuites) {
@@ -620,14 +620,15 @@ TEST_F(SslContextImplTest, MustHaveSubjectOrSAN) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
   EXPECT_THROW_WITH_REGEX(
-      manager_.createSslServerContext(*store_.rootScope(), server_context_config, {}),
+      manager_.createSslServerContext(*store_.rootScope(), server_context_config, {}, nullptr),
       EnvoyException, "has neither subject CN nor SAN names");
 }
 
 class SslServerContextImplOcspTest : public SslContextImplTest {
 public:
   Envoy::Ssl::ServerContextSharedPtr loadConfig(ServerContextConfigImpl& cfg) {
-    return manager_.createSslServerContext(*store_.rootScope(), cfg, std::vector<std::string>{});
+    return manager_.createSslServerContext(*store_.rootScope(), cfg, std::vector<std::string>{},
+                                           nullptr);
   }
 
   Envoy::Ssl::ServerContextSharedPtr loadConfigYaml(const std::string& yaml) {
@@ -826,8 +827,8 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
 class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   void loadConfig(ServerContextConfigImpl& cfg) {
-    Envoy::Ssl::ServerContextSharedPtr server_ctx(
-        manager_.createSslServerContext(*store_.rootScope(), cfg, std::vector<std::string>{}));
+    Envoy::Ssl::ServerContextSharedPtr server_ctx(manager_.createSslServerContext(
+        *store_.rootScope(), cfg, std::vector<std::string>{}, nullptr));
     auto cleanup = cleanUpHelper(server_ctx);
   }
 
@@ -1156,8 +1157,8 @@ public:
     }};
   }
 
-  Event::SimulatedTimeSystem time_system_;
-  ContextManagerImpl manager_{time_system_};
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  ContextManagerImpl manager_{server_factory_context_};
 };
 
 // Validate that empty SNI (according to C string rules) fails config validation.
@@ -1287,8 +1288,7 @@ TEST_F(ClientContextConfigImplTest, RSA3072Cert) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
-  Event::SimulatedTimeSystem time_system;
-  ContextManagerImpl manager(time_system);
+  ContextManagerImpl manager(server_factory_context_);
   Stats::IsolatedStoreImpl store;
   auto context = manager_.createSslClientContext(*store.rootScope(), client_context_config);
   auto cleanup = cleanUpHelper(context);
@@ -1764,7 +1764,10 @@ TEST_F(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
       "Unknown static certificate validation context: missing");
 }
 
-class ServerContextConfigImplTest : public SslCertsTest {};
+class ServerContextConfigImplTest : public SslCertsTest {
+public:
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+};
 
 // Multiple TLS certificates are supported.
 TEST_F(ServerContextConfigImplTest, MultipleTlsCertificates) {
@@ -1895,12 +1898,11 @@ TEST_F(ServerContextConfigImplTest, TlsCertificateNonEmpty) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   ServerContextConfigImpl client_context_config(tls_context, factory_context_);
-  Event::SimulatedTimeSystem time_system;
-  ContextManagerImpl manager(time_system);
+  ContextManagerImpl manager(server_factory_context_);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_MESSAGE(
       Envoy::Ssl::ServerContextSharedPtr server_ctx(manager.createSslServerContext(
-          *store.rootScope(), client_context_config, std::vector<std::string>{})),
+          *store.rootScope(), client_context_config, std::vector<std::string>{}, nullptr)),
       EnvoyException, "Server TlsCertificates must have a certificate specified");
 }
 
@@ -2001,8 +2003,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  Event::SimulatedTimeSystem time_system;
-  ContextManagerImpl manager(time_system);
+  ContextManagerImpl manager(server_factory_context_);
   EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
@@ -2025,7 +2026,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
   EXPECT_THROW_WITH_MESSAGE(
       Envoy::Ssl::ServerContextSharedPtr server_ctx(manager.createSslServerContext(
-          *store.rootScope(), server_context_config, std::vector<std::string>{})),
+          *store.rootScope(), server_context_config, std::vector<std::string>{}, nullptr)),
       EnvoyException, "Failed to get BoringSSL private key method from provider");
 }
 
@@ -2193,13 +2194,15 @@ TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndCertChain) {
       "Certificate configuration can't have both pkcs12 and certificate_chain");
 }
 
+// TODO: test throw from additional_init
+
 // Subclass ContextImpl so we can instantiate directly from tests, despite the
 // constructor being protected.
 class TestContextImpl : public ContextImpl {
 public:
   TestContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
-                  TimeSource& time_source)
-      : ContextImpl(scope, config, time_source), pool_(scope.symbolTable()),
+                  Server::Configuration::ServerFactoryContext& factory_context)
+      : ContextImpl(scope, config, factory_context, nullptr), pool_(scope.symbolTable()),
         fallback_(pool_.add("fallback")) {}
 
   void incCounter(absl::string_view name, absl::string_view value) {
@@ -2217,7 +2220,7 @@ protected:
     client_context_config_ =
         std::make_unique<ClientContextConfigImpl>(tls_context_, factory_context_);
     context_ = std::make_unique<TestContextImpl>(*store_.rootScope(), *client_context_config_,
-                                                 time_system_);
+                                                 server_factory_context_);
   }
 
   Stats::TestUtil::TestStore store_;

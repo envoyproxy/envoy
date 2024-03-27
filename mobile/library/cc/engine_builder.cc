@@ -48,6 +48,21 @@ namespace {
 // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
 constexpr int32_t SocketReceiveBufferSize = 1024 * 1024; // 1MB
 
+std::string nativeNameToConfig(absl::string_view name) {
+#ifndef ENVOY_ENABLE_YAML
+  return absl::StrCat("[type.googleapis.com/"
+                      "envoymobile.extensions.filters.http.platform_bridge.PlatformBridge] {"
+                      "platform_filter_name: \"",
+                      name, "\" }");
+#else
+  return absl::StrCat(
+      "{'@type': "
+      "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, "
+      "platform_filter_name: ",
+      name, "}");
+#endif
+}
+
 } // namespace
 
 #ifdef ENVOY_MOBILE_XDS
@@ -138,19 +153,31 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const
 }
 #endif
 
-EngineBuilder::EngineBuilder() : callbacks_(std::make_shared<EngineCallbacks>()) {
+EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<EngineCallbacks>()) {
 #ifndef ENVOY_ENABLE_QUIC
   enable_http3_ = false;
 #endif
 }
 
 EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
+  // Envoy::Platform::LogLevel is essentially the same as Logger::Logger::Levels, so we can
+  // safely cast it.
+  log_level_ = static_cast<Logger::Logger::Levels>(log_level);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setLogger(envoy_logger envoy_logger) {
-  envoy_logger_.emplace(envoy_logger);
+EngineBuilder& EngineBuilder::setLogger(std::unique_ptr<EnvoyLogger> logger) {
+  logger_ = std::move(logger);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks) {
+  callbacks_ = std::move(callbacks);
   return *this;
 }
 
@@ -368,13 +395,7 @@ EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string type
 }
 
 EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
-  addNativeFilter(
-      "envoy.filters.http.platform_bridge",
-      absl::StrCat(
-          "{'@type': "
-          "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, "
-          "platform_filter_name: ",
-          name, "}"));
+  addNativeFilter("envoy.filters.http.platform_bridge", nativeNameToConfig(name));
   return *this;
 }
 
@@ -438,13 +459,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
        ++filter) {
-#ifdef ENVOY_ENABLE_YAML
     auto* native_filter = hcm->add_http_filters();
+#ifdef ENVOY_ENABLE_YAML
     native_filter->set_name((*filter).name_);
     MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
                               ProtobufMessage::getStrictValidationVisitor());
 #else
-    IS_ENVOY_BUG("native filter chains can not be added when YAML is compiled out.");
+    Protobuf::TextFormat::ParseFromString((*filter).typed_config_,
+                                          native_filter->mutable_typed_config());
+    RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
+                   "Failed to parse" + (*filter).typed_config_);
 #endif
   }
 
@@ -892,16 +916,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  envoy_logger null_logger;
-  null_logger.log = nullptr;
-  null_logger.release = envoy_noop_const_release;
-  null_logger.context = nullptr;
-
   envoy_event_tracker null_tracker{};
 
-  Envoy::InternalEngine* envoy_engine = new Envoy::InternalEngine(
-      callbacks_->asEnvoyEngineCallbacks(),
-      (envoy_logger_.has_value()) ? *envoy_logger_ : null_logger, null_tracker);
+  InternalEngine* envoy_engine =
+      new InternalEngine(std::move(callbacks_), std::move(logger_), null_tracker);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
@@ -929,14 +947,17 @@ EngineSharedPtr EngineBuilder::build() {
 
   Engine* engine = new Engine(envoy_engine);
 
-  auto options = std::make_unique<Envoy::OptionsImplBase>();
+  auto options = std::make_shared<Envoy::OptionsImplBase>();
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
   if (bootstrap) {
     options->setConfigProto(std::move(bootstrap));
   }
-  ENVOY_BUG(options->setLogLevel(logLevelToString(log_level_)).ok(), "invalid log level");
+  ENVOY_BUG(
+      options->setLogLevel(logLevelToString(static_cast<Envoy::Platform::LogLevel>(log_level_)))
+          .ok(),
+      "invalid log level");
   options->setConcurrency(1);
-  envoy_engine->run(std::move(options));
+  envoy_engine->run(options);
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend

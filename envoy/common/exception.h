@@ -17,7 +17,7 @@ namespace Envoy {
 #define throwEnvoyExceptionOrPanic(x) PANIC(x)
 #define throwExceptionOrPanic(x, y) PANIC(y)
 #else
-#define throwEnvoyExceptionOrPanic(x) throw EnvoyException(x)
+#define throwEnvoyExceptionOrPanic(x) throw ::Envoy::EnvoyException(x)
 #define throwExceptionOrPanic(y, x) throw y(x)
 #endif
 
@@ -28,6 +28,12 @@ class EnvoyException : public std::runtime_error {
 public:
   EnvoyException(const std::string& message) : std::runtime_error(message) {}
 };
+
+#define SET_AND_RETURN_IF_NOT_OK(check_status, set_status)                                         \
+  if (!check_status.ok()) {                                                                        \
+    set_status = check_status;                                                                     \
+    return;                                                                                        \
+  }
 
 #define THROW_IF_NOT_OK_REF(status)                                                                \
   do {                                                                                             \
