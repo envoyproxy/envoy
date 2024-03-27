@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "source/common/buffer/buffer_impl.h"
@@ -19,7 +20,8 @@ class AsyncFileManager;
 // old-school synchronous posix file operations.
 class AsyncFileContextThreadPool final : public AsyncFileContextBase {
 public:
-  explicit AsyncFileContextThreadPool(AsyncFileManager& manager, int fd);
+  explicit AsyncFileContextThreadPool(AsyncFileManager& manager, int fd,
+                                      std::optional<std::string> path_to_unlink = std::nullopt);
 
   absl::StatusOr<CancelFunction>
   stat(std::function<void(absl::StatusOr<struct stat>)> on_complete) override;
@@ -43,6 +45,7 @@ public:
 protected:
   absl::StatusOr<CancelFunction> checkFileAndEnqueue(std::shared_ptr<AsyncFileAction> action);
 
+  std::optional<std::string> path_to_unlink_;
   int file_descriptor_;
 };
 
