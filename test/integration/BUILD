@@ -373,6 +373,7 @@ envoy_cc_test_binary(
         "//source/exe:process_wide_lib",
         "//source/exe:stripped_main_base_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
+        "//source/extensions/transport_sockets/tls:config",
     ],
 )
 
@@ -540,6 +541,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:retry_priority_factory_mocks",
         "//test/mocks/upstream:retry_priority_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -984,7 +986,7 @@ envoy_cc_test(
     srcs = ["idle_timeout_integration_test.cc"],
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 4,
+    shard_count = 8,
     tags = [
         "cpu:3",
     ],
@@ -1810,13 +1812,14 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 8,
+    shard_count = 30,
     tags = [
         "cpu:3",
     ],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
+        ":tcp_tunneling_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/upstreams/http/tcp:config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -1824,6 +1827,19 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "tcp_tunneling_integration_lib",
+    srcs = [
+        "tcp_tunneling_integration.cc",
+    ],
+    hdrs = [
+        "tcp_tunneling_integration.h",
+    ],
+    deps = [
+        ":http_integration_lib",
     ],
 )
 

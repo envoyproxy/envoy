@@ -26,6 +26,7 @@ MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
   ON_CALL(server_context_, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(server_context_, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(server_context_, singletonManager()).WillByDefault(ReturnRef(singleton_manager_));
+  ON_CALL(server_context_, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
 }
 
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;

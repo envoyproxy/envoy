@@ -10,7 +10,6 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
  * @param attemptCount The number of internal attempts to carry out a request/operation. 0 if not
  *   set.
  */
-open class StreamIntel
-constructor(val streamId: Long, val connectionId: Long, val attemptCount: Long) {
+open class StreamIntel(val streamId: Long, val connectionId: Long, val attemptCount: Long) {
   constructor(base: EnvoyStreamIntel) : this(base.streamId, base.connectionId, base.attemptCount)
 }

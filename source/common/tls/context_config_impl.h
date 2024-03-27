@@ -77,6 +77,7 @@ protected:
   Api::Api& api_;
   const Server::Options& options_;
   Singleton::Manager& singleton_manager_;
+  Server::ServerLifecycleNotifier& lifecycle_notifier_;
 
 private:
   static unsigned tlsVersionFromProto(

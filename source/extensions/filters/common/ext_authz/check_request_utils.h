@@ -109,13 +109,15 @@ public:
    */
   static void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
                              envoy::service::auth::v3::CheckRequest& request,
-                             bool include_peer_certificate,
+                             bool include_peer_certificate, bool include_tls_session,
                              const Protobuf::Map<std::string, std::string>& destination_labels);
 
   static MatcherSharedPtr toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
-                                            bool add_http_headers);
+                                            bool add_http_headers,
+                                            Server::Configuration::CommonFactoryContext& context);
   static std::vector<Matchers::StringMatcherPtr>
-  createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
+  createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                       Server::Configuration::CommonFactoryContext& context);
 
 private:
   static void setAttrContextPeer(envoy::service::auth::v3::AttributeContext::Peer& peer,
@@ -136,6 +138,8 @@ private:
                                     const Envoy::Http::RequestHeaderMap& headers,
                                     uint64_t max_request_bytes, bool pack_as_bytes,
                                     const MatcherSharedPtr& request_header_matchers);
+  static void setTLSSession(envoy::service::auth::v3::AttributeContext::TLSSession& session,
+                            const Ssl::ConnectionInfoConstSharedPtr ssl_info);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
   static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);
 };

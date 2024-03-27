@@ -20,8 +20,8 @@ configure_make(
     configure_options = [
         "--disable-fast-crc-in-assembler",
         "--disable-systemd",
-        "--disable-shared",
         "--with-pic",
+        "--disable-shared",
         "--enable-static",
         "--enable-samples=no",
     ],

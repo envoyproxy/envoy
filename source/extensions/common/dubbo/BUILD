@@ -48,11 +48,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "message_lib",
     srcs = [
-        "message_impl.cc",
+        "message.cc",
     ],
     hdrs = [
         "message.h",
-        "message_impl.h",
     ],
     deps = [
         ":hessian2_utils_lib",

@@ -187,6 +187,15 @@ void CheckRequestUtils::setAttrContextRequest(
                  max_request_bytes, pack_as_bytes, request_header_matchers);
 }
 
+void CheckRequestUtils::setTLSSession(
+    envoy::service::auth::v3::AttributeContext::TLSSession& session,
+    const Ssl::ConnectionInfoConstSharedPtr ssl_info) {
+  if (!ssl_info->sni().empty()) {
+    const std::string server_name(ssl_info->sni());
+    session.set_sni(server_name);
+  }
+}
+
 void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::RequestHeaderMap& headers,
@@ -212,14 +221,8 @@ void CheckRequestUtils::createHttpCheck(
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
                         request_header_matchers);
 
-  if (include_tls_session) {
-    if (cb->connection()->ssl() != nullptr) {
-      attrs->mutable_tls_session();
-      if (!cb->connection()->ssl()->sni().empty()) {
-        const std::string server_name(cb->connection()->ssl()->sni());
-        attrs->mutable_tls_session()->set_sni(server_name);
-      }
-    }
+  if (include_tls_session && cb->connection()->ssl() != nullptr) {
+    setTLSSession(*attrs->mutable_tls_session(), cb->connection()->ssl());
   }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
   // Fill in the context extensions and metadata context.
@@ -230,7 +233,7 @@ void CheckRequestUtils::createHttpCheck(
 
 void CheckRequestUtils::createTcpCheck(
     const Network::ReadFilterCallbacks* callbacks, envoy::service::auth::v3::CheckRequest& request,
-    bool include_peer_certificate,
+    bool include_peer_certificate, bool include_tls_session,
     const Protobuf::Map<std::string, std::string>& destination_labels) {
 
   auto attrs = request.mutable_attributes();
@@ -242,13 +245,17 @@ void CheckRequestUtils::createTcpCheck(
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), server_name, true,
                      include_peer_certificate);
+  if (include_tls_session && cb->connection().ssl() != nullptr) {
+    setTLSSession(*attrs->mutable_tls_session(), cb->connection().ssl());
+  }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
 }
 
 MatcherSharedPtr
 CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
-                                     bool add_http_headers) {
-  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
+                                     bool add_http_headers,
+                                     Server::Configuration::CommonFactoryContext& context) {
+  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list, context));
 
   if (add_http_headers) {
     const std::vector<Http::LowerCaseString> keys{
@@ -260,7 +267,7 @@ CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringM
       matcher.set_exact(key.get());
       matchers.push_back(
           std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              matcher));
+              matcher, context));
     }
   }
 
@@ -268,12 +275,13 @@ CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringM
 }
 
 std::vector<Matchers::StringMatcherPtr>
-CheckRequestUtils::createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
+CheckRequestUtils::createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                                        Server::Configuration::CommonFactoryContext& context) {
   std::vector<Matchers::StringMatcherPtr> matchers;
   for (const auto& matcher : list.patterns()) {
     matchers.push_back(
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher));
+            matcher, context));
   }
   return matchers;
 }

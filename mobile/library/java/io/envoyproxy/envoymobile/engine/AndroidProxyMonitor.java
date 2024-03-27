@@ -15,8 +15,8 @@ import android.os.Bundle;
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 class AndroidProxyMonitor extends BroadcastReceiver {
   static volatile AndroidProxyMonitor instance = null;
-  private ConnectivityManager connectivityManager;
-  private EnvoyEngine envoyEngine;
+  private final ConnectivityManager connectivityManager;
+  private final EnvoyEngine envoyEngine;
 
   static void load(Context context, EnvoyEngine envoyEngine) {
     if (instance != null) {

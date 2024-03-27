@@ -2,6 +2,7 @@
 
 #include "source/extensions/filters/http/cache/cacheability_utils.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -35,13 +36,16 @@ envoy::extensions::filters::http::cache::v3::CacheConfig getConfig() {
 
 class IsCacheableResponseTest : public testing::Test {
 public:
-  IsCacheableResponseTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {}
+  IsCacheableResponseTest()
+      : vary_allow_list_(getConfig().allowed_vary_headers(), factory_context_) {}
 
 protected:
   std::string cache_control_ = "max-age=3600";
   Http::TestResponseHeaderMapImpl response_headers_ = {{":status", "200"},
                                                        {"date", "Sun, 06 Nov 1994 08:49:37 GMT"},
                                                        {"cache-control", cache_control_}};
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   VaryAllowList vary_allow_list_;
 };
 

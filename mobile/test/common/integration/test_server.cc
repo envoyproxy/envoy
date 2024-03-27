@@ -25,7 +25,7 @@ namespace Envoy {
 Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsContext(
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{time_system_};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{server_factory_context_};
   tls_context.mutable_common_tls_context()->add_alpn_protocols("h3");
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -78,6 +78,8 @@ TestServer::TestServer()
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope())
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
+  ON_CALL(factory_context_, sslContextManager())
+      .WillByDefault(testing::ReturnRef(context_manager_));
 }
 
 void TestServer::startTestServer(TestServerType test_server_type) {

@@ -9,6 +9,8 @@
 #endif
 #include "quiche/common/simple_buffer_allocator.h"
 #include "quiche/quic/core/http/quic_spdy_client_stream.h"
+#include "quiche/quic/core/qpack/qpack_encoder.h"
+#include "quiche/quic/core/qpack/qpack_instruction_encoder.h"
 
 namespace Envoy {
 namespace Quic {
@@ -16,7 +18,8 @@ namespace Quic {
 // This class is a quic stream and also a request encoder.
 class EnvoyQuicClientStream : public quic::QuicSpdyClientStream,
                               public EnvoyQuicStream,
-                              public Http::RequestEncoder {
+                              public Http::RequestEncoder,
+                              public quic::QuicSpdyStream::MetadataVisitor {
 public:
   EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
@@ -51,6 +54,9 @@ public:
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
   void clearWatermarkBuffer();
+
+  // quic::QuicSpdyStream::MetadataVisitor
+  void OnMetadataComplete(size_t frame_len, const quic::QuicHeaderList& header_list) override;
 
 protected:
   // EnvoyQuicStream
