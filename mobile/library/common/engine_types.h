@@ -15,6 +15,9 @@
 
 #include "source/common/common/base_logger.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 
 /** The callbacks for the Envoy Engine. */
@@ -27,6 +30,15 @@ struct EngineCallbacks {
 struct EnvoyLogger {
   std::function<void(Logger::Logger::Levels, const std::string&)> on_log =
       [](Logger::Logger::Levels, const std::string&) {};
+  std::function<void()> on_exit = [] {};
+};
+
+inline constexpr absl::string_view ENVOY_EVENT_TRACKER_API_NAME = "event_tracker_api";
+
+/** The callbacks for Envoy Event Tracker. */
+struct EnvoyEventTracker {
+  std::function<void(const absl::flat_hash_map<std::string, std::string>&)> on_track =
+      [](const absl::flat_hash_map<std::string, std::string>&) {};
   std::function<void()> on_exit = [] {};
 };
 

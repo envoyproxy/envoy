@@ -15,14 +15,14 @@ namespace Logger {
 class EventTrackingDelegate : public SinkDelegate {
 public:
   explicit EventTrackingDelegate(DelegatingLogSinkSharedPtr log_sink)
-      : SinkDelegate(log_sink), event_tracker_(*static_cast<envoy_event_tracker*>(
-                                    Api::External::retrieveApi(envoy_event_tracker_api_name))) {}
+      : SinkDelegate(log_sink), event_tracker_(static_cast<std::unique_ptr<EnvoyEventTracker>*>(
+                                    Api::External::retrieveApi(ENVOY_EVENT_TRACKER_API_NAME))) {}
 
   void logWithStableName(absl::string_view stable_name, absl::string_view level,
                          absl::string_view component, absl::string_view msg) override;
 
 private:
-  envoy_event_tracker& event_tracker_;
+  std::unique_ptr<EnvoyEventTracker>* event_tracker_;
 };
 
 using EventTrackingDelegatePtr = std::unique_ptr<EventTrackingDelegate>;
