@@ -120,7 +120,7 @@ TEST_P(ProxyProtoIntegrationTest, V2RouterRequestAndResponseWithBodyNoBufferV6) 
   EXPECT_EQ(found_counter->value(), 1UL);
   EXPECT_EQ(found_counter->tagExtractedName(), "downstream_proxy_proto.versions.found");
   EXPECT_THAT(found_counter->tags(), IsSupersetOf(Stats::TagVector{
-                                         {"envoy.proxy_protocol_version", "v2"},
+                                         {"envoy.proxy_protocol_version", "2"},
                                      }));
 }
 
@@ -404,7 +404,7 @@ TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V1Disallowed) {
   EXPECT_EQ(found_counter->value(), 1UL);
   EXPECT_EQ(found_counter->tagExtractedName(), "downstream_proxy_proto.versions.found");
   EXPECT_THAT(found_counter->tags(), IsSupersetOf(Stats::TagVector{
-                                         {"envoy.proxy_protocol_version", "v1"},
+                                         {"envoy.proxy_protocol_version", "1"},
                                      }));
 
   const auto disallowed_counter =
@@ -412,7 +412,7 @@ TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V1Disallowed) {
   EXPECT_EQ(disallowed_counter->value(), 1UL);
   EXPECT_EQ(disallowed_counter->tagExtractedName(), "downstream_proxy_proto.versions.disallowed");
   EXPECT_THAT(disallowed_counter->tags(), IsSupersetOf(Stats::TagVector{
-                                              {"envoy.proxy_protocol_version", "v1"},
+                                              {"envoy.proxy_protocol_version", "1"},
                                           }));
 }
 
@@ -435,7 +435,7 @@ TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V2Error) {
   EXPECT_EQ(found_counter->value(), 1UL);
   EXPECT_EQ(found_counter->tagExtractedName(), "downstream_proxy_proto.versions.error");
   EXPECT_THAT(found_counter->tags(), IsSupersetOf(Stats::TagVector{
-                                         {"envoy.proxy_protocol_version", "v2"},
+                                         {"envoy.proxy_protocol_version", "2"},
                                      }));
 }
 
