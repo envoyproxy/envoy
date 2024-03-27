@@ -20,6 +20,12 @@ behavior_changes:
     :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
     the cached assignment and finish updating the warmed cluster. This change temporarily disabled by setting
     the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to ``false``.
+- area: proxy_protocol
+  change: |
+    Use typed metadata by default in proxy protocol listener. Typed metadata can be consumed as
+    :ref:`TlvsMetadata type <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.TlvsMetadata>`. 
+    This change temporarily disabled by setting the runtime flag ``envoy.reloadable_features.use_typed_metadata_in_proxy_protol_listener`` 
+    to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
