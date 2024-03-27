@@ -175,7 +175,6 @@ build:mobile-remote-ci-common --config=rbe-engflow
 build:mobile-remote-ci-common --jobs=40
 build:mobile-remote-ci-common --verbose_failures
 build:mobile-remote-ci-common --spawn_strategy=remote,sandboxed,local
-build:mobile-remote-ci-common --features=-layering_check
 
 #############################################################################
 # mobile-remote-ci-linux: These options are linux-only using GCC by default
@@ -201,6 +200,7 @@ build:mobile-remote-ci-linux-clang --action_env=CXX=/opt/llvm/bin/clang++
 build:mobile-remote-ci-linux-clang --config=mobile-remote-ci-linux
 # Temporary revert to C++17 for mobile NDK builds.
 build:mobile-remote-ci-linux-clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+build:mobile-remote-ci-linux-clang --features=-layering_check
 
 #############################################################################
 # mobile-remote-ci-linux-asan: These options are Linux-only using Clang and AddressSanitizer
