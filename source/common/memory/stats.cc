@@ -114,11 +114,12 @@ AllocatorManager::AllocatorManager(
       memory_release_interval_msec_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(config, memory_release_interval, 1000))),
       allocator_manager_stats_(MemoryAllocatorManagerStats{
-          MEMORY_ALLOCATOR_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "tcmalloc."))}) {
+          MEMORY_ALLOCATOR_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "tcmalloc."))}),
+      api_(api) {
 #if defined(GPERFTOOLS_TCMALLOC)
   RELEASE_ASSERT((bytes_to_release_ == 0), "Memory releasing is not supported for gperf tcmalloc.");
 #elif defined(TCMALLOC)
-  configureBackgroundMemoryRelease(api);
+  configureBackgroundMemoryRelease();
 #endif
 };
 
@@ -144,10 +145,10 @@ void AllocatorManager::tcmallocRelease() {
  * Configures tcmalloc release rate from the page heap. If `bytes_to_release_`
  * has been initialized to `0`, no heap memory will be released in background.
  */
-void AllocatorManager::configureBackgroundMemoryRelease(Api::Api& api) {
+void AllocatorManager::configureBackgroundMemoryRelease() {
   RELEASE_ASSERT(!tcmalloc_thread_, "Invalid state, tcmalloc has already been initialised");
   if (bytes_to_release_ > 0) {
-    tcmalloc_routine_dispatcher_ = api.allocateDispatcher(std::string(TCMALLOC_ROUTINE_THREAD_ID));
+    tcmalloc_routine_dispatcher_ = api_.allocateDispatcher(std::string(TCMALLOC_ROUTINE_THREAD_ID));
     memory_release_timer_ = tcmalloc_routine_dispatcher_->createTimer([this]() -> void {
       const uint64_t unmapped_bytes_before_release = Stats::totalPageHeapUnmapped();
       tcmallocRelease();
@@ -161,7 +162,7 @@ void AllocatorManager::configureBackgroundMemoryRelease(Api::Api& api) {
       }
       memory_release_timer_->enableTimer(memory_release_interval_msec_);
     });
-    tcmalloc_thread_ = api.threadFactory().createThread(
+    tcmalloc_thread_ = api_.threadFactory().createThread(
         [this]() -> void {
           ENVOY_LOG_MISC(debug, "Started {}", TCMALLOC_ROUTINE_THREAD_ID);
           memory_release_timer_->enableTimer(memory_release_interval_msec_);

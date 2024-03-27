@@ -77,10 +77,11 @@ private:
   const uint64_t bytes_to_release_;
   const std::chrono::milliseconds memory_release_interval_msec_;
   MemoryAllocatorManagerStats allocator_manager_stats_;
+  Api::Api& api_;
   Thread::ThreadPtr tcmalloc_thread_;
   Event::DispatcherPtr tcmalloc_routine_dispatcher_;
   Event::TimerPtr memory_release_timer_;
-  void configureBackgroundMemoryRelease(Api::Api& api);
+  void configureBackgroundMemoryRelease();
   void tcmallocRelease();
   // Used for testing.
   friend class AllocatorManagerPeer;
