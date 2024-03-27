@@ -38,7 +38,7 @@ TEST_P(AdminInstanceTest, UnreadyTargetsDump) {
   EXPECT_CALL(listener_manager, listeners(_)).WillRepeatedly(Return(listeners));
 
   // Perform test twice - once with no params and once with empty params
-  // The second mirrors the behavior of call from the  admin UI landing page
+  // The second mirrors the behavior of call from the admin landing page
   EXPECT_EQ(Http::Code::OK, getCallback("/init_dump", header_map, response));
   EXPECT_EQ(Http::Code::OK, getCallback("/init_dump?mask=", header_map, response2));
   // The expected value should be updated when ProtobufTypes::MessagePtr
