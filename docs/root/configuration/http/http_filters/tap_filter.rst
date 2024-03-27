@@ -36,6 +36,7 @@ Example filter configuration:
     common_config:
       admin_config:
         config_id: test_config_id
+        max_concurrent_streams: 1
 
 The previous snippet configures the filter for control via the :http:post:`/tap` admin handler.
 See the following section for more details.
@@ -71,6 +72,7 @@ An example POST body:
 .. code-block:: yaml
 
   config_id: test_config_id
+  max_concurrent_streams: 1
   tap_config:
     match_config:
       and_match:
@@ -98,6 +100,7 @@ Another example POST body:
 .. code-block:: yaml
 
   config_id: test_config_id
+  max_concurrent_streams: 1
   tap_config:
     match_config:
       or_match:
@@ -125,6 +128,7 @@ Another example POST body:
 .. code-block:: yaml
 
   config_id: test_config_id
+  max_concurrent_streams: 1
   tap_config:
     match_config:
       any_match: true
@@ -140,6 +144,7 @@ Another example POST body:
 .. code-block:: yaml
 
   config_id: test_config_id
+  max_concurrent_streams: 1
   tap_config:
     match_config:
       and_match:
@@ -191,6 +196,7 @@ An example of a streaming admin tap configuration that uses the :ref:`JSON_BODY_
 .. code-block:: yaml
 
   config_id: test_config_id
+  max_concurrent_streams: 1
   tap_config:
     match_config:
       any_match: true
@@ -226,6 +232,7 @@ An example of a buffered admin tap configuration:
 .. code-block:: yaml
 
   config_id: test_config_id
+  max_concurrent_streams: 1
   tap_config:
     match_config:
       any_match: true

@@ -203,6 +203,7 @@ typed_config:
   common_config:
     admin_config:
       config_id: test_config_id
+      max_concurrent_streams: 2
 )EOF";
 
   IntegrationCodecClientPtr admin_client_;
