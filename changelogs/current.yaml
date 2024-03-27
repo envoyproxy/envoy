@@ -245,10 +245,6 @@ new_features:
   change: |
     Update ``aws_lambda`` filter to support use as an upstream HTTP filter. This allows successful calculation of
     signatures after the forwarding stage has completed, particularly if the path element is modified.
-- area: aws_lambda
-  change: |
-    Refactor aws_lambda configuration to make signer part of filter setting. This allows to add signature algorithm and
-    other providers configurations.
 - area: grpc reverse bridge
   change: |
     Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter
