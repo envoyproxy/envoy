@@ -13,7 +13,6 @@
 #include "library/common/types/managed_envoy_headers.h"
 #include "library/jni/android_network_utility.h"
 #include "library/jni/import/jni_import.h"
-#include "library/jni/jni_support.h"
 #include "library/jni/jni_utility.h"
 #include "library/jni/types/exception.h"
 #include "library/jni/types/java_virtual_machine.h"
@@ -31,27 +30,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
   return Envoy::JNI::JavaVirtualMachine::getJNIVersion();
 }
 
-// JniLibrary
-
-static void jvm_on_track(envoy_map events, const void* context) {
-  if (context == nullptr) {
-    return;
-  }
-
-  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
-  Envoy::JNI::LocalRefUniquePtr<jobject> events_hashmap =
-      Envoy::JNI::envoyMapToJavaMap(jni_helper, events);
-
-  jobject j_context = static_cast<jobject>(const_cast<void*>(context));
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_EnvoyEventTracker =
-      jni_helper.getObjectClass(j_context);
-  jmethodID jmid_onTrack =
-      jni_helper.getMethodId(jcls_EnvoyEventTracker.get(), "track", "(Ljava/util/Map;)V");
-  jni_helper.callVoidMethod(j_context, jmid_onTrack, events_hashmap.get());
-
-  release_envoy_map(events);
-}
-
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jclass, jint level) {
   Envoy::Logger::Context::changeAllLogLevels(static_cast<spdlog::level::level_enum>(level));
@@ -59,61 +37,84 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jc
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(
     JNIEnv* env, jclass, jobject on_start_context, jobject envoy_logger_context,
-    jobject j_event_tracker) {
-
-  jobject retained_on_start_context =
-      env->NewGlobalRef(on_start_context); // Required to keep context in memory
+    jobject event_tracker_context) {
+  //================================================================================================
+  // EngineCallbacks
+  //================================================================================================
   std::unique_ptr<Envoy::EngineCallbacks> callbacks = std::make_unique<Envoy::EngineCallbacks>();
-  callbacks->on_engine_running = [retained_on_start_context] {
-    Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
-    Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmonEngineRunningContext =
-        jni_helper.getObjectClass(retained_on_start_context);
-    jmethodID jmid_onEngineRunning = jni_helper.getMethodId(
-        jcls_JvmonEngineRunningContext.get(), "invokeOnEngineRunning", "()Ljava/lang/Object;");
-    Envoy::JNI::LocalRefUniquePtr<jobject> unused =
-        jni_helper.callObjectMethod(retained_on_start_context, jmid_onEngineRunning);
+  if (on_start_context != nullptr) {
+    jobject retained_on_start_context =
+        env->NewGlobalRef(on_start_context); // Required to keep context in memory
+    callbacks->on_engine_running = [retained_on_start_context] {
+      Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
+      Envoy::JNI::LocalRefUniquePtr<jclass> java_on_engine_running_class =
+          jni_helper.getObjectClass(retained_on_start_context);
+      jmethodID java_on_engine_running_method_id = jni_helper.getMethodId(
+          java_on_engine_running_class.get(), "invokeOnEngineRunning", "()Ljava/lang/Object;");
+      Envoy::JNI::LocalRefUniquePtr<jobject> unused =
+          jni_helper.callObjectMethod(retained_on_start_context, java_on_engine_running_method_id);
 
-    // TODO(goaway): This isn't re-used by other engine callbacks, so it's safe to delete here.
-    // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
-    jni_helper.getEnv()->DeleteGlobalRef(retained_on_start_context);
-  };
-  callbacks->on_exit = [] {
-    // Note that this is not dispatched because the thread that
-    // needs to be detached is the engine thread.
-    // This function is called from the context of the engine's
-    // thread due to it being posted to the engine's event dispatcher.
-    Envoy::JNI::JavaVirtualMachine::detachCurrentThread();
-  };
-
-  const jobject retained_logger_context = env->NewGlobalRef(envoy_logger_context);
+      // TODO(goaway): This isn't re-used by other engine callbacks, so it's safe to delete here.
+      // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
+      jni_helper.getEnv()->DeleteGlobalRef(retained_on_start_context);
+    };
+    callbacks->on_exit = [] {
+      // Note that this is not dispatched because the thread that
+      // needs to be detached is the engine thread.
+      // This function is called from the context of the engine's
+      // thread due to it being posted to the engine's event dispatcher.
+      Envoy::JNI::JavaVirtualMachine::detachCurrentThread();
+    };
+  }
+  //================================================================================================
+  // EnvoyLogger
+  //================================================================================================
   std::unique_ptr<Envoy::EnvoyLogger> logger = std::make_unique<Envoy::EnvoyLogger>();
-  logger->on_log = [retained_logger_context](Envoy::Logger::Logger::Levels level,
-                                             const std::string& message) {
-    Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
-    Envoy::JNI::LocalRefUniquePtr<jstring> java_message = jni_helper.newStringUtf(message.c_str());
-    jint java_level = static_cast<jint>(level);
-    Envoy::JNI::LocalRefUniquePtr<jclass> java_envoy_logger_class =
-        jni_helper.getObjectClass(retained_logger_context);
-    jmethodID java_log_method_id =
-        jni_helper.getMethodId(java_envoy_logger_class.get(), "log", "(ILjava/lang/String;)V");
-    jni_helper.callVoidMethod(retained_logger_context, java_log_method_id, java_level,
-                              java_message.get());
-  };
-  logger->on_exit = [retained_logger_context] {
-    Envoy::JNI::getEnv()->DeleteGlobalRef(retained_logger_context);
-  };
-
-  envoy_event_tracker event_tracker = {nullptr, nullptr};
-  if (j_event_tracker != nullptr) {
-    // TODO(goaway): The retained_context leaks, but it's tied to the life of the engine.
-    // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332.
-    jobject retained_context = env->NewGlobalRef(j_event_tracker);
-    event_tracker.track = jvm_on_track;
-    event_tracker.context = retained_context;
+  if (envoy_logger_context != nullptr) {
+    const jobject retained_logger_context = env->NewGlobalRef(envoy_logger_context);
+    logger->on_log = [retained_logger_context](Envoy::Logger::Logger::Levels level,
+                                               const std::string& message) {
+      Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
+      Envoy::JNI::LocalRefUniquePtr<jstring> java_message =
+          jni_helper.newStringUtf(message.c_str());
+      jint java_level = static_cast<jint>(level);
+      Envoy::JNI::LocalRefUniquePtr<jclass> java_envoy_logger_class =
+          jni_helper.getObjectClass(retained_logger_context);
+      jmethodID java_log_method_id =
+          jni_helper.getMethodId(java_envoy_logger_class.get(), "log", "(ILjava/lang/String;)V");
+      jni_helper.callVoidMethod(retained_logger_context, java_log_method_id, java_level,
+                                java_message.get());
+    };
+    logger->on_exit = [retained_logger_context] {
+      Envoy::JNI::getEnv()->DeleteGlobalRef(retained_logger_context);
+    };
+  }
+  //================================================================================================
+  // EnvoyEventTracker
+  //================================================================================================
+  std::unique_ptr<Envoy::EnvoyEventTracker> event_tracker =
+      std::make_unique<Envoy::EnvoyEventTracker>();
+  if (event_tracker_context != nullptr) {
+    const jobject retained_event_tracker_context = env->NewGlobalRef(event_tracker_context);
+    event_tracker->on_track = [retained_event_tracker_context](
+                                  const absl::flat_hash_map<std::string, std::string>& events) {
+      Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
+      Envoy::JNI::LocalRefUniquePtr<jobject> java_events =
+          Envoy::JNI::cppMapToJavaMap(jni_helper, events);
+      Envoy::JNI::LocalRefUniquePtr<jclass> java_envoy_event_tracker_class =
+          jni_helper.getObjectClass(retained_event_tracker_context);
+      jmethodID java_track_method_id = jni_helper.getMethodId(java_envoy_event_tracker_class.get(),
+                                                              "track", "(Ljava/util/Map;)V");
+      jni_helper.callVoidMethod(retained_event_tracker_context, java_track_method_id,
+                                java_events.get());
+    };
+    event_tracker->on_exit = [retained_event_tracker_context] {
+      Envoy::JNI::getEnv()->DeleteGlobalRef(retained_event_tracker_context);
+    };
   }
 
   return reinterpret_cast<intptr_t>(
-      new Envoy::InternalEngine(std::move(callbacks), std::move(logger), event_tracker));
+      new Envoy::InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker)));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(

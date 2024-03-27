@@ -359,15 +359,6 @@ static envoy_data ios_get_string(const void *context) {
   return toManagedNativeString(accessor.getEnvoyString());
 }
 
-static void ios_track_event(envoy_map map, const void *context) {
-  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
-  // is necessary to act as a breaker for any Objective-C allocation that happens.
-  @autoreleasepool {
-    EnvoyEventTracker *eventTracker = (__bridge EnvoyEventTracker *)context;
-    eventTracker.track(to_ios_map(map));
-  }
-}
-
 @implementation EnvoyEngineImpl {
   envoy_engine_t _engineHandle;
   Envoy::InternalEngine *_engine;
@@ -414,18 +405,24 @@ static void ios_track_event(envoy_map map, const void *context) {
     };
   }
 
-  // TODO(Augustyniak): Everything here leaks, but it's all tied to the life of the engine.
-  // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332.
-  envoy_event_tracker native_event_tracker = {NULL, NULL};
+  std::unique_ptr<Envoy::EnvoyEventTracker> native_event_tracker =
+      std::make_unique<Envoy::EnvoyEventTracker>();
   if (eventTracker) {
-    EnvoyEventTracker *objcEventTracker =
-        [[EnvoyEventTracker alloc] initWithEventTrackingClosure:eventTracker];
-    native_event_tracker.track = ios_track_event;
-    native_event_tracker.context = CFBridgingRetain(objcEventTracker);
+    native_event_tracker->on_track =
+        [eventTracker =
+             std::move(eventTracker)](const absl::flat_hash_map<std::string, std::string> &events) {
+          NSMutableDictionary *newMap = [NSMutableDictionary new];
+          for (const auto &[cppKey, cppValue] : events) {
+            NSString *key = @(cppKey.c_str());
+            NSString *value = @(cppValue.c_str());
+            newMap[key] = value;
+          }
+          eventTracker(newMap);
+        };
   }
 
   _engine = new Envoy::InternalEngine(std::move(native_callbacks), std::move(native_logger),
-                                      native_event_tracker);
+                                      std::move(native_event_tracker));
   _engineHandle = reinterpret_cast<envoy_engine_t>(_engine);
 
   if (networkMonitoringMode == 1) {
