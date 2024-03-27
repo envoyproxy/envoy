@@ -198,6 +198,10 @@ bug_fixes:
     specifies the lifetime of the refresh token. The default value is ``604800`` seconds (a week).
 - area: admin
   change: |
+    Fixed a bug where the config_dump & init_dump admin endpoint would return an empty response when called with empty
+    query parameters (e.g. ``/config_dump?resource=&mask=&name_regex=``).
+- area: admin
+  change: |
     Removing the ECDS config entry from the config dump when it does not exist (or has expired).
 
 removed_config_or_runtime:
