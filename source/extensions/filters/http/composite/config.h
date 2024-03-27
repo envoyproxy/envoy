@@ -22,13 +22,14 @@ namespace Composite {
  * Config registration for the composite filter. @see NamedHttpFilterConfigFactory.
  */
 class CompositeFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::composite::v3::Composite> {
+    : public Common::DualFactoryBase<envoy::extensions::filters::http::composite::v3::Composite> {
 public:
-  CompositeFilterFactory() : FactoryBase("envoy.filters.http.composite") {}
+  CompositeFilterFactory() : DualFactoryBase("envoy.filters.http.composite") {}
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::composite::v3::Composite& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, DualInfo dual_info,
+      Server::Configuration::ServerFactoryContext& context) override;
 
   Server::Configuration::MatchingRequirementsPtr matchingRequirements() override {
     auto requirements = std::make_unique<
@@ -48,7 +49,10 @@ public:
   }
 };
 
+using UpstreamCompositeFilterFactory = CompositeFilterFactory;
+
 DECLARE_FACTORY(CompositeFilterFactory);
+DECLARE_FACTORY(UpstreamCompositeFilterFactory);
 
 } // namespace Composite
 } // namespace HttpFilters

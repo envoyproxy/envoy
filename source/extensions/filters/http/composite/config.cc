@@ -10,13 +10,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 
-Http::FilterFactoryCb CompositeFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> CompositeFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::composite::v3::Composite&,
-    const std::string& stat_prefix, Server::Configuration::FactoryContext& factory_context) {
+    const std::string& stat_prefix, DualInfo dual_info,
+    Server::Configuration::ServerFactoryContext&) {
 
   const auto& prefix = stat_prefix + "composite.";
-  auto stats = std::make_shared<FilterStats>(FilterStats{
-      ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_PREFIX(factory_context.scope(), prefix))});
+  auto stats = std::make_shared<FilterStats>(
+      FilterStats{ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_PREFIX(dual_info.scope, prefix))});
 
   return [stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(*stats, callbacks.dispatcher());
@@ -29,6 +30,8 @@ Http::FilterFactoryCb CompositeFilterFactory::createFilterFactoryFromProtoTyped(
  * Static registration for the composite filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(CompositeFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamCompositeFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace Composite
 } // namespace HttpFilters

@@ -69,8 +69,10 @@ using HttpMatchingDataImplSharedPtr = std::shared_ptr<HttpMatchingDataImpl>;
 struct HttpFilterActionContext {
   const std::string& stat_prefix_;
   OptRef<Server::Configuration::FactoryContext> factory_context_;
+  OptRef<Server::Configuration::UpstreamFactoryContext> upstream_factory_context_;
   OptRef<Server::Configuration::ServerFactoryContext> server_factory_context_;
 };
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy
