@@ -45,7 +45,6 @@ message ProxyProtocol {
 
   message TlvsMetadata {
     // Typed metadata for :ref:`Proxy protocol filter <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol>`, that represents map of TLVs.
-    // This metadata can be accessed by proxy protocol namespace key ``.
     // Each entry in the map consists of a key (TLV type) and value (TLV value in bytes).
     // When runtime flag ``envoy.reloadable_features.use_typed_metadata_in_proxy_protol_listener`` is enabled,
     //  :ref:`Proxy protocol filter <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol>`
@@ -60,7 +59,7 @@ message ProxyProtocol {
   //
   // .. attention::
   //
-  //   This breaks conformance with the specification_.
+  //   This breaks conformance with the specification.
   //   Only enable if ALL traffic to the listener comes from a trusted source.
   //   For more information on the security implications of this feature, see
   //   https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt

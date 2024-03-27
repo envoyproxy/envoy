@@ -836,7 +836,11 @@ public:
    */
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
 
-  // todo add comments
+  /**
+   * @param name the namespace used in the metadata in reverse DNS format, for example:
+   * envoy.test.my_filter.
+   * @param value of type protobuf any to set on the namespace.
+   */
   virtual void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) PURE;
 
   /**
