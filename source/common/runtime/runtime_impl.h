@@ -30,6 +30,7 @@
 #include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/status/statusor.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -214,12 +215,12 @@ using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;
  */
 class LoaderImpl : public Loader, Logger::Loggable<Logger::Id::runtime> {
 public:
-  LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
-             const envoy::config::bootstrap::v3::LayeredRuntime& config,
-             const LocalInfo::LocalInfo& local_info, Stats::Store& store,
-             Random::RandomGenerator& generator,
-             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-             absl::Status& creation_status);
+  static absl::StatusOr<std::unique_ptr<LoaderImpl>>
+  create(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+         const envoy::config::bootstrap::v3::LayeredRuntime& config,
+         const LocalInfo::LocalInfo& local_info, Stats::Store& store,
+         Random::RandomGenerator& generator, ProtobufMessage::ValidationVisitor& validation_visitor,
+         Api::Api& api);
 
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;
@@ -232,7 +233,13 @@ public:
 
 private:
   friend RtdsSubscription;
+  LoaderImpl(ThreadLocal::SlotAllocator& tls,
+             const envoy::config::bootstrap::v3::LayeredRuntime& config,
+             const LocalInfo::LocalInfo& local_info, Stats::Store& store,
+             Random::RandomGenerator& generator, Api::Api& api);
 
+  absl::Status initLayers(Event::Dispatcher& dispatcher,
+                          ProtobufMessage::ValidationVisitor& validation_visitor);
   // Create a new Snapshot
   absl::StatusOr<SnapshotImplPtr> createNewSnapshot();
   // Load a new Snapshot into TLS

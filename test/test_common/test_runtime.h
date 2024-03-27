@@ -43,13 +43,11 @@ public:
     // The existence of an admin layer is required for mergeValues() to work.
     config.add_layers()->mutable_admin_layer();
 
-    absl::Status creation_status;
-    Runtime::LoaderPtr runtime_ptr = std::make_unique<Runtime::LoaderImpl>(
-        dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_,
-        creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
+        dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
     // This will ignore values set in test, but just use flag defaults!
-    runtime_ = std::move(runtime_ptr);
+    runtime_ = std::move(loader.value());
   }
 
   Runtime::Loader& loader() { return *runtime_; }
@@ -88,13 +86,11 @@ public:
     }
     runtime->mutable_static_layer()->MergeFrom(envoy_layer);
 
-    absl::Status creation_status;
-    Runtime::LoaderPtr runtime_ptr = std::make_unique<Runtime::LoaderImpl>(
-        dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_,
-        creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
+        dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
     // This will ignore values set in test, but just use flag defaults!
-    runtime_ = std::move(runtime_ptr);
+    runtime_ = std::move(loader.value());
   }
 
 protected:
