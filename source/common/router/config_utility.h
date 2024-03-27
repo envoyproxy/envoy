@@ -31,7 +31,8 @@ public:
   // equivalent of the QueryParameterMatcher proto in the RDS v2 API.
   class QueryParameterMatcher {
   public:
-    QueryParameterMatcher(const envoy::config::route::v3::QueryParameterMatcher& config);
+    QueryParameterMatcher(const envoy::config::route::v3::QueryParameterMatcher& config,
+                          Server::Configuration::CommonFactoryContext& context);
 
     /**
      * Check if the query parameters for a request contain a match for this

@@ -24,6 +24,7 @@ envoy_cc_library(
         "codec_callbacks.h",
     ],
     deps = [
+        ":route_interface",
         ":stream_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/network:drain_decision_interface",

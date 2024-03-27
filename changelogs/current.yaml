@@ -51,6 +51,11 @@ minor_behavior_changes:
   change: |
     Make each upstream connection to read as many as 32 packets in each event loop. This feature can be disabled by setting
     ``envoy.reloadable_features.quic_upstream_reads_fixed_number_packets`` to false.
+- area: stats
+  change: |
+    ``thread_local_cluster_manager.worker_0.*`` metrics are now parsed to use the
+    ``worker_id`` tag like other metrics with ``worker_id`` do, when
+    :ref:`use_all_default_tags <envoy_v3_api_field_config.metrics.v3.StatsConfig.use_all_default_tags>` is true.
 - area: aws
   change: |
     AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
@@ -195,6 +200,9 @@ bug_fixes:
   change: |
     Fixed a bug where the config_dump & init_dump admin endpoint would return an empty response when called with empty
     query parameters (e.g. ``/config_dump?resource=&mask=&name_regex=``).
+- area: admin
+  change: |
+    Removing the ECDS config entry from the config dump when it does not exist (or has expired).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -365,10 +373,25 @@ new_features:
     Update ``aws_request_signing`` filter to support optionally sending the aws signature in query parameters rather than headers,
     by specifying the :ref:`query_string <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string>`
     configuration section.
+- area: formatters
+  change: |
+    Added :ref:`formatters <envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.formatters>`
+    to Fluentd access logger to allow adding extension commands when formatter access logs.
 - area: rbac
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
     to allow adding custom prefix to the stats emitted by rules.
+- area: tracing
+  change: |
+    Dynatrace sampler fetches configuration from Dynatrace API.
+- area: cors
+  change: |
+    Added :ref:`configuration option <envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.forward_not_matching_preflights>`
+    to return local response when CORS preflight's origin does not match allowed origin.
+- area: ext_authz
+  change: |
+    Added support for populating the :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`
+    check request attribute for network ext_authz by setting :ref:`include_tls_session <config_network_filters_ext_authz>` to true.
 
 deprecated:
 - area: listener

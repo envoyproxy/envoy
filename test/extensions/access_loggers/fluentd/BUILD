@@ -48,6 +48,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/access_loggers/fluentd:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/formatter/cel:config",
         "//test/integration:integration_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",

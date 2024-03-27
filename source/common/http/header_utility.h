@@ -69,7 +69,8 @@ public:
   // to match in a request's header, specified in the header_match_type_ member.
   // It is the runtime equivalent of the HeaderMatchSpecifier proto in RDS API.
   struct HeaderData : public HeaderMatcher {
-    HeaderData(const envoy::config::route::v3::HeaderMatcher& config);
+    HeaderData(const envoy::config::route::v3::HeaderMatcher& config,
+               Server::Configuration::CommonFactoryContext& factory_context);
 
     const LowerCaseString name_;
     HeaderMatchType header_match_type_;
@@ -93,10 +94,11 @@ public:
    * Build a vector of HeaderDataPtr given input config.
    */
   static std::vector<HeaderUtility::HeaderDataPtr> buildHeaderDataVector(
-      const Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher>& header_matchers) {
+      const Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher>& header_matchers,
+      Server::Configuration::CommonFactoryContext& context) {
     std::vector<HeaderUtility::HeaderDataPtr> ret;
     for (const auto& header_matcher : header_matchers) {
-      ret.emplace_back(std::make_unique<HeaderUtility::HeaderData>(header_matcher));
+      ret.emplace_back(std::make_unique<HeaderUtility::HeaderData>(header_matcher, context));
     }
     return ret;
   }
@@ -105,10 +107,11 @@ public:
    * Build a vector of HeaderMatcherSharedPtr given input config.
    */
   static std::vector<Http::HeaderMatcherSharedPtr> buildHeaderMatcherVector(
-      const Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher>& header_matchers) {
+      const Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher>& header_matchers,
+      Server::Configuration::CommonFactoryContext& context) {
     std::vector<Http::HeaderMatcherSharedPtr> ret;
     for (const auto& header_matcher : header_matchers) {
-      ret.emplace_back(std::make_shared<HeaderUtility::HeaderData>(header_matcher));
+      ret.emplace_back(std::make_shared<HeaderUtility::HeaderData>(header_matcher, context));
     }
     return ret;
   }

@@ -9,8 +9,8 @@
 
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
+#include "library/common/engine_types.h"
 #include "library/common/http/client.h"
-#include "library/common/internal_engine_types.h"
 #include "library/common/logger/logger_delegate.h"
 #include "library/common/network/connectivity_manager.h"
 #include "library/common/types/c_types.h"
@@ -25,8 +25,8 @@ public:
    * @param logger, the callbacks to use for engine logging.
    * @param event_tracker, the event tracker to use for the emission of events.
    */
-  InternalEngine(std::unique_ptr<InternalEngineCallbacks> callbacks, envoy_logger logger,
-                 envoy_event_tracker event_tracker);
+  InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
+                 std::unique_ptr<EnvoyEventTracker> event_tracker);
 
   /**
    * InternalEngine destructor.
@@ -122,8 +122,9 @@ public:
 private:
   GTEST_FRIEND_CLASS(InternalEngineTest, ThreadCreationFailed);
 
-  InternalEngine(std::unique_ptr<InternalEngineCallbacks> callbacks, envoy_logger logger,
-                 envoy_event_tracker event_tracker, Thread::PosixThreadFactoryPtr thread_factory);
+  InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
+                 std::unique_ptr<EnvoyEventTracker> event_tracker,
+                 Thread::PosixThreadFactoryPtr thread_factory);
 
   envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
@@ -133,9 +134,9 @@ private:
   Event::Dispatcher* event_dispatcher_{};
   Stats::ScopeSharedPtr client_scope_;
   Stats::StatNameSetPtr stat_name_set_;
-  std::unique_ptr<InternalEngineCallbacks> callbacks_;
-  envoy_logger logger_;
-  envoy_event_tracker event_tracker_;
+  std::unique_ptr<EngineCallbacks> callbacks_;
+  std::unique_ptr<EnvoyLogger> logger_;
+  std::unique_ptr<EnvoyEventTracker> event_tracker_;
   Assert::ActionRegistrationPtr assert_handler_registration_;
   Assert::ActionRegistrationPtr bug_handler_registration_;
   Thread::MutexBasicLockable mutex_;

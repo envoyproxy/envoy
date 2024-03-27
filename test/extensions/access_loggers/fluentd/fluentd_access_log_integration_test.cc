@@ -35,7 +35,8 @@ public:
             absl::optional<uint32_t> buffer_size_bytes = absl::nullopt,
             absl::optional<uint32_t> max_connect_attempts = 1,
             absl::optional<uint64_t> base_backoff_interval = absl::nullopt,
-            absl::optional<uint64_t> max_backoff_interval = absl::nullopt) {
+            absl::optional<uint64_t> max_backoff_interval = absl::nullopt,
+            absl::optional<std::string> formatter_type = absl::nullopt) {
     setUpstreamCount(2);
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier(
@@ -89,6 +90,23 @@ public:
           auto* record = access_log_config.mutable_record();
           (*record->mutable_fields())["Message"].set_string_value("SomeValue");
           (*record->mutable_fields())["LogType"].set_string_value("%ACCESS_LOG_TYPE%");
+
+          if (formatter_type.has_value()) {
+            std::string cel_key = "%CEL(connection.mtls)%";
+            (*record->mutable_fields())["FromFormatterIsDownstreamMtls"].set_string_value(cel_key);
+
+            const std::string yaml = fmt::format(R"EOF(
+                name: envoy.formatter.metadata
+                typed_config:
+                  "@type": type.googleapis.com/{}
+            )EOF",
+                                                 formatter_type.value());
+
+            auto* formatter = access_log_config.add_formatters();
+            envoy::config::core::v3::TypedExtensionConfig proto;
+            TestUtility::loadFromYaml(yaml, proto);
+            *formatter = proto;
+          }
 
           access_log->mutable_typed_config()->PackFrom(access_log_config);
           config_blob->PackFrom(tcp_proxy_config);
@@ -164,6 +182,13 @@ TEST_F(FluentdAccessLogIntegrationTest, InvalidBackoffConfig) {
   EXPECT_DEATH(init(default_cluster_name, false, 1, 1, 30, 20), "");
 }
 
+TEST_F(FluentdAccessLogIntegrationTest, InvalidUnknownFormatter) {
+  EXPECT_THROW_WITH_REGEX(
+      init(default_cluster_name, false, 1, 1, 20, 30, "envoy.extensions.formatter.Unknown"),
+      EnvoyException,
+      ".*could not find @type 'type.googleapis.com/envoy.extensions.formatter.Unknown'.*");
+}
+
 TEST_F(FluentdAccessLogIntegrationTest, LogLostOnBufferFull) {
   init(default_cluster_name, false, /* max_buffer_size = */ 0);
   sendBidirectionalData();
@@ -186,6 +211,27 @@ TEST_F(FluentdAccessLogIntegrationTest, SingleEntrySingleRecord) {
     bool validated = false;
     validateFluentdPayload(tcp_data, &validated,
                            {{"{\"Message\":\"SomeValue\",\"LogType\":\"TcpConnectionEnd\"}"}});
+    return validated;
+  }));
+}
+
+TEST_F(FluentdAccessLogIntegrationTest, SingleEntrySingleRecordWithFormatter) {
+  init(default_cluster_name, false, 1, 1, 20, 30, "envoy.extensions.formatter.cel.v3.Cel");
+  sendBidirectionalData();
+
+  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_buffered", 1);
+  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.events_sent", 1);
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_));
+  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 1);
+  test_server_->waitForGaugeEq("cluster.fluentd_cluster.upstream_cx_active", 1);
+
+  // Using CEL for formatter validation with sample use case.
+  EXPECT_TRUE(fake_access_log_connection_->waitForData([&](const std::string& tcp_data) -> bool {
+    bool validated = false;
+    validateFluentdPayload(tcp_data, &validated,
+                           {{"{\"FromFormatterIsDownstreamMtls\":\"false\","
+                             "\"Message\":\"SomeValue\",\"LogType\":\"TcpConnectionEnd\"}"}});
     return validated;
   }));
 }

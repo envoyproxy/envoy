@@ -50,7 +50,8 @@ class RouteEntryImplBase : public RouteEntry,
                            public Route,
                            public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
-  RouteEntryImplBase(const envoy::extensions::filters::network::thrift_proxy::v3::Route& route);
+  RouteEntryImplBase(const envoy::extensions::filters::network::thrift_proxy::v3::Route& route,
+                     Server::Configuration::CommonFactoryContext& context);
 
   void validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
   // Router::RouteEntry
@@ -162,7 +163,8 @@ using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBas
 class MethodNameRouteEntryImpl : public RouteEntryImplBase {
 public:
   MethodNameRouteEntryImpl(
-      const envoy::extensions::filters::network::thrift_proxy::v3::Route& route);
+      const envoy::extensions::filters::network::thrift_proxy::v3::Route& route,
+      Server::Configuration::CommonFactoryContext& context);
 
   // RouteEntryImplBase
   RouteConstSharedPtr matches(const MessageMetadata& metadata,
@@ -176,7 +178,8 @@ private:
 class ServiceNameRouteEntryImpl : public RouteEntryImplBase {
 public:
   ServiceNameRouteEntryImpl(
-      const envoy::extensions::filters::network::thrift_proxy::v3::Route& route);
+      const envoy::extensions::filters::network::thrift_proxy::v3::Route& route,
+      Server::Configuration::CommonFactoryContext& context);
 
   // RouteEntryImplBase
   RouteConstSharedPtr matches(const MessageMetadata& metadata,
@@ -192,7 +195,8 @@ public:
   // validation_clusters = absl::nullopt means that clusters are not validated.
   RouteMatcher(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
-      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters);
+      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters,
+      Server::Configuration::CommonFactoryContext& context);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 
