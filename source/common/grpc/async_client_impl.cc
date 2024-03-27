@@ -142,13 +142,17 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
 void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
   decoded_frames_.clear();
   auto status = decoder_.decode(data, decoded_frames_);
-  if (status.code() == absl::StatusCode::kInternal) {
-    streamError(Status::WellKnownGrpcStatus::Internal);
-    return;
-  }
 
+  // decode() currently only returns two types of error:
+  // - decoding error is mapped to ResourceExhausted
+  // - over-limit error is mapped to Internal.
+  // Other potential future errors in the future are mapped to internel for now.
   if (status.code() == absl::StatusCode::kResourceExhausted) {
     streamError(Status::WellKnownGrpcStatus::ResourceExhausted);
+    return;
+  }
+  if (status.code() != absl::StatusCode::kOk) {
+    streamError(Status::WellKnownGrpcStatus::Internal);
     return;
   }
 

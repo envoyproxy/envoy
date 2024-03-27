@@ -102,7 +102,7 @@ TEST(GrpcCodecTest, decodeInvalidFrame) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  EXPECT_FALSE(decoder.decode(buffer, frames).ok());
+  EXPECT_EQ(decoder.decode(buffer, frames).code(), absl::StatusCode::kInternal);
   EXPECT_EQ(size, buffer.length());
 }
 
@@ -117,7 +117,7 @@ TEST(GrpcCodecTest, DecodeMultipleFramesInvalid) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  EXPECT_FALSE(decoder.decode(buffer, frames).ok());
+  EXPECT_EQ(decoder.decode(buffer, frames).code(), absl::StatusCode::kInternal);
   // When the decoder doesn't successfully decode, it puts decoded frames up until
   // an invalid frame into output frame vector.
   EXPECT_EQ(1, frames.size());
@@ -146,7 +146,7 @@ TEST(GrpcCodecTest, DecodeValidFrameWithInvalidFrameAfterward) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  EXPECT_FALSE(decoder.decode(buffer, frames).ok());
+  EXPECT_EQ(decoder.decode(buffer, frames).code(), absl::StatusCode::kInternal);
   // When the decoder doesn't successfully decode, it puts valid frames up until
   // an invalid frame into output frame vector.
   EXPECT_EQ(1, frames.size());
