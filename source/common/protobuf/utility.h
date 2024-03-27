@@ -224,7 +224,7 @@ public:
 
   // std::equals_to
   bool operator()(const Protobuf::Message& lhs, const Protobuf::Message& rhs) const {
-    return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
+    return Protobuf::util::MessageDifferencer::Equals(lhs, rhs);
   }
 
   class FileExtensionValues {
