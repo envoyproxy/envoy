@@ -1,6 +1,5 @@
 import Envoy
 import EnvoyEngine
-import EnvoyTestServer
 import Foundation
 import TestExtensions
 import XCTest
@@ -12,21 +11,61 @@ final class ResetConnectivityStateTest: XCTestCase {
   }
 
   func testResetConnectivityState() {
-    EnvoyTestServer.startHttp1PlaintextServer()
-    let port = String(EnvoyTestServer.getEnvoyPort())
-
-    let engine = EngineBuilder()
+    // swiftlint:disable:next line_length
+    let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
+    // swiftlint:disable:next line_length
+    let assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+    let config =
+"""
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
+static_resources:
+  listeners:
+  - name: base_api_listener
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    api_listener:
+      api_listener:
+        "@type": \(emhcmType)
+        config:
+          stat_prefix: hcm
+          route_config:
+            name: api_router
+            virtual_hosts:
+              - name: api
+                domains:
+                  - "*"
+                routes:
+                  - match:
+                      prefix: "/"
+                    direct_response:
+                      status: 200
+          http_filters:
+            - name: envoy.filters.http.assertion
+              typed_config:
+                "@type": \(assertionFilterType)
+                match_config:
+                  http_request_headers_match:
+                    headers:
+                      - name: ":authority"
+                        exact_match: example.com
+            - name: envoy.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+"""
+    let engine = EngineBuilder(yaml: config)
       .addLogLevel(.debug)
-      .addNativeFilter(
-        name: "envoy.filters.http.assertion",
-        // swiftlint:disable:next line_length
-        typedConfig: "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion\",match_config: {http_request_headers_match: {patterns: [{string_match: \"localhost\"}]}}}")
       .build()
 
     let client = engine.streamClient()
 
-    let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
-                                               authority: "localhost:" + port, path: "/test")
+    let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
+                                               authority: "example.com", path: "/test")
       .build()
 
     let expectation1 =
@@ -68,6 +107,5 @@ final class ResetConnectivityStateTest: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [expectation2], timeout: 10), .completed)
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
   }
 }
