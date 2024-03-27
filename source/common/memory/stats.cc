@@ -117,8 +117,9 @@ AllocatorManager::AllocatorManager(
           MEMORY_ALLOCATOR_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "tcmalloc."))}) {
 #if defined(GPERFTOOLS_TCMALLOC)
   RELEASE_ASSERT((bytes_to_release_ == 0), "Memory releasing is not supported for gperf tcmalloc.");
-#endif
+#elif defined(TCMALLOC)
   configureBackgroundMemoryRelease(api);
+#endif
 };
 
 AllocatorManager::~AllocatorManager() {
@@ -144,7 +145,6 @@ void AllocatorManager::tcmallocRelease() {
  * has been initialized to `0`, no heap memory will be released in background.
  */
 void AllocatorManager::configureBackgroundMemoryRelease(Api::Api& api) {
-#if defined(TCMALLOC)
   RELEASE_ASSERT(!tcmalloc_thread_, "Invalid state, tcmalloc has already been initialised");
   if (bytes_to_release_ > 0) {
     tcmalloc_routine_dispatcher_ = api.allocateDispatcher(std::string(TCMALLOC_ROUTINE_THREAD_ID));
@@ -173,7 +173,6 @@ void AllocatorManager::configureBackgroundMemoryRelease(Api::Api& api) {
                   "Configured tcmalloc with background release rate: {} bytes per {} milliseconds",
                   bytes_to_release_, memory_release_interval_msec_.count()));
   }
-#endif
 }
 
 } // namespace Memory
