@@ -50,13 +50,13 @@ TEST_F(UtilsTest, QueryParam) {
   EXPECT_EQ("value", query_.getFirstValue("key").value());
 }
 
-TEST_F(UtilsTest, NotEmptyQueryParam) {
-  EXPECT_FALSE(Utility::notEmptyQueryParam(query_, "key").has_value());
+TEST_F(UtilsTest, NonEmptyQueryParam) {
+  EXPECT_FALSE(Utility::nonEmptyQueryParam(query_, "key").has_value());
   query_.overwrite("key", "");
-  EXPECT_FALSE(Utility::notEmptyQueryParam(query_, "key").has_value());
+  EXPECT_FALSE(Utility::nonEmptyQueryParam(query_, "key").has_value());
   query_.overwrite("key", "value");
-  EXPECT_TRUE(Utility::notEmptyQueryParam(query_, "key").has_value());
-  EXPECT_EQ("value", Utility::notEmptyQueryParam(query_, "key").value());
+  EXPECT_TRUE(Utility::nonEmptyQueryParam(query_, "key").has_value());
+  EXPECT_EQ("value", Utility::nonEmptyQueryParam(query_, "key").value());
 }
 
 } // namespace Server
