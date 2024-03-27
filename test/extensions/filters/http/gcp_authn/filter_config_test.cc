@@ -29,6 +29,34 @@ TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithCorrectProto) {
         base_interval: 0.1s
         max_interval: 32s
       num_retries: 5
+    audience_provider: CLUSTER_METADATA
+  )EOF";
+  GcpAuthnFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  GcpAuthnFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
+TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithAudienceHeaderProto) {
+  std::string filter_config_yaml = R"EOF(
+    http_uri:
+      uri: http://test/path
+      cluster: test_cluster
+      timeout:
+        seconds: 5
+    retry_policy:
+      retry_back_off:
+        base_interval: 0.1s
+        max_interval: 32s
+      num_retries: 5
+    audience_provider: REQUEST_HEADER
+    audience_header: header_name
   )EOF";
   GcpAuthnFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);

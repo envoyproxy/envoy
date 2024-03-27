@@ -39,6 +39,22 @@ constexpr char DefaultConfig[] = R"EOF(
         base_interval: 1s
         max_interval: 10s
       num_retries: 5
+    audience_provider: CLUSTER_METADATA
+  )EOF";
+
+constexpr char RequestHeaderAudienceProviderConfig[] = R"EOF(
+    http_uri:
+      uri: http://testhost/path/test
+      cluster: test_cluster
+      timeout:
+        seconds: 5
+    retry_policy:
+      retry_back_off:
+        base_interval: 1s
+        max_interval: 10s
+      num_retries: 5
+    audience_provider: REQUEST_HEADER
+    audience_header: audience
   )EOF";
 
 class GcpAuthnFilterTest : public testing::Test {
@@ -71,11 +87,11 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
-  void setupMockFilterMetadata(bool valid) {
+  void setupMockFilterMetadata(bool set_audience_metadata) {
     // Set up mock filter metadata.
     cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
-    if (valid) {
+    if (set_audience_metadata) {
       envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
       audience.set_url("test");
 
@@ -114,6 +130,11 @@ public:
   FilterConfigSharedPtr filter_config_;
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl headers_with_audience_{{":method", "GET"},
+                                                        {":path", "/"},
+                                                        {":scheme", "http"},
+                                                        {":authority", "host"},
+                                                        {"audience", "test"}};
   envoy::config::core::v3::Metadata metadata_;
 };
 
@@ -225,7 +246,7 @@ TEST_F(GcpAuthnFilterTest, NoFilterMetadata) {
   setupMockObjects();
   setupFilterAndCallback();
   // Set up mock filter metadata.
-  setupMockFilterMetadata(/*valid=*/false);
+  setupMockFilterMetadata(/*set_audience_metadata=*/false);
   // decodeHeaders() is expected to return `Continue` because no filter metadata is specified
   // in configuration.
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
@@ -236,7 +257,7 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIteration) {
   setupMockObjects();
   setupFilterAndCallback();
   // Set up mock filter metadata.
-  setupMockFilterMetadata(/*valid=*/true);
+  setupMockFilterMetadata(/*set_audience_metadata=*/true);
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
@@ -255,12 +276,68 @@ TEST_F(GcpAuthnFilterTest, DestroyFilter) {
   setupMockObjects();
   setupFilterAndCallback();
   // Set up mock filter metadata.
-  setupMockFilterMetadata(/*valid=*/true);
+  setupMockFilterMetadata(/*set_audience_metadata=*/true);
 
   // decodeHeaders() is expected to return `StopAllIterationAndWatermark` and state is expected to
   // be in `Calling` state because none of complete functions(i.e., onSuccess, onFailure, onDestroy,
   // etc) has been called.
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  EXPECT_EQ(filter_->state(), GcpAuthnFilter::State::Calling);
+  filter_->onDestroy();
+  // onDestroy() call is expected to update the state from `Calling` to `Complete`.
+  EXPECT_EQ(filter_->state(), GcpAuthnFilter::State::Complete);
+}
+
+class GcpAuthnFilterAudienceFromHeadersTest : public GcpAuthnFilterTest {
+public:
+  GcpAuthnFilterAudienceFromHeadersTest() {
+    GcpAuthnFilterConfig config;
+    TestUtility::loadFromYaml(RequestHeaderAudienceProviderConfig, config);
+    overrideConfig(config);
+  }
+};
+
+TEST_F(GcpAuthnFilterAudienceFromHeadersTest, NoAudienceRequestHeader) {
+  setupMockObjects();
+  setupFilterAndCallback();
+  // Set up mock filter metadata.
+  setupMockFilterMetadata(/*set_audience_metadata=*/false);
+  // decodeHeaders() is expected to return `Continue` because no filter metadata is specified
+  // in the request header.
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter_->stats().retrieve_audience_failed_.value(), 1);
+}
+
+TEST_F(GcpAuthnFilterAudienceFromHeadersTest, ResumeFilterChainIteration) {
+  setupMockObjects();
+  setupFilterAndCallback();
+  // Set up mock filter metadata.
+  setupMockFilterMetadata(/*set_audience_metadata=*/false);
+
+  EXPECT_EQ(filter_->decodeHeaders(headers_with_audience_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  // continueDecoding() is expected to be called to resume the filter chain iteration after
+  // onSuccess().
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
+TEST_F(GcpAuthnFilterAudienceFromHeadersTest, DestroyFilter) {
+  setupMockObjects();
+  setupFilterAndCallback();
+  // Set up mock filter metadata.
+  setupMockFilterMetadata(/*set_audience_metadata=*/false);
+
+  // decodeHeaders() is expected to return `StopAllIterationAndWatermark` and state is expected to
+  // be in `Calling` state because none of complete functions(i.e., onSuccess, onFailure, onDestroy,
+  // etc) has been called.
+  EXPECT_EQ(filter_->decodeHeaders(headers_with_audience_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
   EXPECT_EQ(filter_->state(), GcpAuthnFilter::State::Calling);
   filter_->onDestroy();

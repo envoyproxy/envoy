@@ -46,8 +46,10 @@ public:
     }
   }
 
-  void initializeConfig(bool add_audience, bool configure_token_header = false) {
-    config_helper_.addConfigModifier([this, add_audience, configure_token_header](
+  void initializeConfig(bool add_audience, bool configure_token_header = false,
+                        bool configure_audience_from_headers = false) {
+    config_helper_.addConfigModifier([this, add_audience, configure_token_header,
+                                      configure_audience_from_headers](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* gcp_authn_cluster = bootstrap.mutable_static_resources()->add_clusters();
       gcp_authn_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -67,7 +69,14 @@ public:
                 .PackFrom(audience);
       }
 
-      TestUtility::loadFromYaml(default_config_, proto_config_);
+      // Set the config to either read the audience URL from a request header or
+      // from metadata on the cluster..
+      if (configure_audience_from_headers) {
+        TestUtility::loadFromYaml(request_header_audience_provider_config_, proto_config_);
+      } else {
+        TestUtility::loadFromYaml(default_config_, proto_config_);
+      }
+
       // Set token_header in the config.
       if (configure_token_header) {
         proto_config_.mutable_token_header()->mutable_name()->append("service-to-service-auth");
@@ -91,8 +100,11 @@ public:
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
     if (send_request_body) {
       response_ = codec_client_->makeRequestWithBody(
-          Http::TestRequestHeaderMapImpl{
-              {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}},
+          Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                         {":path", "/"},
+                                         {":scheme", "http"},
+                                         {":authority", "host"},
+                                         {"audience", std::string(AudienceValue)}},
           "test");
     } else {
       response_ = codec_client_->makeHeaderOnlyRequest(
@@ -102,7 +114,8 @@ public:
                                          {":authority", "host"},
                                          // Add a pair with `Authorization` as the key for
                                          // verification of header map overridden behavior.
-                                         {"Authorization", "test"}});
+                                         {"Authorization", "test"},
+                                         {"audience", std::string(AudienceValue)}});
     }
   }
 
@@ -207,6 +220,18 @@ public:
         seconds: 5
     cache_config:
       cache_size: 100
+    audience_provider: CLUSTER_METADATA
+  )EOF";
+  const std::string request_header_audience_provider_config_ = R"EOF(
+    http_uri:
+      uri: "gcp_authn:9000"
+      cluster: gcp_authn
+      timeout:
+        seconds: 5
+    cache_config:
+      cache_size: 100
+    audience_provider: REQUEST_HEADER
+    audience_header: audience
   )EOF";
   envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig proto_config_{};
 };
@@ -295,6 +320,27 @@ TEST_P(GcpAuthnFilterIntegrationTest, SendRequestWithBody) {
   RELEASE_ASSERT(!assert_result, assert_result.message());
   // Clean up the codec and connections.
   cleanup();
+}
+
+TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithAudienceFromHeader) {
+  initializeConfig(/*add_audience=*/false, /*configure_token_header=*/false,
+                   /*configure_audience_from_headers=*/true);
+  HttpIntegrationTest::initialize();
+  int num = 2;
+  // Send multiple requests.
+  for (int i = 0; i < num; ++i) {
+    initiateClientConnection();
+    // Send the request to cluster `gcp_authn`.
+    waitForGcpAuthnServerResponse();
+    // Send the request to cluster `cluster_0` and validate the response.
+    sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
+    // Clean up the codec and connections.
+    cleanup();
+  }
+
+  // Verify request has been routed to both upstream clusters.
+  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), num);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), num);
 }
 
 } // namespace

@@ -21,7 +21,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.gcp_authn]
 
 // Filter configuration.
+// [#next-free-field: 7]
 message GcpAuthnFilterConfig {
+  enum AudienceProvider {
+    // The audience will be set on the cluster's typed_filter_metadata.
+    CLUSTER_METADATA = 0;
+
+    // The audience will be set from the value of a specified request header.
+    REQUEST_HEADER = 1;
+  }
+
   // The HTTP URI to fetch tokens from GCE Metadata Server(https://cloud.google.com/compute/docs/metadata/overview).
   // The URL format is "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
   config.core.v3.HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
@@ -35,6 +44,22 @@ message GcpAuthnFilterConfig {
   // Request header location to extract the token. By default (i.e. if this field is not specified), the token
   // is extracted to the Authorization HTTP header, in the format "Authorization: Bearer <token>".
   TokenHeader token_header = 4;
+
+  // Config for where to retrieve the audience URL of the receiving service that
+  // performs token authentication.
+  // Defaults to CLUSTER_METADATA.
+  AudienceProvider audience_provider = 5 [(validate.rules).enum = {defined_only: true}];
+
+  // Setting this is required when the audience provider is
+  // :ref:`REQUEST_HEADER<envoy_api_enum_value_GcpAuthnFilterConfig.AudienceProvider.REQUEST_HEADER>`.
+  //
+  // The value of this request header will be used as the audience URL of the
+  // receiving service.
+  //
+  // .. note::
+  //
+  //   If the header appears multiple times only the first value is used.
+  string audience_header = 6;
 }
 
 // Audience is the URL of the receiving service that performs token authentication.

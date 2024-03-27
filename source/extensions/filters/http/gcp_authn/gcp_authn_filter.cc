@@ -41,19 +41,36 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   state_ = State::Calling;
   initiating_call_ = true;
 
-  Envoy::Upstream::ThreadLocalCluster* cluster =
-      context_.serverFactoryContext().clusterManager().getThreadLocalCluster(
-          route->routeEntry()->clusterName());
+  switch (filter_config_->audience_provider()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig::CLUSTER_METADATA: {
+    Envoy::Upstream::ThreadLocalCluster* cluster =
+        context_.serverFactoryContext().clusterManager().getThreadLocalCluster(
+            route->routeEntry()->clusterName());
 
-  if (cluster != nullptr) {
-    // The `audience` is passed to filter through cluster metadata.
-    auto filter_metadata = cluster->info()->metadata().typed_filter_metadata();
-    const auto filter_it = filter_metadata.find(std::string(FilterName));
-    if (filter_it != filter_metadata.end()) {
-      envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-      THROW_IF_NOT_OK(MessageUtil::unpackTo(filter_it->second, audience));
-      audience_str_ = audience.url();
+    if (cluster != nullptr) {
+      // The `audience` is passed to filter through cluster metadata.
+      auto filter_metadata = cluster->info()->metadata().typed_filter_metadata();
+      const auto filter_it = filter_metadata.find(std::string(FilterName));
+      if (filter_it != filter_metadata.end()) {
+        envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+        THROW_IF_NOT_OK(MessageUtil::unpackTo(filter_it->second, audience));
+        audience_str_ = audience.url();
+      }
     }
+    break;
+  }
+  case envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig::REQUEST_HEADER: {
+    const auto& audience_header = filter_config_->audience_header();
+    if (!audience_header.empty()) {
+      const auto header = hdrs.get(Http::LowerCaseString(audience_header));
+      if (!header.empty()) {
+        // Per the API documentation only the first value is used.
+        audience_str_ = header[0]->value().getStringView();
+      }
+    }
+    break;
+  }
   }
 
   if (!audience_str_.empty()) {
