@@ -212,9 +212,8 @@ TagNameValues::TagNameValues() {
   // http.<stat_prefix>.rbac.(<rules_stat_prefix>.)*
   addTokenized(RBAC_HTTP_PREFIX, "http.*.rbac.$.**");
 
-  // downstream_proxy_proto.versions.v(<version>).**
-  addRe2(PROXY_PROTOCOL_VERSION, R"(^downstream_proxy_proto\.(versions\.v(\d)\.)\w+)",
-         "downstream_proxy_proto.versions");
+  // proxy_proto.(versions.v<version_number>.)**
+  addRe2(PROXY_PROTOCOL_VERSION, R"(^proxy_proto\.(versions\.v(\d)\.)\w+)", "proxy_proto.versions");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,

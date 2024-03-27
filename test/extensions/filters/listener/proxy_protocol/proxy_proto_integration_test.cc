@@ -116,9 +116,9 @@ TEST_P(ProxyProtoIntegrationTest, V2RouterRequestAndResponseWithBodyNoBufferV6) 
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 
   // Verify stats (with tags for proxy protocol version).
-  const auto found_counter = test_server_->counter("downstream_proxy_proto.versions.v2.found");
+  const auto found_counter = test_server_->counter("proxy_proto.versions.v2.found");
   EXPECT_EQ(found_counter->value(), 1UL);
-  EXPECT_EQ(found_counter->tagExtractedName(), "downstream_proxy_proto.versions.found");
+  EXPECT_EQ(found_counter->tagExtractedName(), "proxy_proto.found");
   EXPECT_THAT(found_counter->tags(), IsSupersetOf(Stats::TagVector{
                                          {"envoy.proxy_protocol_version", "2"},
                                      }));
@@ -400,17 +400,16 @@ TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V1Disallowed) {
   tcp_client->waitForDisconnect();
 
   // Verify stats (with tags for proxy protocol version).
-  const auto found_counter = test_server_->counter("downstream_proxy_proto.versions.v1.found");
+  const auto found_counter = test_server_->counter("proxy_proto.versions.v1.found");
   EXPECT_EQ(found_counter->value(), 1UL);
-  EXPECT_EQ(found_counter->tagExtractedName(), "downstream_proxy_proto.versions.found");
+  EXPECT_EQ(found_counter->tagExtractedName(), "proxy_proto.found");
   EXPECT_THAT(found_counter->tags(), IsSupersetOf(Stats::TagVector{
                                          {"envoy.proxy_protocol_version", "1"},
                                      }));
 
-  const auto disallowed_counter =
-      test_server_->counter("downstream_proxy_proto.versions.v1.disallowed");
+  const auto disallowed_counter = test_server_->counter("proxy_proto.versions.v1.disallowed");
   EXPECT_EQ(disallowed_counter->value(), 1UL);
-  EXPECT_EQ(disallowed_counter->tagExtractedName(), "downstream_proxy_proto.versions.disallowed");
+  EXPECT_EQ(disallowed_counter->tagExtractedName(), "proxy_proto.disallowed");
   EXPECT_THAT(disallowed_counter->tags(), IsSupersetOf(Stats::TagVector{
                                               {"envoy.proxy_protocol_version", "1"},
                                           }));
@@ -431,9 +430,9 @@ TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V2Error) {
   tcp_client->waitForDisconnect();
 
   // Verify stats (with tags for proxy protocol version).
-  const auto found_counter = test_server_->counter("downstream_proxy_proto.versions.v2.error");
+  const auto found_counter = test_server_->counter("proxy_proto.versions.v2.error");
   EXPECT_EQ(found_counter->value(), 1UL);
-  EXPECT_EQ(found_counter->tagExtractedName(), "downstream_proxy_proto.versions.error");
+  EXPECT_EQ(found_counter->tagExtractedName(), "proxy_proto.error");
   EXPECT_THAT(found_counter->tags(), IsSupersetOf(Stats::TagVector{
                                          {"envoy.proxy_protocol_version", "2"},
                                      }));
