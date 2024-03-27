@@ -138,10 +138,10 @@ public:
 
     // StreamFilterCallbacks
     Envoy::Event::Dispatcher& dispatcher() override { return parent_.dispatcher(); }
-    const CodecFactory& downstreamCodec() override { return parent_.downstreamCodec(); }
-    const RouteEntry* routeEntry() const override { return parent_.routeEntry(); }
+    const CodecFactory& codecFactory() override { return parent_.codecFactory(); }
+    const RouteEntry* routeEntry() const override { return parent_.routeEntry().ptr(); }
     const RouteSpecificFilterConfig* perFilterConfig() const override {
-      if (const auto* entry = parent_.routeEntry(); entry != nullptr) {
+      if (const auto entry = parent_.routeEntry(); entry.has_value()) {
         return entry->perFilterConfig(context_.config_name);
       }
       return nullptr;
@@ -243,10 +243,9 @@ public:
   void initializeFilterChain(FilterChainFactory& factory);
 
   Envoy::Event::Dispatcher& dispatcher();
-  const CodecFactory& downstreamCodec();
+  const CodecFactory& codecFactory();
   void resetStream(DownstreamStreamResetReason reason);
   StreamInfo::StreamInfoImpl& streamInfo() { return stream_info_; }
-  const RouteEntry* routeEntry() const { return cached_route_entry_.get(); }
 
   void sendLocalReply(Status status, absl::string_view data, ResponseUpdateFunction func);
   void continueDecoding();
@@ -264,6 +263,9 @@ public:
 
   // ResponseEncoderCallback
   void onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) override;
+  OptRef<const RouteEntry> routeEntry() const override {
+    return makeOptRefFromPtr<const RouteEntry>(cached_route_entry_.get());
+  }
 
   void onRequestFrame(StreamFramePtr frame);
 

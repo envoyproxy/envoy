@@ -499,9 +499,9 @@ protected:
   void applyLastOrDefaultConfig(std::shared_ptr<FilterConfigSubscription>& subscription,
                                 DynamicFilterConfigProviderImplBase& provider,
                                 const std::string& filter_config_name);
-  void validateProtoConfigDefaultFactory(const bool null_default_factory,
-                                         const std::string& filter_config_name,
-                                         absl::string_view type_url) const;
+  absl::Status validateProtoConfigDefaultFactory(const bool null_default_factory,
+                                                 const std::string& filter_config_name,
+                                                 absl::string_view type_url) const;
   void validateProtoConfigTypeUrl(const std::string& type_url,
                                   const absl::flat_hash_set<std::string>& require_type_urls) const;
   // Return the config dump map key string for the corresponding ECDS filter type.
@@ -631,8 +631,8 @@ protected:
                    bool last_filter_in_filter_chain, const std::string& filter_chain_type,
                    const absl::flat_hash_set<std::string>& require_type_urls) const {
     auto* default_factory = Config::Utility::getFactoryByType<Factory>(proto_config);
-    validateProtoConfigDefaultFactory(default_factory == nullptr, filter_config_name,
-                                      proto_config.type_url());
+    THROW_IF_NOT_OK(validateProtoConfigDefaultFactory(default_factory == nullptr,
+                                                      filter_config_name, proto_config.type_url()));
     validateProtoConfigTypeUrl(Config::Utility::getFactoryType(proto_config), require_type_urls);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         proto_config, server_context.messageValidationVisitor(), *default_factory);

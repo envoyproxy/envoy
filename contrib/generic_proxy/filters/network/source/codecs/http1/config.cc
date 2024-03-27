@@ -635,7 +635,7 @@ Http::Http1::CallbackResult Http1ClientCodec::onMessageCompleteImpl() {
 
 CodecFactoryPtr
 Http1CodecFactoryConfig::createCodecFactory(const Protobuf::Message& config,
-                                            Envoy::Server::Configuration::FactoryContext&) {
+                                            Envoy::Server::Configuration::ServerFactoryContext&) {
   const auto& typed_config = dynamic_cast<const ProtoConfig&>(config);
 
   return std::make_unique<Http1CodecFactory>(

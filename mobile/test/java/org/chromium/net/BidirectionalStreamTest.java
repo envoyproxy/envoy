@@ -831,6 +831,7 @@ public class BidirectionalStreamTest {
     callback.blockForDone();
     assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
     assertEquals(userAgentValue, callback.mResponseAsString);
+    engine.shutdown();
   }
 
   @Test

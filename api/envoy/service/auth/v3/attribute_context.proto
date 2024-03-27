@@ -187,7 +187,11 @@ message AttributeContext {
   config.core.v3.Metadata route_metadata_context = 13;
 
   // TLS session details of the underlying connection.
-  // This is not populated by default and will be populated if ext_authz filter's
-  // :ref:`include_tls_session <config_http_filters_ext_authz>` is set to true.
+  // This is not populated by default and will be populated only if the ext_authz filter has
+  // been specifically configured to include this information.
+  // For HTTP ext_authz, that requires :ref:`include_tls_session <config_http_filters_ext_authz>`
+  // to be set to true.
+  // For network ext_authz, that requires :ref:`include_tls_session <config_network_filters_ext_authz>`
+  // to be set to true.
   TLSSession tls_session = 12;
 }

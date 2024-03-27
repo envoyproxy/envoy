@@ -186,6 +186,11 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setEventTracker(std::unique_ptr<EnvoyEventTracker> event_tracker) {
+  event_tracker_ = std::move(event_tracker);
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addConnectTimeoutSeconds(int connect_timeout_seconds) {
   connect_timeout_seconds_ = connect_timeout_seconds;
   return *this;
@@ -916,10 +921,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  envoy_event_tracker null_tracker{};
-
   InternalEngine* envoy_engine =
-      new InternalEngine(std::move(callbacks_), std::move(logger_), null_tracker);
+      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_));
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

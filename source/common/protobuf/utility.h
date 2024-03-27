@@ -367,7 +367,7 @@ public:
    *
    * @throw EnvoyException if the message does not unpack.
    */
-  static void unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
+  static void unpackToOrThrow(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
 
   /**
    * Convert from google.protobuf.Any to a typed message. This should be used
@@ -378,8 +378,7 @@ public:
    *
    * @return absl::Status
    */
-  static absl::Status unpackToNoThrow(const ProtobufWkt::Any& any_message,
-                                      Protobuf::Message& message);
+  static absl::Status unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
 
   /**
    * Convert from google.protobuf.Any to bytes as std::string
@@ -390,12 +389,12 @@ public:
   static std::string anyToBytes(const ProtobufWkt::Any& any) {
     if (any.Is<ProtobufWkt::StringValue>()) {
       ProtobufWkt::StringValue s;
-      MessageUtil::unpackTo(any, s);
+      MessageUtil::unpackToOrThrow(any, s);
       return s.value();
     }
     if (any.Is<ProtobufWkt::BytesValue>()) {
       Protobuf::BytesValue b;
-      MessageUtil::unpackTo(any, b);
+      MessageUtil::unpackToOrThrow(any, b);
       return b.value();
     }
     return any.value();
@@ -409,7 +408,7 @@ public:
    */
   template <class MessageType>
   static inline void anyConvert(const ProtobufWkt::Any& message, MessageType& typed_message) {
-    unpackTo(message, typed_message);
+    unpackToOrThrow(message, typed_message);
   };
 
   template <class MessageType>
