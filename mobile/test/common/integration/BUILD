@@ -156,6 +156,7 @@ envoy_cc_test_library(
     deps = [
         ":base_client_integration_test_lib",
         "@envoy//source/common/config:api_version_lib",
+        "@envoy//source/common/http:rds_lib",
         "@envoy//test/test_common:environment_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
