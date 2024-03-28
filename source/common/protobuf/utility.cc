@@ -852,10 +852,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     return;
   }
 
-#ifdef ENVOY_ENABLE_YAML
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
-#endif
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
     if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
       return;
@@ -863,14 +861,17 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
 #endif
     throwEnvoyExceptionOrPanic("Unable to parse file \"" + path + "\" as a text protobuf (type " +
                                message.GetTypeName() + ")");
-#ifdef ENVOY_ENABLE_YAML
   }
+#ifdef ENVOY_ENABLE_YAML
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
       absl::EndsWithIgnoreCase(path, FileExtensions::get().Yml)) {
     loadFromYaml(contents, message, validation_visitor);
   } else {
     loadFromJson(contents, message, validation_visitor);
   }
+#else
+  throwEnvoyExceptionOrPanic("Unable to parse file \"" + path + "\" (type " +
+                             message.GetTypeName() + ")");
 #endif
 }
 
