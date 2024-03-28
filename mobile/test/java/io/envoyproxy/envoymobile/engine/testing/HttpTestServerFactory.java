@@ -33,7 +33,7 @@ public final class HttpTestServerFactory {
     public native void shutdown();
   }
 
-  static { System.loadLibrary("envoy_jni_http_test_server"); }
+  static { System.loadLibrary("envoy_jni_http_test_server_factory"); }
 
   /**
    * Starts the server and returns the instance of the {@link HttpTestServer}. This server will

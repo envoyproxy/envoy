@@ -28,7 +28,7 @@ android_library(
         "HttpTestServerFactory.java",
     ],
     data = [
-        "//test/jni:libenvoy_jni_http_test_server.so",
+        "//test/jni:libenvoy_jni_http_test_server_factory.so",
     ],
     visibility = ["//test:__subpackages__"],
     deps = [

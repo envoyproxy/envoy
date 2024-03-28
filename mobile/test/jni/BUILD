@@ -38,10 +38,10 @@ cc_library(
 
 # Library which contains JNI functions for the HttpTestServer.
 cc_library(
-    name = "jni_http_test_server_lib",
+    name = "jni_http_test_server_factory_lib",
     testonly = True,
     srcs = [
-        "jni_http_test_server.cc",
+        "jni_http_test_server_factory.cc",
     ],
     linkopts = select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
@@ -58,11 +58,11 @@ cc_library(
 )
 
 cc_binary(
-    name = "libenvoy_jni_http_test_server.so",
+    name = "libenvoy_jni_http_test_server_factory.so",
     testonly = True,
     linkshared = True,
     deps = [
-        ":jni_http_test_server_lib",
+        ":jni_http_test_server_factory_lib",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
 )
