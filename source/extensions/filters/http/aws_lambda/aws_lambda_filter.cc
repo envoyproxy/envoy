@@ -116,32 +116,16 @@ bool isContentTypeTextual(const Http::RequestOrResponseHeaderMap& headers) {
 } // namespace
 
 // TODO(nbaws) Implement Sigv4a support
-Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
-               const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer,
-               bool is_upstream)
-    : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer), is_upstream_(is_upstream) {}
+Filter::Filter(const FilterSettingsSharedPtr& settings, const FilterStats& stats, bool is_upstream)
+    : settings_(settings), stats_(stats), is_upstream_(is_upstream) {}
 
-absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
-  const auto* settings =
-      Http::Utility::resolveMostSpecificPerFilterConfig<FilterSettings>(decoder_callbacks_);
-  if (!settings) {
-    return absl::nullopt;
+FilterSettings& Filter::getSettings() {
+  auto* settings = const_cast<FilterSettings*>(
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterSettings>(decoder_callbacks_));
+  if (settings) {
+    return *settings;
   }
-
-  return *settings;
-}
-
-void Filter::resolveSettings() {
-  if (auto route_settings = getRouteSpecificSettings()) {
-    payload_passthrough_ = route_settings->payloadPassthrough();
-    invocation_mode_ = route_settings->invocationMode();
-    arn_ = route_settings->arn();
-    host_rewrite_ = route_settings->hostRewrite();
-  } else {
-    payload_passthrough_ = settings_.payloadPassthrough();
-    invocation_mode_ = settings_.invocationMode();
-    host_rewrite_ = settings_.hostRewrite();
-  }
+  return *settings_;
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
@@ -154,20 +138,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  resolveSettings();
-
-  if (!arn_) {
-    arn_ = settings_.arn();
-  }
+  auto& settings = getSettings();
 
   if (!end_stream) {
     request_headers_ = &headers;
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  if (payload_passthrough_) {
-    setLambdaHeaders(headers, arn_, invocation_mode_, host_rewrite_);
-    sigv4_signer_->signEmptyPayload(headers, arn_->region());
+  if (settings.payloadPassthrough()) {
+    setLambdaHeaders(headers, settings.arn(), settings.invocationMode(), settings.hostRewrite());
+    settings.signer().signEmptyPayload(headers, settings.arn().region());
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -175,12 +155,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   jsonizeRequest(headers, nullptr, json_buf);
   // We must call setLambdaHeaders *after* the JSON transformation of the request. That way we
   // reflect the actual incoming request headers instead of the overwritten ones.
-  setLambdaHeaders(headers, arn_, invocation_mode_, host_rewrite_);
+  setLambdaHeaders(headers, settings.arn(), settings.invocationMode(), settings.hostRewrite());
   headers.setContentLength(json_buf.length());
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hash = Hex::encode(hashing_util.getSha256Digest(json_buf));
-  sigv4_signer_->sign(headers, hash, arn_->region());
+  settings.signer().sign(headers, hash, settings.arn().region());
   decoder_callbacks_->addDecodedData(json_buf, false);
   return Http::FilterHeadersStatus::Continue;
 }
@@ -223,7 +203,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
 
-  if (!payload_passthrough_) {
+  auto& settings = getSettings();
+
+  if (!settings.payloadPassthrough()) {
     decoder_callbacks_->modifyDecodingBuffer([this](Buffer::Instance& dec_buf) {
       Buffer::OwnedImpl json_buf;
       jsonizeRequest(*request_headers_, &dec_buf, json_buf);
@@ -235,15 +217,18 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     request_headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   }
 
-  setLambdaHeaders(*request_headers_, arn_, invocation_mode_, host_rewrite_);
+  setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(),
+                   settings.hostRewrite());
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
-  sigv4_signer_->sign(*request_headers_, hash, arn_->region());
+  settings.signer().sign(*request_headers_, hash, settings.arn().region());
   stats().upstream_rq_payload_size_.recordValue(decoding_buffer.length());
   return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (skip_ || payload_passthrough_ || invocation_mode_ == InvocationMode::Asynchronous) {
+  auto& settings = getSettings();
+  if (skip_ || settings.payloadPassthrough() ||
+      settings.invocationMode() == InvocationMode::Asynchronous) {
     return Http::FilterDataStatus::Continue;
   }
 

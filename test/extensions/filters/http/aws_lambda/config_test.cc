@@ -40,7 +40,7 @@ invocation_mode: asynchronous
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
     auto filter = std::static_pointer_cast<Filter>(stream_filter);
-    const auto settings = filter->settingsForTest();
+    const auto& settings = filter->settingsForTest();
     return settings.payloadPassthrough() &&
            settings.invocationMode() == InvocationMode::Asynchronous;
   };
@@ -69,7 +69,7 @@ arn: "arn:aws:lambda:region:424242:function:fun"
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
     auto filter = std::static_pointer_cast<Filter>(stream_filter);
-    const auto settings = filter->settingsForTest();
+    const auto& settings = filter->settingsForTest();
     return settings.payloadPassthrough() == false &&
            settings.invocationMode() == InvocationMode::Synchronous;
   };
