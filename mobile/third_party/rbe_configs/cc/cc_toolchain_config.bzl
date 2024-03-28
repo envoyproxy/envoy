@@ -31,62 +31,63 @@ load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 def layering_check_features(compiler):
     if compiler != "clang":
         return []
-    return [
-        feature(
-            name = "use_module_maps",
-            requires = [feature_set(features = ["module_maps"])],
-            flag_sets = [
-                flag_set(
-                    actions = [
-                        ACTION_NAMES.c_compile,
-                        ACTION_NAMES.cpp_compile,
-                        ACTION_NAMES.cpp_header_parsing,
-                        ACTION_NAMES.cpp_module_compile,
-                    ],
-                    flag_groups = [
-                        flag_group(
-                            flags = [
-                                "-fmodule-name=%{module_name}",
-                                "-fmodule-map-file=%{module_map_file}",
-                            ],
-                        ),
-                    ],
-                ),
-            ],
-        ),
+    return []
+    # return [
+    #     feature(
+    #         name = "use_module_maps",
+    #         requires = [feature_set(features = ["module_maps"])],
+    #         flag_sets = [
+    #             flag_set(
+    #                 actions = [
+    #                     ACTION_NAMES.c_compile,
+    #                     ACTION_NAMES.cpp_compile,
+    #                     ACTION_NAMES.cpp_header_parsing,
+    #                     ACTION_NAMES.cpp_module_compile,
+    #                 ],
+    #                 flag_groups = [
+    #                     flag_group(
+    #                         flags = [
+    #                             "-fmodule-name=%{module_name}",
+    #                             "-fmodule-map-file=%{module_map_file}",
+    #                         ],
+    #                     ),
+    #                 ],
+    #             ),
+    #         ],
+    #     ),
 
-        # Tell blaze we support module maps in general, so they will be generated
-        # for all c/c++ rules.
-        # Note: not all C++ rules support module maps; thus, do not imply this
-        # feature from other features - instead, require it.
-        feature(name = "module_maps", enabled = True),
-        feature(
-            name = "layering_check",
-            implies = ["use_module_maps"],
-            flag_sets = [
-                flag_set(
-                    actions = [
-                        ACTION_NAMES.c_compile,
-                        ACTION_NAMES.cpp_compile,
-                        ACTION_NAMES.cpp_header_parsing,
-                        ACTION_NAMES.cpp_module_compile,
-                    ],
-                    flag_groups = [
-                        flag_group(flags = [
-                            "-fmodules-strict-decluse",
-                            "-Wprivate-header",
-                        ]),
-                        flag_group(
-                            iterate_over = "dependent_module_map_files",
-                            flags = [
-                                "-fmodule-map-file=%{dependent_module_map_files}",
-                            ],
-                        ),
-                    ],
-                ),
-            ],
-        ),
-    ]
+    #     # Tell blaze we support module maps in general, so they will be generated
+    #     # for all c/c++ rules.
+    #     # Note: not all C++ rules support module maps; thus, do not imply this
+    #     # feature from other features - instead, require it.
+    #     feature(name = "module_maps", enabled = True),
+    #     feature(
+    #         name = "layering_check",
+    #         implies = ["use_module_maps"],
+    #         flag_sets = [
+    #             flag_set(
+    #                 actions = [
+    #                     ACTION_NAMES.c_compile,
+    #                     ACTION_NAMES.cpp_compile,
+    #                     ACTION_NAMES.cpp_header_parsing,
+    #                     ACTION_NAMES.cpp_module_compile,
+    #                 ],
+    #                 flag_groups = [
+    #                     flag_group(flags = [
+    #                         "-fmodules-strict-decluse",
+    #                         "-Wprivate-header",
+    #                     ]),
+    #                     flag_group(
+    #                         iterate_over = "dependent_module_map_files",
+    #                         flags = [
+    #                             "-fmodule-map-file=%{dependent_module_map_files}",
+    #                         ],
+    #                     ),
+    #                 ],
+    #             ),
+    #         ],
+    #     ),
+    # ]
 
 all_compile_actions = [
     ACTION_NAMES.c_compile,
