@@ -14,6 +14,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",
+        "@envoy//source/common/common:assert_lib",
         "@envoy_build_config//:test_extensions",
     ],
 )

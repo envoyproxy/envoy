@@ -26,7 +26,7 @@ public:
    * @param event_tracker, the event tracker to use for the emission of events.
    */
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
-                 envoy_event_tracker event_tracker);
+                 std::unique_ptr<EnvoyEventTracker> event_tracker);
 
   /**
    * InternalEngine destructor.
@@ -62,32 +62,16 @@ public:
   // to http client functions of the same name after doing a dispatcher post
   // (thread context switch)
   envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
-                             bool explicit_flow_control) {
-    return dispatcher_->post([&, stream, bridge_callbacks, explicit_flow_control]() {
-      http_client_->startStream(stream, bridge_callbacks, explicit_flow_control);
-    });
-  }
-  envoy_status_t sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream) {
-    return dispatcher_->post([&, stream, headers, end_stream]() {
-      http_client_->sendHeaders(stream, headers, end_stream);
-    });
-  }
-  envoy_status_t readData(envoy_stream_t stream, size_t bytes_to_read) {
-    return dispatcher_->post(
-        [&, stream, bytes_to_read]() { http_client_->readData(stream, bytes_to_read); });
-  }
-  envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
-    return dispatcher_->post(
-        [&, stream, data, end_stream]() { http_client_->sendData(stream, data, end_stream); });
-  }
-  envoy_status_t sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
-    return dispatcher_->post(
-        [&, stream, trailers]() { http_client_->sendTrailers(stream, trailers); });
-  }
+                             bool explicit_flow_control);
+  envoy_status_t sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream);
 
-  envoy_status_t cancelStream(envoy_stream_t stream) {
-    return dispatcher_->post([&, stream]() { http_client_->cancelStream(stream); });
-  }
+  envoy_status_t readData(envoy_stream_t stream, size_t bytes_to_read);
+
+  envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream);
+
+  envoy_status_t sendTrailers(envoy_stream_t stream, envoy_headers trailers);
+
+  envoy_status_t cancelStream(envoy_stream_t stream);
 
   // These functions are wrappers around networkConnectivityManager functions, which hand off
   // to networkConnectivityManager after doing a dispatcher post (thread context switch)
@@ -123,7 +107,8 @@ private:
   GTEST_FRIEND_CLASS(InternalEngineTest, ThreadCreationFailed);
 
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
-                 envoy_event_tracker event_tracker, Thread::PosixThreadFactoryPtr thread_factory);
+                 std::unique_ptr<EnvoyEventTracker> event_tracker,
+                 Thread::PosixThreadFactoryPtr thread_factory);
 
   envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
@@ -135,7 +120,7 @@ private:
   Stats::StatNameSetPtr stat_name_set_;
   std::unique_ptr<EngineCallbacks> callbacks_;
   std::unique_ptr<EnvoyLogger> logger_;
-  envoy_event_tracker event_tracker_;
+  std::unique_ptr<EnvoyEventTracker> event_tracker_;
   Assert::ActionRegistrationPtr assert_handler_registration_;
   Assert::ActionRegistrationPtr bug_handler_registration_;
   Thread::MutexBasicLockable mutex_;

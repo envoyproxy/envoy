@@ -204,7 +204,7 @@ getClusterSpecifierPluginByTheProto(const envoy::config::route::v3::ClusterSpeci
 }
 
 ::Envoy::Http::Utility::RedirectConfig
-createRedirectConfig(const envoy::config::route::v3::Route& route) {
+createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine& regex_engine) {
   ::Envoy::Http::Utility::RedirectConfig redirect_config{
       route.redirect().scheme_redirect(),
       route.redirect().host_redirect(),
@@ -214,7 +214,7 @@ createRedirectConfig(const envoy::config::route::v3::Route& route) {
       route.redirect().prefix_rewrite(),
       route.redirect().has_regex_rewrite() ? route.redirect().regex_rewrite().substitution() : "",
       route.redirect().has_regex_rewrite()
-          ? Regex::Utility::parseRegex(route.redirect().regex_rewrite().pattern())
+          ? Regex::Utility::parseRegex(route.redirect().regex_rewrite().pattern(), regex_engine)
           : nullptr,
       route.redirect().path_redirect().find('?') != absl::string_view::npos,
       route.redirect().https_redirect(),
@@ -501,7 +501,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                     : absl::nullopt),
       host_rewrite_path_regex_(
           route.route().has_host_rewrite_path_regex()
-              ? Regex::Utility::parseRegex(route.route().host_rewrite_path_regex().pattern())
+              ? Regex::Utility::parseRegex(route.route().host_rewrite_path_regex().pattern(),
+                                           factory_context.regexEngine())
               : nullptr),
       host_rewrite_path_regex_substitution_(
           route.route().has_host_rewrite_path_regex()
@@ -513,7 +514,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       runtime_(loadRuntimeData(route.match())),
       redirect_config_(route.has_redirect()
                            ? std::make_unique<::Envoy::Http::Utility::RedirectConfig>(
-                                 createRedirectConfig(route))
+                                 createRedirectConfig(route, factory_context.regexEngine()))
                            : nullptr),
       hedge_policy_(buildHedgePolicy(vhost->hedgePolicy(), route.route())),
       retry_policy_(
@@ -626,7 +627,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   }
 
   if (!route.route().hash_policy().empty()) {
-    hash_policy_ = std::make_unique<Http::HashPolicyImpl>(route.route().hash_policy());
+    hash_policy_ = std::make_unique<Http::HashPolicyImpl>(route.route().hash_policy(),
+                                                          factory_context.regexEngine());
   }
 
   if (route.match().has_tls_context()) {
@@ -703,7 +705,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   if (route.route().has_regex_rewrite()) {
     auto rewrite_spec = route.route().regex_rewrite();
-    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_ =
+        Regex::Utility::parseRegex(rewrite_spec.pattern(), factory_context.regexEngine());
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 

@@ -217,10 +217,10 @@ TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
   repeated.Add()->set_value(10);
   EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[value:\\s*10\n\\]"));
+              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n\\]"));
   repeated.Add()->set_value(20);
   EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[value:\\s*10\n, value:\\s*20\n\\]"));
+              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n,.*[\n]*value:\\s*20\n\\]"));
 }
 
 // Validated exception thrown when downcastAndValidate observes a PGV failures.
@@ -1455,7 +1455,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   source_any.PackFrom(source_duration);
   EXPECT_THROW_WITH_REGEX(
       TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any), EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 // Validated exception thrown when anyConvertAndValidate observes a PGV failures.
@@ -1468,7 +1468,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
                ProtoValidationException);
 }
 
-// MessageUtility::unpackTo() with the wrong type throws.
+// MessageUtility::unpackToOrThrow() with the wrong type throws.
 TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
@@ -1476,11 +1476,11 @@ TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   source_any.PackFrom(source_duration);
   ProtobufWkt::Timestamp dst;
   EXPECT_THROW_WITH_REGEX(
-      MessageUtil::unpackTo(source_any, dst), EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      MessageUtil::unpackToOrThrow(source_any, dst), EnvoyException,
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
-// MessageUtility::unpackTo() with API message works at same version.
+// MessageUtility::unpackToOrThrow() with API message works at same version.
 TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
   {
     API_NO_BOOST(envoy::api::v2::Cluster) source;
@@ -1488,7 +1488,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
-    MessageUtil::unpackTo(source_any, dst);
+    MessageUtil::unpackToOrThrow(source_any, dst);
     EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
@@ -1497,35 +1497,36 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-    MessageUtil::unpackTo(source_any, dst);
+    MessageUtil::unpackToOrThrow(source_any, dst);
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
 }
 
-// MessageUtility::unpackToNoThrow() with the right type.
+// MessageUtility::unpackTo() with the right type.
 TEST_F(ProtobufUtilityTest, UnpackToNoThrowRightType) {
   ProtobufWkt::Duration src_duration;
   src_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(src_duration);
   ProtobufWkt::Duration dst_duration;
-  EXPECT_OK(MessageUtil::unpackToNoThrow(source_any, dst_duration));
+  EXPECT_OK(MessageUtil::unpackTo(source_any, dst_duration));
   // Source and destination are expected to be equal.
   EXPECT_EQ(src_duration, dst_duration);
 }
 
-// MessageUtility::unpackToNoThrow() with the wrong type.
+// MessageUtility::unpackTo() with the wrong type.
 TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(source_duration);
   ProtobufWkt::Timestamp dst;
-  auto status = MessageUtil::unpackToNoThrow(source_any, dst);
+  auto status = MessageUtil::unpackTo(source_any, dst);
   EXPECT_TRUE(absl::IsInternal(status));
-  EXPECT_THAT(std::string(status.message()),
-              testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
-                                     "\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
+  EXPECT_THAT(
+      std::string(status.message()),
+      testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
+                             ".*[\n]*\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
 }
 
 // MessageUtility::loadFromJson() throws on garbage JSON.

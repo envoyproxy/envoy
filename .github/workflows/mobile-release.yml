@@ -24,8 +24,7 @@ jobs:
       packages: read
     if: >-
       ${{
-          (github.repository == 'envoyproxy/envoy'
-           || vars.ENVOY_CI)
+          github.repository == 'envoyproxy/envoy'
           && (github.event.schedule
               || !contains(github.actor, '[bot]'))
       }}

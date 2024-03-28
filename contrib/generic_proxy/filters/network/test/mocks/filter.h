@@ -92,7 +92,7 @@ public:
 template <class Base> class MockStreamFilterCallbacks : public Base {
 public:
   MOCK_METHOD(Envoy::Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(const CodecFactory&, downstreamCodec, ());
+  MOCK_METHOD(const CodecFactory&, codecFactory, ());
   MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (), (const));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));

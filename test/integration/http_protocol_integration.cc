@@ -70,40 +70,6 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
   return ret;
 }
 
-absl::string_view upstreamToString(Http::CodecType type) {
-  switch (type) {
-  case Http::CodecType::HTTP1:
-    return "HttpUpstream";
-  case Http::CodecType::HTTP2:
-    return "Http2Upstream";
-  case Http::CodecType::HTTP3:
-    return "Http3Upstream";
-  }
-  return "UnknownUpstream";
-}
-
-absl::string_view downstreamToString(Http::CodecType type) {
-  switch (type) {
-  case Http::CodecType::HTTP1:
-    return "HttpDownstream_";
-  case Http::CodecType::HTTP2:
-    return "Http2Downstream_";
-  case Http::CodecType::HTTP3:
-    return "Http3Downstream_";
-  }
-  return "UnknownDownstream";
-}
-
-absl::string_view http2ImplementationToString(Http2Impl impl) {
-  switch (impl) {
-  case Http2Impl::Nghttp2:
-    return "Nghttp2";
-  case Http2Impl::Oghttp2:
-    return "Oghttp2";
-  }
-  return "UnknownHttp2Impl";
-}
-
 std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
     const ::testing::TestParamInfo<HttpProtocolTestParams>& params) {
   return absl::StrCat((params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),

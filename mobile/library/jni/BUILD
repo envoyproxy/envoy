@@ -59,6 +59,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         "//library/jni/import:jni_import_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@envoy//source/common/common:assert_lib",
     ],
 )

@@ -1963,8 +1963,9 @@ TEST_F(AsyncClientImplTest, DumpState) {
 class AsyncClientImplUnitTest : public AsyncClientImplTest {
 public:
   Router::RetryPolicyImpl retry_policy_;
+  Regex::GoogleReEngine regex_engine_;
   std::unique_ptr<NullRouteImpl> route_impl_{new NullRouteImpl(
-      client_.cluster_->name(), retry_policy_, absl::nullopt,
+      client_.cluster_->name(), retry_policy_, regex_engine_, absl::nullopt,
       Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>())};
   std::unique_ptr<Http::AsyncStreamImpl> stream_{
       new Http::AsyncStreamImpl(client_, stream_callbacks_, AsyncClient::StreamOptions())};
