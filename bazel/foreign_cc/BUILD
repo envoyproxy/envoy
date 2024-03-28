@@ -157,7 +157,7 @@ configure_make(
         "--disable-manual",
         "--disable-shared",
         "--enable-static",
-        "--with-colm=$EXT_BUILD_DEPS/colm",
+        "--with-colm=$$EXT_BUILD_DEPS/colm",
     ],
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
