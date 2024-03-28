@@ -31,7 +31,7 @@ void Encoder::prependFrameHeader(uint8_t flags, Buffer::Instance& buffer, uint32
   buffer.prepend(frame_buffer);
 }
 
-bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
+absl::Status Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
   // Make sure those flags are set to initial state.
   decoding_error_ = false;
   is_frame_oversized_ = false;
@@ -39,12 +39,16 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
   inspect(input);
   output_ = nullptr;
 
-  if (decoding_error_ || is_frame_oversized_) {
-    return false;
+  if (decoding_error_) {
+    return absl::InternalError("Grpc decoding error");
+  }
+
+  if (is_frame_oversized_) {
+    return absl::ResourceExhaustedError("Grpc frame length exceeds limit");
   }
 
   input.drain(input.length());
-  return true;
+  return absl::OkStatus();
 }
 
 bool Decoder::frameStart(uint8_t flags) {

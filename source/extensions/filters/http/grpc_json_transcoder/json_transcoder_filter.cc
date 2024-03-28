@@ -883,7 +883,7 @@ void JsonTranscoderFilter::maybeSendHttpBodyRequestMessage(Buffer::Instance* dat
 bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
     Http::ResponseHeaderMap& response_headers, Buffer::Instance& data) {
   std::vector<Grpc::Frame> frames;
-  decoder_.decode(data, frames);
+  std::ignore = decoder_.decode(data, frames);
   if (frames.empty()) {
     return false;
   }

@@ -570,7 +570,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
 
   Grpc::Decoder decoder;
   std::vector<Grpc::Frame> frames;
-  decoder.decode(request_data, frames);
+  std::ignore = decoder.decode(request_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
@@ -642,7 +642,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMetho
 
   Grpc::Decoder decoder;
   std::vector<Grpc::Frame> frames;
-  decoder.decode(request_data, frames);
+  std::ignore = decoder.decode(request_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
@@ -704,7 +704,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
 
   Grpc::Decoder decoder;
   std::vector<Grpc::Frame> frames;
-  decoder.decode(*request_data, frames);
+  std::ignore = decoder.decode(*request_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
@@ -737,7 +737,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(*response_data, true));
 
   frames.clear();
-  decoder.decode(*response_data, frames);
+  std::ignore = decoder.decode(*response_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
@@ -1089,7 +1089,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
   // decodeData with EOS will output the grpc frame.
   std::vector<Grpc::Frame> frames;
   Grpc::Decoder decoder;
-  decoder.decode(buffer, frames);
+  std::ignore = decoder.decode(buffer, frames);
   ASSERT_EQ(frames.size(), 1);
 
   bookstore::EchoBodyRequest expected_request;
@@ -1197,7 +1197,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
     EXPECT_EQ(frames.size(), 1);
 
     bookstore::EchoBodyRequest expected_request;
@@ -1828,7 +1828,7 @@ TEST_P(GrpcJsonTranscoderFilterUnescapeTest, UnescapeSpec) {
 
   Grpc::Decoder decoder;
   std::vector<Grpc::Frame> frames;
-  decoder.decode(request_data, frames);
+  std::ignore = decoder.decode(request_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
