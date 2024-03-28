@@ -5318,7 +5318,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
   }
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
                             "error adding listener '127.0.0.1:1234': filter chain 'bar' has "
-                            "the same matching rules defined as 'foo'");
+                            "the same matching rules defined as 'foo'"
+#ifdef ENVOY_ENABLE_YAML
+                            ". duplicate matcher is: {\"transport_protocol\":\"tls\"}"
+#endif
+  );
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest,

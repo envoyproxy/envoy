@@ -286,6 +286,26 @@ TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
   EXPECT_FALSE(context1->drainDecision().drainClose());
 }
 
+TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
+  envoy::config::listener::v3::FilterChain new_filter_chain1 = filter_chain_template_;
+  new_filter_chain1.mutable_filter_chain_match()->add_server_names("example.com");
+  envoy::config::listener::v3::FilterChain new_filter_chain2 = new_filter_chain1;
+
+  EXPECT_THROW_WITH_MESSAGE(filter_chain_manager_->addFilterChains(
+                                nullptr,
+                                std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                    &new_filter_chain1, &new_filter_chain2},
+                                nullptr, filter_chain_factory_builder_, *filter_chain_manager_),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': filter chain 'foo' has the "
+                            "same matching rules defined as 'foo'"
+#ifdef ENVOY_ENABLE_YAML
+                            ". duplicate matcher is: "
+                            "{\"destination_port\":10000,\"server_names\":[\"example.com\"]}"
+#endif
+  );
+}
+
 INSTANTIATE_TEST_SUITE_P(Matcher, FilterChainManagerImplTest, ::testing::Values(true, false));
 
 } // namespace Server
