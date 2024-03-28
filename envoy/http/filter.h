@@ -1148,9 +1148,7 @@ public:
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
   virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
 
-  const StreamInfo::FilterState& filterState() const {
-    return streamInfo().filterState();
-  }
+  const StreamInfo::FilterState& filterState() const { return streamInfo().filterState(); }
 
   const Network::Address::Instance& localAddress() const {
     return *connectionInfoProvider().localAddress();

@@ -259,12 +259,12 @@ DECLARE_FACTORY(TransportProtocolInputFactory);
 template <class MatchingDataType>
 class FilterStateInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  FilterStateInput(const std::string& filter_state_key)
-      : filter_state_key_(filter_state_key) {}
+  FilterStateInput(const std::string& filter_state_key) : filter_state_key_(filter_state_key) {}
 
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto* filter_state_object = 
-        data.filterState().template getDataReadOnly<StreamInfo::FilterState::Object>(filter_state_key_);
+    const auto* filter_state_object =
+        data.filterState().template getDataReadOnly<StreamInfo::FilterState::Object>(
+            filter_state_key_);
 
     if (filter_state_object != nullptr) {
       auto str = filter_state_object->serializeAsString();

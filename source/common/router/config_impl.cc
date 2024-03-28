@@ -138,8 +138,8 @@ public:
             ->GetDescriptor()
             ->full_name());
     static std::string filter_state_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-        createReflectableMessage(
-            envoy::extensions::matching::common_inputs::network::v3::FilterStateInput::default_instance())
+        createReflectableMessage(envoy::extensions::matching::common_inputs::network::v3::
+                                     FilterStateInput::default_instance())
             ->GetDescriptor()
             ->full_name());
     if (type_url == request_header_input_name || type_url == filter_state_input_name) {
