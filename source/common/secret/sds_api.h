@@ -92,7 +92,8 @@ protected:
   Api::Api& api_;
 
 private:
-  absl::Status validateUpdateSize(int num_resources);
+  absl::Status validateUpdateSize(uint32_t added_resources_num,
+                                  uint32_t removed_resources_num) const;
   void initialize();
   FileContentMap loadFiles();
   uint64_t getHashForFiles(const FileContentMap& files);
