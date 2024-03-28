@@ -179,6 +179,7 @@ FIRSTHDR
 FQDN
 FREEBIND
 curr
+doo
 eslint
 freeifaddrs
 FUZZER
@@ -261,6 +262,7 @@ LEV
 LF
 LHS
 hls
+hoo
 iframe
 ilp
 ingressed
