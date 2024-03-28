@@ -22,10 +22,10 @@ android_library(
 )
 
 android_library(
-    name = "http_test_server_lib",
+    name = "http_test_server_factory_lib",
     testonly = True,
     srcs = [
-        "HttpTestServer.java",
+        "HttpTestServerFactory.java",
     ],
     data = [
         "//test/jni:libenvoy_jni_http_test_server.so",
@@ -56,7 +56,7 @@ envoy_mobile_android_test(
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
-        ":http_test_server_lib",
+        ":http_test_server_factory_lib",
         ":testing",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
     ],

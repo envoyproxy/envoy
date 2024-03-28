@@ -89,7 +89,7 @@ public class QuicTestServerTest {
 
   private final Context appContext = ApplicationProvider.getApplicationContext();
   private Engine engine;
-  private HttpTestServer.HttpServer httpServer;
+  private HttpTestServerFactory.HttpTestServer httpTestServer;
 
   @BeforeClass
   public static void loadJniLibrary() {
@@ -103,11 +103,11 @@ public class QuicTestServerTest {
     headers.put("Cache-Control", "max-age=0");
     headers.put("Content-Type", "text/plain");
     headers.put("X-Original-Url", "https://test.example.com:6121/simple.txt");
-    httpServer = HttpTestServer.start(HttpTestServer.Type.HTTP3, headers,
-                                      "This is a simple text file served by QUIC.\n");
+    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP3, headers,
+                                                 "This is a simple text file served by QUIC.\n");
     CountDownLatch latch = new CountDownLatch(1);
     engine = new AndroidEngineBuilder(appContext,
-                                      new Custom(String.format(CONFIG, httpServer.getPort())))
+                                      new Custom(String.format(CONFIG, httpTestServer.getPort())))
                  .addLogLevel(LogLevel.WARN)
                  .setOnEngineRunning(() -> {
                    latch.countDown();
@@ -120,7 +120,7 @@ public class QuicTestServerTest {
   @After
   public void shutdownEngine() {
     engine.terminate();
-    httpServer.shutdown();
+    httpTestServer.shutdown();
   }
 
   @Test
@@ -129,7 +129,7 @@ public class QuicTestServerTest {
         new RequestScenario()
             .setHttpMethod(RequestMethod.GET)
             .addHeader("no_trailers", "true")
-            .setUrl("https://test.example.com:" + httpServer.getPort() + "/simple.txt");
+            .setUrl("https://test.example.com:" + httpTestServer.getPort() + "/simple.txt");
 
     Response response = sendRequest(requestScenario);
 
