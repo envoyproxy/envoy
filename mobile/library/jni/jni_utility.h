@@ -134,5 +134,23 @@ LocalRefUniquePtr<jbyteArray> protoToJavaByteArray(JniHelper& jni_helper,
 /** Converts from Java `String` to C++ string. */
 std::string javaStringToString(JniHelper& jni_helper, jstring java_string);
 
+/** Converts from C++'s map-type<std::string, std::string> to Java's HashMap<String, String>. */
+template <typename MapType>
+LocalRefUniquePtr<jobject> cppMapToJavaMap(JniHelper& jni_helper, const MapType& cpp_map) {
+  auto java_map_class = jni_helper.findClass("java/util/HashMap");
+  auto java_map_init_method_id = jni_helper.getMethodId(java_map_class.get(), "<init>", "(I)V");
+  auto java_map_put_method_id = jni_helper.getMethodId(
+      java_map_class.get(), "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+  auto java_map_object =
+      jni_helper.newObject(java_map_class.get(), java_map_init_method_id, cpp_map.size());
+  for (const auto& [key, value] : cpp_map) {
+    auto java_key = jni_helper.newStringUtf(key.c_str());
+    auto java_value = jni_helper.newStringUtf(value.c_str());
+    auto ignored = jni_helper.callObjectMethod(java_map_object.get(), java_map_put_method_id,
+                                               java_key.get(), java_value.get());
+  }
+  return java_map_object;
+}
+
 } // namespace JNI
 } // namespace Envoy

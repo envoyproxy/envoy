@@ -245,15 +245,13 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
       fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
-  auto& quic_transport_socket_factory_ref =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*quic_transport_socket_factory_);
   return Quic::createQuicNetworkConnection(
-      *quic_connection_persistent_info_, quic_transport_socket_factory_ref.getCryptoConfig(),
+      *quic_connection_persistent_info_, quic_transport_socket_factory_->getCryptoConfig(),
       quic::QuicServerId(
-          quic_transport_socket_factory_ref.clientContextConfig()->serverNameIndication(),
+          quic_transport_socket_factory_->clientContextConfig()->serverNameIndication(),
           static_cast<uint16_t>(port)),
       *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, *stats_store_.rootScope(),
-      options, nullptr, connection_id_generator_, quic_transport_socket_factory_ref);
+      options, nullptr, connection_id_generator_, *quic_transport_socket_factory_);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -1783,6 +1781,40 @@ Http2Frame Http2RawFrameIntegrationTest::readFrame() {
 void Http2RawFrameIntegrationTest::sendFrame(const Http2Frame& frame) {
   ASSERT_TRUE(tcp_client_->connected());
   ASSERT_TRUE(tcp_client_->write(std::string(frame), false, false));
+}
+
+absl::string_view upstreamToString(Http::CodecType type) {
+  switch (type) {
+  case Http::CodecType::HTTP1:
+    return "HttpUpstream";
+  case Http::CodecType::HTTP2:
+    return "Http2Upstream";
+  case Http::CodecType::HTTP3:
+    return "Http3Upstream";
+  }
+  return "UnknownUpstream";
+}
+
+absl::string_view downstreamToString(Http::CodecType type) {
+  switch (type) {
+  case Http::CodecType::HTTP1:
+    return "HttpDownstream_";
+  case Http::CodecType::HTTP2:
+    return "Http2Downstream_";
+  case Http::CodecType::HTTP3:
+    return "Http3Downstream_";
+  }
+  return "UnknownDownstream";
+}
+
+absl::string_view http2ImplementationToString(Http2Impl impl) {
+  switch (impl) {
+  case Http2Impl::Nghttp2:
+    return "Nghttp2";
+  case Http2Impl::Oghttp2:
+    return "Oghttp2";
+  }
+  return "UnknownHttp2Impl";
 }
 
 } // namespace Envoy

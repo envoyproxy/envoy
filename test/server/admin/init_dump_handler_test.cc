@@ -13,19 +13,20 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
 // Test Using /init_dump to dump information of all unready targets.
 TEST_P(AdminInstanceTest, UnreadyTargetsDump) {
   Buffer::OwnedImpl response;
+  Buffer::OwnedImpl response2;
   Http::TestResponseHeaderMapImpl header_map;
 
   Network::MockListenerConfig listener_1;
   Init::ManagerImpl init_manager_1{"test_init_manager_1"};
   Init::TargetImpl target_1("test_target_1", nullptr);
   init_manager_1.add(target_1);
-  EXPECT_CALL(listener_1, initManager()).WillOnce(ReturnRef(init_manager_1));
+  EXPECT_CALL(listener_1, initManager()).WillRepeatedly(ReturnRef(init_manager_1));
 
   Network::MockListenerConfig listener_2;
   Init::ManagerImpl init_manager_2{"test_init_manager_2"};
   Init::TargetImpl target_2("test_target_2", nullptr);
   init_manager_2.add(target_2);
-  EXPECT_CALL(listener_2, initManager()).WillOnce(ReturnRef(init_manager_2));
+  EXPECT_CALL(listener_2, initManager()).WillRepeatedly(ReturnRef(init_manager_2));
 
   MockListenerManager listener_manager;
   EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
@@ -34,10 +35,12 @@ TEST_P(AdminInstanceTest, UnreadyTargetsDump) {
   listeners.push_back(listener_1);
   listeners.push_back(listener_2);
   EXPECT_CALL(listener_manager, isWorkerStarted()).WillRepeatedly(Return(true));
-  EXPECT_CALL(listener_manager, listeners(_)).WillOnce(Return(listeners));
+  EXPECT_CALL(listener_manager, listeners(_)).WillRepeatedly(Return(listeners));
 
+  // Perform test twice - once with no params and once with empty params
+  // The second mirrors the behavior of call from the admin landing page
   EXPECT_EQ(Http::Code::OK, getCallback("/init_dump", header_map, response));
-  std::string output = response.toString();
+  EXPECT_EQ(Http::Code::OK, getCallback("/init_dump?mask=", header_map, response2));
   // The expected value should be updated when ProtobufTypes::MessagePtr
   // AdminImpl::dumpListenerUnreadyTargets function includes more dump when mask has no value.
   const std::string expected_json = R"EOF({
@@ -57,7 +60,8 @@ TEST_P(AdminInstanceTest, UnreadyTargetsDump) {
  ]
 }
 )EOF";
-  EXPECT_EQ(output, expected_json);
+  EXPECT_EQ(response.toString(), expected_json);
+  EXPECT_EQ(response2.toString(), expected_json);
 }
 
 // Test Using /init_dump?listener to dump unready targets of listeners.

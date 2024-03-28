@@ -71,9 +71,8 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
 
   if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
-        config.service_name(), region, credentials_provider,
-        server_context.mainThreadDispatcher().timeSource(), matcher_config, query_string,
-        expiration_time);
+        config.service_name(), region, credentials_provider, server_context, matcher_config,
+        query_string, expiration_time);
   } else {
     // Verify that we have not specified a region set when using sigv4 algorithm
     if (isARegionSet(region)) {
@@ -81,9 +80,8 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
                            "can be specified when using signing_algorithm: AWS_SIGV4A.");
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-        config.service_name(), region, credentials_provider,
-        server_context.mainThreadDispatcher().timeSource(), matcher_config, query_string,
-        expiration_time);
+        config.service_name(), region, credentials_provider, server_context, matcher_config,
+        query_string, expiration_time);
   }
 
   auto filter_config =
@@ -137,7 +135,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
       AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
         per_route_config.aws_request_signing().service_name(), region, credentials_provider,
-        context.mainThreadDispatcher().timeSource(), matcher_config, query_string, expiration_time);
+        context, matcher_config, query_string, expiration_time);
   } else {
     // Verify that we have not specified a region set when using sigv4 algorithm
     if (isARegionSet(region)) {
@@ -146,7 +144,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         per_route_config.aws_request_signing().service_name(), region, credentials_provider,
-        context.mainThreadDispatcher().timeSource(), matcher_config, query_string, expiration_time);
+        context, matcher_config, query_string, expiration_time);
   }
 
   return std::make_shared<const FilterConfigImpl>(

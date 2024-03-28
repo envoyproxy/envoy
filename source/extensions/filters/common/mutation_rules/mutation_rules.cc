@@ -35,13 +35,14 @@ private:
   absl::flat_hash_set<LowerCaseString> headers_;
 };
 
-Checker::Checker(const envoy::config::common::mutation_rules::v3::HeaderMutationRules& rules)
+Checker::Checker(const envoy::config::common::mutation_rules::v3::HeaderMutationRules& rules,
+                 Regex::Engine& regex_engine)
     : rules_(rules) {
   if (rules.has_allow_expression()) {
-    allow_expression_ = Regex::Utility::parseRegex(rules.allow_expression());
+    allow_expression_ = Regex::Utility::parseRegex(rules.allow_expression(), regex_engine);
   }
   if (rules.has_disallow_expression()) {
-    disallow_expression_ = Regex::Utility::parseRegex(rules.disallow_expression());
+    disallow_expression_ = Regex::Utility::parseRegex(rules.disallow_expression(), regex_engine);
   }
 }
 

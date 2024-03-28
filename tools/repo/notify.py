@@ -300,6 +300,11 @@ class RepoNotifier(runner.Runner):
                 text=(
                     f"*{num_issues} Untriaged Issues* (please tag and cc area experts)\n<{ISSUE_LINK}|{ISSUE_LINK}>"
                 ))
+            await self.send_message(
+                channel='#envoy-ci',
+                text=(
+                    f"<@{oncall_handle}> please triage flakes per <https://shorturl.at/acDH1 | instructions>"
+                ))
         except SlackApiError as e:
             self.log.error(f"Unexpected error {e.response['error']}")
 

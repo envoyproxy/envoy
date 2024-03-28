@@ -32,7 +32,7 @@ public:
                                              const std::string& version) {
     if (resource.Is<envoy::service::discovery::v3::Resource>()) {
       envoy::service::discovery::v3::Resource r;
-      MessageUtil::unpackTo(resource, r);
+      MessageUtil::unpackToOrThrow(resource, r);
 
       r.set_version(version);
 

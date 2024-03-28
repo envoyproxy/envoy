@@ -3,7 +3,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 
-#include "source/common/singleton/threadsafe_singleton.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/http/ext_authz/ext_authz_fuzz.pb.h"
@@ -42,8 +41,6 @@ private:
 
 class ReusableFuzzerUtil {
 public:
-  ReusableFuzzerUtil();
-
   // Validate input, then create a filter using the input.config() & the provided client.
   absl::StatusOr<std::unique_ptr<Filter>>
   setup(const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input,
@@ -53,7 +50,6 @@ private:
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   ReusableFilterFactory filter_factory_;
-  ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
 } // namespace ExtAuthz

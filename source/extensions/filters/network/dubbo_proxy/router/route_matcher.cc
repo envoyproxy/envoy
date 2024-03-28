@@ -12,9 +12,11 @@ namespace DubboProxy {
 namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
-    const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route)
+    const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route,
+    Server::Configuration::CommonFactoryContext& context)
     : cluster_name_(route.route().cluster()),
-      config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())) {
+      config_headers_(
+          Http::HeaderUtility::buildHeaderDataVector(route.match().headers(), context)) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -82,8 +84,9 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(const RouteEntryI
 }
 
 ParameterRouteEntryImpl::ParameterRouteEntryImpl(
-    const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route)
-    : RouteEntryImplBase(route) {
+    const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route,
+    Server::Configuration::CommonFactoryContext& context)
+    : RouteEntryImplBase(route, context) {
   for (auto& config : route.match().method().params_match()) {
     parameter_data_list_.emplace_back(config.first, config.second);
   }
@@ -168,9 +171,9 @@ ParameterRouteEntryImpl::ParameterData::ParameterData(uint32_t index,
 MethodRouteEntryImpl::MethodRouteEntryImpl(
     const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route,
     Server::Configuration::CommonFactoryContext& context)
-    : RouteEntryImplBase(route), method_name_(route.match().method().name(), context) {
+    : RouteEntryImplBase(route, context), method_name_(route.match().method().name(), context) {
   if (route.match().method().params_match_size() != 0) {
-    parameter_route_ = std::make_shared<ParameterRouteEntryImpl>(route);
+    parameter_route_ = std::make_shared<ParameterRouteEntryImpl>(route, context);
   }
 }
 

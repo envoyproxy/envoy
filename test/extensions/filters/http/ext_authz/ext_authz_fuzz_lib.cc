@@ -43,8 +43,6 @@ ReusableFilterFactory::newFilter(FilterConfigSharedPtr config,
   return filter;
 }
 
-ReusableFuzzerUtil::ReusableFuzzerUtil() : engine_(std::make_unique<Regex::GoogleReEngine>()) {}
-
 absl::StatusOr<std::unique_ptr<Filter>> ReusableFuzzerUtil::setup(
     const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input,
     Filters::Common::ExtAuthz::ClientPtr client) {

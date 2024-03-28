@@ -313,6 +313,7 @@ ODCDS
 middlewildcard
 monostate
 mpd
+mutators
 na
 oghttp
 OID
@@ -354,6 +355,7 @@ QUIC
 QoS
 qat
 qatzip
+qatzstd
 RAII
 RANLUX
 RBAC
@@ -470,7 +472,6 @@ VM
 VPN
 WAITFORONE
 WASM
-WAVM
 WIP
 WKT
 WRONGPASS

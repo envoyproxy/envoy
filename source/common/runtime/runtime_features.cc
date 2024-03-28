@@ -64,6 +64,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_allow_partial_urls_in_referer);
 RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
+RUNTIME_GUARD(envoy_reloadable_features_http_route_connect_proxy_by_default);
 RUNTIME_GUARD(envoy_reloadable_features_immediate_response_use_filter_mutation_rule);
 RUNTIME_GUARD(envoy_reloadable_features_locality_routing_use_new_routing_logic);
 RUNTIME_GUARD(envoy_reloadable_features_lowercase_scheme);
@@ -130,6 +131,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 // TODO(wbpcode) complete remove this feature is no one use it.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
+// TODO(vikaschoudhary16) flip this to true only after all the
+// TcpProxy::Filter::HttpStreamDecoderFilterCallbacks are implemented or commented as unnecessary
+FALSE_RUNTIME_GUARD(envoy_restart_features_upstream_http_filters_with_tcp_proxy);
 // TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
 // TODO(suniltheta): Once the newly added http async technique is stabilized move it under
