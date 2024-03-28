@@ -63,12 +63,37 @@ class FakeUpstream;
 /**
  * Provides a fake HTTP stream for integration testing.
  */
-class FakeStream : public Http::RequestDecoder,
-                   public Http::StreamCallbacks,
-                   Logger::Loggable<Logger::Id::testing> {
+class FakeStream : public Http::RequestDecoder, Logger::Loggable<Logger::Id::testing> {
 public:
+  class FakeStreamCallbacks : public Http::StreamCallbacks {
+  public:
+    explicit FakeStreamCallbacks(FakeStream& parent) : parent_(parent) {}
+
+    // Http::StreamCallbacks
+    void onResetStream(Http::StreamResetReason reason,
+                       absl::string_view transport_failure_reason) override {
+      absl::MutexLock lock(&lock_);
+      if (parent_.has_value()) {
+        parent_->onResetStream(reason, transport_failure_reason);
+      }
+    }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
+
+    void detachFromFakeStream() {
+      absl::MutexLock lock(&lock_);
+      parent_.reset();
+    }
+
+  private:
+    absl::Mutex lock_;
+    OptRef<FakeStream> parent_ ABSL_GUARDED_BY(lock_);
+  };
+
   FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
              Event::TestTimeSystem& time_system);
+
+  ~FakeStream() override;
 
   uint64_t bodyLength() {
     absl::MutexLock lock(&lock_);
@@ -235,11 +260,7 @@ public:
     return access_log_handlers_;
   }
 
-  // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason,
-                     absl::string_view transport_failure_reason) override;
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
+  void onResetStream(Http::StreamResetReason reason, absl::string_view transport_failure_reason);
 
   virtual void setEndStream(bool end) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { end_stream_ = end; }
 
@@ -272,6 +293,8 @@ private:
   bool received_data_{false};
   bool grpc_stream_started_{false};
   Http::ServerHeaderValidatorPtr header_validator_;
+  std::unique_ptr<FakeStreamCallbacks> stream_callbacks_;
+  Event::Dispatcher& dispatcher_;
 };
 
 using FakeStreamPtr = std::unique_ptr<FakeStream>;
@@ -490,6 +513,10 @@ public:
                      uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                          headers_with_underscores_action);
+
+  ~FakeHttpConnection() override {
+    dispatcher_.post([codec = codec_.release()]() { delete codec; });
+  }
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
