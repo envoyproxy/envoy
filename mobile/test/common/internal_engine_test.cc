@@ -499,7 +499,8 @@ protected:
 
     CallbackContext context;
     envoy_http_callbacks stream_cbs{
-        [](envoy_headers, bool, envoy_stream_intel, void* context) -> void {
+        [](envoy_headers c_headers, bool, envoy_stream_intel, void* context) -> void {
+          release_envoy_map(c_headers);
           // Gets the thread priority, so we can check that it's the same thread priority we set.
           auto* callback_context = static_cast<CallbackContext*>(context);
           callback_context->thread_priority = getpriority(PRIO_PROCESS, 0);
@@ -519,13 +520,14 @@ protected:
     Http::TestRequestHeaderMapImpl headers;
     HttpTestUtility::addDefaultHeaders(headers);
     envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
-    Http::TestRequestTrailerMapImpl trailers;
-    envoy_headers c_trailers = Http::Utility::toBridgeHeaders(trailers);
+
+    Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+    envoy_data c_data = Data::Utility::toBridgeData(request_data);
 
     envoy_stream_t stream = engine->initStream();
     engine->startStream(stream, stream_cbs, false);
     engine->sendHeaders(stream, c_headers, false);
-    engine->sendTrailers(stream, c_trailers);
+    engine->sendData(stream, c_data, true);
 
     EXPECT_TRUE(context.on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
     engine->terminate();
