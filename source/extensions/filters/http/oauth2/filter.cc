@@ -289,11 +289,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     }
   }
 
-  // Sanitize the Authorization header, since we have no way to validate its content. Also,
-  // if token forwarding is enabled, this header will be set based on what is on the HMAC cookie
-  // before forwarding the request upstream.
-  headers.removeInline(authorization_handle.handle());
-
   // The following 2 headers are guaranteed for regular requests. The asserts are helpful when
   // writing test code to not forget these important variables in mock requests
   const Http::HeaderEntry* host_header = headers.Host();
