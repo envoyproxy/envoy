@@ -71,11 +71,9 @@ public:
 
       // Set the config to either read the audience URL from a request header or
       // from metadata on the cluster.
-      if (configure_audience_from_headers) {
-        TestUtility::loadFromYaml(request_header_audience_provider_config_, proto_config_);
-      } else {
-        TestUtility::loadFromYaml(default_config_, proto_config_);
-      }
+      auto& config = configure_audience_from_headers ? request_header_audience_provider_config_
+                                                     : default_config_;
+      TestUtility::loadFromYaml(config, proto_config_);
 
       // Set token_header in the config.
       if (configure_token_header) {
