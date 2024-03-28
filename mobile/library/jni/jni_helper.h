@@ -142,6 +142,38 @@ public:
   JNIEnv* getEnv();
 
   /**
+   * Gets the field ID for an instance field of a class.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getfieldid
+   */
+  jfieldID getFieldId(jclass clazz, const char* name, const char* signature);
+
+  /** A macro to create `Call<Type>Method` helper function. */
+#define DECLARE_GET_FIELD(JAVA_TYPE, JNI_TYPE)                                                     \
+  JNI_TYPE get##JAVA_TYPE##Field(jobject object, jfieldID field_id);
+
+  /**
+   * Helper functions for `Get<Type>Field`.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#gettypefield-routines
+   */
+  DECLARE_GET_FIELD(Byte, jbyte)
+  DECLARE_GET_FIELD(Char, jchar)
+  DECLARE_GET_FIELD(Short, jshort)
+  DECLARE_GET_FIELD(Int, jint)
+  DECLARE_GET_FIELD(Long, jlong)
+  DECLARE_GET_FIELD(Float, jfloat)
+  DECLARE_GET_FIELD(Double, jdouble)
+  DECLARE_GET_FIELD(Boolean, jboolean)
+
+  template <typename T = jobject>
+  [[nodiscard]] LocalRefUniquePtr<T> getObjectField(jobject object, jfieldID field_id) {
+    LocalRefUniquePtr<T> result(static_cast<T>(env_->GetObjectField(object, field_id)),
+                                LocalRefDeleter(env_));
+    return result;
+  }
+
+  /**
    * Gets the object method with the given signature.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getmethodid

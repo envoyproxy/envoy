@@ -21,6 +21,38 @@ android_library(
     ],
 )
 
+android_library(
+    name = "http_test_server_factory_lib",
+    testonly = True,
+    srcs = [
+        "HttpTestServerFactory.java",
+    ],
+    data = [
+        "//test/jni:libenvoy_jni_http_test_server_factory.so",
+    ],
+    visibility = ["//test:__subpackages__"],
+    deps = [
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
+    ],
+)
+
+android_library(
+    name = "http_proxy_test_server_factory_lib",
+    testonly = True,
+    srcs = [
+        "HttpProxyTestServerFactory.java",
+    ],
+    data = [
+        "//test/jni:libenvoy_jni_http_proxy_test_server_factory.so",
+    ],
+    visibility = ["//test:__subpackages__"],
+    deps = [
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
+    ],
+)
+
 envoy_mobile_android_test(
     name = "quic_test_server_test",
     srcs = [
@@ -40,6 +72,7 @@ envoy_mobile_android_test(
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
+        ":http_test_server_factory_lib",
         ":testing",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
     ],

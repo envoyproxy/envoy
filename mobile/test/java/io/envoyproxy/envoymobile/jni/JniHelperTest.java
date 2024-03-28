@@ -17,6 +17,25 @@ public class JniHelperTest {
   //================================================================================
   // Native methods for testing.
   //================================================================================
+  public static native void getFieldId(Class<?> clazz, String name, String signature);
+  public static native byte getByteField(Class<?> clazz, Object instance, String name,
+                                         String signature);
+  public static native char getCharField(Class<?> clazz, Object instance, String name,
+                                         String signature);
+  public static native short getShortField(Class<?> clazz, Object instance, String name,
+                                           String signature);
+  public static native int getIntField(Class<?> clazz, Object instance, String name,
+                                       String signature);
+  public static native long getLongField(Class<?> clazz, Object instance, String name,
+                                         String signature);
+  public static native float getFloatField(Class<?> clazz, Object instance, String name,
+                                           String signature);
+  public static native double getDoubleField(Class<?> clazz, Object instance, String name,
+                                             String signature);
+  public static native boolean getBooleanField(Class<?> clazz, Object instance, String name,
+                                               String signature);
+  public static native Object getObjectField(Class<?> clazz, Object instance, String name,
+                                             String signature);
   public static native void getMethodId(Class<?> clazz, String name, String signature);
   public static native void getStaticMethodId(Class<?> clazz, String name, String signature);
   public static native Class<?> findClass(String className);
@@ -90,6 +109,19 @@ public class JniHelperTest {
   public static native Object newDirectByteBuffer();
 
   //================================================================================
+  // Fields used for Get<Type>Field tests.
+  //================================================================================
+  private final byte byteField = 1;
+  private final char charField = 'a';
+  private final short shortField = 1;
+  private final int intField = 1;
+  private final long longField = 1;
+  private final float floatField = 3.14f;
+  private final double doubleField = 3.14;
+  private final boolean booleanField = true;
+  private final String objectField = "Hello";
+
+  //================================================================================
   // Object methods used for Call<Type>Method tests.
   //================================================================================
   public byte byteMethod() { return 1; }
@@ -117,15 +149,66 @@ public class JniHelperTest {
   public static void staticVoidMethod() {}
   public static String staticObjectMethod() { return "Hello"; }
 
-  static class Foo {}
+  static class Foo { private final int field = 1; }
 
   @Test
-  public void testMethodId() {
+  public void testGetFieldId() {
+    getFieldId(Foo.class, "field", "I");
+  }
+
+  @Test
+  public void testGetByteField() {
+    assertThat(getByteField(JniHelperTest.class, this, "byteField", "B")).isEqualTo(1);
+  }
+
+  @Test
+  public void testGetCharField() {
+    assertThat(getCharField(JniHelperTest.class, this, "charField", "C")).isEqualTo('a');
+  }
+
+  @Test
+  public void testGetShortField() {
+    assertThat(getShortField(JniHelperTest.class, this, "shortField", "S")).isEqualTo(1);
+  }
+
+  @Test
+  public void testGetIntField() {
+    assertThat(getIntField(JniHelperTest.class, this, "intField", "I")).isEqualTo(1);
+  }
+
+  @Test
+  public void testGetLongField() {
+    assertThat(getLongField(JniHelperTest.class, this, "longField", "J")).isEqualTo(1L);
+  }
+
+  @Test
+  public void testGetFloatField() {
+    assertThat(getFloatField(JniHelperTest.class, this, "floatField", "F")).isEqualTo(3.14f);
+  }
+
+  @Test
+  public void testGetDoubleField() {
+    assertThat(getDoubleField(JniHelperTest.class, this, "doubleField", "D")).isEqualTo(3.14);
+  }
+
+  @Test
+  public void testGetBooleanField() {
+    assertThat(getBooleanField(JniHelperTest.class, this, "booleanField", "Z")).isEqualTo(true);
+  }
+
+  @Test
+  public void testGetObjectField() {
+    assertThat(getObjectField(JniHelperTest.class, this, "objectField", "Ljava/lang/String;"))
+        .isEqualTo("Hello");
+  }
+
+  @Test
+  public void testGetMethodId() {
     getMethodId(Foo.class, "<init>", "()V");
   }
 
   @Test
-  public void testStaticMethodId() {
+  public void testGetStaticMethodId() {
     getStaticMethodId(JniHelperTest.class, "staticVoidMethod", "()V");
   }
 

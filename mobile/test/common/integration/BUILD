@@ -167,14 +167,12 @@ envoy_cc_test_library(
 
 # interface libs for test servers` jni implementations
 envoy_cc_test_library(
-    name = "test_server_interface_lib",
+    name = "test_server_lib",
     srcs = [
         "test_server.cc",
-        "test_server_interface.cc",
     ],
     hdrs = [
         "test_server.h",
-        "test_server_interface.h",
     ],
     data = [
         "@envoy//test/config/integration/certs",
@@ -193,6 +191,20 @@ envoy_cc_test_library(
         ["@envoy//source/common/signal:sigaction_lib"],
         "@envoy",
     ),
+)
+
+envoy_cc_test_library(
+    name = "test_server_interface_lib",
+    srcs = [
+        "test_server_interface.cc",
+    ],
+    hdrs = [
+        "test_server_interface.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":test_server_lib",
+    ],
 )
 
 envoy_cc_test_library(

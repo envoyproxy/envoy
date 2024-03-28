@@ -11,10 +11,12 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.testing.TestJni
+import io.envoyproxy.envoymobile.engine.testing.HttpProxyTestServerFactory
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito
@@ -40,10 +42,21 @@ class ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest {
     JniLibrary.load()
   }
 
+  private lateinit var httpProxyTestServer: HttpProxyTestServerFactory.HttpProxyTestServer
+
+  @Before
+  fun setUp() {
+    httpProxyTestServer =
+      HttpProxyTestServerFactory.start(HttpProxyTestServerFactory.Type.HTTP_PROXY)
+  }
+
+  @After
+  fun tearDown() {
+    httpProxyTestServer.shutdown()
+  }
+
   @Test
   fun `performs an HTTP request through a proxy`() {
-    TestJni.startHttpProxyTestServer()
-
     val context = Mockito.spy(ApplicationProvider.getApplicationContext<Context>())
     val connectivityManager: ConnectivityManager = Mockito.mock(ConnectivityManager::class.java)
     Mockito.doReturn(connectivityManager)
@@ -91,6 +104,5 @@ class ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest {
     assertThat(onRespondeHeadersLatch.count).isEqualTo(0)
 
     engine.terminate()
-    TestJni.shutdownTestServer()
   }
 }

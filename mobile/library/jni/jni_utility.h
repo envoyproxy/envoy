@@ -5,9 +5,9 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "library/common/types/c_types.h"
 #include "library/common/types/managed_envoy_headers.h"
-#include "library/common/types/matcher_data.h"
 #include "library/jni/import/jni_import.h"
 #include "library/jni/jni_helper.h"
 
@@ -131,10 +131,14 @@ void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
 LocalRefUniquePtr<jbyteArray> protoToJavaByteArray(JniHelper& jni_helper,
                                                    const Envoy::Protobuf::MessageLite& source);
 
-/** Converts from Java `String` to C++ string. */
-std::string javaStringToString(JniHelper& jni_helper, jstring java_string);
+/** Converts from Java `String` to C++ `std::string`. */
+std::string javaStringToCppString(JniHelper& jni_helper, jstring java_string);
 
-/** Converts from C++'s map-type<std::string, std::string> to Java's HashMap<String, String>. */
+/** Converts from C++ `std::string` to Java `String`. */
+LocalRefUniquePtr<jstring> cppStringToJavaString(JniHelper& jni_helper,
+                                                 const std::string& cpp_string);
+
+/** Converts from C++'s map-type<std::string, std::string> to Java `HashMap<String, String>`. */
 template <typename MapType>
 LocalRefUniquePtr<jobject> cppMapToJavaMap(JniHelper& jni_helper, const MapType& cpp_map) {
   auto java_map_class = jni_helper.findClass("java/util/HashMap");
@@ -143,14 +147,21 @@ LocalRefUniquePtr<jobject> cppMapToJavaMap(JniHelper& jni_helper, const MapType&
       java_map_class.get(), "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
   auto java_map_object =
       jni_helper.newObject(java_map_class.get(), java_map_init_method_id, cpp_map.size());
-  for (const auto& [key, value] : cpp_map) {
-    auto java_key = jni_helper.newStringUtf(key.c_str());
-    auto java_value = jni_helper.newStringUtf(value.c_str());
+  for (const auto& [cpp_key, cpp_value] : cpp_map) {
+    auto java_key = cppStringToJavaString(jni_helper, cpp_key);
+    auto java_value = cppStringToJavaString(jni_helper, cpp_value);
     auto ignored = jni_helper.callObjectMethod(java_map_object.get(), java_map_put_method_id,
                                                java_key.get(), java_value.get());
   }
   return java_map_object;
 }
+
+/**
+ * Converts from Java's `Map<String, String>` to C++'s `absl::flat_hash_map<std::string,
+ * std::string>`.
+ */
+absl::flat_hash_map<std::string, std::string> javaMapToCppMap(JniHelper& jni_helper,
+                                                              jobject java_map);
 
 } // namespace JNI
 } // namespace Envoy

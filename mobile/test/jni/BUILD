@@ -29,11 +29,73 @@ cc_library(
     }),
     deps = [
         "//library/jni:envoy_jni_lib",
-        "//test/common/integration:test_server_interface_lib",
+        "//test/common/integration:test_server_lib",
         "//test/common/integration:xds_test_server_interface_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
+)
+
+# Library which contains JNI functions for the HttpTestServer.
+cc_library(
+    name = "jni_http_test_server_factory_lib",
+    testonly = True,
+    srcs = [
+        "jni_http_test_server_factory.cc",
+    ],
+    linkopts = select({
+        "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//library/jni:envoy_jni_lib",
+        "//library/jni:jni_helper_lib",
+        "//library/jni:jni_utility_lib",
+        "//test/common/integration:test_server_lib",
+    ],
+    # We need this to ensure that we link this into the .so even though there are no code references.
+    alwayslink = True,
+)
+
+cc_binary(
+    name = "libenvoy_jni_http_test_server_factory.so",
+    testonly = True,
+    linkshared = True,
+    deps = [
+        ":jni_http_test_server_factory_lib",
+        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
+    ],
+)
+
+# Library which contains JNI functions for the HttpProxyTestServer.
+cc_library(
+    name = "jni_http_proxy_test_server_factory_lib",
+    testonly = True,
+    srcs = [
+        "jni_http_proxy_test_server_factory.cc",
+    ],
+    linkopts = select({
+        "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//library/jni:envoy_jni_lib",
+        "//library/jni:jni_helper_lib",
+        "//library/jni:jni_utility_lib",
+        "//test/common/integration:test_server_lib",
+    ],
+    # We need this to ensure that we link this into the .so even though there are no code references.
+    alwayslink = True,
+)
+
+cc_binary(
+    name = "libenvoy_jni_http_proxy_test_server_factory.so",
+    testonly = True,
+    linkshared = True,
+    deps = [
+        ":jni_http_proxy_test_server_factory_lib",
+        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
+    ],
 )
 
 # Base binary (.so) for testing

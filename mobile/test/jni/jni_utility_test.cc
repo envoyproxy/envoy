@@ -17,13 +17,18 @@ Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_protoJavaByteArrayConversion(J
   return Envoy::JNI::protoToJavaByteArray(jni_helper, s).release();
 }
 
-extern "C" JNIEXPORT jobject JNICALL
-Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_cppMapToJavaMap(JNIEnv* env, jclass) {
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_javaCppStringConversion(JNIEnv* env, jclass,
+                                                                          jstring java_string) {
   Envoy::JNI::JniHelper jni_helper(env);
-  absl::flat_hash_map<std::string, std::string> cpp_map{
-      {"key1", "value1"},
-      {"key2", "value2"},
-      {"key3", "value3"},
-  };
+  auto cpp_string = Envoy::JNI::javaStringToCppString(jni_helper, java_string);
+  return Envoy::JNI::cppStringToJavaString(jni_helper, cpp_string).release();
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_javaCppMapConversion(JNIEnv* env, jclass,
+                                                                       jobject java_map) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  auto cpp_map = Envoy::JNI::javaMapToCppMap(jni_helper, java_map);
   return Envoy::JNI::cppMapToJavaMap(jni_helper, cpp_map).release();
 }

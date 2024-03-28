@@ -8,11 +8,14 @@ import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.testing.TestJni
+import io.envoyproxy.envoymobile.engine.testing.HttpTestServer
+import io.envoyproxy.envoymobile.engine.testing.HttpTestServer.HttpServer
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import org.junit.After
 import org.junit.Assert.fail
+import org.junit.Before
 import org.junit.Test
 
 private const val ASSERTION_FILTER_TYPE =
@@ -25,11 +28,20 @@ class SendDataTest {
     JniLibrary.load()
   }
 
+  private lateinit var httpServer: HttpServer
+
+  @Before
+  fun setUp() {
+    httpServer = HttpTestServer.start(HttpTestServer.Type.HTTP2_WITH_TLS)
+  }
+
+  @After
+  fun tearDown() {
+    httpServer.shutdown()
+  }
+
   @Test
   fun `successful sending data`() {
-    TestJni.startHttp2TestServer()
-    val port = TestJni.getServerPort()
-
     val expectation = CountDownLatch(1)
     val engine =
       EngineBuilder(Standard())
@@ -46,7 +58,7 @@ class SendDataTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "localhost:$port",
+          authority = "localhost:${httpServer.port}",
           path = "/simple.txt"
         )
         .build()
@@ -71,7 +83,6 @@ class SendDataTest {
     expectation.await(10, TimeUnit.SECONDS)
 
     engine.terminate()
-    TestJni.shutdownTestServer()
 
     assertThat(expectation.count).isEqualTo(0)
     assertThat(responseStatus).isEqualTo(200)
