@@ -184,10 +184,13 @@ Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::ResponseHeaderMap& hea
   if (!is_cors_request_) {
     return Http::FilterHeadersStatus::Continue;
   }
-
-  if (!latched_origin_.empty()) {
-    headers.setInline(access_control_allow_origin_handle.handle(), latched_origin_);
+  // Origin did not match. Do not modify the response headers.
+  if (latched_origin_.empty()) {
+    return Http::FilterHeadersStatus::Continue;
   }
+
+  headers.setInline(access_control_allow_origin_handle.handle(), latched_origin_);
+
   if (allowCredentials()) {
     headers.setReferenceInline(access_control_allow_credentials_handle.handle(),
                                Http::CustomHeaders::get().CORSValues.True);
