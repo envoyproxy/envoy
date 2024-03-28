@@ -148,9 +148,9 @@ public:
    * callback should always be initialized.
    * @param config supplies the general json configuration for the filter
    * @param filter_chain_factory_context supplies the filter's context.
-   * @return Network::FilterFactoryCb the factory creation function.
+   * @return Network::FilterFactoryCb the factory creation function or an error status.
    */
-  virtual Network::FilterFactoryCb
+  virtual absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                FactoryContext& filter_chain_factory_context) PURE;
 

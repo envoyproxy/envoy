@@ -87,6 +87,11 @@ public:
    */
   const Router::HeaderParser& requestHeaderParser() const { return *request_headers_parser_; }
 
+  /**
+   * Returns whether or not to encode raw headers (i.e. use headers_map instead of headers field).
+   */
+  bool encodeRawHeaders() const { return encode_raw_headers_; }
+
 private:
   static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
                                            Server::Configuration::CommonFactoryContext& context);
@@ -111,6 +116,7 @@ private:
   const std::string path_prefix_;
   const std::string tracing_name_;
   Router::HeaderParserPtr request_headers_parser_;
+  const bool encode_raw_headers_;
 };
 
 using ClientConfigSharedPtr = std::shared_ptr<ClientConfig>;

@@ -111,7 +111,7 @@ void UberFilterFuzzer::fuzz(
     // Make sure no invalid system calls are executed in fuzzer.
     checkInvalidInputForFuzzer(filter_name, message.get());
     ENVOY_LOG_MISC(info, "Config content after decoded: {}", message->DebugString());
-    cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
+    cb_ = factory.createFilterFactoryFromProto(*message, factory_context_).value();
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Controlled exception in filter setup {}", e.what());
     return;

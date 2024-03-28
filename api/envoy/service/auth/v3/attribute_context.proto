@@ -7,6 +7,7 @@ import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/timestamp.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -99,7 +100,7 @@ message AttributeContext {
 
   // This message defines attributes for an HTTP request.
   // HTTP/1.x, HTTP/2, gRPC are all considered as HTTP requests.
-  // [#next-free-field: 13]
+  // [#next-free-field: 14]
   message HttpRequest {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.auth.v2.AttributeContext.HttpRequest";
@@ -116,7 +117,31 @@ message AttributeContext {
     // The HTTP request headers. If multiple headers share the same key, they
     // must be merged according to the HTTP spec. All header keys must be
     // lower-cased, because HTTP header keys are case-insensitive.
-    map<string, string> headers = 3;
+    // Header value is encoded as UTF-8 string. Non-UTF-8 characters will be replaced by "!".
+    // This field will not be set if
+    // :ref:`encode_raw_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`
+    // is set to true.
+    map<string, string> headers = 3
+        [(udpa.annotations.field_migrate).oneof_promotion = "headers_type"];
+
+    // A list of the raw HTTP request headers. This is used instead of
+    // :ref:`headers <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>` when
+    // :ref:`encode_raw_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`
+    // is set to true.
+    //
+    // Note that this is not actually a map type. ``header_map`` contains a single repeated field
+    // ``headers``.
+    //
+    // Here, only the ``key`` and ``raw_value`` fields will be populated for each HeaderValue, and
+    // that is only when
+    // :ref:`encode_raw_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`
+    // is set to true.
+    //
+    // Also, unlike the
+    // :ref:`headers <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>`
+    // field, headers with the same key are not combined into a single comma separated header.
+    config.core.v3.HeaderMap header_map = 13
+        [(udpa.annotations.field_migrate).oneof_promotion = "headers_type"];
 
     // The request target, as it appears in the first line of the HTTP request. This includes
     // the URL path and query-string. No decoding is performed.

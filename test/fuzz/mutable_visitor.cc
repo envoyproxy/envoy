@@ -32,7 +32,7 @@ void traverseMessageWorkerExt(ProtoVisitor& visitor, Protobuf::Message& message,
       inner_message = Helper::typeUrlToMessage(any_message->type_url());
       target_type_url = any_message->type_url();
       if (inner_message) {
-        MessageUtil::unpackTo(*any_message, *inner_message);
+        THROW_IF_NOT_OK(MessageUtil::unpackTo(*any_message, *inner_message));
       }
     } else if (message.GetDescriptor()->full_name() == "xds.type.v3.TypedStruct") {
       std::tie(inner_message, target_type_url) =

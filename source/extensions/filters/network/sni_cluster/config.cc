@@ -12,7 +12,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SniCluster {
 
-Network::FilterFactoryCb SniClusterNetworkFilterConfigFactory::createFilterFactoryFromProto(
+absl::StatusOr<Network::FilterFactoryCb>
+SniClusterNetworkFilterConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message&, Server::Configuration::FactoryContext&) {
   return [](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<SniClusterFilter>());

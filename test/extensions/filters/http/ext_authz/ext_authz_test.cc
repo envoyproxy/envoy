@@ -802,6 +802,52 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
   EXPECT_EQ(data_.length(), check_request.attributes().request().http().raw_body().size());
 }
 
+// Checks that the filter buffers the data and initiates the authorization request.
+TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
+  InSequence s;
+
+  // N.B. encode_raw_headers is set to true.
+  initialize(R"EOF(
+  transport_api_version: V3
+  encode_raw_headers: true
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  prepareCheck();
+
+  // Add header with non-UTF-8 value.
+  absl::string_view header_key = "header-with-non-utf-8-value";
+  const uint8_t non_utf_8_bytes[3] = {0xc0, 0xc0, 0};
+  absl::string_view header_value = reinterpret_cast<const char*>(non_utf_8_bytes);
+  request_headers_.addCopy(Http::LowerCaseString(header_key), header_value);
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest& check_request,
+                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+        request_callbacks_ = &callbacks;
+        // headers should be empty.
+        EXPECT_EQ(0, check_request.attributes().request().http().headers().size());
+        ASSERT_TRUE(check_request.attributes().request().http().has_header_map());
+        // header_map should contain the header we added and it should be unchanged.
+        bool exact_match_utf_8_header = false;
+        for (const auto& header :
+             check_request.attributes().request().http().header_map().headers()) {
+          if (header.key() == header_key && header.raw_value() == header_value) {
+            exact_match_utf_8_header = true;
+            break;
+          }
+        }
+        EXPECT_TRUE(exact_match_utf_8_header);
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
+}
+
 // Checks that filter does not buffer data on header-only request.
 TEST_F(HttpFilterTest, HeaderOnlyRequest) {
   InSequence s;

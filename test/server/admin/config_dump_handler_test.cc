@@ -41,6 +41,7 @@ void addHostInfo(NiceMock<Upstream::MockHost>& host, const std::string& hostname
 
 TEST_P(AdminInstanceTest, ConfigDump) {
   Buffer::OwnedImpl response;
+  Buffer::OwnedImpl response2;
   Http::TestResponseHeaderMapImpl header_map;
   auto entry = admin_.getConfigTracker().add("foo", [](const Matchers::StringMatcher&) {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
@@ -57,8 +58,10 @@ TEST_P(AdminInstanceTest, ConfigDump) {
 }
 )EOF";
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
-  std::string output = response.toString();
-  EXPECT_EQ(expected_json, output);
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/config_dump?resource=&mask=&name_regex=", header_map, response2));
+  EXPECT_EQ(expected_json, response.toString());
+  EXPECT_EQ(expected_json, response2.toString());
 }
 
 TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {

@@ -211,14 +211,33 @@ run:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - api/**/*
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - envoy/**/*
     - mobile/.bazelrc
     - mobile/**/*
-    - tools/code_format/check_format.py
+    - source/**/*
+    - test/config/**/*
+    - test/integration/*
+    - test/mocks/**/*
+    - test/test_common/**/*
   mobile-compile-time-cc:
     paths:
-    - "**/*"
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - api/**/*
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - envoy/**/*
+    - mobile/.bazelrc
+    - mobile/**/*
+    - source/**/*
+    - test/config/**/*
+    - test/integration/*
+    - test/mocks/**/*
+    - test/test_common/**/*
   mobile-compile-time-options:
     paths:
     - .bazelrc
@@ -241,9 +260,20 @@ run:
     - tools/code_format/check_format.py
   mobile-core:
     paths:
-    - "**/*"
-    - "*"
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - api/**/*
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - envoy/**/*
     - mobile/.bazelrc
+    - mobile/**/*
+    - source/**/*
+    - test/config/**/*
+    - test/integration/*
+    - test/mocks/**/*
+    - test/test_common/**/*
   mobile-format:
     paths:
     - .bazelrc

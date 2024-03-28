@@ -87,7 +87,7 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_headers_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_headers_cb", "{}ms", elapsed.count());
   }
 
   response_headers_forwarded_ = true;
@@ -173,7 +173,7 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_data_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_data_cb", "{}ms", elapsed.count());
   }
 
   if (send_end_stream) {
@@ -214,7 +214,7 @@ void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMa
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_trailers_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_trailers_cb", "{}ms", elapsed.count());
   }
 
   onComplete();
@@ -288,7 +288,7 @@ void Client::DirectStreamCallbacks::onComplete() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_complete_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_complete_cb", "{}ms", elapsed.count());
   }
 }
 
@@ -345,7 +345,7 @@ void Client::DirectStreamCallbacks::sendErrorToBridge() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_error_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_error_cb", "{}ms", elapsed.count());
   }
 }
 
@@ -372,7 +372,7 @@ void Client::DirectStreamCallbacks::onCancel() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb", "{}ms", elapsed.count());
   }
 }
 

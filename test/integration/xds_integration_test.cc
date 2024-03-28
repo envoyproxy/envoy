@@ -977,10 +977,10 @@ TEST_P(XdsSotwMultipleAuthoritiesTest, SameResourceNameAndTypeFromMultipleAuthor
   // Two xDS resources with the same name and same type.
   ASSERT_EQ(config_dump.configs_size(), 2);
   envoy::admin::v3::SecretsConfigDump::DynamicSecret dynamic_secret;
-  ASSERT_OK(MessageUtil::unpackToNoThrow(config_dump.configs(0), dynamic_secret));
+  ASSERT_OK(MessageUtil::unpackTo(config_dump.configs(0), dynamic_secret));
   EXPECT_EQ(cert_name, dynamic_secret.name());
   EXPECT_EQ("1", dynamic_secret.version_info());
-  ASSERT_OK(MessageUtil::unpackToNoThrow(config_dump.configs(1), dynamic_secret));
+  ASSERT_OK(MessageUtil::unpackTo(config_dump.configs(1), dynamic_secret));
   EXPECT_EQ(cert_name, dynamic_secret.name());
   EXPECT_EQ("1", dynamic_secret.version_info());
 }

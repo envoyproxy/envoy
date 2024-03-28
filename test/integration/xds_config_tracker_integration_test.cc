@@ -58,8 +58,7 @@ public:
         const auto& config_typed_metadata = resource->metadata()->typed_filter_metadata();
         if (const auto& metadata_it = config_typed_metadata.find(kTestKey);
             metadata_it != config_typed_metadata.end()) {
-          const auto status =
-              Envoy::MessageUtil::unpackToNoThrow(metadata_it->second, test_metadata);
+          const auto status = Envoy::MessageUtil::unpackTo(metadata_it->second, test_metadata);
           if (!status.ok()) {
             continue;
           }
@@ -80,8 +79,7 @@ public:
         const auto& config_typed_metadata = resource.metadata().typed_filter_metadata();
         if (const auto& metadata_it = config_typed_metadata.find(kTestKey);
             metadata_it != config_typed_metadata.end()) {
-          const auto status =
-              Envoy::MessageUtil::unpackToNoThrow(metadata_it->second, test_metadata);
+          const auto status = Envoy::MessageUtil::unpackTo(metadata_it->second, test_metadata);
           if (!status.ok()) {
             continue;
           }

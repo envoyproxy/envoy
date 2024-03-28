@@ -63,8 +63,9 @@ Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& hea
         });
       });
 
-  // Stop the iteration for headers for the current filter and the filters following.
-  return Http::FilterHeadersStatus::StopIteration;
+  // Stop the iteration for headers and data (POST request) for the current filter and the filters
+  // following.
+  return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
 }
 
 Http::FilterDataStatus GeoipFilter::decodeData(Buffer::Instance&, bool) {

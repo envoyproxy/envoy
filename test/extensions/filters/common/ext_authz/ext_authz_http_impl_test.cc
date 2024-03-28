@@ -33,6 +33,12 @@ namespace Common {
 namespace ExtAuthz {
 namespace {
 
+struct SendRequestOpts {
+  const std::string body_content = EMPTY_STRING;
+  bool use_raw_body = false;
+  bool encode_raw_headers = false;
+};
+
 class ExtAuthzHttpClientTest : public testing::Test {
 public:
   ExtAuthzHttpClientTest() : async_request_{&async_client_} { initialize(EMPTY_STRING); }
@@ -141,21 +147,33 @@ public:
   }
 
   Http::RequestMessagePtr sendRequest(absl::node_hash_map<std::string, std::string>&& headers,
-                                      const std::string body_content = EMPTY_STRING,
-                                      bool use_raw_body = false) {
+                                      SendRequestOpts opts = {}) {
     envoy::service::auth::v3::CheckRequest request{};
-    auto mutable_headers =
-        request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
-    for (const auto& header : headers) {
-      (*mutable_headers)[header.first] = header.second;
+    if (opts.encode_raw_headers) {
+      auto mutable_headers = request.mutable_attributes()
+                                 ->mutable_request()
+                                 ->mutable_http()
+                                 ->mutable_header_map()
+                                 ->mutable_headers();
+      for (const auto& header : headers) {
+        auto* new_header = mutable_headers->Add();
+        new_header->set_key(header.first);
+        new_header->set_raw_value(header.second);
+      }
+    } else {
+      auto mutable_headers =
+          request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
+      for (const auto& header : headers) {
+        (*mutable_headers)[header.first] = header.second;
+      }
     }
 
-    if (use_raw_body) {
+    if (opts.use_raw_body) {
       *request.mutable_attributes()->mutable_request()->mutable_http()->mutable_raw_body() =
-          body_content;
+          opts.body_content;
     } else {
       *request.mutable_attributes()->mutable_request()->mutable_http()->mutable_body() =
-          body_content;
+          opts.body_content;
     }
 
     Http::RequestMessagePtr message_ptr;
@@ -251,16 +269,16 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
 
 // Verify request body is set correctly when the normal body is empty and raw body is set.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithRawBody) {
-  Http::RequestMessagePtr message_ptr =
-      sendRequest({{":path", "/foo"}, {"foo", "bar"}}, "raw_body", true);
+  Http::RequestMessagePtr message_ptr = sendRequest(
+      {{":path", "/foo"}, {"foo", "bar"}}, {/*body_content=*/"raw_body", /*use_raw_body=*/true});
 
   EXPECT_EQ(message_ptr->bodyAsString(), "raw_body");
 }
 
 // Verify request body is set correctly when the normal body is set and raw body is empty.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithBody) {
-  Http::RequestMessagePtr message_ptr =
-      sendRequest({{":path", "/foo"}, {"foo", "bar"}}, "body", false);
+  Http::RequestMessagePtr message_ptr = sendRequest(
+      {{":path", "/foo"}, {"foo", "bar"}}, {/*body_content=*/"body", /*use_raw_body=*/false});
 
   EXPECT_EQ(message_ptr->bodyAsString(), "body");
 }
@@ -295,6 +313,31 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZeroWithAllowedHeaders) {
   Http::RequestMessagePtr message_ptr =
       sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
                    {Http::Headers::get().Method.get(), std::string{"POST"}}});
+
+  EXPECT_EQ(message_ptr->headers().getContentLengthValue(), "0");
+  EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");
+}
+
+// Test the client when the config has raw headers enabled. Should read from request's header_map
+// instead of header.
+TEST_F(ExtAuthzHttpClientTest, EncodeRawHeaders) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  encode_raw_headers: true
+  )EOF";
+
+  initialize(yaml);
+
+  SendRequestOpts opts;
+  opts.encode_raw_headers = true;
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
+                   {Http::Headers::get().Method.get(), std::string{"POST"}}},
+                  opts);
 
   EXPECT_EQ(message_ptr->headers().getContentLengthValue(), "0");
   EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");

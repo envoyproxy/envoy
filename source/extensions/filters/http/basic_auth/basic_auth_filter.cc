@@ -26,8 +26,10 @@ std::string computeSHA1(absl::string_view password) {
 
 } // namespace
 
-FilterConfig::FilterConfig(UserMap&& users, const std::string& stats_prefix, Stats::Scope& scope)
-    : users_(std::move(users)), stats_(generateStats(stats_prefix + "basic_auth.", scope)) {}
+FilterConfig::FilterConfig(UserMap&& users, const std::string& forward_username_header,
+                           const std::string& stats_prefix, Stats::Scope& scope)
+    : users_(std::move(users)), forward_username_header_(forward_username_header),
+      stats_(generateStats(stats_prefix + "basic_auth.", scope)) {}
 
 bool FilterConfig::validateUser(absl::string_view username, absl::string_view password) const {
   auto user = users_.find(username);
@@ -73,6 +75,10 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
   if (!config_->validateUser(username, password)) {
     return onDenied("User authentication failed. Invalid username/password combination.",
                     "invalid_credential_for_basic_auth");
+  }
+
+  if (!config_->forwardUsernameHeader().empty()) {
+    headers.setCopy(Http::LowerCaseString(config_->forwardUsernameHeader()), username);
   }
 
   config_->stats().allowed_.inc();

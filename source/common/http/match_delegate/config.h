@@ -104,15 +104,15 @@ private:
 };
 
 class MatchDelegateConfig
-    : public Extensions::HttpFilters::Common::FactoryBase<
+    : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
           envoy::extensions::common::matching::v3::ExtensionWithMatcher,
           envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute> {
 public:
   // TODO(wbpcode): move this filter to 'source/extensions/filters/http'.
-  MatchDelegateConfig() : FactoryBase("envoy.filters.http.match_delegate") {}
+  MatchDelegateConfig() : ExceptionFreeFactoryBase("envoy.filters.http.match_delegate") {}
 
 private:
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
       const std::string&, Server::Configuration::FactoryContext& context) override;
 

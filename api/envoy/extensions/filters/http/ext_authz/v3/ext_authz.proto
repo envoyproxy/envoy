@@ -28,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -215,6 +215,28 @@ message ExtAuthz {
   // Whether to increment cluster statistics (e.g. cluster.<cluster_name>.upstream_rq_*) on authorization failure.
   // Defaults to true.
   google.protobuf.BoolValue charge_cluster_response_stats = 20;
+
+  // Whether to encode the raw headers (i.e. unsanitized values & unconcatenated multi-line headers)
+  // in authentication request. Works with both HTTP and GRPC clients.
+  //
+  // When this is set to true, header values are not sanitized. Headers with the same key will also
+  // not be combined into a single, comma-separated header.
+  // Requests to GRPC services will populate the field
+  // :ref:`header_map<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.header_map>`.
+  // Requests to HTTP services will be constructed with the unsanitized header values and preserved
+  // multi-line headers with the same key.
+  //
+  // If this field is set to false, header values will be sanitized, with any non-UTF-8-compliant
+  // bytes replaced with '!'. Headers with the same key will have their values concatenated into a
+  // single comma-separated header value.
+  // Requests to GRPC services will populate the field
+  // :ref:`headers<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>`.
+  // Requests to HTTP services will have their header values sanitized and will not preserve
+  // multi-line headers with the same key.
+  //
+  // It's recommended you set this to true unless you already rely on the old behavior. False is the
+  // default only for backwards compatibility.
+  bool encode_raw_headers = 23;
 }
 
 // Configuration for buffering the request data.

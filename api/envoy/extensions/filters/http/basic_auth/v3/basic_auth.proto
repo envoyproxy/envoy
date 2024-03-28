@@ -6,6 +6,7 @@ import "envoy/config/core/v3/base.proto";
 
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.basic_auth.v3";
 option java_outer_classname = "BasicAuthProto";
@@ -33,4 +34,11 @@ message BasicAuth {
   // The value needs to be the htpasswd format.
   // Reference to https://httpd.apache.org/docs/2.4/programs/htpasswd.html
   config.core.v3.DataSource users = 1 [(udpa.annotations.sensitive) = true];
+
+  // This field specifies the header name to forward a successfully authenticated user to
+  // the backend. The header will be added to the request with the username as the value.
+  //
+  // If it is not specified, the username will not be forwarded.
+  string forward_username_header = 2
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 }

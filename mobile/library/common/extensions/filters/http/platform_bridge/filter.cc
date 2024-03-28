@@ -101,8 +101,7 @@ PlatformBridgeFilter::PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr c
     callback_time_ms->complete();
     auto elapsed = callback_time_ms->elapsed();
     if (elapsed > SlowCallbackWarningThreshold) {
-      ENVOY_LOG_EVENT(warn, "slow_init_cb",
-                      filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+      ENVOY_LOG_EVENT(warn, "slow_init_cb", "{}|{}ms", filter_name_, elapsed.count());
     }
 
     ASSERT(platform_filter_.instance_context,
@@ -180,8 +179,7 @@ void PlatformBridgeFilter::onDestroy() {
     callback_time_ms->complete();
     auto elapsed = callback_time_ms->elapsed();
     if (elapsed > SlowCallbackWarningThreshold) {
-      ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb",
-                      filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+      ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb", "{}|{}ms", filter_name_, elapsed.count());
     }
   }
 
@@ -285,8 +283,8 @@ Http::FilterHeadersStatus PlatformBridgeFilter::FilterBase::onHeaders(Http::Head
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_headers_cb",
-                    parent_.filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_headers_cb", "{}|{}ms", parent_.filter_name_,
+                    elapsed.count());
   }
 
   state_.on_headers_called_ = true;
@@ -346,8 +344,8 @@ Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_data_cb",
-                    parent_.filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_data_cb", "{}|{}ms", parent_.filter_name_,
+                    elapsed.count());
   }
 
   state_.on_data_called_ = true;
@@ -441,8 +439,8 @@ Http::FilterTrailersStatus PlatformBridgeFilter::FilterBase::onTrailers(Http::He
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_trailers_cb",
-                    parent_.filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_trailers_cb", "{}|{}ms", parent_.filter_name_,
+                    elapsed.count());
   }
 
   state_.on_trailers_called_ = true;
@@ -680,8 +678,8 @@ void PlatformBridgeFilter::FilterBase::onResume() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_resume_cb",
-                    parent_.filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_resume_cb", "{}|{}ms", parent_.filter_name_,
+                    elapsed.count());
   }
 
   state_.on_resume_called_ = true;

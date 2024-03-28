@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.tracers.opentelemetry.samplers.v3;
 
-import "envoy/config/core/v3/http_uri.proto";
+import "envoy/config/core/v3/http_service.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -13,10 +13,9 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/tra
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Dynatrace Sampler config]
+
 // Configuration for the Dynatrace Sampler extension.
 // [#extension: envoy.tracers.opentelemetry.samplers.dynatrace]
-
-// [#next-free-field: 6]
 message DynatraceSamplerConfig {
   // The Dynatrace tenant.
   //
@@ -28,19 +27,21 @@ message DynatraceSamplerConfig {
   // The value can be obtained from the Envoy deployment page in Dynatrace.
   int32 cluster_id = 2;
 
-  // The HTTP URI to fetch the sampler configuration (root spans per minute). For example:
+  // The HTTP service to fetch the sampler configuration from the Dynatrace API (root spans per minute). For example:
   //
   // .. code-block:: yaml
   //
-  //    http_uri:
-  //      uri: <tenant>.dev.dynatracelabs.com/api/v2/samplingConfiguration
-  //      cluster: dynatrace
-  //      timeout: 10s
+  //    http_service:
+  //      http_uri:
+  //        cluster: dynatrace
+  //        uri: <tenant>.dev.dynatracelabs.com/api/v2/samplingConfiguration
+  //        timeout: 10s
+  //      request_headers_to_add:
+  //      - header:
+  //          key : "authorization"
+  //          value: "Api-Token dt..."
   //
-  config.core.v3.HttpUri http_uri = 3;
-
-  // The access token to fetch the sampling configuration from the Dynatrace API
-  string token = 4;
+  config.core.v3.HttpService http_service = 3;
 
   // Default number of root spans per minute, used when the value can't be obtained from the Dynatrace API.
   //
@@ -49,5 +50,5 @@ message DynatraceSamplerConfig {
   // - ``root_spans_per_minute`` is unset
   // - ``root_spans_per_minute`` is set to 0
   //
-  uint32 root_spans_per_minute = 5;
+  uint32 root_spans_per_minute = 4;
 }

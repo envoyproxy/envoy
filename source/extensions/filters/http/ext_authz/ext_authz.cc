@@ -105,8 +105,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       decoder_callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
       std::move(route_metadata_context), check_request_, max_request_bytes_, config_->packAsBytes(),
-      config_->includePeerCertificate(), config_->includeTLSSession(), config_->destinationLabels(),
-      config_->requestHeaderMatchers());
+      config_->headersAsBytes(), config_->includePeerCertificate(), config_->includeTLSSession(),
+      config_->destinationLabels(), config_->requestHeaderMatchers());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
   // Store start time of ext_authz filter call

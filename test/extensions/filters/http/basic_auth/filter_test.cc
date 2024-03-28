@@ -18,7 +18,8 @@ public:
     UserMap users;
     users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
     users.insert({"user2", {"user2", "EJ9LPFDXsN9ynSmbxvjp75Bmlx8="}}); // user2:test2
-    config_ = std::make_unique<FilterConfig>(std::move(users), "stats", *stats_.rootScope());
+    config_ = std::make_unique<FilterConfig>(std::move(users), "x-username", "stats",
+                                             *stats_.rootScope());
     filter_ = std::make_shared<BasicAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
   }
@@ -35,12 +36,14 @@ TEST_F(FilterTest, BasicAuth) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_user1, true));
+  EXPECT_EQ("user1", request_headers_user1.get_("x-username"));
 
   // user2:test2
   Http::TestRequestHeaderMapImpl request_headers_user2{{"Authorization", "Basic dXNlcjI6dGVzdDI="}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_user2, true));
+  EXPECT_EQ("user2", request_headers_user2.get_("x-username"));
 }
 
 TEST_F(FilterTest, UserNotExist) {
@@ -128,6 +131,16 @@ TEST_F(FilterTest, HasAuthHeaderButNoColon) {
       }));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_user1, true));
+}
+
+TEST_F(FilterTest, ExistingUsernameHeader) {
+  // user1:test1
+  Http::TestRequestHeaderMapImpl request_headers_user1{{"Authorization", "Basic dXNlcjE6dGVzdDE="},
+                                                       {"x-username", "existingUsername"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(request_headers_user1, true));
+  EXPECT_EQ("user1", request_headers_user1.get_("x-username"));
 }
 
 } // namespace BasicAuth

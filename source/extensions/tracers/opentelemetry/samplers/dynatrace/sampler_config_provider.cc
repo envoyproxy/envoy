@@ -35,9 +35,12 @@ SamplerConfigProviderImpl::SamplerConfigProviderImpl(
     Server::Configuration::TracerFactoryContext& context,
     const envoy::extensions::tracers::opentelemetry::samplers::v3::DynatraceSamplerConfig& config)
     : cluster_manager_(context.serverFactoryContext().clusterManager()),
-      http_uri_(config.http_uri()),
-      authorization_header_value_(absl::StrCat("Api-Token ", config.token())),
-      sampler_config_(config.root_spans_per_minute()) {
+      http_uri_(config.http_service().http_uri()), sampler_config_(config.root_spans_per_minute()) {
+
+  for (const auto& header_value_option : config.http_service().request_headers_to_add()) {
+    parsed_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
+                                      header_value_option.header().value()});
+  }
 
   timer_ = context.serverFactoryContext().mainThreadDispatcher().createTimer([this]() -> void {
     const auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(http_uri_.cluster());
@@ -47,8 +50,9 @@ SamplerConfigProviderImpl::SamplerConfigProviderImpl(
     } else {
       Http::RequestMessagePtr message = Http::Utility::prepareHeaders(http_uri_);
       message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
-      message->headers().setReference(Http::CustomHeaders::get().Authorization,
-                                      authorization_header_value_);
+      for (const auto& header_pair : parsed_headers_to_add_) {
+        message->headers().setReference(header_pair.first, header_pair.second);
+      }
       active_request_ = thread_local_cluster->httpAsyncClient().send(
           std::move(message), *this,
           Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(

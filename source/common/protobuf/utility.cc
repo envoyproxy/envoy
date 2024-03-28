@@ -340,7 +340,7 @@ void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Messag
 #endif
 }
 
-void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
+void MessageUtil::unpackToOrThrow(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
   if (!any_message.UnpackTo(&message)) {
     throwEnvoyExceptionOrPanic(fmt::format("Unable to unpack as {}: {}",
@@ -354,8 +354,8 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
   }
 }
 
-absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
-                                          Protobuf::Message& message) {
+absl::Status MessageUtil::unpackTo(const ProtobufWkt::Any& any_message,
+                                   Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
   if (!any_message.UnpackTo(&message)) {
     return absl::InternalError(absl::StrCat("Unable to unpack as ",

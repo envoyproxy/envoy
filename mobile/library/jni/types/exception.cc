@@ -16,7 +16,7 @@ bool Exception::checkAndClear(const std::string& details) {
     env->ExceptionClear();
 
     const auto exception = Exception(env, throwable);
-    ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "jni_cleared_pending_exception",
+    ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "jni_cleared_pending_exception", "{}",
                               exception.description(details));
     return true;
   } else {

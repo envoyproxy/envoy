@@ -158,6 +158,17 @@ void DelegatingLogSink::setTlsDelegate(SinkDelegate* sink) { *tlsSink() = sink; 
 
 SinkDelegate* DelegatingLogSink::tlsDelegate() { return *tlsSink(); }
 
+void DelegatingLogSink::logWithStableName(absl::string_view stable_name, absl::string_view level,
+                                          absl::string_view component, absl::string_view message) {
+  auto tls_sink = tlsDelegate();
+  if (tls_sink != nullptr) {
+    tls_sink->logWithStableName(stable_name, level, component, message);
+    return;
+  }
+  absl::ReaderMutexLock sink_lock(&sink_mutex_);
+  sink_->logWithStableName(stable_name, level, component, message);
+}
+
 static std::atomic<Context*> current_context = nullptr;
 static_assert(std::atomic<Context*>::is_always_lock_free);
 

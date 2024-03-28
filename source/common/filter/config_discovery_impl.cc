@@ -248,15 +248,16 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
   }
 }
 
-void FilterConfigProviderManagerImplBase::validateProtoConfigDefaultFactory(
+absl::Status FilterConfigProviderManagerImplBase::validateProtoConfigDefaultFactory(
     const bool null_default_factory, const std::string& filter_config_name,
     absl::string_view type_url) const {
   if (null_default_factory) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("Error: cannot find filter factory {} for default filter "
                     "configuration with type URL {}.",
                     filter_config_name, type_url));
   }
+  return absl::OkStatus();
 }
 
 void FilterConfigProviderManagerImplBase::validateProtoConfigTypeUrl(

@@ -53,7 +53,7 @@ private:
       const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 
-  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr> createProtocolOptionsTyped(
       const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions&
           proto_config,
       Server::Configuration::ProtocolOptionsFactoryContext&) override {

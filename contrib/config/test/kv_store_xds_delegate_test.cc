@@ -81,7 +81,7 @@ protected:
     EXPECT_EQ(expected_resources.size(), retrieved_resources.size());
     for (size_t i = 0; i < expected_resources.size(); ++i) {
       Resource unpacked_resource;
-      MessageUtil::unpackTo(retrieved_resources[i].resource(), unpacked_resource);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(retrieved_resources[i].resource(), unpacked_resource));
       TestUtility::protoEqual(expected_resources[i].get().resource(), unpacked_resource);
     }
   }

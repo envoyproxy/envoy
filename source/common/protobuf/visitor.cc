@@ -28,7 +28,7 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
       target_type_url = any_message->type_url();
       // inner_message must be valid as parsing would have already failed to load if there was an
       // invalid type_url.
-      MessageUtil::unpackTo(*any_message, *inner_message);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(*any_message, *inner_message));
     } else if (message.GetTypeName() == "xds.type.v3.TypedStruct") {
       std::tie(inner_message, target_type_url) =
           Helper::convertTypedStruct<xds::type::v3::TypedStruct>(message);

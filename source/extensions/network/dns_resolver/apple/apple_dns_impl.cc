@@ -407,7 +407,7 @@ public:
                                              typed_dns_resolver_config) const override {
     ASSERT(dispatcher.isThreadSafe());
     envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig apple;
-    Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), apple);
+    THROW_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), apple));
     return std::make_shared<Network::AppleDnsResolverImpl>(apple, dispatcher, api.rootScope());
   }
 };

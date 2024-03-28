@@ -227,7 +227,7 @@ protected:
     // Expect at least the "client_cert" dynamic secret.
     ASSERT_GE(config_dump.configs_size(), 1);
     envoy::admin::v3::SecretsConfigDump::DynamicSecret dynamic_secret;
-    ASSERT_OK(MessageUtil::unpackToNoThrow(config_dump.configs(0), dynamic_secret));
+    ASSERT_OK(MessageUtil::unpackTo(config_dump.configs(0), dynamic_secret));
     EXPECT_EQ(secret_name, dynamic_secret.name());
     EXPECT_EQ(version_info, dynamic_secret.version_info());
   }

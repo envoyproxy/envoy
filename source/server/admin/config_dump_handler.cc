@@ -106,7 +106,9 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
       ASSERT(inner_descriptor != nullptr);
       std::unique_ptr<Protobuf::Message> inner_message;
       inner_message.reset(dmf.GetPrototype(inner_descriptor)->New());
-      MessageUtil::unpackTo(any_message, *inner_message);
+      if (!MessageUtil::unpackTo(any_message, *inner_message).ok()) {
+        return false;
+      }
       // Trim message.
       if (!checkFieldMaskAndTrimMessage(inner_field_mask, *inner_message)) {
         return false;
@@ -151,8 +153,9 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
                                                 Buffer::Instance& response,
                                                 AdminStream& admin_stream) const {
   Http::Utility::QueryParamsMulti query_params = admin_stream.queryParams();
-  const auto resource = query_params.getFirstValue("resource");
-  const auto mask = query_params.getFirstValue("mask");
+  const absl::optional<std::string> resource =
+      Utility::nonEmptyQueryParam(query_params, "resource");
+  const absl::optional<std::string> mask = Utility::nonEmptyQueryParam(query_params, "mask");
   const bool include_eds = shouldIncludeEdsInDump(query_params);
   const absl::StatusOr<Matchers::StringMatcherPtr> name_matcher =
       buildNameMatcher(query_params, server_.regexEngine());

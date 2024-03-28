@@ -76,7 +76,7 @@ class TestNetworkFilterFactory
       public Server::Configuration::NamedNetworkFilterConfigFactory,
       public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
 public:
-  Network::FilterFactoryCb
+  absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
     created_ = true;

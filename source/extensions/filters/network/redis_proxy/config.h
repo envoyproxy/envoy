@@ -74,7 +74,7 @@ private:
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 
-  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr> createProtocolOptionsTyped(
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions&
           proto_config,
       Server::Configuration::ProtocolOptionsFactoryContext&) override {

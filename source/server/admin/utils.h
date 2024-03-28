@@ -25,6 +25,9 @@ absl::Status histogramBucketsParam(const Http::Utility::QueryParamsMulti& params
 
 absl::optional<std::string> formatParam(const Http::Utility::QueryParamsMulti& params);
 
+absl::optional<std::string> nonEmptyQueryParam(const Http::Utility::QueryParamsMulti& params,
+                                               const std::string& key);
+
 } // namespace Utility
 } // namespace Server
 } // namespace Envoy

@@ -591,7 +591,7 @@ filter_chains:
 class NonTerminalFilterFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
+  absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager&) -> void {};
@@ -671,7 +671,7 @@ filter_chains:
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactoryFromProto(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProto(
       const Protobuf::Message&,
       Configuration::FactoryContext& filter_chain_factory_context) override {
     return commonFilterFactory(filter_chain_factory_context);

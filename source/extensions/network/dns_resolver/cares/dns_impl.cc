@@ -550,7 +550,7 @@ public:
     ASSERT(dispatcher.isThreadSafe());
     // Only c-ares DNS factory will call into this function.
     // Directly unpack the typed config to a c-ares object.
-    Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares);
+    THROW_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares));
     if (!cares.resolvers().empty()) {
       const auto& resolver_addrs = cares.resolvers();
       resolvers.reserve(resolver_addrs.size());

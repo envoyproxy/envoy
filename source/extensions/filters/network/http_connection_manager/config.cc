@@ -263,7 +263,7 @@ absl::StatusOr<std::shared_ptr<HttpConnectionManagerConfig>> Utility::createConf
   return config;
 }
 
-Network::FilterFactoryCb
+absl::StatusOr<Network::FilterFactoryCb>
 HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
@@ -271,7 +271,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   return createFilterFactoryFromProtoAndHopByHop(proto_config, context, true);
 }
 
-Network::FilterFactoryCb
+absl::StatusOr<Network::FilterFactoryCb>
 HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHop(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
@@ -306,7 +306,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   };
 }
 
-Network::FilterFactoryCb
+absl::StatusOr<Network::FilterFactoryCb>
 MobileHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::http_connection_manager::v3::
         EnvoyMobileHttpConnectionManager& mobile_config,

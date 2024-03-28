@@ -59,7 +59,8 @@ bool validateOnMatchConfig(const xds::type::matcher::v3::Matcher::OnMatch& on_ma
       return false;
     }
     envoy::config::route::v3::Route on_match_route_action_config;
-    MessageUtil::unpackTo(on_match.action().typed_config(), on_match_route_action_config);
+    THROW_IF_NOT_OK(
+        MessageUtil::unpackTo(on_match.action().typed_config(), on_match_route_action_config));
     ENVOY_LOG_MISC(trace, "typed_config of on_match.action is: {}",
                    on_match_route_action_config.DebugString());
     return !isUnsupportedRouteConfig(on_match_route_action_config);
