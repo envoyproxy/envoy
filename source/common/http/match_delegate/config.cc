@@ -305,9 +305,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.extension_config().typed_config(), validation, factory);
   auto filter_factory_or_error = factory.createFilterFactoryFromProto(*message, prefix, context);
-  if (!filter_factory_or_error.ok()) {
-    throwEnvoyExceptionOrPanic(std::string(filter_factory_or_error.status().message()));
-  }
+  RETURN_IF_STATUS_NOT_OK(filter_factory_or_error);
   auto filter_factory = filter_factory_or_error.value();
 
   Factory::MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
@@ -325,8 +323,8 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
 
   if (!validation_visitor.errors().empty()) {
     // TODO(snowp): Output all violations.
-    throwEnvoyExceptionOrPanic(fmt::format("requirement violation while creating match tree: {}",
-                                           validation_visitor.errors()[0]));
+    return absl::InvalidArgumentError(fmt::format(
+        "requirement violation while creating match tree: {}", validation_visitor.errors()[0]));
   }
 
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree = nullptr;

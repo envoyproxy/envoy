@@ -26,8 +26,7 @@ Tracing::DriverSharedPtr OpenCensusTracerFactory::createTracerDriverTyped(
     }
   }
 
-  driver_ = std::make_shared<Driver>(proto_config, context.serverFactoryContext().localInfo(),
-                                     context.serverFactoryContext().api());
+  driver_ = std::make_shared<Driver>(proto_config, context.serverFactoryContext());
   config_ = proto_config;
   return driver_;
 }

@@ -44,6 +44,9 @@ envoy_cc_library(
     name = "oauth_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
+    external_deps = [
+        "jwt_verify_lib",
+    ],
     deps = [
         ":oauth_client",
         "//envoy/server:filter_config_interface",

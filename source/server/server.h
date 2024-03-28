@@ -140,10 +140,10 @@ public:
    * @param validation_visitor message validation visitor instance.
    * @param api reference to the Api object
    */
-  static void loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                  const Options& options,
-                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                  Api::Api& api);
+  static absl::Status loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                          const Options& options,
+                                          ProtobufMessage::ValidationVisitor& validation_visitor,
+                                          Api::Api& api);
 };
 
 /**

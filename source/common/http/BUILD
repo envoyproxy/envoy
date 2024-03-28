@@ -308,6 +308,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "rds_lib",
+    srcs = [
+        "route_config_update_requster.cc",
+    ],
+    hdrs = [
+        "route_config_update_requster.h",
+    ],
+    deps = [
+        "//envoy/router:rds_interface",
+        "//source/common/router:scoped_rds_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_manager_lib",
     srcs = [
         "conn_manager_impl.cc",
@@ -346,7 +360,6 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:drain_decision_interface",
         "//envoy/network:filter_interface",
-        "//envoy/router:rds_interface",
         "//envoy/router:scopes_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server/overload:overload_manager_interface",
@@ -374,7 +387,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/quic:quic_server_factory_stub_lib",
         "//source/common/router:config_lib",
-        "//source/common/router:scoped_rds_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",

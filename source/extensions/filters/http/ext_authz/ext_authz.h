@@ -69,6 +69,8 @@ public:
         // cause non UTF-8 body content to be changed when it doesn't need to.
         pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
 
+        encode_raw_headers_(config.encode_raw_headers()),
+
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
         filter_enabled_(config.has_filter_enabled()
@@ -77,7 +79,8 @@ public:
                             : absl::nullopt),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
-                ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
+                ? absl::optional<Matchers::MetadataMatcher>(
+                      Matchers::MetadataMatcher(config.filter_enabled_metadata(), factory_context))
                 : absl::nullopt),
         deny_at_disable_(config.has_deny_at_disable()
                              ? absl::optional<Runtime::FeatureFlag>(
@@ -149,6 +152,8 @@ public:
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
   bool packAsBytes() const { return pack_as_bytes_; }
+
+  bool headersAsBytes() const { return encode_raw_headers_; }
 
   Http::Code statusOnError() const { return status_on_error_; }
 
@@ -230,6 +235,7 @@ private:
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const bool pack_as_bytes_;
+  const bool encode_raw_headers_;
   const Http::Code status_on_error_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;

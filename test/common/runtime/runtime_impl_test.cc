@@ -29,7 +29,7 @@
 #include "gtest/gtest.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/envoy_quic_utils.h"
+#include "quiche/common/platform/api/quiche_flags.h"
 #endif
 
 using testing::_;
@@ -107,7 +107,7 @@ public:
 
   void updateDiskLayer(uint32_t layer) {
     ASSERT_LT(layer, on_changed_cbs_.size());
-    on_changed_cbs_[layer](Filesystem::Watcher::Events::MovedTo);
+    EXPECT_TRUE(on_changed_cbs_[layer](Filesystem::Watcher::Events::MovedTo).ok());
   }
 
   ProtobufWkt::Struct base_;
@@ -563,13 +563,13 @@ TEST_F(StaticLoaderImplTest, All) {
 
 #ifdef ENVOY_ENABLE_QUIC
 TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
-  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
-  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicheReloadableFlag(quic_testonly_default_true));
+  EXPECT_FALSE(GetQuicheReloadableFlag(quic_testonly_default_false));
 
   SetQuicheReloadableFlag(quic_testonly_default_true, false);
 
-  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
-  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_FALSE(GetQuicheReloadableFlag(quic_testonly_default_true));
+  EXPECT_FALSE(GetQuicheReloadableFlag(quic_testonly_default_false));
 
   // Test that Quiche flags can be overwritten via Envoy runtime config.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(
@@ -577,8 +577,8 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
       "true");
   setup();
 
-  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
-  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicheReloadableFlag(quic_testonly_default_true));
+  EXPECT_FALSE(GetQuicheReloadableFlag(quic_testonly_default_false));
 
   // Test that Quiche flags can be overwritten again.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(
@@ -586,8 +586,8 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
       "false");
   setup();
 
-  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
-  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_FALSE(GetQuicheReloadableFlag(quic_testonly_default_true));
+  EXPECT_FALSE(GetQuicheReloadableFlag(quic_testonly_default_false));
 }
 #endif
 

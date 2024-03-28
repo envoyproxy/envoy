@@ -39,8 +39,7 @@ public:
       : policy_(policy), runtime_(context.runtime()) {
     for (const auto& additional_origin : policy.additional_origins()) {
       additional_origins_.emplace_back(
-          std::make_unique<
-              Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
               additional_origin, context));
     }
   }

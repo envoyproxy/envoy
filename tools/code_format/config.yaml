@@ -121,7 +121,6 @@ paths:
     - source/common/http/http2/codec_impl.cc
     - source/common/http/hash_policy.cc
     - source/common/http/conn_manager_utility.cc
-    - source/common/http/match_delegate/config.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/visitor.cc
     - source/common/protobuf/utility.cc
@@ -132,7 +131,6 @@ paths:
     - source/common/tcp_proxy/tcp_proxy.cc
     - source/common/config/subscription_factory_impl.cc
     - source/common/config/xds_resource.cc
-    - source/common/runtime/runtime_impl.cc
     - source/common/filter/config_discovery_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
@@ -140,6 +138,7 @@ paths:
     - source/common/router/scoped_config_impl.cc
     - source/common/router/header_parser.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc
+    - source/common/filesystem/inotify/watcher_impl.cc
     - source/common/filesystem/kqueue/watcher_impl.cc
     - source/common/filesystem/win32/directory_iterator_impl.cc
     - source/common/common/utility.cc

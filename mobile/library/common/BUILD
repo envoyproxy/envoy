@@ -24,6 +24,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":engine_common_lib",
+        ":engine_types_lib",
         "//library/common/bridge:utility_lib",
         "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
@@ -71,5 +72,18 @@ envoy_cc_library(
     deps = [
         ":engine_common_lib",
         "@envoy//source/exe:envoy_stripped_main_base_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "engine_types_lib",
+    hdrs = [
+        "engine_types.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/strings",
+        "@envoy//source/common/common:base_logger_lib",
     ],
 )
