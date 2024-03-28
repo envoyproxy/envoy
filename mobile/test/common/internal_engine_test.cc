@@ -1,21 +1,23 @@
-#include <atomic>
-
 #include <sys/resource.h>
 
-#include "source/common/common/assert.h"
-
-#include "test/common/http/common.h"
-#include "test/common/mocks/common/mocks.h"
-#include "test/mocks/thread/mocks.h"
+#include <atomic>
 
 #include "absl/synchronization/notification.h"
+
 #include "gtest/gtest.h"
+
 #include "library/cc/engine_builder.h"
 #include "library/common/api/external.h"
 #include "library/common/bridge/utility.h"
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
+
+#include "source/common/common/assert.h"
+
+#include "test/common/http/common.h"
+#include "test/common/mocks/common/mocks.h"
+#include "test/mocks/thread/mocks.h"
 
 namespace Envoy {
 
@@ -490,9 +492,8 @@ protected:
   // Returns the engine's main thread priority.
   int startEngineWithPriority(const int thread_priority) {
     EngineTestContext test_context{};
-    envoy_event_tracker event_tracker{};
     std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
-        createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, event_tracker);
+        createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
     engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG, thread_priority);
 
     struct CallbackContext {

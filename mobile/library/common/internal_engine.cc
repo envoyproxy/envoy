@@ -3,6 +3,7 @@
 #include <sys/resource.h>
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/utility.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -62,7 +63,7 @@ envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> optio
           const int rc = setpriority(PRIO_PROCESS, thread_factory_->currentThreadId().getId(),
                                      *thread_priority);
           if (rc != 0) {
-            ENVOY_LOG(debug, "failed to set thread priority: {}", strerror(errno));
+            ENVOY_LOG(debug, "failed to set thread priority: {}", Envoy::errorDetails(errno));
           }
         }
 
