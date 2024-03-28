@@ -309,15 +309,17 @@ void DetectorImpl::initialize(Cluster& cluster) {
   }
 
   if (config_.successfulActiveHealthCheckUnejectHost() && cluster.healthChecker() != nullptr) {
-    cluster.healthChecker()->addHostCheckCompleteCb([this](HostSharedPtr host, HealthTransition) {
-      // If the host is ejected by outlier detection and active health check succeeds,
-      // we should treat this host as healthy.
-      if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
-          host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-        host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-        unejectHost(host);
-      }
-    });
+    cluster.healthChecker()->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition, HealthState current_check_result) {
+          // If the host is ejected by outlier detection and active health check succeeds,
+          // we should treat this host as healthy.
+          if (current_check_result == HealthState::Healthy &&
+              !host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
+              host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+            host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+            unejectHost(host);
+          }
+        });
   }
   member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {

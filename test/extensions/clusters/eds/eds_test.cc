@@ -846,7 +846,7 @@ TEST_F(EdsTest, EndpointRemovalAfterHcFail) {
     not_removed_host = hosts[0];
     removed_host = hosts[1];
     hosts[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-    health_checker->runCallbacks(hosts[1], HealthTransition::Changed);
+    health_checker->runCallbacks(hosts[1], HealthTransition::Changed, HealthState::Unhealthy);
   }
 
   {
@@ -987,7 +987,7 @@ TEST_F(EdsTest, DisableActiveHCEndpoints) {
     hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
 
     // After the active health check status is changed, run the callbacks to reload hosts.
-    health_checker->runCallbacks(hosts[1], HealthTransition::Changed);
+    health_checker->runCallbacks(hosts[1], HealthTransition::Changed, HealthState::Healthy);
 
     auto& hosts_reload = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts_reload.size(), 2);

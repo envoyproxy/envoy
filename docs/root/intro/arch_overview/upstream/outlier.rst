@@ -204,7 +204,11 @@ For gRPC requests, the outlier detection will use the HTTP status mapped from th
 .. note::
 
   If :ref:`active health checking <arch_overview_health_checking>` is also configured, a successful active health check unejects the host and
-  clears all outlier detection counters. If your active health check is not validating data plane traffic then in situations where
+  clears all outlier detection counters. If the host has not reached :ref:`unhealthy_threshold<envoy_v3_api_field_config.core.v3.HealthCheck.unhealthy_threshold>`
+  failed health checks yet, a single successful health check will uneject the host. If the FAILED_ACTIVE_HC health flag is set for the host,
+  :ref:`healthy_threshold<envoy_v3_api_field_config.core.v3.HealthCheck.healthy_threshold>` consecutive successful health checks
+  will uneject the host (and clear the FAILED_ACTIVE_HC flag).
+  If your active health check is not validating data plane traffic then in situations where
   active health checking passes but the traffic is failing, the endpoint will be unejected prematurely. To disable this option then set
   :ref:`outlier_detection.successful_active_health_check_uneject_host<envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`
   configuration flag to ``false``.
