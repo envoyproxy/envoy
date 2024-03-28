@@ -74,6 +74,7 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:retry_factory_lib",
         "//source/extensions/early_data:default_early_data_policy_lib",
+        "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/path/match/uri_template:config",
         "//source/extensions/path/rewrite/uri_template:config",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
