@@ -268,7 +268,7 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     break;
   }
   case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
-    output_file_ << trace->DebugString();
+    output_file_ << MessageUtil::toTextProto(*trace);
     break;
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
