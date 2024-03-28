@@ -11,6 +11,12 @@ behavior_changes:
     The runtime flag ``envoy.reloadable_features.enable_include_histograms`` is now enabled by default.
     This causes the ``includeHistogram()`` method on ``Stats::SinkPredicates`` to filter histograms to
     be flushed to stat sinks.
+- area: proxy_protocol
+  change: |
+    Use typed metadata by default in proxy protocol listener. Typed metadata can be consumed as
+    :ref:`TlvsMetadata type <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.TlvsMetadata>`.
+    This change temporarily disabled by setting the runtime flag ``envoy.reloadable_features.use_typed_metadata_in_proxy_protol_listener``
+    to ``false``.
 - area: http2
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
