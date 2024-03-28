@@ -1430,5 +1430,52 @@ HostConstSharedPtr RandomLoadBalancer::peekOrChoose(LoadBalancerContext* context
   return hosts_to_use[random_hash % hosts_to_use.size()];
 }
 
+HostConstSharedPtr PeakEWMALoadBalancer::chooseHostOnce(LoadBalancerContext* context) {
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(false));
+  if (!hosts_source) {
+    return nullptr;
+  }
+
+  const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
+  if (hosts_to_use.empty()) {
+    return nullptr;
+  }
+
+  HostSharedPtr candidate_host = nullptr;
+  // TODO(jizhuozhi): maybe this should be configurable, but there seems to be no problem so far.
+  for (uint32_t choice_idx = 0; choice_idx < 2; ++choice_idx) {
+    const int rand_idx = random_.random() % hosts_to_use.size();
+    HostSharedPtr sampled_host = hosts_to_use[rand_idx];
+
+    if (candidate_host == nullptr) {
+      // Make a first choice to start the comparisons.
+      candidate_host = sampled_host;
+      continue;
+    }
+
+    const double candidate_score = score(candidate_host);
+    const double sampled_score = score(sampled_host);
+    if (candidate_score < sampled_score) {
+      candidate_host = sampled_host;
+    }
+  }
+  return candidate_host;
+}
+
+double PeakEWMALoadBalancer::score(HostSharedPtr host) {
+  double active_req = host->stats().rq_active_.value();
+  double weight = host->weight();
+  double decay_rtt = host->stats().decay_rtt_.decay_value();
+  double decay_err = host->stats().decay_err_.decay_value();
+  double decay_total = host->stats().decay_total_.decay_value();
+
+  // TODO(jizhuozhi): maybe this should be configurable, but there seems to be no problem so far.
+  if (decay_rtt == 0) {
+    decay_rtt = DEFAULT_RTT;
+  }
+
+  return ((active_req + 1) / weight) * decay_rtt / (1 - (decay_err / (decay_total + 1)));
+}
+
 } // namespace Upstream
 } // namespace Envoy

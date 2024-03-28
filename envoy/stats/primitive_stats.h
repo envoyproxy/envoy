@@ -5,7 +5,9 @@
 #include "envoy/stats/tag.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
 #include "source/common/common/non_copyable.h"
+#include "source/common/common/thread.h"
 
 #include "absl/strings/string_view.h"
 
@@ -106,6 +108,34 @@ public:
 private:
   const uint64_t value_;
 };
+
+class PrimitiveEwma : NonCopyable {
+public:
+  PrimitiveEwma() = default;
+
+  double value() const { return value_; }
+
+  double decay_value() {
+    update(0);
+    return value_;
+  }
+
+  void update(double v) {
+    Thread::LockGuard guard_(mutex_);
+    long now = time(nullptr);
+    value_ = v * alpha_ + pow(1 - alpha_, now - last_tick_) * value_;
+    last_tick_ = now;
+  }
+
+private:
+  const double alpha_ = 1 - exp(-5 / 60 / 1); // for one-minute moving average
+
+  Thread::MutexBasicLockable mutex_;
+  std::atomic<double> value_{0};
+  time_t last_tick_{time(nullptr)};
+};
+
+using PrimitiveEwmaReference = std::reference_wrapper<PrimitiveEwma>;
 
 } // namespace Stats
 } // namespace Envoy
