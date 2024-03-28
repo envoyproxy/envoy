@@ -1337,6 +1337,11 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
   return 0;
 }
 
+void ConnectionImpl::onFrameNotSend(int32_t stream_id, size_t /*length*/, uint8_t type,
+                                    uint8_t /*flags*/) {
+  adapter_->FrameNotSent(stream_id, type);
+}
+
 int ConnectionImpl::onError(absl::string_view error) {
   ENVOY_CONN_LOG(debug, "invalid http2: {}", connection_, error);
   return 0;
@@ -1847,9 +1852,11 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
       });
 
   nghttp2_session_callbacks_set_on_frame_not_send_callback(
-      callbacks_, [](nghttp2_session*, const nghttp2_frame*, int, void*) -> int {
+      callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, int, void* user_data) -> int {
         // We used to always return failure here but it looks now this can get called if the other
         // side sends GOAWAY and we are trying to send a SETTINGS ACK. Just ignore this for now.
+        static_cast<ConnectionImpl*>(user_data)->onFrameNotSend(
+            frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags);
         return 0;
       });
 
