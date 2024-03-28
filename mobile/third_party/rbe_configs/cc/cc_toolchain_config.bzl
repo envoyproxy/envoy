@@ -1231,7 +1231,7 @@ def _impl(ctx):
             user_compile_flags_feature,
             sysroot_feature,
             unfiltered_compile_flags_feature,
-        ] + layering_check_features(ctx.attr.compiler)
+        ]
     else:
         features = [
             supports_pic_feature,
@@ -1251,7 +1251,7 @@ def _impl(ctx):
             user_compile_flags_feature,
             sysroot_feature,
             unfiltered_compile_flags_feature,
-        ] + layering_check_features(ctx.attr.compiler)
+        ]
 
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
