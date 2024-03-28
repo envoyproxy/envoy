@@ -74,14 +74,15 @@ TEST(TagExtractorTest, noSubstrMismatch) {
 }
 
 TEST(TagExtractorTest, EmptyName) {
-  EXPECT_THROW_WITH_MESSAGE(
-      TagExtractorStdRegexImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)"), EnvoyException,
+  EXPECT_EQ(
+      TagExtractorStdRegexImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)").status().message(),
       "tag_name cannot be empty");
 }
 
 TEST(TagExtractorTest, BadRegex) {
-  EXPECT_THROW_WITH_REGEX(TagExtractorStdRegexImpl::createTagExtractor("cluster_name", "+invalid"),
-                          EnvoyException, "Invalid regex '\\+invalid':");
+  EXPECT_THROW_WITH_REGEX(
+      TagExtractorStdRegexImpl::createTagExtractor("cluster_name", "+invalid").IgnoreError(),
+      EnvoyException, "Invalid regex '\\+invalid':");
 }
 
 class DefaultTagRegexTester {
@@ -489,7 +490,7 @@ TEST(TagExtractorTest, ExtAuthzTagExtractors) {
 TEST(TagExtractorTest, ExtractRegexPrefix) {
   TagExtractorPtr tag_extractor; // Keep tag_extractor in this scope to prolong prefix lifetime.
   auto extractRegexPrefix = [&tag_extractor](const std::string& regex) -> absl::string_view {
-    tag_extractor = TagExtractorStdRegexImpl::createTagExtractor("foo", regex);
+    tag_extractor = TagExtractorStdRegexImpl::createTagExtractor("foo", regex).value();
     return tag_extractor->prefixToken();
   };
 
@@ -504,8 +505,9 @@ TEST(TagExtractorTest, ExtractRegexPrefix) {
 }
 
 TEST(TagExtractorTest, CreateTagExtractorNoRegex) {
-  EXPECT_THROW_WITH_REGEX(TagExtractorStdRegexImpl::createTagExtractor("no such default tag", ""),
-                          EnvoyException, "^No regex specified for tag specifier and no default");
+  EXPECT_THAT(
+      TagExtractorStdRegexImpl::createTagExtractor("no such default tag", "").status().message(),
+      testing::ContainsRegex("^No regex specified for tag specifier and no default"));
 }
 
 class TagExtractorTokensTest : public testing::Test {
