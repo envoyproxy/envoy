@@ -123,6 +123,7 @@ public:
   EngineBuilder();
   EngineBuilder(EngineBuilder&&) = default;
   virtual ~EngineBuilder() = default;
+  static std::string nativeNameToConfig(absl::string_view name);
 
   [[deprecated("Use EngineBuilder::setLogLevel instead")]] EngineBuilder&
   addLogLevel(LogLevel log_level);

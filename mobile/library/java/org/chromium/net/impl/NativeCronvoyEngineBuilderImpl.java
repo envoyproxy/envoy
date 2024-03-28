@@ -115,7 +115,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   public CronvoyEngineBuilderImpl addUrlInterceptorsForTesting() {
     nativeFilterChain.add(new EnvoyNativeFilterConfig(
         "envoy.filters.http.test_read",
-        "{\"@type\": type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead}"));
+        "[type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead] {}"));
     return this;
   }
 

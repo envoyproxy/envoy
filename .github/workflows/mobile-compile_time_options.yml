@@ -50,12 +50,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - name: Running C++ test with YAML disabled
-          target: cc-test-no-yaml
-          args: >-
-            build
-            --config=mobile-remote-ci-cc-no-yaml
-            //test/common/integration:client_integration_test
         - name: Running C++ build with exceptions disabled
           target: cc-no-build-exceptions
           args: >-

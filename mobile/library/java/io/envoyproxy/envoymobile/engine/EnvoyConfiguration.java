@@ -209,9 +209,7 @@ public class EnvoyConfiguration {
     int index = 0;
     // Insert in this order to preserve prior ordering constraints.
     for (EnvoyHTTPFilterFactory filterFactory : httpPlatformFilterFactories) {
-      String config =
-          "{'@type': type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, platform_filter_name: " +
-          filterFactory.getFilterName() + "}";
+      String config = JniLibrary.getNativeFilterConfig(filterFactory.getFilterName());
       EnvoyNativeFilterConfig ins =
           new EnvoyNativeFilterConfig("envoy.filters.http.platform_bridge", config);
       nativeFilterChain.add(index++, ins);

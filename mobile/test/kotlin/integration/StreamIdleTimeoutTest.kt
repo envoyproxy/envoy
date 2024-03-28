@@ -79,7 +79,7 @@ class StreamIdleTimeoutTest {
           name = "idle_timeout_validation_filter",
           factory = { IdleTimeoutValidationFilter(filterExpectation) }
         )
-        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
+        .addNativeFilter("test_remote_response", "[$TEST_RESPONSE_FILTER_TYPE] {}")
         .addStreamIdleTimeoutSeconds(1)
         .build()
 
