@@ -65,6 +65,10 @@ minor_behavior_changes:
   change: |
     Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
     previously used HTTP/1 parser).
+- area: route config
+  change: |
+    changed :ref:`file datasource <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` implementation to listen to
+    file changes and dynamically update the response.
 - area: http
   change: |
     When the HTTP CONNECT request method is enabled using :ref:`RouteAction.UpgradeConfig

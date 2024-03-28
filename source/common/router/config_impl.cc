@@ -29,6 +29,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/regex.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/datasource.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
@@ -545,10 +546,34 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       using_new_timeouts_(route.route().has_max_stream_duration()),
       match_grpc_(route.match().has_grpc()),
       case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
+  Api::Api& api = factory_context.api();
   auto body_or_error = ConfigUtility::parseDirectResponseBody(
-      route, factory_context.api(), vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
+      route, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
   THROW_IF_STATUS_NOT_OK(body_or_error, throw);
-  direct_response_body_ = body_or_error.value();
+  std::string& direct_response_body = body_or_error.value();
+  tls_ = factory_context.threadLocal().allocateSlot();
+  tls_->set([direct_response_body](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalDirectResponseBody>(direct_response_body);
+  });
+  if (envoy::config::core::v3::DataSource::SpecifierCase::kFilename ==
+      route.direct_response().body().specifier_case()) {
+    direct_response_file_watcher_ =
+        factory_context.mainThreadDispatcher().createFilesystemWatcher();
+    THROW_IF_NOT_OK(direct_response_file_watcher_->addWatch(
+        route.direct_response().body().filename(),
+        Filesystem::Watcher::Events::Modified | Filesystem::Watcher::Events::MovedTo,
+        [this, &api, file_name = route.direct_response().body().filename()](uint32_t) {
+          auto file_or_error = Envoy::Config::DataSource::readFileDatasource(
+              file_name, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
+          RETURN_IF_STATUS_NOT_OK(file_or_error);
+          std::string& direct_response_body = file_or_error.value();
+          tls_->set([direct_response_body](
+                        Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+            return std::make_shared<ThreadLocalDirectResponseBody>(direct_response_body);
+          });
+          return absl::OkStatus();
+        }));
+  }
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
     request_headers_parser_ =
         HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
