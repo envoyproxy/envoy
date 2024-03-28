@@ -77,19 +77,19 @@ private:
 };
 
 class SetResponseCodeFilterFactory
-    : public Extensions::HttpFilters::Common::FactoryBase<
+    : public Extensions::HttpFilters::Common::DualFactoryBase<
           test::integration::filters::SetResponseCodeFilterConfig,
           test::integration::filters::SetResponseCodePerRouteFilterConfig> {
 public:
-  SetResponseCodeFilterFactory() : FactoryBase("set-response-code-filter") {}
+  SetResponseCodeFilterFactory() : DualFactoryBase("set-response-code-filter") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const test::integration::filters::SetResponseCodeFilterConfig& proto_config,
-      const std::string&, Server::Configuration::FactoryContext& context) override {
+      const std::string&, DualInfo, Server::Configuration::ServerFactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
         proto_config.prefix(), proto_config.code(), proto_config.body(),
-        context.serverFactoryContext());
+        context);
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<SetResponseCodeFilter>(filter_config));
     };
@@ -113,5 +113,8 @@ private:
   }
 };
 
+using UpstreamSetResponseCodeFilterFactory = SetResponseCodeFilterFactory;
 REGISTER_FACTORY(SetResponseCodeFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamSetResponseCodeFilterFactory, Server::Configuration::UpstreamHttpFilterConfigFactory);
+
 } // namespace Envoy

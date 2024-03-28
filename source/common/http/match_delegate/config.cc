@@ -275,7 +275,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           proto_config.extension_config());
-  Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context, absl::nullopt,
+  Envoy::Http::Matching::HttpFilterActionContext action_context{true, prefix, context, absl::nullopt,
                                                                 context.serverFactoryContext()};
   return createFilterFactory(proto_config, prefix, context.messageValidationVisitor(),
                              action_context, context, factory);
@@ -288,7 +288,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::UpstreamHttpFilterConfigFactory>(
           proto_config.extension_config());
-  Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, absl::nullopt, context,
+  Envoy::Http::Matching::HttpFilterActionContext action_context{false, prefix, absl::nullopt, context,
                                                                 context.serverFactoryContext()};
   return createFilterFactory(proto_config, prefix,
                              context.serverFactoryContext().messageValidationVisitor(),
@@ -359,7 +359,7 @@ FilterConfigPerRoute::createFilterMatchTree(
       envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance().GetTypeName()));
   requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
       xds::type::matcher::v3::HttpAttributesCelMatchInput::default_instance().GetTypeName()));
-  Envoy::Http::Matching::HttpFilterActionContext action_context{
+  Envoy::Http::Matching::HttpFilterActionContext action_context{true,
       fmt::format("http.{}.",
                   server_context.scope().symbolTable().toString(server_context.scope().prefix())),
       absl::nullopt, absl::nullopt, server_context};

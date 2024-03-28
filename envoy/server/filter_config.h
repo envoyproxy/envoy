@@ -268,24 +268,6 @@ public:
                                        Server::Configuration::ServerFactoryContext&) {
     return false;
   }
-};
-
-class NamedHttpFilterConfigFactory : public virtual HttpFilterConfigFactoryBase {
-public:
-  /**
-   * Create a particular http filter factory implementation. If the implementation is unable to
-   * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
-   * callback should always be initialized.
-   * @param config supplies the general Protobuf message to be marshaled into a filter-specific
-   * configuration.
-   * @param stat_prefix prefix for stat logging
-   * @param context supplies the filter's context.
-   * @return  absl::StatusOr<Http::FilterFactoryCb> the factory creation function or an error if
-   * creation fails.
-   */
-  virtual absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
-                               Server::Configuration::FactoryContext& context) PURE;
 
   /**
    * Create a particular http filter factory implementation. If the implementation is unable to
@@ -304,6 +286,24 @@ public:
         "Creating filter factory from server factory context is not supported");
     return nullptr;
   }
+};
+
+class NamedHttpFilterConfigFactory : public virtual HttpFilterConfigFactoryBase {
+public:
+  /**
+   * Create a particular http filter factory implementation. If the implementation is unable to
+   * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
+   * callback should always be initialized.
+   * @param config supplies the general Protobuf message to be marshaled into a filter-specific
+   * configuration.
+   * @param stat_prefix prefix for stat logging
+   * @param context supplies the filter's context.
+   * @return  absl::StatusOr<Http::FilterFactoryCb> the factory creation function or an error if
+   * creation fails.
+   */
+  virtual absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
+                               Server::Configuration::FactoryContext& context) PURE;
 };
 
 class UpstreamHttpFilterConfigFactory : public virtual HttpFilterConfigFactoryBase {

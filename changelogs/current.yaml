@@ -348,6 +348,12 @@ new_features:
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
     to allow adding custom prefix to the stats emitted by rules.
+- area: match_delegate
+  change: |
+    Convert match_delegate fiter into dual filter so it can be installed in the upstream filter chain.
+- area: composite
+  change: |
+    Convert composite fiter into dual filter so it can be installed in the upstream filter chain.
 
 deprecated:
 - area: listener

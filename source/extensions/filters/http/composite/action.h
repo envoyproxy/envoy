@@ -41,6 +41,46 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterAction>();
   }
+
+private:
+  template<class FactoryCtx, class FilterCfgFactory>
+  Matcher::ActionFactoryCb createActionFactoryCbTyped(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Http::Matching::HttpFilterActionContext& context,
+      ProtobufMessage::ValidationVisitor& validation_visitor,
+      OptRef<FactoryCtx> factory_context) {
+    auto& factory =
+        Config::Utility::getAndCheckFactory<FilterCfgFactory>(
+            composite_action.typed_config());
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        composite_action.typed_config().typed_config(), validation_visitor, factory);
+
+    Envoy::Http::FilterFactoryCb callback = nullptr;
+
+    // First, try to create the filter factory creation function from factory context (if exists).
+    if (factory_context.has_value()) {
+      auto callback_or_status = factory.createFilterFactoryFromProto(
+          *message, context.stat_prefix_, factory_context.value());
+      THROW_IF_STATUS_NOT_OK(callback_or_status, throw);
+      callback = callback_or_status.value();
+    }
+
+    // If above failed, try to create the filter factory creation function from server factory
+    // context (if exists).
+    if (callback == nullptr && context.server_factory_context_.has_value()) {
+      callback = factory.createFilterFactoryFromProtoWithServerContext(
+          *message, context.stat_prefix_, context.server_factory_context_.value());
+    }
+
+    if (callback == nullptr) {
+      throw EnvoyException("Failed to get filter factory creation function");
+    }
+    std::string name = composite_action.typed_config().name();
+
+    return [cb = std::move(callback), n = std::move(name)]() -> Matcher::ActionPtr {
+      return std::make_unique<ExecuteFilterAction>(cb, n);
+    };
+  }
 };
 
 DECLARE_FACTORY(ExecuteFilterActionFactory);
