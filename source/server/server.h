@@ -32,6 +32,7 @@
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/init/manager_impl.h"
+#include "source/common/memory/stats.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
@@ -338,7 +339,6 @@ private:
       Stage stage, std::function<void()> completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
-
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
 
@@ -416,8 +416,8 @@ private:
   ServerFactoryContextImpl server_contexts_;
   bool enable_reuse_port_default_{false};
   Regex::EnginePtr regex_engine_;
-
   bool stats_flush_in_progress_ : 1;
+  std::unique_ptr<Memory::AllocatorManager> memory_allocator_manager_;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {
