@@ -70,7 +70,7 @@ public:
       }
 
       // Set the config to either read the audience URL from a request header or
-      // from metadata on the cluster..
+      // from metadata on the cluster.
       if (configure_audience_from_headers) {
         TestUtility::loadFromYaml(request_header_audience_provider_config_, proto_config_);
       } else {
