@@ -195,6 +195,11 @@ public:
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
   EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
 
+  // Sets the thread priority of the Envoy main (network) thread.
+  // The value must be an integer between -20 (highest priority) and 19 (lowest priority). Values
+  // outside of this range will be ignored.
+  EngineBuilder& setNetworkThreadPriority(int thread_priority);
+
 #if defined(__APPLE__)
   // Right now, this API is only used by Apple (iOS) to register the Apple proxy resolver API for
   // use in reading and using the system proxy settings.
@@ -244,6 +249,7 @@ private:
   absl::optional<ProtobufWkt::Struct> node_metadata_ = absl::nullopt;
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
+  absl::optional<int> network_thread_priority_ = absl::nullopt;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 

@@ -159,6 +159,11 @@ EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<EngineCallbacks>())
 #endif
 }
 
+EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
+  network_thread_priority_ = thread_priority;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
   // Envoy::Platform::LogLevel is essentially the same as Logger::Logger::Levels, so we can
   // safely cast it.
@@ -960,7 +965,7 @@ EngineSharedPtr EngineBuilder::build() {
           .ok(),
       "invalid log level");
   options->setConcurrency(1);
-  envoy_engine->run(options);
+  envoy_engine->run(options, network_thread_priority_);
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend
