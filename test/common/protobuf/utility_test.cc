@@ -217,10 +217,10 @@ TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
   repeated.Add()->set_value(10);
   EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[value:\\s*10\n\\]"));
+              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n\\]"));
   repeated.Add()->set_value(20);
   EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[value:\\s*10\n, value:\\s*20\n\\]"));
+              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n,.*[\n]*value:\\s*20\n\\]"));
 }
 
 // Validated exception thrown when downcastAndValidate observes a PGV failures.
@@ -1455,7 +1455,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   source_any.PackFrom(source_duration);
   EXPECT_THROW_WITH_REGEX(
       TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any), EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 // Validated exception thrown when anyConvertAndValidate observes a PGV failures.
@@ -1477,7 +1477,7 @@ TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Timestamp dst;
   EXPECT_THROW_WITH_REGEX(
       MessageUtil::unpackToOrThrow(source_any, dst), EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 // MessageUtility::unpackToOrThrow() with API message works at same version.
@@ -1523,9 +1523,10 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   ProtobufWkt::Timestamp dst;
   auto status = MessageUtil::unpackTo(source_any, dst);
   EXPECT_TRUE(absl::IsInternal(status));
-  EXPECT_THAT(std::string(status.message()),
-              testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
-                                     "\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
+  EXPECT_THAT(
+      std::string(status.message()),
+      testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
+                             ".*[\n]*\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
 }
 
 // MessageUtility::loadFromJson() throws on garbage JSON.

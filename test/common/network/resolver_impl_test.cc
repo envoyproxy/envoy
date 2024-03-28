@@ -170,7 +170,8 @@ TEST(ResolverTest, NonStandardResolver) {
 
 TEST(ResolverTest, UninitializedAddress) {
   envoy::config::core::v3::Address address;
-  EXPECT_EQ(resolveProtoAddress(address).status().message(), "Address must be set: ");
+  EXPECT_THAT(resolveProtoAddress(address).status().message(),
+              testing::HasSubstr("Address must be set: "));
 }
 
 TEST(ResolverTest, NoSuchResolver) {

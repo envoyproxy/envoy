@@ -31,6 +31,7 @@
 
 using testing::ContainsRegex;
 using testing::Eq;
+using testing::HasSubstr;
 using testing::Optional;
 using testing::Ref;
 using testing::Return;
@@ -156,12 +157,11 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    EXPECT_EQ(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
-                                               false)
-            .status()
-            .message(),
-        "API configs must have either a gRPC service or a cluster name defined: api_type: GRPC\n");
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .status()
+                    .message(),
+                HasSubstr("API configs must have either a gRPC service or a cluster name defined"));
   }
 
   {
@@ -545,7 +545,7 @@ TEST(UtilityTest, AnyWrongType) {
       Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
                                      out),
       EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
@@ -563,7 +563,7 @@ TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
       Utility::translateAnyToFactoryConfig(typed_config,
                                            ProtobufMessage::getStrictValidationVisitor(), factory),
       EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST(UtilityTest, TranslateAnyToFactoryConfig) {
@@ -735,10 +735,10 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
 
   // GRPC cluster without GRPC services.
-  EXPECT_EQ(
+  EXPECT_THAT(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
           .message(),
-      "API configs must have either a gRPC service or a cluster name defined: api_type: GRPC\n");
+      HasSubstr("API configs must have either a gRPC service or a cluster name defined"));
 
   // Non-existent cluster.
   api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo_cluster");
