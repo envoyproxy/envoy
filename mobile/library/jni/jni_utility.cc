@@ -5,6 +5,7 @@
 
 #include "source/common/common/assert.h"
 
+#include "library/common/types/matcher_data.h"
 #include "library/jni/jni_support.h"
 #include "library/jni/types/env.h"
 #include "library/jni/types/exception.h"
@@ -369,13 +370,60 @@ LocalRefUniquePtr<jbyteArray> protoToJavaByteArray(JniHelper& jni_helper,
   return byte_array;
 }
 
-std::string javaStringToString(JniHelper& jni_helper, jstring java_string) {
+std::string javaStringToCppString(JniHelper& jni_helper, jstring java_string) {
   if (!java_string) {
     return "";
   }
-  StringUtfUniquePtr native_java_string = jni_helper.getStringUtfChars(java_string, nullptr);
-  std::string cpp_string(native_java_string.get());
-  return cpp_string;
+  StringUtfUniquePtr cpp_java_string = jni_helper.getStringUtfChars(java_string, nullptr);
+  return std::string(cpp_java_string.get());
+}
+
+LocalRefUniquePtr<jstring> cppStringToJavaString(JniHelper& jni_helper,
+                                                 const std::string& cpp_string) {
+  return jni_helper.newStringUtf(cpp_string.c_str());
+}
+
+absl::flat_hash_map<std::string, std::string> javaMapToCppMap(JniHelper& jni_helper,
+                                                              jobject java_map) {
+  absl::flat_hash_map<std::string, std::string> cpp_map;
+
+  auto java_map_class = jni_helper.getObjectClass(java_map);
+  auto java_entry_set_method_id =
+      jni_helper.getMethodId(java_map_class.get(), "entrySet", "()Ljava/util/Set;");
+  auto java_entry_set_object = jni_helper.callObjectMethod(java_map, java_entry_set_method_id);
+
+  auto java_set_class = jni_helper.getObjectClass(java_entry_set_object.get());
+  auto java_map_entry_class = jni_helper.findClass("java/util/Map$Entry");
+
+  auto java_iterator_method_id =
+      jni_helper.getMethodId(java_set_class.get(), "iterator", "()Ljava/util/Iterator;");
+  auto java_get_key_method_id =
+      jni_helper.getMethodId(java_map_entry_class.get(), "getKey", "()Ljava/lang/Object;");
+  auto java_get_value_method_id =
+      jni_helper.getMethodId(java_map_entry_class.get(), "getValue", "()Ljava/lang/Object;");
+
+  auto java_iterator_object =
+      jni_helper.callObjectMethod(java_entry_set_object.get(), java_iterator_method_id);
+  auto java_iterator_class = jni_helper.getObjectClass(java_iterator_object.get());
+  auto java_has_next_method_id =
+      jni_helper.getMethodId(java_iterator_class.get(), "hasNext", "()Z");
+  auto java_next_method_id =
+      jni_helper.getMethodId(java_iterator_class.get(), "next", "()Ljava/lang/Object;");
+
+  while (jni_helper.callBooleanMethod(java_iterator_object.get(), java_has_next_method_id)) {
+    auto java_entry_object =
+        jni_helper.callObjectMethod(java_iterator_object.get(), java_next_method_id);
+    auto java_key_object =
+        jni_helper.callObjectMethod<jstring>(java_entry_object.get(), java_get_key_method_id);
+    auto java_value_object =
+        jni_helper.callObjectMethod<jstring>(java_entry_object.get(), java_get_value_method_id);
+
+    std::string cpp_key = javaStringToCppString(jni_helper, java_key_object.get());
+    std::string cpp_value = javaStringToCppString(jni_helper, java_value_object.get());
+    cpp_map.emplace(std::move(cpp_key), std::move(cpp_value));
+  }
+
+  return cpp_map;
 }
 
 } // namespace JNI
