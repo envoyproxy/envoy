@@ -614,6 +614,7 @@ void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst)
 }
 
 std::string MessageUtil::toTextProto(const Protobuf::Message& message) {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   std::string text_format;
   Protobuf::TextFormat::Printer printer;
   printer.SetExpandAny(true);
@@ -621,6 +622,11 @@ std::string MessageUtil::toTextProto(const Protobuf::Message& message) {
   bool result = printer.PrintToString(message, &text_format);
   ASSERT(result);
   return text_format;
+#else
+  // Note that MessageLite::DebugString never had guarantees of producing
+  // serializable text proto representation.
+  return message.DebugString();
+#endif
 }
 
 bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {
