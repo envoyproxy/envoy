@@ -208,14 +208,12 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "xds_test_server_interface_lib",
+    name = "xds_test_server_lib",
     srcs = [
         "xds_test_server.cc",
-        "xds_test_server_interface.cc",
     ],
     hdrs = [
         "xds_test_server.h",
-        "xds_test_server_interface.h",
     ],
     repository = "@envoy",
     deps = [

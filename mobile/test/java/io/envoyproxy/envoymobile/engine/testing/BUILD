@@ -30,7 +30,7 @@ android_library(
     data = [
         "//test/jni:libenvoy_jni_http_test_server_factory.so",
     ],
-    visibility = ["//test:__subpackages__"],
+    visibility = ["//visibility:public"],
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
@@ -46,7 +46,23 @@ android_library(
     data = [
         "//test/jni:libenvoy_jni_http_proxy_test_server_factory.so",
     ],
-    visibility = ["//test:__subpackages__"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
+    ],
+)
+
+android_library(
+    name = "xds_test_server_factory_lib",
+    testonly = True,
+    srcs = [
+        "XdsTestServerFactory.java",
+    ],
+    data = [
+        "//test/jni:libenvoy_jni_xds_test_server_factory.so",
+    ],
+    visibility = ["//visibility:public"],
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
