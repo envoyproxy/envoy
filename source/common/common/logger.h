@@ -46,6 +46,7 @@ const static bool should_log = true;
   FUNCTION(connection)                                                                             \
   FUNCTION(conn_handler)                                                                           \
   FUNCTION(compression)                                                                            \
+  FUNCTION(credential_injector)                                                                    \
   FUNCTION(decompression)                                                                          \
   FUNCTION(dns)                                                                                    \
   FUNCTION(dubbo)                                                                                  \

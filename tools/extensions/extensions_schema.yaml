@@ -70,6 +70,7 @@ categories:
 - envoy.config_subscription
 - envoy.config_mux
 - envoy.filters.http
+- envoy.injected_credentials
 - envoy.filters.listener
 - envoy.filters.network
 - envoy.filters.udp_listener
