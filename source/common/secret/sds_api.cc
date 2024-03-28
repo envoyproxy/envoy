@@ -110,7 +110,10 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     // WatchedDirectory object, or we need to implement per-file watches in the else
     // clause.
     if (watched_directory != nullptr) {
-      watched_directory->setCallback([this]() { onWatchUpdate(); });
+      watched_directory->setCallback([this]() {
+        onWatchUpdate();
+        return absl::OkStatus();
+      });
     } else {
       // List DataSources that refer to files
       auto files = getDataSourceFilenames();
@@ -124,7 +127,10 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
           RETURN_IF_STATUS_NOT_OK(result_or_error);
           RETURN_IF_NOT_OK(watcher_->addWatch(absl::StrCat(result_or_error.value().directory_, "/"),
                                               Filesystem::Watcher::Events::MovedTo,
-                                              [this](uint32_t) { onWatchUpdate(); }));
+                                              [this](uint32_t) {
+                                                onWatchUpdate();
+                                                return absl::OkStatus();
+                                              }));
         }
       } else {
         watcher_.reset(); // Destroy the old watch if any

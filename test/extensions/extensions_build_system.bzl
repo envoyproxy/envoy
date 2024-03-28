@@ -1,5 +1,5 @@
-load("//bazel:envoy_build_system.bzl", "envoy_benchmark_test", "envoy_cc_benchmark_binary", "envoy_cc_mock", "envoy_cc_test", "envoy_cc_test_binary", "envoy_cc_test_library", "envoy_py_test")
 load("@envoy_build_config//:extensions_build_config.bzl", "EXTENSIONS")
+load("//bazel:envoy_build_system.bzl", "envoy_benchmark_test", "envoy_cc_benchmark_binary", "envoy_cc_mock", "envoy_cc_test", "envoy_cc_test_binary", "envoy_cc_test_library", "envoy_py_test")
 
 def _apply_to_extension_allow_for_test(func, name, extension_names, **kwargs):
     for extension_name in extension_names:

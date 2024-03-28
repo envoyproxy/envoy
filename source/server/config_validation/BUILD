@@ -50,23 +50,12 @@ envoy_cc_library(
     hdrs = [
         "connection.h",
         "dispatcher.h",
-        "dns.h",
     ],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
         "//source/common/common:assert_lib",
         "//source/common/event:dispatcher_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "dns_lib",
-    srcs = ["dns.cc"],
-    hdrs = ["dns.h"],
-    deps = [
-        "//envoy/event:dispatcher_interface",
-        "//envoy/network:dns_interface",
     ],
 )
 
@@ -79,7 +68,6 @@ envoy_cc_library(
         ":admin_lib",
         ":api_lib",
         ":cluster_manager_lib",
-        ":dns_lib",
         "//envoy/server:drain_manager_interface",
         "//envoy/server:instance_interface",
         "//envoy/ssl:context_manager_interface",
@@ -100,6 +88,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/common/version:version_lib",
+        "//source/extensions/transport_sockets/tls:config",
         "//source/server:configuration_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:overload_manager_lib",

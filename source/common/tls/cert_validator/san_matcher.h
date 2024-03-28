@@ -40,7 +40,7 @@ public:
 
 private:
   const int general_name_type_;
-  const Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher> matcher_;
+  const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;
 };
 
 SanMatcherPtr createStringSanMatcher(

@@ -9,6 +9,7 @@
 #include "source/common/grpc/async_client_manager_impl.h"
 
 #include "test/benchmark/main.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -27,20 +28,20 @@ namespace {
 
 class AsyncClientManagerImplTest {
 public:
-  AsyncClientManagerImplTest()
-      : api_(Api::createApiForTest()), stat_names_(scope_.symbolTable()),
-        async_client_manager_(
-            cm_, tls_, test_time_.timeSystem(), *api_, stat_names_,
-            envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig()) {}
+  AsyncClientManagerImplTest() : api_(Api::createApiForTest()), stat_names_(scope_.symbolTable()) {
+    ON_CALL(context_, api()).WillByDefault(testing::ReturnRef(*api_));
+    async_client_manager_ = std::make_unique<AsyncClientManagerImpl>(
+        cm_, context_.threadLocal(), context_, stat_names_,
+        envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig());
+  }
 
   Upstream::MockClusterManager cm_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Stats::MockStore store_;
   Stats::MockScope& scope_{store_.mockScope()};
-  DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
   StatNames stat_names_;
-  AsyncClientManagerImpl async_client_manager_;
+  std::unique_ptr<AsyncClientManagerImpl> async_client_manager_;
 };
 
 void testGetOrCreateAsyncClientWithConfig(::benchmark::State& state) {
@@ -54,7 +55,7 @@ void testGetOrCreateAsyncClientWithConfig(::benchmark::State& state) {
     for (int i = 0; i < 1000; i++) {
       RawAsyncClientSharedPtr foo_client0 =
           async_client_man_test.async_client_manager_
-              .getOrCreateRawAsyncClient(grpc_service, async_client_man_test.scope_, true)
+              ->getOrCreateRawAsyncClient(grpc_service, async_client_man_test.scope_, true)
               .value();
     }
   }
@@ -72,8 +73,8 @@ void testGetOrCreateAsyncClientWithHashConfig(::benchmark::State& state) {
     for (int i = 0; i < 1000; i++) {
       RawAsyncClientSharedPtr foo_client0 =
           async_client_man_test.async_client_manager_
-              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key_a,
-                                                    async_client_man_test.scope_, true)
+              ->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key_a,
+                                                     async_client_man_test.scope_, true)
               .value();
     }
   }

@@ -45,7 +45,8 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 //   d.present_match: Match will succeed if the header is present.
 //   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
 //   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
-HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatcher& config)
+HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatcher& config,
+                                      Server::Configuration::CommonFactoryContext& factory_context)
     : name_(config.name()), invert_match_(config.invert_match()),
       treat_missing_as_empty_(config.treat_missing_header_as_empty()) {
   switch (config.header_match_specifier_case()) {
@@ -55,7 +56,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
-    regex_ = Regex::Utility::parseRegex(config.safe_regex_match());
+    regex_ = Regex::Utility::parseRegex(config.safe_regex_match(), factory_context.regexEngine());
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kRangeMatch:
     header_match_type_ = HeaderMatchType::Range;
@@ -82,7 +83,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     header_match_type_ = HeaderMatchType::StringMatch;
     string_match_ =
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config.string_match());
+            config.string_match(), factory_context);
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:

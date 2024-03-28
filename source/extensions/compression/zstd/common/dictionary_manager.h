@@ -46,7 +46,10 @@ public:
         const auto& filename = source.filename();
         THROW_IF_NOT_OK(watcher_->addWatch(
             filename, Filesystem::Watcher::Events::Modified | Filesystem::Watcher::Events::MovedTo,
-            [this, id, filename](uint32_t) { onDictionaryUpdate(id, filename); }));
+            [this, id, filename](uint32_t) {
+              onDictionaryUpdate(id, filename);
+              return absl::OkStatus();
+            }));
       }
     }
 

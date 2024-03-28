@@ -100,6 +100,7 @@ private:
   bool shadowEnabled();
   bool enabled();
   bool isOriginAllowed(const Http::HeaderString& origin);
+  bool forwardNotMatchingPreflights();
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};

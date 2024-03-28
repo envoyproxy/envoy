@@ -172,6 +172,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-android-all:
@@ -181,6 +182,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
     push: never
@@ -191,6 +193,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-asan:
@@ -200,6 +203,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-cc:
@@ -209,6 +213,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-compile-time-cc:
@@ -221,6 +226,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-coverage:
@@ -230,12 +236,14 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-core:
     paths:
     - "**/*"
     - "*"
+    - mobile/.bazelrc
   mobile-format:
     paths:
     - .bazelrc
@@ -243,6 +251,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-ios:
@@ -252,6 +261,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-ios-all:
@@ -261,6 +271,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
     push: never
@@ -271,6 +282,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-perf:
@@ -280,6 +292,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-release-validation:
@@ -289,6 +302,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-tsan:
@@ -298,6 +312,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   precheck-deps:

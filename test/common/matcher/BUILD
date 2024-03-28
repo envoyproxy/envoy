@@ -65,6 +65,7 @@ envoy_cc_test(
     srcs = ["value_input_matcher_test.cc"],
     deps = [
         "//source/common/matcher:value_input_matcher_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )
