@@ -613,6 +613,16 @@ void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst)
   }
 }
 
+std::string MessageUtil::toTextProto(const Protobuf::Message& message) {
+  std::string text_format;
+  Protobuf::TextFormat::Printer printer;
+  printer.SetExpandAny(true);
+  printer.SetHideUnknownFields(true);
+  bool result = printer.PrintToString(message, &text_format);
+  ASSERT(result);
+  return text_format;
+}
+
 bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {
   ProtobufWkt::Value::KindCase kind = v1.kind_case();
   if (kind != v2.kind_case()) {
