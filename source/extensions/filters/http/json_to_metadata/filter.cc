@@ -407,7 +407,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::Continue;
   }
   if (!config_->requestContentTypeAllowed(headers.getContentTypeValue())) {
-    request_processing_finished_ = true;
+    handleAllOnError(config_->requestRules(), true, *decoder_callbacks_,
+                     request_processing_finished_);
     config_->rqstats().mismatched_content_type_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -426,7 +427,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     return Http::FilterHeadersStatus::Continue;
   }
   if (!config_->responseContentTypeAllowed(headers.getContentTypeValue())) {
-    response_processing_finished_ = true;
+    handleAllOnError(config_->responseRules(), false, *encoder_callbacks_,
+                     response_processing_finished_);
     config_->respstats().mismatched_content_type_.inc();
     return Http::FilterHeadersStatus::Continue;
   }

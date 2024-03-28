@@ -89,7 +89,7 @@ message JsonToMetadata {
     // The value in the KeyValuePair must be set.
     KeyValuePair on_missing = 3;
 
-    // If the body is too large or fail to parse, apply this metadata KeyValuePair.
+    // If the body is too large or fail to parse or content-type is mismatched, apply this metadata KeyValuePair.
     //
     // The value in the KeyValuePair must be set.
     KeyValuePair on_error = 4;
