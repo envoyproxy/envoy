@@ -16,6 +16,10 @@
 
 namespace Envoy {
 
+using ::testing::IsSupersetOf;
+
+constexpr absl::string_view kProxyProtoFilterName = "envoy.listener.proxy_protocol";
+
 static void
 insertProxyProtocolFilterConfigModifier(envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   ::envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proxy_protocol;
@@ -24,9 +28,10 @@ insertProxyProtocolFilterConfigModifier(envoy::config::bootstrap::v3::Bootstrap&
   rule->mutable_on_tlv_present()->set_key("PP2TypeAuthority");
 
   auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+  listener->set_stat_prefix("test_listener");
   auto* ppv_filter = listener->add_listener_filters();
-  ppv_filter->set_name("envoy.listener.proxy_protocol");
-  ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol);
+  ppv_filter->set_name(kProxyProtoFilterName);
+  ASSERT_TRUE(ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol));
 }
 
 ProxyProtoIntegrationTest::ProxyProtoIntegrationTest()
@@ -109,6 +114,14 @@ TEST_P(ProxyProtoIntegrationTest, V2RouterRequestAndResponseWithBodyNoBufferV6) 
   };
 
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+
+  // Verify stats (with tags for proxy protocol version).
+  const auto found_counter = test_server_->counter("proxy_proto.versions.v2.found");
+  EXPECT_EQ(found_counter->value(), 1UL);
+  EXPECT_EQ(found_counter->tagExtractedName(), "proxy_proto.found");
+  EXPECT_THAT(found_counter->tags(), IsSupersetOf(Stats::TagVector{
+                                         {"envoy.proxy_protocol_version", "2"},
+                                     }));
 }
 
 TEST_P(ProxyProtoIntegrationTest, RouterProxyUnknownRequestAndResponseWithBodyNoBuffer) {
@@ -353,6 +366,76 @@ TEST_P(ProxyProtoFilterChainMatchIntegrationTest, MoreSpecificDirectSource) {
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::HasSubstr(
                   absl::StrCat("- ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound)));
+}
+
+ProxyProtoDisallowedVersionsIntegrationTest::ProxyProtoDisallowedVersionsIntegrationTest() {
+  config_helper_.skipPortUsageValidation();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    // This test doesn't need to deal with upstream connections at all, so make sure none occur.
+    bootstrap.mutable_static_resources()->mutable_clusters(0)->clear_load_assignment();
+
+    // V1 is disallowed.
+    ::envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proxy_protocol;
+    proxy_protocol.add_disallowed_versions(::envoy::config::core::v3::ProxyProtocolConfig::V1);
+
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* ppv_filter = listener->mutable_listener_filters(0);
+    ASSERT_EQ(ppv_filter->name(), kProxyProtoFilterName);
+    // Overwrite.
+    ASSERT_TRUE(ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol));
+  });
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoDisallowedVersionsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validate Envoy closes connection when PROXY protocol version 1 is used.
+TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V1Disallowed) {
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234\r\nhello",
+                                /*end_stream=*/false, /*verify=*/false));
+  tcp_client->waitForDisconnect();
+
+  // Verify stats (with tags for proxy protocol version).
+  const auto found_counter = test_server_->counter("proxy_proto.versions.v1.found");
+  EXPECT_EQ(found_counter->value(), 1UL);
+  EXPECT_EQ(found_counter->tagExtractedName(), "proxy_proto.found");
+  EXPECT_THAT(found_counter->tags(), IsSupersetOf(Stats::TagVector{
+                                         {"envoy.proxy_protocol_version", "1"},
+                                     }));
+
+  const auto disallowed_counter = test_server_->counter("proxy_proto.versions.v1.disallowed");
+  EXPECT_EQ(disallowed_counter->value(), 1UL);
+  EXPECT_EQ(disallowed_counter->tagExtractedName(), "proxy_proto.disallowed");
+  EXPECT_THAT(disallowed_counter->tags(), IsSupersetOf(Stats::TagVector{
+                                              {"envoy.proxy_protocol_version", "1"},
+                                          }));
+}
+
+// Validate Envoy closes connection when PROXY protocol version 2 has parsing error.
+TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V2Error) {
+  // A well-formed message with an unsupported address family
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x41, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  Buffer::OwnedImpl buf(buffer, sizeof(buffer));
+  ASSERT_TRUE(tcp_client->write(buf.toString(), /*end_stream=*/false, /*verify=*/false));
+  tcp_client->waitForDisconnect();
+
+  // Verify stats (with tags for proxy protocol version).
+  const auto found_counter = test_server_->counter("proxy_proto.versions.v2.error");
+  EXPECT_EQ(found_counter->value(), 1UL);
+  EXPECT_EQ(found_counter->tagExtractedName(), "proxy_proto.error");
+  EXPECT_THAT(found_counter->tags(), IsSupersetOf(Stats::TagVector{
+                                         {"envoy.proxy_protocol_version", "2"},
+                                     }));
 }
 
 } // namespace Envoy

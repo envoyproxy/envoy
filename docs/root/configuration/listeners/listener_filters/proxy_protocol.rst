@@ -16,9 +16,13 @@ the TLV will be emitted as dynamic metadata with user-specified key.
 
 This implementation supports both version 1 and version 2, it
 automatically determines on a per-connection basis which of the two
-versions is present. Note: if the filter is enabled, the Proxy Protocol
-must be present on the connection (either version 1 or version 2),
-the standard does not allow parsing to determine if it is present or not.
+versions is present.
+
+.. note::
+  If the filter is enabled, the Proxy Protocol must be present on the connection (either version 1 or version 2).
+  The standard does not allow parsing to determine if it is present or not. However, the filter can be configured
+  to allow the connection to be accepted without the Proxy Protocol header (against the standard).
+  See :ref:`allow_requests_without_proxy_protocol <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>`.
 
 If there is a protocol error or an unsupported address family
 (e.g. AF_UNIX) the connection will be closed and an error thrown.
@@ -29,10 +33,33 @@ If there is a protocol error or an unsupported address family
 Statistics
 ----------
 
-This filter emits the following statistics:
+This filter emits the following general statistics, rooted at *downstream_proxy_proto*
 
 .. csv-table::
   :header: Name, Type, Description
-  :widths: 1, 1, 2
+  :widths: 4, 1, 8
 
-  downstream_cx_proxy_proto_error, Counter, Total proxy protocol errors
+  not_found_disallowed, Counter, "Total number of connections that don't contain the PROXY protocol header and are rejected."
+  not_found_allowed, Counter, "Total number of connections that don't contain the PROXY protocol header, but are allowed due to :ref:`allow_requests_without_proxy_protocol <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>`."
+
+The filter also emits the statistics rooted at *downstream_proxy_proto.versions.<version>*
+for each matched PROXY protocol version. Proxy protocol versions include ``v1`` and ``v2``.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 4, 1, 8
+
+  found, Counter, "Total number of connections where the PROXY protocol header was found and parsed correctly."
+  disallowed, Counter, "Total number of ``found`` connections that are rejected due to :ref:`disallowed_versions <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.disallowed_versions>`."
+  error, Counter, "Total number of connections where the PROXY protocol header was malformed (and the connection was rejected)."
+
+The filter also emits the following legacy statistics, rooted at its own scope:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 4, 1, 8
+
+  downstream_cx_proxy_proto_error, Counter, "Total number of connections with proxy protocol errors, i.e. ``v1.error``, ``v2.error``, and ``not_found_disallowed``."
+
+.. attention::
+  Prefer using the more-detailed non-legacy statistics above.
