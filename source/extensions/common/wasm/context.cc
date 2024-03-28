@@ -807,7 +807,7 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     const Http::LowerCaseString lower_key{std::string(p.first)};
     map->addCopy(lower_key, std::string(p.second));
   }
-  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
+  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_ && decoder_callbacks_->downstreamCallbacks()) {
     decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;

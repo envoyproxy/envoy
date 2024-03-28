@@ -13,10 +13,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Wasm {
 
-Http::FilterFactoryCb WasmFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config, const std::string&,
-    Server::Configuration::FactoryContext& context) {
-  context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
+absl::StatusOr<Http::FilterFactoryCb> WasmFilterConfig::createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config,
+      const std::string&, DualInfo,
+      Server::Configuration::ServerFactoryContext& context) {
+
+  context.api().customStatNamespaces().registerStatNamespace(
       Extensions::Common::Wasm::CustomStatNamespace);
   auto filter_config = std::make_shared<FilterConfig>(proto_config, context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -33,6 +35,8 @@ Http::FilterFactoryCb WasmFilterConfig::createFilterFactoryFromProtoTyped(
  * Static registration for the Wasm filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(WasmFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamWasmFilterConfig,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace Wasm
 } // namespace HttpFilters
