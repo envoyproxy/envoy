@@ -346,7 +346,7 @@ new_features:
 - area: matching
   change: |
     added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`
-    for matching based on filter state objects.
+    for matching http input based on filter state objects.
 
 deprecated:
 - area: listener
