@@ -175,11 +175,11 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
   }
 }
 
-TEST(MatchingData, FilterStateDataInput) {
+TEST(MatchingData, FilterStateInput) {
   HttpMatchingDataImpl data(createStreamInfo());
 
   {
-    FilterStateDataInput input("filter_state_key");
+    FilterStateInput input("filter_state_key");
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_, Matcher.DataInputGetResult::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
@@ -190,7 +190,7 @@ TEST(MatchingData, FilterStateDataInput) {
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   {
-    FilterStateDataInput input("filter_state_key");
+    FilterStateInput input("filter_state_key");
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
@@ -202,7 +202,7 @@ TEST(MatchingData, FilterStateDataInput) {
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   {
-    FilterStateDataInput input("filter_state_key");
+    FilterStateInput input("filter_state_key");
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);

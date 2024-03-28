@@ -43,7 +43,7 @@ struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigF
     data_input_allow_list->add_type_url(
         "type.googleapis.com/envoy.type.matcher.v3.HttpRequestQueryParamMatchInput");
     data_input_allow_list->add_type_url(
-        "type.googleapis.com/envoy.type.matcher.v3.FilterStateMatchInput");
+        "type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput");
     )
 
     return requirements;
@@ -237,7 +237,7 @@ xds_matcher:
   matcher_tree:
     input: filter-state-key
       typed_config:
-        "@type": type.googleapis.com/envoy.type.matcher.v3.FilterStateMatchInput
+        "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
         filter_state_key: arg
     exact_match_map:
         map:
