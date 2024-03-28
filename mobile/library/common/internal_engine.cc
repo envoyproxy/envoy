@@ -13,8 +13,6 @@ namespace Envoy {
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
-envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
-
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
@@ -48,6 +46,42 @@ envoy_status_t InternalEngine::run(const std::string& config, const std::string&
   }
   options->setConcurrency(1);
   return run(std::move(options), thread_priority);
+}
+
+envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
+
+envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
+                                           envoy_http_callbacks bridge_callbacks,
+                                           bool explicit_flow_control) {
+  return dispatcher_->post([&, stream, bridge_callbacks, explicit_flow_control]() {
+    http_client_->startStream(stream, bridge_callbacks, explicit_flow_control);
+  });
+}
+
+envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, envoy_headers headers,
+                                           bool end_stream) {
+  return dispatcher_->post([&, stream, headers, end_stream]() {
+    http_client_->sendHeaders(stream, headers, end_stream);
+  });
+}
+
+envoy_status_t InternalEngine::readData(envoy_stream_t stream, size_t bytes_to_read) {
+  return dispatcher_->post(
+      [&, stream, bytes_to_read]() { http_client_->readData(stream, bytes_to_read); });
+}
+
+envoy_status_t InternalEngine::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
+  return dispatcher_->post(
+      [&, stream, data, end_stream]() { http_client_->sendData(stream, data, end_stream); });
+}
+
+envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
+  return dispatcher_->post(
+      [&, stream, trailers]() { http_client_->sendTrailers(stream, trailers); });
+}
+
+envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
+  return dispatcher_->post([&, stream]() { http_client_->cancelStream(stream); });
 }
 
 // This function takes a `std::shared_ptr` instead of `std::unique_ptr` because `std::function` is a
@@ -322,17 +356,20 @@ Stats::Store& InternalEngine::getStatsStore() {
 
 void InternalEngine::logInterfaces(absl::string_view event,
                                    std::vector<Network::InterfacePair>& interfaces) {
-  std::vector<std::string> names;
-  names.resize(interfaces.size());
-  std::transform(interfaces.begin(), interfaces.end(), names.begin(),
-                 [](Network::InterfacePair& pair) { return std::get<0>(pair); });
+  auto all_names_printer = [](std::vector<Network::InterfacePair>& interfaces) -> std::string {
+    std::vector<std::string> names;
+    names.resize(interfaces.size());
+    std::transform(interfaces.begin(), interfaces.end(), names.begin(),
+                   [](Network::InterfacePair& pair) { return std::get<0>(pair); });
 
-  auto unique_end = std::unique(names.begin(), names.end());
-  std::string all_names = std::accumulate(names.begin(), unique_end, std::string{},
-                                          [](std::string acc, std::string next) {
-                                            return acc.empty() ? next : std::move(acc) + "," + next;
-                                          });
-  ENVOY_LOG_EVENT(debug, event, all_names);
+    auto unique_end = std::unique(names.begin(), names.end());
+    std::string all_names = std::accumulate(
+        names.begin(), unique_end, std::string{}, [](std::string acc, std::string next) {
+          return acc.empty() ? next : std::move(acc) + "," + next;
+        });
+    return all_names;
+  };
+  ENVOY_LOG_EVENT(debug, event, "{}", all_names_printer(interfaces));
 }
 
 } // namespace Envoy

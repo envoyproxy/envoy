@@ -53,9 +53,11 @@ namespace {
 
 TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
   EXPECT_THROW(
-      HttpConnectionManagerFilterConfigFactory().createFilterFactoryFromProto(
-          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager(),
-          context_),
+      HttpConnectionManagerFilterConfigFactory()
+          .createFilterFactoryFromProto(envoy::extensions::filters::network::
+                                            http_connection_manager::v3::HttpConnectionManager(),
+                                        context_)
+          .IgnoreError(),
       ProtoValidationException);
 }
 
@@ -1610,8 +1612,10 @@ http_filters:
   HttpConnectionManagerFilterConfigFactory factory;
   // We expect a single slot allocation vs. multiple.
   EXPECT_CALL(context_.server_factory_context_.thread_local_, allocateSlot());
-  Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(proto_config, context_);
-  Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, context_);
+  Network::FilterFactoryCb cb1 =
+      factory.createFilterFactoryFromProto(proto_config, context_).value();
+  Network::FilterFactoryCb cb2 =
+      factory.createFilterFactoryFromProto(proto_config, context_).value();
   EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context_.serverFactoryContext()));
 }
 
@@ -3352,7 +3356,8 @@ TEST_F(HttpConnectionManagerMobileConfigTest, Mobile) {
   TestUtility::loadFromYamlAndValidate(yaml_string, config);
 
   MobileHttpConnectionManagerFilterConfigFactory factory;
-  Network::FilterFactoryCb create_hcm_cb = factory.createFilterFactoryFromProto(config, context_);
+  Network::FilterFactoryCb create_hcm_cb =
+      factory.createFilterFactoryFromProto(config, context_).value();
 
   NiceMock<Network::MockFilterManager> fm;
   NiceMock<Network::MockReadFilterCallbacks> cb;

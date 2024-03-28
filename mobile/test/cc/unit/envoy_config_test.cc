@@ -42,7 +42,7 @@ DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
   const auto& clusters = bootstrap.static_resources().clusters();
   for (const auto& cluster : clusters) {
     if (cluster.name() == "base") {
-      MessageUtil::unpackTo(cluster.cluster_type().typed_config(), cluster_config);
+      MessageUtil::unpackTo(cluster.cluster_type().typed_config(), cluster_config).IgnoreError();
     }
   }
   return cluster_config;

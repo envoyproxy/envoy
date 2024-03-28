@@ -156,6 +156,7 @@ envoy_cc_test_library(
     deps = [
         ":base_client_integration_test_lib",
         "@envoy//source/common/config:api_version_lib",
+        "@envoy//source/common/http:rds_lib",
         "@envoy//test/test_common:environment_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -166,14 +167,12 @@ envoy_cc_test_library(
 
 # interface libs for test servers` jni implementations
 envoy_cc_test_library(
-    name = "test_server_interface_lib",
+    name = "test_server_lib",
     srcs = [
         "test_server.cc",
-        "test_server_interface.cc",
     ],
     hdrs = [
         "test_server.h",
-        "test_server_interface.h",
     ],
     data = [
         "@envoy//test/config/integration/certs",
@@ -192,6 +191,20 @@ envoy_cc_test_library(
         ["@envoy//source/common/signal:sigaction_lib"],
         "@envoy",
     ),
+)
+
+envoy_cc_test_library(
+    name = "test_server_interface_lib",
+    srcs = [
+        "test_server_interface.cc",
+    ],
+    hdrs = [
+        "test_server_interface.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":test_server_lib",
+    ],
 )
 
 envoy_cc_test_library(

@@ -198,7 +198,15 @@ bug_fixes:
     specifies the lifetime of the refresh token. The default value is ``604800`` seconds (a week).
 - area: admin
   change: |
+    Fixed a bug where the config_dump & init_dump admin endpoint would return an empty response when called with empty
+    query parameters (e.g. ``/config_dump?resource=&mask=&name_regex=``).
+- area: admin
+  change: |
     Removing the ECDS config entry from the config dump when it does not exist (or has expired).
+- area: geoip
+  change: |
+    Switch to use StopAllIterationAndWatermark instead of StopIteration in geoip filter to fix an issue where large
+    POST request body may get corrupted when geoip is enabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -228,6 +236,10 @@ removed_config_or_runtime:
     removed ``envoy_reloadable_features_initialize_upstream_filters`` and legacy code paths.
 
 new_features:
+- area: basic_auth
+  change: |
+    Added :ref:`forward_username_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.forward_username_header>`
+    config to forward the username to the backend.
 - area: ext_proc
   change: |
     Added
@@ -321,6 +333,17 @@ new_features:
     added an option to dynamically set a per downstream connection idle timeout period object under the key
     ``envoy.tcp_proxy.per_connection_idle_timeout_ms``. If this filter state value exists, it will override the idle timeout
     specified in the filter configuration and the default idle timeout.
+- area: ext_authz
+  change: |
+    The proto field :ref:`headers <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>`'s
+    value type is string.  Thus, it is unable to support non-utf8 characters in header values.
+    To support header values with non-utf8 characters, a new boolean field was added to the
+    ext_authz config :ref:`encode_raw_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`.
+    When this is set to true, the new field in HttpRequest
+    :ref:`header_map <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.header_map>` (specifically
+    ``header_map.headers.raw_value``) gets populated with the raw values instead of ``headers``,
+    which normally contains UTF-8 sanitized header values. Also, since the new field is not a map,
+    headers with the same key are not combined into a single comma-seperated header.
 - area: load shed point
   change: |
     Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if
@@ -388,6 +411,9 @@ new_features:
   change: |
     Added support for populating the :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`
     check request attribute for network ext_authz by setting :ref:`include_tls_session <config_network_filters_ext_authz>` to true.
+- area: aws
+  change: |
+    Update credential_provider utility to support EKS Pod Identity provided via token file.
 
 deprecated:
 - area: listener

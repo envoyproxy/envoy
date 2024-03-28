@@ -54,19 +54,19 @@ using FilterConfigProviderManager =
  */
 class HttpConnectionManagerFilterConfigFactory
     : Logger::Loggable<Logger::Id::config>,
-      public Common::FactoryBase<
+      public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager> {
 public:
   HttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
+      : ExceptionFreeFactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
 
-  static Network::FilterFactoryCb createFilterFactoryFromProtoAndHopByHop(
+  static absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoAndHopByHop(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
       Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers);
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
       Server::Configuration::FactoryContext& context) override;
@@ -79,14 +79,16 @@ DECLARE_FACTORY(HttpConnectionManagerFilterConfigFactory);
  */
 class MobileHttpConnectionManagerFilterConfigFactory
     : Logger::Loggable<Logger::Id::config>,
-      public Common::FactoryBase<envoy::extensions::filters::network::http_connection_manager::v3::
-                                     EnvoyMobileHttpConnectionManager> {
+      public Common::ExceptionFreeFactoryBase<
+          envoy::extensions::filters::network::http_connection_manager::v3::
+              EnvoyMobileHttpConnectionManager> {
 public:
   MobileHttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().EnvoyMobileHttpConnectionManager, true) {}
+      : ExceptionFreeFactoryBase(NetworkFilterNames::get().EnvoyMobileHttpConnectionManager, true) {
+  }
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::http_connection_manager::v3::
           EnvoyMobileHttpConnectionManager& proto_config,
       Server::Configuration::FactoryContext& context) override;
