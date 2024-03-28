@@ -411,6 +411,9 @@ new_features:
   change: |
     Added support for populating the :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`
     check request attribute for network ext_authz by setting :ref:`include_tls_session <config_network_filters_ext_authz>` to true.
+- area: aws
+  change: |
+    Update credential_provider utility to support EKS Pod Identity provided via token file.
 
 deprecated:
 - area: listener
