@@ -72,6 +72,7 @@ jobs:
             source/server/watchdog_impl.h
             source/server/options_impl.cc
             source/extensions/access_loggers/common/file_access_log_impl.h
+            source/common/router/scoped_rds.cc
           target: size-current
         - name: Main size
           args: >-

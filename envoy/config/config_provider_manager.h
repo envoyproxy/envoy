@@ -4,6 +4,7 @@
 
 #include "envoy/config/config_provider.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/singleton/instance.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -23,7 +24,7 @@ namespace Config {
  * growth based on the size of the configuration set, regardless of the number of threads/objects
  * that must hold a reference/pointer to them.
  */
-class ConfigProviderManager {
+class ConfigProviderManager : public Singleton::Instance {
 public:
   class OptionalArg {
   public:
