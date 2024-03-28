@@ -25,7 +25,9 @@ public:
                         quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
 
-  void setResponseDecoder(Http::ResponseDecoder& decoder) { response_decoder_ = &decoder; }
+  void setResponseDecoder(Http::ResponseDecoder& decoder) {
+    response_decoder_handle_ = decoder.getHandle();
+  }
 
   // Http::StreamEncoder
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
@@ -91,7 +93,11 @@ private:
   void useCapsuleProtocol();
 #endif
 
-  Http::ResponseDecoder* response_decoder_{nullptr};
+  Http::ResponseDecoder* getResponseDecoder() {
+    return response_decoder_handle_ ? response_decoder_handle_->ptr() : nullptr;
+  }
+
+  Http::ResponseDecoderHandleSharedPtr response_decoder_handle_;
   bool decoded_1xx_{false};
 
   // When an HTTP Upgrade is requested, this contains the protocol upgrade type, e.g. "websocket".

@@ -525,6 +525,7 @@ void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks 
 
   // Note: streams created by Envoy Mobile are tagged as is_internally_created. This means that
   // the Http::ConnectionManager _will not_ sanitize headers when creating a stream.
+  // This interface directly returns a handle which takes care of the decoder life time.
   direct_stream->request_decoder_ =
       api_listener_->newStreamHandle(*direct_stream->callbacks_, true /* is_internally_created */);
 

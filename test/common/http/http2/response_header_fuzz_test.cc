@@ -24,7 +24,8 @@ void replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   // Create a new stream.
   Http::Status status = Http::okStatus();
   codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
-  codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);
+  MockStreamCallbacks client_stream_callbacks;
+  codec.request_encoder_->getStream().addCallbacks(client_stream_callbacks);
   // Setup a single stream to inject frames as a reply to.
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);

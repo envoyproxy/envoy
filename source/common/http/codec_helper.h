@@ -11,8 +11,16 @@
 namespace Envoy {
 namespace Http {
 
-class StreamCallbackHelper {
+class StreamCallbackHelper : public StreamCallbacks::StreamCallbacksRegistry {
 public:
+  ~StreamCallbackHelper() override {
+    for (StreamCallbacks* callbacks : callbacks_) {
+      if (callbacks != nullptr) {
+        callbacks->clearRegistry();
+      }
+    }
+  }
+
   void runLowWatermarkCallbacks() {
     if (reset_callbacks_started_ || local_end_stream_) {
       return;
@@ -54,9 +62,11 @@ public:
   }
 
   bool local_end_stream_{};
+  bool reset_callbacks_started_{};
 
 protected:
-  void addCallbacksHelper(StreamCallbacks& callbacks) {
+  // StreamCallbacksRegistry
+  void registerStreamCallbacks(StreamCallbacks& callbacks) override {
     ASSERT(!reset_callbacks_started_ && !local_end_stream_);
     callbacks_.push_back(&callbacks);
     for (uint32_t i = 0; i < high_watermark_callbacks_; ++i) {
@@ -64,7 +74,7 @@ protected:
     }
   }
 
-  void removeCallbacksHelper(StreamCallbacks& callbacks) {
+  void unregisterStreamCallbacks(StreamCallbacks& callbacks) override {
     // For performance reasons we just clear the callback and do not resize the vector.
     // Reset callbacks scale with the number of filters per request and do not get added and
     // removed multiple times.
@@ -80,7 +90,6 @@ protected:
 
 private:
   absl::InlinedVector<StreamCallbacks*, 8> callbacks_;
-  bool reset_callbacks_started_{};
   uint32_t high_watermark_callbacks_{};
 };
 

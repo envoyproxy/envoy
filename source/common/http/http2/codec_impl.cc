@@ -531,13 +531,15 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   }
 #else
   // In UHV mode the :status header at this point can be malformed, as it is validated
-  // later on in the response_decoder_.decodeHeaders() call.
+  // later on in the decodeHeaders() call.
   // Account for this here.
   absl::optional<uint64_t> status_opt = Http::Utility::getResponseStatusOrNullopt(*headers);
   if (!status_opt.has_value()) {
-    // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
+    // In case the status is invalid or missing, the decodeHeaders() will fail the
     // request
-    response_decoder_.decodeHeaders(std::move(headers), sendEndStream());
+    if (response_decoder_handle_ != nullptr && response_decoder_handle_->ptr() != nullptr) {
+      response_decoder_handle_->ptr()->decodeHeaders(std::move(headers), sendEndStream());
+    }
     return;
   }
   const uint64_t status = status_opt.value();
@@ -548,10 +550,12 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   received_noninformational_headers_ =
       !CodeUtility::is1xx(status) || status == enumToInt(Http::Code::SwitchingProtocols);
 
-  if (HeaderUtility::isSpecial1xx(*headers)) {
-    response_decoder_.decode1xxHeaders(std::move(headers));
-  } else {
-    response_decoder_.decodeHeaders(std::move(headers), sendEndStream());
+  if (response_decoder_handle_ != nullptr && response_decoder_handle_->ptr() != nullptr) {
+    if (HeaderUtility::isSpecial1xx(*headers)) {
+      response_decoder_handle_->ptr()->decode1xxHeaders(std::move(headers));
+    } else {
+      response_decoder_handle_->ptr()->decodeHeaders(std::move(headers), sendEndStream());
+    }
   }
 }
 
@@ -580,8 +584,10 @@ void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
   // Consume any buffered trailers.
   stream_manager_.trailers_buffered_ = false;
 
-  response_decoder_.decodeTrailers(
-      std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
+  if (response_decoder_handle_ != nullptr && response_decoder_handle_->ptr() != nullptr) {
+    response_decoder_handle_->ptr()->decodeTrailers(
+        std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
+  }
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
@@ -592,7 +598,9 @@ void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
 #endif
-  request_decoder_->decodeHeaders(std::move(headers), sendEndStream());
+  if (request_decoder_handle_ != nullptr && request_decoder_handle_->ptr() != nullptr) {
+    request_decoder_handle_->ptr()->decodeHeaders(std::move(headers), sendEndStream());
+  }
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
@@ -603,8 +611,10 @@ void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
   // Consume any buffered trailers.
   stream_manager_.trailers_buffered_ = false;
 
-  request_decoder_->decodeTrailers(
-      std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+  if (request_decoder_handle_ != nullptr && request_decoder_handle_->ptr() != nullptr) {
+    request_decoder_handle_->ptr()->decodeTrailers(
+        std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+  }
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
@@ -2209,8 +2219,9 @@ void ClientConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const
 
   const ClientStreamImpl* client_stream =
       static_cast<const ClientStreamImpl*>(getStreamUnchecked(current_stream_id_.value()));
-  if (client_stream) {
-    client_stream->response_decoder_.dumpState(os, indent_level + 1);
+  if (client_stream && client_stream->response_decoder_handle_ &&
+      client_stream->response_decoder_handle_->ptr()) {
+    client_stream->response_decoder_handle_->ptr()->dumpState(os, indent_level + 1);
   } else {
     os << spaces
        << " Failed to get the upstream stream with stream id: " << current_stream_id_.value()

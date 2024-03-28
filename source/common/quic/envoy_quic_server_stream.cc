@@ -22,6 +22,22 @@
 namespace Envoy {
 namespace Quic {
 
+namespace {
+
+struct QuicStreamDestructionState : public Http::DestructionState {
+  bool reset_callbacks_started_;
+  bool local_end_stream_;
+  bool rst_received_;
+  bool rst_sent_;
+  bool fin_received_;
+  bool fin_buffered_;
+  bool fin_sent_;
+  bool reading_stopped_;
+  quic::QuicRstStreamErrorCode stream_error_;
+};
+
+} // namespace
+
 EnvoyQuicServerStream::EnvoyQuicServerStream(
     quic::QuicStreamId id, quic::QuicSpdySession* session, quic::StreamType type,
     Http::Http3::CodecStats& stats,
@@ -43,6 +59,23 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
   stats_gatherer_ = new QuicStatsGatherer(&filterManagerConnection()->dispatcher().timeSource());
   set_ack_listener(stats_gatherer_);
   RegisterMetadataVisitor(this);
+}
+
+EnvoyQuicServerStream::~EnvoyQuicServerStream() {
+  if (handle_ != nullptr && handle_->ptr() != nullptr) {
+    // Trigger callback with its own destruction state.
+    auto destruction_state = std::make_unique<QuicStreamDestructionState>();
+    destruction_state->reset_callbacks_started_ = reset_callbacks_started_;
+    destruction_state->local_end_stream_ = local_end_stream_;
+    destruction_state->rst_received_ = rst_received();
+    destruction_state->rst_sent_ = rst_sent();
+    destruction_state->fin_received_ = fin_received();
+    destruction_state->fin_buffered_ = fin_buffered();
+    destruction_state->fin_sent_ = fin_sent();
+    destruction_state->reading_stopped_ = reading_stopped();
+    destruction_state->stream_error_ = stream_error();
+    handle_->onObjectDestroyed(std::move(destruction_state));
+  }
 }
 
 void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
@@ -204,7 +237,9 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 #endif
 
-  request_decoder_->decodeHeaders(std::move(headers), /*end_stream=*/fin);
+  if (getRequestDecoder()) {
+    getRequestDecoder()->decodeHeaders(std::move(headers), /*end_stream=*/fin);
+  }
   ConsumeHeaderList();
 }
 
@@ -252,7 +287,9 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
       // A stream error has occurred, stop processing.
       return;
     }
-    request_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
+    if (getRequestDecoder()) {
+      getRequestDecoder()->decodeData(*buffer, fin_read_and_no_trailers);
+    }
   }
 
   if (!sequencer()->IsClosed() || read_side_closed()) {
@@ -304,7 +341,9 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
       onStreamError(close_connection_upon_invalid_header_, rst);
       return;
     }
-    request_decoder_->decodeTrailers(std::move(trailers));
+    if (getRequestDecoder()) {
+      getRequestDecoder()->decodeTrailers(std::move(trailers));
+    }
     MarkTrailersConsumed();
   }
 }
@@ -456,8 +495,8 @@ void EnvoyQuicServerStream::OnMetadataComplete(size_t /*frame_len*/,
     onStreamError(true, quic::QUIC_HEADERS_TOO_LARGE);
     return;
   }
-  if (!header_list.empty()) {
-    request_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
+  if (!header_list.empty() && getRequestDecoder() != nullptr) {
+    getRequestDecoder()->decodeMetadata(metadataMapFromHeaderList(header_list));
   }
 }
 
@@ -500,8 +539,8 @@ bool EnvoyQuicServerStream::hasPendingData() {
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 void EnvoyQuicServerStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  ASSERT(request_decoder_ != nullptr);
-  http_datagram_handler_->setStreamDecoder(request_decoder_);
+  ASSERT(getRequestDecoder());
+  http_datagram_handler_->setStreamDecoder(getRequestDecoder());
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif

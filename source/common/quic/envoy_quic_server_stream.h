@@ -26,9 +26,11 @@ public:
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);
 
+  ~EnvoyQuicServerStream() override;
+
   void setRequestDecoder(Http::RequestDecoder& decoder) override {
-    request_decoder_ = &decoder;
-    stats_gatherer_->setAccessLogHandlers(request_decoder_->accessLogHandlers());
+    request_decoder_handle_ = decoder.getHandle();
+    stats_gatherer_->setAccessLogHandlers(decoder.accessLogHandlers());
   }
 
   // Http::StreamEncoder
@@ -109,6 +111,10 @@ protected:
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();
 
+  Http::RequestDecoder* getRequestDecoder() {
+    return request_decoder_handle_ ? request_decoder_handle_->ptr() : nullptr;
+  }
+
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
@@ -119,7 +125,7 @@ private:
   void useCapsuleProtocol();
 #endif
 
-  Http::RequestDecoder* request_decoder_{nullptr};
+  Http::RequestDecoderHandleSharedPtr request_decoder_handle_;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
 

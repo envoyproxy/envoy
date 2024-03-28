@@ -246,7 +246,23 @@ protected:
                                           "a1a2a3a4a5a6a7a8")         // HTTP Datagram Payload
       );
 #endif
+  Http::ResponseEncoderHandleSharedPtr encoder_handle_;
 };
+
+TEST_F(EnvoyQuicServerStreamTest, EncoderHandleLifeTime) {
+  Http::ResponseEncoderHandleSharedPtr encoder_handle1 = quic_stream_->getHandle();
+  EXPECT_NE(nullptr, encoder_handle1->ptr());
+
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
+  Http::ResponseEncoderHandleSharedPtr encoder_handle2 = quic_stream_->getHandle();
+  EXPECT_NE(nullptr, encoder_handle2->ptr());
+  encoder_handle2.reset();
+  quic_session_.CleanUpClosedStreams();
+  EXPECT_EQ(nullptr, encoder_handle1->ptr());
+}
 
 TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))

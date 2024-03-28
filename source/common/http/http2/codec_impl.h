@@ -518,7 +518,7 @@ protected:
   struct ClientStreamImpl : public StreamImpl, public RequestEncoder {
     ClientStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit,
                      ResponseDecoder& response_decoder)
-        : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder),
+        : StreamImpl(parent, buffer_limit), response_decoder_handle_(response_decoder.getHandle()),
           headers_or_trailers_(
               ResponseHeaderMapImpl::create(parent_.max_headers_kb_, parent_.max_headers_count_)) {}
 
@@ -537,7 +537,12 @@ protected:
     HeadersState headersState() const override { return headers_state_; }
     // Do not use deferred reset on upstream connections.
     bool useDeferredReset() const override { return false; }
-    StreamDecoder& decoder() override { return response_decoder_; }
+    StreamDecoder& decoder() override {
+      RELEASE_ASSERT(
+          response_decoder_handle_ != nullptr && response_decoder_handle_->ptr() != nullptr,
+          "Trying to access to the decoder without a handle or the decoder has been destroyed.");
+      return *response_decoder_handle_->ptr();
+    }
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
@@ -572,7 +577,7 @@ protected:
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
 
-    ResponseDecoder& response_decoder_;
+    ResponseDecoderHandleSharedPtr response_decoder_handle_;
     absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
     std::string upgrade_type_;
     HeadersState headers_state_ = HeadersState::Response;
@@ -599,7 +604,12 @@ protected:
     // written out before force resetting the stream, assuming there is enough H2 connection flow
     // control window is available.
     bool useDeferredReset() const override { return true; }
-    StreamDecoder& decoder() override { return *request_decoder_; }
+    StreamDecoder& decoder() override {
+      RELEASE_ASSERT(
+          request_decoder_handle_ != nullptr && request_decoder_handle_->ptr() != nullptr,
+          "Trying to access to the decoder without a handle or the decoder has been destroyed.");
+      return *request_decoder_handle_->ptr();
+    }
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
@@ -624,7 +634,9 @@ protected:
     void encodeTrailers(const ResponseTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
     }
-    void setRequestDecoder(Http::RequestDecoder& decoder) override { request_decoder_ = &decoder; }
+    void setRequestDecoder(Http::RequestDecoder& decoder) override {
+      request_decoder_handle_ = decoder.getHandle();
+    }
     void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
                                               Http::ResponseHeaderMapConstSharedPtr,
                                               Http::ResponseTrailerMapConstSharedPtr,
@@ -640,7 +652,7 @@ protected:
     }
 
   private:
-    RequestDecoder* request_decoder_{};
+    RequestDecoderHandleSharedPtr request_decoder_handle_;
     HeadersState headers_state_ = HeadersState::Request;
   };
 
