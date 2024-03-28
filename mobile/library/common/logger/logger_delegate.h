@@ -1,12 +1,12 @@
 #pragma once
 
 #include <iostream>
-#include <string>
 
 #include "source/common/common/logger.h"
 
 #include "absl/strings/string_view.h"
 #include "library/common/api/external.h"
+#include "library/common/engine_types.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
@@ -15,20 +15,20 @@ namespace Logger {
 class EventTrackingDelegate : public SinkDelegate {
 public:
   explicit EventTrackingDelegate(DelegatingLogSinkSharedPtr log_sink)
-      : SinkDelegate(log_sink), event_tracker_(*static_cast<envoy_event_tracker*>(
-                                    Api::External::retrieveApi(envoy_event_tracker_api_name))) {}
+      : SinkDelegate(log_sink), event_tracker_(static_cast<std::unique_ptr<EnvoyEventTracker>*>(
+                                    Api::External::retrieveApi(ENVOY_EVENT_TRACKER_API_NAME))) {}
 
   void logWithStableName(absl::string_view stable_name, absl::string_view level,
                          absl::string_view component, absl::string_view msg) override;
 
 private:
-  envoy_event_tracker& event_tracker_;
+  std::unique_ptr<EnvoyEventTracker>* event_tracker_;
 };
 
 using EventTrackingDelegatePtr = std::unique_ptr<EventTrackingDelegate>;
 class LambdaDelegate : public EventTrackingDelegate {
 public:
-  LambdaDelegate(envoy_logger logger, DelegatingLogSinkSharedPtr log_sink);
+  LambdaDelegate(std::unique_ptr<EnvoyLogger> logger, DelegatingLogSinkSharedPtr log_sink);
   ~LambdaDelegate() override;
 
   // SinkDelegate
@@ -37,7 +37,7 @@ public:
   void flush() override{};
 
 private:
-  envoy_logger logger_;
+  std::unique_ptr<EnvoyLogger> logger_{nullptr};
 };
 
 // A default log delegate that logs to stderr, mimicking the default used by Envoy

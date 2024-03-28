@@ -47,8 +47,8 @@ DECLARE_FACTORY(HttpHealthCheckerFactory);
 class HttpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   HttpHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
-                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Server::Configuration::HealthCheckerFactoryContext& context,
+                        HealthCheckEventLoggerPtr&& event_logger);
 
   // Returns the HTTP protocol used for the health checker.
   Http::Protocol protocol() const;

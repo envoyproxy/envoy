@@ -46,7 +46,7 @@ public:
    * @return const CodecFactory& the downstream codec factory used to create request/response
    * decoder/encoder.
    */
-  virtual const CodecFactory& downstreamCodec() PURE;
+  virtual const CodecFactory& codecFactory() PURE;
 
   /**
    * @return const RouteEntry* cached route entry for current request.

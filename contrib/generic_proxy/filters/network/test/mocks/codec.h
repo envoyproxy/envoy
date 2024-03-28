@@ -22,11 +22,13 @@ public:
   MOCK_METHOD(void, onDecodingFailure, ());
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
   MOCK_METHOD(OptRef<Network::Connection>, connection, ());
+  MOCK_METHOD(OptRef<const Upstream::ClusterInfo>, upstreamCluster, (), (const));
 };
 
 class MockEncodingCallbacks : public EncodingCallbacks {
 public:
   MOCK_METHOD(void, onEncodingSuccess, (Buffer::Instance & buffer, bool end_stream));
+  MOCK_METHOD(OptRef<const RouteEntry>, routeEntry, (), (const));
 };
 
 class MockServerCodec : public ServerCodec {
@@ -56,7 +58,10 @@ class MockProxyFactory : public ProxyFactory {
 public:
   MockProxyFactory();
 
-  MOCK_METHOD(void, createProxy, (Network::FilterManager&, const FilterConfigSharedPtr&), (const));
+  MOCK_METHOD(void, createProxy,
+              (Server::Configuration::FactoryContext&, Network::FilterManager&,
+               FilterConfigSharedPtr),
+              (const));
 };
 
 class MockStreamCodecFactoryConfig : public CodecFactoryConfig {
@@ -64,9 +69,9 @@ public:
   MockStreamCodecFactoryConfig();
 
   MOCK_METHOD(CodecFactoryPtr, createCodecFactory,
-              (const Protobuf::Message&, Envoy::Server::Configuration::FactoryContext&));
+              (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&));
   MOCK_METHOD(ProxyFactoryPtr, createProxyFactory,
-              (const Protobuf::Message&, Envoy::Server::Configuration::FactoryContext&));
+              (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Struct>();

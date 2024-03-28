@@ -270,27 +270,6 @@ public:
   virtual HealthStatus edsHealthStatus() const PURE;
 
   /**
-   * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
-   * a new monitor must be installed before the host is used across threads. Thus,
-   * this routine should only be called on the main thread before the host is used across threads.
-   */
-  virtual void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) PURE;
-
-  /**
-   * Set the host's outlier detector monitor. Outlier detector monitors are assumed to be thread
-   * safe, however a new outlier detector monitor must be installed before the host is used across
-   * threads. Thus, this routine should only be called on the main thread before the host is used
-   * across threads.
-   */
-  virtual void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) PURE;
-
-  /**
-   * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
-   * active health checking.
-   */
-  virtual void setLastHcPassTime(MonotonicTime last_hc_pass_time) PURE;
-
-  /**
    * @return the current load balancing weight of the host, in the range 1-128 (see
    * envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
    */

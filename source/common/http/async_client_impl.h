@@ -59,10 +59,10 @@ class AsyncRequestSharedImpl;
 class AsyncClientImpl final : public AsyncClient {
 public:
   AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster, Stats::Store& stats_store,
-                  Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info,
-                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                  Random::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer,
-                  Http::Context& http_context, Router::Context& router_context);
+                  Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
+                  Server::Configuration::CommonFactoryContext& factory_context,
+                  Router::ShadowWriterPtr&& shadow_writer, Http::Context& http_context,
+                  Router::Context& router_context);
   ~AsyncClientImpl() override;
 
   // Http::AsyncClient
@@ -71,7 +71,7 @@ public:
   Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
   OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
                                const AsyncClient::RequestOptions& options) override;
-  Singleton::Manager& singleton_manager_;
+  Server::Configuration::CommonFactoryContext& factory_context_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
