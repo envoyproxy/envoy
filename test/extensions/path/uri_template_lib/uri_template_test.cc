@@ -13,10 +13,21 @@
 
 #include "gtest/gtest.h"
 
+// NOLINT(namespace-envoy)
+// Overload functions in std library.
+namespace std {
+
+std::ostream& operator<<(std::ostream& os,
+                         const Envoy::Extensions::UriTemplate::RewriteSegment& seg) {
+  absl::visit([&os](auto&& arg) { os << arg; }, seg);
+  return os;
+}
+
+} // namespace std
+
 namespace Envoy {
 namespace Extensions {
 namespace UriTemplate {
-
 namespace {
 
 using ::Envoy::StatusHelpers::IsOkAndHolds;
