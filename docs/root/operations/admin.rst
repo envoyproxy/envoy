@@ -774,7 +774,8 @@ modify different aspects of the server:
 
   Optional ``histogram_buckets`` query parameter is used to control how histogram metrics get reported.
   If unset, histograms get reported as the "histogram" prometheus metric type, but can also be used to
-  emit prometheus "summary" metrics if set to ``summary``.
+  emit prometheus "summary" metrics if set to ``summary``. Each emitted summary is over the interval
+  of the last :ref:`stats_flush_interval <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_interval>`.
 
   Example histogram output:
 
