@@ -203,6 +203,10 @@ bug_fixes:
 - area: admin
   change: |
     Removing the ECDS config entry from the config dump when it does not exist (or has expired).
+- area: geoip
+  change: |
+    Switch to use StopAllIterationAndWatermark instead of StopIteration in geoip filter to fix an issue where large
+    POST request body may get corrupted when geoip is enabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
