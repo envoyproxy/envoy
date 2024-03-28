@@ -3,18 +3,14 @@
 #include <atomic>
 
 #include "absl/synchronization/notification.h"
-
 #include "gtest/gtest.h"
-
 #include "library/cc/engine_builder.h"
 #include "library/common/api/external.h"
 #include "library/common/bridge/utility.h"
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
-
 #include "source/common/common/assert.h"
-
 #include "test/common/http/common.h"
 #include "test/common/mocks/common/mocks.h"
 #include "test/mocks/thread/mocks.h"

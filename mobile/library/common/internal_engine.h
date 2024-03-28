@@ -1,22 +1,18 @@
 #pragma once
 
 #include "absl/types/optional.h"
-
 #include "envoy/server/lifecycle_notifier.h"
-
 #include "extension_registry.h"
-
-#include "source/common/common/logger.h"
-#include "source/common/common/macros.h"
-#include "source/common/common/posix/thread_impl.h"
-#include "source/common/common/thread.h"
-
 #include "library/common/engine_common.h"
 #include "library/common/engine_types.h"
 #include "library/common/http/client.h"
 #include "library/common/logger/logger_delegate.h"
 #include "library/common/network/connectivity_manager.h"
 #include "library/common/types/c_types.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/posix/thread_impl.h"
+#include "source/common/common/thread.h"
 
 namespace Envoy {
 

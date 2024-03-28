@@ -2,13 +2,12 @@
 
 #include <sys/resource.h>
 
-#include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/common/utility.h"
-#include "source/common/common/lock_guard.h"
-#include "source/common/runtime/runtime_features.h"
-
 #include "absl/synchronization/notification.h"
 #include "library/common/stats/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 
