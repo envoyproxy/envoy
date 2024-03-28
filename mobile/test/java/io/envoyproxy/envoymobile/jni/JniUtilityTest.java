@@ -8,6 +8,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @RunWith(RobolectricTestRunner.class)
 public class JniUtilityTest {
   public JniUtilityTest() { System.loadLibrary("envoy_jni_utility_test"); }
@@ -16,6 +19,8 @@ public class JniUtilityTest {
   // Native methods for testing.
   //================================================================================
   public static native byte[] protoJavaByteArrayConversion(byte[] source);
+  public static native String javaCppStringConversion(String string);
+  public static native Map<String, String> javaCppMapConversion(Map<String, String> map);
 
   @Test
   public void testProtoJavaByteArrayConversion() throws Exception {
@@ -27,5 +32,20 @@ public class JniUtilityTest {
             .build();
     Struct dest = Struct.parseFrom(protoJavaByteArrayConversion(source.toByteArray()));
     assertThat(source).isEqualTo(dest);
+  }
+
+  @Test
+  public void testJavaCppStringConversion() {
+    String input = "Hello World";
+    assertThat(javaCppStringConversion(input)).isEqualTo(input);
+  }
+
+  @Test
+  public void testCppStringMapToJavaStringMap() {
+    Map<String, String> map = new HashMap<>();
+    map.put("key1", "value1");
+    map.put("key2", "value2");
+    map.put("key3", "value3");
+    assertThat(javaCppMapConversion(map)).isEqualTo(map);
   }
 }

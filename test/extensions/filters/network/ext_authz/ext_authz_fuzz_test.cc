@@ -9,6 +9,7 @@
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -63,10 +64,10 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   Stats::TestUtil::TestStore stats_store;
   Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config = input.config();
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   ConfigSharedPtr config =
-      std::make_shared<Config>(proto_config, *stats_store.rootScope(), bootstrap);
+      std::make_shared<Config>(proto_config, *stats_store.rootScope(), context);
   std::unique_ptr<Filter> filter =
       std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
 

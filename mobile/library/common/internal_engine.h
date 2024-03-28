@@ -1,13 +1,15 @@
 #pragma once
 
 #include "envoy/server/lifecycle_notifier.h"
-#include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/posix/thread_impl.h"
+#include "source/common/common/thread.h"
 
-#include "absl/base/call_once.h"
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
+#include "library/common/engine_types.h"
 #include "library/common/http/client.h"
 #include "library/common/logger/logger_delegate.h"
 #include "library/common/network/connectivity_manager.h"
@@ -23,8 +25,8 @@ public:
    * @param logger, the callbacks to use for engine logging.
    * @param event_tracker, the event tracker to use for the emission of events.
    */
-  InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
-                 envoy_event_tracker event_tracker);
+  InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
+                 std::unique_ptr<EnvoyEventTracker> event_tracker);
 
   /**
    * InternalEngine destructor.
@@ -37,7 +39,7 @@ public:
    * @param log_level, the log level.
    */
   envoy_status_t run(const std::string& config, const std::string& log_level);
-  envoy_status_t run(std::unique_ptr<Envoy::OptionsImplBase>&& options);
+  envoy_status_t run(std::shared_ptr<Envoy::OptionsImplBase> options);
 
   /**
    * Immediately terminate the engine, if running. Calling this function when
@@ -118,16 +120,23 @@ public:
   Stats::Store& getStatsStore();
 
 private:
-  envoy_status_t main(std::unique_ptr<Envoy::OptionsImplBase>&& options);
+  GTEST_FRIEND_CLASS(InternalEngineTest, ThreadCreationFailed);
+
+  InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
+                 std::unique_ptr<EnvoyEventTracker> event_tracker,
+                 Thread::PosixThreadFactoryPtr thread_factory);
+
+  envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
 
+  Thread::PosixThreadFactoryPtr thread_factory_;
   Event::Dispatcher* event_dispatcher_{};
   Stats::ScopeSharedPtr client_scope_;
   Stats::StatNameSetPtr stat_name_set_;
-  envoy_engine_callbacks callbacks_;
-  envoy_logger logger_;
-  envoy_event_tracker event_tracker_;
+  std::unique_ptr<EngineCallbacks> callbacks_;
+  std::unique_ptr<EnvoyLogger> logger_;
+  std::unique_ptr<EnvoyEventTracker> event_tracker_;
   Assert::ActionRegistrationPtr assert_handler_registration_;
   Assert::ActionRegistrationPtr bug_handler_registration_;
   Thread::MutexBasicLockable mutex_;
@@ -142,7 +151,7 @@ private:
   Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;
   // main_thread_ should be destroyed first, hence it is the last member variable. Objects with
   // instructions scheduled on the main_thread_ need to have a longer lifetime.
-  std::thread main_thread_{}; // Empty placeholder to be populated later.
+  Thread::PosixThreadPtr main_thread_{nullptr}; // Empty placeholder to be populated later.
   bool terminated_{false};
 };
 

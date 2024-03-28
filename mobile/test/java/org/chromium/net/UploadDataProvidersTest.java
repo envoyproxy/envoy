@@ -14,6 +14,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
 import org.chromium.net.testing.Feature;
@@ -45,7 +47,7 @@ public class UploadDataProvidersTest {
     mFile = new File(getContext().getCacheDir().getPath() + "/tmpfile");
     FileOutputStream fileOutputStream = new FileOutputStream(mFile);
     try {
-      fileOutputStream.write(LOREM.getBytes("UTF-8"));
+      fileOutputStream.write(LOREM.getBytes(StandardCharsets.UTF_8));
     } finally {
       fileOutputStream.close();
     }
@@ -122,7 +124,8 @@ public class UploadDataProvidersTest {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
         NativeTestServer.getRedirectToEchoBody(), callback, callback.getExecutor());
-    UploadDataProvider dataProvider = UploadDataProviders.create(LOREM.getBytes("UTF-8"));
+    UploadDataProvider dataProvider =
+        UploadDataProviders.create(LOREM.getBytes(StandardCharsets.UTF_8));
     builder.setUploadDataProvider(dataProvider, callback.getExecutor());
     builder.addHeader("Content-Type", "useless/string");
     builder.build().start();
@@ -248,7 +251,7 @@ public class UploadDataProvidersTest {
     UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
         NativeTestServer.getRedirectToEchoBody(), callback, callback.getExecutor());
     builder.addHeader("Content-Type", "useless/string");
-    byte[] uploadData = LOREM.getBytes("UTF-8");
+    byte[] uploadData = LOREM.getBytes(StandardCharsets.UTF_8);
     int offset = 5;
     byte[] uploadDataWithPadding = new byte[uploadData.length + offset];
     System.arraycopy(uploadData, 0, uploadDataWithPadding, offset, uploadData.length);

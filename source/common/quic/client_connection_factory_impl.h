@@ -9,8 +9,8 @@
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/tls/ssl_socket.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "quiche/quic/core/quic_utils.h"
 

@@ -40,7 +40,7 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
   const auto& typed_config =
       dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(config);
   envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb_config;
-  auto status = Envoy::MessageUtil::unpackToNoThrow(typed_config.typed_config(), dlb_config);
+  auto status = Envoy::MessageUtil::unpackTo(typed_config.typed_config(), dlb_config);
   if (!status.ok()) {
     return fallback(fmt::format("unexpected dlb config: {}", typed_config.DebugString()));
   }

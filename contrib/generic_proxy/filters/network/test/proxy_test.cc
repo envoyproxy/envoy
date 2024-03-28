@@ -405,7 +405,7 @@ TEST_F(FilterTest, ActiveStreamRouteEntry) {
   EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
-  EXPECT_EQ(active_stream->routeEntry(), route_matcher_->route_entry_.get());
+  EXPECT_EQ(active_stream->routeEntry().ptr(), route_matcher_->route_entry_.get());
 }
 
 TEST_F(FilterTest, ActiveStreamPerFilterConfig) {

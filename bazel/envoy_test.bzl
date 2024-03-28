@@ -1,10 +1,9 @@
+load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
+
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
-load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load(":envoy_binary.bzl", "envoy_cc_binary")
-load(":envoy_library.bzl", "tcmalloc_external_deps")
-load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",
@@ -17,6 +16,8 @@ load(
     "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
+load(":envoy_library.bzl", "tcmalloc_external_deps")
+load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
 
 # Envoy C++ related test infrastructure (that want gtest, gmock, but may be
 # relied on by envoy_cc_test_library) should use this function.

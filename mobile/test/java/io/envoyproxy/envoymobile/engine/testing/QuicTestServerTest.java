@@ -7,28 +7,16 @@ import androidx.test.core.app.ApplicationProvider;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Custom;
 import io.envoyproxy.envoymobile.Engine;
-import io.envoyproxy.envoymobile.EnvoyError;
 import io.envoyproxy.envoymobile.LogLevel;
-import io.envoyproxy.envoymobile.RequestHeaders;
-import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
-import io.envoyproxy.envoymobile.ResponseHeaders;
-import io.envoyproxy.envoymobile.ResponseTrailers;
 import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
-import io.envoyproxy.envoymobile.engine.testing.RequestScenario;
-import io.envoyproxy.envoymobile.engine.testing.Response;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
@@ -39,7 +27,6 @@ import org.robolectric.RobolectricTestRunner;
 
 @RunWith(RobolectricTestRunner.class)
 public class QuicTestServerTest {
-
   private static final String HCM_TYPE =
       "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
 
@@ -102,6 +89,7 @@ public class QuicTestServerTest {
 
   private final Context appContext = ApplicationProvider.getApplicationContext();
   private Engine engine;
+  private HttpTestServerFactory.HttpTestServer httpTestServer;
 
   @BeforeClass
   public static void loadJniLibrary() {
@@ -111,10 +99,15 @@ public class QuicTestServerTest {
 
   @Before
   public void setUpEngine() throws Exception {
-    TestJni.startHttp3TestServer();
+    Map<String, String> headers = new HashMap<>();
+    headers.put("Cache-Control", "max-age=0");
+    headers.put("Content-Type", "text/plain");
+    headers.put("X-Original-Url", "https://test.example.com:6121/simple.txt");
+    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP3, headers,
+                                                 "This is a simple text file served by QUIC.\n");
     CountDownLatch latch = new CountDownLatch(1);
     engine = new AndroidEngineBuilder(appContext,
-                                      new Custom(String.format(CONFIG, TestJni.getServerPort())))
+                                      new Custom(String.format(CONFIG, httpTestServer.getPort())))
                  .addLogLevel(LogLevel.WARN)
                  .setOnEngineRunning(() -> {
                    latch.countDown();
@@ -127,15 +120,16 @@ public class QuicTestServerTest {
   @After
   public void shutdownEngine() {
     engine.terminate();
-    TestJni.shutdownTestServer();
+    httpTestServer.shutdown();
   }
 
   @Test
   public void get_simpleTxt() throws Exception {
-    RequestScenario requestScenario = new RequestScenario()
-                                          .setHttpMethod(RequestMethod.GET)
-                                          .addHeader("no_trailers", "true")
-                                          .setUrl(TestJni.getServerURL() + "/simple.txt");
+    RequestScenario requestScenario =
+        new RequestScenario()
+            .setHttpMethod(RequestMethod.GET)
+            .addHeader("no_trailers", "true")
+            .setUrl("https://test.example.com:" + httpTestServer.getPort() + "/simple.txt");
 
     Response response = sendRequest(requestScenario);
 
