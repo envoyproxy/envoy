@@ -10,8 +10,6 @@ public final class HttpTestServerFactory {
     public static final int HTTP1_WITHOUT_TLS = 0;
     public static final int HTTP2_WITH_TLS = 1;
     public static final int HTTP3 = 2;
-    public static final int HTTP_PROXY = 3;
-    public static final int HTTPS_PROXY = 4;
 
     private Type() {}
   }
