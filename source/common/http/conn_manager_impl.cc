@@ -1453,6 +1453,13 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
       request_headers_->removeEnvoyDecoratorOperation();
     }
   }
+
+  ProtobufWkt::Struct trace_metadata;
+  auto& trace_fields = *trace_metadata.mutable_fields();
+  trace_fields["trace_id"].set_string_value(active_span_->getTraceIdAsHex());
+  trace_fields["span_id"].set_string_value(active_span_->getSpanIdAsHex());
+  trace_fields["sampled"].set_bool_value(tracing_decision.traced);
+  filter_manager_.streamInfo().setDynamicMetadata("envoy.tracing", trace_metadata);
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {

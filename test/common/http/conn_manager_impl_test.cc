@@ -1589,6 +1589,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
+  EXPECT_CALL(*span, getTraceIdAsHex()).WillOnce(Return("1"));
+  EXPECT_CALL(*span, getSpanIdAsHex()).WillOnce(Return("2"));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -1633,6 +1635,13 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
   EXPECT_EQ(1UL, tracing_stats_.service_forced_.value());
   EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
+
+  auto& dynamic_metadata = filter->callbacks_->streamInfo().dynamicMetadata();
+  EXPECT_EQ(1, dynamic_metadata.filter_metadata_size());
+  auto& tracing_fields = dynamic_metadata.filter_metadata().at("envoy.tracing").fields();
+  EXPECT_EQ("1", tracing_fields.at("trace_id").string_value());
+  EXPECT_EQ("2", tracing_fields.at("span_id").string_value());
+  EXPECT_EQ(true, tracing_fields.at("sampled").bool_value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorator) {
