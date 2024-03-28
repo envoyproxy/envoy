@@ -1,5 +1,6 @@
 import Envoy
 import EnvoyEngine
+import EnvoyTestServer
 import Foundation
 import TestExtensions
 import XCTest
@@ -11,61 +12,7 @@ final class CancelStreamTests: XCTestCase {
   }
 
   func testCancelStream() {
-    let remotePort = Int.random(in: 10001...11000)
-    // swiftlint:disable:next line_length
-    let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
-    let lefType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
-    // swiftlint:disable:next line_length
-    let pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
     let filterName = "cancel_validation_filter"
-    let config =
-"""
-listener_manager:
-    name: envoy.listener_manager_impl.api
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
-static_resources:
-  listeners:
-  - name: base_api_listener
-    address:
-      socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10000 }
-    api_listener:
-      api_listener:
-        "@type": \(emhcmType)
-        config:
-          stat_prefix: api_hcm
-          route_config:
-            name: api_router
-            virtual_hosts:
-            - name: api
-              domains: ["*"]
-              routes:
-              - match: { prefix: "/" }
-                route: { cluster: fake_remote }
-          http_filters:
-          - name: envoy.filters.http.local_error
-            typed_config:
-              "@type": \(lefType)
-          - name: envoy.filters.http.platform_bridge
-            typed_config:
-              "@type": \(pbfType)
-              platform_filter_name: \(filterName)
-          - name: envoy.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  clusters:
-  - name: fake_remote
-    connect_timeout: 0.25s
-    type: STATIC
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: fake_remote
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address: { address: 127.0.0.1, port_value: \(remotePort) }
-"""
 
     struct CancelValidationFilter: ResponseFilter {
       let expectation: XCTestExpectation
@@ -99,7 +46,9 @@ static_resources:
     let runExpectation = self.expectation(description: "Run called with expected cancellation")
     let filterExpectation = self.expectation(description: "Filter called with cancellation")
 
-    let engine = EngineBuilder(yaml: config)
+    EnvoyTestServer.startHttp1PlaintextServer()
+
+    let engine = EngineBuilder()
       .addLogLevel(.trace)
       .addPlatformFilter(
         name: filterName,
@@ -109,8 +58,9 @@ static_resources:
 
     let client = engine.streamClient()
 
-    let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
-                                               authority: "example.com", path: "/test")
+    let port = String(EnvoyTestServer.getEnvoyPort())
+    let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
+                                               authority: "localhost:" + port, path: "/")
       .build()
 
     client
@@ -126,5 +76,6 @@ static_resources:
     XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     engine.terminate()
+    EnvoyTestServer.shutdownTestServer()
   }
 }
