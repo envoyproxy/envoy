@@ -255,6 +255,7 @@ envoy_mobile_android_test(
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
