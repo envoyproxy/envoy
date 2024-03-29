@@ -183,7 +183,7 @@ TEST(MatchingData, FilterStateInput) {
   {
     Network::Matching::FilterStateInput<HttpMatchingData> input("filter_state_key");
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_, 
+    EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
