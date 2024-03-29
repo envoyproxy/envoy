@@ -128,7 +128,15 @@ absl::Status MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap&
   }
 
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
-  cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(bootstrap);
+
+  {
+    // These two functions has to be called consecutively to avoid any cluster manager init issues.
+    // Originally init() is called inside clusterManagerFromProto(). However, it turns out for some
+    // features called in the init() function needs to access cluster_manager_. So, cluster_manager_
+    // needs to be instantiated before calling init().
+    cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(bootstrap);
+    THROW_IF_NOT_OK(cluster_manager_->init(bootstrap));
+  }
 
   const auto& listeners = bootstrap.static_resources().listeners();
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
