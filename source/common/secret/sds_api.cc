@@ -153,8 +153,9 @@ SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_reso
   }
 
   if (removed_resources.size() == 1) {
-    // We only removed a resource here; don't go through the SotW init process
-    // and expect this to be cleaned up by the owning cluster or listener.
+    // SDS is a singleton (e.g. single-resource) resource subscription, so it should never be
+    // removed except by the modification of the referenced cluster/listener. Therefore, since the
+    // server indicates a removal, ignore it (via an ACK).
     ENVOY_LOG_MISC(
         trace,
         "Server sent a delta SDS update attempting to remove a resource (name: {}). Ignoring.",
@@ -177,6 +178,11 @@ absl::Status SdsApi::validateUpdateSize(uint32_t added_resources_num,
     return absl::InvalidArgumentError(
         fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
   }
+
+  // This conditional technically allows a response with added=1 removed=1
+  // which is nonsensical since SDS is a singleton resource subscription.
+  // It is, however, preferred to ignore these nonsensical responses rather
+  // than NACK them, so it is allowed here.
   if (added_resources_num > 1 || removed_resources_num > 1) {
     return absl::InvalidArgumentError(
         fmt::format("Unexpected SDS secrets length for {}, number of added resources "
