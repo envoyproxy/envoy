@@ -136,6 +136,9 @@ type RequestHeaderMap interface {
 	Method() string
 	Host() string
 	Path() string
+	SetMethod(method string)
+	SetHost(host string)
+	SetPath(path string)
 }
 
 type RequestTrailerMap interface {

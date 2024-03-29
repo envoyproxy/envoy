@@ -156,6 +156,9 @@ type StreamFilterCallbacks interface {
 
 type FilterCallbacks interface {
 	StreamFilterCallbacks
+	// ClearRouteCache clears the route cache for the current request,
+	// and filtermanager will re-fetch the route in the next filter.
+	ClearRouteCache()
 	// Continue or SendLocalReply should be last API invoked, no more code after them.
 	Continue(StatusType)
 	SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)

@@ -32,6 +32,8 @@ type filter struct {
 	databuffer  string // return api.Stop
 	panic       string // hit panic in which phase
 	badapi      bool   // bad api call
+	newPath     string // set new path
+	clearRoute  bool   // clear route cache
 }
 
 func parseQuery(path string) url.Values {
@@ -76,6 +78,8 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 	f.localreplay = f.query_params.Get("localreply")
 	f.panic = f.query_params.Get("panic")
 	f.badapi = f.query_params.Get("badapi") != ""
+	f.newPath = f.query_params.Get("newPath")
+	f.clearRoute = f.query_params.Get("clearRoute") != ""
 }
 
 func (f *filter) fail(msg string, a ...any) api.StatusType {
@@ -226,6 +230,13 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 
 	if f.panic == "decode-header" {
 		badcode()
+	}
+
+	if f.newPath != "" {
+		header.SetPath(f.newPath)
+	}
+	if f.clearRoute {
+		f.callbacks.ClearRouteCache()
 	}
 	return api.Continue
 }
