@@ -8,6 +8,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
@@ -19,7 +20,7 @@ namespace Filesystem {
  */
 class Watcher {
 public:
-  using OnChangedCb = std::function<void(uint32_t events)>;
+  using OnChangedCb = std::function<absl::Status(uint32_t events)>;
 
   struct Events {
     static constexpr uint32_t MovedTo = 0x1;

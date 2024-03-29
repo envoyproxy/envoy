@@ -107,7 +107,7 @@ bool ActiveStream::spawnUpstreamSpan() const {
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() {
   return parent_.downstreamConnection().dispatcher();
 }
-const CodecFactory& ActiveStream::downstreamCodec() { return parent_.config_->codecFactory(); }
+const CodecFactory& ActiveStream::codecFactory() { return parent_.config_->codecFactory(); }
 void ActiveStream::resetStream(DownstreamStreamResetReason reason) {
   if (active_stream_reset_) {
     return;

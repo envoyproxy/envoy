@@ -14,6 +14,7 @@
 #include "source/common/thread_local/thread_local_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -67,10 +68,12 @@ public:
   void initPrefixRejections(const std::string& prefix) {
     stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
         prefix);
-    store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(stats_config_, symbol_table_));
+    store_.setStatsMatcher(
+        std::make_unique<Stats::StatsMatcherImpl>(stats_config_, symbol_table_, context_));
   }
 
 private:
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Stats::SymbolTableImpl symbol_table_;
   Event::SimulatedTimeSystem time_system_;
   Stats::AllocatorImpl heap_alloc_;

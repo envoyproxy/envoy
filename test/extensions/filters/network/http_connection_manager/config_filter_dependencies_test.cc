@@ -82,9 +82,10 @@ TEST_F(HttpConnectionManagerConfigTest, UnregisteredFilterException) {
   hcm_config.add_http_filters()->set_name("envoy.filters.http.router");
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(
-          hcm_config, context_, date_provider_, route_config_provider_manager_,
-          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
+      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                  route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, tracer_manager_,
+                                  filter_config_provider_manager_, creation_status_),
       EnvoyException, "Didn't find a registered implementation for name: 'test.pantry'");
 }
 
@@ -102,7 +103,8 @@ TEST_F(HttpConnectionManagerConfigTest, AllDependenciesSatisfiedOk) {
 
   HttpConnectionManagerConfig(hcm_config, context_, date_provider_, route_config_provider_manager_,
                               scoped_routes_config_provider_manager_, tracer_manager_,
-                              filter_config_provider_manager_);
+                              filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
 }
 
 // PantryFilter provides a potato, which is not required by any other filter.
@@ -116,7 +118,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnusedProvidencyOk) {
 
   HttpConnectionManagerConfig(hcm_config, context_, date_provider_, route_config_provider_manager_,
                               scoped_routes_config_provider_manager_, tracer_manager_,
-                              filter_config_provider_manager_);
+                              filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
 }
 
 // ChefFilter requires a potato, but no filter provides it.
@@ -128,12 +131,12 @@ TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyError) {
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(
-          hcm_config, context_, date_provider_, route_config_provider_manager_,
-          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
-      EnvoyException,
-      "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_EQ(creation_status_.message(),
+            "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
 
 // ChefFilter requires a potato, but no preceding filter provides it.
@@ -149,12 +152,12 @@ TEST_F(HttpConnectionManagerConfigTest, MisorderedDependenciesError) {
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(
-          hcm_config, context_, date_provider_, route_config_provider_manager_,
-          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
-      EnvoyException,
-      "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_EQ(creation_status_.message(),
+            "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UpgradeUnmetDependencyError) {
@@ -168,12 +171,12 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeUnmetDependencyError) {
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(
-          hcm_config, context_, date_provider_, route_config_provider_manager_,
-          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
-      EnvoyException,
-      "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_EQ(creation_status_.message(),
+            "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UpgradeDependencyOK) {
@@ -189,9 +192,11 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeDependencyOK) {
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  HttpConnectionManagerConfig(hcm_config, context_, date_provider_, route_config_provider_manager_,
-                              scoped_routes_config_provider_manager_, tracer_manager_,
-                              filter_config_provider_manager_);
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
 }
 
 // Dependencies provided in the HCM config filter chain do not satisfy
@@ -211,12 +216,12 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFr
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(
-          hcm_config, context_, date_provider_, route_config_provider_manager_,
-          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
-      EnvoyException,
-      "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_EQ(creation_status_.message(),
+            "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
 
 // Dependencies provided in one upgrade filter chain do not satisfy
@@ -238,12 +243,12 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFr
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(
-          hcm_config, context_, date_provider_, route_config_provider_manager_,
-          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
-      EnvoyException,
-      "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_EQ(creation_status_.message(),
+            "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
 
 } // namespace

@@ -43,9 +43,10 @@ public:
     const bool use_deferred_cluster = GetParam();
     bootstrap.mutable_cluster_manager()->set_enable_deferred_cluster_creation(use_deferred_cluster);
     cluster_manager_ = Upstream::TestClusterManagerImpl::createAndInit(
-        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, http_context_, grpc_context_, router_context_, server_);
+        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
+        factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
+        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_,
+        server_);
     ASSERT_TRUE(cluster_manager_->initializeSecondaryClusters(bootstrap).ok());
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
     cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
@@ -278,9 +279,9 @@ TEST_P(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
 
   auto bootstrap = parseBootstrapFromV2Yaml(config);
   cluster_manager_ = Upstream::TestClusterManagerImpl::createAndInit(
-      bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.local_info_,
-      log_manager_, factory_.dispatcher_, admin_, validation_context_, *factory_.api_,
-      http_context_, grpc_context_, router_context_, server_);
+      bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
+      factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
+      validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_);
   ASSERT_TRUE(cluster_manager_->initializeSecondaryClusters(bootstrap).ok());
   EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
   cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");

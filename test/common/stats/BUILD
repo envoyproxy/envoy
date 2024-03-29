@@ -43,6 +43,7 @@ envoy_cc_test(
     srcs = ["histogram_impl_test.cc"],
     deps = [
         "//source/common/stats:histogram_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
@@ -142,6 +143,7 @@ envoy_cc_test(
     deps = [
         "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
@@ -284,6 +286,7 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
@@ -350,6 +353,7 @@ envoy_cc_test(
         "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:test_time_lib",
@@ -372,6 +376,7 @@ envoy_cc_benchmark_binary(
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",

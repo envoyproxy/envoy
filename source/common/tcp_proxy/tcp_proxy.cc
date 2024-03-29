@@ -159,7 +159,8 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
     : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
       upstream_drain_manager_slot_(context.serverFactoryContext().threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
-      random_generator_(context.serverFactoryContext().api().randomGenerator()) {
+      random_generator_(context.serverFactoryContext().api().randomGenerator()),
+      regex_engine_(context.serverFactoryContext().regexEngine()) {
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
         std::make_shared<UpstreamDrainManager>();
@@ -563,7 +564,8 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
     // TODO(vikaschoudhary16): Initialize route_ once per cluster.
     upstream_decoder_filter_callbacks_.route_ = std::make_shared<Http::NullRouteImpl>(
         cluster.info()->name(),
-        *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()});
+        *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()},
+        config_->regexEngine());
   }
   generic_conn_pool_ = factory->createGenericConnPool(
       cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
@@ -684,7 +686,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       route_stat_name_storage_("tcpproxy_tunneling", context.scope().symbolTable()),
       // TODO(vikaschoudhary16): figure out which of the following router_config_ members are
       // not required by tcp_proxy and move them to a different class
-      router_config_(route_stat_name_storage_.statName(),
+      router_config_(context.serverFactoryContext(), route_stat_name_storage_.statName(),
                      context.serverFactoryContext().localInfo(), stats_scope,
                      context.serverFactoryContext().clusterManager(),
                      context.serverFactoryContext().runtime(),
