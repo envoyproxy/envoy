@@ -94,6 +94,10 @@ minor_behavior_changes:
     Disables recvmmsg (multi-message) for reading packets from a client QUIC UDP socket, if GRO
     is not set or not supported. recvmsg will be used instead. This behavior change can be
     reverted by setting ``envoy.reloadable_features.disallow_quic_client_udp_mmsg`` to ``false``.
+- area: xds
+  change: |
+    Delta SDS removals will no longer result in a "Missing SDS resources" NACK
+    and instead will be ignored.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
