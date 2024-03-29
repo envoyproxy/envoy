@@ -29,6 +29,5 @@ envoy_cc_extension(
         "//source/extensions/http/injected_credentials/common:credential_factory_base_lib",
         "//source/extensions/http/injected_credentials/common:secret_reader_lib",
         "@envoy_api//envoy/extensions/http/injected_credentials/generic/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/http/injected_credentialstialstialstialstialstials/generic/v3:pkg_cc_proto",
     ],
 )

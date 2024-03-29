@@ -17,7 +17,7 @@ envoy_cc_library(
         "//envoy/server:filter_config_interface",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//source/extensions/injected_credentials/common:credential_interface",
+        "//source/extensions/http/injected_credentials/common:credential_interface",
     ],
 )
 
@@ -31,7 +31,7 @@ envoy_cc_extension(
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "//source/extensions/injected_credentials/common:credential_config_interface",
+        "//source/extensions/http/injected_credentials/common:credential_config_interface",
         "@envoy_api//envoy/extensions/filters/http/credential_injector/v3:pkg_cc_proto",
     ],
 )

@@ -1,15 +1,16 @@
 #pragma once
 
+#include "envoy/extensions/http/injected_credentials/generic/v3/generic.pb.h"
 #include "envoy/extensions/http/injected_credentials/generic/v3/generic.pb.validate.h"
-#include "envoy/extensions/http/injected_credentialstialstialstialstialstials/generic/v3/generic.pb.h"
 
 #include "source/common/http/headers.h"
+#include "source/extensions/http/injected_credentials/common/factory.h"
+#include "source/extensions/http/injected_credentials/common/factory_base.h"
 #include "source/extensions/http/injected_credentials/generic/generic_impl.h"
-#include "source/extensions/http/injected_credentialstials/common/factory.h"
-#include "source/extensions/http/injected_credentialstials/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
+namespace Http {
 namespace InjectedCredentials {
 namespace Generic {
 
@@ -30,5 +31,6 @@ DECLARE_FACTORY(GenericCredentialInjectorFactory);
 
 } // namespace Generic
 } // namespace InjectedCredentials
+} // namespace Http
 } // namespace Extensions
 } // namespace Envoy

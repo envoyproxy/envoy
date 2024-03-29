@@ -2,11 +2,12 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "source/extensions/http/injected_credentials/common/credential.h"
 #include "source/extensions/http/injected_credentials/common/factory.h"
-#include "source/extensions/http/injected_credentialstials/common/credential.h"
 
 namespace Envoy {
 namespace Extensions {
+namespace Http {
 namespace InjectedCredentials {
 namespace Common {
 
@@ -41,5 +42,6 @@ private:
 
 } // namespace Common
 } // namespace InjectedCredentials
+} // namespace Http
 } // namespace Extensions
 } // namespace Envoy

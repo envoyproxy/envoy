@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.credential_injector"],
     deps = [
         "//source/extensions/filters/http/credential_injector:credential_injector_lib",
-        "//source/extensions/injected_credentials/generic:generic_lib",
+        "//source/extensions/http/injected_credentials/generic:generic_lib",
         "//test/mocks/server:server_mocks",
     ],
 )
@@ -49,7 +49,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.credential_injector"],
     deps = [
         "//source/extensions/filters/http/credential_injector:config",
-        "//source/extensions/injected_credentials/generic:config",
+        "//source/extensions/http/injected_credentials/generic:config",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:utility_lib",
     ],

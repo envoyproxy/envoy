@@ -74,12 +74,6 @@ EXTENSIONS = {
     "envoy.health_check.event_sinks.file":              "//source/extensions/health_check/event_sinks/file:file_sink_lib",
 
     #
-    # Injected credentials
-    #
-
-    "envoy.injected_credentials.generic":              "//source/extensions/injected_credentials/generic:config",
-
-    #
     # Input Matchers
     #
 
@@ -403,6 +397,12 @@ EXTENSIONS = {
 
     "envoy.http.custom_response.redirect_policy":             "//source/extensions/http/custom_response/redirect_policy:redirect_policy_lib",
     "envoy.http.custom_response.local_response_policy":       "//source/extensions/http/custom_response/local_response_policy:local_response_policy_lib",
+
+    #
+    # Injected credentials
+    #
+
+    "envoy.http.injected_credentials.generic":              "//source/extensions/http/injected_credentials/generic:config",
 
     #
     # QUIC extensions

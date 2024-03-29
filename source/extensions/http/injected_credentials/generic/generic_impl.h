@@ -1,10 +1,11 @@
 #pragma once
 
 #include "source/extensions/http/injected_credentials/common/credential.h"
-#include "source/extensions/http/injected_credentialstials/common/secret_reader.h"
+#include "source/extensions/http/injected_credentials/common/secret_reader.h"
 
 namespace Envoy {
 namespace Extensions {
+namespace Http {
 namespace InjectedCredentials {
 namespace Generic {
 
@@ -25,7 +26,7 @@ public:
     return nullptr;
   };
 
-  absl::Status inject(Http::RequestHeaderMap& headers, bool overwrite) override;
+  absl::Status inject(Envoy::Http::RequestHeaderMap& headers, bool overwrite) override;
 
 private:
   const std::string header_;
@@ -34,5 +35,6 @@ private:
 
 } // namespace Generic
 } // namespace InjectedCredentials
+} // namespace Http
 } // namespace Extensions
 } // namespace Envoy

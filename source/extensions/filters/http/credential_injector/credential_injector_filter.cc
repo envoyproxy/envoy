@@ -16,7 +16,7 @@ FilterConfig::FilterConfig(CredentialInjectorSharedPtr credential_injector, bool
 
 // Inject configured credential to the HTTP request header.
 // return true if successful
-bool FilterConfig::injectCredential(Http::RequestHeaderMap& headers) {
+bool FilterConfig::injectCredential(Envoy::Http::RequestHeaderMap& headers) {
   absl::Status status = injector_->inject(headers, overwrite_);
 
   // If the credential already exists in the header and overwrite is false,
@@ -45,8 +45,8 @@ bool FilterConfig::injectCredential(Http::RequestHeaderMap& headers) {
 CredentialInjectorFilter::CredentialInjectorFilter(FilterConfigSharedPtr config)
     : config_(std::move(config)) {}
 
-Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
-                                                                  bool) {
+Envoy::Http::FilterHeadersStatus
+CredentialInjectorFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) {
   // Initiate the credential provider if not already done.
   if (!credential_init_) {
     // Save the pointer to the request headers for header manipulation based on credential provider
@@ -59,13 +59,13 @@ Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestH
     // We don't need to inject credential here because the credential has been injected in the
     // onSuccess callback.
     if (credential_init_) {
-      return Http::FilterHeadersStatus::Continue;
+      return Envoy::Http::FilterHeadersStatus::Continue;
     }
 
     // pause while we await the credential provider to retrieve the credential, for example, an
     // oauth2 credential provider may need to make a remote call to retrieve the credential.
     stop_iteration_ = true;
-    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+    return Envoy::Http::FilterHeadersStatus::StopAllIterationAndBuffer;
   }
 
   // The credential provider has failed to retrieve the credential
@@ -73,23 +73,25 @@ Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestH
     config_->stats().failed_.inc();
 
     if (!config_->allowRequestWithoutCredential()) {
-      decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
-                                         nullptr, absl::nullopt, "failed_to_inject_credential");
-      return Http::FilterHeadersStatus::StopIteration;
+      decoder_callbacks_->sendLocalReply(Envoy::Http::Code::Unauthorized,
+                                         "Failed to inject credential.", nullptr, absl::nullopt,
+                                         "failed_to_inject_credential");
+      return Envoy::Http::FilterHeadersStatus::StopIteration;
     }
 
-    return Http::FilterHeadersStatus::Continue;
+    return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
   // The credential provider has successfully retrieved the credential, inject it to the header
   bool succeed = config_->injectCredential(headers);
   if (!succeed && !config_->allowRequestWithoutCredential()) {
-    decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
-                                       nullptr, absl::nullopt, "failed_to_inject_credential");
-    return Http::FilterHeadersStatus::StopIteration;
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::Unauthorized,
+                                       "Failed to inject credential.", nullptr, absl::nullopt,
+                                       "failed_to_inject_credential");
+    return Envoy::Http::FilterHeadersStatus::StopIteration;
   }
 
-  return Http::FilterHeadersStatus::Continue;
+  return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
 void CredentialInjectorFilter::onSuccess() {
@@ -100,8 +102,9 @@ void CredentialInjectorFilter::onSuccess() {
   assert(request_headers_ != nullptr);
   bool succeed = config_->injectCredential(*request_headers_);
   if (!succeed && !config_->allowRequestWithoutCredential()) {
-    decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
-                                       nullptr, absl::nullopt, "failed_to_inject_credential");
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::Unauthorized,
+                                       "Failed to inject credential.", nullptr, absl::nullopt,
+                                       "failed_to_inject_credential");
     request_headers_ = nullptr;
     return;
   }
@@ -124,8 +127,9 @@ void CredentialInjectorFilter::onFailure(const std::string& reason) {
   config_->stats().failed_.inc();
 
   if (!config_->allowRequestWithoutCredential()) {
-    decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
-                                       nullptr, absl::nullopt, "failed_to_inject_credential");
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::Unauthorized,
+                                       "Failed to inject credential.", nullptr, absl::nullopt,
+                                       "failed_to_inject_credential");
     return;
   }
 
@@ -137,7 +141,7 @@ void CredentialInjectorFilter::onFailure(const std::string& reason) {
 }
 
 void CredentialInjectorFilter::setDecoderFilterCallbacks(
-    Http::StreamDecoderFilterCallbacks& callbacks) {
+    Envoy::Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
 }
 

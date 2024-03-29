@@ -24,7 +24,7 @@ Configuration
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
 
-Currently the filter supports :ref:`generic <envoy_v3_api_msg_extensions.injected_credentials.generic.v3.Generic>` only.
+Currently the filter supports :ref:`generic <envoy_v3_api_msg_extensions.http.injected_credentials.generic.v3.Generic>` only.
 Other credential types can be supported as extensions.
 
 Here is an example configuration with Generic credential, which injects an HTTP Basic Auth credential into the proxied requests.

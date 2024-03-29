@@ -894,13 +894,13 @@ envoy.http.header_validators.envoy_default:
   status: wip
   type_urls:
   - envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
-envoy.injected_credentials.generic:
+envoy.http.injected_credentials.generic:
   categories:
-  - envoy.injected_credentials
+  - envoy.http.injected_credentials
   security_posture: unknown
   status: alpha
   type_urls:
-  - envoy.extensions.injected_credentials.generic.v3.Generic
+  - envoy.extensions.http.injected_credentials.generic.v3.Generic
 envoy.internal_redirect_predicates.allow_listed_routes:
   categories:
   - envoy.internal_redirect_predicates

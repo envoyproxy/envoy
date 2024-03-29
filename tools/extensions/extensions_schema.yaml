@@ -70,7 +70,6 @@ categories:
 - envoy.config_subscription
 - envoy.config_mux
 - envoy.filters.http
-- envoy.injected_credentials
 - envoy.filters.listener
 - envoy.filters.network
 - envoy.filters.udp_listener
@@ -122,7 +121,7 @@ categories:
 - envoy.rbac.audit_loggers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
-- envoy.injected_credentials
+- envoy.http.injected_credentials
 - envoy.matching.action
 - envoy.matching.http.input
 - envoy.matching.http.custom_matchers

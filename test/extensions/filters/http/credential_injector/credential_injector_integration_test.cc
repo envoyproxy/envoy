@@ -52,7 +52,7 @@ typed_config:
   credential:
     name: basic_auth
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.injected_credentials.generic.v3.Generic
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic
       credential:
         name: credential
 )EOF";
@@ -88,7 +88,7 @@ typed_config:
   credential:
     name: basic_auth
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.injected_credentials.generic.v3.Generic
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic
       credential:
         name: credential
         sds_config:
@@ -128,7 +128,7 @@ typed_config:
   credential:
     name: basic_auth
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.injected_credentials.generic.v3.Generic
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic
       credential:
         name: credential
         sds_config:
@@ -171,7 +171,7 @@ typed_config:
   credential:
     name: basic_auth
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.injected_credentials.generic.v3.Generic
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic
       credential:
         name: credential
         sds_config:

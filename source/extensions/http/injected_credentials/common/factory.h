@@ -7,6 +7,7 @@
 
 namespace Envoy {
 namespace Extensions {
+namespace Http {
 namespace InjectedCredentials {
 namespace Common {
 
@@ -21,5 +22,6 @@ public:
 
 } // namespace Common
 } // namespace InjectedCredentials
+} // namespace Http
 } // namespace Extensions
 } // namespace Envoy

@@ -2,16 +2,16 @@
 
 #include "source/common/config/utility.h"
 #include "source/extensions/filters/http/credential_injector/credential_injector_filter.h"
-#include "source/extensions/injected_credentials/common/factory.h"
+#include "source/extensions/http/injected_credentials/common/factory.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace CredentialInjector {
 
-using Envoy::Extensions::InjectedCredentials::Common::NamedCredentialInjectorConfigFactory;
+using Envoy::Extensions::Http::InjectedCredentials::Common::NamedCredentialInjectorConfigFactory;
 
-absl::StatusOr<Http::FilterFactoryCb>
+absl::StatusOr<Envoy::Http::FilterFactoryCb>
 CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&
         proto_config,
@@ -36,7 +36,7 @@ CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
       std::move(credential_injector), proto_config.overwrite(),
       proto_config.allow_request_without_credential(), stats_prefix, context.scope());
-  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<CredentialInjectorFilter>(config));
   };
 }

@@ -1,11 +1,12 @@
+#include "source/extensions/http/injected_credentials/generic/config.h"
+
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/extensions/http/injected_credentials/generic/config.h"
-
 namespace Envoy {
 namespace Extensions {
+namespace Http {
 namespace InjectedCredentials {
 namespace Generic {
 
@@ -51,9 +52,10 @@ GenericCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
  */
 REGISTER_FACTORY(
     GenericCredentialInjectorFactory,
-    Envoy::Extensions::InjectedCredentials::Common::NamedCredentialInjectorConfigFactory);
+    Envoy::Extensions::Http::InjectedCredentials::Common::NamedCredentialInjectorConfigFactory);
 
 } // namespace Generic
 } // namespace InjectedCredentials
+} // namespace Http
 } // namespace Extensions
 } // namespace Envoy

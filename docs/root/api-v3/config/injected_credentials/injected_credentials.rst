@@ -5,4 +5,4 @@ Injected credentials
   :glob:
   :maxdepth: 2
 
-  ../../extensions/injected_credentials/*/v3/*
+  ../../extensions/http/injected_credentials/*/v3/*

@@ -4,7 +4,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-#include "source/extensions/injected_credentials/common/credential.h"
+#include "source/extensions/http/injected_credentials/common/credential.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,8 +26,8 @@ struct CredentialInjectorStats {
   ALL_CREDENTIAL_INJECTOR_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using Envoy::Extensions::InjectedCredentials::Common::CredentialInjector;
-using Envoy::Extensions::InjectedCredentials::Common::CredentialInjectorSharedPtr;
+using Envoy::Extensions::Http::InjectedCredentials::Common::CredentialInjector;
+using Envoy::Extensions::Http::InjectedCredentials::Common::CredentialInjectorSharedPtr;
 
 /**
  * Configuration for the Credential Injector filter.
@@ -44,7 +44,7 @@ public:
 
   // Inject configured credential to the HTTP request header.
   // return should continue processing the request or not
-  bool injectCredential(Http::RequestHeaderMap& headers);
+  bool injectCredential(Envoy::Http::RequestHeaderMap& headers);
 
   bool allowRequestWithoutCredential() const { return allow_request_without_credential_; }
 
@@ -62,7 +62,7 @@ private:
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 // The Envoy filter to inject credentials.
-class CredentialInjectorFilter : public Http::PassThroughFilter,
+class CredentialInjectorFilter : public Envoy::Http::PassThroughFilter,
                                  public CredentialInjector::Callbacks,
                                  public Logger::Loggable<Logger::Id::credential_injector> {
 public:
@@ -72,16 +72,17 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&) override;
+  Envoy::Http::FilterHeadersStatus decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
+                                                 bool) override;
+  void setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallbacks&) override;
 
   // CredentialInjector::Callbacks
   void onSuccess() override;
   void onFailure(const std::string& reason) override;
 
 private:
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
-  Http::RequestHeaderMap* request_headers_{};
+  Envoy::Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  Envoy::Http::RequestHeaderMap* request_headers_{};
 
   FilterConfigSharedPtr config_;
 
