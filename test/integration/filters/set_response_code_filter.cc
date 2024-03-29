@@ -88,8 +88,7 @@ private:
       const test::integration::filters::SetResponseCodeFilterConfig& proto_config,
       const std::string&, DualInfo, Server::Configuration::ServerFactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
-        proto_config.prefix(), proto_config.code(), proto_config.body(),
-        context);
+        proto_config.prefix(), proto_config.code(), proto_config.body(), context);
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<SetResponseCodeFilter>(filter_config));
     };
@@ -115,6 +114,7 @@ private:
 
 using UpstreamSetResponseCodeFilterFactory = SetResponseCodeFilterFactory;
 REGISTER_FACTORY(SetResponseCodeFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
-REGISTER_FACTORY(UpstreamSetResponseCodeFilterFactory, Server::Configuration::UpstreamHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamSetResponseCodeFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace Envoy

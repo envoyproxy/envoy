@@ -60,12 +60,12 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
 
   if (context.is_downstream) {
     return createActionFactoryCbTyped<Server::Configuration::FactoryContext,
-        Server::Configuration::NamedHttpFilterConfigFactory>(composite_action, context,
-                                                             validation_visitor, context.factory_context_);
+                                      Server::Configuration::NamedHttpFilterConfigFactory>(
+        composite_action, context, validation_visitor, context.factory_context_);
   } else {
     return createActionFactoryCbTyped<Server::Configuration::UpstreamFactoryContext,
-        Server::Configuration::UpstreamHttpFilterConfigFactory>(composite_action, context,
-                                                                validation_visitor, context.upstream_factory_context_);
+                                      Server::Configuration::UpstreamHttpFilterConfigFactory>(
+        composite_action, context, validation_visitor, context.upstream_factory_context_);
   }
 }
 

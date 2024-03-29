@@ -43,15 +43,13 @@ public:
   }
 
 private:
-  template<class FactoryCtx, class FilterCfgFactory>
+  template <class FactoryCtx, class FilterCfgFactory>
   Matcher::ActionFactoryCb createActionFactoryCbTyped(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context,
-      ProtobufMessage::ValidationVisitor& validation_visitor,
-      OptRef<FactoryCtx> factory_context) {
+      ProtobufMessage::ValidationVisitor& validation_visitor, OptRef<FactoryCtx> factory_context) {
     auto& factory =
-        Config::Utility::getAndCheckFactory<FilterCfgFactory>(
-            composite_action.typed_config());
+        Config::Utility::getAndCheckFactory<FilterCfgFactory>(composite_action.typed_config());
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         composite_action.typed_config().typed_config(), validation_visitor, factory);
 
@@ -59,8 +57,8 @@ private:
 
     // First, try to create the filter factory creation function from factory context (if exists).
     if (factory_context.has_value()) {
-      auto callback_or_status = factory.createFilterFactoryFromProto(
-          *message, context.stat_prefix_, factory_context.value());
+      auto callback_or_status = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
+                                                                     factory_context.value());
       THROW_IF_STATUS_NOT_OK(callback_or_status, throw);
       callback = callback_or_status.value();
     }
