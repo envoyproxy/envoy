@@ -241,8 +241,7 @@ TEST_P(GrpcClientIntegrationTest, BadReplyOverGrpcFrameLimit) {
   stream->sendRequest();
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->expectTrailingMetadata(empty_metadata_);
-  // TODO(tyxia) Change the error status to RESOURCE_EXHAUSTED.
-  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::Internal);
+  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::RESOURCE_EXHAUSTED);
   auto serialized_response = Grpc::Common::serializeToGrpcFrame(reply);
   stream->fake_stream_->encodeData(*serialized_response, true);
   dispatcher_helper_.runDispatcher();
