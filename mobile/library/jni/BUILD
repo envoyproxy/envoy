@@ -101,7 +101,6 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":jni_utility_lib",
-        "//library/common/api:c_types",
         "//library/common/data:utility_lib",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/types:c_types_lib",
