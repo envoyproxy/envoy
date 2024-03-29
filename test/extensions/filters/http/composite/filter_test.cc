@@ -325,8 +325,9 @@ TEST(ConfigTest, TestConfig) {
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Envoy::Http::Matching::HttpFilterActionContext action_context{"test", factory_context,
-                                                                server_factory_context};
+  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      true, "test", factory_context, upstream_factory_context, server_factory_context};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createActionFactoryCb(config, action_context,
@@ -349,10 +350,11 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConf
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
-  Envoy::Http::Matching::HttpFilterActionContext action_context{"test", factory_context,
-                                                                server_factory_context};
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      true, "test", factory_context, upstream_factory_context, server_factory_context};
   ExecuteFilterActionFactory factory;
   auto action = factory.createActionFactoryCb(config, action_context,
                                               ProtobufMessage::getStrictValidationVisitor())();
@@ -375,10 +377,11 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForTypedConfig
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
-  Envoy::Http::Matching::HttpFilterActionContext action_context{"test", factory_context,
-                                                                server_factory_context};
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      true, "test", factory_context, upstream_factory_context, server_factory_context};
   ExecuteFilterActionFactory factory;
   auto action = factory.createActionFactoryCb(config, action_context,
                                               ProtobufMessage::getStrictValidationVisitor())();
