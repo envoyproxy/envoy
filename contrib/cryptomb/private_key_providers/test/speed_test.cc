@@ -13,7 +13,7 @@
 
 namespace Envoy {
 
-const std::string RsaKey = R"EOF(
+constexpr absl::string_view RsaKey = R"EOF(
 -----BEGIN RSA PRIVATE KEY-----
 MIIEogIBAAKCAQEAtBPRFC+8WpCauAyIr1uCTSK6qtAeevEW1vRkn/KkFQX27UWS
 NgU/IukTbA091BDae7HEiWSp7IA1IDbu2q4IwY9UksjF8yFVNZYifr/IzS6lbHOI
@@ -43,23 +43,13 @@ tTlD+8NECIvI+ytbzLS0PZWBYctAR2rP2qlMCGdYerdjwl8S98E=
 -----END RSA PRIVATE KEY-----
 )EOF";
 
-const std::string EcdsaKey = R"EOF(
+constexpr absl::string_view EcdsaKey = R"EOF(
 -----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIMpJw5U66K+DcA963b+/jZYrMrZDjaB0khHSwZte3vYCoAoGCCqGSM49
 AwEHoUQDQgAELp3XvBfkVWQBOKo3ttAaJ6SUaUb8uKqCS504WXHWMO4h89F+nYtC
 Ecgl8EiLXXyc86tawKjGdizcCjrKMiFo3A==
 -----END EC PRIVATE KEY-----
 )EOF";
-
-const uint8_t X25519PeerKey[32] = {115, 37,  104, 170, 129, 2,   28,  127, 31,  23,  65,
-                                   54,  184, 25,  224, 63,  148, 203, 128, 113, 174, 207,
-                                   254, 159, 88,  132, 70,  251, 70,  226, 124, 101};
-
-const uint8_t P256PeerKey[65] = {4,   45,  57,  212, 246, 58, 143, 240, 116, 243, 116, 90,  217,
-                                 1,   33,  251, 173, 110, 73, 189, 99,  212, 82,  128, 8,   43,
-                                 48,  114, 22,  95,  36,  13, 80,  97,  159, 142, 172, 108, 137,
-                                 235, 47,  56,  62,  111, 53, 214, 161, 243, 185, 3,   93,  46,
-                                 148, 243, 156, 70,  178, 39, 220, 210, 93,  220, 70,  228, 9};
 
 bssl::UniquePtr<EVP_PKEY> makeEcdsaKey() {
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(EcdsaKey.data(), EcdsaKey.size()));
@@ -69,6 +59,7 @@ bssl::UniquePtr<EVP_PKEY> makeEcdsaKey() {
   RELEASE_ASSERT(1 == EVP_PKEY_assign_EC_KEY(key.get(), ec), "EVP_PKEY_assign_EC_KEY failed.");
   return key;
 }
+
 bssl::UniquePtr<EVP_PKEY> makeRsaKey() {
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(RsaKey.data(), RsaKey.size()));
   bssl::UniquePtr<EVP_PKEY> key(EVP_PKEY_new());
@@ -78,9 +69,7 @@ bssl::UniquePtr<EVP_PKEY> makeRsaKey() {
   return key;
 }
 
-static constexpr size_t in_len_ = 32;
-static constexpr uint8_t in_[in_len_] = {0x7f};
-static constexpr size_t max_out_len_ = 256;
+const std::vector<uint8_t>& message() { CONSTRUCT_ON_FIRST_USE(std::vector<uint8_t>, 32, 127); }
 
 int calculateDigest(const EVP_MD* md, const uint8_t* in, size_t in_len, unsigned char* hash,
                     unsigned int* hash_len) {
@@ -98,15 +87,16 @@ void verifyEcdsa(EC_KEY* ec_key, uint8_t* out, uint32_t out_len) {
   const EVP_MD* md = SSL_get_signature_algorithm_digest(SSL_SIGN_ECDSA_SECP256R1_SHA256);
   uint8_t hash[EVP_MAX_MD_SIZE];
   uint32_t hash_len;
-  calculateDigest(md, in_, in_len_, hash, &hash_len);
+  calculateDigest(md, message().data(), message().size(), hash, &hash_len);
 
   EXPECT_EQ(ECDSA_verify(0, hash, hash_len, out, out_len, ec_key), 1);
 }
+
 void verifyRsa(RSA* rsa, uint8_t* out, uint32_t out_len) {
   const EVP_MD* md = SSL_get_signature_algorithm_digest(SSL_SIGN_RSA_PSS_SHA256);
-  uint8_t buf[max_out_len_];
+  uint8_t buf[32];
   uint32_t buf_len;
-  calculateDigest(md, in_, in_len_, buf, &buf_len);
+  calculateDigest(md, message().data(), message().size(), buf, &buf_len);
 
   EXPECT_EQ(RSA_verify_pss_mgf1(rsa, buf, buf_len, md, nullptr, -1, out, out_len), 1);
 }
@@ -122,7 +112,7 @@ static void BM_ECDSA_Signing(benchmark::State& state) {
 
     unsigned char hash[EVP_MAX_MD_SIZE];
     unsigned int hash_len;
-    calculateDigest(md, in_, in_len_, hash, &hash_len);
+    calculateDigest(md, message().data(), message().size(), hash, &hash_len);
 
     ECDSA_sign(0, hash, hash_len, out, &out_len, ec_key);
   }
@@ -151,7 +141,7 @@ static void BM_ECDSA_Signing_CryptoMB(benchmark::State& state) {
 
       unsigned char hash[EVP_MAX_MD_SIZE];
       unsigned int hash_len;
-      calculateDigest(md, in_, in_len_, hash, &hash_len);
+      calculateDigest(md, message().data(), message().size(), hash, &hash_len);
 
       priv_key[i] = EC_KEY_get0_private_key(ec_key);
       const EC_GROUP* group = EC_KEY_get0_group(ec_key);
@@ -222,9 +212,9 @@ static void BM_RSA_Signing(benchmark::State& state) {
 
     unsigned char hash[EVP_MAX_MD_SIZE];
     unsigned int hash_len;
-    calculateDigest(md, in_, in_len_, hash, &hash_len);
+    calculateDigest(md, message().data(), message().size(), hash, &hash_len);
 
-    RSA_sign_pss_mgf1(rsa, &out_len, out, max_out_len_, hash, hash_len, md, nullptr, -1);
+    RSA_sign_pss_mgf1(rsa, &out_len, out, 256, hash, hash_len, md, nullptr, -1);
   }
 
   RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
@@ -241,7 +231,6 @@ static void BM_RSA_Signing_CryptoMB(benchmark::State& state) {
   uint32_t out_len[8];
   for (auto _ : state) { // NOLINT
     std::unique_ptr<uint8_t[]> in_buf[8];
-    uint8_t out_buf[8][512];
     uint32_t out_buf_len[8];
     const BIGNUM* p[8];
     const BIGNUM* q[8];
@@ -254,7 +243,7 @@ static void BM_RSA_Signing_CryptoMB(benchmark::State& state) {
 
       unsigned char hash[EVP_MAX_MD_SIZE];
       unsigned int hash_len;
-      calculateDigest(md, in_, in_len_, hash, &hash_len);
+      calculateDigest(md, message().data(), message().size(), hash, &hash_len);
 
       size_t msg_len = RSA_size(rsa);
       uint8_t* msg = static_cast<uint8_t*>(OPENSSL_malloc(msg_len));
@@ -269,6 +258,7 @@ static void BM_RSA_Signing_CryptoMB(benchmark::State& state) {
       OPENSSL_free(msg);
     }
 
+    uint8_t out_buf[8][512];
     const uint8_t* from[8];
     uint8_t* to[8];
     for (int i = 0; i < 8; i++) {
@@ -293,6 +283,61 @@ static void BM_RSA_Signing_CryptoMB(benchmark::State& state) {
 }
 BENCHMARK(BM_RSA_Signing_CryptoMB);
 
+const std::vector<uint8_t>& x25519Key() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<uint8_t>,
+                         {143, 108, 246, 59,  152, 5,   67,  152, 220, 11, 144,
+                          198, 61,  43,  240, 209, 94,  190, 231, 111, 57, 42,
+                          141, 225, 230, 220, 231, 252, 50,  205, 236, 181});
+}
+
+const std::vector<uint8_t>& x25519PeerKey() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<uint8_t>,
+                         {64,  109, 230, 49,  46,  217, 20,  68,  22,  16, 129,
+                          224, 53,  100, 61,  184, 204, 65,  60,  10,  60, 73,
+                          62,  45,  192, 238, 74,  116, 237, 230, 155, 63});
+}
+
+const std::vector<uint8_t>& p256Key() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<uint8_t>,
+                         {154, 198, 171, 184, 138, 154, 154, 228, 142, 151, 103,
+                          249, 233, 0,   68,  110, 166, 26,  232, 232, 71,  127,
+                          53,  107, 249, 233, 71,  125, 136, 239, 141, 143});
+}
+
+const std::vector<uint8_t>& p256PeerKey() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<uint8_t>,
+                         {4,   0,   125, 68,  149, 141, 169, 88,  123, 178, 63,  48,  93,
+                          53,  234, 36,  240, 255, 93,  0,   165, 216, 140, 3,   12,  220,
+                          201, 27,  126, 171, 36,  172, 205, 175, 174, 17,  128, 214, 28,
+                          189, 58,  138, 133, 149, 148, 84,  2,   46,  144, 172, 236, 7,
+                          226, 234, 110, 168, 52,  119, 85,  146, 77,  157, 59,  39,  122});
+}
+
+void verifyX25519(uint8_t* ciphertext, uint8_t* secret) {
+  uint8_t peer_secret[32];
+  X25519(peer_secret, x25519Key().data(), ciphertext);
+
+  EXPECT_EQ(CRYPTO_memcmp(secret, peer_secret, 32), 0);
+}
+
+void verifyP256(uint8_t* ciphertext, uint8_t* secret) {
+  bssl::UniquePtr<BIGNUM> key(BN_new());
+  BN_bin2bn(p256Key().data(), p256Key().size(), key.get());
+
+  const EC_GROUP* group = EC_group_p256();
+  bssl::UniquePtr<EC_POINT> point(EC_POINT_new(group));
+  EC_POINT_oct2point(group, point.get(), ciphertext, 65, nullptr);
+  bssl::UniquePtr<EC_POINT> result(EC_POINT_new(group));
+  bssl::UniquePtr<BIGNUM> x(BN_new());
+  EC_POINT_mul(group, result.get(), nullptr, point.get(), key.get(), nullptr);
+  EC_POINT_get_affine_coordinates_GFp(group, result.get(), x.get(), nullptr, nullptr);
+
+  uint8_t peer_secret[32];
+  BN_bn2bin_padded(peer_secret, 32, x.get());
+
+  EXPECT_EQ(CRYPTO_memcmp(secret, peer_secret, 32), 0);
+}
+
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_X25519_Computing(benchmark::State& state) {
   uint8_t ciphertext[32];
@@ -303,8 +348,10 @@ static void BM_X25519_Computing(benchmark::State& state) {
     X25519_keypair(public_key, priv_key);
     memcpy(ciphertext, public_key, 32);
 
-    X25519(secret, priv_key, X25519PeerKey);
+    X25519(secret, priv_key, x25519PeerKey().data());
   }
+
+  verifyX25519(ciphertext, secret);
 
   state.counters["Requests"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
 }
@@ -316,8 +363,7 @@ static void BM_X25519_Computing_CryptoMB(benchmark::State& state) {
   uint8_t secret[8][32];
   for (auto _ : state) { // NOLINT
     uint8_t priv_key[8][32];
-    uint8_t pub_key[8][32];
-    uint8_t shared_key[8][32];
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (int i = 0; i < 8; i++) {
       RAND_bytes(priv_key[i], 32);
       priv_key[i][0] |= ~248;
@@ -325,6 +371,7 @@ static void BM_X25519_Computing_CryptoMB(benchmark::State& state) {
       priv_key[i][31] |= ~127;
     }
 
+    uint8_t pub_key[8][32];
     const uint8_t* pa_priv_key[8];
     uint8_t* pa_pub_key[8];
     for (int i = 0; i < 8; i++) {
@@ -333,11 +380,12 @@ static void BM_X25519_Computing_CryptoMB(benchmark::State& state) {
     }
     mbx_x25519_public_key_mb8(pa_pub_key, pa_priv_key);
 
+    uint8_t shared_key[8][32];
     uint8_t* pa_shared_key[8];
     const uint8_t* pa_peer_key[8];
     for (int i = 0; i < 8; i++) {
       pa_shared_key[i] = shared_key[i];
-      pa_peer_key[i] = X25519PeerKey;
+      pa_peer_key[i] = x25519PeerKey().data();
     }
     mbx_x25519_mb8(pa_shared_key, pa_priv_key, pa_peer_key);
 
@@ -345,6 +393,10 @@ static void BM_X25519_Computing_CryptoMB(benchmark::State& state) {
       memcpy(ciphertext[i], pub_key[i], 32);
       memcpy(secret[i], pa_shared_key[i], 32);
     }
+  }
+
+  for (int i = 0; i < 8; i++) {
+    verifyX25519(ciphertext[i], secret[i]);
   }
 
   state.counters["Requests"] =
@@ -366,7 +418,8 @@ static void BM_P256_Computing(benchmark::State& state) {
                        nullptr);
 
     bssl::UniquePtr<EC_POINT> peer_point(EC_POINT_new(group));
-    EC_POINT_oct2point(group, peer_point.get(), P256PeerKey, 65, nullptr);
+    EC_POINT_oct2point(group, peer_point.get(), p256PeerKey().data(), p256PeerKey().size(),
+                       nullptr);
     bssl::UniquePtr<EC_POINT> result(EC_POINT_new(group));
     bssl::UniquePtr<BIGNUM> x(BN_new());
     EC_POINT_mul(group, result.get(), nullptr, peer_point.get(), priv_key.get(), nullptr);
@@ -375,19 +428,20 @@ static void BM_P256_Computing(benchmark::State& state) {
     BN_bn2bin_padded(secret, 32, x.get());
   }
 
+  verifyP256(ciphertext, secret);
+
   state.counters["Requests"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
 }
 BENCHMARK(BM_P256_Computing);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_P256_Computing_CryptoMB(benchmark::State& state) {
+  const EC_GROUP* group = EC_group_p256();
   uint8_t ciphertext[8][65];
   uint8_t secret[8][32];
   for (auto _ : state) { // NOLINT
-    const EC_GROUP* group = EC_group_p256();
     bssl::UniquePtr<BIGNUM> priv_key[8];
-    uint8_t out_ciphertext[8][65];
-    uint8_t shared_key[8][32] = {};
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (int i = 0; i < 8; i++) {
       priv_key[i].reset(BN_new());
       BN_rand_range_ex(priv_key[i].get(), 1, EC_GROUP_get0_order(group));
@@ -407,6 +461,7 @@ static void BM_P256_Computing_CryptoMB(benchmark::State& state) {
     }
     mbx_nistp256_ecpublic_key_ssl_mb8(pa_pub_x, pa_pub_y, nullptr, pa_priv_key, nullptr);
 
+    uint8_t out_ciphertext[8][65];
     bssl::UniquePtr<EC_POINT> public_key[8];
     for (int i = 0; i < 8; i++) {
       public_key[i].reset(EC_POINT_new(group));
@@ -422,11 +477,13 @@ static void BM_P256_Computing_CryptoMB(benchmark::State& state) {
       peer_x[i].reset(BN_new());
       peer_y[i].reset(BN_new());
       bssl::UniquePtr<EC_POINT> peer_key(EC_POINT_new(group));
-      EC_POINT_oct2point(group, peer_key.get(), P256PeerKey, 65, nullptr);
+      EC_POINT_oct2point(group, peer_key.get(), p256PeerKey().data(), p256PeerKey().size(),
+                         nullptr);
       EC_POINT_get_affine_coordinates_GFp(group, peer_key.get(), peer_x[i].get(), peer_y[i].get(),
                                           nullptr);
     }
 
+    uint8_t shared_key[8][32] = {};
     uint8_t* pa_shared_key[8];
     BIGNUM* pa_peer_x[8];
     BIGNUM* pa_peer_y[8];
@@ -441,6 +498,10 @@ static void BM_P256_Computing_CryptoMB(benchmark::State& state) {
       memcpy(ciphertext[i], out_ciphertext[i], 65);
       memcpy(secret[i], pa_shared_key[i], 32);
     }
+  }
+
+  for (int i = 0; i < 8; i++) {
+    verifyP256(ciphertext[i], secret[i]);
   }
 
   state.counters["Requests"] =
