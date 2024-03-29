@@ -74,14 +74,15 @@ TEST(TagExtractorTest, noSubstrMismatch) {
 }
 
 TEST(TagExtractorTest, EmptyName) {
-  EXPECT_THROW_WITH_MESSAGE(
-      TagExtractorStdRegexImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)"), EnvoyException,
+  EXPECT_EQ(
+      TagExtractorStdRegexImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)").status().message(),
       "tag_name cannot be empty");
 }
 
 TEST(TagExtractorTest, BadRegex) {
-  EXPECT_THROW_WITH_REGEX(TagExtractorStdRegexImpl::createTagExtractor("cluster_name", "+invalid"),
-                          EnvoyException, "Invalid regex '\\+invalid':");
+  EXPECT_THROW_WITH_REGEX(
+      TagExtractorStdRegexImpl::createTagExtractor("cluster_name", "+invalid").IgnoreError(),
+      EnvoyException, "Invalid regex '\\+invalid':");
 }
 
 class DefaultTagRegexTester {
@@ -450,6 +451,17 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   rbac_prefix.name_ = tag_names.RBAC_PREFIX;
   rbac_prefix.value_ = "my_rbac_prefix";
   regex_tester.testRegex("my_rbac_prefix.rbac.allowed", "rbac.allowed", {rbac_prefix});
+
+  // RBAC HTTP Filter Prefix
+  Tag rbac_http_hcm_prefix;
+  rbac_http_hcm_prefix.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
+  rbac_http_hcm_prefix.value_ = "hcm_prefix";
+
+  Tag rbac_http_prefix;
+  rbac_http_prefix.name_ = tag_names.RBAC_HTTP_PREFIX;
+  rbac_http_prefix.value_ = "prefix";
+  regex_tester.testRegex("http.hcm_prefix.rbac.prefix.allowed", "http.rbac.allowed",
+                         {rbac_http_hcm_prefix, rbac_http_prefix});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {
@@ -478,7 +490,7 @@ TEST(TagExtractorTest, ExtAuthzTagExtractors) {
 TEST(TagExtractorTest, ExtractRegexPrefix) {
   TagExtractorPtr tag_extractor; // Keep tag_extractor in this scope to prolong prefix lifetime.
   auto extractRegexPrefix = [&tag_extractor](const std::string& regex) -> absl::string_view {
-    tag_extractor = TagExtractorStdRegexImpl::createTagExtractor("foo", regex);
+    tag_extractor = TagExtractorStdRegexImpl::createTagExtractor("foo", regex).value();
     return tag_extractor->prefixToken();
   };
 
@@ -493,8 +505,9 @@ TEST(TagExtractorTest, ExtractRegexPrefix) {
 }
 
 TEST(TagExtractorTest, CreateTagExtractorNoRegex) {
-  EXPECT_THROW_WITH_REGEX(TagExtractorStdRegexImpl::createTagExtractor("no such default tag", ""),
-                          EnvoyException, "^No regex specified for tag specifier and no default");
+  EXPECT_THAT(
+      TagExtractorStdRegexImpl::createTagExtractor("no such default tag", "").status().message(),
+      testing::ContainsRegex("^No regex specified for tag specifier and no default"));
 }
 
 class TagExtractorTokensTest : public testing::Test {

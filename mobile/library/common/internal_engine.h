@@ -1,16 +1,15 @@
 #pragma once
 
 #include "envoy/server/lifecycle_notifier.h"
-#include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/posix/thread_impl.h"
 #include "source/common/common/thread.h"
 
-#include "absl/base/call_once.h"
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
+#include "library/common/engine_types.h"
 #include "library/common/http/client.h"
 #include "library/common/logger/logger_delegate.h"
 #include "library/common/network/connectivity_manager.h"
@@ -26,8 +25,8 @@ public:
    * @param logger, the callbacks to use for engine logging.
    * @param event_tracker, the event tracker to use for the emission of events.
    */
-  InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
-                 envoy_event_tracker event_tracker);
+  InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
+                 std::unique_ptr<EnvoyEventTracker> event_tracker);
 
   /**
    * InternalEngine destructor.
@@ -63,32 +62,16 @@ public:
   // to http client functions of the same name after doing a dispatcher post
   // (thread context switch)
   envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
-                             bool explicit_flow_control) {
-    return dispatcher_->post([&, stream, bridge_callbacks, explicit_flow_control]() {
-      http_client_->startStream(stream, bridge_callbacks, explicit_flow_control);
-    });
-  }
-  envoy_status_t sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream) {
-    return dispatcher_->post([&, stream, headers, end_stream]() {
-      http_client_->sendHeaders(stream, headers, end_stream);
-    });
-  }
-  envoy_status_t readData(envoy_stream_t stream, size_t bytes_to_read) {
-    return dispatcher_->post(
-        [&, stream, bytes_to_read]() { http_client_->readData(stream, bytes_to_read); });
-  }
-  envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
-    return dispatcher_->post(
-        [&, stream, data, end_stream]() { http_client_->sendData(stream, data, end_stream); });
-  }
-  envoy_status_t sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
-    return dispatcher_->post(
-        [&, stream, trailers]() { http_client_->sendTrailers(stream, trailers); });
-  }
+                             bool explicit_flow_control);
+  envoy_status_t sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream);
 
-  envoy_status_t cancelStream(envoy_stream_t stream) {
-    return dispatcher_->post([&, stream]() { http_client_->cancelStream(stream); });
-  }
+  envoy_status_t readData(envoy_stream_t stream, size_t bytes_to_read);
+
+  envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream);
+
+  envoy_status_t sendTrailers(envoy_stream_t stream, envoy_headers trailers);
+
+  envoy_status_t cancelStream(envoy_stream_t stream);
 
   // These functions are wrappers around networkConnectivityManager functions, which hand off
   // to networkConnectivityManager after doing a dispatcher post (thread context switch)
@@ -123,8 +106,9 @@ public:
 private:
   GTEST_FRIEND_CLASS(InternalEngineTest, ThreadCreationFailed);
 
-  InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
-                 envoy_event_tracker event_tracker, Thread::PosixThreadFactoryPtr thread_factory);
+  InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
+                 std::unique_ptr<EnvoyEventTracker> event_tracker,
+                 Thread::PosixThreadFactoryPtr thread_factory);
 
   envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
@@ -134,9 +118,9 @@ private:
   Event::Dispatcher* event_dispatcher_{};
   Stats::ScopeSharedPtr client_scope_;
   Stats::StatNameSetPtr stat_name_set_;
-  envoy_engine_callbacks callbacks_;
-  envoy_logger logger_;
-  envoy_event_tracker event_tracker_;
+  std::unique_ptr<EngineCallbacks> callbacks_;
+  std::unique_ptr<EnvoyLogger> logger_;
+  std::unique_ptr<EnvoyEventTracker> event_tracker_;
   Assert::ActionRegistrationPtr assert_handler_registration_;
   Assert::ActionRegistrationPtr bug_handler_registration_;
   Thread::MutexBasicLockable mutex_;

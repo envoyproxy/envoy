@@ -25,7 +25,7 @@ namespace Envoy {
 Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsContext(
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{time_system_};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{server_factory_context_};
   tls_context.mutable_common_tls_context()->add_alpn_protocols("h3");
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -190,6 +190,18 @@ void TestServer::setHeadersAndData(absl::string_view header_key, absl::string_vi
       std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
           {{std::string(header_key), std::string(header_value)}, {":status", "200"}})));
   upstream_->setResponseBody(std::string(response_body));
+}
+
+void TestServer::setResponse(const absl::flat_hash_map<std::string, std::string>& headers,
+                             absl::string_view body) {
+  ASSERT(upstream_);
+  Http::TestResponseHeaderMapImpl new_headers;
+  for (const auto& [key, value] : headers) {
+    new_headers.addCopy(key, value);
+  }
+  new_headers.addCopy(":status", "200");
+  upstream_->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(new_headers));
+  upstream_->setResponseBody(std::string(body));
 }
 
 const std::string TestServer::http_proxy_config = R"EOF(

@@ -23,6 +23,7 @@ typed_config:
     inline_string: |-
       user1:{SHA}tESsBmE/yNY3lb6a0L6vVQEZNqw=
       user2:{SHA}EJ9LPFDXsN9ynSmbxvjp75Bmlx8=
+  forward_username_header: x-username
 )EOF";
     config_helper_.prependFilter(filter_config);
     initialize();
@@ -51,6 +52,11 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, ValidCredential) {
   });
 
   waitForNextUpstreamRequest();
+
+  const auto username_entry = upstream_request_->headers().get(Http::LowerCaseString("x-username"));
+  EXPECT_FALSE(username_entry.empty());
+  EXPECT_EQ(username_entry[0]->value().getStringView(), "user1");
+
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -112,6 +118,33 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, NoneExistedUser) {
   EXPECT_EQ("401", response->headers().getStatusValue());
   EXPECT_EQ("User authentication failed. Invalid username/password combination.", response->body());
 }
+
+// Request with existing username header
+TEST_P(BasicAuthIntegrationTestAllProtocols, ExistingUsernameHeader) {
+  initializeFilter();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Basic dXNlcjE6dGVzdDE="}, // user1, test1
+      {"x-username", "existingUsername"},
+  });
+
+  waitForNextUpstreamRequest();
+
+  const auto username_entry = upstream_request_->headers().get(Http::LowerCaseString("x-username"));
+  EXPECT_FALSE(username_entry.empty());
+  EXPECT_EQ(username_entry[0]->value().getStringView(), "user1");
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 } // namespace
 } // namespace BasicAuth
 } // namespace HttpFilters

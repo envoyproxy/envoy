@@ -42,10 +42,11 @@ struct CacheResponseCodeDetailValues {
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
 CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-                         const std::string&, Stats::Scope&, TimeSource& time_source,
+                         const std::string&, Stats::Scope&,
+                         Server::Configuration::CommonFactoryContext& context,
                          std::shared_ptr<HttpCache> http_cache)
-    : time_source_(time_source), cache_(http_cache),
-      vary_allow_list_(config.allowed_vary_headers()) {}
+    : time_source_(context.timeSource()), cache_(http_cache),
+      vary_allow_list_(config.allowed_vary_headers(), context) {}
 
 void CacheFilter::onDestroy() {
   filter_state_ = FilterState::Destroyed;

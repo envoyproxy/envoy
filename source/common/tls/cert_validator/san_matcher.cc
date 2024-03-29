@@ -28,7 +28,8 @@ bool StringSanMatcher::match(const GENERAL_NAME* general_name) const {
 }
 
 SanMatcherPtr createStringSanMatcher(
-    envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher const& matcher) {
+    envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher const& matcher,
+    Server::Configuration::CommonFactoryContext& context) {
   // Verify that a new san type has not been added.
   static_assert(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType_MAX ==
                 4);
@@ -36,13 +37,13 @@ SanMatcherPtr createStringSanMatcher(
   switch (matcher.san_type()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS:
-    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher.matcher())};
+    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher.matcher(), context)};
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL:
-    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_EMAIL, matcher.matcher())};
+    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_EMAIL, matcher.matcher(), context)};
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI:
-    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher.matcher())};
+    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher.matcher(), context)};
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS:
-    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_IPADD, matcher.matcher())};
+    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_IPADD, matcher.matcher(), context)};
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SAN_TYPE_UNSPECIFIED:
     PANIC("unhandled value");
   }
