@@ -1620,11 +1620,10 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProces
   if (!deferProcessingBackedUpStreams()) {
     return;
   }
-
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedData(),
-               "Crashing as request body over 1000!.*"
-               "ActiveStream.*Http2::ConnectionImpl.*Dumping current stream.*"
-               "ConnectionImpl::StreamImpl.*ConnectionImpl");
+               "Crashing as request body over 1000!(.|\n)*"
+               "ActiveStream(.|\n)*Http2::ConnectionImpl(.|\n)*Dumping current stream(.|\n)*"
+               "ConnectionImpl::StreamImpl(.|\n)*ConnectionImpl");
 }
 
 TEST_P(Http2DeferredProcessingIntegrationTest,
@@ -1635,9 +1634,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
     return;
   }
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedDataOfDeferredCloseStream(),
-               "Crashing as response body over 1000!.*"
-               "ActiveStream.*Http2::ConnectionImpl.*Dumping 1 Active Streams.*"
-               "ConnectionImpl::StreamImpl.*ConnectionImpl");
+               "Crashing as response body over 1000!(.|\n)*"
+               "ActiveStream(.|\n)*Http2::ConnectionImpl(.|\n)*Dumping 1 Active Streams(.|\n)*"
+               "ConnectionImpl::StreamImpl(.|\n)*ConnectionImpl");
 }
 
 #endif
