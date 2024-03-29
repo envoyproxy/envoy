@@ -1,15 +1,18 @@
 #include "source/common/common/assert.h"
 
 #include "benchmark/benchmark.h"
-#include "crypto_mb/ec_nistp256.h"
-#include "crypto_mb/rsa.h"
-#include "crypto_mb/x25519.h"
 #include "gtest/gtest.h"
 #include "openssl/curve25519.h"
 #include "openssl/evp.h"
 #include "openssl/pem.h"
 #include "openssl/rand.h"
 #include "openssl/ssl.h"
+
+#ifndef IPP_CRYPTO_DISABLED
+#include "crypto_mb/ec_nistp256.h"
+#include "crypto_mb/rsa.h"
+#include "crypto_mb/x25519.h"
+#endif
 
 namespace Envoy {
 
@@ -124,6 +127,7 @@ static void BM_ECDSA_Signing(benchmark::State& state) {
 }
 BENCHMARK(BM_ECDSA_Signing);
 
+#ifndef IPP_CRYPTO_DISABLED
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_ECDSA_Signing_CryptoMB(benchmark::State& state) {
   bssl::UniquePtr<EVP_PKEY> pkey = makeEcdsaKey();
@@ -200,6 +204,7 @@ static void BM_ECDSA_Signing_CryptoMB(benchmark::State& state) {
       benchmark::Counter(state.iterations() * 8, benchmark::Counter::kIsRate);
 }
 BENCHMARK(BM_ECDSA_Signing_CryptoMB);
+#endif
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_RSA_Signing(benchmark::State& state) {
@@ -224,6 +229,7 @@ static void BM_RSA_Signing(benchmark::State& state) {
 }
 BENCHMARK(BM_RSA_Signing);
 
+#ifndef IPP_CRYPTO_DISABLED
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_RSA_Signing_CryptoMB(benchmark::State& state) {
   bssl::UniquePtr<EVP_PKEY> pkey = makeRsaKey();
@@ -282,6 +288,7 @@ static void BM_RSA_Signing_CryptoMB(benchmark::State& state) {
       benchmark::Counter(state.iterations() * 8, benchmark::Counter::kIsRate);
 }
 BENCHMARK(BM_RSA_Signing_CryptoMB);
+#endif
 
 const std::vector<uint8_t>& x25519Key() {
   CONSTRUCT_ON_FIRST_USE(std::vector<uint8_t>,
@@ -357,6 +364,7 @@ static void BM_X25519_Computing(benchmark::State& state) {
 }
 BENCHMARK(BM_X25519_Computing);
 
+#ifndef IPP_CRYPTO_DISABLED
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_X25519_Computing_CryptoMB(benchmark::State& state) {
   uint8_t ciphertext[8][32];
@@ -403,6 +411,7 @@ static void BM_X25519_Computing_CryptoMB(benchmark::State& state) {
       benchmark::Counter(state.iterations() * 8, benchmark::Counter::kIsRate);
 }
 BENCHMARK(BM_X25519_Computing_CryptoMB);
+#endif
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_P256_Computing(benchmark::State& state) {
@@ -434,6 +443,7 @@ static void BM_P256_Computing(benchmark::State& state) {
 }
 BENCHMARK(BM_P256_Computing);
 
+#ifndef IPP_CRYPTO_DISABLED
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_P256_Computing_CryptoMB(benchmark::State& state) {
   const EC_GROUP* group = EC_group_p256();
@@ -508,5 +518,6 @@ static void BM_P256_Computing_CryptoMB(benchmark::State& state) {
       benchmark::Counter(state.iterations() * 8, benchmark::Counter::kIsRate);
 }
 BENCHMARK(BM_P256_Computing_CryptoMB);
+#endif
 
 } // namespace Envoy
