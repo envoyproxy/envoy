@@ -216,8 +216,8 @@ TEST_F(InternalEngineTest, AccessEngineAfterInitialization) {
 
 TEST_F(InternalEngineTest, RecordCounter) {
   EngineTestContext test_context{};
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
 
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -236,8 +236,8 @@ TEST_F(InternalEngineTest, Logger) {
     }
   };
   logger->on_exit = [&] { test_context.on_log_exit.Notify(); };
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), std::move(logger), {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), std::move(logger), /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
@@ -252,8 +252,8 @@ TEST_F(InternalEngineTest, Logger) {
 TEST_F(InternalEngineTest, EventTrackerRegistersDefaultAPI) {
   EngineTestContext test_context{};
 
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, nullptr));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   // A default event tracker is registered in external API registry.
@@ -282,8 +282,8 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAPI) {
     }
   };
 
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, std::move(event_tracker)));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, std::move(event_tracker));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -309,8 +309,8 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
     }
   };
 
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, std::move(event_tracker)));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, std::move(event_tracker));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -336,8 +336,8 @@ TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
     }
   };
 
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, std::move(event_tracker)));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, std::move(event_tracker));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -354,8 +354,8 @@ TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
 
 TEST_F(InternalEngineTest, BasicStream) {
   EngineTestContext test_context{};
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(BUFFERED_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
@@ -407,8 +407,8 @@ TEST_F(InternalEngineTest, ResetStream) {
   EngineTestContext test_context{};
   // There is nothing functional about the config used to run the engine, as the created stream is
   // immediately reset.
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
@@ -444,8 +444,8 @@ TEST_F(InternalEngineTest, ResetStream) {
 TEST_F(InternalEngineTest, RegisterPlatformApi) {
   EngineTestContext test_context{};
   // Using the minimal envoy mobile config that allows for running the engine.
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
@@ -460,8 +460,8 @@ TEST_F(InternalEngineTest, RegisterPlatformApi) {
 
 TEST_F(InternalEngineTest, ResetConnectivityState) {
   EngineTestContext test_context{};
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
