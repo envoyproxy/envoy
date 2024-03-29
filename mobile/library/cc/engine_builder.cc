@@ -927,7 +927,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
 EngineSharedPtr EngineBuilder::build() {
   InternalEngine* envoy_engine =
-      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_));
+      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
+                         network_thread_priority_);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
@@ -965,7 +966,7 @@ EngineSharedPtr EngineBuilder::build() {
           .ok(),
       "invalid log level");
   options->setConcurrency(1);
-  envoy_engine->run(options, network_thread_priority_);
+  envoy_engine->run(options);
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend

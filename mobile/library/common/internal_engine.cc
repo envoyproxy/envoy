@@ -17,9 +17,11 @@ static std::atomic<envoy_stream_t> current_stream_handle_{0};
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
+                               absl::optional<int> thread_priority,
                                Thread::PosixThreadFactoryPtr thread_factory)
     : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
       logger_(std::move(logger)), event_tracker_(std::move(event_tracker)),
+      thread_priority_(thread_priority),
       dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
   ExtensionRegistry::registerFactories();
 
@@ -33,12 +35,12 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
 
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
-                               std::unique_ptr<EnvoyEventTracker> event_tracker)
+                               std::unique_ptr<EnvoyEventTracker> event_tracker,
+                               absl::optional<int> thread_priority)
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
-                     Thread::PosixThreadFactory::create()) {}
+                     thread_priority, Thread::PosixThreadFactory::create()) {}
 
-envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level,
-                                   absl::optional<int> thread_priority) {
+envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
   // Start the Envoy on the dedicated thread.
   auto options = std::make_shared<Envoy::OptionsImplBase>();
   options->setConfigYaml(config);
@@ -46,7 +48,7 @@ envoy_status_t InternalEngine::run(const std::string& config, const std::string&
     ENVOY_BUG(options->setLogLevel(log_level).ok(), "invalid log level");
   }
   options->setConcurrency(1);
-  return run(std::move(options), thread_priority);
+  return run(std::move(options));
 }
 
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
@@ -88,14 +90,13 @@ envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
 // This function takes a `std::shared_ptr` instead of `std::unique_ptr` because `std::function` is a
 // copy-constructible type, so it's not possible to move capture `std::unique_ptr` with
 // `std::function`.
-envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options,
-                                   absl::optional<int> thread_priority) {
+envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options) {
   main_thread_ = thread_factory_->createThread(
-      [this, thread_priority, options]() mutable -> void {
-        if (thread_priority) {
+      [this, options]() mutable -> void {
+        if (thread_priority_) {
           // Set the thread priority before invoking the thread routine.
           const int rc = setpriority(PRIO_PROCESS, thread_factory_->currentThreadId().getId(),
-                                     *thread_priority);
+                                     *thread_priority_);
           if (rc != 0) {
             ENVOY_LOG(debug, "failed to set thread priority: {}", Envoy::errorDetails(errno));
           }

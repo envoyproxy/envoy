@@ -25,9 +25,11 @@ public:
    * @param callbacks, the callbacks to use for engine lifecycle monitoring.
    * @param logger, the callbacks to use for engine logging.
    * @param event_tracker, the event tracker to use for the emission of events.
+   * @param thread_priority, an optional thread priority, between -20 and 19.
    */
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
-                 std::unique_ptr<EnvoyEventTracker> event_tracker);
+                 std::unique_ptr<EnvoyEventTracker> event_tracker,
+                 absl::optional<int> thread_priority = absl::nullopt);
 
   /**
    * InternalEngine destructor.
@@ -38,12 +40,9 @@ public:
    * Run the engine with the provided configuration.
    * @param config, the Envoy bootstrap configuration to use.
    * @param log_level, the log level.
-   * @param thread_priority, an optional thread priority, between -20 and 19.
    */
-  envoy_status_t run(const std::string& config, const std::string& log_level,
-                     absl::optional<int> thread_priority = absl::nullopt);
-  envoy_status_t run(std::shared_ptr<Envoy::OptionsImplBase> options,
-                     absl::optional<int> thread_priority = absl::nullopt);
+  envoy_status_t run(const std::string& config, const std::string& log_level);
+  envoy_status_t run(std::shared_ptr<Envoy::OptionsImplBase> options);
 
   /**
    * Immediately terminate the engine, if running. Calling this function when
@@ -112,7 +111,7 @@ private:
 
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
-                 Thread::PosixThreadFactoryPtr thread_factory);
+                 absl::optional<int> thread_priority, Thread::PosixThreadFactoryPtr thread_factory);
 
   envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
@@ -125,6 +124,7 @@ private:
   std::unique_ptr<EngineCallbacks> callbacks_;
   std::unique_ptr<EnvoyLogger> logger_;
   std::unique_ptr<EnvoyEventTracker> event_tracker_;
+  absl::optional<int> thread_priority_;
   Assert::ActionRegistrationPtr assert_handler_registration_;
   Assert::ActionRegistrationPtr bug_handler_registration_;
   Thread::MutexBasicLockable mutex_;

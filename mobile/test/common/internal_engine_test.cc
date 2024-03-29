@@ -476,7 +476,7 @@ TEST_F(InternalEngineTest, ThreadCreationFailed) {
   auto thread_factory = std::make_unique<Thread::MockPosixThreadFactory>();
   EXPECT_CALL(*thread_factory, createThread(_, _, false)).WillOnce(Return(ByMove(nullptr)));
   std::unique_ptr<InternalEngine> engine(new InternalEngine(
-      createDefaultEngineCallbacks(test_context), {}, {}, std::move(thread_factory)));
+      createDefaultEngineCallbacks(test_context), {}, {}, {}, std::move(thread_factory)));
   envoy_status_t status = engine->run(BUFFERED_TEST_CONFIG, LEVEL_DEBUG);
   EXPECT_EQ(status, ENVOY_FAILURE);
   // Calling `terminate()` should not crash.
@@ -491,8 +491,9 @@ protected:
   int startEngineWithPriority(const int thread_priority) {
     EngineTestContext test_context{};
     std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
-        createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
-    engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG, thread_priority);
+        createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr,
+        thread_priority);
+    engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
     struct CallbackContext {
       absl::Notification on_complete_notification;
