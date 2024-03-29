@@ -25,6 +25,8 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
+#include "quiche/http2/adapter/header_validator.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -351,6 +353,9 @@ public:
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
 private:
+  void applyHeaderMutations(const Filters::Common::ExtAuthz::Response& response);
+  bool headerPairIsValid(const std::pair<std::string, std::string>& header_pair);
+
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
@@ -387,6 +392,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
+  http2::adapter::HeaderValidator header_validator_;
 
   // This is used to hold the final configs after we merge them with per-route configs.
   bool allow_partial_message_{};

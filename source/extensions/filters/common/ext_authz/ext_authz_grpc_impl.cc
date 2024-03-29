@@ -51,33 +51,19 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
-      toAuthzResponseHeader(authz_response, response->ok_response().headers());
-      if (response->ok_response().headers_to_remove_size() > 0) {
-        for (const auto& header : response->ok_response().headers_to_remove()) {
-          authz_response->headers_to_remove.push_back(Http::LowerCaseString(header));
-        }
-      }
-      if (response->ok_response().query_parameters_to_set_size() > 0) {
-        for (const auto& query_parameter : response->ok_response().query_parameters_to_set()) {
+      auto ok_response = response->ok_response();
+      copyHeaderMutations(authz_response, ok_response.headers(),
+                          ok_response.response_headers_to_add(), ok_response.headers_to_remove());
+
+      if (ok_response.query_parameters_to_set_size() > 0) {
+        for (const auto& query_parameter : ok_response.query_parameters_to_set()) {
           authz_response->query_parameters_to_set.push_back(
               std::pair(query_parameter.key(), query_parameter.value()));
         }
       }
-      if (response->ok_response().query_parameters_to_remove_size() > 0) {
-        for (const auto& key : response->ok_response().query_parameters_to_remove()) {
+      if (ok_response.query_parameters_to_remove_size() > 0) {
+        for (const auto& key : ok_response.query_parameters_to_remove()) {
           authz_response->query_parameters_to_remove.push_back(key);
-        }
-      }
-      // These two vectors hold header overrides of encoded response headers.
-      if (response->ok_response().response_headers_to_add_size() > 0) {
-        for (const auto& header : response->ok_response().response_headers_to_add()) {
-          if (header.append().value()) {
-            authz_response->response_headers_to_add.emplace_back(
-                Http::LowerCaseString(header.header().key()), header.header().value());
-          } else {
-            authz_response->response_headers_to_set.emplace_back(
-                Http::LowerCaseString(header.header().key()), header.header().value());
-          }
         }
       }
     }
@@ -88,7 +74,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     // The default HTTP status code for denied response is 403 Forbidden.
     authz_response->status_code = Http::Code::Forbidden;
     if (response->has_denied_response()) {
-      toAuthzResponseHeader(authz_response, response->denied_response().headers());
+      copyHeaderMutations(authz_response, response->denied_response().headers());
 
       const uint32_t status_code = response->denied_response().status().code();
       if (status_code > 0) {
@@ -122,17 +108,31 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   callbacks_ = nullptr;
 }
 
-void GrpcClientImpl::toAuthzResponseHeader(
-    ResponsePtr& response,
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers) {
+void GrpcClientImpl::copyHeaderMutations(
+    ResponsePtr& response, const RepeatedHeaderValueOption& headers,
+    const RepeatedHeaderValueOption& response_headers_to_add,
+    const Protobuf::RepeatedPtrField<std::string>& headers_to_remove) {
   for (const auto& header : headers) {
     if (header.append().value()) {
-      response->headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),
-                                               header.header().value());
+      response->headers_to_append.emplace_back(header.header().key(), header.header().value());
     } else {
-      response->headers_to_set.emplace_back(Http::LowerCaseString(header.header().key()),
-                                            header.header().value());
+      response->headers_to_set.emplace_back(header.header().key(), header.header().value());
     }
+  }
+
+  // These two vectors hold header overrides of encoded response headers.
+  for (const auto& header : response_headers_to_add) {
+    if (header.append().value()) {
+      response->response_headers_to_add.emplace_back(header.header().key(),
+                                                     header.header().value());
+    } else {
+      response->response_headers_to_set.emplace_back(header.header().key(),
+                                                     header.header().value());
+    }
+  }
+
+  for (const auto& header : headers_to_remove) {
+    response->headers_to_remove.push_back(header);
   }
 }
 

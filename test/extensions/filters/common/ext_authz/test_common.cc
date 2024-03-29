@@ -96,22 +96,21 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
   if (!headers.empty()) {
     for (auto& header : headers) {
       if (header.append().value()) {
-        authz_response.headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),
+        authz_response.headers_to_append.emplace_back(header.header().key(),
                                                       header.header().value());
       } else {
-        authz_response.headers_to_set.emplace_back(Http::LowerCaseString(header.header().key()),
-                                                   header.header().value());
+        authz_response.headers_to_set.emplace_back(header.header().key(), header.header().value());
       }
     }
   }
   if (!downstream_headers.empty()) {
     for (auto& header : downstream_headers) {
       if (header.append().value()) {
-        authz_response.response_headers_to_add.emplace_back(
-            Http::LowerCaseString(header.header().key()), header.header().value());
+        authz_response.response_headers_to_add.emplace_back(header.header().key(),
+                                                            header.header().value());
       } else {
-        authz_response.response_headers_to_set.emplace_back(
-            Http::LowerCaseString(header.header().key()), header.header().value());
+        authz_response.response_headers_to_set.emplace_back(header.header().key(),
+                                                            header.header().value());
       }
     }
   }
@@ -143,13 +142,14 @@ Http::ResponseMessagePtr TestCommon::makeMessageResponse(const HeaderValueOption
   return response;
 };
 
-bool TestCommon::compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs) {
-  return std::set<std::pair<Http::LowerCaseString, std::string>>(lhs.begin(), lhs.end()) ==
-         std::set<std::pair<Http::LowerCaseString, std::string>>(rhs.begin(), rhs.end());
+bool TestCommon::compareHeaderVector(const UnvalidatedHeaderVector& lhs,
+                                     const UnvalidatedHeaderVector& rhs) {
+  return std::set<std::pair<std::string, std::string>>(lhs.begin(), lhs.end()) ==
+         std::set<std::pair<std::string, std::string>>(rhs.begin(), rhs.end());
 }
 
-bool TestCommon::compareVectorOfHeaderName(const std::vector<Http::LowerCaseString>& lhs,
-                                           const std::vector<Http::LowerCaseString>& rhs) {
+bool TestCommon::compareVectorOfHeaderName(const std::vector<std::string>& lhs,
+                                           const std::vector<std::string>& rhs) {
   return std::set<Http::LowerCaseString>(lhs.begin(), lhs.end()) ==
          std::set<Http::LowerCaseString>(rhs.begin(), rhs.end());
 }

@@ -34,6 +34,9 @@ using CheckResponsePtr = std::unique_ptr<envoy::service::auth::v3::CheckResponse
 
 class TestCommon {
 public:
+  using UnvalidatedHeaderVector =
+      Envoy::Extensions::Filters::Common::ExtAuthz::UnvalidatedHeaderVector;
+
   static Http::ResponseMessagePtr makeMessageResponse(const HeaderValueOptionVector& headers,
                                                       const std::string& body = std::string{});
 
@@ -51,11 +54,12 @@ public:
 
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
-  static bool compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs);
+  static bool compareHeaderVector(const UnvalidatedHeaderVector& lhs,
+                                  const UnvalidatedHeaderVector& rhs);
   static bool compareQueryParamsVector(const Http::Utility::QueryParamsVector& lhs,
                                        const Http::Utility::QueryParamsVector& rhs);
-  static bool compareVectorOfHeaderName(const std::vector<Http::LowerCaseString>& lhs,
-                                        const std::vector<Http::LowerCaseString>& rhs);
+  static bool compareVectorOfHeaderName(const std::vector<std::string>& lhs,
+                                        const std::vector<std::string>& rhs);
   static bool compareVectorOfUnorderedStrings(const std::vector<std::string>& lhs,
                                               const std::vector<std::string>& rhs);
 };

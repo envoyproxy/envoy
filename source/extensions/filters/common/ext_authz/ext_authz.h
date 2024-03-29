@@ -73,6 +73,8 @@ enum class CheckStatus {
   Denied
 };
 
+using UnvalidatedHeaderVector = std::vector<std::pair<std::string, std::string>>;
+
 /**
  * Authorization response object for a RequestCallback.
  */
@@ -81,23 +83,23 @@ struct Response {
   CheckStatus status;
   // A set of HTTP headers returned by the authorization server, that will be optionally appended
   // to the request to the upstream server.
-  Http::HeaderVector headers_to_append;
+  UnvalidatedHeaderVector headers_to_append;
   // A set of HTTP headers returned by the authorization server, will be optionally set
   // (using "setCopy") to the request to the upstream server.
-  Http::HeaderVector headers_to_set;
+  UnvalidatedHeaderVector headers_to_set;
   // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the request to the upstream server.
-  Http::HeaderVector headers_to_add;
+  UnvalidatedHeaderVector headers_to_add;
   // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the response sent back to the downstream client on OK auth
   // responses.
-  Http::HeaderVector response_headers_to_add;
+  UnvalidatedHeaderVector response_headers_to_add;
   // A set of HTTP headers returned by the authorization server, will be optionally set (using
   // "setCopy") to the response sent back to the downstream client on OK auth responses.
-  Http::HeaderVector response_headers_to_set;
+  UnvalidatedHeaderVector response_headers_to_set;
   // A set of HTTP headers consumed by the authorization server, will be removed
   // from the request to the upstream server.
-  std::vector<Envoy::Http::LowerCaseString> headers_to_remove;
+  std::vector<std::string> headers_to_remove;
   // A set of query string parameters to be set (possibly overwritten) on the
   // request to the upstream server.
   Http::Utility::QueryParamsVector query_parameters_to_set;

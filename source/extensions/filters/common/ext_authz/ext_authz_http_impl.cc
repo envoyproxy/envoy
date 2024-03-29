@@ -34,11 +34,11 @@ const Http::HeaderMap& lengthZeroHeader() {
 // Static response used for creating authorization ERROR responses.
 const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
-                                            Http::HeaderVector{},
-                                            Http::HeaderVector{},
-                                            Http::HeaderVector{},
-                                            Http::HeaderVector{},
-                                            Http::HeaderVector{},
+                                            UnvalidatedHeaderVector{},
+                                            UnvalidatedHeaderVector{},
+                                            UnvalidatedHeaderVector{},
+                                            UnvalidatedHeaderVector{},
+                                            UnvalidatedHeaderVector{},
                                             {{}},
                                             Http::Utility::QueryParamsVector{},
                                             {},
@@ -305,7 +305,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   const auto& storage_header_name = Headers::get().EnvoyAuthHeadersToRemove;
   // If we are going to construct an Ok response we need to save the
   // headers_to_remove in a variable first.
-  std::vector<Http::LowerCaseString> headers_to_remove;
+  std::vector<std::string> headers_to_remove;
   if (status_code == enumToInt(Http::Code::OK)) {
     const auto& get_result = message->headers().get(storage_header_name);
     for (size_t i = 0; i < get_result.size(); ++i) {
@@ -316,7 +316,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
             storage_header_value, ",", /*keep_empty_string=*/false, /*trim_whitespace=*/true);
         headers_to_remove.reserve(headers_to_remove.size() + header_names.size());
         for (const auto& header_name : header_names) {
-          headers_to_remove.push_back(Http::LowerCaseString(std::string(header_name)));
+          headers_to_remove.push_back(std::string(header_name));
         }
       }
     }
@@ -333,11 +333,11 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                        config_->clientHeaderOnSuccessMatchers(),
                        config_->dynamicMetadataMatchers(),
                        Response{CheckStatus::OK,
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
+                                UnvalidatedHeaderVector{},
+                                UnvalidatedHeaderVector{},
+                                UnvalidatedHeaderVector{},
+                                UnvalidatedHeaderVector{},
+                                UnvalidatedHeaderVector{},
                                 std::move(headers_to_remove),
                                 Http::Utility::QueryParamsVector{},
                                 {},
@@ -354,11 +354,11 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                          config_->clientHeaderOnSuccessMatchers(),
                          config_->dynamicMetadataMatchers(),
                          Response{CheckStatus::Denied,
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
+                                  UnvalidatedHeaderVector{},
+                                  UnvalidatedHeaderVector{},
+                                  UnvalidatedHeaderVector{},
+                                  UnvalidatedHeaderVector{},
+                                  UnvalidatedHeaderVector{},
                                   {{}},
                                   Http::Utility::QueryParamsVector{},
                                   {},

@@ -127,6 +127,34 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
+// Test that the client just passes through invalid headers (they will fail validation in the filter
+// later).
+TEST_F(ExtAuthzGrpcClientTest, IndifferentToInvalidHeaders) {
+  initialize();
+
+  const std::string empty_body{};
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
+  const auto expected_downstream_headers = TestCommon::makeHeaderValueOption(
+      {{"invalid-key\n\n\n\n\n", "TestAuthService", false}, {"cookie", "authtoken=1234", true}});
+  auto check_response =
+      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
+                                    empty_body, expected_headers, expected_downstream_headers);
+  auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::OK, Http::Code::OK, empty_body, expected_headers, expected_downstream_headers);
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+  client_->onSuccess(std::move(check_response), span_);
+}
+
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
   initialize();

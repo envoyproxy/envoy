@@ -222,8 +222,9 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   if (!response_headers_to_add_.empty()) {
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter added header(s) to the encoded response:", *encoder_callbacks_);
+    // response_headers_to_add_ elements have already been validated.
     for (const auto& header : response_headers_to_add_) {
-      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, header.first.get(), header.second);
+      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, header.first, header.second);
       headers.addCopy(header.first, header.second);
     }
   }
@@ -231,8 +232,9 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   if (!response_headers_to_set_.empty()) {
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter set header(s) to the encoded response:", *encoder_callbacks_);
+    // response_headers_to_set_ elements have already been validated.
     for (const auto& header : response_headers_to_set_) {
-      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, header.first.get(), header.second);
+      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, header.first, header.second);
       headers.setCopy(header.first, header.second);
     }
   }
@@ -264,6 +266,12 @@ void Filter::onDestroy() {
     state_ = State::Complete;
     client_->cancel();
   }
+}
+
+bool Filter::headerPairIsValid(const std::pair<std::string, std::string>& header_pair) {
+  http2::adapter::HeaderValidator::HeaderStatus status =
+      header_validator_.ValidateSingleHeader(header_pair.first, header_pair.second);
+  return status == http2::adapter::HeaderValidatorBase::HeaderStatus::HEADER_OK;
 }
 
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
@@ -299,59 +307,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
 
-    ENVOY_STREAM_LOG(trace,
-                     "ext_authz filter added header(s) to the request:", *decoder_callbacks_);
-    for (const auto& header : response->headers_to_set) {
-      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, header.first.get(), header.second);
-      request_headers_->setCopy(header.first, header.second);
-    }
-    for (const auto& header : response->headers_to_add) {
-      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, header.first.get(), header.second);
-      request_headers_->addCopy(header.first, header.second);
-    }
-    for (const auto& header : response->headers_to_append) {
-      const auto header_to_modify = request_headers_->get(header.first);
-      // TODO(dio): Add a flag to allow appending non-existent headers, without setting it first
-      // (via `headers_to_add`). For example, given:
-      // 1. Original headers {"original": "true"}
-      // 2. Response headers from the authorization servers {{"append": "1"}, {"append": "2"}}
-      //
-      // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the intended
-      // combined headers: {{"original": "true"}, {"append": "1"}, {"append": "2"}}) to the request
-      // to upstream server by only sets `headers_to_append`.
-      if (!header_to_modify.empty()) {
-        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, header.first.get(),
-                         header.second);
-        // The current behavior of appending is by combining entries with the same key, into one
-        // entry. The value of that combined entry is separated by ",".
-        // TODO(dio): Consider to use addCopy instead.
-        request_headers_->appendCopy(header.first, header.second);
-      }
-    }
-
-    ENVOY_STREAM_LOG(trace,
-                     "ext_authz filter removed header(s) from the request:", *decoder_callbacks_);
-    for (const auto& header : response->headers_to_remove) {
-      // We don't allow removing any :-prefixed headers, nor Host, as removing
-      // them would make the request malformed.
-      if (!Http::HeaderUtility::isRemovableHeader(header.get())) {
-        continue;
-      }
-      ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, header.get());
-      request_headers_->remove(header);
-    }
-
-    if (!response->response_headers_to_add.empty()) {
-      ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to add to the response:",
-                       *decoder_callbacks_, response->response_headers_to_add.size());
-      response_headers_to_add_ = std::move(response->response_headers_to_add);
-    }
-
-    if (!response->response_headers_to_set.empty()) {
-      ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to set to the response:",
-                       *decoder_callbacks_, response->response_headers_to_set.size());
-      response_headers_to_set_ = std::move(response->response_headers_to_set);
-    }
+    // Apply (valid) header mutations from response. Invalid mutations get ignored.
+    applyHeaderMutations(*response);
 
     absl::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
     if (!response->query_parameters_to_set.empty()) {
@@ -360,8 +317,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(
           trace, "ext_authz filter set query parameter(s) on the request:", *decoder_callbacks_);
       for (const auto& [key, value] : response->query_parameters_to_set) {
-        ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, key, value);
-        modified_query_parameters->overwrite(key, value);
+        std::string encoded_key = Http::Utility::PercentEncoding::urlEncodeQueryParameter(key);
+        std::string encoded_value = Http::Utility::PercentEncoding::urlEncodeQueryParameter(value);
+        ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, encoded_key, encoded_value);
+        modified_query_parameters->overwrite(encoded_key, encoded_value);
       }
     }
 
@@ -373,8 +332,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter removed query parameter(s) from the request:",
                        *decoder_callbacks_);
       for (const auto& key : response->query_parameters_to_remove) {
-        ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, key);
-        modified_query_parameters->remove(key);
+        std::string encoded_key = Http::Utility::PercentEncoding::urlEncodeQueryParameter(key);
+        ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, encoded_key);
+        modified_query_parameters->remove(encoded_key);
       }
     }
 
@@ -425,19 +385,23 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
-        [&headers = response->headers_to_set,
+        [this, &headers = response->headers_to_set,
          &callbacks = *decoder_callbacks_](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);
-          // Firstly, remove all headers requested by the ext_authz filter, to ensure that they will
-          // override existing headers.
+          // Validate then remove each header to ensure that they will override existing headers.
+          Http::HeaderVector validated_headers_to_set;
           for (const auto& header : headers) {
-            response_headers.remove(header.first);
+            if (headerPairIsValid(header)) {
+              Http::LowerCaseString key(header.first);
+              response_headers.remove(key);
+              validated_headers_to_set.emplace_back(std::pair(std::move(key), header.second));
+            }
           }
           // Then set all of the requested headers, allowing the same header to be set multiple
           // times, e.g. `Set-Cookie`.
-          for (const auto& header : headers) {
-            ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, header.first.get(), header.second);
+          for (const auto& header : validated_headers_to_set) {
+            ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, header.first, header.second);
             response_headers.addCopy(header.first, header.second);
           }
         },
@@ -472,8 +436,87 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
           Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
     }
+
     break;
   }
+  }
+}
+
+// TODO(leonti): add denylist for header mutation keys.
+void Filter::applyHeaderMutations(const Filters::Common::ExtAuthz::Response& response) {
+  ENVOY_STREAM_LOG(trace, "ext_authz filter added header(s) to the request:", *decoder_callbacks_);
+  for (const auto& header : response.headers_to_set) {
+    if (headerPairIsValid(header)) {
+      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, header.first, header.second);
+      request_headers_->setCopy(Http::LowerCaseString(header.first), header.second);
+    }
+  }
+
+  for (const auto& header : response.headers_to_add) {
+    if (headerPairIsValid(header)) {
+      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, header.first, header.second);
+      request_headers_->addCopy(Http::LowerCaseString(header.first), header.second);
+    }
+  }
+
+  for (const auto& header : response.headers_to_append) {
+    if (headerPairIsValid(header)) {
+      const auto header_to_modify = request_headers_->get(Http::LowerCaseString(header.first));
+      // TODO(dio): Add a flag to allow appending non-existent headers, without setting it first
+      // (via `headers_to_add`). For example, given:
+      // 1. Original headers {"original": "true"}
+      // 2. Response headers from the authorization servers {{"append": "1"}, {"append": "2"}}
+      //
+      // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the intended
+      // combined headers: {{"original": "true"}, {"append": "1"}, {"append": "2"}}) to the request
+      // to upstream server by only sets `headers_to_append`.
+      if (!header_to_modify.empty()) {
+        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, header.first, header.second);
+        // The current behavior of appending is by combining entries with the same key, into one
+        // entry. The value of that combined entry is separated by ",".
+        // TODO(dio): Consider to use addCopy instead.
+        request_headers_->appendCopy(Http::LowerCaseString(header.first), header.second);
+      }
+    }
+  }
+
+  ENVOY_STREAM_LOG(trace,
+                   "ext_authz filter removed header(s) from the request:", *decoder_callbacks_);
+  for (const auto& header : response.headers_to_remove) {
+    if (Http::HeaderUtility::headerNameIsValid(header)) {
+      // We don't allow removing any :-prefixed headers, nor Host, as removing
+      // them would make the request malformed.
+      if (!Http::HeaderUtility::isRemovableHeader(header)) {
+        continue;
+      }
+      ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, header);
+      request_headers_->remove(Http::LowerCaseString(header));
+    }
+  }
+
+  if (!response.response_headers_to_add.empty()) {
+    ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to add to the response:",
+                     *decoder_callbacks_, response.response_headers_to_add.size());
+    // Validate headers & convert to HeaderVector before saving them for later.
+    for (const auto& header : response.response_headers_to_add) {
+      if (headerPairIsValid(header)) {
+        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, header.first, header.second);
+        response_headers_to_add_.push_back(
+            std::pair(Http::LowerCaseString(header.first), header.second));
+      }
+    }
+  }
+
+  if (!response.response_headers_to_set.empty()) {
+    ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to set to the response:",
+                     *decoder_callbacks_, response.response_headers_to_set.size());
+    for (const auto& header : response.response_headers_to_set) {
+      if (headerPairIsValid(header)) {
+        ENVOY_STREAM_LOG(trace, "'{}'='{}'", *decoder_callbacks_, header.first, header.second);
+        response_headers_to_set_.push_back(
+            std::pair(Http::LowerCaseString(header.first), header.second));
+      }
+    }
   }
 }
 
