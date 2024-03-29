@@ -5,7 +5,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
-#include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
