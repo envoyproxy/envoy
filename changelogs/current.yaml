@@ -400,6 +400,13 @@ new_features:
   change: |
     Added :ref:`formatters <envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.formatters>`
     to Fluentd access logger to allow adding extension commands when formatter access logs.
+- area: proxy_protocol
+  change: |
+    Added :ref:`disallowed_versions <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.disallowed_versions>`
+    to enforce the filter only matches specific PROXY protocol versions.
+- area: proxy_protocol
+  change: |
+    Added new statistics to the proxy protocol filter to track connections found/disallowed/errored by PROXY protocol version.
 - area: rbac
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
