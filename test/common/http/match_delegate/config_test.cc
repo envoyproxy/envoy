@@ -234,7 +234,8 @@ extension_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
 xds_matcher:
   matcher_tree:
-    input: filter-state-key
+    input:
+      name: filter_state
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
         key: arg
