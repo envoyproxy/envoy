@@ -732,6 +732,33 @@ TEST_F(EnvoyQuicClientStreamTest, EncodeTrailersOnClosedStream) {
   EXPECT_EQ(0u, quic_session_.bytesToSend());
 }
 
+TEST_F(EnvoyQuicClientStreamTest, EncodeTrailersWithEmptyTrailers) {
+  size_t num_writes = 0;
+  size_t last_write_length = 0;
+  quic::StreamSendingState last_state = quic::NO_FIN;
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
+      .WillRepeatedly(
+          Invoke([&](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
+                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+            ++num_writes;
+            last_write_length = write_length;
+            last_state = state;
+            return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
+          }));
+  const auto result = quic_stream_->encodeHeaders(request_headers_, false);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(1u, num_writes);
+  EXPECT_EQ(quic::NO_FIN, last_state);
+
+  quic_stream_->encodeTrailers(Http::TestRequestTrailerMapImpl{});
+
+  // An empty data frame should be written to close the stream.
+  EXPECT_EQ(2u, num_writes);
+  EXPECT_EQ(0u, last_write_length);
+  EXPECT_EQ(quic::FIN, last_state);
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 TEST_F(EnvoyQuicClientStreamTest, EncodeCapsule) {
   setUpCapsuleProtocol(false, true);

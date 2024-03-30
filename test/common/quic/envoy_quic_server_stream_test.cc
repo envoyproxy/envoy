@@ -358,6 +358,32 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeTrailersOnClosedStream) {
   EXPECT_EQ(0u, quic_session_.bytesToSend());
 }
 
+TEST_F(EnvoyQuicServerStreamTest, EncodeTrailersWithEmptyTrailers) {
+  receiveRequest(request_body_, true, request_body_.size() * 2);
+  size_t num_writes = 0;
+  size_t last_write_length = 0;
+  quic::StreamSendingState last_state = quic::NO_FIN;
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
+      .WillRepeatedly(
+          Invoke([&](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
+                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+            ++num_writes;
+            last_write_length = write_length;
+            last_state = state;
+            return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
+          }));
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+  EXPECT_EQ(1u, num_writes);
+  EXPECT_EQ(quic::NO_FIN, last_state);
+
+  quic_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{});
+
+  // An empty data frame should be written to close the stream.
+  EXPECT_EQ(2u, num_writes);
+  EXPECT_EQ(0u, last_write_length);
+  EXPECT_EQ(quic::FIN, last_state);
+}
+
 TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesReceived());
