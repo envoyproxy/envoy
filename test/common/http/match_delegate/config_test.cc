@@ -237,7 +237,7 @@ xds_matcher:
     input: filter-state-key
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
-        filter_state_key: arg
+        key: arg
     exact_match_map:
         map:
             match:
