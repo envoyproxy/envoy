@@ -44,7 +44,6 @@ struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigF
         "type.googleapis.com/envoy.type.matcher.v3.HttpRequestQueryParamMatchInput");
     data_input_allow_list->add_type_url(
         "type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput");
-    )
 
     return requirements;
   }
