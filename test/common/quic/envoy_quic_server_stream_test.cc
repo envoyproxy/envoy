@@ -366,7 +366,7 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeTrailersWithEmptyTrailers) {
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillRepeatedly(
           Invoke([&](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
+                     quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
             ++num_writes;
             last_write_length = write_length;
             last_state = state;

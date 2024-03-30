@@ -88,11 +88,11 @@ void EnvoyQuicStream::encodeTrailersImpl(spdy::Http2HeaderBlock&& trailers) {
   local_end_stream_ = true;
 
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(&quic_stream_, this);
-  
+
   size_t bytes_sent = 0;
   if (trailers.empty()) {
     // No trailers to send. Send an empty data frame to terminate the stream.
-    auto result = quic_stream_.WriteBodySlices({}, /*end_stream=*/ true);
+    auto result = quic_stream_.WriteBodySlices({}, /*end_stream=*/true);
     ENVOY_BUG(result.fin_consumed, "Failed to encode empty trailers.");
   } else {
     IncrementalBytesSentTracker tracker(quic_stream_, *mutableBytesMeter(), true);
@@ -100,7 +100,7 @@ void EnvoyQuicStream::encodeTrailersImpl(spdy::Http2HeaderBlock&& trailers) {
     ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers.");
   }
   if (stats_gatherer_ != nullptr) {
-    stats_gatherer_->addBytesSent(bytes_sent, /*end_stream=*/ true);
+    stats_gatherer_->addBytesSent(bytes_sent, /*end_stream=*/true);
   }
   if (codec_callbacks_) {
     codec_callbacks_->onCodecEncodeComplete();
