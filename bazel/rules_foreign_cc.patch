@@ -1,0 +1,13 @@
+diff --git a/foreign_cc/built_tools/pkgconfig_build.bzl b/foreign_cc/built_tools/pkgconfig_build.bzl
+index 64cb677..d654f67 100644
+--- a/foreign_cc/built_tools/pkgconfig_build.bzl
++++ b/foreign_cc/built_tools/pkgconfig_build.bzl
+@@ -13,7 +13,7 @@ load("//toolchains/native_tools:tool_access.bzl", "get_make_data")
+ def _pkgconfig_tool_impl(ctx):
+     make_data = get_make_data(ctx)
+     script = [
+-        "./configure  --with-internal-glib --prefix=$$INSTALLDIR$$",
++        "CFLAGS=-Wno-int-conversion CXXFLAGS=-Wno-int-conversion ./configure  --with-internal-glib --prefix=$$INSTALLDIR$$",
+         "%s" % make_data.path,
+         "%s install" % make_data.path,
+     ]
