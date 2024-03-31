@@ -101,7 +101,6 @@ envoy_mobile_kt_library(
         "Trailers.kt",
         "filters/*.kt",
         "grpc/*.kt",
-        "mocks/*.kt",
         "stats/*.kt",
     ]),
     visibility = ["//visibility:public"],

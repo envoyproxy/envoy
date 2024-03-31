@@ -1386,6 +1386,24 @@ TEST_F(NullGrpcMuxImplTest, OnDiscoveryResponseImplemented) {
   EXPECT_NO_THROW(null_mux_.onDiscoveryResponse(std::move(response), cp_stats));
 }
 
+TEST(GrpcMuxFactoryTest, InvalidRateLimit) {
+  auto* factory =
+      Config::Utility::getFactoryByName<Config::MuxFactory>("envoy.config_mux.grpc_mux_factory");
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Stats::MockStore> store;
+  Stats::MockScope& scope{store.mockScope()};
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  envoy::config::core::v3::ApiConfigSource ads_config;
+  ads_config.mutable_rate_limit_settings()->mutable_max_tokens()->set_value(100);
+  ads_config.mutable_rate_limit_settings()->mutable_fill_rate()->set_value(
+      std::numeric_limits<double>::quiet_NaN());
+  EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), dispatcher, random, scope,
+                               ads_config, local_info, nullptr, nullptr, absl::nullopt,
+                               absl::nullopt, false),
+               EnvoyException);
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

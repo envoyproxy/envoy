@@ -7,11 +7,11 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 #include "source/common/upstream/health_discovery_service.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
 #include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -61,8 +61,7 @@ protected:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),
         async_client_(new Grpc::MockAsyncClient()),
-        api_(Api::createApiForTest(stats_store_, random_)),
-        ssl_context_manager_(api_->timeSource()) {
+        api_(Api::createApiForTest(stats_store_, random_)), ssl_context_manager_(server_context_) {
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
     node_.set_id("hds-node");
   }

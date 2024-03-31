@@ -172,6 +172,7 @@ public:
   ServerHeaderValidatorPtr makeHeaderValidator(Protocol protocol) override {
     return header_validator_factory_.createServerHeaderValidator(protocol, header_validator_stats_);
   }
+  bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;

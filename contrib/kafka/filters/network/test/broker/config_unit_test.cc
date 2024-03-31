@@ -24,7 +24,7 @@ stat_prefix: test_prefix
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   KafkaConfigFactory factory;
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
 

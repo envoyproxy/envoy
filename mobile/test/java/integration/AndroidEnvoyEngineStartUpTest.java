@@ -1,4 +1,4 @@
-package test.kotlin.integration;
+package test.java.integration;
 
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
@@ -9,7 +9,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.google.common.truth.Truth.assertThat;
 
 // NOLINT(namespace-envoy)
 

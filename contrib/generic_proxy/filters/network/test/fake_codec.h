@@ -284,7 +284,7 @@ public:
   // CodecFactoryConfig
   CodecFactoryPtr
   createCodecFactory(const Protobuf::Message& config,
-                     Envoy::Server::Configuration::FactoryContext& context) override;
+                     Envoy::Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Struct>();
   }

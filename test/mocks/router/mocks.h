@@ -87,6 +87,9 @@ public:
   };
   bool enabled() const override { return enabled_; };
   bool shadowEnabled() const override { return shadow_enabled_; };
+  const absl::optional<bool>& forwardNotMatchingPreflights() const override {
+    return forward_not_matching_preflights_;
+  };
 
   std::vector<Matchers::StringMatcherPtr> allow_origins_;
   std::string allow_methods_;
@@ -97,6 +100,7 @@ public:
   absl::optional<bool> allow_private_network_access_;
   bool enabled_{};
   bool shadow_enabled_{};
+  absl::optional<bool> forward_not_matching_preflights_;
 };
 
 class TestHedgePolicy : public HedgePolicy {

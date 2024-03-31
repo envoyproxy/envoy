@@ -94,7 +94,7 @@ public:
           callbacks.streamInfo().setResponseCodeDetails("");
         }));
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
-    EXPECT_CALL(filter_factory_, createUpgradeFilterChain("WebSocket", _, _))
+    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
         .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
                                    FilterChainManager& manager) -> bool {
           return filter_factory_.createFilterChain(manager);
@@ -239,6 +239,7 @@ public:
     // be changed too
     return nullptr;
   }
+  bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
 
@@ -338,6 +339,11 @@ public:
           // If sendLocalReply is called:
           ON_CALL(encoder_, encodeHeaders(_, true))
               .WillByDefault(Invoke([this](const ResponseHeaderMap&, bool end_stream) -> void {
+                response_state_ =
+                    end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
+              }));
+          ON_CALL(encoder_, encodeData(_, true))
+              .WillByDefault(Invoke([this](const Buffer::Instance&, bool end_stream) -> void {
                 response_state_ =
                     end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
               }));

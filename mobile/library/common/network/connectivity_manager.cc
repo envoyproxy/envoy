@@ -92,7 +92,7 @@ envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(envoy_network_t net
   //  return network_state_.configuration_key_ - 1;
   //}
 
-  ENVOY_LOG_EVENT(debug, "netconf_network_change", std::to_string(network));
+  ENVOY_LOG_EVENT(debug, "netconf_network_change", "{}", std::to_string(network));
 
   network_state_.configuration_key_++;
   network_state_.network_ = network;
@@ -104,14 +104,14 @@ envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(envoy_network_t net
 
 void ConnectivityManagerImpl::setProxySettings(ProxySettingsConstSharedPtr new_proxy_settings) {
   if (proxy_settings_ == nullptr && new_proxy_settings != nullptr) {
-    ENVOY_LOG_EVENT(info, "netconf_proxy_change", new_proxy_settings->asString());
+    ENVOY_LOG_EVENT(info, "netconf_proxy_change", "{}", new_proxy_settings->asString());
     proxy_settings_ = new_proxy_settings;
   } else if (proxy_settings_ != nullptr && new_proxy_settings == nullptr) {
     ENVOY_LOG_EVENT(info, "netconf_proxy_change", "no_proxy_configured");
     proxy_settings_ = new_proxy_settings;
   } else if (proxy_settings_ != nullptr && new_proxy_settings != nullptr &&
              *proxy_settings_ != *new_proxy_settings) {
-    ENVOY_LOG_EVENT(info, "netconf_proxy_change", new_proxy_settings->asString());
+    ENVOY_LOG_EVENT(info, "netconf_proxy_change", "{}", new_proxy_settings->asString());
     proxy_settings_ = new_proxy_settings;
   }
 
@@ -215,7 +215,7 @@ void ConnectivityManagerImpl::onDnsResolutionComplete(
     // drain connections. It may be possible to refine this logic in the future.
     // TODO(goaway): check the set of cached hosts from the last triggered DNS refresh for this
     // host, and if present, remove it and trigger connection drain for this host specifically.
-    ENVOY_LOG_EVENT(debug, "netconf_post_dns_drain_cx", resolved_host);
+    ENVOY_LOG_EVENT(debug, "netconf_post_dns_drain_cx", "{}", resolved_host);
 
     // Pass predicate to only drain connections to the resolved host (for any cluster).
     cluster_manager_.drainConnections(
@@ -252,13 +252,13 @@ void ConnectivityManagerImpl::refreshDns(envoy_netconf_t configuration_key,
     // Note this does NOT completely prevent parallel refreshes from being triggered in multiple
     // flip-flop scenarios.
     if (configuration_key != network_state_.configuration_key_) {
-      ENVOY_LOG_EVENT(debug, "netconf_dns_flipflop", std::to_string(configuration_key));
+      ENVOY_LOG_EVENT(debug, "netconf_dns_flipflop", "{}", std::to_string(configuration_key));
       return;
     }
   }
 
   if (auto dns_cache = dnsCache()) {
-    ENVOY_LOG_EVENT(debug, "netconf_refresh_dns", std::to_string(configuration_key));
+    ENVOY_LOG_EVENT(debug, "netconf_refresh_dns", "{}", std::to_string(configuration_key));
 
     if (drain_connections && enable_drain_post_dns_refresh_) {
       dns_cache->iterateHostMap(
@@ -275,7 +275,7 @@ void ConnectivityManagerImpl::refreshDns(envoy_netconf_t configuration_key,
 Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ConnectivityManagerImpl::dnsCache() {
   auto cache = dns_cache_manager_->lookUpCacheByName(BaseDnsCache);
   if (!cache) {
-    ENVOY_LOG_EVENT(warn, "netconf_dns_cache_missing", std::string(BaseDnsCache));
+    ENVOY_LOG_EVENT(warn, "netconf_dns_cache_missing", "{}", std::string(BaseDnsCache));
   }
   return cache;
 }
@@ -409,6 +409,9 @@ InterfacePair ConnectivityManagerImpl::getActiveAlternateInterface(envoy_network
   return std::make_pair("", nullptr);
 }
 
+// TODO(abeyad): pass OsSysCallsImpl in as a class dependency instead of directly using
+// Api::OsSysCallsSingleton. That'll make it easier to create tests that mock out the
+// sys calls behavior.
 std::vector<InterfacePair>
 ConnectivityManagerImpl::enumerateInterfaces([[maybe_unused]] unsigned short family,
                                              [[maybe_unused]] unsigned int select_flags,
@@ -421,7 +424,10 @@ ConnectivityManagerImpl::enumerateInterfaces([[maybe_unused]] unsigned short fam
 
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
-  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+  if (rc.return_value_ != 0) {
+    ENVOY_LOG_EVERY_POW_2(warn, "getifaddrs error: {}", rc.errno_);
+    return pairs;
+  }
 
   for (const auto& interface_address : interface_addresses) {
     const auto family_version = family == AF_INET ? Envoy::Network::Address::IpVersion::v4

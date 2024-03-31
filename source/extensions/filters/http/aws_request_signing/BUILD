@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         "//envoy/http:filter_interface",
         "//source/extensions/common/aws:credentials_provider_impl_lib",
+        "//source/extensions/common/aws:region_provider_impl_lib",
         "//source/extensions/common/aws:sigv4_signer_impl_lib",
         "//source/extensions/common/aws:sigv4a_signer_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

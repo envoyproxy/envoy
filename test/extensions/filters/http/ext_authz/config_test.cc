@@ -31,12 +31,12 @@ namespace ExtAuthz {
 class TestAsyncClientManagerImpl : public Grpc::AsyncClientManagerImpl {
 public:
   TestAsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
-                             TimeSource& time_source, Api::Api& api,
+                             Server::Configuration::CommonFactoryContext& context,
                              const Grpc::StatNames& stat_names,
                              const Bootstrap::GrpcAsyncClientManagerConfig& config)
-      : Grpc::AsyncClientManagerImpl(cm, tls, time_source, api, stat_names, config) {}
-  Grpc::AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService&,
-                                                    Stats::Scope&, bool) override {
+      : Grpc::AsyncClientManagerImpl(cm, tls, context, stat_names, config) {}
+  absl::StatusOr<Grpc::AsyncClientFactoryPtr>
+  factoryForGrpcService(const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) override {
     return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
   }
 };
@@ -46,10 +46,13 @@ class ExtAuthzFilterTest : public Event::TestUsingSimulatedTime,
                            public testing::Test {
 public:
   ExtAuthzFilterTest() : RealThreadsTestHelper(5), stat_names_(symbol_table_) {
+    ON_CALL(context_.server_factory_context_, threadLocal())
+        .WillByDefault(testing::ReturnRef(tls()));
+    ON_CALL(context_.server_factory_context_, api()).WillByDefault(testing::ReturnRef(api()));
     runOnMainBlocking([&]() {
       async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
-          context_.server_factory_context_.cluster_manager_, tls(), api().timeSource(), api(),
-          stat_names_, Bootstrap::GrpcAsyncClientManagerConfig());
+          context_.server_factory_context_.cluster_manager_, tls(),
+          context_.server_factory_context_, stat_names_, Bootstrap::GrpcAsyncClientManagerConfig());
     });
   }
 
@@ -211,8 +214,9 @@ private:
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
         Envoy::Grpc::GrpcServiceConfigWithHashKey(ext_authz_config.grpc_service());
     Grpc::RawAsyncClientSharedPtr async_client =
-        async_client_manager_->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key,
-                                                                    context_.scope(), false);
+        async_client_manager_
+            ->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context_.scope(), false)
+            .value();
     Grpc::MockAsyncClient* mock_async_client =
         dynamic_cast<Grpc::MockAsyncClient*>(async_client.get());
     EXPECT_NE(mock_async_client, nullptr);

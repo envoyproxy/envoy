@@ -19,7 +19,8 @@ class AsyncClientFactoryImpl : public AsyncClientFactory {
 public:
   AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
                          const envoy::config::core::v3::GrpcService& config,
-                         bool skip_cluster_check, TimeSource& time_source);
+                         bool skip_cluster_check, TimeSource& time_source,
+                         absl::Status& creation_status);
   RawAsyncClientPtr createUncachedRawAsyncClient() override;
 
 private:
@@ -32,8 +33,9 @@ class GoogleAsyncClientFactoryImpl : public AsyncClientFactory {
 public:
   GoogleAsyncClientFactoryImpl(ThreadLocal::Instance& tls, ThreadLocal::Slot* google_tls_slot,
                                Stats::Scope& scope,
-                               const envoy::config::core::v3::GrpcService& config, Api::Api& api,
-                               const StatNames& stat_names);
+                               const envoy::config::core::v3::GrpcService& config,
+                               Server::Configuration::CommonFactoryContext& context,
+                               const StatNames& stat_names, absl::Status& creation_status);
   RawAsyncClientPtr createUncachedRawAsyncClient() override;
 
 private:
@@ -41,27 +43,27 @@ private:
   ThreadLocal::Slot* google_tls_slot_;
   Stats::ScopeSharedPtr scope_;
   const envoy::config::core::v3::GrpcService config_;
-  Api::Api& api_;
+  Server::Configuration::CommonFactoryContext& factory_context_;
   const StatNames& stat_names_;
 };
 
 class AsyncClientManagerImpl : public AsyncClientManager {
 public:
   AsyncClientManagerImpl(
-      Upstream::ClusterManager& cm, ThreadLocal::Instance& tls, TimeSource& time_source,
-      Api::Api& api, const StatNames& stat_names,
+      Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
+      Server::Configuration::CommonFactoryContext& context, const StatNames& stat_names,
       const envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig& config);
-  RawAsyncClientSharedPtr
+  absl::StatusOr<RawAsyncClientSharedPtr>
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
                             bool skip_cluster_check) override;
 
-  RawAsyncClientSharedPtr
+  absl::StatusOr<RawAsyncClientSharedPtr>
   getOrCreateRawAsyncClientWithHashKey(const GrpcServiceConfigWithHashKey& config_with_hash_key,
                                        Stats::Scope& scope, bool skip_cluster_check) override;
 
-  AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
-                                              Stats::Scope& scope,
-                                              bool skip_cluster_check) override;
+  absl::StatusOr<AsyncClientFactoryPtr>
+  factoryForGrpcService(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
+                        bool skip_cluster_check) override;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
     explicit RawAsyncClientCache(Event::Dispatcher& dispatcher,
@@ -91,11 +93,10 @@ public:
   };
 
 private:
-  Upstream::ClusterManager& cm_;
   ThreadLocal::Instance& tls_;
+  Upstream::ClusterManager& cm_; // Need to track outside of `context_` due to startup ordering.
+  Server::Configuration::CommonFactoryContext& context_;
   ThreadLocal::SlotPtr google_tls_slot_;
-  TimeSource& time_source_;
-  Api::Api& api_;
   const StatNames& stat_names_;
   ThreadLocal::TypedSlot<RawAsyncClientCache> raw_async_client_cache_;
 };

@@ -15,6 +15,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
+#include "envoy/router/scopes.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/tracer.h"
 #include "envoy/upstream/load_balancer.h"
@@ -25,6 +26,9 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+namespace Router {
+class RouteConfigProvider;
+}
 namespace Http {
 
 /**
@@ -267,6 +271,48 @@ public:
  */
 using RouteConfigUpdatedCallback = std::function<void(bool)>;
 using RouteConfigUpdatedCallbackSharedPtr = std::shared_ptr<RouteConfigUpdatedCallback>;
+
+// This class allows entities caching a route (e.g.) ActiveStream to delegate route clearing to xDS
+// components.
+class RouteCache {
+public:
+  virtual ~RouteCache() = default;
+
+  // Returns true if the route cache currently has a cached route.
+  virtual bool hasCachedRoute() const PURE;
+  // Forces the route cache to refresh the cached route.
+  virtual void refreshCachedRoute() PURE;
+};
+
+class RouteConfigUpdateRequester {
+public:
+  virtual ~RouteConfigUpdateRequester() = default;
+
+  virtual void
+  requestRouteConfigUpdate(RouteCache& route_cache,
+                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
+                           absl::optional<Router::ConfigConstSharedPtr> route_config,
+                           Event::Dispatcher& dispatcher, RequestHeaderMap& request_headers) PURE;
+  virtual void
+  requestVhdsUpdate(const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
+                    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+  virtual void
+  requestSrdsUpdate(RouteCache& route_cache, Router::ScopeKeyPtr scope_key,
+                    Event::Dispatcher& thread_local_dispatcher,
+                    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+};
+
+class RouteConfigUpdateRequesterFactory : public Config::UntypedFactory {
+public:
+  // UntypedFactory
+  virtual std::string category() const override { return "envoy.route_config_update_requester"; }
+
+  virtual std::unique_ptr<RouteConfigUpdateRequester>
+  createRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider) PURE;
+  virtual std::unique_ptr<RouteConfigUpdateRequester>
+  createRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider,
+                                   OptRef<const Router::ScopeKeyBuilder> scope_key_builder) PURE;
+};
 
 class DownstreamStreamFilterCallbacks {
 public:

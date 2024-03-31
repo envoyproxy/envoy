@@ -47,7 +47,8 @@ TEST_F(FilterChainTest, CreateFilterChain) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(basic_config_), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_);
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
 
   NiceMock<Http::MockFilterChainManager> manager;
   EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
@@ -81,7 +82,8 @@ http_filters:
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(basic_config_), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_);
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
 
   NiceMock<Http::MockFilterChainManager> manager;
   EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
@@ -89,7 +91,7 @@ http_filters:
 }
 
 TEST_F(FilterChainTest, CreateFilterChainWithDisabledTerminalFilter) {
-  const std::string config_yaml = R"EOF(
+  const std::string yaml_string = R"EOF(
 codec_type: http1
 server_name: foo
 stat_prefix: router
@@ -112,11 +114,7 @@ http_filters:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(config_yaml), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, tracer_manager_,
-                                  filter_config_provider_manager_),
-      EnvoyException,
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
       "Error: the last (terminal) filter (envoy.filters.http.router) in the chain cannot be "
       "disabled by default.");
 }
@@ -155,7 +153,8 @@ http_filters:
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_);
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
 
   NiceMock<Http::MockFilterChainManager> manager;
   Http::StreamDecoderFilterSharedPtr missing_config_filter;
@@ -180,9 +179,11 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(basic_config_);
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 
-  HttpConnectionManagerConfig config(
-      hcm_config, context_, date_provider_, route_config_provider_manager_,
-      scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_);
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
 
   NiceMock<Http::MockFilterChainManager> manager;
   ;
@@ -228,9 +229,11 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
   hcm_config.mutable_upgrade_configs(0)->mutable_enabled()->set_value(false);
 
-  HttpConnectionManagerConfig config(
-      hcm_config, context_, date_provider_, route_config_provider_manager_,
-      scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_);
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
 
   NiceMock<Http::MockFilterChainManager> manager;
   ;
@@ -283,9 +286,11 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
                                              "\x19"
                                              "envoy.filters.http.router");
 
-  HttpConnectionManagerConfig config(
-      hcm_config, context_, date_provider_, route_config_provider_manager_,
-      scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_);
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
 
   {
     NiceMock<Http::MockFilterChainManager> manager;
@@ -327,9 +332,10 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
                                              "encoder-decoder-buffer-filter");
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(
-          hcm_config, context_, date_provider_, route_config_provider_manager_,
-          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
+      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                  route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, tracer_manager_,
+                                  filter_config_provider_manager_, creation_status_),
       EnvoyException,
       "Error: terminal filter named envoy.filters.http.router of type envoy.filters.http.router "
       "must be the last filter in a http upgrade filter chain.");
@@ -340,11 +346,12 @@ TEST_F(FilterChainTest, InvalidConfig) {
   hcm_config.add_upgrade_configs()->set_upgrade_type("WEBSOCKET");
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(
-          hcm_config, context_, date_provider_, route_config_provider_manager_,
-          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
-      EnvoyException, "Error: multiple upgrade configs with the same name: 'websocket'");
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_EQ(creation_status_.message(),
+            "Error: multiple upgrade configs with the same name: 'websocket'");
 }
 
 } // namespace

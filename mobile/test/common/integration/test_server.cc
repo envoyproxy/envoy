@@ -8,11 +8,11 @@
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
+#include "source/common/tls/context_config_impl.h"
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/udp_packet_writer/default/config.h"
 #include "source/server/hot_restart_nop_impl.h"
 #include "source/server/instance_impl.h"
@@ -25,7 +25,7 @@ namespace Envoy {
 Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsContext(
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{time_system_};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{server_factory_context_};
   tls_context.mutable_common_tls_context()->add_alpn_protocols("h3");
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -78,6 +78,8 @@ TestServer::TestServer()
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope())
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
+  ON_CALL(factory_context_, sslContextManager())
+      .WillByDefault(testing::ReturnRef(context_manager_));
 }
 
 void TestServer::startTestServer(TestServerType test_server_type) {
@@ -188,6 +190,18 @@ void TestServer::setHeadersAndData(absl::string_view header_key, absl::string_vi
       std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
           {{std::string(header_key), std::string(header_value)}, {":status", "200"}})));
   upstream_->setResponseBody(std::string(response_body));
+}
+
+void TestServer::setResponse(const absl::flat_hash_map<std::string, std::string>& headers,
+                             absl::string_view body) {
+  ASSERT(upstream_);
+  Http::TestResponseHeaderMapImpl new_headers;
+  for (const auto& [key, value] : headers) {
+    new_headers.addCopy(key, value);
+  }
+  new_headers.addCopy(":status", "200");
+  upstream_->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(new_headers));
+  upstream_->setResponseBody(std::string(body));
 }
 
 const std::string TestServer::http_proxy_config = R"EOF(

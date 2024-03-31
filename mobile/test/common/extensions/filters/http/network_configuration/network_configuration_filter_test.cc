@@ -11,6 +11,8 @@
 #include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
+#include "library/common/network/proxy_api.h"
+#include "library/common/network/proxy_resolver_interface.h"
 #include "library/common/network/proxy_settings.h"
 
 using Envoy::Extensions::Common::DynamicForwardProxy::DnsCache;
@@ -60,8 +62,8 @@ public:
 class NetworkConfigurationFilterTest : public testing::Test {
 public:
   NetworkConfigurationFilterTest()
-      : connectivity_manager_(new NiceMock<MockConnectivityManager>),
-        proxy_settings_(new Network::ProxySettings("127.0.0.1", 82)),
+      : connectivity_manager_(std::make_shared<NiceMock<MockConnectivityManager>>()),
+        proxy_settings_(std::make_shared<Network::ProxySettings>("127.0.0.1", 82)),
         filter_(connectivity_manager_, false, false) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     ON_CALL(decoder_callbacks_.stream_info_, getRequestHeaders())
@@ -182,6 +184,104 @@ TEST_F(NetworkConfigurationFilterTest, AsyncDnsLookupSuccess) {
   EXPECT_CALL(decoder_callbacks_.stream_info_, filterState());
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   filter_.onLoadDnsCacheComplete(host_info_);
+}
+
+class MockProxyResolver : public Network::ProxyResolver {
+public:
+  MOCK_METHOD(Network::ProxyResolutionResult, resolveProxy,
+              (const std::string& target_url_string, std::vector<Network::ProxySettings>& proxies,
+               Network::ProxySettingsResolvedCallback proxy_resolution_completed));
+};
+
+class NetworkConfigurationFilterProxyResolverApiTest : public NetworkConfigurationFilterTest {
+public:
+  NetworkConfigurationFilterProxyResolverApiTest() : NetworkConfigurationFilterTest() {}
+
+  void SetUp() override {
+    auto proxy_resolver_api = std::make_unique<Network::ProxyResolverApi>();
+    proxy_resolver_api->resolver = std::make_unique<NiceMock<MockProxyResolver>>();
+    Api::External::registerApi("envoy_proxy_resolver", proxy_resolver_api.release());
+  }
+
+  void TearDown() override {
+    std::unique_ptr<Network::ProxyResolverApi> wrapped_api(getResolverApi());
+    // Safe deletion of the envoy_proxy_resolver API.
+    wrapped_api.reset();
+  }
+
+  Network::ProxyResolverApi* getResolverApi() {
+    return static_cast<Network::ProxyResolverApi*>(
+        Api::External::retrieveApi("envoy_proxy_resolver"));
+  }
+
+  MockProxyResolver& getMockProxyResolver() {
+    return *static_cast<MockProxyResolver*>(getResolverApi()->resolver.get());
+  }
+};
+
+TEST_F(NetworkConfigurationFilterProxyResolverApiTest, NoProxyConfigured) {
+  std::vector<Network::ProxySettings> proxy_settings;
+  EXPECT_CALL(getMockProxyResolver(), resolveProxy(_, proxy_settings, _))
+      .WillOnce(Return(Network::ProxyResolutionResult::NO_PROXY_CONFIGURED));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.decodeHeaders(default_request_headers_, false));
+}
+
+TEST_F(NetworkConfigurationFilterProxyResolverApiTest, EmptyProxyConfigured) {
+  std::vector<Network::ProxySettings> proxy_settings;
+  EXPECT_CALL(getMockProxyResolver(), resolveProxy(_, proxy_settings, _))
+      .WillOnce(Return(Network::ProxyResolutionResult::RESULT_COMPLETED));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.decodeHeaders(default_request_headers_, false));
+}
+
+TEST_F(NetworkConfigurationFilterProxyResolverApiTest, DirectProxyConfigured) {
+  std::vector<Network::ProxySettings> proxy_settings;
+  EXPECT_CALL(getMockProxyResolver(), resolveProxy(_, proxy_settings, _))
+      .WillOnce([](const std::string& /*target_url_string*/,
+                   std::vector<Network::ProxySettings>& proxies,
+                   Network::ProxySettingsResolvedCallback /*proxy_resolution_completed*/) {
+        proxies.emplace_back(Network::ProxySettings::direct());
+        return Network::ProxyResolutionResult::RESULT_COMPLETED;
+      });
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.decodeHeaders(default_request_headers_, false));
+}
+
+TEST_F(NetworkConfigurationFilterProxyResolverApiTest, ProxyWithIpAddressConfigured) {
+  std::vector<Network::ProxySettings> proxy_settings;
+  EXPECT_CALL(getMockProxyResolver(), resolveProxy(_, proxy_settings, _))
+      .WillOnce([](const std::string& /*target_url_string*/,
+                   std::vector<Network::ProxySettings>& proxies,
+                   Network::ProxySettingsResolvedCallback /*proxy_resolution_completed*/) {
+        proxies.emplace_back(Network::ProxySettings("127.0.0.1", 8080));
+        return Network::ProxyResolutionResult::RESULT_COMPLETED;
+      });
+  EXPECT_CALL(decoder_callbacks_.stream_info_, filterState());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.decodeHeaders(default_request_headers_, false));
+}
+
+TEST_F(NetworkConfigurationFilterProxyResolverApiTest, ProxyWithHostConfigured) {
+  createCache();
+
+  std::vector<Network::ProxySettings> proxy_settings;
+  EXPECT_CALL(getMockProxyResolver(), resolveProxy(_, proxy_settings, _))
+      .WillOnce([](const std::string& /*target_url_string*/,
+                   std::vector<Network::ProxySettings>& proxies,
+                   Network::ProxySettingsResolvedCallback /*proxy_resolution_completed*/) {
+        proxies.emplace_back(Network::ProxySettings("foo.com", 8080));
+        return Network::ProxyResolutionResult::RESULT_COMPLETED;
+      });
+  EXPECT_CALL(decoder_callbacks_.stream_info_, filterState());
+  EXPECT_CALL(*dns_cache_, loadDnsCacheEntry_(Eq("foo.com"), 8080, false, _))
+      .WillOnce(
+          Invoke([&](absl::string_view, uint16_t, bool, DnsCache::LoadDnsCacheEntryCallbacks&) {
+            return MockDnsCache::MockLoadDnsCacheEntryResult{
+                DnsCache::LoadDnsCacheEntryStatus::InCache, nullptr, host_info_};
+          }));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.decodeHeaders(default_request_headers_, false));
 }
 
 } // namespace

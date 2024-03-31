@@ -1,6 +1,10 @@
+#include <sys/socket.h>
+
 #include <string>
 #include <vector>
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 
 #include "test/test_common/utility.h"
@@ -24,10 +28,13 @@ namespace {
 using namespace Platform;
 
 using envoy::config::bootstrap::v3::Bootstrap;
+using envoy::config::cluster::v3::Cluster;
+using envoy::config::core::v3::SocketOption;
 using DfpClusterConfig = ::envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig;
 using testing::HasSubstr;
 using testing::IsEmpty;
 using testing::Not;
+using testing::NotNull;
 using testing::SizeIs;
 
 DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
@@ -35,7 +42,7 @@ DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
   const auto& clusters = bootstrap.static_resources().clusters();
   for (const auto& cluster : clusters) {
     if (cluster.name() == "base") {
-      MessageUtil::unpackTo(cluster.cluster_type().typed_config(), cluster_config);
+      MessageUtil::unpackTo(cluster.cluster_type().typed_config(), cluster_config).IgnoreError();
     }
   }
   return cluster_config;
@@ -87,10 +94,12 @@ TEST(TestConfig, ConfigIsApplied) {
       "canonical_suffixes: \".opq.com\"",
       "canonical_suffixes: \".xyz.com\"",
       "num_timeouts_to_trigger_port_migration { value: 4 }",
+      "idle_network_timeout { seconds: 30 }",
 #endif
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
       "key: \"always_use_v6\" value { bool_value: true }",
       "key: \"test_feature_false\" value { bool_value: true }",
+      "key: \"allow_client_socket_creation_failure\" value { bool_value: true }",
       "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
       "key: \"app_version\" value { string_value: \"1.2.3\" } }",
       "key: \"app_id\" value { string_value: \"1234-1234-1234\" } }",
@@ -218,6 +227,18 @@ TEST(TestConfig, EnableDrainPostDnsRefresh) {
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("enable_drain_post_dns_refresh: true"));
 }
 
+TEST(TestConfig, SetDnsQueryTimeout) {
+  EngineBuilder engine_builder;
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  // The default value.
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 5 }"));
+
+  engine_builder.addDnsQueryTimeoutSeconds(30);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 30 }"));
+}
+
 TEST(TestConfig, EnforceTrustChainVerification) {
   EngineBuilder engine_builder;
 
@@ -293,6 +314,38 @@ TEST(TestConfig, DisableHttp3) {
 #endif
 }
 
+#ifdef ENVOY_ENABLE_QUIC
+TEST(TestConfig, SocketReceiveBufferSize) {
+  EngineBuilder engine_builder;
+  engine_builder.enableHttp3(true);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  Cluster const* base_cluster = nullptr;
+  for (const Cluster& cluster : bootstrap->static_resources().clusters()) {
+    if (cluster.name() == "base") {
+      base_cluster = &cluster;
+      break;
+    }
+  }
+
+  // The base H3 cluster should always be found.
+  ASSERT_THAT(base_cluster, NotNull());
+
+  SocketOption const* rcv_buf_option = nullptr;
+  for (const SocketOption& sock_opt : base_cluster->upstream_bind_config().socket_options()) {
+    if (sock_opt.name() == SO_RCVBUF) {
+      rcv_buf_option = &sock_opt;
+      break;
+    }
+  }
+
+  // When using an H3 cluster, the UDP receive buffer size option should always be set.
+  ASSERT_THAT(rcv_buf_option, NotNull());
+  EXPECT_EQ(rcv_buf_option->level(), SOL_SOCKET);
+  EXPECT_EQ(rcv_buf_option->int_value(), 1024 * 1024 /* 1 MB */);
+}
+#endif
+
 #ifdef ENVOY_MOBILE_XDS
 TEST(TestConfig, XdsConfig) {
   EngineBuilder engine_builder;
@@ -338,7 +391,7 @@ TEST(TestConfig, XdsConfig) {
             "com.google.envoymobile.io.myapp");
 }
 
-TEST(TestConfig, CopyConstructor) {
+TEST(TestConfig, MoveConstructor) {
   EngineBuilder engine_builder;
   engine_builder.setRuntimeGuard("test_feature_false", true).enableGzipDecompression(false);
 
@@ -347,18 +400,18 @@ TEST(TestConfig, CopyConstructor) {
   EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
   EXPECT_THAT(bootstrap_str, Not(HasSubstr("envoy.filters.http.decompressor")));
 
-  EngineBuilder engine_builder_copy(engine_builder);
-  engine_builder_copy.enableGzipDecompression(true);
+  EngineBuilder engine_builder_move1(std::move(engine_builder));
+  engine_builder_move1.enableGzipDecompression(true);
   XdsBuilder xdsBuilder("FAKE_XDS_SERVER", 0);
   xdsBuilder.addClusterDiscoveryService();
-  engine_builder_copy.setXds(xdsBuilder);
-  bootstrap_str = engine_builder_copy.generateBootstrap()->ShortDebugString();
+  engine_builder_move1.setXds(xdsBuilder);
+  bootstrap_str = engine_builder_move1.generateBootstrap()->ShortDebugString();
   EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
   EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
   EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
 
-  EngineBuilder engine_builder_copy2(engine_builder_copy);
-  bootstrap_str = engine_builder_copy2.generateBootstrap()->ShortDebugString();
+  EngineBuilder engine_builder_move2(std::move(engine_builder_move1));
+  bootstrap_str = engine_builder_move2.generateBootstrap()->ShortDebugString();
   EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
   EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
   EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));

@@ -284,7 +284,7 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
       idle_timer_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
           [this] { onIdleTimer(); })),
       udp_session_info_(StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(),
-                                                   CreateDownstreamConnectionInfoProvider())) {
+                                                   createDownstreamConnectionInfoProvider())) {
   udp_session_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   cluster_.filter_.config_->stats().downstream_sess_total_.inc();
   cluster_.filter_.config_->stats().downstream_sess_active_.inc();
@@ -338,7 +338,7 @@ void UdpProxyFilter::ActiveSession::onSessionComplete() {
 }
 
 std::shared_ptr<Network::ConnectionInfoSetterImpl>
-UdpProxyFilter::ActiveSession::CreateDownstreamConnectionInfoProvider() {
+UdpProxyFilter::ActiveSession::createDownstreamConnectionInfoProvider() {
   auto downstream_connection_info_provider =
       std::make_shared<Network::ConnectionInfoSetterImpl>(addresses_.local_, addresses_.peer_);
   downstream_connection_info_provider->setConnectionID(session_id_);
@@ -399,7 +399,8 @@ void UdpProxyFilter::UdpActiveSession::onReadReady() {
   uint32_t packets_dropped = 0;
   const Api::IoErrorPtr result = Network::Utility::readPacketsFromSocket(
       udp_socket_->ioHandle(), *addresses_.local_, *this, cluster_.filter_.config_->timeSource(),
-      cluster_.filter_.config_->upstreamSocketConfig().prefer_gro_, packets_dropped);
+      cluster_.filter_.config_->upstreamSocketConfig().prefer_gro_, /*allow_mmsg=*/true,
+      packets_dropped);
   if (result == nullptr) {
     udp_socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
     return;

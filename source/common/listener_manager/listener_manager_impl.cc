@@ -116,8 +116,9 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
         factory.isTerminalFilterByProto(*message,
                                         filter_chain_factory_context.serverFactoryContext()),
         is_terminal);
-    Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
+    Network::FilterFactoryCb callback = THROW_OR_RETURN_VALUE(
+        factory.createFilterFactoryFromProto(*message, filter_chain_factory_context),
+        Network::FilterFactoryCb);
     ret.push_back(
         config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name()));
   }
@@ -321,7 +322,10 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
       if (socket_type == Network::Socket::Type::Stream) {
         return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
       } else {
-        return std::make_shared<Network::UdpListenSocket>(std::move(io_handle), address, options);
+        auto socket = std::make_shared<Network::UdpListenSocket>(
+            std::move(io_handle), address, options,
+            server_.hotRestart().parentDrainedCallbackRegistrar());
+        return socket;
       }
     }
   }

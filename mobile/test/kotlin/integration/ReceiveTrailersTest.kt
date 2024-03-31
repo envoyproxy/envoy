@@ -1,5 +1,6 @@
 package test.kotlin.integration
 
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -18,8 +19,7 @@ import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.fail
+import org.junit.Assert.fail
 import org.junit.Test
 
 private const val TEST_RESPONSE_FILTER_TYPE =

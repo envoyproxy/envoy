@@ -45,7 +45,7 @@ public:
     // Common mock calls.
     ON_CALL(mock_filter_callback_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(mock_filter_callback_, activeSpan()).WillByDefault(ReturnRef(active_span_));
-    ON_CALL(mock_filter_callback_, downstreamCodec()).WillByDefault(ReturnRef(mock_codec_factory_));
+    ON_CALL(mock_filter_callback_, codecFactory()).WillByDefault(ReturnRef(mock_codec_factory_));
     ON_CALL(mock_filter_callback_, streamInfo()).WillByDefault(ReturnRef(mock_stream_info_));
     ON_CALL(mock_filter_callback_, connection())
         .WillByDefault(Return(&mock_downstream_connection_));
@@ -175,10 +175,10 @@ public:
     ASSERT(!filter_->upstreamRequestsForTest().empty());
 
     auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
+    auto stream_frame = std::make_shared<StreamFramePtr>(std::move(response));
 
     EXPECT_CALL(*mock_client_codec_, decode(BufferStringEqual("test_1"), _))
-        .WillOnce(Invoke([this, resp = std::make_shared<StreamFramePtr>(std::move(response))](
-                             Buffer::Instance& buffer, bool) {
+        .WillOnce(Invoke([this, resp = std::move(stream_frame)](Buffer::Instance& buffer, bool) {
           buffer.drain(buffer.length());
 
           const bool end_stream = (*resp)->frameFlags().endStream();
