@@ -780,7 +780,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.compression.zstd.compressor",
             "envoy.compression.zstd.decompressor",
         ],
-        release_date = "2024-03-27",
+        release_date = "2024-03-30",
         cpe = "cpe:2.3:a:facebook:zstandard:*",
     ),
     com_github_zlib_ng_zlib_ng = dict(
