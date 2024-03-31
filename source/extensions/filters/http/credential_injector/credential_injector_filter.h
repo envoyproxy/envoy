@@ -78,7 +78,7 @@ public:
 
   // CredentialInjector::Callbacks
   void onSuccess() override;
-  void onFailure(const std::string& reason) override;
+  void onFailure(absl::string_view reason) override;
 
 private:
   Envoy::Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

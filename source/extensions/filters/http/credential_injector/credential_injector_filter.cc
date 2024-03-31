@@ -116,7 +116,7 @@ void CredentialInjectorFilter::onSuccess() {
   }
 }
 
-void CredentialInjectorFilter::onFailure(const std::string& reason) {
+void CredentialInjectorFilter::onFailure(absl::string_view reason) {
   credential_init_ = true; // TODO: retry after a certain period of time
   credential_success_ = false;
   in_flight_credential_request_ = nullptr;

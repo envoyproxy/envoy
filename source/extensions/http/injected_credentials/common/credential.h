@@ -46,7 +46,7 @@ public:
      * Called when the async request for credentials fails.
      * @param reason supplies the failure reason.
      */
-    virtual void onFailure(const std::string& reason) PURE;
+    virtual void onFailure(absl::string_view reason) PURE;
   };
 
   /**
