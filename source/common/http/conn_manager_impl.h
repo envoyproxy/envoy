@@ -6,6 +6,7 @@
 #include <list>
 #include <memory>
 #include <optional>
+#include <queue>
 #include <string>
 #include <vector>
 
@@ -46,7 +47,6 @@
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/common_connection_filter_states.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
-#include "source/common/router/scoped_rds.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
@@ -133,39 +133,6 @@ private:
   struct ActiveStream;
   class MobileConnectionManagerImpl;
 
-  class RdsRouteConfigUpdateRequester {
-  public:
-    RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider,
-                                  ActiveStream& parent)
-        : route_config_provider_(route_config_provider), parent_(parent) {}
-
-    RdsRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider,
-                                  OptRef<const Router::ScopeKeyBuilder> scope_key_builder,
-                                  ActiveStream& parent)
-        // Expect the dynamic cast to succeed because only ScopedRdsConfigProvider is fully
-        // implemented. Inline provider will be cast to nullptr here but it is not full implemented
-        // and can't not be used at this point. Should change this implementation if we have a
-        // functional inline scope route provider in the future.
-        : scoped_route_config_provider_(
-              dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider)),
-          scope_key_builder_(scope_key_builder), parent_(parent) {}
-
-    void
-    requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
-    void requestVhdsUpdate(const std::string& host_header,
-                           Event::Dispatcher& thread_local_dispatcher,
-                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
-    void requestSrdsUpdate(Router::ScopeKeyPtr scope_key,
-                           Event::Dispatcher& thread_local_dispatcher,
-                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
-
-  private:
-    Router::RouteConfigProvider* route_config_provider_;
-    Router::ScopedRdsConfigProvider* scoped_route_config_provider_;
-    OptRef<const Router::ScopeKeyBuilder> scope_key_builder_;
-    ActiveStream& parent_;
-  };
-
   /**
    * Wraps a single active stream on the connection. These are either full request/response pairs
    * or pushes.
@@ -178,7 +145,8 @@ private:
                               public Tracing::Config,
                               public ScopeTrackedObject,
                               public FilterManagerCallbacks,
-                              public DownstreamStreamFilterCallbacks {
+                              public DownstreamStreamFilterCallbacks,
+                              public RouteCache {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
                  Buffer::BufferMemoryAccountSharedPtr account);
 
@@ -345,7 +313,6 @@ private:
     // not found, snapped_route_config_ is set to Router::NullConfigImpl.
     void snapScopedRouteConfig();
 
-    void refreshCachedRoute();
     void refreshCachedRoute(const Router::RouteCallback& cb);
 
     void refreshCachedTracingCustomTags();
@@ -407,7 +374,12 @@ private:
     void onRequestHeaderTimeout();
     // Per-stream alive duration reached.
     void onStreamMaxDurationReached();
-    bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
+
+    // RouteCache
+    bool hasCachedRoute() const override {
+      return cached_route_.has_value() && cached_route_.value();
+    }
+    void refreshCachedRoute() override;
 
     // Return local port of the connection.
     uint32_t localPort();
@@ -516,7 +488,7 @@ private:
 
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
-    std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
+    absl::optional<std::unique_ptr<RouteConfigUpdateRequester>> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
     Http::ServerHeaderValidatorPtr header_validator_;
 

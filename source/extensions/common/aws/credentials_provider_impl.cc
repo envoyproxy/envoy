@@ -43,6 +43,7 @@ constexpr char WEB_IDENTITY_RESULT_ELEMENT[] = "AssumeRoleWithWebIdentityResult"
 constexpr char AWS_CONTAINER_CREDENTIALS_RELATIVE_URI[] = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI";
 constexpr char AWS_CONTAINER_CREDENTIALS_FULL_URI[] = "AWS_CONTAINER_CREDENTIALS_FULL_URI";
 constexpr char AWS_CONTAINER_AUTHORIZATION_TOKEN[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN";
+constexpr char AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE";
 constexpr char AWS_EC2_METADATA_DISABLED[] = "AWS_EC2_METADATA_DISABLED";
 
 constexpr std::chrono::hours REFRESH_INTERVAL{1};
@@ -425,7 +426,7 @@ void InstanceProfileCredentialsProvider::onMetadataError(Failure reason) {
   }
 }
 
-TaskRoleCredentialsProvider::TaskRoleCredentialsProvider(
+ContainerCredentialsProvider::ContainerCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context,
     const CurlMetadataFetcher& fetch_metadata_using_curl,
     CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view credential_uri,
@@ -435,14 +436,29 @@ TaskRoleCredentialsProvider::TaskRoleCredentialsProvider(
           envoy::config::cluster::v3::Cluster::STATIC /*cluster_type*/, credential_uri),
       credential_uri_(credential_uri), authorization_token_(authorization_token) {}
 
-bool TaskRoleCredentialsProvider::needsRefresh() {
+bool ContainerCredentialsProvider::needsRefresh() {
   const auto now = api_.timeSource().systemTime();
   return (now - last_updated_ > REFRESH_INTERVAL) ||
          (expiration_time_ - now < REFRESH_GRACE_PERIOD);
 }
 
-void TaskRoleCredentialsProvider::refresh() {
-  ENVOY_LOG(debug, "Getting AWS credentials from the task role at URI: {}", credential_uri_);
+void ContainerCredentialsProvider::refresh() {
+  ENVOY_LOG(debug, "Getting AWS credentials from the container role at URI: {}", credential_uri_);
+
+  // ECS Task role: use const authorization_token set during initialization
+  absl::string_view authorization_header = authorization_token_;
+  absl::StatusOr<std::string> token_or_error;
+
+  if (authorization_token_.empty()) {
+    // EKS Pod Identity token is sourced from AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
+    if (const auto token_file = std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE)) {
+      token_or_error = api_.fileSystem().fileReadToEnd(std::string(token_file));
+      if (token_or_error.ok()) {
+        ENVOY_LOG_MISC(debug, "Container authorization token file contents loaded");
+        authorization_header = token_or_error.value();
+      }
+    }
+  }
 
   absl::string_view host;
   absl::string_view path;
@@ -453,12 +469,12 @@ void TaskRoleCredentialsProvider::refresh() {
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(host);
   message.headers().setPath(path);
-  message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_token_);
+  message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
   if (!useHttpAsyncClient() || !context_) {
     // Using curl to fetch the AWS credentials.
     const auto credential_document = fetch_metadata_using_curl_(message);
     if (!credential_document) {
-      ENVOY_LOG(error, "Could not load AWS credentials document from the task role");
+      ENVOY_LOG(error, "Could not load AWS credentials document from the container role");
       return;
     }
     extractCredentials(std::move(credential_document.value()));
@@ -480,7 +496,7 @@ void TaskRoleCredentialsProvider::refresh() {
   }
 }
 
-void TaskRoleCredentialsProvider::extractCredentials(
+void ContainerCredentialsProvider::extractCredentials(
     const std::string&& credential_document_value) {
   if (credential_document_value.empty()) {
     handleFetchDone();
@@ -489,7 +505,8 @@ void TaskRoleCredentialsProvider::extractCredentials(
   Json::ObjectSharedPtr document_json;
   TRY_NEEDS_AUDIT { document_json = Json::Factory::loadFromString(credential_document_value); }
   END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Could not parse AWS credentials document from the task role: {}", e.what());
+    ENVOY_LOG(error, "Could not parse AWS credentials document from the container role: {}",
+              e.what());
     handleFetchDone();
     return;
   }
@@ -498,7 +515,7 @@ void TaskRoleCredentialsProvider::extractCredentials(
   const auto secret_access_key = document_json->getString(SECRET_ACCESS_KEY, "");
   const auto session_token = document_json->getString(TOKEN, "");
 
-  ENVOY_LOG(debug, "Found following AWS credentials in the task role: {}={}, {}={}, {}={}",
+  ENVOY_LOG(debug, "Found following AWS credentials in the container role: {}={}, {}={}, {}={}",
             AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
             secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
             session_token.empty() ? "" : "*****");
@@ -507,7 +524,7 @@ void TaskRoleCredentialsProvider::extractCredentials(
   if (!expiration_str.empty()) {
     absl::Time expiration_time;
     if (absl::ParseTime(EXPIRATION_FORMAT, expiration_str, &expiration_time, nullptr)) {
-      ENVOY_LOG(debug, "Task role AWS credentials expiration time: {}", expiration_str);
+      ENVOY_LOG(debug, "Container role AWS credentials expiration time: {}", expiration_str);
       expiration_time_ = absl::ToChronoTime(expiration_time);
     }
   }
@@ -522,13 +539,13 @@ void TaskRoleCredentialsProvider::extractCredentials(
   handleFetchDone();
 }
 
-void TaskRoleCredentialsProvider::onMetadataSuccess(const std::string&& body) {
+void ContainerCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   // TODO(suniltheta): increment fetch success stats
   ENVOY_LOG(debug, "AWS Task metadata fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
-void TaskRoleCredentialsProvider::onMetadataError(Failure reason) {
+void ContainerCredentialsProvider::onMetadataError(Failure reason) {
   // TODO(suniltheta): increment fetch failed stats
   ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
   handleFetchDone();
@@ -747,26 +764,26 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
 
   if (!relative_uri.empty()) {
     const auto uri = absl::StrCat(CONTAINER_METADATA_HOST, relative_uri);
-    ENVOY_LOG(debug, "Using task role credentials provider with URI: {}", uri);
-    add(factories.createTaskRoleCredentialsProvider(api, context, fetch_metadata_using_curl,
-                                                    MetadataFetcher::create,
-                                                    CONTAINER_METADATA_CLUSTER, uri));
+    ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", uri);
+    add(factories.createContainerCredentialsProvider(api, context, fetch_metadata_using_curl,
+                                                     MetadataFetcher::create,
+                                                     CONTAINER_METADATA_CLUSTER, uri));
   } else if (!full_uri.empty()) {
-    const auto authorization_token =
+    auto authorization_token =
         absl::NullSafeStringView(std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN));
     if (!authorization_token.empty()) {
       ENVOY_LOG(debug,
-                "Using task role credentials provider with URI: "
+                "Using container role credentials provider with URI: "
                 "{} and authorization token",
                 full_uri);
-      add(factories.createTaskRoleCredentialsProvider(
+      add(factories.createContainerCredentialsProvider(
           api, context, fetch_metadata_using_curl, MetadataFetcher::create,
           CONTAINER_METADATA_CLUSTER, full_uri, authorization_token));
     } else {
-      ENVOY_LOG(debug, "Using task role credentials provider with URI: {}", full_uri);
-      add(factories.createTaskRoleCredentialsProvider(api, context, fetch_metadata_using_curl,
-                                                      MetadataFetcher::create,
-                                                      CONTAINER_METADATA_CLUSTER, full_uri));
+      ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", full_uri);
+      add(factories.createContainerCredentialsProvider(api, context, fetch_metadata_using_curl,
+                                                       MetadataFetcher::create,
+                                                       CONTAINER_METADATA_CLUSTER, full_uri));
     }
   } else if (metadata_disabled != TRUE) {
     ENVOY_LOG(debug, "Using instance profile credentials provider");
