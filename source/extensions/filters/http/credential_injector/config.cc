@@ -16,14 +16,15 @@ CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&
         proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+
   // Find the credential injector factory.
-  const std::string type{
-      TypeUtil::typeUrlToDescriptorFullName(proto_config.credential().typed_config().type_url())};
-  NamedCredentialInjectorConfigFactory* const config_factory =
-      Registry::FactoryRegistry<NamedCredentialInjectorConfigFactory>::getFactoryByType(type);
+  auto* config_factory = Envoy::Config::Utility::getFactory<NamedCredentialInjectorConfigFactory>(
+      proto_config.credential());
   if (config_factory == nullptr) {
-    return absl::InvalidArgumentError(
-        fmt::format("Didn't find a registered implementation for type: '{}'", type));
+    return absl::InvalidArgumentError(fmt::format(
+        "Didn't find a registered implementation for '{}' with type URL: '{}'",
+        proto_config.credential().name(),
+        Envoy::Config::Utility::getFactoryType(proto_config.credential().typed_config())));
   }
 
   // create the credential injector
