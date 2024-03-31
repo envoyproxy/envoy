@@ -1468,7 +1468,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
                ProtoValidationException);
 }
 
-// MessageUtility::unpackTo() with the wrong type throws.
+// MessageUtility::unpackToOrThrow() with the wrong type throws.
 TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
@@ -1476,11 +1476,11 @@ TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   source_any.PackFrom(source_duration);
   ProtobufWkt::Timestamp dst;
   EXPECT_THROW_WITH_REGEX(
-      MessageUtil::unpackTo(source_any, dst), EnvoyException,
+      MessageUtil::unpackToOrThrow(source_any, dst), EnvoyException,
       R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
-// MessageUtility::unpackTo() with API message works at same version.
+// MessageUtility::unpackToOrThrow() with API message works at same version.
 TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
   {
     API_NO_BOOST(envoy::api::v2::Cluster) source;
@@ -1488,7 +1488,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
-    MessageUtil::unpackTo(source_any, dst);
+    MessageUtil::unpackToOrThrow(source_any, dst);
     EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
@@ -1497,31 +1497,31 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-    MessageUtil::unpackTo(source_any, dst);
+    MessageUtil::unpackToOrThrow(source_any, dst);
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
 }
 
-// MessageUtility::unpackToNoThrow() with the right type.
+// MessageUtility::unpackTo() with the right type.
 TEST_F(ProtobufUtilityTest, UnpackToNoThrowRightType) {
   ProtobufWkt::Duration src_duration;
   src_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(src_duration);
   ProtobufWkt::Duration dst_duration;
-  EXPECT_OK(MessageUtil::unpackToNoThrow(source_any, dst_duration));
+  EXPECT_OK(MessageUtil::unpackTo(source_any, dst_duration));
   // Source and destination are expected to be equal.
   EXPECT_EQ(src_duration, dst_duration);
 }
 
-// MessageUtility::unpackToNoThrow() with the wrong type.
+// MessageUtility::unpackTo() with the wrong type.
 TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(source_duration);
   ProtobufWkt::Timestamp dst;
-  auto status = MessageUtil::unpackToNoThrow(source_any, dst);
+  auto status = MessageUtil::unpackTo(source_any, dst);
   EXPECT_TRUE(absl::IsInternal(status));
   EXPECT_THAT(std::string(status.message()),
               testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
