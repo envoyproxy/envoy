@@ -62,7 +62,7 @@ private:
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 // The Envoy filter to inject credentials.
-class CredentialInjectorFilter : public Envoy::Http::PassThroughFilter,
+class CredentialInjectorFilter : public Envoy::Http::PassThroughDecoderFilter,
                                  public CredentialInjector::Callbacks,
                                  public Logger::Loggable<Logger::Id::credential_injector> {
 public:
