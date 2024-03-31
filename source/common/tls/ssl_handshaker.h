@@ -59,7 +59,8 @@ public:
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
-  void onCertSelectionResult(SSL_CTX* ctx) override;
+  void onCertSelectionResult(bool succeeded, const Ssl::TlsContext& selected_ctx,
+                             bool staple) override;
 
   void onSslHandshakeCancelled();
 

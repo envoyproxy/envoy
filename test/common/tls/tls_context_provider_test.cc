@@ -93,7 +93,7 @@ public:
     switch (mod_) {
     case Ssl::SelectionResult::Continue:
       ENVOY_LOG_MISC(info, "debug: select cert done");
-      cb->onCertSelectionResult(getSslCtx());
+      cb->onCertSelectionResult(true, getTlsContext(), false);
       break;
     case Ssl::SelectionResult::Stop:
       ENVOY_LOG_MISC(info, "debug: select cert async");
@@ -108,10 +108,10 @@ public:
 
   void selectTlsContextAsync() {
     ENVOY_LOG_MISC(info, "debug: select cert async done");
-    cb_->onCertSelectionResult(getSslCtx());
+    cb->onCertSelectionResult(true, getTlsContext(), false);
   }
 
-  SSL_CTX* getSslCtx() { return ctx_.lock()->getTlsContexts()[0].ssl_ctx_.get(); }
+  Ssl::TlsContext& getTlsContext() { return ctx_.lock()->getTlsContexts()[0]; }
 
   Ssl::SelectionResult mod_;
 

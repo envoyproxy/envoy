@@ -215,11 +215,10 @@ public:
                                                                      bool client_ecdsa_capable,
                                                                      bool client_ocsp_capable,
                                                                      bool* cert_matched_sni);
+  bool isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
+  bool isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
 
 private:
-  // Select the TLS certificate context from customer provider.
-  enum ssl_select_cert_result_t
-  selectTlsContextFromProvider(const SSL_CLIENT_HELLO* ssl_client_hello);
   // Currently, at most one certificate of a given key type may be specified for each exact
   // server name or wildcard domain name.
   using PkeyTypesMap = absl::flat_hash_map<int, std::reference_wrapper<Ssl::TlsContext>>;
@@ -236,8 +235,6 @@ private:
                          unsigned int inlen);
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
-  bool isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
-  bool isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
   OcspStapleAction ocspStapleAction(const Ssl::TlsContext& ctx, bool client_ocsp_capable);
 
   SessionContextID generateHashForSessionContextId(const std::vector<std::string>& server_names);

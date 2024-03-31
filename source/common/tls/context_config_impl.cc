@@ -13,6 +13,7 @@
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
+#include "source/common/tls/tls_context_provider.h"
 
 #include "openssl/ssl.h"
 
@@ -330,7 +331,8 @@ Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
 }
 
 Ssl::TlsContextProviderFactoryCb ContextConfigImpl::createTlsContextProvider() const {
-  return tls_context_provider_factory_cb_;
+  return tls_context_provider_factory_cb_ != nullptr ? tls_context_provider_factory_cb_
+                                                     : &Ssl::TlsContextProviderFactoryCbImpl;
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(

@@ -179,8 +179,10 @@ public:
 
   /**
    * Called when the cert selection completes.
+   * It's safe to call it even the SSL connection may be terminated early.
    */
-  virtual void onCertSelectionResult(SSL_CTX* ctx) PURE;
+  virtual void onCertSelectionResult(bool succeeded, const Ssl::TlsContext& selected_ctx,
+                                     bool staple) PURE;
 };
 
 using CertSelectionCallbackPtr = std::unique_ptr<CertSelectionCallback>;
