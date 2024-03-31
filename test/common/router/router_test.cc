@@ -2940,12 +2940,27 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
+class RouterConnectFailureTest : public RouterTest {
+public:
+  RouterConnectFailureTest() {
+    scoped_runtime_.mergeValues({{"envoy.restart_features.ensure_connection_retry", "true"}});
+    // Recreate router filter.
+    router_ = std::make_unique<RouterTestFilter>(config_, config_.default_stats_);
+    router_->setDecoderFilterCallbacks(callbacks_);
+    router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(host_address_);
+    router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+  }
+
+protected:
+  TestScopedRuntime scoped_runtime_;
+};
+
 // Test retrying a request on connect failure, when the first attempt fails while the client
 // is sending the body, with the rest of the request arriving in between upstream
 // request attempts, and wait to get a new connection.
-TEST_F(RouterTest, RetryRequestConnectFailureBodyBufferLimitExceeded) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.ensure_connection_retry", "true"}});
+TEST_F(RouterConnectFailureTest, RetryRequestConnectFailureBodyBufferLimitExceeded) {
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))

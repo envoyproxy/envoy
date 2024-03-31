@@ -747,10 +747,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
                                         can_use_http3, false /*enable_half_close*/);
-  if (retry_state_ && retry_state_->shouldRetryOnConnectionFailure() &&
-      Runtime::runtimeFeatureEnabled("envoy.restart_features.ensure_connection_retry")) {
+  if (retry_state_ && retry_state_->shouldRetryOnConnectionFailure() && ensure_connection_retry_) {
     upstream_request->addUpstreamCallbacks(*this);
     wait_for_connect_ = true;
+    // Set to the maximum between the current limit and 2 time the cluster connection buffer limit.
+    // 2 times in order to ensure we do not reach this limit until the connection get establish,
+    // the upstream request will pause the read on the downstream connection but this is a soft
+    // limit, so it might goes above this limit.
     retry_connection_failure_buffer_limit_ =
         std::max(retry_shadow_buffer_limit_, 2 * cluster_->perConnectionBufferLimitBytes());
     original_buffer_limit_ = callbacks_->decoderBufferLimit();
@@ -2030,7 +2033,8 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
                                         can_use_http3, false /*enable_tcp_tunneling*/);
-  if (retry_state_ && retry_state_->shouldRetryOnConnectionFailure() && wait_for_connect_) {
+  if (retry_state_ && retry_state_->shouldRetryOnConnectionFailure() && wait_for_connect_ &&
+      ensure_connection_retry_) {
     upstream_request->addUpstreamCallbacks(*this);
   }
 
