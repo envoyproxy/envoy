@@ -164,6 +164,7 @@ envoy_cc_library(
         "//source/server:options_lib",
         # TODO(wbpcode) make this a proper extension
         "//source/extensions/filters/http/match_delegate:config",
+        "//source/common/http:rds_lib",
     ] + envoy_select_enable_http3(["//source/common/quic:server_codec_lib"]),
 )
 

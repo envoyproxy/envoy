@@ -159,6 +159,11 @@ EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<EngineCallbacks>())
 #endif
 }
 
+EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
+  network_thread_priority_ = thread_priority;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
   // Envoy::Platform::LogLevel is essentially the same as Logger::Logger::Levels, so we can
   // safely cast it.
@@ -922,7 +927,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
 EngineSharedPtr EngineBuilder::build() {
   InternalEngine* envoy_engine =
-      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_));
+      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
+                         network_thread_priority_);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

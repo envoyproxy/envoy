@@ -261,8 +261,8 @@ build:mobile-remote-ci --config=remote-ci
 
 build:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --build_tests_only
-test:mobile-remote-ci-android --config=mobile-test-android
 test:mobile-remote-ci-android --config=mobile-remote-ci
+test:mobile-remote-ci-android --config=mobile-test-android
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
 # Temporary revert to C++17 for mobile NDK builds.

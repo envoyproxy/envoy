@@ -70,14 +70,14 @@ TEST(GrpcCodecTest, decodeIncompleteFrame) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  EXPECT_TRUE(decoder.decode(buffer, frames).ok());
   EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(static_cast<size_t>(0), frames.size());
   EXPECT_EQ(static_cast<uint32_t>(request.ByteSize()), decoder.length());
   EXPECT_EQ(true, decoder.hasBufferedData());
 
   buffer.add(request_buffer.c_str() + 5);
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  EXPECT_TRUE(decoder.decode(buffer, frames).ok());
   EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(static_cast<size_t>(1), frames.size());
   EXPECT_EQ(static_cast<uint32_t>(0), decoder.length());
@@ -102,7 +102,7 @@ TEST(GrpcCodecTest, decodeInvalidFrame) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  EXPECT_FALSE(decoder.decode(buffer, frames));
+  EXPECT_EQ(decoder.decode(buffer, frames).code(), absl::StatusCode::kInternal);
   EXPECT_EQ(size, buffer.length());
 }
 
@@ -117,7 +117,7 @@ TEST(GrpcCodecTest, DecodeMultipleFramesInvalid) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  EXPECT_FALSE(decoder.decode(buffer, frames));
+  EXPECT_EQ(decoder.decode(buffer, frames).code(), absl::StatusCode::kInternal);
   // When the decoder doesn't successfully decode, it puts decoded frames up until
   // an invalid frame into output frame vector.
   EXPECT_EQ(1, frames.size());
@@ -146,7 +146,7 @@ TEST(GrpcCodecTest, DecodeValidFrameWithInvalidFrameAfterward) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  EXPECT_FALSE(decoder.decode(buffer, frames));
+  EXPECT_EQ(decoder.decode(buffer, frames).code(), absl::StatusCode::kInternal);
   // When the decoder doesn't successfully decode, it puts valid frames up until
   // an invalid frame into output frame vector.
   EXPECT_EQ(1, frames.size());
@@ -162,7 +162,7 @@ TEST(GrpcCodecTest, decodeEmptyFrame) {
 
   Decoder decoder;
   std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  EXPECT_TRUE(decoder.decode(buffer, frames).ok());
 
   EXPECT_EQ(1, frames.size());
   EXPECT_EQ(0, frames[0].length_);
@@ -181,7 +181,7 @@ TEST(GrpcCodecTest, decodeSingleFrame) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  EXPECT_TRUE(decoder.decode(buffer, frames).ok());
   EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(frames.size(), static_cast<uint64_t>(1));
   EXPECT_EQ(GRPC_FH_DEFAULT, frames[0].flags_);
@@ -208,7 +208,7 @@ TEST(GrpcCodecTest, decodeMultipleFrame) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  EXPECT_TRUE(decoder.decode(buffer, frames).ok());
   EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(frames.size(), static_cast<uint64_t>(1009));
   for (Frame& frame : frames) {
@@ -240,7 +240,7 @@ TEST(GrpcCodecTest, decodeSingleFrameOverLimit) {
   decoder.setMaxFrameLength(32 * 1024);
 
   // The decoder doesn't successfully decode due to oversized frame.
-  EXPECT_FALSE(decoder.decode(buffer, frames));
+  EXPECT_EQ(decoder.decode(buffer, frames).code(), absl::StatusCode::kResourceExhausted);
   EXPECT_EQ(buffer.length(), size);
 }
 
@@ -275,7 +275,7 @@ TEST(GrpcCodecTest, decodeSingleFrameWithMultiBuffersOverLimit) {
 
   // Both decoding attempts failed due to the total frame size exceeding the limit.
   for (uint32_t i = 0; i < buffers.size(); ++i) {
-    EXPECT_FALSE(decoder.decode(buffers[i], frames));
+    EXPECT_EQ(decoder.decode(buffers[i], frames).code(), absl::StatusCode::kResourceExhausted);
   }
 
   EXPECT_EQ(frames.size(), 0);
@@ -309,7 +309,7 @@ TEST(GrpcCodecTest, decodeMultipleFramesOverLimit) {
   Decoder decoder;
   decoder.setMaxFrameLength(32 * 1024);
 
-  EXPECT_FALSE(decoder.decode(buffer, frames));
+  EXPECT_EQ(decoder.decode(buffer, frames).code(), absl::StatusCode::kResourceExhausted);
   // When the decoder doesn't successfully decode, it puts valid frames up until
   // an oversized frame into output frame vector.
   ASSERT_EQ(frames.size(), 1);

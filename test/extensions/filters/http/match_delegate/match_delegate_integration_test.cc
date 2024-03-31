@@ -22,7 +22,7 @@ using Envoy::Protobuf::MapPair;
 using Envoy::ProtobufWkt::Any;
 
 class MatchDelegateIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                    public HttpIntegrationTest {
+                                     public HttpIntegrationTest {
 public:
   MatchDelegateIntegrationTest() : HttpIntegrationTest(Envoy::Http::CodecType::HTTP1, GetParam()) {}
   void initialize() override {
@@ -228,7 +228,6 @@ typed_config:
   codec_client_->close();
   second_codec->close();
 }
-
 
 } // namespace
 } // namespace MatchDelegate

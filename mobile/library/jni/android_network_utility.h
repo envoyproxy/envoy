@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "absl/strings/string_view.h"
-#include "library/common/api/c_types.h"
 #include "library/common/extensions/cert_validator/platform_bridge/c_types.h"
 #include "library/jni/import/jni_import.h"
 #include "library/jni/jni_helper.h"
