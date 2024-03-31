@@ -1466,6 +1466,8 @@ def _rules_ruby():
 def _foreign_cc_dependencies():
     external_http_archive(
         name = "rules_foreign_cc",
+        # This patch is needed to fix build on m1 macos.
+        # remove this when https://github.com/bazelbuild/rules_foreign_cc/issues/1186 fixed.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:rules_foreign_cc.patch"],
     )
