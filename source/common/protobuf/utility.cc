@@ -849,6 +849,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     if (message.ParseFromString(contents)) {
       MessageUtil::checkForUnexpectedFields(message, validation_visitor);
     }
+    // Ideally this would throw an error if ParseFromString fails for consistency
+    // but instead it will silently fail.
     return;
   }
 
@@ -865,8 +867,11 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
 #ifdef ENVOY_ENABLE_YAML
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
       absl::EndsWithIgnoreCase(path, FileExtensions::get().Yml)) {
+    // loadFromYaml throws an error if parsing fails.
     loadFromYaml(contents, message, validation_visitor);
   } else {
+    // loadFromJson does not consistently trow an error if parsing fails.
+    // Ideally we would handle that case here.
     loadFromJson(contents, message, validation_visitor);
   }
 #else
