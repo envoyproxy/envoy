@@ -605,8 +605,6 @@ private:
   uint32_t retry_connection_failure_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
-  // If overridden the original buffer limit that will be set back on call of giveUpRetryAndShadow.
-  uint32_t original_buffer_limit_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;
   bool grpc_request_ : 1;

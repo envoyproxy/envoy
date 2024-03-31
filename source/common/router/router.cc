@@ -756,8 +756,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     // limit, so it might goes above this limit.
     retry_connection_failure_buffer_limit_ =
         std::max(retry_shadow_buffer_limit_, 2 * cluster_->perConnectionBufferLimitBytes());
-    original_buffer_limit_ = callbacks_->decoderBufferLimit();
-    callbacks_->setDecoderBufferLimit(retry_connection_failure_buffer_limit_);
   }
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
@@ -855,21 +853,11 @@ void Filter::giveUpRetryAndShadow() {
   retry_state_.reset();
   active_shadow_policies_.clear();
   request_buffer_overflowed_ = true;
-  if (callbacks_->decodingBuffer() != nullptr) {
-    // We previously went over the buffer limit, which pause the read on the downstream connection.
-    // draining the buffer so we enable read on the downstream connection.
-    // This buffer is only used to send the body when retrying and shadowing which has been disable
-    // above.
-    callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
-  }
 }
 
 void Filter::onUpstreamConnectionEstablished() {
   ENVOY_LOG(trace, "Got connection with upstream.");
-  if (wait_for_connect_) {
-    callbacks_->setDecoderBufferLimit(original_buffer_limit_);
-    wait_for_connect_ = false;
-  }
+  wait_for_connect_ = false;
   if (!request_buffer_overflowed_ &&
       getLength(callbacks_->decodingBuffer()) > retry_shadow_buffer_limit_) {
     ENVOY_LOG(debug,
@@ -892,27 +880,38 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   bool buffering = (retry_state_ && retry_state_->enabled()) ||
                    (!active_shadow_policies_.empty() && !streaming_shadows_) ||
                    (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
-  if (buffering && ((!wait_for_connect_ && getLength(callbacks_->decodingBuffer()) + data.length() >
-                                               retry_shadow_buffer_limit_) ||
-                    (wait_for_connect_ && getLength(callbacks_->decodingBuffer()) + data.length() >
-                                              retry_connection_failure_buffer_limit_))) {
-    ENVOY_LOG(debug,
-              "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
-              "up on the retry/shadow.",
-              getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
-    buffering = false;
-    giveUpRetryAndShadow();
+  if (buffering &&
+      getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
+    // Currently waiting to get a connection with the upstream. Increase the buffer limit
+    // accordingly.
+    if (wait_for_connect_ && getLength(callbacks_->decodingBuffer()) + data.length() <
+                                 retry_connection_failure_buffer_limit_) {
+      // Increasing buffer limit if necessary.
+      if (callbacks_->decoderBufferLimit() <=
+          getLength(callbacks_->decodingBuffer()) + data.length()) {
+        callbacks_->setDecoderBufferLimit(retry_connection_failure_buffer_limit_);
+      }
 
-    // If we had to abandon buffering and there's no request in progress, abort the request and
-    // clean up. This happens if the initial upstream request failed, and we are currently waiting
-    // for a backoff timer before starting the next upstream attempt.
-    if (upstream_requests_.empty()) {
-      cleanup();
-      callbacks_->sendLocalReply(
-          Http::Code::InsufficientStorage, "exceeded request buffer limit while retrying upstream",
-          modify_headers_, absl::nullopt,
-          StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit);
-      return Http::FilterDataStatus::StopIterationNoBuffer;
+    } else {
+      ENVOY_LOG(
+          debug,
+          "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
+          "up on the retry/shadow.",
+          getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
+      buffering = false;
+      giveUpRetryAndShadow();
+
+      // If we had to abandon buffering and there's no request in progress, abort the request and
+      // clean up. This happens if the initial upstream request failed, and we are currently waiting
+      // for a backoff timer before starting the next upstream attempt.
+      if (upstream_requests_.empty()) {
+        cleanup();
+        callbacks_->sendLocalReply(
+            Http::Code::InsufficientStorage,
+            "exceeded request buffer limit while retrying upstream", modify_headers_, absl::nullopt,
+            StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit);
+        return Http::FilterDataStatus::StopIterationNoBuffer;
+      }
     }
   }
 
