@@ -43,14 +43,8 @@ ReusableFilterFactory::newFilter(FilterConfigSharedPtr config,
 }
 
 absl::StatusOr<std::unique_ptr<Filter>> ReusableFuzzerUtil::setup(
-    const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input,
+    const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCaseBase& input,
     Filters::Common::ExtAuthz::ClientPtr client) {
-  try {
-    TestUtility::validate(input);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
-    return absl::InvalidArgumentError(absl::StrCat("EnvoyException during validation: ", e.what()));
-  }
 
   // Prepare filter.
   const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config = input.config();
