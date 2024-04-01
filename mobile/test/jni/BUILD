@@ -14,6 +14,7 @@ cc_library(
         "//library/jni:envoy_jni_lib",
         "@envoy_build_config//:test_extensions",
     ],
+    alwayslink = True,
 )
 
 # Library which contains all the JNI related targets.
