@@ -892,6 +892,24 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
         upstream_connection_pool_callback_duration_format.formatValueWithContext({}, stream_info),
         ProtoEq(ValueUtil::numberValue(15.0)));
   }
+
+  {
+    StreamInfoFormatter trace_format("TRACE_ID");
+    EXPECT_CALL(stream_info, traceId()).WillRepeatedly(Return("ae0046f9075194306d7de2931bd38ce3"));
+
+    EXPECT_EQ("ae0046f9075194306d7de2931bd38ce3", trace_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(trace_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("ae0046f9075194306d7de2931bd38ce3")));
+  }
+
+  {
+    StreamInfoFormatter trace_format("SPAN_ID");
+    EXPECT_CALL(stream_info, spanId()).WillRepeatedly(Return("ceb177d18b22ee6c"));
+
+    EXPECT_EQ("ceb177d18b22ee6c", trace_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(trace_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("ceb177d18b22ee6c")));
+  }
 }
 
 TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {

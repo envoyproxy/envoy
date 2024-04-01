@@ -155,6 +155,10 @@ public:
   MOCK_METHOD(void, setStreamIdProvider, (StreamIdProviderSharedPtr provider));
   MOCK_METHOD(void, setTraceReason, (Tracing::Reason reason));
   MOCK_METHOD(Tracing::Reason, traceReason, (), (const));
+  MOCK_METHOD(void, setTraceId, (std::string trace_id));
+  MOCK_METHOD(std::string, traceId, (), (const));
+  MOCK_METHOD(void, setSpanId, (std::string span_id));
+  MOCK_METHOD(std::string, spanId, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const));
   MOCK_METHOD(void, setConnectionID, (uint64_t));
   MOCK_METHOD(void, setAttemptCount, (uint32_t), ());
