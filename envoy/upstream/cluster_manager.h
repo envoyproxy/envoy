@@ -503,6 +503,8 @@ public:
 
   /**
    * Allocate a cluster manager from configuration proto.
+   * The cluster manager init() method needs to be called right after this method.
+   * Please check https://github.com/envoyproxy/envoy/issues/33218 for details.
    */
   virtual ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
