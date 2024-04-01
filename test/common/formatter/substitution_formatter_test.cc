@@ -916,14 +916,14 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     std::vector<std::string> time_points{
-        "FIRST_DOWNSTREAM_RX_BYTE_RECEIVED",
-        "LAST_DOWNSTREAM_RX_BYTE_RECEIVED",
-        "FIRST_UPSTREAM_TX_BYTE_SENT",
-        "LAST_UPSTREAM_TX_BYTE_SENT",
-        "FIRST_UPSTREAM_RX_BYTE_RECEIVED",
-        "LAST_UPSTREAM_RX_BYTE_RECEIVED",
-        "FIRST_DOWNSTREAM_TX_BYTE_SENT",
-        "LAST_DOWNSTREAM_TX_BYTE_SENT",
+        "DS_RX_BEG",
+        "DS_RX_END",
+        "US_TX_BEG",
+        "US_TX_END",
+        "US_RX_BEG",
+        "US_RX_END",
+        "DS_TX_BEG",
+        "DS_TX_END",
         "custom_time_point",
     };
 
@@ -959,46 +959,46 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
       NiceMock<StreamInfo::MockStreamInfo> stream_info;
       MockTimeSystem time_system;
 
-      // FIRST_DOWNSTREAM_RX_BYTE_RECEIVED
+      // DS_RX_BEG
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(1000000))));
       stream_info.start_time_monotonic_ = time_system.monotonicTime();
 
-      // LAST_DOWNSTREAM_RX_BYTE_RECEIVED
+      // DS_RX_END
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(2000000))));
       stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
-      // FIRST_UPSTREAM_TX_BYTE_SENT
+      // US_TX_BEG
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(3000000))));
       stream_info.upstream_info_->upstreamTiming().first_upstream_tx_byte_sent_ =
           time_system.monotonicTime();
 
-      // LAST_UPSTREAM_TX_BYTE_SENT
+      // US_TX_END
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(4000000))));
       stream_info.upstream_info_->upstreamTiming().last_upstream_tx_byte_sent_ =
           time_system.monotonicTime();
 
-      // FIRST_UPSTREAM_RX_BYTE_RECEIVED
+      // US_RX_BEG
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
       stream_info.upstream_info_->upstreamTiming().first_upstream_rx_byte_received_ =
           time_system.monotonicTime();
 
-      // LAST_UPSTREAM_RX_BYTE_RECEIVED
+      // US_RX_END
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(6000000))));
       stream_info.upstream_info_->upstreamTiming().last_upstream_rx_byte_received_ =
           time_system.monotonicTime();
 
-      // FIRST_DOWNSTREAM_TX_BYTE_SENT
+      // DS_TX_BEG
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(7000000))));
       stream_info.downstream_timing_.onFirstDownstreamTxByteSent(time_system);
 
-      // LAST_DOWNSTREAM_TX_BYTE_SENT
+      // DS_TX_END
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(8000000))));
       stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);

@@ -127,9 +127,9 @@ public:
 
   static std::unique_ptr<CommonDurationFormatter> create(absl::string_view sub_command);
 
-  CommonDurationFormatter(TimePointGetter start, TimePointGetter end,
+  CommonDurationFormatter(TimePointGetter beg, TimePointGetter end,
                           DurationPrecision duration_precision)
-      : time_point_start_(std::move(start)), time_point_end_(std::move(end)),
+      : time_point_beg_(std::move(beg)), time_point_end_(std::move(end)),
         duration_precision_(duration_precision) {}
 
   // StreamInfoFormatterProvider
@@ -148,23 +148,23 @@ private:
   static constexpr absl::string_view NanosecondsPrecision = "NS";
 
   static constexpr absl::string_view FirstDownstreamRxByteReceived =
-      "FIRST_DOWNSTREAM_RX_BYTE_RECEIVED"; // Receive downstream request start.
+      "DS_RX_BEG"; // Downstream request receiving begin.
   static constexpr absl::string_view LastDownstreamRxByteReceived =
-      "LAST_DOWNSTREAM_RX_BYTE_RECEIVED"; // Receive Downstream request end.
+      "DS_RX_END"; // Downstream request receiving end.
   static constexpr absl::string_view FirstUpstreamTxByteSent =
-      "FIRST_UPSTREAM_TX_BYTE_SENT"; // Send upstream request start.
+      "US_TX_BEG"; // Upstream request sending begin.
   static constexpr absl::string_view LastUpstreamTxByteSent =
-      "LAST_UPSTREAM_TX_BYTE_SENT"; // Send upstream request end.
+      "US_TX_END"; // Upstream request sending end.
   static constexpr absl::string_view FirstUpstreamRxByteReceived =
-      "FIRST_UPSTREAM_RX_BYTE_RECEIVED"; // Receive upstream response start.
+      "US_RX_BEG"; // Upstream response receiving begin.
   static constexpr absl::string_view LastUpstreamRxByteReceived =
-      "LAST_UPSTREAM_RX_BYTE_RECEIVED"; // Receive upstream response end.
+      "US_RX_END"; // Upstream response receiving end.
   static constexpr absl::string_view FirstDownstreamTxByteSent =
-      "FIRST_DOWNSTREAM_TX_BYTE_SENT"; // Send downstream response start.
+      "DS_TX_BEG"; // Downstream response sending begin.
   static constexpr absl::string_view LastDownstreamTxByteSent =
-      "LAST_DOWNSTREAM_TX_BYTE_SENT"; // Send downstream response end.
+      "DS_TX_END"; // Downstream response sending end.
 
-  TimePointGetter time_point_start_;
+  TimePointGetter time_point_beg_;
   TimePointGetter time_point_end_;
   DurationPrecision duration_precision_;
 };

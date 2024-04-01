@@ -401,15 +401,15 @@ The following command operators are supported:
     Total duration between the START time point and the END time point in specific PRECISION.
     The START and END time points are specified by the following values:
 
-    * ``FIRST_DOWNSTREAM_RX_BYTE_RECEIVED``: The time point of the first byte of downstream request is received. Same as ``START``.
-    * ``LAST_DOWNSTREAM_RX_BYTE_RECEIVED``: The time point of the last byte of downstream request is received.
-    * ``FIRST_UPSTREAM_TX_BYTE_SENT``: The time point of the first byte of upstream request is sent.
-    * ``LAST_UPSTREAM_TX_BYTE_SENT``: The time point of the last byte of upstream request is sent.
-    * ``FIRST_UPSTREAM_RX_BYTE_RECEIVED``: The time point of the first byte of upstream response is received.
-    * ``LAST_UPSTREAM_RX_BYTE_RECEIVED``: The time point of the last byte of upstream response is received.
-    * ``FIRST_DOWNSTREAM_TX_BYTE_SENT``: The time point of the first byte of downstream response is sent.
-    * ``LAST_DOWNSTREAM_TX_BYTE_SENT``: The time point of the last byte of downstream response is sent.
-    * Dynamic value: Any other values will be treated as custom time points that set by named keys in the downstream timing.
+    * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
+    * ``DS_RX_END``: The time point of the downstream request receiving end.
+    * ``US_TX_BEG``: The time point of the upstream request sending begin.
+    * ``US_TX_END``: The time point of the upstream request sending end.
+    * ``US_RX_BEG``: The time point of the upstream response receiving begin.
+    * ``US_RX_END``: The time point of the upstream response receiving end.
+    * ``DS_TX_BEG``: The time point of the downstream response sending begin.
+    * ``DS_TX_END``: The time point of the downstream response sending end.
+    * Dynamic value: Other values will be treated as custom time points that set by named keys.
 
     The PRECISION is specified by the following values:
 

@@ -432,18 +432,18 @@ CommonDurationFormatter::create(absl::string_view sub_command) {
 
 absl::optional<uint64_t>
 CommonDurationFormatter::getDurationCount(const StreamInfo::StreamInfo& info) const {
-  auto time_point_start = time_point_start_(info);
+  auto time_point_beg = time_point_beg_(info);
   auto time_point_end = time_point_end_(info);
 
-  if (!time_point_start.has_value() || !time_point_end.has_value()) {
+  if (!time_point_beg.has_value() || !time_point_end.has_value()) {
     return absl::nullopt;
   }
 
-  if (time_point_end.value() < time_point_start.value()) {
+  if (time_point_end.value() < time_point_beg.value()) {
     return absl::nullopt;
   }
 
-  auto duration = time_point_end.value() - time_point_start.value();
+  auto duration = time_point_end.value() - time_point_beg.value();
 
   switch (duration_precision_) {
   case DurationPrecision::Milliseconds:
