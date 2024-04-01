@@ -98,6 +98,9 @@ minor_behavior_changes:
   change: |
     Delta SDS removals will no longer result in a "Missing SDS resources" NACK
     and instead will be ignored.
+- area: golang
+  change: |
+    Not implicitly clearing route cache in ``HeaderMap.Set``, introduce a new API ``ClearRouteCache`` to do it.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
