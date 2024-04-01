@@ -143,9 +143,9 @@ private:
 
   static TimePointGetter getTimePointGetterByName(absl::string_view name);
 
-  static constexpr absl::string_view MillisecondsPrecision = "MS";
-  static constexpr absl::string_view MicrosecondsPrecision = "US";
-  static constexpr absl::string_view NanosecondsPrecision = "NS";
+  static constexpr absl::string_view MillisecondsPrecision = "ms";
+  static constexpr absl::string_view MicrosecondsPrecision = "us";
+  static constexpr absl::string_view NanosecondsPrecision = "ns";
 
   static constexpr absl::string_view FirstDownstreamRxByteReceived =
       "DS_RX_BEG"; // Downstream request receiving begin.

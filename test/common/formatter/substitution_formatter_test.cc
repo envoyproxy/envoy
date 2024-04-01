@@ -920,7 +920,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
         "US_RX_END", "DS_TX_BEG", "DS_TX_END", "custom_time_point",
     };
 
-    std::vector<std::string> precisions{"MS", "US", "NS"};
+    std::vector<std::string> precisions{"ms", "us", "ns"};
 
     // No time points set.
     {

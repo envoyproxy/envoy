@@ -413,9 +413,9 @@ The following command operators are supported:
 
     The PRECISION is specified by the following values:
 
-    * ``MS``: Millisecond precision.
-    * ``US``: Microsecond precision.
-    * ``NS``: Nanosecond precision.
+    * ``ms``: Millisecond precision.
+    * ``us``: Microsecond precision.
+    * ``ns``: Nanosecond precision.
 
   TCP/UDP
     Not implemented ("-").
