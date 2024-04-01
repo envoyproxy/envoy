@@ -388,6 +388,9 @@ new_features:
   change: |
     Added support for populating the :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`
     check request attribute for network ext_authz by setting :ref:`include_tls_session <config_network_filters_ext_authz>` to true.
+- area: gcp_authn
+  change: |
+    Added :ref:`audience_provider <envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.audience_provider>` to configure where to retrieve the audience URL for the receiving service for authentication.
 
 deprecated:
 - area: listener
