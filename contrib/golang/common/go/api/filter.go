@@ -156,8 +156,8 @@ type StreamFilterCallbacks interface {
 
 type FilterCallbacks interface {
 	StreamFilterCallbacks
-	// ClearRouteCache clears the route cache for the current request,
-	// and filtermanager will re-fetch the route in the next filter.
+	// ClearRouteCache clears the route cache for the current request, and filtermanager will re-fetch the route in the next filter.
+	// Please be careful to invoke it, since filtermanager will raise an 404 route_not_found response when failed to re-fetch a route.
 	ClearRouteCache()
 	// Continue or SendLocalReply should be last API invoked, no more code after them.
 	Continue(StatusType)
