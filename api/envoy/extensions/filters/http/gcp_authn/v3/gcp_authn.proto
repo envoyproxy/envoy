@@ -51,7 +51,7 @@ message GcpAuthnFilterConfig {
   AudienceProvider audience_provider = 5 [(validate.rules).enum = {defined_only: true}];
 
   // Setting this is required when the audience provider is
-  // :ref:`REQUEST_HEADER<envoy_api_enum_value_GcpAuthnFilterConfig.AudienceProvider.REQUEST_HEADER>`.
+  // :ref:`REQUEST_HEADER<envoy_v3_api_enum_value_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.AudienceProvider.REQUEST_HEADER>`.
   //
   // The value of this request header will be used as the audience URL of the
   // receiving service.
