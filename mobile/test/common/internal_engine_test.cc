@@ -1,3 +1,5 @@
+#include <sys/resource.h>
+
 #include <atomic>
 
 #include "source/common/common/assert.h"
@@ -214,8 +216,8 @@ TEST_F(InternalEngineTest, AccessEngineAfterInitialization) {
 
 TEST_F(InternalEngineTest, RecordCounter) {
   EngineTestContext test_context{};
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
 
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -234,8 +236,8 @@ TEST_F(InternalEngineTest, Logger) {
     }
   };
   logger->on_exit = [&] { test_context.on_log_exit.Notify(); };
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), std::move(logger), {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), std::move(logger), /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
@@ -250,8 +252,8 @@ TEST_F(InternalEngineTest, Logger) {
 TEST_F(InternalEngineTest, EventTrackerRegistersDefaultAPI) {
   EngineTestContext test_context{};
 
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, nullptr));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   // A default event tracker is registered in external API registry.
@@ -280,8 +282,8 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAPI) {
     }
   };
 
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, std::move(event_tracker)));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, std::move(event_tracker));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -307,8 +309,8 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
     }
   };
 
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, std::move(event_tracker)));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, std::move(event_tracker));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -334,8 +336,8 @@ TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
     }
   };
 
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, std::move(event_tracker)));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, std::move(event_tracker));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -352,8 +354,8 @@ TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
 
 TEST_F(InternalEngineTest, BasicStream) {
   EngineTestContext test_context{};
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(BUFFERED_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
@@ -405,8 +407,8 @@ TEST_F(InternalEngineTest, ResetStream) {
   EngineTestContext test_context{};
   // There is nothing functional about the config used to run the engine, as the created stream is
   // immediately reset.
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
@@ -442,8 +444,8 @@ TEST_F(InternalEngineTest, ResetStream) {
 TEST_F(InternalEngineTest, RegisterPlatformApi) {
   EngineTestContext test_context{};
   // Using the minimal envoy mobile config that allows for running the engine.
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
@@ -458,8 +460,8 @@ TEST_F(InternalEngineTest, RegisterPlatformApi) {
 
 TEST_F(InternalEngineTest, ResetConnectivityState) {
   EngineTestContext test_context{};
-  std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
@@ -474,11 +476,86 @@ TEST_F(InternalEngineTest, ThreadCreationFailed) {
   auto thread_factory = std::make_unique<Thread::MockPosixThreadFactory>();
   EXPECT_CALL(*thread_factory, createThread(_, _, false)).WillOnce(Return(ByMove(nullptr)));
   std::unique_ptr<InternalEngine> engine(new InternalEngine(
-      createDefaultEngineCallbacks(test_context), {}, {}, std::move(thread_factory)));
+      createDefaultEngineCallbacks(test_context), {}, {}, {}, std::move(thread_factory)));
   envoy_status_t status = engine->run(BUFFERED_TEST_CONFIG, LEVEL_DEBUG);
   EXPECT_EQ(status, ENVOY_FAILURE);
   // Calling `terminate()` should not crash.
   EXPECT_EQ(engine->terminate(), ENVOY_FAILURE);
+}
+
+class ThreadPriorityInternalEngineTest : public InternalEngineTest {
+protected:
+  // Starts an InternalEngine with the given priority and runs a request so the engine thread
+  // priority can be retrieved.
+  // Returns the engine's main thread priority.
+  int startEngineWithPriority(const int thread_priority) {
+    EngineTestContext test_context{};
+    std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+        createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr,
+        thread_priority);
+    engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
+
+    struct CallbackContext {
+      absl::Notification on_complete_notification;
+      int thread_priority = 0;
+    };
+
+    CallbackContext context;
+    envoy_http_callbacks stream_cbs{
+        [](envoy_headers c_headers, bool, envoy_stream_intel, void* context) -> void {
+          release_envoy_map(c_headers);
+          // Gets the thread priority, so we can check that it's the same thread priority we set.
+          auto* callback_context = static_cast<CallbackContext*>(context);
+          callback_context->thread_priority = getpriority(PRIO_PROCESS, 0);
+        } /* on_headers */,
+        nullptr /* on_data */,
+        nullptr /* on_metadata */,
+        nullptr /* on_trailers */,
+        nullptr /* on_error */,
+        [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void {
+          auto* callback_context = static_cast<CallbackContext*>(context);
+          callback_context->on_complete_notification.Notify();
+        } /* on_complete */,
+        nullptr /* on_cancel */,
+        nullptr /* on_send_window_available*/,
+        &context};
+
+    Http::TestRequestHeaderMapImpl headers;
+    HttpTestUtility::addDefaultHeaders(headers);
+    envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
+
+    Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+    envoy_data c_data = Data::Utility::toBridgeData(request_data);
+
+    envoy_stream_t stream = engine->initStream();
+    engine->startStream(stream, stream_cbs, false);
+    engine->sendHeaders(stream, c_headers, false);
+    engine->sendData(stream, c_data, true);
+
+    EXPECT_TRUE(context.on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
+    engine->terminate();
+    EXPECT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
+
+    return context.thread_priority;
+  }
+};
+
+TEST_F(ThreadPriorityInternalEngineTest, SetThreadPriority) {
+  const int expected_thread_priority = 10;
+  const int actual_thread_priority = startEngineWithPriority(expected_thread_priority);
+  EXPECT_EQ(actual_thread_priority, expected_thread_priority);
+}
+
+TEST_F(ThreadPriorityInternalEngineTest, SetOutOfRangeThreadPriority) {
+  // 42 is outside the range of acceptable thread priorities.
+  const int expected_thread_priority = 42;
+  const int actual_thread_priority = startEngineWithPriority(expected_thread_priority);
+  // The `setpriority` system call doesn't define what happens when the thread priority is out of
+  // range, and the behavior could be system dependent. On Linux, if the supplied priority value
+  // is greater than 19, then the thread priority value that gets set is 19. But since the behavior
+  // could be system dependent, we just verify that the thread priority that gets set is not the
+  // out-of-range one that we initialiazed the engine with.
+  EXPECT_NE(actual_thread_priority, expected_thread_priority);
 }
 
 } // namespace Envoy

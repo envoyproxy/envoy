@@ -4,6 +4,8 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/config/core/v3/http_service.pb.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/extensions/tracers/opentelemetry/samplers/v3/dynatrace_sampler.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
@@ -65,7 +67,7 @@ private:
   Event::TimerPtr timer_;
   Upstream::ClusterManager& cluster_manager_;
   envoy::config::core::v3::HttpUri http_uri_;
-  const std::string authorization_header_value_;
+  std::vector<std::pair<const Http::LowerCaseString, const std::string>> parsed_headers_to_add_;
   Http::AsyncClient::Request* active_request_{};
   SamplerConfig sampler_config_;
 };

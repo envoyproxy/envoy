@@ -30,7 +30,7 @@ class RocketmqFilterConfigTestBase {
 public:
   void testConfig(RocketmqProxyProto& config) {
     Network::FilterFactoryCb cb;
-    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
+    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_).value(); });
     Network::MockConnection connection;
     EXPECT_CALL(connection, addReadFilter(_));
     cb(connection);
@@ -48,8 +48,10 @@ public:
 TEST_F(RocketmqFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(
-      RocketmqProxyFilterConfigFactory().createFilterFactoryFromProto(
-          envoy::extensions::filters::network::rocketmq_proxy::v3::RocketmqProxy(), context),
+      RocketmqProxyFilterConfigFactory()
+          .createFilterFactoryFromProto(
+              envoy::extensions::filters::network::rocketmq_proxy::v3::RocketmqProxy(), context)
+          .IgnoreError(),
       ProtoValidationException);
 }
 
@@ -58,7 +60,7 @@ TEST_F(RocketmqFilterConfigTest, ValidProtoConfiguration) {
   config.set_stat_prefix("my_stat_prefix");
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RocketmqProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -71,7 +73,7 @@ TEST_F(RocketmqFilterConfigTest, RocketmqProxyWithEmptyProto) {
       *dynamic_cast<envoy::extensions::filters::network::rocketmq_proxy::v3::RocketmqProxy*>(
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("my_stat_prefix");
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

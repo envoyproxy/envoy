@@ -7,6 +7,26 @@ namespace JNI {
 
 JNIEnv* JniHelper::getEnv() { return env_; }
 
+jfieldID JniHelper::getFieldId(jclass clazz, const char* name, const char* signature) {
+  jfieldID field_id = env_->GetFieldID(clazz, name, signature);
+  rethrowException();
+  return field_id;
+}
+
+#define DEFINE_GET_FIELD(JAVA_TYPE, JNI_TYPE)                                                      \
+  JNI_TYPE JniHelper::get##JAVA_TYPE##Field(jobject object, jfieldID field_id) {                   \
+    return env_->Get##JAVA_TYPE##Field(object, field_id);                                          \
+  }
+
+DEFINE_GET_FIELD(Byte, jbyte)
+DEFINE_GET_FIELD(Char, jchar)
+DEFINE_GET_FIELD(Short, jshort)
+DEFINE_GET_FIELD(Int, jint)
+DEFINE_GET_FIELD(Long, jlong)
+DEFINE_GET_FIELD(Float, jfloat)
+DEFINE_GET_FIELD(Double, jdouble)
+DEFINE_GET_FIELD(Boolean, jboolean)
+
 jmethodID JniHelper::getMethodId(jclass clazz, const char* name, const char* signature) {
   jmethodID method_id = env_->GetMethodID(clazz, name, signature);
   rethrowException();

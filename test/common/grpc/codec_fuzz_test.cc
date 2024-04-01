@@ -59,7 +59,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
             : provider.ConsumeIntegralInRange<uint64_t>(0, wire_buffer.length());
     Buffer::OwnedImpl decode_buffer;
     decode_buffer.move(wire_buffer, decode_length);
-    const bool decode_result = decoder.decode(decode_buffer, frames);
+    const absl::Status decode_result = decoder.decode(decode_buffer, frames);
     // If we have recovered the original frames, we're decoding garbage. It
     // might end up being a valid frame, but there is no predictability, so just
     // drain and move on. If we haven't recovered the original frames, we
@@ -67,7 +67,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     if (frames.size() >= num_encode_frames) {
       decode_buffer.drain(decode_buffer.length());
     } else {
-      FUZZ_ASSERT(decode_result);
+      FUZZ_ASSERT(decode_result.ok());
       FUZZ_ASSERT(decode_buffer.length() == 0);
     }
   }

@@ -217,10 +217,10 @@ TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
   repeated.Add()->set_value(10);
   EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[value:\\s*10\n\\]"));
+              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n\\]"));
   repeated.Add()->set_value(20);
   EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[value:\\s*10\n, value:\\s*20\n\\]"));
+              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n,.*[\n]*value:\\s*20\n\\]"));
 }
 
 // Validated exception thrown when downcastAndValidate observes a PGV failures.
@@ -1455,7 +1455,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   source_any.PackFrom(source_duration);
   EXPECT_THROW_WITH_REGEX(
       TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any), EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 // Validated exception thrown when anyConvertAndValidate observes a PGV failures.
@@ -1477,7 +1477,7 @@ TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Timestamp dst;
   EXPECT_THROW_WITH_REGEX(
       MessageUtil::unpackToOrThrow(source_any, dst), EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 // MessageUtility::unpackToOrThrow() with API message works at same version.
@@ -1523,9 +1523,10 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   ProtobufWkt::Timestamp dst;
   auto status = MessageUtil::unpackTo(source_any, dst);
   EXPECT_TRUE(absl::IsInternal(status));
-  EXPECT_THAT(std::string(status.message()),
-              testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
-                                     "\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
+  EXPECT_THAT(
+      std::string(status.message()),
+      testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
+                             ".*[\n]*\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
 }
 
 // MessageUtility::loadFromJson() throws on garbage JSON.
@@ -2289,6 +2290,119 @@ TEST_F(ProtobufUtilityTest, SubsequentLoadClearsExistingProtoValues) {
   EXPECT_TRUE(obj.foo().empty());
   EXPECT_TRUE(obj.bar().empty());
   EXPECT_EQ(obj.baz(), 2);
+}
+
+// Validate that Equals and Equivalent have the same behavior with respect to
+// out of order repeated fields.
+TEST_F(ProtobufUtilityTest, CompareRepeatedFields) {
+  utility_test::message_field_wip::RepeatedField message1;
+  utility_test::message_field_wip::RepeatedField same_order;
+  utility_test::message_field_wip::RepeatedField different_order;
+
+  utility_test::message_field_wip::MultipleFields element1;
+  element1.set_foo("foo");
+  element1.set_bar("bar");
+  element1.set_baz(57);
+  utility_test::message_field_wip::MultipleFields element2;
+  element2.set_foo("foo1");
+  element2.set_bar("bar1");
+  element2.set_baz(25597);
+  utility_test::message_field_wip::MultipleFields element3;
+  element3.set_foo("foo99");
+  element3.set_bar("678bar");
+  element3.set_baz(985734);
+
+  *message1.add_repeated_multiple_fields() = element1;
+  *message1.add_repeated_multiple_fields() = element2;
+  *message1.add_repeated_multiple_fields() = element3;
+
+  *same_order.add_repeated_multiple_fields() = element1;
+  *same_order.add_repeated_multiple_fields() = element2;
+  *same_order.add_repeated_multiple_fields() = element3;
+
+  // Swap element 2 and 3
+  *different_order.add_repeated_multiple_fields() = element1;
+  *different_order.add_repeated_multiple_fields() = element3;
+  *different_order.add_repeated_multiple_fields() = element2;
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(message1, same_order));
+  EXPECT_FALSE(Protobuf::util::MessageDifferencer::Equals(message1, different_order));
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, same_order));
+  EXPECT_FALSE(Protobuf::util::MessageDifferencer::Equivalent(message1, different_order));
+}
+
+// Validate that order of insertion into a map does not influence results of
+// Equals and Equivalent calls.
+TEST_F(ProtobufUtilityTest, CompareMapFieldsCpp) {
+  utility_test::message_field_wip::MapField message1;
+  utility_test::message_field_wip::MapField same_order;
+  utility_test::message_field_wip::MapField different_order;
+
+  (*message1.mutable_map_field())["foo"] = "bar";
+  (*message1.mutable_map_field())["foo1"] = "bar1";
+  (*message1.mutable_map_field())["foo2"] = "bar2";
+
+  (*same_order.mutable_map_field())["foo"] = "bar";
+  (*same_order.mutable_map_field())["foo1"] = "bar1";
+  (*same_order.mutable_map_field())["foo2"] = "bar2";
+
+  (*different_order.mutable_map_field())["foo"] = "bar";
+  (*different_order.mutable_map_field())["foo2"] = "bar2";
+  (*different_order.mutable_map_field())["foo1"] = "bar1";
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(message1, same_order));
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(message1, different_order));
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, same_order));
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, different_order));
+}
+
+// Validate that proto maps that were deserialized from wire representations with
+// different orders still produce the same result in the Equals and Equivalent
+// methods.
+TEST_F(ProtobufUtilityTest, CompareMapFieldsWire) {
+  utility_test::message_field_wip::StringMapWireCompatible::MapFieldEntry entry1;
+  entry1.set_key("foo");
+  entry1.set_value("bar");
+  utility_test::message_field_wip::StringMapWireCompatible::MapFieldEntry entry2;
+  entry2.set_key("foo1");
+  entry2.set_value("bar1");
+  utility_test::message_field_wip::StringMapWireCompatible::MapFieldEntry entry3;
+  entry3.set_key("foo2");
+  entry3.set_value("bar2");
+
+  utility_test::message_field_wip::StringMapWireCompatible wire_map1;
+  *wire_map1.add_entries() = entry1;
+  *wire_map1.add_entries() = entry2;
+  *wire_map1.add_entries() = entry3;
+  std::string wire_bytes1;
+  EXPECT_TRUE(wire_map1.SerializeToString(&wire_bytes1));
+
+  utility_test::message_field_wip::StringMapWireCompatible wire_map2;
+  *wire_map2.add_entries() = entry2;
+  *wire_map2.add_entries() = entry3;
+  *wire_map2.add_entries() = entry1;
+  std::string wire_bytes2;
+  EXPECT_TRUE(wire_map2.SerializeToString(&wire_bytes2));
+
+  // The MapField and StringMapWireCompatible are wire compatible per
+  // https://protobuf.dev/programming-guides/proto3/#backwards
+  utility_test::message_field_wip::MapField message1;
+  EXPECT_TRUE(message1.ParseFromString(wire_bytes1));
+  EXPECT_EQ(message1.map_field_size(), 3);
+  utility_test::message_field_wip::MapField same_order;
+  EXPECT_TRUE(same_order.ParseFromString(wire_bytes1));
+  // Parse different_order proto from wire bytes with elements in a different order from wire_bytes1
+  utility_test::message_field_wip::MapField different_order;
+  EXPECT_TRUE(different_order.ParseFromString(wire_bytes2));
+  EXPECT_EQ(different_order.map_field_size(), 3);
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(message1, same_order));
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(message1, different_order));
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, same_order));
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, different_order));
 }
 
 } // namespace Envoy

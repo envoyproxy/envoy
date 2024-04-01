@@ -44,6 +44,14 @@ NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>
 
 bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
 
+// Convenience function.
+void headerMapAddHeader(envoy::config::core::v3::HeaderMap& mutable_header_map,
+                        const std::string& key, const std::string& value) {
+  auto* new_header = mutable_header_map.mutable_headers()->Add();
+  new_header->set_key(key);
+  new_header->set_raw_value(value);
+}
+
 void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeContext::Peer& peer,
                                            const Network::Connection& connection,
                                            const std::string& service, const bool local,
@@ -120,7 +128,7 @@ void CheckRequestUtils::setHttpRequest(
     envoy::service::auth::v3::AttributeContext::HttpRequest& httpreq, uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
     const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes,
-    const MatcherSharedPtr& request_header_matchers) {
+    bool encode_raw_headers, const MatcherSharedPtr& request_header_matchers) {
   httpreq.set_id(std::to_string(stream_id));
   httpreq.set_method(getHeaderStr(headers.Method()));
   httpreq.set_path(getHeaderStr(headers.Path()));
@@ -133,26 +141,35 @@ void CheckRequestUtils::setHttpRequest(
   }
 
   // Fill in the headers.
-  auto* mutable_headers = httpreq.mutable_headers();
+  auto* mutable_headers = !encode_raw_headers ? httpreq.mutable_headers() : nullptr;
+  // Calling mutable_header_map() creates the field in the request; only do so when necessary.
+  auto* mutable_header_map = encode_raw_headers ? httpreq.mutable_header_map() : nullptr;
 
-  headers.iterate([request_header_matchers, mutable_headers](const Envoy::Http::HeaderEntry& e) {
+  headers.iterate([encode_raw_headers, request_header_matchers, mutable_headers,
+                   mutable_header_map](const Envoy::Http::HeaderEntry& e) {
     // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
-    if (e.key().getStringView() != Headers::get().EnvoyAuthPartialBody.get()) {
+    if (e.key().getStringView() == Headers::get().EnvoyAuthPartialBody.get()) {
+      return Envoy::Http::HeaderMap::Iterate::Continue;
+    }
+
+    const std::string key(e.key().getStringView());
+    if (request_header_matchers != nullptr && !request_header_matchers->matches(key)) {
+      return Envoy::Http::HeaderMap::Iterate::Continue;
+    }
+
+    if (encode_raw_headers) {
+      headerMapAddHeader(*mutable_header_map, key, std::string(e.value().getStringView()));
+    } else {
       const std::string sanitized_value =
           MessageUtil::sanitizeUtf8String(e.value().getStringView());
 
-      const std::string key(e.key().getStringView());
-
-      if (request_header_matchers == nullptr || request_header_matchers->matches(key)) {
-        if (mutable_headers->find(key) == mutable_headers->end()) {
-          (*mutable_headers)[key] = sanitized_value;
-        } else {
-          // Merge duplicate headers.
-          (*mutable_headers)[key].append(",").append(sanitized_value);
-        }
+      if (mutable_headers->find(key) == mutable_headers->end()) {
+        (*mutable_headers)[key] = sanitized_value;
+      } else {
+        // Merge duplicate headers.
+        (*mutable_headers)[key].append(",").append(sanitized_value);
       }
     }
-
     return Envoy::Http::HeaderMap::Iterate::Continue;
   });
 
@@ -172,8 +189,18 @@ void CheckRequestUtils::setHttpRequest(
     }
 
     // Add in a header to detect when a partial body is used.
-    (*mutable_headers)[Headers::get().EnvoyAuthPartialBody.get()] =
-        length != decoding_buffer->length() ? "true" : "false";
+    std::string partial_body_value;
+    if (length != decoding_buffer->length()) {
+      partial_body_value = "true";
+    } else {
+      partial_body_value = "false";
+    }
+    if (encode_raw_headers) {
+      headerMapAddHeader(*mutable_header_map, Headers::get().EnvoyAuthPartialBody.get(),
+                         partial_body_value);
+    } else {
+      (*mutable_headers)[Headers::get().EnvoyAuthPartialBody.get()] = std::move(partial_body_value);
+    }
   }
 }
 
@@ -181,10 +208,10 @@ void CheckRequestUtils::setAttrContextRequest(
     envoy::service::auth::v3::AttributeContext::Request& req, const uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
     const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes,
-    const MatcherSharedPtr& request_header_matchers) {
+    bool encode_raw_headers, const MatcherSharedPtr& request_header_matchers) {
   setRequestTime(req, stream_info);
   setHttpRequest(*req.mutable_http(), stream_id, stream_info, decoding_buffer, headers,
-                 max_request_bytes, pack_as_bytes, request_header_matchers);
+                 max_request_bytes, pack_as_bytes, encode_raw_headers, request_header_matchers);
 }
 
 void CheckRequestUtils::setTLSSession(
@@ -203,7 +230,7 @@ void CheckRequestUtils::createHttpCheck(
     envoy::config::core::v3::Metadata&& metadata_context,
     envoy::config::core::v3::Metadata&& route_metadata_context,
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool include_peer_certificate, bool include_tls_session,
+    bool encode_raw_headers, bool include_peer_certificate, bool include_tls_session,
     const Protobuf::Map<std::string, std::string>& destination_labels,
     const MatcherSharedPtr& request_header_matchers) {
 
@@ -219,7 +246,7 @@ void CheckRequestUtils::createHttpCheck(
                      include_peer_certificate);
   setAttrContextRequest(*attrs->mutable_request(), cb->streamId(), cb->streamInfo(),
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
-                        request_header_matchers);
+                        encode_raw_headers, request_header_matchers);
 
   if (include_tls_session && cb->connection()->ssl() != nullptr) {
     setTLSSession(*attrs->mutable_tls_session(), cb->connection()->ssl());

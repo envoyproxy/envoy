@@ -12,10 +12,12 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.testing.TestJni
+import io.envoyproxy.envoymobile.engine.testing.HttpProxyTestServerFactory
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito
@@ -39,18 +41,28 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
     JniLibrary.load()
   }
 
+  private lateinit var httpProxyTestServer: HttpProxyTestServerFactory.HttpProxyTestServer
+
+  @Before
+  fun setUp() {
+    httpProxyTestServer =
+      HttpProxyTestServerFactory.start(HttpProxyTestServerFactory.Type.HTTPS_PROXY)
+  }
+
+  @After
+  fun tearDown() {
+    httpProxyTestServer.shutdown()
+  }
+
   @Test
   fun `attempts an HTTPs request through a proxy using an async DNS resolution that fails`() {
-    TestJni.startHttpsProxyTestServer()
-    val port = TestJni.getServerPort()
-
     val context = Mockito.spy(ApplicationProvider.getApplicationContext<Context>())
     val connectivityManager: ConnectivityManager = Mockito.mock(ConnectivityManager::class.java)
     Mockito.doReturn(connectivityManager)
       .`when`(context)
       .getSystemService(Context.CONNECTIVITY_SERVICE)
     Mockito.`when`(connectivityManager.defaultProxy)
-      .thenReturn(ProxyInfo.buildDirectProxy("loopback", port))
+      .thenReturn(ProxyInfo.buildDirectProxy("loopback", httpProxyTestServer.port))
 
     val onEngineRunningLatch = CountDownLatch(1)
     val onErrorLatch = CountDownLatch(1)
@@ -88,6 +100,5 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
     assertThat(onErrorLatch.count).isEqualTo(0)
 
     engine.terminate()
-    TestJni.shutdownTestServer()
   }
 }
