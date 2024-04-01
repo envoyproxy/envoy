@@ -1385,7 +1385,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // Check if tracing is enabled.
   if (connection_manager_tracing_config_.has_value()) {
     traceRequest();
-    // TODO: propagate the trace context to the stream info.
   }
 
   if (!connection_manager_.shouldDeferRequestProxyingToNextIoCycle()) {
@@ -1413,7 +1412,8 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
     return;
   }
 
-  // filter_manager_.streamInfo().setTraceReason(Tracing::Reason reason)
+  filter_manager_.streamInfo().setTraceId(active_span_->getTraceIdAsHex());
+  filter_manager_.streamInfo().setSpanId(active_span_->getSpanIdAsHex());
 
   // TODO: Need to investigate the following code based on the cached route, as may
   // be broken in the case a filter changes the route.

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <string>
 
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -309,6 +310,12 @@ struct StreamInfoImpl : public StreamInfo {
   void setTraceReason(Tracing::Reason reason) override { trace_reason_ = reason; }
   Tracing::Reason traceReason() const override { return trace_reason_; }
 
+  void setTraceId(const std::string trace_id) override { trace_id_ = trace_id; }
+  std::string traceId() const override { return trace_id_; }
+
+  void setSpanId(const std::string span_id) override { span_id_ = span_id; }
+  std::string spanId() const override { return span_id_; }
+
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
@@ -487,6 +494,8 @@ private:
   bool is_shadow_{false};
   std::string downstream_transport_failure_reason_;
   bool should_drain_connection_{false};
+  std::string trace_id_;
+  std::string span_id_;
 };
 
 } // namespace StreamInfo

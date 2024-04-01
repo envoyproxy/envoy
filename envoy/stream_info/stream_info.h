@@ -891,6 +891,26 @@ public:
   virtual Tracing::Reason traceReason() const PURE;
 
   /**
+   * Set the trace id for the stream.
+   */
+  virtual void setTraceId(std::string trace_id) PURE;
+
+  /**
+   * @return the trace id for the stream.
+   */
+  virtual std::string traceId() const PURE;
+
+  /**
+   * Set the span id for the stream.
+   */
+  virtual void setSpanId(std::string span_id) PURE;
+  
+  /**
+   * @return the span id for the stream.
+   */
+  virtual std::string spanId() const PURE;
+
+  /**
    * @param attempt_count, the number of times the request was attempted upstream.
    */
   virtual void setAttemptCount(uint32_t attempt_count) PURE;
