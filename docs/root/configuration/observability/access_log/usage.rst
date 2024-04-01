@@ -401,7 +401,6 @@ The following command operators are supported:
     Total duration between the START time point and the END time point in specific PRECISION.
     The START and END time points are specified by the following values:
 
-    * ``START``: The time point of the first byte of downstream request is received.
     * ``FIRST_DOWNSTREAM_RX_BYTE_RECEIVED``: The time point of the first byte of downstream request is received. Same as ``START``.
     * ``LAST_DOWNSTREAM_RX_BYTE_RECEIVED``: The time point of the last byte of downstream request is received.
     * ``FIRST_UPSTREAM_TX_BYTE_SENT``: The time point of the first byte of upstream request is sent.
