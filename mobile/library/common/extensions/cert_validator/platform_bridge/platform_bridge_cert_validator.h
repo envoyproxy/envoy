@@ -30,8 +30,10 @@ public:
   // cert validator interface. And this class only extends the client interface. But their owner
   // (Tls::ContextImpl) doesn't have endpoint perspective today, so there will need more refactoring
   // to achieve this.
-  void addClientValidationContext(SSL_CTX* /*context*/, bool /*require_client_cert*/) override {
-    PANIC("Should not be reached");
+  absl::Status addClientValidationContext(SSL_CTX* /*context*/,
+                                          bool /*require_client_cert*/) override {
+    IS_ENVOY_BUG("Should not be reached");
+    return absl::InvalidArgumentError("unexpected call");
   }
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& /*md*/,
                                 uint8_t* /*hash_buffer[EVP_MAX_MD_SIZE]*/,
@@ -50,8 +52,8 @@ public:
                     const CertValidator::ExtraValidationContext& validation_context, bool is_server,
                     absl::string_view hostname) override;
   // Returns SSL_VERIFY_PEER so that doVerifyCertChain() will be called from the TLS stack.
-  int initializeSslContexts(std::vector<SSL_CTX*> /*contexts*/,
-                            bool /*handshaker_provides_certificates*/) override {
+  absl::StatusOr<int> initializeSslContexts(std::vector<SSL_CTX*> /*contexts*/,
+                                            bool /*handshaker_provides_certificates*/) override {
     return SSL_VERIFY_PEER;
   }
 
