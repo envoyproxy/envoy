@@ -636,858 +636,967 @@ private:
 };
 
 const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProviders() {
-  CONSTRUCT_ON_FIRST_USE(
-      StreamInfoFormatterProviderLookupTable,
-      {
-          {"REQUEST_DURATION",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoDurationFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    StreamInfo::TimingUtility timing(stream_info);
-                    return timing.lastDownstreamRxByteReceived();
-                  });
-            }}},
-          {"REQUEST_TX_DURATION",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoDurationFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    StreamInfo::TimingUtility timing(stream_info);
-                    return timing.lastUpstreamTxByteSent();
-                  });
-            }}},
-          {"RESPONSE_DURATION",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoDurationFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    StreamInfo::TimingUtility timing(stream_info);
-                    return timing.firstUpstreamRxByteReceived();
-                  });
-            }}},
-          {"RESPONSE_TX_DURATION",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoDurationFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    StreamInfo::TimingUtility timing(stream_info);
-                    auto downstream = timing.lastDownstreamTxByteSent();
-                    auto upstream = timing.firstUpstreamRxByteReceived();
+  CONSTRUCT_ON_FIRST_USE(StreamInfoFormatterProviderLookupTable,
+                         {
+                             {"REQUEST_DURATION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoDurationFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       StreamInfo::TimingUtility timing(stream_info);
+                                       return timing.lastDownstreamRxByteReceived();
+                                     });
+                               }}},
+                             {"REQUEST_TX_DURATION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoDurationFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       StreamInfo::TimingUtility timing(stream_info);
+                                       return timing.lastUpstreamTxByteSent();
+                                     });
+                               }}},
+                             {"RESPONSE_DURATION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoDurationFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       StreamInfo::TimingUtility timing(stream_info);
+                                       return timing.firstUpstreamRxByteReceived();
+                                     });
+                               }}},
+                             {"RESPONSE_TX_DURATION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoDurationFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       StreamInfo::TimingUtility timing(stream_info);
+                                       auto downstream = timing.lastDownstreamTxByteSent();
+                                       auto upstream = timing.firstUpstreamRxByteReceived();
 
-                    absl::optional<std::chrono::nanoseconds> result;
-                    if (downstream && upstream) {
-                      result = downstream.value() - upstream.value();
-                    }
+                                       absl::optional<std::chrono::nanoseconds> result;
+                                       if (downstream && upstream) {
+                                         result = downstream.value() - upstream.value();
+                                       }
 
-                    return result;
-                  });
-            }}},
-          {"DOWNSTREAM_HANDSHAKE_DURATION",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoDurationFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    StreamInfo::TimingUtility timing(stream_info);
-                    return timing.downstreamHandshakeComplete();
-                  });
-            }}},
-          {"ROUNDTRIP_DURATION",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoDurationFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    StreamInfo::TimingUtility timing(stream_info);
-                    return timing.lastDownstreamAckReceived();
-                  });
-            }}},
-          {"BYTES_RECEIVED",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.bytesReceived();
-                  });
-            }}},
-          {"BYTES_RETRANSMITTED",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.bytesRetransmitted();
-                  });
-            }}},
-          {"PACKETS_RETRANSMITTED",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.packetsRetransmitted();
-                  });
-            }}},
-          {"UPSTREAM_WIRE_BYTES_RECEIVED",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
-                    return bytes_meter ? bytes_meter->wireBytesReceived() : 0;
-                  });
-            }}},
-          {"UPSTREAM_HEADER_BYTES_RECEIVED",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
-                    return bytes_meter ? bytes_meter->headerBytesReceived() : 0;
-                  });
-            }}},
-          {"DOWNSTREAM_WIRE_BYTES_RECEIVED",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
-                    return bytes_meter ? bytes_meter->wireBytesReceived() : 0;
-                  });
-            }}},
-          {"DOWNSTREAM_HEADER_BYTES_RECEIVED",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
-                    return bytes_meter ? bytes_meter->headerBytesReceived() : 0;
-                  });
-            }}},
-          {"PROTOCOL",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return SubstitutionFormatUtils::protocolToString(stream_info.protocol());
-                  });
-            }}},
-          {"UPSTREAM_PROTOCOL",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.upstreamInfo()
-                               ? SubstitutionFormatUtils::protocolToString(
-                                     stream_info.upstreamInfo()->upstreamProtocol())
-                               : absl::nullopt;
-                  });
-            }}},
-          {"RESPONSE_CODE",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.responseCode().value_or(0);
-                  });
-            }}},
-          {"RESPONSE_CODE_DETAILS",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.responseCodeDetails();
-                  });
-            }}},
-          {"CONNECTION_TERMINATION_DETAILS",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.connectionTerminationDetails();
-                  });
-            }}},
-          {"BYTES_SENT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.bytesSent();
-                  });
-            }}},
-          {"UPSTREAM_WIRE_BYTES_SENT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
-                    return bytes_meter ? bytes_meter->wireBytesSent() : 0;
-                  });
-            }}},
-          {"UPSTREAM_HEADER_BYTES_SENT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
-                    return bytes_meter ? bytes_meter->headerBytesSent() : 0;
-                  });
-            }}},
-          {"DOWNSTREAM_WIRE_BYTES_SENT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
-                    return bytes_meter ? bytes_meter->wireBytesSent() : 0;
-                  });
-            }}},
-          {"DOWNSTREAM_HEADER_BYTES_SENT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
-                    return bytes_meter ? bytes_meter->headerBytesSent() : 0;
-                  });
-            }}},
-          {"DURATION",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoDurationFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.currentDuration();
-                  });
-            }}},
-          {"RESPONSE_FLAGS",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
-                  });
-            }}},
-          {"RESPONSE_FLAGS_LONG",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return StreamInfo::ResponseFlagUtils::toString(stream_info);
-                  });
-            }}},
-          {"UPSTREAM_HOST",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::withPort(
-                  [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-                      return stream_info.upstreamInfo()->upstreamHost()->address();
-                    }
-                    return nullptr;
-                  });
-            }}},
-          {"UPSTREAM_CONNECTION_ID",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    uint64_t upstream_connection_id = 0;
-                    if (stream_info.upstreamInfo().has_value()) {
-                      upstream_connection_id =
-                          stream_info.upstreamInfo()->upstreamConnectionId().value_or(0);
-                    }
-                    return upstream_connection_id;
-                  });
-            }}},
-          {"UPSTREAM_CLUSTER",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    std::string upstream_cluster_name;
-                    if (stream_info.upstreamClusterInfo().has_value() &&
-                        stream_info.upstreamClusterInfo().value() != nullptr) {
-                      upstream_cluster_name =
-                          stream_info.upstreamClusterInfo().value()->observabilityName();
-                    }
+                                       return result;
+                                     });
+                               }}},
+                             {"DOWNSTREAM_HANDSHAKE_DURATION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoDurationFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       StreamInfo::TimingUtility timing(stream_info);
+                                       return timing.downstreamHandshakeComplete();
+                                     });
+                               }}},
+                             {"ROUNDTRIP_DURATION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoDurationFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       StreamInfo::TimingUtility timing(stream_info);
+                                       return timing.lastDownstreamAckReceived();
+                                     });
+                               }}},
+                             {"BYTES_RECEIVED",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.bytesReceived();
+                                     });
+                               }}},
+                             {"BYTES_RETRANSMITTED",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.bytesRetransmitted();
+                                     });
+                               }}},
+                             {"PACKETS_RETRANSMITTED",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.packetsRetransmitted();
+                                     });
+                               }}},
+                             {"UPSTREAM_WIRE_BYTES_RECEIVED",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       const auto& bytes_meter =
+                                           stream_info.getUpstreamBytesMeter();
+                                       return bytes_meter ? bytes_meter->wireBytesReceived() : 0;
+                                     });
+                               }}},
+                             {"UPSTREAM_HEADER_BYTES_RECEIVED",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       const auto& bytes_meter =
+                                           stream_info.getUpstreamBytesMeter();
+                                       return bytes_meter ? bytes_meter->headerBytesReceived() : 0;
+                                     });
+                               }}},
+                             {"DOWNSTREAM_WIRE_BYTES_RECEIVED",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       const auto& bytes_meter =
+                                           stream_info.getDownstreamBytesMeter();
+                                       return bytes_meter ? bytes_meter->wireBytesReceived() : 0;
+                                     });
+                               }}},
+                             {"DOWNSTREAM_HEADER_BYTES_RECEIVED",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       const auto& bytes_meter =
+                                           stream_info.getDownstreamBytesMeter();
+                                       return bytes_meter ? bytes_meter->headerBytesReceived() : 0;
+                                     });
+                               }}},
+                             {"PROTOCOL",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return SubstitutionFormatUtils::protocolToString(
+                                           stream_info.protocol());
+                                     });
+                               }}},
+                             {"UPSTREAM_PROTOCOL",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.upstreamInfo()
+                                                  ? SubstitutionFormatUtils::protocolToString(
+                                                        stream_info.upstreamInfo()
+                                                            ->upstreamProtocol())
+                                                  : absl::nullopt;
+                                     });
+                               }}},
+                             {"RESPONSE_CODE",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.responseCode().value_or(0);
+                                     });
+                               }}},
+                             {"RESPONSE_CODE_DETAILS",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.responseCodeDetails();
+                                     });
+                               }}},
+                             {"CONNECTION_TERMINATION_DETAILS",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.connectionTerminationDetails();
+                                     });
+                               }}},
+                             {"BYTES_SENT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.bytesSent();
+                                     });
+                               }}},
+                             {"UPSTREAM_WIRE_BYTES_SENT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       const auto& bytes_meter =
+                                           stream_info.getUpstreamBytesMeter();
+                                       return bytes_meter ? bytes_meter->wireBytesSent() : 0;
+                                     });
+                               }}},
+                             {"UPSTREAM_HEADER_BYTES_SENT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       const auto& bytes_meter =
+                                           stream_info.getUpstreamBytesMeter();
+                                       return bytes_meter ? bytes_meter->headerBytesSent() : 0;
+                                     });
+                               }}},
+                             {"DOWNSTREAM_WIRE_BYTES_SENT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       const auto& bytes_meter =
+                                           stream_info.getDownstreamBytesMeter();
+                                       return bytes_meter ? bytes_meter->wireBytesSent() : 0;
+                                     });
+                               }}},
+                             {"DOWNSTREAM_HEADER_BYTES_SENT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       const auto& bytes_meter =
+                                           stream_info.getDownstreamBytesMeter();
+                                       return bytes_meter ? bytes_meter->headerBytesSent() : 0;
+                                     });
+                               }}},
+                             {"DURATION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoDurationFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.currentDuration();
+                                     });
+                               }}},
+                             {"RESPONSE_FLAGS",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return StreamInfo::ResponseFlagUtils::toShortString(
+                                           stream_info);
+                                     });
+                               }}},
+                             {"RESPONSE_FLAGS_LONG",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return StreamInfo::ResponseFlagUtils::toString(stream_info);
+                                     });
+                               }}},
+                             {"UPSTREAM_HOST",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::withPort(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::shared_ptr<
+                                             const Envoy::Network::Address::Instance> {
+                                       if (stream_info.upstreamInfo() &&
+                                           stream_info.upstreamInfo()->upstreamHost()) {
+                                         return stream_info.upstreamInfo()
+                                             ->upstreamHost()
+                                             ->address();
+                                       }
+                                       return nullptr;
+                                     });
+                               }}},
+                             {"UPSTREAM_CONNECTION_ID",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       uint64_t upstream_connection_id = 0;
+                                       if (stream_info.upstreamInfo().has_value()) {
+                                         upstream_connection_id = stream_info.upstreamInfo()
+                                                                      ->upstreamConnectionId()
+                                                                      .value_or(0);
+                                       }
+                                       return upstream_connection_id;
+                                     });
+                               }}},
+                             {"UPSTREAM_CLUSTER",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       std::string upstream_cluster_name;
+                                       if (stream_info.upstreamClusterInfo().has_value() &&
+                                           stream_info.upstreamClusterInfo().value() != nullptr) {
+                                         upstream_cluster_name = stream_info.upstreamClusterInfo()
+                                                                     .value()
+                                                                     ->observabilityName();
+                                       }
 
-                    return upstream_cluster_name.empty()
-                               ? absl::nullopt
-                               : absl::make_optional<std::string>(upstream_cluster_name);
-                  });
-            }}},
-          {"UPSTREAM_LOCAL_ADDRESS",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::withPort(
-                  [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo().has_value()) {
-                      return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
-                    }
-                    return nullptr;
-                  });
-            }}},
-          {"UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::withoutPort(
-                  [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo().has_value()) {
-                      return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
-                    }
-                    return nullptr;
-                  });
-            }}},
-          {"UPSTREAM_LOCAL_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::justPort(
-                  [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo().has_value()) {
-                      return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
-                    }
-                    return nullptr;
-                  });
-            }}},
-          {"UPSTREAM_REMOTE_ADDRESS",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::withPort(
-                  [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-                      return stream_info.upstreamInfo()->upstreamHost()->address();
-                    }
-                    return nullptr;
-                  });
-            }}},
-          {"UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::withoutPort(
-                  [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-                      return stream_info.upstreamInfo()->upstreamHost()->address();
-                    }
-                    return nullptr;
-                  });
-            }}},
-          {"UPSTREAM_REMOTE_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::justPort(
-                  [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-                      return stream_info.upstreamInfo()->upstreamHost()->address();
-                    }
-                    return nullptr;
-                  });
-            }}},
-          {"UPSTREAM_REQUEST_ATTEMPT_COUNT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.attemptCount().value_or(0);
-                  });
-            }}},
-          {"UPSTREAM_TLS_CIPHER",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.ciphersuiteString();
-                  });
-            }}},
-          {"UPSTREAM_TLS_VERSION",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.tlsVersion();
-                  });
-            }}},
-          {"UPSTREAM_TLS_SESSION_ID",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.sessionId();
-                  });
-            }}},
-          {"UPSTREAM_PEER_ISSUER",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.issuerPeerCertificate();
-                  });
-            }}},
-          {"UPSTREAM_PEER_CERT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.urlEncodedPemEncodedPeerCertificate();
-                  });
-            }}},
-          {"UPSTREAM_PEER_SUBJECT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.subjectPeerCertificate();
-                  });
-            }}},
-          {"DOWNSTREAM_LOCAL_ADDRESS",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::withPort(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.downstreamAddressProvider().localAddress();
-                  });
-            }}},
-          {"DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::withoutPort(
-                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.downstreamAddressProvider().localAddress();
-                  });
-            }}},
-          {"DOWNSTREAM_LOCAL_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::justPort(
-                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.downstreamAddressProvider().localAddress();
-                  });
-            }}},
-          {"DOWNSTREAM_REMOTE_ADDRESS",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::withPort(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.downstreamAddressProvider().remoteAddress();
-                  });
-            }}},
-          {"DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::withoutPort(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.downstreamAddressProvider().remoteAddress();
-                  });
-            }}},
-          {"DOWNSTREAM_REMOTE_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::justPort(
-                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.downstreamAddressProvider().remoteAddress();
-                  });
-            }}},
-          {"DOWNSTREAM_DIRECT_REMOTE_ADDRESS",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::withPort(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.downstreamAddressProvider().directRemoteAddress();
-                  });
-            }}},
-          {"DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::withoutPort(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.downstreamAddressProvider().directRemoteAddress();
-                  });
-            }}},
-          {"DOWNSTREAM_DIRECT_REMOTE_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return StreamInfoAddressFormatterProvider::justPort(
-                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.downstreamAddressProvider().directRemoteAddress();
-                  });
-            }}},
-          {"CONNECTION_ID",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoUInt64FormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.downstreamAddressProvider().connectionID().value_or(0);
-                  });
-            }}},
-          {"REQUESTED_SERVER_NAME",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    absl::optional<std::string> result;
-                    if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
-                      result = std::string(
-                          stream_info.downstreamAddressProvider().requestedServerName());
-                    }
-                    return result;
-                  });
-            }}},
-          {"ROUTE_NAME",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    absl::optional<std::string> result;
-                    std::string route_name = stream_info.getRouteName();
-                    if (!route_name.empty()) {
-                      result = route_name;
-                    }
-                    return result;
-                  });
-            }}},
-          {"DOWNSTREAM_PEER_URI_SAN",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
-                  });
-            }}},
-          {"DOWNSTREAM_PEER_DNS_SAN",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return absl::StrJoin(connection_info.dnsSansPeerCertificate(), ",");
-                  });
-            }}},
-          {"DOWNSTREAM_PEER_IP_SAN",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return absl::StrJoin(connection_info.ipSansPeerCertificate(), ",");
-                  });
-            }}},
-          {"DOWNSTREAM_LOCAL_URI_SAN",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return absl::StrJoin(connection_info.uriSanLocalCertificate(), ",");
-                  });
-            }}},
-          {"DOWNSTREAM_LOCAL_DNS_SAN",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return absl::StrJoin(connection_info.dnsSansLocalCertificate(), ",");
-                  });
-            }}},
-          {"DOWNSTREAM_LOCAL_IP_SAN",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return absl::StrJoin(connection_info.ipSansLocalCertificate(), ",");
-                  });
-            }}},
-          {"DOWNSTREAM_PEER_SUBJECT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.subjectPeerCertificate();
-                  });
-            }}},
-          {"DOWNSTREAM_LOCAL_SUBJECT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.subjectLocalCertificate();
-                  });
-            }}},
-          {"DOWNSTREAM_TLS_SESSION_ID",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.sessionId();
-                  });
-            }}},
-          {"DOWNSTREAM_TLS_CIPHER",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.ciphersuiteString();
-                  });
-            }}},
-          {"DOWNSTREAM_TLS_VERSION",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.tlsVersion();
-                  });
-            }}},
-          {"DOWNSTREAM_PEER_FINGERPRINT_256",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.sha256PeerCertificateDigest();
-                  });
-            }}},
-          {"DOWNSTREAM_PEER_FINGERPRINT_1",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.sha1PeerCertificateDigest();
-                  });
-            }}},
-          {"DOWNSTREAM_PEER_SERIAL",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.serialNumberPeerCertificate();
-                  });
-            }}},
-          {"DOWNSTREAM_PEER_ISSUER",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.issuerPeerCertificate();
-                  });
-            }}},
-          {"DOWNSTREAM_PEER_CERT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
-                  [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.urlEncodedPemEncodedPeerCertificate();
-                  });
-            }}},
-          {"DOWNSTREAM_TRANSPORT_FAILURE_REASON",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    absl::optional<std::string> result;
-                    if (!stream_info.downstreamTransportFailureReason().empty()) {
-                      result = absl::StrReplaceAll(stream_info.downstreamTransportFailureReason(),
-                                                   {{" ", "_"}});
-                    }
-                    return result;
-                  });
-            }}},
-          {"UPSTREAM_TRANSPORT_FAILURE_REASON",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    absl::optional<std::string> result;
-                    if (stream_info.upstreamInfo().has_value() &&
-                        !stream_info.upstreamInfo()
-                             .value()
-                             .get()
-                             .upstreamTransportFailureReason()
-                             .empty()) {
-                      result =
-                          stream_info.upstreamInfo().value().get().upstreamTransportFailureReason();
-                    }
-                    if (result) {
-                      std::replace(result->begin(), result->end(), ' ', '_');
-                    }
-                    return result;
-                  });
-            }}},
-          {"HOSTNAME",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              absl::optional<std::string> hostname = SubstitutionFormatUtils::getHostname();
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [hostname](const StreamInfo::StreamInfo&) { return hostname; });
-            }}},
-          {"FILTER_CHAIN_NAME",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                    if (const auto info = stream_info.downstreamAddressProvider().filterChainInfo();
-                        info.has_value()) {
-                      if (!info->name().empty()) {
-                        return std::string(info->name());
-                      }
-                    }
-                    return absl::nullopt;
-                  });
-            }}},
-          {"VIRTUAL_CLUSTER_NAME",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                    return stream_info.virtualClusterName();
-                  });
-            }}},
-          {"TLS_JA3_FINGERPRINT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    absl::optional<std::string> result;
-                    if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
-                      result = std::string(stream_info.downstreamAddressProvider().ja3Hash());
-                    }
-                    return result;
-                  });
-            }}},
-          {"STREAM_ID",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                    auto provider = stream_info.getStreamIdProvider();
-                    if (!provider.has_value()) {
-                      return {};
-                    }
-                    auto id = provider->toStringView();
-                    if (!id.has_value()) {
-                      return {};
-                    }
-                    return absl::make_optional<std::string>(id.value());
-                  });
-            }}},
-          {"START_TIME",
-           {CommandSyntaxChecker::PARAMS_OPTIONAL,
-            [](const std::string& format, absl::optional<size_t>) {
-              return std::make_unique<SystemTimeFormatter>(
-                  format,
-                  std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
-                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
-                        return stream_info.startTime();
-                      }));
-            }}},
-          {"EMIT_TIME",
-           {CommandSyntaxChecker::PARAMS_OPTIONAL,
-            [](const std::string& format, absl::optional<size_t>) {
-              return std::make_unique<SystemTimeFormatter>(
-                  format,
-                  std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
-                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
-                        return stream_info.timeSource().systemTime();
-                      }));
-            }}},
-          {"DYNAMIC_METADATA",
-           {CommandSyntaxChecker::PARAMS_REQUIRED,
-            [](const std::string& format, absl::optional<size_t> max_length) {
-              std::string filter_namespace;
-              std::vector<std::string> path;
+                                       return upstream_cluster_name.empty()
+                                                  ? absl::nullopt
+                                                  : absl::make_optional<std::string>(
+                                                        upstream_cluster_name);
+                                     });
+                               }}},
+                             {"UPSTREAM_LOCAL_ADDRESS",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::withPort(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::shared_ptr<
+                                             const Envoy::Network::Address::Instance> {
+                                       if (stream_info.upstreamInfo().has_value()) {
+                                         return stream_info.upstreamInfo()
+                                             .value()
+                                             .get()
+                                             .upstreamLocalAddress();
+                                       }
+                                       return nullptr;
+                                     });
+                               }}},
+                             {"UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::withoutPort(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::shared_ptr<
+                                             const Envoy::Network::Address::Instance> {
+                                       if (stream_info.upstreamInfo().has_value()) {
+                                         return stream_info.upstreamInfo()
+                                             .value()
+                                             .get()
+                                             .upstreamLocalAddress();
+                                       }
+                                       return nullptr;
+                                     });
+                               }}},
+                             {"UPSTREAM_LOCAL_PORT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::justPort(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::shared_ptr<
+                                             const Envoy::Network::Address::Instance> {
+                                       if (stream_info.upstreamInfo().has_value()) {
+                                         return stream_info.upstreamInfo()
+                                             .value()
+                                             .get()
+                                             .upstreamLocalAddress();
+                                       }
+                                       return nullptr;
+                                     });
+                               }}},
+                             {"UPSTREAM_REMOTE_ADDRESS",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::withPort(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::shared_ptr<
+                                             const Envoy::Network::Address::Instance> {
+                                       if (stream_info.upstreamInfo() &&
+                                           stream_info.upstreamInfo()->upstreamHost()) {
+                                         return stream_info.upstreamInfo()
+                                             ->upstreamHost()
+                                             ->address();
+                                       }
+                                       return nullptr;
+                                     });
+                               }}},
+                             {"UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::withoutPort(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::shared_ptr<
+                                             const Envoy::Network::Address::Instance> {
+                                       if (stream_info.upstreamInfo() &&
+                                           stream_info.upstreamInfo()->upstreamHost()) {
+                                         return stream_info.upstreamInfo()
+                                             ->upstreamHost()
+                                             ->address();
+                                       }
+                                       return nullptr;
+                                     });
+                               }}},
+                             {"UPSTREAM_REMOTE_PORT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::justPort(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::shared_ptr<
+                                             const Envoy::Network::Address::Instance> {
+                                       if (stream_info.upstreamInfo() &&
+                                           stream_info.upstreamInfo()->upstreamHost()) {
+                                         return stream_info.upstreamInfo()
+                                             ->upstreamHost()
+                                             ->address();
+                                       }
+                                       return nullptr;
+                                     });
+                               }}},
+                             {"UPSTREAM_REQUEST_ATTEMPT_COUNT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.attemptCount().value_or(0);
+                                     });
+                               }}},
+                             {"UPSTREAM_TLS_CIPHER",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.ciphersuiteString();
+                                     });
+                               }}},
+                             {"UPSTREAM_TLS_VERSION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.tlsVersion();
+                                     });
+                               }}},
+                             {"UPSTREAM_TLS_SESSION_ID",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.sessionId();
+                                     });
+                               }}},
+                             {"UPSTREAM_PEER_ISSUER",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.issuerPeerCertificate();
+                                     });
+                               }}},
+                             {"UPSTREAM_PEER_CERT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.urlEncodedPemEncodedPeerCertificate();
+                                     });
+                               }}},
+                             {"UPSTREAM_PEER_SUBJECT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.subjectPeerCertificate();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_LOCAL_ADDRESS",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::withPort(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.downstreamAddressProvider()
+                                           .localAddress();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::withoutPort(
+                                     [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.downstreamAddressProvider()
+                                           .localAddress();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_LOCAL_PORT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::justPort(
+                                     [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.downstreamAddressProvider()
+                                           .localAddress();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_REMOTE_ADDRESS",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::withPort(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.downstreamAddressProvider()
+                                           .remoteAddress();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::withoutPort(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.downstreamAddressProvider()
+                                           .remoteAddress();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_REMOTE_PORT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::justPort(
+                                     [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.downstreamAddressProvider()
+                                           .remoteAddress();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_DIRECT_REMOTE_ADDRESS",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::withPort(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.downstreamAddressProvider()
+                                           .directRemoteAddress();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::withoutPort(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.downstreamAddressProvider()
+                                           .directRemoteAddress();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_DIRECT_REMOTE_PORT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return StreamInfoAddressFormatterProvider::justPort(
+                                     [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.downstreamAddressProvider()
+                                           .directRemoteAddress();
+                                     });
+                               }}},
+                             {"CONNECTION_ID",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return stream_info.downstreamAddressProvider()
+                                           .connectionID()
+                                           .value_or(0);
+                                     });
+                               }}},
+                             {"REQUESTED_SERVER_NAME",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       absl::optional<std::string> result;
+                                       if (!stream_info.downstreamAddressProvider()
+                                                .requestedServerName()
+                                                .empty()) {
+                                         result =
+                                             std::string(stream_info.downstreamAddressProvider()
+                                                             .requestedServerName());
+                                       }
+                                       return result;
+                                     });
+                               }}},
+                             {"ROUTE_NAME",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       absl::optional<std::string> result;
+                                       std::string route_name = stream_info.getRouteName();
+                                       if (!route_name.empty()) {
+                                         result = route_name;
+                                       }
+                                       return result;
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_URI_SAN",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::StrJoin(connection_info.uriSanPeerCertificate(),
+                                                            ",");
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_DNS_SAN",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::StrJoin(
+                                           connection_info.dnsSansPeerCertificate(), ",");
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_IP_SAN",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::StrJoin(connection_info.ipSansPeerCertificate(),
+                                                            ",");
+                                     });
+                               }}},
+                             {"DOWNSTREAM_LOCAL_URI_SAN",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::StrJoin(
+                                           connection_info.uriSanLocalCertificate(), ",");
+                                     });
+                               }}},
+                             {"DOWNSTREAM_LOCAL_DNS_SAN",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::StrJoin(
+                                           connection_info.dnsSansLocalCertificate(), ",");
+                                     });
+                               }}},
+                             {"DOWNSTREAM_LOCAL_IP_SAN",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::StrJoin(
+                                           connection_info.ipSansLocalCertificate(), ",");
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_SUBJECT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.subjectPeerCertificate();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_LOCAL_SUBJECT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.subjectLocalCertificate();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_TLS_SESSION_ID",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.sessionId();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_TLS_CIPHER",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.ciphersuiteString();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_TLS_VERSION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.tlsVersion();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_FINGERPRINT_256",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.sha256PeerCertificateDigest();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_FINGERPRINT_1",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.sha1PeerCertificateDigest();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_SERIAL",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.serialNumberPeerCertificate();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_ISSUER",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.issuerPeerCertificate();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_CERT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.urlEncodedPemEncodedPeerCertificate();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_TRANSPORT_FAILURE_REASON",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       absl::optional<std::string> result;
+                                       if (!stream_info.downstreamTransportFailureReason()
+                                                .empty()) {
+                                         result = absl::StrReplaceAll(
+                                             stream_info.downstreamTransportFailureReason(),
+                                             {{" ", "_"}});
+                                       }
+                                       return result;
+                                     });
+                               }}},
+                             {"UPSTREAM_TRANSPORT_FAILURE_REASON",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       absl::optional<std::string> result;
+                                       if (stream_info.upstreamInfo().has_value() &&
+                                           !stream_info.upstreamInfo()
+                                                .value()
+                                                .get()
+                                                .upstreamTransportFailureReason()
+                                                .empty()) {
+                                         result = stream_info.upstreamInfo()
+                                                      .value()
+                                                      .get()
+                                                      .upstreamTransportFailureReason();
+                                       }
+                                       if (result) {
+                                         std::replace(result->begin(), result->end(), ' ', '_');
+                                       }
+                                       return result;
+                                     });
+                               }}},
+                             {"HOSTNAME",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 absl::optional<std::string> hostname =
+                                     SubstitutionFormatUtils::getHostname();
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [hostname](const StreamInfo::StreamInfo&) {
+                                       return hostname;
+                                     });
+                               }}},
+                             {"FILTER_CHAIN_NAME",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       if (const auto info = stream_info.downstreamAddressProvider()
+                                                                 .filterChainInfo();
+                                           info.has_value()) {
+                                         if (!info->name().empty()) {
+                                           return std::string(info->name());
+                                         }
+                                       }
+                                       return absl::nullopt;
+                                     });
+                               }}},
+                             {"VIRTUAL_CLUSTER_NAME",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       return stream_info.virtualClusterName();
+                                     });
+                               }}},
+                             {"TLS_JA3_FINGERPRINT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       absl::optional<std::string> result;
+                                       if (!stream_info.downstreamAddressProvider()
+                                                .ja3Hash()
+                                                .empty()) {
+                                         result = std::string(
+                                             stream_info.downstreamAddressProvider().ja3Hash());
+                                       }
+                                       return result;
+                                     });
+                               }}},
+                             {"STREAM_ID",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       auto provider = stream_info.getStreamIdProvider();
+                                       if (!provider.has_value()) {
+                                         return {};
+                                       }
+                                       auto id = provider->toStringView();
+                                       if (!id.has_value()) {
+                                         return {};
+                                       }
+                                       return absl::make_optional<std::string>(id.value());
+                                     });
+                               }}},
+                             {"START_TIME",
+                              {CommandSyntaxChecker::PARAMS_OPTIONAL,
+                               [](const std::string& format, absl::optional<size_t>) {
+                                 return std::make_unique<SystemTimeFormatter>(
+                                     format,
+                                     std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                                         [](const StreamInfo::StreamInfo& stream_info)
+                                             -> absl::optional<SystemTime> {
+                                           return stream_info.startTime();
+                                         }));
+                               }}},
+                             {"EMIT_TIME",
+                              {CommandSyntaxChecker::PARAMS_OPTIONAL,
+                               [](const std::string& format, absl::optional<size_t>) {
+                                 return std::make_unique<SystemTimeFormatter>(
+                                     format,
+                                     std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                                         [](const StreamInfo::StreamInfo& stream_info)
+                                             -> absl::optional<SystemTime> {
+                                           return stream_info.timeSource().systemTime();
+                                         }));
+                               }}},
+                             {"DYNAMIC_METADATA",
+                              {CommandSyntaxChecker::PARAMS_REQUIRED,
+                               [](const std::string& format, absl::optional<size_t> max_length) {
+                                 std::string filter_namespace;
+                                 std::vector<std::string> path;
 
-              SubstitutionFormatUtils::parseSubcommand(format, ':', filter_namespace, path);
-              return std::make_unique<DynamicMetadataFormatter>(filter_namespace, path, max_length);
-            }}},
+                                 SubstitutionFormatUtils::parseSubcommand(format, ':',
+                                                                          filter_namespace, path);
+                                 return std::make_unique<DynamicMetadataFormatter>(
+                                     filter_namespace, path, max_length);
+                               }}},
 
-          {"CLUSTER_METADATA",
-           {CommandSyntaxChecker::PARAMS_REQUIRED,
-            [](const std::string& format, absl::optional<size_t> max_length) {
-              std::string filter_namespace;
-              std::vector<std::string> path;
+                             {"CLUSTER_METADATA",
+                              {CommandSyntaxChecker::PARAMS_REQUIRED,
+                               [](const std::string& format, absl::optional<size_t> max_length) {
+                                 std::string filter_namespace;
+                                 std::vector<std::string> path;
 
-              SubstitutionFormatUtils::parseSubcommand(format, ':', filter_namespace, path);
-              return std::make_unique<ClusterMetadataFormatter>(filter_namespace, path, max_length);
-            }}},
-          {"UPSTREAM_METADATA",
-           {CommandSyntaxChecker::PARAMS_REQUIRED,
-            [](const std::string& format, absl::optional<size_t> max_length) {
-              std::string filter_namespace;
-              std::vector<std::string> path;
+                                 SubstitutionFormatUtils::parseSubcommand(format, ':',
+                                                                          filter_namespace, path);
+                                 return std::make_unique<ClusterMetadataFormatter>(
+                                     filter_namespace, path, max_length);
+                               }}},
+                             {"UPSTREAM_METADATA",
+                              {CommandSyntaxChecker::PARAMS_REQUIRED,
+                               [](const std::string& format, absl::optional<size_t> max_length) {
+                                 std::string filter_namespace;
+                                 std::vector<std::string> path;
 
-              SubstitutionFormatUtils::parseSubcommand(format, ':', filter_namespace, path);
-              return std::make_unique<UpstreamHostMetadataFormatter>(filter_namespace, path,
-                                                                     max_length);
-            }}},
-          {"FILTER_STATE",
-           {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
-            [](const std::string& format, absl::optional<size_t> max_length) {
-              return FilterStateFormatter::create(format, max_length, false);
-            }}},
-          {"UPSTREAM_FILTER_STATE",
-           {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
-            [](const std::string& format, absl::optional<size_t> max_length) {
-              return FilterStateFormatter::create(format, max_length, true);
-            }}},
-          {"DOWNSTREAM_PEER_CERT_V_START",
-           {CommandSyntaxChecker::PARAMS_OPTIONAL,
-            [](const std::string& format, absl::optional<size_t>) {
-              return std::make_unique<DownstreamPeerCertVStartFormatter>(format);
-            }}},
-          {"DOWNSTREAM_PEER_CERT_V_END",
-           {CommandSyntaxChecker::PARAMS_OPTIONAL,
-            [](const std::string& format, absl::optional<size_t>) {
-              return std::make_unique<DownstreamPeerCertVEndFormatter>(format);
-            }}},
-          {"UPSTREAM_PEER_CERT_V_START",
-           {CommandSyntaxChecker::PARAMS_OPTIONAL,
-            [](const std::string& format, absl::optional<size_t>) {
-              return std::make_unique<UpstreamPeerCertVStartFormatter>(format);
-            }}},
-          {"UPSTREAM_PEER_CERT_V_END",
-           {CommandSyntaxChecker::PARAMS_OPTIONAL,
-            [](const std::string& format, absl::optional<size_t>) {
-              return std::make_unique<UpstreamPeerCertVEndFormatter>(format);
-            }}},
-          {"ENVIRONMENT",
-           {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
-            [](const std::string& key, absl::optional<size_t> max_length) {
-              return std::make_unique<EnvironmentFormatter>(key, max_length);
-            }}},
-          {"UPSTREAM_CONNECTION_POOL_READY_DURATION",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, const absl::optional<size_t>&) {
-              return std::make_unique<StreamInfoDurationFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info)
-                      -> absl::optional<std::chrono::nanoseconds> {
-                    if (auto upstream_info = stream_info.upstreamInfo();
-                        upstream_info.has_value()) {
-                      if (auto connection_pool_callback_latency =
-                              upstream_info.value()
-                                  .get()
-                                  .upstreamTiming()
-                                  .connectionPoolCallbackLatency();
-                          connection_pool_callback_latency.has_value()) {
-                        return connection_pool_callback_latency;
-                      }
-                    }
-                    return absl::nullopt;
-                  });
-            }}},
-            {"TRACE_ID",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                    return stream_info.traceId();
-                  });
-            }}},
-            {"SPAN_ID",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                    return stream_info.spanId();
-                  });
-            }}},
-      });
+                                 SubstitutionFormatUtils::parseSubcommand(format, ':',
+                                                                          filter_namespace, path);
+                                 return std::make_unique<UpstreamHostMetadataFormatter>(
+                                     filter_namespace, path, max_length);
+                               }}},
+                             {"FILTER_STATE",
+                              {CommandSyntaxChecker::PARAMS_OPTIONAL |
+                                   CommandSyntaxChecker::LENGTH_ALLOWED,
+                               [](const std::string& format, absl::optional<size_t> max_length) {
+                                 return FilterStateFormatter::create(format, max_length, false);
+                               }}},
+                             {"UPSTREAM_FILTER_STATE",
+                              {CommandSyntaxChecker::PARAMS_OPTIONAL |
+                                   CommandSyntaxChecker::LENGTH_ALLOWED,
+                               [](const std::string& format, absl::optional<size_t> max_length) {
+                                 return FilterStateFormatter::create(format, max_length, true);
+                               }}},
+                             {"DOWNSTREAM_PEER_CERT_V_START",
+                              {CommandSyntaxChecker::PARAMS_OPTIONAL,
+                               [](const std::string& format, absl::optional<size_t>) {
+                                 return std::make_unique<DownstreamPeerCertVStartFormatter>(format);
+                               }}},
+                             {"DOWNSTREAM_PEER_CERT_V_END",
+                              {CommandSyntaxChecker::PARAMS_OPTIONAL,
+                               [](const std::string& format, absl::optional<size_t>) {
+                                 return std::make_unique<DownstreamPeerCertVEndFormatter>(format);
+                               }}},
+                             {"UPSTREAM_PEER_CERT_V_START",
+                              {CommandSyntaxChecker::PARAMS_OPTIONAL,
+                               [](const std::string& format, absl::optional<size_t>) {
+                                 return std::make_unique<UpstreamPeerCertVStartFormatter>(format);
+                               }}},
+                             {"UPSTREAM_PEER_CERT_V_END",
+                              {CommandSyntaxChecker::PARAMS_OPTIONAL,
+                               [](const std::string& format, absl::optional<size_t>) {
+                                 return std::make_unique<UpstreamPeerCertVEndFormatter>(format);
+                               }}},
+                             {"ENVIRONMENT",
+                              {CommandSyntaxChecker::PARAMS_REQUIRED |
+                                   CommandSyntaxChecker::LENGTH_ALLOWED,
+                               [](const std::string& key, absl::optional<size_t> max_length) {
+                                 return std::make_unique<EnvironmentFormatter>(key, max_length);
+                               }}},
+                             {"UPSTREAM_CONNECTION_POOL_READY_DURATION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, const absl::optional<size_t>&) {
+                                 return std::make_unique<StreamInfoDurationFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::chrono::nanoseconds> {
+                                       if (auto upstream_info = stream_info.upstreamInfo();
+                                           upstream_info.has_value()) {
+                                         if (auto connection_pool_callback_latency =
+                                                 upstream_info.value()
+                                                     .get()
+                                                     .upstreamTiming()
+                                                     .connectionPoolCallbackLatency();
+                                             connection_pool_callback_latency.has_value()) {
+                                           return connection_pool_callback_latency;
+                                         }
+                                       }
+                                       return absl::nullopt;
+                                     });
+                               }}},
+                             {"TRACE_ID",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       return stream_info.traceId();
+                                     });
+                               }}},
+                             {"SPAN_ID",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](const std::string&, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       return stream_info.spanId();
+                                     });
+                               }}},
+                         });
 }
 
 } // namespace Formatter

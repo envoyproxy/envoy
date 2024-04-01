@@ -904,7 +904,7 @@ public:
    * Set the span id for the stream.
    */
   virtual void setSpanId(std::string span_id) PURE;
-  
+
   /**
    * @return the span id for the stream.
    */
