@@ -148,6 +148,7 @@ type RequestHeaderMap interface {
 	// SetPath set path in header map
 	// This won't refresh route cache, please invoke ClearRouteCache if needed.
 	SetPath(path string)
+	// Note: Scheme is the downstream protocol, we'd better not override it.
 }
 
 type RequestTrailerMap interface {
