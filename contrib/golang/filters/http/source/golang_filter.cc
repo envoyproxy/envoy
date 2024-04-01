@@ -31,13 +31,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Golang {
 
-void Filter::onHeadersModified() {
-  // Any changes to request headers can affect how the request is going to be
-  // routed. If we are changing the headers we also need to clear the route
-  // cache.
-  decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
-}
-
 Http::LocalErrorStatus Filter::onLocalReply(const LocalReplyData& data) {
   auto& state = getProcessorState();
   ASSERT(state.isThreadSafe());
@@ -402,6 +395,22 @@ bool Filter::doTrailer(ProcessorState& state, Http::HeaderMap& trailers) {
 
 /*** APIs for go call C ***/
 
+CAPIStatus Filter::clearRouteCache() {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  ENVOY_LOG(debug, "golang filter clearing route cache");
+  decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
+  return CAPIStatus::CAPIOK;
+}
+
 void Filter::continueEncodeLocalReply(ProcessorState& state) {
   ENVOY_LOG(debug,
             "golang filter continue encodeHeader(local reply from other filters) after return from "
@@ -702,8 +711,6 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value, hea
     default:
       RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
     }
-
-    onHeadersModified();
   } else {
     // should deep copy the string_view before post to dipatcher callback.
     auto key_str = std::string(key);
@@ -728,8 +735,6 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value, hea
         default:
           RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
         }
-
-        onHeadersModified();
       } else {
         ENVOY_LOG(debug, "golang filter has gone or destroyed in setHeader");
       }
@@ -759,7 +764,6 @@ CAPIStatus Filter::removeHeader(absl::string_view key) {
   if (state.isThreadSafe()) {
     // it's safe to write header in the safe thread.
     headers_->remove(Http::LowerCaseString(key));
-    onHeadersModified();
   } else {
     // should deep copy the string_view before post to dipatcher callback.
     auto key_str = std::string(key);
@@ -772,7 +776,6 @@ CAPIStatus Filter::removeHeader(absl::string_view key) {
       if (!weak_ptr.expired() && !hasDestroyed()) {
         Thread::LockGuard lock(mutex_);
         headers_->remove(Http::LowerCaseString(key_str));
-        onHeadersModified();
       } else {
         ENVOY_LOG(debug, "golang filter has gone or destroyed in removeHeader");
       }
