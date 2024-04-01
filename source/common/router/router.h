@@ -478,6 +478,7 @@ public:
   bool downstreamEndStream() const override { return downstream_end_stream_; }
   uint32_t attemptCount() const override { return attempt_count_; }
   const std::list<UpstreamRequestPtr>& upstreamRequests() const { return upstream_requests_; }
+  // Http::UpstreamCallbacks
   void onUpstreamConnectionEstablished() override;
 
   TimeSource& timeSource() { return config_.timeSource(); }
