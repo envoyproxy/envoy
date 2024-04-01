@@ -266,12 +266,12 @@ public:
 #endif
 
   // This function attempts to load Envoy configuration from the specified file
-  // based on the filetype.
+  // based on the file type.
   // It handles .pb .pb_text .json .yaml and .yml files which are well
-  // structured based on the filetype.
+  // structured based on the file type.
   // It has somewhat inconsistent handling of invalid file contents,
   // occasionally failing over to try another type of parsing, or silently
-  // failing insead of throwing an exception.
+  // failing instead of throwing an exception.
   static void loadFromFile(const std::string& path, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 

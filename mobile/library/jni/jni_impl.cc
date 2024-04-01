@@ -1203,7 +1203,7 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_getNativeFilterConfig(JNIEnv* env, jclass,
                                                                        jstring filter_name_jstr) {
   Envoy::JNI::JniHelper jni_helper(env);
-  std::string filter_name = Envoy::JNI::javaStringToString(jni_helper, filter_name_jstr);
+  std::string filter_name = Envoy::JNI::javaStringToCppString(jni_helper, filter_name_jstr);
   std::string filter_config = EngineBuilder::nativeNameToConfig(filter_name);
 
   return jni_helper.newStringUtf(filter_config.c_str()).release();
