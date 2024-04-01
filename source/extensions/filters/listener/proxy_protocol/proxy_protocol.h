@@ -133,6 +133,12 @@ public:
   bool allowRequestsWithoutProxyProtocol() const;
 
   /**
+   * Filter configuration that determines if the filter should base64-encode TLVs before
+   * writing them to metadata.
+   */
+  bool encodeTlvs() const;
+
+  /**
    * Filter configuration that determines if a version is disallowed.
    */
   bool isVersionV1Allowed() const;
@@ -142,6 +148,7 @@ private:
   absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
   const bool allow_requests_without_proxy_protocol_;
   const bool pass_all_tlvs_;
+  const bool encode_tlvs_;
   absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
   bool allow_v1_{true};
   bool allow_v2_{true};

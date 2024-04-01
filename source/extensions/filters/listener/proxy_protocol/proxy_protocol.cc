@@ -17,6 +17,7 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/hex.h"
@@ -108,6 +109,9 @@ Config::Config(
       pass_all_tlvs_(proto_config.has_pass_through_tlvs()
                          ? proto_config.pass_through_tlvs().match_type() ==
                                ProxyProtocolPassThroughTLVs::INCLUDE_ALL
+                         : false),
+      encode_tlvs_(proto_config.has_pass_through_tlvs()
+                         ? proto_config.pass_through_tlvs().encode_tlvs()
                          : false) {
   for (const auto& rule : proto_config.rules()) {
     tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
@@ -159,6 +163,10 @@ size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 
 bool Config::allowRequestsWithoutProxyProtocol() const {
   return allow_requests_without_proxy_protocol_;
+}
+
+bool Config::encodeTlvs() const {
+  return encode_tlvs_;
 }
 
 bool Config::isVersionV1Allowed() const { return allow_v1_; }
@@ -534,6 +542,12 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
       ProtobufWkt::Value metadata_value;
+
+      if (config_->encodeTlvs()) {
+        std::string encoded_tlv_value = Base64::encode(tlv_value.data(), tlv_value.size());
+        tlv_value = absl::string_view(encoded_tlv_value.data(), encoded_tlv_value.size());
+      }
+
       // Sanitize any non utf8 characters.
       auto sanitised_tlv_value = MessageUtil::sanitizeUtf8String(tlv_value);
       metadata_value.set_string_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());

@@ -30,6 +30,10 @@ message ProxyProtocolPassThroughTLVs {
   // TLV type is defined as uint8_t in proxy protocol. See `the spec
   // <https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt>`_ for details.
   repeated uint32 tlv_type = 2 [(validate.rules).repeated = {items {uint32 {lt: 256}}}];
+
+  // This config controls whether TLVs should be base64-encoded before being passed to filter state.
+  // This is useful in cases where the TLVs aren't UTF-8 encoded but need to be passed through.
+  bool encode_tlvs = 3;
 }
 
 message ProxyProtocolConfig {
