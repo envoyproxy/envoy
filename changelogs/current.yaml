@@ -428,6 +428,10 @@ new_features:
 - area: aws
   change: |
     Update credential_provider utility to support EKS Pod Identity provided via token file.
+- area: admin
+  change: |
+    The ``/stats/prometheus`` endpoint can now emit prometheus ``summary`` metric types by explicitly setting the
+    ``histogram_buckets`` query parameter to ``summary``.
 
 deprecated:
 - area: listener
