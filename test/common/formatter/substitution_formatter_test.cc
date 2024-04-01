@@ -916,15 +916,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     std::vector<std::string> time_points{
-        "DS_RX_BEG",
-        "DS_RX_END",
-        "US_TX_BEG",
-        "US_TX_END",
-        "US_RX_BEG",
-        "US_RX_END",
-        "DS_TX_BEG",
-        "DS_TX_END",
-        "custom_time_point",
+        "DS_RX_BEG", "DS_RX_END", "US_TX_BEG", "US_TX_END",         "US_RX_BEG",
+        "US_RX_END", "DS_TX_BEG", "DS_TX_END", "custom_time_point",
     };
 
     std::vector<std::string> precisions{"MS", "US", "NS"};
