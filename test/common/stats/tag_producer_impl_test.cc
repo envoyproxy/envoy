@@ -36,34 +36,36 @@ protected:
 TEST_F(TagProducerTest, CheckConstructor) {
   // Should pass there were no tag name conflict.
   addSpecifier("test.x", "xxx");
-  EXPECT_NO_THROW(TagProducerImpl(stats_config_, {}));
-  EXPECT_NO_THROW(TagProducerImpl(stats_config_, {{"test.y", "yyy"}}));
+  EXPECT_TRUE(TagProducerImpl::createTagProducer(stats_config_, {}).status().ok());
+  EXPECT_TRUE(TagProducerImpl::createTagProducer(stats_config_, {{"test.y", "yyy"}}).status().ok());
 
   // Should not raise an error when duplicate tag names between cli and config.
-  EXPECT_NO_THROW(TagProducerImpl(stats_config_, {{"test.x", "yyy"}}));
+  EXPECT_TRUE(TagProducerImpl::createTagProducer(stats_config_, {{"test.x", "yyy"}}).status().ok());
 
   // Should not raise an error when duplicate tag names are specified.
   addSpecifier("test.x", "yyy");
-  EXPECT_NO_THROW(TagProducerImpl(stats_config_, {{"test.y", "yyy"}}));
+  EXPECT_TRUE(TagProducerImpl::createTagProducer(stats_config_, {{"test.y", "yyy"}}).status().ok());
 
   // Should not raise an error when a cli tag names conflicts with Envoy's default tag names.
-  EXPECT_NO_THROW(TagProducerImpl(stats_config_, {{Config::TagNames::get().CLUSTER_NAME, "yyy"}}));
+  EXPECT_TRUE(TagProducerImpl::createTagProducer(stats_config_,
+                                                 {{Config::TagNames::get().CLUSTER_NAME, "yyy"}})
+                  .status()
+                  .ok());
 
   // Also should raise an error when user defined tag name conflicts with Envoy's default tag names.
   stats_config_.clear_stats_tags();
   stats_config_.mutable_use_all_default_tags()->set_value(true);
   auto& custom_tag_extractor = *stats_config_.mutable_stats_tags()->Add();
   custom_tag_extractor.set_tag_name(Config::TagNames::get().CLUSTER_NAME);
-  EXPECT_NO_THROW(TagProducerImpl(stats_config_, {}));
+  EXPECT_TRUE(TagProducerImpl::createTagProducer(stats_config_, {}).status().ok());
 
   // Non-default custom name without regex should throw
   stats_config_.mutable_use_all_default_tags()->set_value(true);
   stats_config_.clear_stats_tags();
   custom_tag_extractor = *stats_config_.mutable_stats_tags()->Add();
   custom_tag_extractor.set_tag_name("test_extractor");
-  EXPECT_THROW_WITH_MESSAGE(
-      TagProducerImpl(stats_config_, {}), EnvoyException,
-      "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
+  EXPECT_EQ(TagProducerImpl::createTagProducer(stats_config_, {}).status().message(),
+            "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
 
   // Also empty regex should throw
   stats_config_.mutable_use_all_default_tags()->set_value(true);
@@ -71,19 +73,18 @@ TEST_F(TagProducerTest, CheckConstructor) {
   custom_tag_extractor = *stats_config_.mutable_stats_tags()->Add();
   custom_tag_extractor.set_tag_name("test_extractor");
   custom_tag_extractor.set_regex("");
-  EXPECT_THROW_WITH_MESSAGE(
-      TagProducerImpl(stats_config_, {}), EnvoyException,
-      "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
+  EXPECT_EQ(TagProducerImpl::createTagProducer(stats_config_, {}).status().message(),
+            "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
 }
 
 TEST_F(TagProducerTest, DuplicateConfigTagBehavior) {
   addSpecifier(tag_name_values_.RESPONSE_CODE, "\\.(response_code=(\\d{3}));");
   {
-    TagProducerImpl producer{stats_config_};
+    auto producer = TagProducerImpl::createTagProducer(stats_config_, {}).value();
     TagVector tags;
     std::string extracted_name;
     EXPECT_LOG_CONTAINS("warn", "Skipping duplicate tag",
-                        extracted_name = producer.produceTags(
+                        extracted_name = producer->produceTags(
                             "cluster.xds-grpc.response_code=300;upstream_rq_200", tags));
     EXPECT_TRUE(extracted_name == "cluster.;upstream_rq_200" ||
                 extracted_name == "cluster.response_code=300;upstream_rq")
@@ -100,12 +101,14 @@ TEST_F(TagProducerTest, DuplicateConfigTagBehavior) {
 TEST_F(TagProducerTest, DuplicateConfigCliTagBehavior) {
   addSpecifier(tag_name_values_.RESPONSE_CODE, "\\.(response_code=(\\d{3}));");
   {
-    TagProducerImpl producer{stats_config_, {{tag_name_values_.RESPONSE_CODE, "fixed"}}};
+    auto producer = TagProducerImpl::createTagProducer(stats_config_,
+                                                       {{tag_name_values_.RESPONSE_CODE, "fixed"}})
+                        .value();
     TagVector tags;
     const std::string stat_name = "cluster.xds-grpc.response_code=300;upstream_rq_200";
     std::string extracted_name;
     EXPECT_LOG_CONTAINS("warn", "Skipping duplicate tag",
-                        extracted_name = producer.produceTags(stat_name, tags));
+                        extracted_name = producer->produceTags(stat_name, tags));
     EXPECT_TRUE(extracted_name == "cluster.;upstream_rq_200" ||
                 extracted_name == "cluster.response_code=300;upstream_rq" ||
                 extracted_name == stat_name)
@@ -121,9 +124,9 @@ TEST_F(TagProducerTest, DuplicateConfigCliTagBehavior) {
 
 TEST_F(TagProducerTest, Fixed) {
   const TagVector tag_config{{"my-tag", "fixed"}};
-  TagProducerImpl producer{stats_config_, tag_config};
+  auto producer(TagProducerImpl::createTagProducer(stats_config_, tag_config).value());
   TagVector tags;
-  EXPECT_EQ("stat-name", producer.produceTags("stat-name", tags));
+  EXPECT_EQ("stat-name", producer->produceTags("stat-name", tags));
   checkTags(tag_config, tags);
 }
 
@@ -138,12 +141,33 @@ TEST_F(TagProducerTest, FixedTags) {
   // This one isn't a fixed value so it won't be included.
   addSpecifier("regex", "value");
 
-  TagProducerImpl producer{stats_config_, tag_config};
-  const auto& tags = producer.fixedTags();
+  auto producer = TagProducerImpl::createTagProducer(stats_config_, tag_config).value();
+  const auto& tags = producer->fixedTags();
   EXPECT_THAT(tags, testing::UnorderedElementsAreArray(TagVector{
                         {"my-tag", "fixed"},
                         {"tag2", "value2"},
                     }));
+}
+
+TEST(UtilityTest, createTagProducer) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  auto producer = TagProducerImpl::createTagProducer(bootstrap.stats_config(), {}).value();
+  ASSERT_TRUE(producer != nullptr);
+  Stats::TagVector tags;
+  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
+  ASSERT_EQ(extracted_name, "http.rq_total");
+  ASSERT_EQ(tags.size(), 1);
+}
+
+TEST(UtilityTest, createTagProducerWithDefaultTgs) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  auto producer =
+      TagProducerImpl::createTagProducer(bootstrap.stats_config(), {{"foo", "bar"}}).value();
+  ASSERT_TRUE(producer != nullptr);
+  Stats::TagVector tags;
+  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
+  EXPECT_EQ(extracted_name, "http.rq_total");
+  EXPECT_EQ(tags.size(), 2);
 }
 
 } // namespace Stats
