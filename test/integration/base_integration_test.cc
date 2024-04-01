@@ -597,6 +597,7 @@ void BaseIntegrationTest::createXdsConnection() {
 }
 
 void BaseIntegrationTest::cleanUpXdsConnection() {
+  xds_stream_.reset();
   if (xds_connection_ != nullptr) {
     AssertionResult result = xds_connection_->close();
     RELEASE_ASSERT(result, result.message());

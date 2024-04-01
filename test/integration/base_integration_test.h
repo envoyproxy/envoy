@@ -512,6 +512,15 @@ protected:
   // DrainManagerImpl::drainClose().
   Server::DrainStrategy drain_strategy_{Server::DrainStrategy::Gradual};
 
+  // Member variables for xDS testing.
+  FakeUpstream* xds_upstream_{};
+  FakeHttpConnectionPtr xds_connection_;
+  FakeStreamPtr xds_stream_;
+  bool create_xds_upstream_{false};
+  bool tls_xds_upstream_{false};
+  bool use_lds_{true}; // Use the integration framework's LDS set up.
+  bool upstream_tls_{false};
+
   Network::DownstreamTransportSocketFactoryPtr
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -522,15 +531,6 @@ protected:
   // The fake upstreams_ are created using the context_manager, so make sure
   // they are destroyed before it is.
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
-
-  // Member variables for xDS testing.
-  FakeUpstream* xds_upstream_{};
-  FakeHttpConnectionPtr xds_connection_;
-  FakeStreamPtr xds_stream_;
-  bool create_xds_upstream_{false};
-  bool tls_xds_upstream_{false};
-  bool use_lds_{true}; // Use the integration framework's LDS set up.
-  bool upstream_tls_{false};
 
   Grpc::SotwOrDelta sotw_or_delta_{Grpc::SotwOrDelta::Sotw};
 

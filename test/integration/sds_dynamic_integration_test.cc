@@ -1036,6 +1036,7 @@ public:
 
   void TearDown() override {
     {
+      sds_stream_.reset();
       AssertionResult result = sds_connection_->close();
       RELEASE_ASSERT(result, result.message());
       result = sds_connection_->waitForDisconnect();
