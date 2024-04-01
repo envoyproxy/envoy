@@ -98,6 +98,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // [#next-free-field: 18]
 message ExternalProcessor {
+  reserved 4;
+
+  reserved "async_mode";
+
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
   config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
@@ -114,10 +118,6 @@ message ExternalProcessor {
   // Specifies default options for how HTTP headers, trailers, and bodies are
   // sent. See ProcessingMode for details.
   ProcessingMode processing_mode = 3;
-
-  reserved 4;
-
-  reserved "async_mode";
 
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
