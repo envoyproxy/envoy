@@ -329,6 +329,9 @@ new_features:
   change: |
     Added :ref:`Fluentd access logger <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig>`
     to support flushing access logs in `Fluentd format <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
+- area: access_loggers
+  change: |
+    Added ``TRACE_ID`` and ``SPAN_ID`` :ref:`access log formatter <config_access_log_format>`.
 - area: redis
   change: |
     Added support for the ``ECHO`` command.
