@@ -94,6 +94,13 @@ minor_behavior_changes:
     Disables recvmmsg (multi-message) for reading packets from a client QUIC UDP socket, if GRO
     is not set or not supported. recvmsg will be used instead. This behavior change can be
     reverted by setting ``envoy.reloadable_features.disallow_quic_client_udp_mmsg`` to ``false``.
+- area: xds
+  change: |
+    Delta SDS removals will no longer result in a "Missing SDS resources" NACK
+    and instead will be ignored.
+- area: golang
+  change: |
+    Not implicitly clearing route cache in ``HeaderMap.Set``, introduce a new API ``ClearRouteCache`` to do it.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -396,6 +403,13 @@ new_features:
   change: |
     Added :ref:`formatters <envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.formatters>`
     to Fluentd access logger to allow adding extension commands when formatter access logs.
+- area: proxy_protocol
+  change: |
+    Added :ref:`disallowed_versions <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.disallowed_versions>`
+    to enforce the filter only matches specific PROXY protocol versions.
+- area: proxy_protocol
+  change: |
+    Added new statistics to the proxy protocol filter to track connections found/disallowed/errored by PROXY protocol version.
 - area: rbac
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`

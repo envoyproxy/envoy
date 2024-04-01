@@ -224,7 +224,7 @@ public:
 
   // std::equals_to
   bool operator()(const Protobuf::Message& lhs, const Protobuf::Message& rhs) const {
-    return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
+    return Protobuf::util::MessageDifferencer::Equals(lhs, rhs);
   }
 
   class FileExtensionValues {
@@ -581,6 +581,13 @@ public:
    * the input string is valid UTF-8, it will be returned unmodified.
    */
   static std::string sanitizeUtf8String(absl::string_view str);
+
+  /**
+   * Return text proto representation of the `message`.
+   * @param message proto to print.
+   * @return text representation of the proto `message`.
+   */
+  static std::string toTextProto(const Protobuf::Message& message);
 };
 
 class ValueUtil {
