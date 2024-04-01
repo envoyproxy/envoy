@@ -28,7 +28,7 @@ The filter configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.fil
 The audience configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience>` is the URL of the destination service,
 which is the receiving service that the calling service is invoking.
 
-The audience provider configuration :ref:`v3 API reference<envoy_v3_api_enum_value_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.AudienceProvider>` is used to specify how the audience URL will be provided. The default provider is :ref:`CLUSTER_METADATA<envoy_v3_api_enum_value_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.AudienceProvider.CLUSTER_METADATA>.`, where the audience URL will be provided through cluster's metadata field :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`.
+The audience provider configuration :ref:`v3 API reference<envoy_v3_api_enum_value_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.AudienceProvider>` is used to specify how the audience URL will be provided. The default provider is :ref:`CLUSTER_METADATA<envoy_v3_api_enum_value_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.AudienceProvider.CLUSTER_METADATA>`, where the audience URL will be provided through cluster's metadata field :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`.
 
 The token cache configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.TokenCacheConfig>` is used to avoid redundant queries to
 the authentication server (GCE metadata server in the context of this filter) for duplicated tokens.
