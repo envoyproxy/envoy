@@ -1751,8 +1751,8 @@ void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3::Cluster>& c
   }
   // Past the initial write, need move semantics to trigger inotify move event that the
   // FilesystemSubscriptionImpl is subscribed to.
-  std::string path =
-      TestEnvironment::writeStringToFileForTest("cds.update.pb_text", cds_response.DebugString());
+  std::string path = TestEnvironment::writeStringToFileForTest(
+      "cds.update.pb_text", MessageUtil::toTextProto(cds_response));
   TestEnvironment::renameFile(path, cds_path_);
 }
 
@@ -1773,8 +1773,8 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoa
   }
   // Past the initial write, need move semantics to trigger inotify move event that the
   // FilesystemSubscriptionImpl is subscribed to.
-  std::string path =
-      TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
+  std::string path = TestEnvironment::writeStringToFileForTest(
+      "eds.update.pb_text", MessageUtil::toTextProto(eds_response));
   TestEnvironment::renameFile(path, eds_path_);
 }
 

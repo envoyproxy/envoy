@@ -340,7 +340,7 @@ void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Messag
 #endif
 }
 
-void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
+void MessageUtil::unpackToOrThrow(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
   if (!any_message.UnpackTo(&message)) {
     throwEnvoyExceptionOrPanic(fmt::format("Unable to unpack as {}: {}",
@@ -354,8 +354,8 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
   }
 }
 
-absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
-                                          Protobuf::Message& message) {
+absl::Status MessageUtil::unpackTo(const ProtobufWkt::Any& any_message,
+                                   Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
   if (!any_message.UnpackTo(&message)) {
     return absl::InternalError(absl::StrCat("Unable to unpack as ",
@@ -611,6 +611,22 @@ void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst)
   if (!dst.ParseFromString(src.SerializeAsString())) {
     throwEnvoyExceptionOrPanic("Unable to deserialize during wireCast()");
   }
+}
+
+std::string MessageUtil::toTextProto(const Protobuf::Message& message) {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  std::string text_format;
+  Protobuf::TextFormat::Printer printer;
+  printer.SetExpandAny(true);
+  printer.SetHideUnknownFields(true);
+  bool result = printer.PrintToString(message, &text_format);
+  ASSERT(result);
+  return text_format;
+#else
+  // Note that MessageLite::DebugString never had guarantees of producing
+  // serializable text proto representation.
+  return message.DebugString();
+#endif
 }
 
 bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {

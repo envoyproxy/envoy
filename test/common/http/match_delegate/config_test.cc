@@ -77,7 +77,7 @@ xds_matcher:
 )EOF");
 
   MatchDelegateConfig match_delegate_config;
-  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context);
+  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context).value();
 
   Envoy::Http::MockFilterChainFactoryCallbacks factory_callbacks;
   testing::InSequence s;
@@ -96,7 +96,7 @@ xds_matcher:
         EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
       }));
   EXPECT_CALL(factory_callbacks, addAccessLogHandler(testing::IsNull()));
-  cb.value()(factory_callbacks);
+  cb(factory_callbacks);
 }
 
 TEST(MatchWrapper, PerRouteConfig) {
@@ -161,7 +161,7 @@ matcher:
 )EOF");
 
   MatchDelegateConfig match_delegate_config;
-  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context);
+  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context).value();
 
   Envoy::Http::MockFilterChainFactoryCallbacks factory_callbacks;
   testing::InSequence s;
@@ -180,7 +180,7 @@ matcher:
         EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
       }));
   EXPECT_CALL(factory_callbacks, addAccessLogHandler(testing::IsNull()));
-  cb.value()(factory_callbacks);
+  cb(factory_callbacks);
 }
 
 TEST(MatchWrapper, QueryParamMatcherYaml) {
@@ -213,8 +213,8 @@ xds_matcher:
 )EOF");
 
   MatchDelegateConfig match_delegate_config;
-  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context);
-  EXPECT_TRUE(cb.value());
+  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context).value();
+  EXPECT_TRUE(cb);
 }
 
 TEST(MatchWrapper, WithMatcherInvalidDataInput) {
@@ -247,14 +247,12 @@ xds_matcher:
 )EOF");
 
   MatchDelegateConfig match_delegate_config;
-  EXPECT_THROW_WITH_REGEX(
-      match_delegate_config.createFilterFactoryFromProto(config, "", factory_context)
-          .status()
-          .IgnoreError(),
-      EnvoyException,
-      "requirement violation while creating match tree: INVALID_ARGUMENT: data input typeUrl "
-      "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput not permitted "
-      "according to allowlist");
+  EXPECT_EQ(match_delegate_config.createFilterFactoryFromProto(config, "", factory_context)
+                .status()
+                .message(),
+            "requirement violation while creating match tree: INVALID_ARGUMENT: data input typeUrl "
+            "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput not permitted "
+            "according to allowlist");
 }
 
 struct TestAction : Matcher::ActionBase<ProtobufWkt::StringValue> {};

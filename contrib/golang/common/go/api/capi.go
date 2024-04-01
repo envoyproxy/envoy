@@ -20,6 +20,7 @@ package api
 import "unsafe"
 
 type HttpCAPI interface {
+	ClearRouteCache(r unsafe.Pointer)
 	HttpContinue(r unsafe.Pointer, status uint64)
 	HttpSendLocalReply(r unsafe.Pointer, responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
 
