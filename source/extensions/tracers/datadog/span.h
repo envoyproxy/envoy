@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <string>
 
 #include "envoy/common/time.h"
 #include "envoy/tracing/trace_driver.h"
@@ -48,6 +49,7 @@ public:
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;
   std::string getTraceIdAsHex() const override;
+  std::string getSpanIdAsHex() const override;
 
 private:
   datadog::tracing::Optional<datadog::tracing::Span> span_;

@@ -12,6 +12,7 @@
 #include "datadog/sampling_priority.h"
 #include "datadog/span_config.h"
 #include "datadog/trace_segment.h"
+#include "span.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -137,6 +138,13 @@ void Span::setBaggage(absl::string_view, absl::string_view) {
 }
 
 std::string Span::getTraceIdAsHex() const {
+  if (!span_) {
+    return std::string{};
+  }
+  return absl::StrCat(absl::Hex(span_->id()));
+}
+
+std::string Span::getSpanIdAsHex() const {
   if (!span_) {
     return std::string{};
   }
