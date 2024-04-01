@@ -12,7 +12,6 @@
 #include "datadog/sampling_priority.h"
 #include "datadog/span_config.h"
 #include "datadog/trace_segment.h"
-#include "span.h"
 
 namespace Envoy {
 namespace Extensions {
