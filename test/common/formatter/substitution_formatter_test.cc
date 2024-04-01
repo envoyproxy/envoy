@@ -892,6 +892,150 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
         upstream_connection_pool_callback_duration_format.formatValueWithContext({}, stream_info),
         ProtoEq(ValueUtil::numberValue(15.0)));
   }
+
+  {
+    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter upstream_format("COMMON_DURATION"); },
+                              EnvoyException, "COMMON_DURATION requires parameters");
+  }
+
+  {
+    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter duration_format("COMMON_DURATION", "a"); },
+                              EnvoyException, "Invalid common duration configuration: a.");
+  }
+
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        { StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:c:d"); }, EnvoyException,
+        "Invalid common duration configuration: a:b:c:d.");
+  }
+
+  {
+    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:zs"); },
+                              EnvoyException, "Invalid common duration precision: zs.");
+  }
+
+  {
+    std::vector<std::string> time_points{
+        "FIRST_DOWNSTREAM_RX_BYTE_RECEIVED",
+        "LAST_DOWNSTREAM_RX_BYTE_RECEIVED",
+        "FIRST_UPSTREAM_TX_BYTE_SENT",
+        "LAST_UPSTREAM_TX_BYTE_SENT",
+        "FIRST_UPSTREAM_RX_BYTE_RECEIVED",
+        "LAST_UPSTREAM_RX_BYTE_RECEIVED",
+        "FIRST_DOWNSTREAM_TX_BYTE_SENT",
+        "LAST_DOWNSTREAM_TX_BYTE_SENT",
+        "custom_time_point",
+    };
+
+    std::vector<std::string> precisions{"MS", "US", "NS"};
+
+    // No time points set.
+    {
+      NiceMock<StreamInfo::MockStreamInfo> stream_info;
+      MockTimeSystem time_system;
+      for (size_t start_index = 0; start_index < time_points.size(); start_index++) {
+        for (size_t end_index = 0; end_index < time_points.size(); end_index++) {
+          for (auto& precision : precisions) {
+            const std::string sub_command =
+                absl::StrCat(time_points[start_index], ":", time_points[end_index], ":", precision);
+            std::cout << sub_command << std::endl;
+            StreamInfoFormatter duration_format("COMMON_DURATION", sub_command);
+
+            if (start_index == end_index && start_index == 0) {
+              EXPECT_EQ("0", duration_format.formatWithContext({}, stream_info));
+              EXPECT_THAT(duration_format.formatValueWithContext({}, stream_info),
+                          ProtoEq(ValueUtil::numberValue(0)));
+            } else {
+              EXPECT_EQ(absl::nullopt, duration_format.formatWithContext({}, stream_info));
+              EXPECT_THAT(duration_format.formatValueWithContext({}, stream_info),
+                          ProtoEq(ValueUtil::nullValue()));
+            }
+          }
+        }
+      }
+    }
+
+    {
+      NiceMock<StreamInfo::MockStreamInfo> stream_info;
+      MockTimeSystem time_system;
+
+      // FIRST_DOWNSTREAM_RX_BYTE_RECEIVED
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(1000000))));
+      stream_info.start_time_monotonic_ = time_system.monotonicTime();
+
+      // LAST_DOWNSTREAM_RX_BYTE_RECEIVED
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(2000000))));
+      stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
+
+      // FIRST_UPSTREAM_TX_BYTE_SENT
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(3000000))));
+      stream_info.upstream_info_->upstreamTiming().first_upstream_tx_byte_sent_ =
+          time_system.monotonicTime();
+
+      // LAST_UPSTREAM_TX_BYTE_SENT
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(4000000))));
+      stream_info.upstream_info_->upstreamTiming().last_upstream_tx_byte_sent_ =
+          time_system.monotonicTime();
+
+      // FIRST_UPSTREAM_RX_BYTE_RECEIVED
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+      stream_info.upstream_info_->upstreamTiming().first_upstream_rx_byte_received_ =
+          time_system.monotonicTime();
+
+      // LAST_UPSTREAM_RX_BYTE_RECEIVED
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(6000000))));
+      stream_info.upstream_info_->upstreamTiming().last_upstream_rx_byte_received_ =
+          time_system.monotonicTime();
+
+      // FIRST_DOWNSTREAM_TX_BYTE_SENT
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(7000000))));
+      stream_info.downstream_timing_.onFirstDownstreamTxByteSent(time_system);
+
+      // LAST_DOWNSTREAM_TX_BYTE_SENT
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(8000000))));
+      stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
+
+      // custom_time_point
+      stream_info.downstream_timing_.setValue("custom_time_point",
+                                              MonotonicTime(std::chrono::nanoseconds(9000000)));
+
+      for (size_t start_index = 0; start_index < time_points.size(); start_index++) {
+        for (size_t end_index = 0; end_index < time_points.size(); end_index++) {
+          uint64_t precision_factor = 1;
+          for (auto& precision : precisions) {
+            auto current_factor = precision_factor;
+            precision_factor *= 1000;
+
+            const std::string sub_command =
+                absl::StrCat(time_points[start_index], ":", time_points[end_index], ":", precision);
+            std::cout << sub_command << std::endl;
+
+            StreamInfoFormatter duration_format("COMMON_DURATION", sub_command);
+
+            if (start_index > end_index) {
+              EXPECT_EQ(absl::nullopt, duration_format.formatWithContext({}, stream_info));
+              EXPECT_THAT(duration_format.formatValueWithContext({}, stream_info),
+                          ProtoEq(ValueUtil::nullValue()));
+              continue;
+            } else {
+              const auto diff = (end_index - start_index) * current_factor;
+              EXPECT_EQ(std::to_string(diff), duration_format.formatWithContext({}, stream_info));
+              EXPECT_THAT(duration_format.formatValueWithContext({}, stream_info),
+                          ProtoEq(ValueUtil::numberValue(diff)));
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {

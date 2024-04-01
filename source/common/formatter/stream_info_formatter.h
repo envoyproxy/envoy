@@ -31,6 +31,8 @@ using StreamInfoFormatterProviderPtr = std::unique_ptr<StreamInfoFormatterProvid
 using StreamInfoFormatterProviderCreateFunc =
     std::function<StreamInfoFormatterProviderPtr(const std::string&, absl::optional<size_t>)>;
 
+enum class DurationPrecision { Milliseconds, Microseconds, Nanoseconds };
+
 enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort };
 
 /**
@@ -116,6 +118,55 @@ private:
   FilterStateFormat format_;
   std::string field_name_;
   StreamInfo::FilterState::ObjectFactory* factory_;
+};
+
+class CommonDurationFormatter : public StreamInfoFormatterProvider {
+public:
+  using TimePointGetter =
+      std::function<absl::optional<MonotonicTime>(const StreamInfo::StreamInfo&)>;
+
+  static std::unique_ptr<CommonDurationFormatter> create(absl::string_view sub_command);
+
+  CommonDurationFormatter(TimePointGetter start, TimePointGetter end,
+                          DurationPrecision duration_precision)
+      : time_point_start_(std::move(start)), time_point_end_(std::move(end)),
+        duration_precision_(duration_precision) {}
+
+  // StreamInfoFormatterProvider
+  absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+
+  static const absl::flat_hash_map<absl::string_view, TimePointGetter> KnownTimePointGetters;
+
+private:
+  absl::optional<uint64_t> getDurationCount(const StreamInfo::StreamInfo& info) const;
+
+  static TimePointGetter getTimePointGetterByName(absl::string_view name);
+
+  static constexpr absl::string_view MillisecondsPrecision = "MS";
+  static constexpr absl::string_view MicrosecondsPrecision = "US";
+  static constexpr absl::string_view NanosecondsPrecision = "NS";
+
+  static constexpr absl::string_view FirstDownstreamRxByteReceived =
+      "FIRST_DOWNSTREAM_RX_BYTE_RECEIVED"; // Receive downstream request start.
+  static constexpr absl::string_view LastDownstreamRxByteReceived =
+      "LAST_DOWNSTREAM_RX_BYTE_RECEIVED"; // Receive Downstream request end.
+  static constexpr absl::string_view FirstUpstreamTxByteSent =
+      "FIRST_UPSTREAM_TX_BYTE_SENT"; // Send upstream request start.
+  static constexpr absl::string_view LastUpstreamTxByteSent =
+      "LAST_UPSTREAM_TX_BYTE_SENT"; // Send upstream request end.
+  static constexpr absl::string_view FirstUpstreamRxByteReceived =
+      "FIRST_UPSTREAM_RX_BYTE_RECEIVED"; // Receive upstream response start.
+  static constexpr absl::string_view LastUpstreamRxByteReceived =
+      "LAST_UPSTREAM_RX_BYTE_RECEIVED"; // Receive upstream response end.
+  static constexpr absl::string_view FirstDownstreamTxByteSent =
+      "FIRST_DOWNSTREAM_TX_BYTE_SENT"; // Send downstream response start.
+  static constexpr absl::string_view LastDownstreamTxByteSent =
+      "LAST_DOWNSTREAM_TX_BYTE_SENT"; // Send downstream response end.
+
+  TimePointGetter time_point_start_;
+  TimePointGetter time_point_end_;
+  DurationPrecision duration_precision_;
 };
 
 /**

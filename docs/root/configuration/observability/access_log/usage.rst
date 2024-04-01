@@ -394,6 +394,33 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+.. _config_access_log_format_common_duration:
+
+%COMMON_DURATION(START:END:PRECISION)%
+  HTTP
+    Total duration between the START time point and the END time point in specific PRECISION.
+    The START and END time points are specified by the following values:
+
+    * ``START``: The time point of the first byte of downstream request is received.
+    * ``FIRST_DOWNSTREAM_RX_BYTE_RECEIVED``: The time point of the first byte of downstream request is received. Same as ``START``.
+    * ``LAST_DOWNSTREAM_RX_BYTE_RECEIVED``: The time point of the last byte of downstream request is received.
+    * ``FIRST_UPSTREAM_TX_BYTE_SENT``: The time point of the first byte of upstream request is sent.
+    * ``LAST_UPSTREAM_TX_BYTE_SENT``: The time point of the last byte of upstream request is sent.
+    * ``FIRST_UPSTREAM_RX_BYTE_RECEIVED``: The time point of the first byte of upstream response is received.
+    * ``LAST_UPSTREAM_RX_BYTE_RECEIVED``: The time point of the last byte of upstream response is received.
+    * ``FIRST_DOWNSTREAM_TX_BYTE_SENT``: The time point of the first byte of downstream response is sent.
+    * ``LAST_DOWNSTREAM_TX_BYTE_SENT``: The time point of the last byte of downstream response is sent.
+    * Dynamic value: Any other values will be treated as custom time points that set by named keys in the downstream timing.
+
+    The PRECISION is specified by the following values:
+
+    * ``MS``: Millisecond precision.
+    * ``US``: Microsecond precision.
+    * ``NS``: Nanosecond precision.
+
+  TCP/UDP
+    Not implemented ("-").
+
 %REQUEST_DURATION%
   HTTP
     Total duration in milliseconds of the request from the start time to the last byte of
