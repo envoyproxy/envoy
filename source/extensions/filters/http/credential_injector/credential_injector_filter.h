@@ -38,10 +38,6 @@ public:
                const std::string& stats_prefix, Stats::Scope& scope);
   CredentialInjectorStats& stats() { return stats_; }
 
-  CredentialInjector::RequestPtr requestCredential(CredentialInjector::Callbacks& callbacks) {
-    return injector_->requestCredential(callbacks);
-  }
-
   // Inject configured credential to the HTTP request header.
   // return should continue processing the request or not
   bool injectCredential(Envoy::Http::RequestHeaderMap& headers);
@@ -63,40 +59,18 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 // The Envoy filter to inject credentials.
 class CredentialInjectorFilter : public Envoy::Http::PassThroughDecoderFilter,
-                                 public CredentialInjector::Callbacks,
                                  public Logger::Loggable<Logger::Id::credential_injector> {
 public:
   CredentialInjectorFilter(FilterConfigSharedPtr config);
-
-  // Http::StreamFilterBase
-  void onDestroy() override;
 
   // Http::StreamDecoderFilter
   Envoy::Http::FilterHeadersStatus decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
                                                  bool) override;
   void setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallbacks&) override;
 
-  // CredentialInjector::Callbacks
-  void onSuccess() override;
-  void onFailure(absl::string_view reason) override;
-
 private:
   Envoy::Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
-  Envoy::Http::RequestHeaderMap* request_headers_{};
-
   FilterConfigSharedPtr config_;
-
-  // Tracks any outstanding in-flight credential requests, allowing us to cancel the request
-  // if the filter ends before the request completes.
-  CredentialInjector::RequestPtr in_flight_credential_request_;
-
-  // Tracks whether we have stopped iteration to wait for the credential provider.
-  bool stop_iteration_ = false;
-
-  // Tracks whether we have initialized the credential provider.
-  bool credential_init_ = false;
-  // Tracks whether the credential provider has succeeded.
-  bool credential_success_ = false;
 };
 
 } // namespace CredentialInjector

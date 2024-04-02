@@ -47,42 +47,6 @@ CredentialInjectorFilter::CredentialInjectorFilter(FilterConfigSharedPtr config)
 
 Envoy::Http::FilterHeadersStatus
 CredentialInjectorFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) {
-  // Initiate the credential provider if not already done.
-  if (!credential_init_) {
-    // Save the pointer to the request headers for header manipulation based on credential provider
-    // response later.
-    request_headers_ = &headers;
-
-    in_flight_credential_request_ = config_->requestCredential(*this);
-
-    // If the callback is called immediately, continue decoding.
-    // We don't need to inject credential here because the credential has been injected in the
-    // onSuccess callback.
-    if (credential_init_) {
-      return Envoy::Http::FilterHeadersStatus::Continue;
-    }
-
-    // pause while we await the credential provider to retrieve the credential, for example, an
-    // oauth2 credential provider may need to make a remote call to retrieve the credential.
-    stop_iteration_ = true;
-    return Envoy::Http::FilterHeadersStatus::StopAllIterationAndBuffer;
-  }
-
-  // The credential provider has failed to retrieve the credential
-  if (!credential_success_) {
-    config_->stats().failed_.inc();
-
-    if (!config_->allowRequestWithoutCredential()) {
-      decoder_callbacks_->sendLocalReply(Envoy::Http::Code::Unauthorized,
-                                         "Failed to inject credential.", nullptr, absl::nullopt,
-                                         "failed_to_inject_credential");
-      return Envoy::Http::FilterHeadersStatus::StopIteration;
-    }
-
-    return Envoy::Http::FilterHeadersStatus::Continue;
-  }
-
-  // The credential provider has successfully retrieved the credential, inject it to the header
   bool succeed = config_->injectCredential(headers);
   if (!succeed && !config_->allowRequestWithoutCredential()) {
     decoder_callbacks_->sendLocalReply(Envoy::Http::Code::Unauthorized,
@@ -94,61 +58,9 @@ CredentialInjectorFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, 
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
-void CredentialInjectorFilter::onSuccess() {
-  credential_init_ = true;
-  credential_success_ = true;
-  in_flight_credential_request_ = nullptr;
-
-  assert(request_headers_ != nullptr);
-  bool succeed = config_->injectCredential(*request_headers_);
-  if (!succeed && !config_->allowRequestWithoutCredential()) {
-    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::Unauthorized,
-                                       "Failed to inject credential.", nullptr, absl::nullopt,
-                                       "failed_to_inject_credential");
-    request_headers_ = nullptr;
-    return;
-  }
-
-  // Only continue decoding if the callback is called from another thread.
-  if (stop_iteration_) {
-    stop_iteration_ = false;
-    decoder_callbacks_->continueDecoding();
-  }
-}
-
-void CredentialInjectorFilter::onFailure(absl::string_view reason) {
-  credential_init_ = true; // TODO: retry after a certain period of time
-  credential_success_ = false;
-  in_flight_credential_request_ = nullptr;
-  request_headers_ = nullptr;
-
-  // Credential provider has failed to retrieve the credential
-  ENVOY_LOG(warn, "Failed to get credential: {}", reason);
-  config_->stats().failed_.inc();
-
-  if (!config_->allowRequestWithoutCredential()) {
-    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::Unauthorized,
-                                       "Failed to inject credential.", nullptr, absl::nullopt,
-                                       "failed_to_inject_credential");
-    return;
-  }
-
-  // Only continue decoding if the callback is called from another thread.
-  if (stop_iteration_) {
-    stop_iteration_ = false;
-    decoder_callbacks_->continueDecoding();
-  }
-}
-
 void CredentialInjectorFilter::setDecoderFilterCallbacks(
     Envoy::Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
-}
-
-void CredentialInjectorFilter::onDestroy() {
-  if (in_flight_credential_request_ != nullptr) {
-    in_flight_credential_request_->cancel();
-  }
 }
 
 } // namespace CredentialInjector
