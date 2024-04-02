@@ -125,7 +125,7 @@ message ProcessingRequest {
   bool observability_mode = 10;
 }
 
-// For every ProcessingRequest received by the server with the ``async_mode`` field
+// For every ProcessingRequest received by the server with the ``observability_mode`` field
 // set to false, the server must send back exactly one ProcessingResponse message.
 // [#next-free-field: 11]
 message ProcessingResponse {
