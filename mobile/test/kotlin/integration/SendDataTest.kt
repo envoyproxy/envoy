@@ -19,7 +19,6 @@ private const val TEST_RESPONSE_FILTER_TYPE =
   "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
 private const val REQUEST_STRING_MATCH = "match_me"
 
-// TODO(fredyw): Figure out why HttpTestServer prevents EngineBuilder from using native filters.
 class SendDataTest {
   init {
     JniLibrary.loadTestLibrary()
