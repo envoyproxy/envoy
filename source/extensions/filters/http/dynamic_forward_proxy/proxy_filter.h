@@ -35,6 +35,7 @@ public:
 };
 
 class ProxyFilterConfig : public Upstream::ClusterUpdateCallbacks,
+                          public std::enable_shared_from_this<ProxyFilterConfig>,
                           Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   ProxyFilterConfig(
@@ -79,12 +80,13 @@ private:
 
   // Per-thread cluster info including pending callbacks.
   struct ThreadLocalClusterInfo : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalClusterInfo(ProxyFilterConfig& parent) : parent_{parent} {
-      handle_ = parent.addThreadLocalClusterUpdateCallbacks();
+    ThreadLocalClusterInfo(std::shared_ptr<ProxyFilterConfig> parent) : parent_{parent} {
+      handle_ = parent->addThreadLocalClusterUpdateCallbacks();
     }
     ~ThreadLocalClusterInfo() override;
     absl::flat_hash_map<std::string, std::list<LoadClusterEntryHandleImpl*>> pending_clusters_;
-    ProxyFilterConfig& parent_;
+    std::weak_ptr<ProxyFilterConfig> parent_;
+    //ProxyFilterConfig& parent_;
     Upstream::ClusterUpdateCallbacksHandlePtr handle_;
   };
 
