@@ -27,7 +27,12 @@ class ReceiveDataTest {
   @Before
   fun setUp() {
     httpTestServer =
-      HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP2_WITH_TLS, mapOf(), "data")
+      HttpTestServerFactory.start(
+        HttpTestServerFactory.Type.HTTP2_WITH_TLS,
+        mapOf(),
+        "data",
+        mapOf()
+      )
   }
 
   @After
