@@ -57,7 +57,11 @@ public class QuicTestServerTest {
     CountDownLatch latch = new CountDownLatch(1);
     engine = new AndroidEngineBuilder(appContext,
                                       new Custom(String.format(CONFIG, httpTestServer.getPort())))
-                 .addLogLevel(LogLevel.WARN)
+                 .addLogLevel(LogLevel.DEBUG)
+                 .setLogger((level, message) -> {
+                   System.out.print(message);
+                   return null;
+                 })
                  .setOnEngineRunning(() -> {
                    latch.countDown();
                    return null;
