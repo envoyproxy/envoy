@@ -19,7 +19,7 @@ namespace Ssl {
 //
 // When adding or changing this interface, it is likely that a change is needed to
 // `DefaultCertValidator::updateDigestForSessionId` in
-// `source/extensions/transport_sockets/tls/cert_validator/default_validator.cc`.
+// `source/common/tls/cert_validator/default_validator.cc`.
 class CertificateValidationContextConfig {
 public:
   virtual ~CertificateValidationContextConfig() = default;

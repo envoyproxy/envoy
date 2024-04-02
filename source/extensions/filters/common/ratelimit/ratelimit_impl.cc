@@ -127,12 +127,14 @@ ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
                           const std::chrono::milliseconds timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
-  return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(
+  auto client_or_error =
       context.serverFactoryContext()
           .clusterManager()
           .grpcAsyncClientManager()
-          .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true),
-      timeout);
+          .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true);
+  THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+  return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(client_or_error.value(),
+                                                                      timeout);
 }
 
 } // namespace RateLimit

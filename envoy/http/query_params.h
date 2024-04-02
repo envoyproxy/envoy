@@ -4,10 +4,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/http/header_map.h"
+
 #include "absl/container/btree_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "header_map.h"
 
 namespace Envoy {
 namespace Http {

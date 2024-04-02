@@ -1,10 +1,9 @@
+load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
+
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
-load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load(":envoy_binary.bzl", "envoy_cc_binary")
-load(":envoy_library.bzl", "tcmalloc_external_deps")
-load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",
@@ -17,6 +16,8 @@ load(
     "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
+load(":envoy_library.bzl", "tcmalloc_external_deps")
+load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
 
 # Envoy C++ related test infrastructure (that want gtest, gmock, but may be
 # relied on by envoy_cc_test_library) should use this function.
@@ -154,6 +155,7 @@ def envoy_cc_test(
         tags = [],
         args = [],
         copts = [],
+        linkopts = [],
         condition = None,
         shard_count = None,
         coverage = True,
@@ -170,7 +172,7 @@ def envoy_cc_test(
         data = data,
         copts = envoy_copts(repository, test = True) + copts + envoy_pch_copts(repository, "//test:test_pch"),
         additional_linker_inputs = envoy_exported_symbols_input(),
-        linkopts = _envoy_test_linkopts(),
+        linkopts = _envoy_test_linkopts() + linkopts,
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
         deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
@@ -228,6 +230,7 @@ def envoy_cc_test_binary(
         tags = [],
         deps = [],
         stamp = 0,
+        linkstatic = True,
         **kargs):
     envoy_cc_binary(
         name,
@@ -238,6 +241,7 @@ def envoy_cc_test_binary(
             "@envoy//test/test_common:test_version_linkstamp",
         ],
         stamp = stamp,
+        linkstatic = linkstatic,
         **kargs
     )
 

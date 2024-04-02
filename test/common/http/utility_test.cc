@@ -527,22 +527,11 @@ TEST(HttpUtility, updateAuthority) {
 
   // Test that we only append to x-forwarded-host if it is not already present.
   {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.append_xfh_idempotent", "true"}});
     TestRequestHeaderMapImpl headers{{":authority", "dns.name"},
                                      {"x-forwarded-host", "host.com,dns.name"}};
     Utility::updateAuthority(headers, "newhost.com", true);
     EXPECT_EQ("newhost.com", headers.get_(":authority"));
     EXPECT_EQ("host.com,dns.name", headers.get_("x-forwarded-host"));
-  }
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.append_xfh_idempotent", "false"}});
-    TestRequestHeaderMapImpl headers{{":authority", "dns.name"},
-                                     {"x-forwarded-host", "host.com,dns.name"}};
-    Utility::updateAuthority(headers, "newhost.com", true);
-    EXPECT_EQ("newhost.com", headers.get_(":authority"));
-    EXPECT_EQ("host.com,dns.name,dns.name", headers.get_("x-forwarded-host"));
   }
 }
 
@@ -1358,8 +1347,8 @@ num_retries: 10
 
   envoy::config::core::v3::RetryPolicy core_retry_policy2;
   TestUtility::loadFromYaml(core_policy2, core_retry_policy2);
-  EXPECT_THROW_WITH_MESSAGE(Utility::validateCoreRetryPolicy(core_retry_policy2), EnvoyException,
-                            "max_interval must be greater than or equal to the base_interval");
+  EXPECT_EQ(Utility::validateCoreRetryPolicy(core_retry_policy2).message(),
+            "max_interval must be greater than or equal to the base_interval");
 }
 
 // Validates TE header is stripped if it contains an unsupported value

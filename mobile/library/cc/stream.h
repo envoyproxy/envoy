@@ -8,12 +8,12 @@
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
-class Engine;
+class InternalEngine;
 namespace Platform {
 
 class Stream {
 public:
-  Stream(Envoy::Engine* engine, envoy_stream_t handle);
+  Stream(Envoy::InternalEngine* engine, envoy_stream_t handle);
 
   Stream& sendHeaders(RequestHeadersSharedPtr headers, bool end_stream);
   Stream& sendData(envoy_data data);
@@ -23,7 +23,7 @@ public:
   void cancel();
 
 private:
-  Envoy::Engine* engine_;
+  Envoy::InternalEngine* engine_;
   envoy_stream_t handle_;
 };
 

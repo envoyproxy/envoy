@@ -1,4 +1,3 @@
-#include "processor_state.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -424,7 +423,7 @@ void DecodingProcessorState::clearRouteCache(const CommonResponse& common_respon
   if (!common_response.clear_route_cache()) {
     return;
   }
-  if (filter_.config().isUpstreamFilter()) {
+  if (filter_.config().isUpstream()) {
     filter_.stats().clear_route_cache_upstream_ignored_.inc();
     ENVOY_LOG(debug, "NOT clearing route cache. The filter is in upstream filter chain.");
     return;

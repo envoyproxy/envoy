@@ -6,6 +6,7 @@
 
 #include "source/common/stats/stats_matcher_impl.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
@@ -18,7 +19,8 @@ public:
   StatsMatcherPerf() : pool_(symbol_table_) {}
 
   void initMatcher() {
-    stats_matcher_impl_ = std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_);
+    stats_matcher_impl_ =
+        std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_);
   }
 
   envoy::type::matcher::v3::StringMatcher* inclusionList() {
@@ -28,6 +30,7 @@ public:
     return stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns();
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   SymbolTableImpl symbol_table_;
   StatNamePool pool_;
   std::unique_ptr<StatsMatcherImpl> stats_matcher_impl_;

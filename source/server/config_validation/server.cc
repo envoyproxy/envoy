@@ -5,6 +5,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "source/common/common/utility.h"
+#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/event/real_time_system.h"
@@ -12,12 +13,12 @@
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/admin/admin_factory_context.h"
 #include "source/server/listener_manager_factory.h"
 #include "source/server/overload_manager_impl.h"
 #include "source/server/regex_engine.h"
-#include "source/server/ssl_context_manager.h"
 #include "source/server/utils.h"
 
 namespace Envoy {
@@ -87,8 +88,8 @@ void ValidationInstance::initialize(const Options& options,
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options,
-                                    messageValidationContext().staticValidationVisitor(), *api_);
+  THROW_IF_NOT_OK(InstanceUtil::loadBootstrapConfig(
+      bootstrap_, options, messageValidationContext().staticValidationVisitor(), *api_));
 
   if (bootstrap_.has_application_log_config()) {
     THROW_IF_NOT_OK(
@@ -97,10 +98,10 @@ void ValidationInstance::initialize(const Options& options,
   }
 
   // Inject regex engine to singleton.
-  Regex::EnginePtr regex_engine = createRegexEngine(
+  regex_engine_ = createRegexEngine(
       bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
 
-  Config::Utility::createTagProducer(bootstrap_, options_.statsTags());
+  Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags());
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
     *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
   }
@@ -114,7 +115,7 @@ void ValidationInstance::initialize(const Options& options,
       messageValidationContext().staticValidationVisitor(), *api_, options_);
   absl::Status creation_status = absl::OkStatus();
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
-  THROW_IF_NOT_OK(creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
   AdminFactoryContext factory_context(*this, std::make_shared<ListenerInfoImpl>());
   initial_config.initAdminAccessLog(bootstrap_, factory_context);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
@@ -131,7 +132,9 @@ void ValidationInstance::initialize(const Options& options,
             "Component factory should not return nullptr from createDrainManager()");
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
-  ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
+  ssl_context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(server_contexts_);
+
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },

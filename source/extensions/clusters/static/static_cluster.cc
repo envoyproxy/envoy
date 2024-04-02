@@ -10,8 +10,8 @@ namespace Upstream {
 StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                      ClusterFactoryContext& context)
     : ClusterImplBase(cluster, context),
-      priority_state_manager_(
-          new PriorityStateManager(*this, context.serverFactoryContext().localInfo(), nullptr)) {
+      priority_state_manager_(new PriorityStateManager(
+          *this, context.serverFactoryContext().localInfo(), nullptr, random_)) {
   const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
       cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(

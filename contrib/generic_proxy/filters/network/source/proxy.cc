@@ -31,15 +31,15 @@ Tracing::Decision tracingDecision(const Tracing::ConnectionManagerTracingConfig&
   return {Tracing::Reason::NotTraceable, false};
 }
 
-StreamInfo::ResponseFlag
+StreamInfo::CoreResponseFlag
 responseFlagFromDownstreamReasonReason(DownstreamStreamResetReason reason) {
   switch (reason) {
   case DownstreamStreamResetReason::ConnectionTermination:
-    return StreamInfo::ResponseFlag::DownstreamConnectionTermination;
+    return StreamInfo::CoreResponseFlag::DownstreamConnectionTermination;
   case DownstreamStreamResetReason::LocalConnectionTermination:
-    return StreamInfo::ResponseFlag::LocalReset;
+    return StreamInfo::CoreResponseFlag::LocalReset;
   case DownstreamStreamResetReason::ProtocolError:
-    return StreamInfo::ResponseFlag::DownstreamProtocolError;
+    return StreamInfo::CoreResponseFlag::DownstreamProtocolError;
   }
   PANIC("Unknown reset reason");
 }
@@ -107,7 +107,7 @@ bool ActiveStream::spawnUpstreamSpan() const {
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() {
   return parent_.downstreamConnection().dispatcher();
 }
-const CodecFactory& ActiveStream::downstreamCodec() { return parent_.config_->codecFactory(); }
+const CodecFactory& ActiveStream::codecFactory() { return parent_.config_->codecFactory(); }
 void ActiveStream::resetStream(DownstreamStreamResetReason reason) {
   if (active_stream_reset_) {
     return;

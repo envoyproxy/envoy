@@ -4,8 +4,6 @@
 
 #include "source/common/event/dispatcher_impl.h"
 
-#include "dns.h"
-
 namespace Envoy {
 namespace Event {
 

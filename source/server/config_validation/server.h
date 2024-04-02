@@ -27,7 +27,6 @@
 #include "source/server/config_validation/admin.h"
 #include "source/server/config_validation/api.h"
 #include "source/server/config_validation/cluster_manager.h"
-#include "source/server/config_validation/dns.h"
 #include "source/server/hot_restart_nop_impl.h"
 #include "source/server/server.h"
 
@@ -123,6 +122,7 @@ public:
   bool enableReusePortDefault() override { return true; }
 
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
+  Regex::Engine& regexEngine() override { return *regex_engine_; }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
@@ -194,6 +194,7 @@ private:
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
   Server::DrainManagerPtr drain_manager_;
   HotRestartNopImpl nop_hot_restart_;
+  Regex::EnginePtr regex_engine_;
 };
 
 } // namespace Server

@@ -12,13 +12,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-class ExternalProcessingFilterFactory
+class ExternalProcessingFilterConfig
     : public Common::DualFactoryBase<
           envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor,
           envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute> {
 
 public:
-  ExternalProcessingFilterFactory() : DualFactoryBase("envoy.filters.http.ext_proc") {}
+  ExternalProcessingFilterConfig() : DualFactoryBase("envoy.filters.http.ext_proc") {}
 
 private:
   static constexpr uint64_t DefaultMessageTimeoutMs = 200;
@@ -33,9 +33,17 @@ private:
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
+
+  #if 0
+  // This needs to be changed after https://github.com/envoyproxy/envoy/pull/33013 is merged.
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& server_context);
+  #endif
 };
 
-using UpstreamExternalProcessingFilterFactory = ExternalProcessingFilterFactory;
+using UpstreamExternalProcessingFilterConfig = ExternalProcessingFilterConfig;
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters

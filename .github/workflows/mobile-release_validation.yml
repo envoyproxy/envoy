@@ -51,10 +51,7 @@ jobs:
       request: ${{ needs.load.outputs.request }}
       runs-on: macos-12
       source: |
-        # TODO(fredyw): A workaround since mobile/WORKSPACE always requires Android SDK to be available
-        # and the GitHub Action runner image no longer includes Android SDK 30:
-        # https://github.com/actions/runner-images/issues/8952
-        ./ci/mac_ci_setup.sh --android
+        source ./ci/mac_ci_setup.sh
       # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
       steps-post: |
         - run: |

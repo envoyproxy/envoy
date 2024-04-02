@@ -1,5 +1,6 @@
 package test.kotlin.integration
 
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -18,14 +19,11 @@ import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
 private const val FILTER_NAME = "cancel_validation_filter"
-private const val PBF_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
-private const val LOCAL_ERROR_FILTER_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
+private const val LOCAL_ERROR_FILTER_CONFIG =
+  "[type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError] {}"
 
 class CancelGRPCStreamTest {
 
@@ -77,11 +75,7 @@ class CancelGRPCStreamTest {
           name = FILTER_NAME,
           factory = { CancelValidationFilter(filterExpectation) }
         )
-        .addNativeFilter(
-          "envoy.filters.http.platform_bridge",
-          "{'@type': $PBF_TYPE, platform_filter_name: $FILTER_NAME}"
-        )
-        .addNativeFilter("envoy.filters.http.local_error", "{'@type': $LOCAL_ERROR_FILTER_TYPE}")
+        .addNativeFilter("envoy.filters.http.local_error", "$LOCAL_ERROR_FILTER_CONFIG")
         .build()
 
     val client = GRPCClient(engine.streamClient())

@@ -27,7 +27,7 @@ namespace Upstream {
 // weights and an O(log n) pick time.
 template <class C> class EdfScheduler : public Scheduler<C> {
 public:
-  EdfScheduler() {}
+  EdfScheduler() = default;
 
   // See scheduler.h for an explanation of each public method.
   std::shared_ptr<C> peekAgain(std::function<double(const C&)> calculate_weight) override {
@@ -89,7 +89,7 @@ public:
                         }));
 
     // Nothing to do if there are no entries.
-    if (entries.size() == 0) {
+    if (entries.empty()) {
       return EdfScheduler<C>();
     }
 

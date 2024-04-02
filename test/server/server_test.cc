@@ -495,7 +495,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
       startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
 
   // Wait till stats are flushed to custom sink and validate that the actual flush happens.
-  TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_);
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
@@ -591,10 +591,12 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
       post_init = true;
       post_init_fired.Notify();
     });
-    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
-      shutdown = true;
-      shutdown_begin.Notify();
-    });
+    ServerLifecycleNotifier::HandlePtr handle3 =
+        server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
+          shutdown = true;
+          shutdown_begin.Notify();
+          handle3 = nullptr;
+        });
     auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                              [&](Event::PostCb completion_cb) {
                                                // Block till we're told to complete
@@ -612,7 +614,7 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
     server_->run();
     handle1 = nullptr;
     handle2 = nullptr;
-    handle3 = nullptr;
+    // handle3 is nulled out in the callback itself, to test that works as well
     handle4 = nullptr;
     server_ = nullptr;
     thread_local_ = nullptr;
@@ -668,7 +670,7 @@ protected:
     EXPECT_CALL(restart_, drainParentListeners);
   }
 
-  ~ServerInstanceImplWorkersTest() {
+  ~ServerInstanceImplWorkersTest() override {
     server_->dispatcher().post([&] { server_->shutdown(); });
     server_thread_->join();
   }
@@ -1345,10 +1347,10 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
-  server_.reset(new InstanceImpl(
+  server_ = std::make_unique<InstanceImpl>(
       *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
       std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
-      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr));
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
   EXPECT_THROW_WITH_MESSAGE(
       server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                           component_factory_),

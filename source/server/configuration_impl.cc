@@ -10,6 +10,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
@@ -23,7 +24,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -276,11 +276,13 @@ void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstr
   }
 
   if (!admin.access_log_path().empty()) {
-    Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File,
-                                          admin.access_log_path()};
-    admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-        file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
-        factory_context.serverFactoryContext().accessLogManager()));
+    envoy::extensions::access_loggers::file::v3::FileAccessLog config;
+    config.mutable_format();
+    config.set_path(admin.access_log_path());
+
+    auto factory = Config::Utility::getFactoryByName<AccessLog::AccessLogInstanceFactory>(
+        "envoy.file_access_log");
+    admin_.access_logs_.emplace_back(factory->createAccessLogInstance(config, {}, factory_context));
   }
 }
 

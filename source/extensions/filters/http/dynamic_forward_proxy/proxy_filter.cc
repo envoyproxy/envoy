@@ -379,7 +379,8 @@ void ProxyFilter::onDnsResolutionFail() {
     return;
   }
 
-  decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DnsResolutionFailed);
+  decoder_callbacks_->streamInfo().setResponseFlag(
+      StreamInfo::CoreResponseFlag::DnsResolutionFailed);
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                      ResponseStrings::get().DnsResolutionFailure, nullptr,
                                      absl::nullopt, RcDetails::get().DnsResolutionFailure);

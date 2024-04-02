@@ -1,5 +1,6 @@
 package test.kotlin.integration
 
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.KeyValueStore
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
@@ -8,12 +9,11 @@ import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.fail
+import org.junit.Assert.fail
 import org.junit.Test
 
-private const val TEST_RESPONSE_FILTER_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
+private const val TEST_RESPONSE_FILTER_CONFIG =
+  "[type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse]{}"
 private const val TEST_KEY = "foo"
 private const val TEST_VALUE = "bar"
 
@@ -47,9 +47,9 @@ class KeyValueStoreTest {
         .addKeyValueStore("envoy.key_value.platform_test", testKeyValueStore)
         .addNativeFilter(
           "envoy.filters.http.test_kv_store",
-          "{'@type': type.googleapis.com/envoymobile.extensions.filters.http.test_kv_store.TestKeyValueStore, kv_store_name: envoy.key_value.platform_test, test_key: $TEST_KEY, test_value: $TEST_VALUE}"
+          "[type.googleapis.com/envoymobile.extensions.filters.http.test_kv_store.TestKeyValueStore] { kv_store_name: 'envoy.key_value.platform_test', test_key: '$TEST_KEY', test_value: '$TEST_VALUE'}"
         )
-        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
+        .addNativeFilter("test_remote_response", "$TEST_RESPONSE_FILTER_CONFIG")
         .build()
     val client = engine.streamClient()
 

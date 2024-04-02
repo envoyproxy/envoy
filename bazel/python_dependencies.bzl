@@ -1,6 +1,6 @@
-load("@rules_python//python:pip.bzl", "pip_parse")
-load("@python3_11//:defs.bzl", "interpreter")
 load("@envoy_toolshed//:packages.bzl", "load_packages")
+load("@python3_11//:defs.bzl", "interpreter")
+load("@rules_python//python:pip.bzl", "pip_parse")
 
 def envoy_python_dependencies():
     # TODO(phlax): rename base_pip3 -> pip3 and remove this

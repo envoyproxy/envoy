@@ -8,7 +8,7 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.XdsBuilder
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.testing.TestJni
+import io.envoyproxy.envoymobile.engine.testing.XdsTestServerFactory
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import org.junit.After
@@ -27,11 +27,13 @@ class XdsTest {
     JniLibrary.load()
   }
 
+  private lateinit var xdsTestServer: XdsTestServerFactory.XdsTestServer
+
   @Before
   fun setUp() {
     val upstreamCert: String =
       File("../envoy/test/config/integration/certs/upstreamcacert.pem").readText()
-    TestJni.initXdsTestServer()
+    xdsTestServer = XdsTestServerFactory.create()
     val latch = CountDownLatch(1)
     engine =
       AndroidEngineBuilder(appContext)
@@ -39,46 +41,28 @@ class XdsTest {
         .setOnEngineRunning { latch.countDown() }
         .setXds(
           XdsBuilder(
-              TestJni.getXdsTestServerHost(),
-              TestJni.getXdsTestServerPort(),
+              xdsTestServer.host,
+              xdsTestServer.port,
             )
             .setSslRootCerts(upstreamCert)
             .addClusterDiscoveryService()
         )
         .build()
     latch.await()
-    TestJni.startXdsTestServer()
+    xdsTestServer.start()
   }
 
   @After
   fun tearDown() {
     engine.terminate()
-    TestJni.shutdownXdsTestServer()
+    xdsTestServer.shutdown()
   }
 
   @Test
   fun `test xDS with CDS`() {
     // There are 2 initial clusters: base and base_clear.
     engine.waitForStatGe("cluster_manager.cluster_added", 2)
-    val cdsResponse =
-      """
-      version_info: v1
-      resources:
-      - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
-        name: my_cluster
-        type: STATIC
-        connect_timeout: 5s
-        typed_extension_protocol_options:
-          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-            explicit_http_config:
-              http2_protocol_options:
-                {}
-      type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
-      nonce: nonce1
-    """
-        .trimIndent()
-    TestJni.sendDiscoveryResponse(cdsResponse)
+    xdsTestServer.sendDiscoveryResponse("my_cluster")
     // There are now 3 clusters: base, base_cluster, and my_cluster.
     engine.waitForStatGe("cluster_manager.cluster_added", 3)
   }

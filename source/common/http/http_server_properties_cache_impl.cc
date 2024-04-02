@@ -3,8 +3,8 @@
 #include <memory>
 
 #include "source/common/common/logger.h"
+#include "source/common/http/http3_status_tracker_impl.h"
 
-#include "http3_status_tracker_impl.h"
 #include "quiche/spdy/core/spdy_alt_svc_wire_format.h"
 #include "re2/re2.h"
 

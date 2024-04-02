@@ -86,8 +86,8 @@ AggregateClusterLoadBalancer::linearizePrioritySet(OptRef<const std::string> exc
       if (!host_set->hosts().empty()) {
         priority_context->priority_set_.updateHosts(
             next_priority_after_linearizing, Upstream::HostSetImpl::updateHostsParams(*host_set),
-            host_set->localityWeights(), host_set->hosts(), {}, host_set->weightedPriorityHealth(),
-            host_set->overprovisioningFactor());
+            host_set->localityWeights(), host_set->hosts(), {}, random_.random(),
+            host_set->weightedPriorityHealth(), host_set->overprovisioningFactor());
         priority_context->priority_to_cluster_.emplace_back(
             std::make_pair(priority_in_current_cluster, tlc));
 

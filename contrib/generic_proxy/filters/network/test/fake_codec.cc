@@ -15,9 +15,8 @@ ClientCodecPtr FakeStreamCodecFactory::createClientCodec() const {
   return std::make_unique<FakeClientCodec>();
 }
 
-CodecFactoryPtr
-FakeStreamCodecFactoryConfig::createCodecFactory(const Protobuf::Message&,
-                                                 Envoy::Server::Configuration::FactoryContext&) {
+CodecFactoryPtr FakeStreamCodecFactoryConfig::createCodecFactory(
+    const Protobuf::Message&, Envoy::Server::Configuration::ServerFactoryContext&) {
   return std::make_unique<FakeStreamCodecFactory>();
 }
 

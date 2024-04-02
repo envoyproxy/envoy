@@ -54,7 +54,7 @@ var (
 // memory per worker thread to avoid locks.
 //
 // Note: Do not use inside of an `init()` function, the value will not be populated yet. Use within the filters
-// `StreamFilterConfigFactory` or `StreamFilterConfigParser`
+// `StreamFilterFactory` or `StreamFilterConfigParser`
 func EnvoyConcurrency() uint32 {
 	if !initialized {
 		panic("concurrency has not yet been initialized, do not access within an init()")
@@ -119,8 +119,8 @@ func createRequest(r *C.httpRequest) *httpRequest {
 	}
 
 	configId := uint64(r.configId)
-	filterFactory := getOrCreateHttpFilterFactory(req.pluginName(), configId)
-	f := filterFactory(req)
+	filterFactory, config := getHttpFilterFactoryAndConfig(req.pluginName(), configId)
+	f := filterFactory(config, req)
 	req.httpFilter = f
 
 	return req

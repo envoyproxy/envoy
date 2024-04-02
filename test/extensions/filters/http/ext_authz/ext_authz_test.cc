@@ -24,6 +24,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/proto/helloworld.pb.h"
@@ -54,15 +55,15 @@ namespace {
 
 template <class T> class HttpFilterTestBase : public T {
 public:
-  HttpFilterTestBase() : http_context_(stats_store_.symbolTable()) {}
+  HttpFilterTestBase() {}
 
   void initialize(std::string&& yaml) {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(), runtime_,
-                                             http_context_, "ext_authz_prefix", bootstrap_);
+    config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
+                                             "ext_authz_prefix", factory_context_);
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
@@ -122,7 +123,6 @@ public:
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   Stats::Scope& stats_scope_{*stats_store_.rootScope()};
-  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::MockClient* client_;
   std::unique_ptr<Filter> filter_;
@@ -132,11 +132,10 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
   Buffer::OwnedImpl data_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
-  Http::ContextImpl http_context_;
 };
 
 class HttpFilterTest : public HttpFilterTestBase<testing::Test> {
@@ -803,6 +802,52 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
   EXPECT_EQ(data_.length(), check_request.attributes().request().http().raw_body().size());
 }
 
+// Checks that the filter buffers the data and initiates the authorization request.
+TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
+  InSequence s;
+
+  // N.B. encode_raw_headers is set to true.
+  initialize(R"EOF(
+  transport_api_version: V3
+  encode_raw_headers: true
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  prepareCheck();
+
+  // Add header with non-UTF-8 value.
+  absl::string_view header_key = "header-with-non-utf-8-value";
+  const uint8_t non_utf_8_bytes[3] = {0xc0, 0xc0, 0};
+  absl::string_view header_value = reinterpret_cast<const char*>(non_utf_8_bytes);
+  request_headers_.addCopy(Http::LowerCaseString(header_key), header_value);
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest& check_request,
+                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+        request_callbacks_ = &callbacks;
+        // headers should be empty.
+        EXPECT_EQ(0, check_request.attributes().request().http().headers().size());
+        ASSERT_TRUE(check_request.attributes().request().http().has_header_map());
+        // header_map should contain the header we added and it should be unchanged.
+        bool exact_match_utf_8_header = false;
+        for (const auto& header :
+             check_request.attributes().request().http().header_map().headers()) {
+          if (header.key() == header_key && header.raw_value() == header_value) {
+            exact_match_utf_8_header = true;
+            break;
+          }
+        }
+        EXPECT_TRUE(exact_match_utf_8_header);
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
+}
+
 // Checks that filter does not buffer data on header-only request.
 TEST_F(HttpFilterTest, HeaderOnlyRequest) {
   InSequence s;
@@ -949,7 +994,7 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1004,7 +1049,7 @@ TEST_F(HttpFilterTest, ClearCache) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1051,7 +1096,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1095,7 +1140,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1139,7 +1184,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1184,7 +1229,7 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1222,7 +1267,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1693,7 +1738,7 @@ TEST_F(HttpFilterTest, FilterDisabled) {
       denominator: HUNDRED
   )EOF");
 
-  ON_CALL(runtime_.snapshot_,
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
           featureEnabled("http.ext_authz.enabled",
                          testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
       .WillByDefault(Return(false));
@@ -1720,7 +1765,7 @@ TEST_F(HttpFilterTest, FilterEnabled) {
 
   prepareCheck();
 
-  ON_CALL(runtime_.snapshot_,
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
           featureEnabled("http.ext_authz.enabled",
                          testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
       .WillByDefault(Return(true));
@@ -1824,7 +1869,7 @@ TEST_F(HttpFilterTest, FilterEnabledButMetadataDisabled) {
   )EOF");
 
   // Enable in filter_enabled.
-  ON_CALL(runtime_.snapshot_,
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
           featureEnabled("http.ext_authz.enabled",
                          testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
       .WillByDefault(Return(true));
@@ -1869,7 +1914,7 @@ TEST_F(HttpFilterTest, FilterDisabledButMetadataEnabled) {
   )EOF");
 
   // Disable in filter_enabled.
-  ON_CALL(runtime_.snapshot_,
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
           featureEnabled("http.ext_authz.enabled",
                          testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
       .WillByDefault(Return(false));
@@ -1914,7 +1959,7 @@ TEST_F(HttpFilterTest, FilterEnabledAndMetadataEnabled) {
   )EOF");
 
   // Enable in filter_enabled.
-  ON_CALL(runtime_.snapshot_,
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
           featureEnabled("http.ext_authz.enabled",
                          testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
       .WillByDefault(Return(true));
@@ -1957,12 +2002,13 @@ TEST_F(HttpFilterTest, FilterDenyAtDisable) {
       value: true
   )EOF");
 
-  ON_CALL(runtime_.snapshot_,
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
           featureEnabled("http.ext_authz.enabled",
                          testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
       .WillByDefault(Return(false));
 
-  ON_CALL(runtime_.snapshot_, featureEnabled("http.ext_authz.enabled", false))
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("http.ext_authz.enabled", false))
       .WillByDefault(Return(true));
 
   // Make sure check is not called.
@@ -1990,12 +2036,13 @@ TEST_F(HttpFilterTest, FilterAllowAtDisable) {
       value: false
   )EOF");
 
-  ON_CALL(runtime_.snapshot_,
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
           featureEnabled("http.ext_authz.enabled",
                          testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
       .WillByDefault(Return(false));
 
-  ON_CALL(runtime_.snapshot_, featureEnabled("http.ext_authz.enabled", false))
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("http.ext_authz.enabled", false))
       .WillByDefault(Return(false));
 
   // Make sure check is not called.
@@ -2163,7 +2210,7 @@ TEST_P(HttpFilterTestParam, OkResponse) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -2525,7 +2572,7 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401) {
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -2570,7 +2617,7 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401NoClusterResponseCodeStats) {
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -2606,7 +2653,7 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith403) {
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -2817,7 +2864,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 

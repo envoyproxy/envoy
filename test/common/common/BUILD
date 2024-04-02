@@ -233,6 +233,7 @@ envoy_cc_test(
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
@@ -510,4 +511,12 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "inline_map_speed_test_benchmark_test",
     benchmark_binary = "inline_map_speed_test",
+)
+
+envoy_cc_test(
+    name = "execution_context_test",
+    srcs = ["execution_context_test.cc"],
+    deps = [
+        "//envoy/common:execution_context",
+    ],
 )

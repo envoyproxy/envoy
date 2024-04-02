@@ -1,5 +1,6 @@
 package test.kotlin.integration
 
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
@@ -9,8 +10,7 @@ import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.fail
+import org.junit.Assert.fail
 import org.junit.Test
 
 private const val TEST_RESPONSE_FILTER_TYPE =
@@ -34,13 +34,13 @@ class SendTrailersTest {
       EngineBuilder(Standard())
         .addNativeFilter(
           "envoy.filters.http.assertion",
-          "{'@type': $ASSERTION_FILTER_TYPE, match_config: {http_request_trailers_match: {headers: [{name: 'test-trailer', exact_match: 'test.code'}]}}}"
+          "[$ASSERTION_FILTER_TYPE] {match_config: {http_request_trailers_match: {headers: [{name: 'test-trailer', exact_match: 'test.code'}]}}}"
         )
         .addNativeFilter(
           "envoy.filters.http.buffer",
-          "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":65000}"
+          "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 65000 } }"
         )
-        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
+        .addNativeFilter("test_remote_response", "[$TEST_RESPONSE_FILTER_TYPE]{}")
         .build()
 
     val client = engine.streamClient()

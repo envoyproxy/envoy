@@ -204,7 +204,7 @@ TEST(HeaderParserTest, TestParse) {
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
-  stream_info.setResponseFlag(StreamInfo::ResponseFlag::LocalReset);
+  stream_info.setResponseFlag(StreamInfo::CoreResponseFlag::LocalReset);
 
   absl::optional<std::string> rc_details{"via_upstream"};
   ON_CALL(stream_info, responseCodeDetails()).WillByDefault(ReturnRef(rc_details));

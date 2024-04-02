@@ -19,6 +19,7 @@
 #include "test/extensions/filters/http/fault/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -137,8 +138,8 @@ public:
   const std::string v2_empty_fault_config_yaml = "{}";
 
   void setUpTest(const envoy::extensions::filters::http::fault::v3::HTTPFault fault) {
-    config_ = std::make_shared<FaultFilterConfig>(fault, runtime_, "prefix.", *stats_.rootScope(),
-                                                  time_system_);
+    ON_CALL(context_, timeSource()).WillByDefault(ReturnRef(time_system_));
+    config_ = std::make_shared<FaultFilterConfig>(fault, "prefix.", *stats_.rootScope(), context_);
     filter_ = std::make_unique<FaultFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
@@ -156,6 +157,7 @@ public:
     EXPECT_CALL(*timer_, disableTimer());
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
@@ -166,7 +168,7 @@ public:
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
   Buffer::OwnedImpl data_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Runtime::MockLoader>& runtime_{context_.runtime_loader_};
   Event::MockTimer* timer_{};
   Event::SimulatedTimeSystem time_system_;
 };
@@ -246,7 +248,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected))
       .Times(0);
 
   // Abort related calls
@@ -266,7 +268,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -300,7 +302,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected))
       .Times(0);
 
   // Abort related calls
@@ -322,7 +324,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
   EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -356,7 +358,7 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected))
       .Times(0);
 
   // Abort related calls
@@ -377,7 +379,7 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
               encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -406,7 +408,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithGrpcStatus) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected))
       .Times(0);
 
   // Abort related calls
@@ -428,7 +430,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithGrpcStatus) {
               encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -457,7 +459,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpAndGrpcStatus) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected))
       .Times(0);
 
   // Abort related calls
@@ -479,7 +481,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpAndGrpcStatus) {
   EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -585,7 +587,7 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -593,7 +595,7 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
@@ -639,7 +641,7 @@ TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected))
       .Times(2);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
       .WillOnce(ReturnRef(dynamic_metadata))
@@ -654,7 +656,7 @@ TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
@@ -720,7 +722,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
       .WillOnce(Return(500UL));
   expectDelayTimer(500UL);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -730,7 +732,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
@@ -769,7 +771,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamClusterDisableTracing) {
       .WillOnce(Return(500UL));
   expectDelayTimer(500UL);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -779,7 +781,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamClusterDisableTracing) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
@@ -828,7 +830,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   expectDelayTimer(500UL);
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -854,7 +856,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   timer_->invokeCallback();
@@ -893,7 +895,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -915,7 +917,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
   EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
@@ -947,7 +949,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
 
   request_headers_.addCopy("x-envoy-downstream-service-node", "canary");
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -969,7 +971,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
   EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
@@ -1011,7 +1013,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -1032,7 +1034,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
               encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
@@ -1095,7 +1097,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000UL), _));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -1114,7 +1116,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
@@ -1149,7 +1151,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -1157,7 +1159,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   timer_->invokeCallback();
@@ -1226,7 +1228,8 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
 
 TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
   setUpTest(v2_empty_fault_config_yaml);
-  Fault::FaultSettings delay_fault(convertYamlStrToProtoConfig(delay_with_upstream_cluster_yaml));
+  Fault::FaultSettings delay_fault(convertYamlStrToProtoConfig(delay_with_upstream_cluster_yaml),
+                                   context_);
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&delay_fault));
@@ -1254,7 +1257,7 @@ TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -1355,7 +1358,7 @@ TEST_F(FaultFilterRateLimitTest, DelayWithResponseRateLimitEnabled) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
 
   // Rate limiter related calls.
   ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
@@ -1369,7 +1372,7 @@ TEST_F(FaultFilterRateLimitTest, DelayWithResponseRateLimitEnabled) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
@@ -1479,7 +1482,7 @@ class FaultFilterSettingsTest : public FaultFilterTest {};
 TEST_F(FaultFilterSettingsTest, CheckDefaultRuntimeKeys) {
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
 
-  Fault::FaultSettings settings(fault);
+  Fault::FaultSettings settings(fault, context_);
 
   EXPECT_EQ("fault.http.delay.fixed_delay_percent", settings.delayPercentRuntime());
   EXPECT_EQ("fault.http.abort.abort_percent", settings.abortPercentRuntime());
@@ -1501,7 +1504,7 @@ TEST_F(FaultFilterSettingsTest, CheckOverrideRuntimeKeys) {
   fault.set_response_rate_limit_percent_runtime(
       std::string("fault.response_rate_limit_percent_runtime"));
 
-  Fault::FaultSettings settings(fault);
+  Fault::FaultSettings settings(fault, context_);
 
   EXPECT_EQ("fault.delay_percent_runtime", settings.delayPercentRuntime());
   EXPECT_EQ("fault.abort_percent_runtime", settings.abortPercentRuntime());

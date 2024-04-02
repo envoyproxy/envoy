@@ -127,6 +127,7 @@ categories:
 - envoy.matching.http.custom_matchers
 - envoy.matching.network.input
 - envoy.matching.network.custom_matchers
+- envoy.string_matcher
 - envoy.filters.http.upstream
 - envoy.path.match
 - envoy.path.rewrite

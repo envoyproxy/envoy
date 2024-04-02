@@ -11,14 +11,12 @@ func init() {
 	api.LogCritical("init")
 	api.LogCritical(api.GetLogLevel().String())
 
-	http.RegisterHttpFilterConfigFactoryAndParser(Name, ConfigFactory, nil)
+	http.RegisterHttpFilterFactoryAndConfigParser(Name, filterFactory, http.NullParser)
 }
 
-func ConfigFactory(interface{}) api.StreamFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
-		return &filter{
-			callbacks: callbacks,
-		}
+func filterFactory(c interface{}, callbacks api.FilterCallbackHandler) api.StreamFilter {
+	return &filter{
+		callbacks: callbacks,
 	}
 }
 

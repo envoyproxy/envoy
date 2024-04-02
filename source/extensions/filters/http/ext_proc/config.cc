@@ -10,7 +10,7 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 absl::StatusOr<Http::FilterFactoryCb>
-ExternalProcessingFilterFactory::createFilterFactoryFromProtoTyped(
+ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
     const std::string& stats_prefix, DualInfo dual_info,
     Server::Configuration::ServerFactoryContext& context) {
@@ -20,8 +20,8 @@ ExternalProcessingFilterFactory::createFilterFactoryFromProtoTyped(
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
-      context.scope(), stats_prefix, dual_info.is_upstream_filter,
-      Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context.localInfo());
+      context.scope(), stats_prefix, dual_info.is_upstream,
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context);
 
   return [filter_config, grpc_service = proto_config.grpc_service(), &context,
           dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
@@ -34,15 +34,40 @@ ExternalProcessingFilterFactory::createFilterFactoryFromProtoTyped(
 }
 
 Router::RouteSpecificFilterConfigConstSharedPtr
-ExternalProcessingFilterFactory::createRouteSpecificFilterConfigTyped(
+ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<FilterConfigPerRoute>(proto_config);
 }
 
-LEGACY_REGISTER_FACTORY(ExternalProcessingFilterFactory,
+#if 0
+Http::FilterFactoryCb
+ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+  const uint32_t message_timeout_ms =
+      PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
+  const uint32_t max_message_timeout_ms =
+      PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
+  const auto filter_config = std::make_shared<FilterConfig>(
+      proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
+      server_context.scope(), stats_prefix,
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context), server_context);
+
+  return [filter_config, grpc_service = proto_config.grpc_service(),
+          &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
+    auto client = std::make_unique<ExternalProcessorClientImpl>(
+        server_context.clusterManager().grpcAsyncClientManager(), server_context.scope());
+
+    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
+        std::make_shared<Filter>(filter_config, std::move(client), grpc_service)});
+  };
+}
+#endif
+
+LEGACY_REGISTER_FACTORY(ExternalProcessingFilterConfig,
                         Server::Configuration::NamedHttpFilterConfigFactory, "envoy.ext_proc");
-LEGACY_REGISTER_FACTORY(UpstreamExternalProcessingFilterFactory,
+LEGACY_REGISTER_FACTORY(UpstreamExternalProcessingFilterConfig,
                         Server::Configuration::UpstreamHttpFilterConfigFactory, "envoy.ext_proc");
 
 } // namespace ExternalProcessing

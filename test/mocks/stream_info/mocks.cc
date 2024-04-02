@@ -85,13 +85,12 @@ MockStreamInfo::MockStreamInfo()
   downstream_connection_info_provider_->setDirectRemoteAddressForTest(
       downstream_direct_remote_address);
 
-  ON_CALL(*this, setResponseFlag(_))
-      .WillByDefault(Invoke([this](ExtendedResponseFlag response_flag) {
-        auto iter = std::find(response_flags_.begin(), response_flags_.end(), response_flag);
-        if (iter == response_flags_.end()) {
-          response_flags_.push_back(response_flag);
-        }
-      }));
+  ON_CALL(*this, setResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag response_flag) {
+    auto iter = std::find(response_flags_.begin(), response_flags_.end(), response_flag);
+    if (iter == response_flags_.end()) {
+      response_flags_.push_back(response_flag);
+    }
+  }));
   ON_CALL(*this, setResponseCode(_)).WillByDefault(Invoke([this](uint32_t code) {
     response_code_ = code;
   }));
@@ -141,20 +140,20 @@ MockStreamInfo::MockStreamInfo()
     bytes_sent_ += bytes_sent;
   }));
   ON_CALL(*this, bytesSent()).WillByDefault(ReturnPointee(&bytes_sent_));
-  ON_CALL(*this, hasResponseFlag(_)).WillByDefault(Invoke([this](ExtendedResponseFlag flag) {
+  ON_CALL(*this, hasResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag flag) {
     auto iter = std::find(response_flags_.begin(), response_flags_.end(), flag);
     return iter != response_flags_.end();
   }));
   ON_CALL(*this, hasAnyResponseFlag()).WillByDefault(Invoke([this]() {
     return !response_flags_.empty();
   }));
-  ON_CALL(*this, responseFlags())
-      .WillByDefault(
-          Invoke([this]() -> absl::Span<const ExtendedResponseFlag> { return response_flags_; }));
+  ON_CALL(*this, responseFlags()).WillByDefault(Invoke([this]() -> absl::Span<const ResponseFlag> {
+    return response_flags_;
+  }));
   ON_CALL(*this, legacyResponseFlags()).WillByDefault(Invoke([this]() -> uint64_t {
     uint64_t legacy_flags = 0;
-    for (ExtendedResponseFlag flag : response_flags_) {
-      if (flag.value() <= static_cast<uint16_t>(ResponseFlag::LastFlag)) {
+    for (ResponseFlag flag : response_flags_) {
+      if (flag.value() <= static_cast<uint16_t>(CoreResponseFlag::LastFlag)) {
         ASSERT(flag.value() < 64, "Legacy response flag out of range");
         legacy_flags |= (1UL << flag.value());
       }

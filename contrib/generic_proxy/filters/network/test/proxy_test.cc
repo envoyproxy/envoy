@@ -405,7 +405,7 @@ TEST_F(FilterTest, ActiveStreamRouteEntry) {
   EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
-  EXPECT_EQ(active_stream->routeEntry(), route_matcher_->route_entry_.get());
+  EXPECT_EQ(active_stream->routeEntry().ptr(), route_matcher_->route_entry_.get());
 }
 
 TEST_F(FilterTest, ActiveStreamPerFilterConfig) {
@@ -906,7 +906,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   response->status_ = {234, false}; // Response non-OK.
-  active_stream->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
+  active_stream->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError);
   active_stream->onResponseStart(std::move(response));
 
   EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);

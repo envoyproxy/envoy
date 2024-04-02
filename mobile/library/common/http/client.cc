@@ -8,11 +8,11 @@
 #include "source/common/http/utility.h"
 
 #include "library/common/bridge/utility.h"
-#include "library/common/common/system_helper.h"
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
 #include "library/common/stream_info/extra_stream_info.h"
+#include "library/common/system/system_helper.h"
 
 namespace Envoy {
 namespace Http {
@@ -87,7 +87,7 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_headers_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_headers_cb", "{}ms", elapsed.count());
   }
 
   response_headers_forwarded_ = true;
@@ -121,10 +121,10 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
     response_data_ = std::make_unique<Buffer::WatermarkBuffer>(
         [this]() -> void { onBufferedDataDrained(); }, [this]() -> void { onHasBufferedData(); },
         []() -> void {});
-    // Default to 1M per stream. This is fairly arbitrary and will result in
+    // Default to 2M per stream. This is fairly arbitrary and will result in
     // Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
-    // and having local data of 1M + kernel-buffer-limit for HTTP/1.1
-    response_data_->setWatermarks(1000000);
+    // and having local data of 2M + kernel-buffer-limit for HTTP/1.1
+    response_data_->setWatermarks(2 * 1024 * 1024);
   }
 
   // Send data if in default flow control mode, or if resumeData has been called in explicit
@@ -173,7 +173,7 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_data_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_data_cb", "{}ms", elapsed.count());
   }
 
   if (send_end_stream) {
@@ -214,7 +214,7 @@ void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMa
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_trailers_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_trailers_cb", "{}ms", elapsed.count());
   }
 
   onComplete();
@@ -288,7 +288,7 @@ void Client::DirectStreamCallbacks::onComplete() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_complete_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_complete_cb", "{}ms", elapsed.count());
   }
 }
 
@@ -345,7 +345,7 @@ void Client::DirectStreamCallbacks::sendErrorToBridge() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_error_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_error_cb", "{}ms", elapsed.count());
   }
 }
 
@@ -372,7 +372,7 @@ void Client::DirectStreamCallbacks::onCancel() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb", "{}ms", elapsed.count());
   }
 }
 

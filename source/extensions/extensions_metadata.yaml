@@ -12,6 +12,13 @@ envoy.access_loggers.extension_filters.cel:
   status: alpha
   type_urls:
   - envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+envoy.access_loggers.fluentd:
+  categories:
+  - envoy.access_loggers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig
 envoy.access_loggers.http_grpc:
   categories:
   - envoy.access_loggers
@@ -197,8 +204,10 @@ envoy.filters.http.alternate_protocols_cache:
 envoy.filters.http.aws_lambda:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.aws_lambda.v3.Config
   - envoy.extensions.filters.http.aws_lambda.v3.PerRouteConfig
@@ -1133,6 +1142,13 @@ envoy.stat_sinks.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.stat_sinks.wasm.v3.Wasm
+envoy.string_matcher.lua:
+  categories:
+  - envoy.string_matcher
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.string_matcher.lua.v3.Lua
 envoy.tls.cert_validator.spiffe:
   categories:
   - envoy.tls.cert_validator
@@ -1173,6 +1189,13 @@ envoy.tracers.opentelemetry.samplers.always_on:
   status: wip
   type_urls:
   - envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
+envoy.tracers.opentelemetry.samplers.dynatrace:
+  categories:
+  - envoy.tracers.opentelemetry.samplers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig
 envoy.tracers.skywalking:
   categories:
   - envoy.tracers
@@ -1326,14 +1349,6 @@ envoy.wasm.runtime.wamr:
   security_posture: unknown
   status: alpha
 envoy.wasm.runtime.wasmtime:
-  categories:
-  - envoy.wasm.runtime
-  # "This may never change from unknown until the threat model at
-  # https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions
-  # is updated to capture additional Wasm runtimes".
-  security_posture: unknown
-  status: alpha
-envoy.wasm.runtime.wavm:
   categories:
   - envoy.wasm.runtime
   # "This may never change from unknown until the threat model at

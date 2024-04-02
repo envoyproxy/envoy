@@ -28,7 +28,7 @@
 
 #include "gmock/gmock.h"
 
-#include "quiche/common/platform/api/quiche_logging.h"
+#include "quiche/common/platform/api/quiche_test.h"
 
 using testing::_;
 using testing::Invoke;
@@ -833,7 +833,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     // inconsistent state (and crashes/accesses inconsistent memory), then it will be a bug we'll
     // need to further evaluate. However, in fuzzing we allow oghttp2 reaching FATAL states that may
     // happen in production environments.
-    quiche::setDFatalExitDisabled(true);
+    quiche::test::QuicheScopedDisableExitOnDFatal scoped_object;
     codecFuzzHttp2Oghttp2(input);
 #endif
   } catch (const EnvoyException& e) {

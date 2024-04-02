@@ -15,10 +15,10 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/stats/symbol_table.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/utility.h"
-#include "source/extensions/transport_sockets/tls/stats.h"
-#include "source/extensions/transport_sockets/tls/utility.h"
+#include "source/common/tls/cert_validator/factory.h"
+#include "source/common/tls/cert_validator/utility.h"
+#include "source/common/tls/stats.h"
+#include "source/common/tls/utility.h"
 
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
@@ -31,8 +31,9 @@ namespace Tls {
 using SPIFFEConfig = envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig;
 
 SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                                 SslStats& stats, TimeSource& time_source)
-    : stats_(stats), time_source_(time_source) {
+                                 SslStats& stats,
+                                 Server::Configuration::CommonFactoryContext& context)
+    : stats_(stats), time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
 
@@ -48,7 +49,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
         // SAN types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
         // TODO(pradeepcrao): Throw an exception when a non-URI matcher is encountered after the
         // deprecated field match_subject_alt_names is removed
-        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher));
+        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher, context));
       }
     }
   }
@@ -61,7 +62,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
           "Multiple trust bundles are given for one trust domain for ", domain.name()));
     }
 
-    auto cert = Config::DataSource::read(domain.trust_bundle(), true, config->api());
+    auto cert = THROW_OR_RETURN_VALUE(
+        Config::DataSource::read(domain.trust_bundle(), true, config->api()), std::string);
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert.data()), cert.size()));
     RELEASE_ASSERT(bio != nullptr, "");
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
@@ -309,9 +311,10 @@ Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const 
 
 class SPIFFEValidatorFactory : public CertValidatorFactory {
 public:
-  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                                       SslStats& stats, TimeSource& time_source) override {
-    return std::make_unique<SPIFFEValidator>(config, stats, time_source);
+  CertValidatorPtr
+  createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
+                      Server::Configuration::CommonFactoryContext& context) override {
+    return std::make_unique<SPIFFEValidator>(config, stats, context);
   }
 
   std::string name() const override { return "envoy.tls.cert_validator.spiffe"; }

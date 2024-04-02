@@ -90,7 +90,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "limiter error"),
           false);
       decoder_callbacks_->streamInfo().setResponseFlag(
-          StreamInfo::ResponseFlag::RateLimitServiceError);
+          StreamInfo::CoreResponseFlag::RateLimitServiceError);
       return;
     }
     cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
@@ -102,7 +102,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       decoder_callbacks_->sendLocalReply(
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "over limit"),
           false);
-      decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
+      decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
       return;
     }
     break;

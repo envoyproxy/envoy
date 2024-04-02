@@ -90,7 +90,7 @@ index e7555ee10..a93beb1c5 100644
 @@ -31,3 +31,10 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
 
- __version__ = '4.23.4'
+ __version__ = '4.24.4'
 +
 +
 +if __name__ != '__main__':
@@ -122,18 +122,6 @@ diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
  // This error has been generally flaky, but we need to disable it specifically
  // to fix https://github.com/protocolbuffers/protobuf/issues/12313
  #pragma clang diagnostic ignored "-Wunused-parameter"
-diff --git a/src/google/protobuf/map.h b/src/google/protobuf/map.h
---- a/src/google/protobuf/map.h	2023-06-30 14:32:34.892148233 +0000
-+++ b/src/google/protobuf/map.h	2023-06-30 14:35:37.447992493 +0000
-@@ -883,7 +883,7 @@
-         TreeConvert(b);
-       }
-       ABSL_DCHECK(TableEntryIsTree(b))
--          << (void*)table_[b] << " " << (uintptr_t)table_[b];
-+          << reinterpret_cast<void*>(table_[b]) << " " << static_cast<uintptr_t>(table_[b]);
-       InsertUniqueInTree(b, node);
-       index_of_first_non_null_ = (std::min)(index_of_first_non_null_, b);
-     }
 diff --git a/src/google/protobuf/map_field.h b/src/google/protobuf/map_field.h
 --- a/src/google/protobuf/map_field.h	2023-06-30 17:14:18.934528580 +0000
 +++ b/src/google/protobuf/map_field.h	2023-06-30 17:14:52.098500807 +0000
@@ -157,7 +145,7 @@ diff --git a/src/google/protobuf/compiler/BUILD.bazel b/src/google/protobuf/comp
 +    visibility = ["//visibility:public"],
      deps = [
          "//src/google/protobuf:protobuf_nowkt",
-         "@com_google_absl//absl/types:span",
+         "@com_google_absl//absl/container:flat_hash_set",
 
 diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
 index 1c6a24945..c27d0bf2a 100644

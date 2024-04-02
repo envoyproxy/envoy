@@ -15,10 +15,10 @@ envoy_mobile_jni_kt_test(
         "sandboxAllowed": "False",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
         ],
         "//conditions:default": [],
     }),
@@ -43,8 +43,9 @@ envoy_mobile_kt_test(
     srcs = [
         "GRPCStreamTest.kt",
     ],
+    associates = ["//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib"],
     deps = [
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/kotlin/io/envoyproxy/envoymobile/mocks:mocks_lib",
     ],
 )
 

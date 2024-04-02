@@ -29,6 +29,10 @@ build --workspace_status_command=../bazel/get_workspace_status
 build --xcode_version=14.1
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
+build --define=google_grpc=disabled
+build --define=envoy_mobile_xds=disabled
+build --define=envoy_yaml=disabled
+
 # We don't have a ton of Swift in Envoy Mobile, so always build with WMO
 # This also helps work around a bug in rules_swift: https://github.com/bazelbuild/rules_swift/issues/949
 build --swiftcopt=-wmo
@@ -40,13 +44,14 @@ build --define cxxopts=-std=c++17
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
 build --copt -Wno-deprecated-declarations
+build --define=signal_trace=disabled
 
 build:rules_xcodeproj --config=ios
 build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
 # Disable global index store to work around https://github.com/buildbuddy-io/rules_xcodeproj/issues/1878
 build:rules_xcodeproj --features=-swift.use_global_index_store
 
-# Override PGV validation with NOP functions
+# Override PGV validation with NOP functions for binary size savings.
 build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
 
 build:mobile-dbg-common --compilation_mode=dbg
@@ -74,6 +79,9 @@ build:mobile-dbg-ios --config=ios
 
 # Default flags for Android tests
 build:mobile-test-android --define=static_extension_registration=disabled
+# enabled for //test/kotlin/integration:xds_test and
+# //test/java/io/envoyproxy/envoymobile/engine:envoy_configuration_test
+build:mobile-test-android --define=envoy_mobile_xds=enabled
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
@@ -110,6 +118,8 @@ build:mobile-tsan-dev --test_env="TSAN_OPTIONS=report_atomic_races=0"
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
 build:mobile-release-common --define=no_debug_info=1
+# TODO(alyssar) fix example apps
+build:mobile-release-common --define=envoy_yaml=enabled
 
 # order matters here to ensure downloads
 build:mobile-remote-release-clang --config=mobile-remote-ci-linux-clang
@@ -130,17 +140,14 @@ build:mobile-remote-release-clang-android-publish --linkopt=-fuse-ld=lld
 build:mobile-remote-release-clang-android-publish-xds --config=mobile-remote-release-clang-android-publish
 build:mobile-remote-release-clang-android-publish-xds --define=envoy_mobile_xds=enabled
 
+# Temporary revert to C++17 for mobile NDK builds.
+build:mobile-release-common --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+
 # Compile releases optimizing for size (eg -Os, etc).
 build:mobile-release-common --config=sizeopt
 
 # Set default symbols visibility to hidden to reduce .dynstr and the symbol table size
 build:mobile-release-common --copt=-fvisibility=hidden
-
-# Disable google_grpc in production by default
-build:mobile-release-common --define=google_grpc=disabled
-
-# Disable envoy_mobile_xds in production by default
-build:mobile-release-common --define=envoy_mobile_xds=disabled
 
 # Enable automatic extension factory registration for release builds
 build:mobile-release-common --define=static_extension_registration=enabled
@@ -192,6 +199,8 @@ build:mobile-remote-ci-linux --config=mobile-remote-ci-common
 build:mobile-remote-ci-linux-clang --action_env=CC=/opt/llvm/bin/clang
 build:mobile-remote-ci-linux-clang --action_env=CXX=/opt/llvm/bin/clang++
 build:mobile-remote-ci-linux-clang --config=mobile-remote-ci-linux
+# Temporary revert to C++17 for mobile NDK builds.
+build:mobile-remote-ci-linux-clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 
 #############################################################################
 # mobile-remote-ci-linux-asan: These options are Linux-only using Clang and AddressSanitizer
@@ -247,69 +256,47 @@ build:mobile-remote-ci-macos --xcode_version_config=//ci:xcode_config
 build:mobile-remote-ci-macos --remote_download_toplevel
 build:mobile-remote-ci-macos --config=ci
 build:mobile-remote-ci-macos --config=remote
+# TODO(alyssar) fix swift tests
+build:mobile-remote-ci-macos --define=envoy_yaml=enabled
 
 build:mobile-remote-ci --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci --config=remote-ci
 
 build:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --build_tests_only
-test:mobile-remote-ci-android --config=mobile-test-android
 test:mobile-remote-ci-android --config=mobile-remote-ci
-test:mobile-remote-ci-android --define=signal_trace=disabled
+test:mobile-remote-ci-android --config=mobile-test-android
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
+# Temporary revert to C++17 for mobile NDK builds.
+build:mobile-remote-ci-cc --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
-test:mobile-remote-ci-cc --copt=-DUSE_API_LISTENER
 
-build:mobile-remote-ci-cc-no-yaml --config=mobile-remote-ci
-build:mobile-remote-ci-cc-no-yaml --define=envoy_yaml=disabled
+# TODO(alyssar) remove.
+build:mobile-remote-ci-cc-no-yaml --config=mobile-remote-ci-cc
 build:mobile-remote-ci-cc-no-yaml --define=envoy_full_protos=disabled
 build:mobile-remote-ci-cc-no-yaml --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
-build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci
-build:mobile-remote-ci-cc-no-exceptions --define=envoy_yaml=disabled
+build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci-cc
 build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
-build:mobile-remote-ci-cc-no-exceptions --copt=-fno-unwind-tables
 build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
-build:mobile-remote-ci-cc-no-exceptions --define=google_grpc=disabled
-build:mobile-remote-ci-cc-no-exceptions --define=envoy_mobile_xds=disabled
 
-
-build:mobile-remote-ci-cc-test --config=mobile-remote-ci
+build:mobile-remote-ci-cc-test --config=mobile-remote-ci-cc
 test:mobile-remote-ci-cc-test --test_output=all
-test:mobile-remote-ci-cc-test --config=mobile-remote-ci
-test:mobile-remote-ci-cc-test --define=signal_trace=disabled
-test:mobile-remote-ci-cc-test --define=google_grpc=disabled
-test:mobile-remote-ci-cc-test --define=envoy_mobile_xds=disabled
-test:mobile-remote-ci-cc-test --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
-test:mobile-remote-ci-cc-test --define=envoy_yaml=disabled
+test:mobile-remote-ci-cc-test --config=mobile-remote-ci-cc
 
 build:mobile-remote-ci-macos-kotlin --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-kotlin --fat_apk_cpu=x86_64
-build:mobile-remote-ci-macos-kotlin --define=signal_trace=disabled
-build:mobile-remote-ci-macos-kotlin --define=envoy_mobile_request_compression=disabled
-build:mobile-remote-ci-macos-kotlin --define=envoy_enable_http_datagrams=disabled
-build:mobile-remote-ci-macos-kotlin --define=google_grpc=disabled
-build:mobile-remote-ci-macos-kotlin --define=envoy_mobile_xds=disabled
 build:mobile-remote-ci-macos-kotlin --define=envoy_yaml=disabled
-build:mobile-remote-ci-macos-kotlin --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
 
 build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-swift --config=mobile-test-ios
-build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
-build:mobile-remote-ci-macos-swift --define=signal_trace=disabled
-build:mobile-remote-ci-macos-swift --define=envoy_mobile_request_compression=disabled
-build:mobile-remote-ci-macos-swift --define=envoy_mobile_swift_cxx_interop=disabled
-build:mobile-remote-ci-macos-swift --define=google_grpc=disabled
-build:mobile-remote-ci-macos-swift --define=envoy_mobile_xds=disabled
 build:mobile-remote-ci-macos-swift --@envoy//bazel:http3=False
-build:mobile-remote-ci-macos-swift --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
 
 build:mobile-remote-ci-core --config=mobile-remote-ci
 test:mobile-remote-ci-core --build_tests_only
 test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
 test:mobile-remote-ci-core --test_env=ENVOY_IP_TEST_VERSIONS=v4only
-test:mobile-remote-ci-core --define=envoy_yaml=disabled
 
 build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-ios --config=mobile-test-ios

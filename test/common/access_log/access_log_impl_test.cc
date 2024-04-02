@@ -48,9 +48,7 @@ envoy::config::accesslog::v3::AccessLog parseAccessLogFromV3Yaml(const std::stri
 
 class AccessLogImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  AccessLogImplTest()
-      : stream_info_(time_source_), file_(new MockAccessLogFile()),
-        engine_(std::make_unique<Regex::GoogleReEngine>()) {
+  AccessLogImplTest() : stream_info_(time_source_), file_(new MockAccessLogFile()) {
     ON_CALL(context_.server_factory_context_, runtime()).WillByDefault(ReturnRef(runtime_));
     ON_CALL(context_.server_factory_context_, accessLogManager())
         .WillByDefault(ReturnRef(log_manager_));
@@ -73,7 +71,6 @@ protected:
   TestStreamInfo stream_info_;
   std::shared_ptr<MockAccessLogFile> file_;
   StringViewSaver output_;
-  ScopedInjectableLoader<Regex::Engine> engine_;
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
@@ -91,7 +88,7 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
   request_headers_.addCopy(Http::Headers::get().UserAgent, "user-agent-set");
   request_headers_.addCopy(Http::Headers::get().RequestId, "id");
   request_headers_.addCopy(Http::Headers::get().Host, "host");
@@ -118,7 +115,7 @@ typed_config:
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info_.upstreamInfo()->setUpstreamHost(
       Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime()));
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::DownstreamConnectionTermination);
 
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
   EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 DC 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
@@ -135,7 +132,7 @@ void AccessLogImplTest::routeNameTest(std::string yaml, bool omit_empty) {
   route->route_name_ = "route-test-name";
 
   stream_info_.route_ = route;
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
   request_headers_.addCopy(Http::Headers::get().UserAgent, "user-agent-set");
   request_headers_.addCopy(Http::Headers::get().RequestId, "id");
   request_headers_.addCopy(Http::Headers::get().Host, "host");
@@ -977,7 +974,7 @@ typed_config:
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
   EXPECT_CALL(*file_, write(_));
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
@@ -999,11 +996,11 @@ typed_config:
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
   EXPECT_CALL(*file_, write(_));
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
@@ -1026,11 +1023,11 @@ typed_config:
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
   EXPECT_CALL(*file_, write(_));
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
@@ -1069,6 +1066,7 @@ filter:
       - OM
       - DF
       - DO
+      - DR
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
@@ -1076,9 +1074,10 @@ typed_config:
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  for (const auto& [flag_strings, response_flag] :
+  for (const auto& [short_string, long_string, response_flag] :
        StreamInfo::ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
-    UNREFERENCED_PARAMETER(flag_strings);
+    UNREFERENCED_PARAMETER(short_string);
+    UNREFERENCED_PARAMETER(long_string);
 
     TestStreamInfo stream_info(time_source_);
     stream_info.setResponseFlag(response_flag);
@@ -1130,13 +1129,13 @@ typed_config:
   ON_CALL(context_.server_factory_context_, accessLogManager())
       .WillByDefault(ReturnRef(log_manager_));
   EXPECT_CALL(log_manager_, createAccessLog(_))
-      .WillOnce(Invoke(
-          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
-            EXPECT_EQ(file_info.path_, "");
-            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stdout);
+      .WillOnce(Invoke([this](const Envoy::Filesystem::FilePathAndType& file_info)
+                           -> absl::StatusOr<AccessLogFileSharedPtr> {
+        EXPECT_EQ(file_info.path_, "");
+        EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stdout);
 
-            return file_;
-          }));
+        return file_;
+      }));
   EXPECT_NO_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_));
 }
 
@@ -1151,12 +1150,12 @@ typed_config:
   ON_CALL(context_.server_factory_context_, accessLogManager())
       .WillByDefault(ReturnRef(log_manager_));
   EXPECT_CALL(log_manager_, createAccessLog(_))
-      .WillOnce(Invoke(
-          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
-            EXPECT_EQ(file_info.path_, "");
-            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stderr);
-            return file_;
-          }));
+      .WillOnce(Invoke([this](const Envoy::Filesystem::FilePathAndType& file_info)
+                           -> absl::StatusOr<AccessLogFileSharedPtr> {
+        EXPECT_EQ(file_info.path_, "");
+        EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stderr);
+        return file_;
+      }));
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 }
 
@@ -1650,7 +1649,7 @@ public:
     const auto& header_config =
         TestUtility::downcastAndValidate<const envoy::config::accesslog::v3::HeaderFilter&>(
             *factory_config);
-    return std::make_unique<HeaderFilter>(header_config);
+    return std::make_unique<HeaderFilter>(header_config, context.serverFactoryContext());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

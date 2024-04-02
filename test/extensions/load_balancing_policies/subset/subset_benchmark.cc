@@ -58,10 +58,10 @@ public:
   void update() {
     priority_set_.updateHosts(
         0, Upstream::HostSetImpl::partitionHosts(smaller_hosts_, smaller_locality_hosts_), nullptr,
-        {}, host_moved_, absl::nullopt);
+        {}, host_moved_, random_.random(), absl::nullopt);
     priority_set_.updateHosts(
         0, Upstream::HostSetImpl::partitionHosts(orig_hosts_, orig_locality_hosts_), nullptr,
-        host_moved_, {}, absl::nullopt);
+        host_moved_, {}, random_.random(), absl::nullopt);
   }
 
   std::unique_ptr<Upstream::LoadBalancerSubsetInfoImpl> subset_info_;
@@ -71,6 +71,7 @@ public:
   Upstream::HostsPerLocalitySharedPtr orig_locality_hosts_;
   Upstream::HostsPerLocalitySharedPtr smaller_locality_hosts_;
   Upstream::HostVector host_moved_;
+  Random::RandomGeneratorImpl random_;
 };
 
 void benchmarkSubsetLoadBalancerCreate(::benchmark::State& state) {

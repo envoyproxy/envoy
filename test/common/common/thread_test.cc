@@ -1,5 +1,9 @@
 #include <functional>
 
+#if defined(__linux__) || defined(__APPLE__)
+#include "source/common/common/posix/thread_impl.h"
+#endif
+
 #include "source/common/common/thread.h"
 #include "source/common/common/thread_synchronizer.h"
 
@@ -245,6 +249,31 @@ TEST_F(ThreadAsyncPtrTest, NameNotSpecifiedWait) {
 #endif
   thread->join();
 }
+
+#if defined(__linux__) || defined(__APPLE__)
+TEST(PosixThreadTest, PThreadId) {
+  auto thread_factory = PosixThreadFactory::create();
+  ThreadId thread_id;
+  auto thread =
+      thread_factory->createThread([&]() { thread_id = thread_factory->currentPthreadId(); },
+                                   /* options= */ absl::nullopt, /* crash_on_failure= */ false);
+  auto threadId = thread->pthreadId();
+  thread->join();
+
+  EXPECT_EQ(threadId, thread_id);
+  EXPECT_NE(threadId, thread_factory->currentThreadId());
+}
+
+TEST(PosixThreadTest, Joinable) {
+  auto thread_factory = PosixThreadFactory::create();
+  auto thread = thread_factory->createThread([&]() {}, /* options= */ absl::nullopt,
+                                             /* crash_on_failure= */ true);
+
+  EXPECT_TRUE(thread->joinable());
+  thread->join();
+  EXPECT_FALSE(thread->joinable());
+}
+#endif
 
 } // namespace
 } // namespace Thread

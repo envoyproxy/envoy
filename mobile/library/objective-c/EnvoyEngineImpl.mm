@@ -8,7 +8,9 @@
 #import "library/common/types/c_types.h"
 #import "library/common/extensions/key_value/platform/c_types.h"
 #import "library/cc/engine_builder.h"
-#import "library/common/engine.h"
+#import "library/common/internal_engine.h"
+
+#include "library/common/network/apple_proxy_resolution.h"
 
 #if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
@@ -17,36 +19,6 @@
 @interface EnvoyConfiguration (CXX)
 - (std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>)generateBootstrap;
 @end
-
-static void ios_on_engine_running(void *context) {
-  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
-  // is necessary to act as a breaker for any Objective-C allocation that happens.
-  @autoreleasepool {
-    EnvoyEngineImpl *engineImpl = (__bridge EnvoyEngineImpl *)context;
-    if (engineImpl.onEngineRunning) {
-      engineImpl.onEngineRunning();
-    }
-  }
-}
-
-static void ios_on_exit(void *context) {
-  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
-  // is necessary to act as a breaker for any Objective-C allocation that happens.
-  @autoreleasepool {
-    NSLog(@"[Envoy] library is exiting");
-  }
-}
-
-static void ios_on_log(envoy_data data, const void *context) {
-  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
-  // is necessary to act as a breaker for any Objective-C allocation that happens.
-  @autoreleasepool {
-    EnvoyLogger *logger = (__bridge EnvoyLogger *)context;
-    logger.log(to_ios_string(data));
-  }
-}
-
-static void ios_on_logger_release(const void *context) { CFRelease(context); }
 
 static const void *ios_http_filter_init(const void *context) {
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
@@ -387,23 +359,14 @@ static envoy_data ios_get_string(const void *context) {
   return toManagedNativeString(accessor.getEnvoyString());
 }
 
-static void ios_track_event(envoy_map map, const void *context) {
-  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
-  // is necessary to act as a breaker for any Objective-C allocation that happens.
-  @autoreleasepool {
-    EnvoyEventTracker *eventTracker = (__bridge EnvoyEventTracker *)context;
-    eventTracker.track(to_ios_map(map));
-  }
-}
-
 @implementation EnvoyEngineImpl {
   envoy_engine_t _engineHandle;
-  Envoy::Engine *_engine;
+  Envoy::InternalEngine *_engine;
   EnvoyNetworkMonitor *_networkMonitor;
 }
 
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
-                                 logger:(nullable void (^)(NSString *))logger
+                                 logger:(nullable void (^)(NSInteger, NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
                   networkMonitoringMode:(int)networkMonitoringMode {
   self = [super init];
@@ -411,29 +374,55 @@ static void ios_track_event(envoy_map map, const void *context) {
     return nil;
   }
 
-  self.onEngineRunning = onEngineRunning;
-  envoy_engine_callbacks native_callbacks = {ios_on_engine_running, ios_on_exit,
-                                             (__bridge void *)(self)};
+  std::unique_ptr<Envoy::EngineCallbacks> native_callbacks =
+      std::make_unique<Envoy::EngineCallbacks>();
+  native_callbacks->on_engine_running = [onEngineRunning = std::move(onEngineRunning)] {
+    // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool
+    // block is necessary to act as a breaker for any Objective-C allocation that happens.
+    @autoreleasepool {
+      if (onEngineRunning) {
+        onEngineRunning();
+      }
+    }
+  };
+  native_callbacks->on_exit = [] {
+    // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool
+    // block is necessary to act as a breaker for any Objective-C allocation that happens.
+    @autoreleasepool {
+      NSLog(@"[Envoy] library is exiting");
+    }
+  };
 
-  envoy_logger native_logger = {NULL, NULL, NULL};
+  std::unique_ptr<Envoy::EnvoyLogger> native_logger = std::make_unique<Envoy::EnvoyLogger>();
   if (logger) {
-    EnvoyLogger *objcLogger = [[EnvoyLogger alloc] initWithLogClosure:logger];
-    native_logger.log = ios_on_log;
-    native_logger.release = ios_on_logger_release;
-    native_logger.context = CFBridgingRetain(objcLogger);
+    native_logger->on_log = [logger = std::move(logger)](Envoy::Logger::Logger::Levels level,
+                                                         const std::string &message) {
+      // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool
+      // block is necessary to act as a breaker for any Objective-C allocation that happens.
+      @autoreleasepool {
+        logger(level, @(message.c_str()));
+      }
+    };
   }
 
-  // TODO(Augustyniak): Everything here leaks, but it's all tied to the life of the engine.
-  // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332.
-  envoy_event_tracker native_event_tracker = {NULL, NULL};
+  std::unique_ptr<Envoy::EnvoyEventTracker> native_event_tracker =
+      std::make_unique<Envoy::EnvoyEventTracker>();
   if (eventTracker) {
-    EnvoyEventTracker *objcEventTracker =
-        [[EnvoyEventTracker alloc] initWithEventTrackingClosure:eventTracker];
-    native_event_tracker.track = ios_track_event;
-    native_event_tracker.context = CFBridgingRetain(objcEventTracker);
+    native_event_tracker->on_track =
+        [eventTracker =
+             std::move(eventTracker)](const absl::flat_hash_map<std::string, std::string> &events) {
+          NSMutableDictionary *newMap = [NSMutableDictionary new];
+          for (const auto &[cppKey, cppValue] : events) {
+            NSString *key = @(cppKey.c_str());
+            NSString *value = @(cppValue.c_str());
+            newMap[key] = value;
+          }
+          eventTracker(newMap);
+        };
   }
 
-  _engine = new Envoy::Engine(native_callbacks, native_logger, native_event_tracker);
+  _engine = new Envoy::InternalEngine(std::move(native_callbacks), std::move(native_logger),
+                                      std::move(native_event_tracker));
   _engineHandle = reinterpret_cast<envoy_engine_t>(_engine);
 
   if (networkMonitoringMode == 1) {
@@ -510,6 +499,10 @@ static void ios_track_event(envoy_map map, const void *context) {
 
   for (NSString *name in config.keyValueStores) {
     [self registerKeyValueStore:name keyValueStore:config.keyValueStores[name]];
+  }
+
+  if (config.respectSystemProxySettings) {
+    registerAppleProxyResolver();
   }
 }
 

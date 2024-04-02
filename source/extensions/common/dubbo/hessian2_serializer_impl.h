@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/extensions/common/dubbo/message_impl.h"
+#include "source/extensions/common/dubbo/message.h"
 #include "source/extensions/common/dubbo/serializer.h"
 
 namespace Envoy {

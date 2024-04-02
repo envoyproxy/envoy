@@ -7,7 +7,7 @@
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
-class Engine;
+class InternalEngine;
 class BaseClientIntegrationTest;
 
 namespace Platform {
@@ -23,10 +23,10 @@ public:
   StreamClientSharedPtr streamClient();
 
   envoy_status_t terminate();
-  Envoy::Engine* engine() { return engine_; }
+  Envoy::InternalEngine* engine() { return engine_; }
 
 private:
-  Engine(::Envoy::Engine* engine);
+  Engine(::Envoy::InternalEngine* engine);
 
   // required to access private constructor
   friend class EngineBuilder;
@@ -35,11 +35,11 @@ private:
   // for testing only
   friend class ::Envoy::BaseClientIntegrationTest;
 
-  Envoy::Engine* engine_;
+  Envoy::InternalEngine* engine_;
   StreamClientSharedPtr stream_client_;
 };
 
-using EngineSharedPtr = std::shared_ptr<Engine>;
+using InternalEngineSharedPtr = std::shared_ptr<Engine>;
 
 } // namespace Platform
 } // namespace Envoy

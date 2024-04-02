@@ -107,7 +107,7 @@ Network::FilterStatus Filter::onNewConnection() {
     ENVOY_CONN_LOG(trace, "local_rate_limit: rate limiting connection",
                    read_callbacks_->connection());
     read_callbacks_->connection().streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
+        StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
                                         "local_ratelimit_close_over_limit");
     return Network::FilterStatus::StopIteration;

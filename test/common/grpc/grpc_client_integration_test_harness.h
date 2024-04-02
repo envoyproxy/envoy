@@ -26,8 +26,8 @@
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stats/symbol_table.h"
 
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
@@ -335,14 +335,14 @@ public:
     EXPECT_CALL(*mock_host_, cluster())
         .WillRepeatedly(ReturnRef(*cm_.thread_local_cluster_.cluster_.info_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
-    http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, random_, host_ptr_,
-                                                    Upstream::ResourcePriority::Default, nullptr,
-                                                    nullptr, state_);
+    http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, api_->randomGenerator(),
+                                                    host_ptr_, Upstream::ResourcePriority::Default,
+                                                    nullptr, nullptr, state_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, local_info_, cm_,
-        runtime_, random_, std::move(shadow_writer_ptr_), http_context_, router_context_);
+        cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, cm_,
+        server_factory_context_, std::move(shadow_writer_ptr_), http_context_, router_context_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .WillRepeatedly(ReturnRef(*http_async_client_));
     envoy::config::core::v3::GrpcService config;
@@ -368,9 +368,9 @@ public:
 #ifdef ENVOY_GOOGLE_GRPC
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
-    return std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *google_tls_, stub_factory,
-                                                   stats_scope_, createGoogleGrpcConfig(), *api_,
-                                                   google_grpc_stat_names_);
+    return std::make_unique<GoogleAsyncClientImpl>(
+        *dispatcher_, *google_tls_, stub_factory, stats_scope_, createGoogleGrpcConfig(),
+        server_factory_context_, google_grpc_stat_names_);
 #else
     PANIC("reached unexpected code");
 #endif
@@ -394,7 +394,8 @@ public:
 
   virtual void expectExtraHeaders(FakeStream&) {}
 
-  HelloworldRequestPtr createRequest(const TestMetadata& initial_metadata) {
+  HelloworldRequestPtr createRequest(const TestMetadata& initial_metadata,
+                                     bool expect_upstream_request = true) {
     auto request = std::make_unique<HelloworldRequest>(dispatcher_helper_);
     EXPECT_CALL(*request, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
@@ -420,6 +421,10 @@ public:
     request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
                                                 active_span, Http::AsyncClient::RequestOptions());
     EXPECT_NE(request->grpc_request_, nullptr);
+
+    if (!expect_upstream_request) {
+      return request;
+    }
 
     if (!fake_connection_) {
       AssertionResult result =
@@ -502,11 +507,9 @@ public:
   // Fake/mock infrastructure for Grpc::AsyncClientImpl upstream.
   Upstream::ClusterConnectivityState state_;
   Network::TransportSocketPtr async_client_transport_socket_{new Network::RawBufferSocket()};
-  Upstream::MockClusterManager cm_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Runtime::MockLoader runtime_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{test_time_.timeSystem()};
-  NiceMock<Random::MockRandomGenerator> random_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
+  Upstream::MockClusterManager& cm_{server_factory_context_.cluster_manager_};
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
   Http::ContextImpl http_context_;
@@ -527,6 +530,8 @@ class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
   GrpcSslClientIntegrationTest() {
     ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(server_factory_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(*dispatcher_));
   }
   void TearDown() override {
     // Reset some state in the superclass before we destruct context_manager_ in our destructor, it
@@ -556,6 +561,7 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
+
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
         tls_context, factory_context_);
 
@@ -587,6 +593,13 @@ public:
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     }
+    if (use_server_tls_13_) {
+      auto* tls_params = common_tls_context->mutable_tls_params();
+      tls_params->set_tls_minimum_protocol_version(
+          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+      tls_params->set_tls_maximum_protocol_version(
+          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+    }
 
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
@@ -598,6 +611,7 @@ public:
   }
 
   bool use_client_cert_{};
+  bool use_server_tls_13_{false};
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 

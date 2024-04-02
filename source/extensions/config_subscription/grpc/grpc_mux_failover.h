@@ -102,26 +102,26 @@ private:
   public:
     PrimaryGrpcStreamCallbacks(GrpcMuxFailover& parent) : parent_(parent) {}
 
-    virtual void onStreamEstablished() override {
+    void onStreamEstablished() override {
       // TODO(adisuissa): At the moment this is a pass-through method. Once the
       // implementation matures, this call will be updated.
       parent_.grpc_mux_callbacks_.onStreamEstablished();
     }
 
-    virtual void onEstablishmentFailure() override {
+    void onEstablishmentFailure() override {
       // TODO(adisuissa): At the moment this is a pass-through method. Once the
       // implementation matures, this call will be updated.
       parent_.grpc_mux_callbacks_.onEstablishmentFailure();
     }
 
-    virtual void onDiscoveryResponse(ResponseProtoPtr<ResponseType>&& message,
-                                     ControlPlaneStats& control_plane_stats) override {
+    void onDiscoveryResponse(ResponseProtoPtr<ResponseType>&& message,
+                             ControlPlaneStats& control_plane_stats) override {
       // TODO(adisuissa): At the moment this is a pass-through method. Once the
       // implementation matures, this call will be updated.
       parent_.grpc_mux_callbacks_.onDiscoveryResponse(std::move(message), control_plane_stats);
     }
 
-    virtual void onWriteable() override {
+    void onWriteable() override {
       // TODO(adisuissa): At the moment this is a pass-through method. Once the
       // implementation matures, this call will be updated.
       parent_.grpc_mux_callbacks_.onWriteable();

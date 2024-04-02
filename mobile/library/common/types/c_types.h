@@ -73,9 +73,6 @@ typedef enum {
   ENVOY_NET_WWAN = 2,
 } envoy_network_t;
 
-// The name used to registered event tracker api.
-extern const char* envoy_event_tracker_api_name;
-
 #ifdef __cplusplus
 extern "C" { // release function
 #endif
@@ -211,7 +208,7 @@ typedef struct {
   uint64_t received_byte_count;
   // The final response flags for the stream. See
   // https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
-  // for the ResponseFlag enum.
+  // for the CoreResponseFlag enum.
   uint64_t response_flags;
   // The upstream protocol, if an upstream connection was established. Field
   // entries are based off of Envoy's Http::Protocol
@@ -311,10 +308,9 @@ extern "C" { // function pointers
  * @param stream_intel, contains internal stream metrics, context, and other details.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
- * @return void*, return context (may be unused).
  */
-typedef void* (*envoy_on_headers_f)(envoy_headers headers, bool end_stream,
-                                    envoy_stream_intel stream_intel, void* context);
+typedef void (*envoy_on_headers_f)(envoy_headers headers, bool end_stream,
+                                   envoy_stream_intel stream_intel, void* context);
 
 /**
  * Callback signature for data on an HTTP stream.
@@ -326,10 +322,9 @@ typedef void* (*envoy_on_headers_f)(envoy_headers headers, bool end_stream,
  * @param stream_intel, contains internal stream metrics, context, and other details.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
- * @return void*, return context (may be unused).
  */
-typedef void* (*envoy_on_data_f)(envoy_data data, bool end_stream, envoy_stream_intel stream_intel,
-                                 void* context);
+typedef void (*envoy_on_data_f)(envoy_data data, bool end_stream, envoy_stream_intel stream_intel,
+                                void* context);
 
 /**
  * Callback signature for metadata on an HTTP stream.
@@ -342,8 +337,8 @@ typedef void* (*envoy_on_data_f)(envoy_data data, bool end_stream, envoy_stream_
  * execution.
  * @return void*, return context (may be unused).
  */
-typedef void* (*envoy_on_metadata_f)(envoy_headers metadata, envoy_stream_intel stream_intel,
-                                     void* context);
+typedef void (*envoy_on_metadata_f)(envoy_headers metadata, envoy_stream_intel stream_intel,
+                                    void* context);
 
 /**
  * Callback signature for trailers on an HTTP stream.
@@ -354,10 +349,9 @@ typedef void* (*envoy_on_metadata_f)(envoy_headers metadata, envoy_stream_intel 
  * @param stream_intel, contains internal stream metrics, context, and other details.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
- * @return void*, return context (may be unused).
  */
-typedef void* (*envoy_on_trailers_f)(envoy_headers trailers, envoy_stream_intel stream_intel,
-                                     void* context);
+typedef void (*envoy_on_trailers_f)(envoy_headers trailers, envoy_stream_intel stream_intel,
+                                    void* context);
 
 /**
  * Callback signature for errors with an HTTP stream.
@@ -369,10 +363,9 @@ typedef void* (*envoy_on_trailers_f)(envoy_headers trailers, envoy_stream_intel 
  * @param final_stream_intel, contains final internal stream metrics, context, and other details.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
- * @return void*, return context (may be unused).
  */
-typedef void* (*envoy_on_error_f)(envoy_error error, envoy_stream_intel stream_intel,
-                                  envoy_final_stream_intel final_stream_intel, void* context);
+typedef void (*envoy_on_error_f)(envoy_error error, envoy_stream_intel stream_intel,
+                                 envoy_final_stream_intel final_stream_intel, void* context);
 
 /**
  * Callback signature for when an HTTP stream bi-directionally completes without error.
@@ -383,10 +376,9 @@ typedef void* (*envoy_on_error_f)(envoy_error error, envoy_stream_intel stream_i
  * @param final_stream_intel, contains final internal stream metrics, context, and other details.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
- * @return void*, return context (may be unused).
  */
-typedef void* (*envoy_on_complete_f)(envoy_stream_intel stream_intel,
-                                     envoy_final_stream_intel final_stream_intel, void* context);
+typedef void (*envoy_on_complete_f)(envoy_stream_intel stream_intel,
+                                    envoy_final_stream_intel final_stream_intel, void* context);
 
 /**
  * Callback signature for when an HTTP stream is cancelled.
@@ -397,40 +389,9 @@ typedef void* (*envoy_on_complete_f)(envoy_stream_intel stream_intel,
  * @param final_stream_intel, contains final internal stream metrics, context, and other details.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
- * @return void*, return context (may be unused).
  */
-typedef void* (*envoy_on_cancel_f)(envoy_stream_intel stream_intel,
-                                   envoy_final_stream_intel final_stream_intel, void* context);
-
-/**
- * Called when the envoy engine is exiting.
- */
-typedef void (*envoy_on_exit_f)(void* context);
-
-/**
- * Called when the envoy has finished its async setup and returned post-init callbacks.
- *
- * @param context, contains the necessary state to carry out platform-specific dispatch and
- * execution.
- */
-typedef void (*envoy_on_engine_running_f)(void* context);
-
-/**
- * Called when envoy's logger logs data.
- *
- * @param data, the logged data.
- * @param context, contains the necessary state to carry out platform-specific dispatch and
- * execution.
- */
-typedef void (*envoy_logger_log_f)(envoy_data data, const void* context);
-
-/**
- * Called when Envoy is done with the logger.
- *
- * @param context, contains the necessary state to carry out platform-specific dispatch and
- * execution.
- */
-typedef void (*envoy_logger_release_f)(const void* context);
+typedef void (*envoy_on_cancel_f)(envoy_stream_intel stream_intel,
+                                  envoy_final_stream_intel final_stream_intel, void* context);
 
 /**
  * Callback signature which notify when there is buffer available for request
@@ -444,18 +405,8 @@ typedef void (*envoy_logger_release_f)(const void* context);
  * @param stream_intel, contains internal stream metrics, context, and other details.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
- * @return void*, return context (may be unused).
  */
-typedef void* (*envoy_on_send_window_available_f)(envoy_stream_intel stream_intel, void* context);
-
-/**
- * Called when envoy's event tracker tracks an event.
- *
- * @param event, the dictionary with attributes that describe the event.
- * @param context, contains the necessary state to carry out platform-specific dispatch and
- * execution.
- */
-typedef void (*envoy_event_tracker_track_f)(envoy_map event, const void* context);
+typedef void (*envoy_on_send_window_available_f)(envoy_stream_intel stream_intel, void* context);
 
 #ifdef __cplusplus
 } // function pointers
@@ -476,56 +427,3 @@ typedef struct {
   // Context passed through to callbacks to provide dispatch and execution state.
   void* context;
 } envoy_http_callbacks;
-
-/**
- * Interface that can handle engine callbacks.
- */
-typedef struct {
-  envoy_on_engine_running_f on_engine_running;
-  envoy_on_exit_f on_exit;
-  // Context passed through to callbacks to provide dispatch and execution state.
-  void* context;
-} envoy_engine_callbacks;
-
-/**
- * Interface for logging.
- */
-typedef struct {
-  envoy_logger_log_f log;
-  envoy_logger_release_f release;
-  // Context passed through to callbacks to provide dispatch and execution state.
-  const void* context;
-} envoy_logger;
-
-/**
- * Interface for event tracking.
- */
-typedef struct {
-  envoy_event_tracker_track_f track;
-  // Context passed through to callbacks to provide dispatch and execution state.
-  const void* context;
-} envoy_event_tracker;
-
-/**
- * The list of certificate verification results returned from Java side to the
- * C++ side.
- * A Java counterpart lives in org.chromium.net.CertVerifyStatusAndroid.java
- */
-typedef enum {
-  // Certificate is trusted.
-  CERT_VERIFY_STATUS_OK = 0,
-  // Certificate verification could not be conducted.
-  CERT_VERIFY_STATUS_FAILED = -1,
-  // Certificate is not trusted due to non-trusted root of the certificate
-  // chain.
-  CERT_VERIFY_STATUS_NO_TRUSTED_ROOT = -2,
-  // Certificate is not trusted because it has expired.
-  CERT_VERIFY_STATUS_EXPIRED = -3,
-  // Certificate is not trusted because it is not valid yet.
-  CERT_VERIFY_STATUS_NOT_YET_VALID = -4,
-  // Certificate is not trusted because it could not be parsed.
-  CERT_VERIFY_STATUS_UNABLE_TO_PARSE = -5,
-  // Certificate is not trusted because it has an extendedKeyUsage field, but
-  // its value is not correct for a web server.
-  CERT_VERIFY_STATUS_INCORRECT_KEY_USAGE = -6,
-} envoy_cert_verify_status_t;

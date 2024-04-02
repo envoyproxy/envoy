@@ -127,12 +127,12 @@ public:
 
   struct DualInfo {
     DualInfo(Server::Configuration::UpstreamFactoryContext& context)
-        : init_manager(context.initManager()), scope(context.scope()), is_upstream_filter(true) {}
+        : init_manager(context.initManager()), scope(context.scope()), is_upstream(true) {}
     DualInfo(Server::Configuration::FactoryContext& context)
-        : init_manager(context.initManager()), scope(context.scope()), is_upstream_filter(false) {}
+        : init_manager(context.initManager()), scope(context.scope()), is_upstream(false) {}
     Init::Manager& init_manager;
     Stats::Scope& scope;
-    bool is_upstream_filter;
+    bool is_upstream;
   };
 
   absl::StatusOr<Envoy::Http::FilterFactoryCb>
