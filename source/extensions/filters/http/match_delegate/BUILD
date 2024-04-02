@@ -14,6 +14,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     extra_visibility = [
         "//test/integration:__subpackages__",
+        "//test/config_test:__subpackages__",
     ],
     deps = [
         "//envoy/registry",
