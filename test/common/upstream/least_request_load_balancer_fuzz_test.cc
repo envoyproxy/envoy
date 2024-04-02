@@ -67,7 +67,7 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCa
         least_request_lb_config.active_request_bias().default_value() > 25) {
       ENVOY_LOG_MISC(debug,
                      "active_request_bias default_value in the least-request config is too high "
-                     "({} > 25), skipping test as the config is invliad",
+                     "({} > 25), skipping test as the config is invalid",
                      least_request_lb_config.active_request_bias().default_value());
       return;
     }
