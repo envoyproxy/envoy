@@ -43,15 +43,6 @@ message ProxyProtocol {
     KeyValuePair on_tlv_present = 2;
   }
 
-  message TlvsMetadata {
-    // Typed metadata for :ref:`Proxy protocol filter <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol>`, that represents map of TLVs.
-    // Each entry in the map consists of a key (TLV type) and value (TLV value in bytes).
-    // When runtime flag ``envoy.reloadable_features.use_typed_metadata_in_proxy_protol_listener`` is enabled,
-    // :ref:`Proxy protocol filter <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol>`
-    // will set typed metadata instead of regular metadata. By default filter will use typed metadata.
-    map<string, google.protobuf.BytesValue> typed_metadata = 1;
-  }
-
   // The list of rules to apply to requests.
   repeated Rule rules = 1;
 
@@ -81,4 +72,13 @@ message ProxyProtocol {
   //   :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`,
   //   which controls pass-through for the upstream.
   config.core.v3.ProxyProtocolPassThroughTLVs pass_through_tlvs = 3;
+}
+
+message TlvsMetadata {
+  // Typed metadata for :ref:`Proxy protocol filter <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol>`, that represents map of TLVs.
+  // Each entry in the map consists of a key (TLV type) and value (TLV value in bytes).
+  // When runtime flag ``envoy.reloadable_features.use_typed_metadata_in_proxy_protol_listener`` is enabled,
+  // :ref:`Proxy protocol filter <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol>`
+  // will set typed metadata instead of regular metadata. By default filter will use typed metadata.
+  map<string, google.protobuf.BytesValue> typed_metadata = 1;
 }

@@ -450,8 +450,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
         const auto typed_proxy_filter_metadata = typed_filter_metadata.find(metadata_key);
         Protobuf::BytesValue tlv_byte_value;
         tlv_byte_value.set_value(tlv_value.data(), tlv_value.size());
-        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::TlvsMetadata
-            tlvs_metadata;
+        envoy::extensions::filters::listener::proxy_protocol::v3::TlvsMetadata tlvs_metadata;
         if (typed_proxy_filter_metadata != typed_filter_metadata.end()) {
           MessageUtil::unpackTo(typed_proxy_filter_metadata->second, tlvs_metadata);
         }
