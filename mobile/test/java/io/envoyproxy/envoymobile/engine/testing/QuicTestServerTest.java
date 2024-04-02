@@ -13,6 +13,7 @@ import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -53,7 +54,8 @@ public class QuicTestServerTest {
     headers.put("Content-Type", "text/plain");
     headers.put("X-Original-Url", "https://test.example.com:6121/simple.txt");
     httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP3, headers,
-                                                 "This is a simple text file served by QUIC.\n");
+                                                 "This is a simple text file served by QUIC.\n",
+                                                 Collections.emptyMap());
     CountDownLatch latch = new CountDownLatch(1);
     engine = new AndroidEngineBuilder(appContext,
                                       new Custom(String.format(CONFIG, httpTestServer.getPort())))
