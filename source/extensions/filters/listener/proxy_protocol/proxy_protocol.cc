@@ -111,8 +111,8 @@ Config::Config(
                                ProxyProtocolPassThroughTLVs::INCLUDE_ALL
                          : false),
       encode_tlvs_(proto_config.has_pass_through_tlvs()
-                         ? proto_config.pass_through_tlvs().encode_tlvs()
-                         : false) {
+                       ? proto_config.pass_through_tlvs().encode_tlvs()
+                       : false) {
   for (const auto& rule : proto_config.rules()) {
     tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
   }
@@ -165,9 +165,7 @@ bool Config::allowRequestsWithoutProxyProtocol() const {
   return allow_requests_without_proxy_protocol_;
 }
 
-bool Config::encodeTlvs() const {
-  return encode_tlvs_;
-}
+bool Config::encodeTlvs() const { return encode_tlvs_; }
 
 bool Config::isVersionV1Allowed() const { return allow_v1_; }
 
@@ -545,8 +543,8 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
 
       // Base64-encode or sanitize any non utf8 characters.
       auto sanitised_tlv_value = config_->encodeTlvs()
-        ? Envoy::Base64::encode(tlv_value.data(), tlv_value.size())
-        : MessageUtil::sanitizeUtf8String(tlv_value);
+                                     ? Envoy::Base64::encode(tlv_value.data(), tlv_value.size())
+                                     : MessageUtil::sanitizeUtf8String(tlv_value);
       metadata_value.set_string_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
 
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
