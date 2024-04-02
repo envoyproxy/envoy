@@ -543,13 +543,10 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     if (nullptr != key_value_pair) {
       ProtobufWkt::Value metadata_value;
 
-      if (config_->encodeTlvs()) {
-        std::string encoded_tlv_value = Base64::encode(tlv_value.data(), tlv_value.size());
-        tlv_value = absl::string_view(encoded_tlv_value.data(), encoded_tlv_value.size());
-      }
-
-      // Sanitize any non utf8 characters.
-      auto sanitised_tlv_value = MessageUtil::sanitizeUtf8String(tlv_value);
+      // Base64-encode or sanitize any non utf8 characters.
+      auto sanitised_tlv_value = config_->encodeTlvs()
+        ? Envoy::Base64::encode(tlv_value.data(), tlv_value.size())
+        : MessageUtil::sanitizeUtf8String(tlv_value);
       metadata_value.set_string_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
 
       std::string metadata_key = key_value_pair->metadata_namespace().empty()

@@ -1783,12 +1783,12 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndBase64Encode) {
   EXPECT_EQ(1, fields.count("PP2 vpc id"));
 
   auto value_type_authority = fields.at("PP2 type authority").string_value();
-  // Base64 encoded value of tlv_type_authority.
-  ASSERT_EQ(value_type_authority, "Zv5vLm9vwQ==");
+  // Base64 encoded value of the value section of tlv_type_authority.
+  ASSERT_EQ(value_type_authority, "Zv5vLmNvwQ==");
 
   auto value_vpc_id = fields.at("PP2 vpc id").string_value();
-  // Base64 encoded value of tlv_vpc_id.
-  ASSERT_EQ(value_vpc_id, "AXZwYy0wwzV0ZXN0MmZhNjM2M2j5Nw==");
+  // Base64 encoded value of the value section of tlv_vpc_id.
+  ASSERT_EQ(value_vpc_id, "AXZwYy0wwDV0ZXN0MmZhNmM2M2j5Nw==");
 
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);

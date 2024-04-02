@@ -25,6 +25,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
         "//source/common/common:empty_string",
         "//source/common/common:hex_lib",
         "//source/common/common:minimal_logger_lib",
