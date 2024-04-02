@@ -28,6 +28,10 @@ public:
       : BaseIntegrationTest(Network::Address::IpVersion::v4, config_yaml) {
     skip_tag_extraction_rule_check_ = true;
   };
+
+  const Upstream::ClusterManager& clusterManager() const {
+    return test_server_->server().clusterManager();
+  }
 };
 
 class IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion> {
@@ -66,12 +70,14 @@ public:
   using TestReadFilterSharedPtr = std::shared_ptr<TestReadFilter>;
 
   struct TestRequestEncoderCallback : public EncodingCallbacks {
+    OptRef<const RouteEntry> routeEntry() const override { return {}; }
     void onEncodingSuccess(Buffer::Instance& buffer, bool) override { buffer_.move(buffer); }
     Buffer::OwnedImpl buffer_;
   };
   using TestRequestEncoderCallbackSharedPtr = std::shared_ptr<TestRequestEncoderCallback>;
 
   struct TestResponseEncoderCallback : public EncodingCallbacks {
+    OptRef<const RouteEntry> routeEntry() const override { return {}; }
     void onEncodingSuccess(Buffer::Instance& buffer, bool) override { buffer_.move(buffer); }
     Buffer::OwnedImpl buffer_;
   };
@@ -111,6 +117,13 @@ public:
     OptRef<Network::Connection> connection() override {
       if (parent_.upstream_connection_ != nullptr) {
         return parent_.upstream_connection_->connection();
+      }
+      return {};
+    }
+    OptRef<const Upstream::ClusterInfo> upstreamCluster() const override {
+      auto result = parent_.integration_->clusterManager().clusters().getCluster("cluster_0");
+      if (result.has_value()) {
+        return makeOptRefFromPtr(result.value().get().info().get());
       }
       return {};
     }

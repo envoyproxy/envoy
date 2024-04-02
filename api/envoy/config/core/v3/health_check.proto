@@ -95,12 +95,11 @@ message HealthCheck {
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used. The host header can be customized for a specific endpoint by setting the
     // :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
-    string host = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+    string host = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE}];
 
     // Specifies the HTTP path that will be requested during health checking. For example
     // ``/healthcheck``.
-    string path = 2
-        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+    string path = 2 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE}];
 
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;

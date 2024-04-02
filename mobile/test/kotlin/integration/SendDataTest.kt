@@ -5,10 +5,8 @@ import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.Standard
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.testing.TestJni
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -17,19 +15,18 @@ import org.junit.Test
 
 private const val ASSERTION_FILTER_TYPE =
   "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+private const val TEST_RESPONSE_FILTER_TYPE =
+  "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
 private const val REQUEST_STRING_MATCH = "match_me"
 
+// TODO(fredyw): Figure out why HttpTestServer prevents EngineBuilder from using native filters.
 class SendDataTest {
   init {
-    AndroidJniLibrary.loadTestLibrary()
-    JniLibrary.load()
+    JniLibrary.loadTestLibrary()
   }
 
   @Test
   fun `successful sending data`() {
-    TestJni.startHttp2TestServer()
-    val port = TestJni.getServerPort()
-
     val expectation = CountDownLatch(1)
     val engine =
       EngineBuilder(Standard())
@@ -37,6 +34,7 @@ class SendDataTest {
           "envoy.filters.http.assertion",
           "{'@type': $ASSERTION_FILTER_TYPE, match_config: {http_request_generic_body_match: {patterns: [{string_match: $REQUEST_STRING_MATCH}]}}}"
         )
+        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
         .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
         .build()
 
@@ -46,8 +44,8 @@ class SendDataTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "localhost:$port",
-          path = "/simple.txt"
+          authority = "example.com",
+          path = "/test"
         )
         .build()
 
@@ -71,7 +69,6 @@ class SendDataTest {
     expectation.await(10, TimeUnit.SECONDS)
 
     engine.terminate()
-    TestJni.shutdownTestServer()
 
     assertThat(expectation.count).isEqualTo(0)
     assertThat(responseStatus).isEqualTo(200)

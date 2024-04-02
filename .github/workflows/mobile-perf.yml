@@ -63,6 +63,7 @@ jobs:
           # Ensure files don't leak back into the main binary
           source: >-
             rm
+            source/common/http/route_config_update_requster.h
             source/common/listener_manager/listener_manager_impl.h
             source/server/overload_manager_impl.cc
             source/common/network/listen_socket_impl.h

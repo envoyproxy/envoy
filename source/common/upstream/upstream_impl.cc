@@ -1514,7 +1514,7 @@ bool validateTransportSocketSupportsQuic(
   }
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
       http11_socket;
-  MessageUtil::unpackTo(transport_socket.typed_config(), http11_socket);
+  THROW_IF_NOT_OK(MessageUtil::unpackTo(transport_socket.typed_config(), http11_socket));
   return http11_socket.transport_socket().name() == "envoy.transport_sockets.quic";
 }
 

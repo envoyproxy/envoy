@@ -3776,6 +3776,40 @@ TEST_F(HttpHealthCheckerImplTest, MethodConnectDisallowedValidation) {
                           "Proto constraint validation failed.*")
 }
 
+TEST_F(HttpHealthCheckerImplTest, InvalidHost) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    http_health_check:
+      host: "\x07"
+      path: "/aaa"
+    )EOF";
+
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
+                          "Proto constraint validation failed*")
+}
+
+TEST_F(HttpHealthCheckerImplTest, InvalidPath) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    http_health_check:
+      host: "aaa"
+      path: "\x08"
+    )EOF";
+
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
+                          "Proto constraint validation failed*")
+}
+
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
   setupNoServiceValidationHCWithHttp2();
   EXPECT_EQ(Http::CodecType::HTTP2,
@@ -5105,7 +5139,7 @@ public:
         .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
           std::vector<Grpc::Frame> decoded_frames;
           Grpc::Decoder decoder;
-          ASSERT_TRUE(decoder.decode(data, decoded_frames));
+          ASSERT_TRUE(decoder.decode(data, decoded_frames).ok());
           ASSERT_EQ(1U, decoded_frames.size());
           auto& frame = decoded_frames[0];
           Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
@@ -5289,7 +5323,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithAdditionalHeaders) {
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
         std::vector<Grpc::Frame> decoded_frames;
         Grpc::Decoder decoder;
-        ASSERT_TRUE(decoder.decode(data, decoded_frames));
+        ASSERT_TRUE(decoder.decode(data, decoded_frames).ok());
         ASSERT_EQ(1U, decoded_frames.size());
         auto& frame = decoded_frames[0];
         Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));

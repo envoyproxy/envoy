@@ -16,12 +16,12 @@
 
 namespace Envoy {
 
-enum class TestServerType {
-  HTTP1_WITHOUT_TLS,
-  HTTP2_WITH_TLS,
-  HTTP3,
-  HTTP_PROXY,
-  HTTPS_PROXY,
+enum class TestServerType : int {
+  HTTP1_WITHOUT_TLS = 0,
+  HTTP2_WITH_TLS = 1,
+  HTTP3 = 2,
+  HTTP_PROXY = 3,
+  HTTPS_PROXY = 4,
 };
 
 class TestServer : public ListenerHooks {
@@ -81,6 +81,13 @@ public:
    */
   void setHeadersAndData(absl::string_view header_key, absl::string_view header_value,
                          absl::string_view response_body);
+
+  /**
+   * Sets the response headers and body for the test server to return on all future request.
+   * Can only be called once the server has been started.
+   */
+  void setResponse(const absl::flat_hash_map<std::string, std::string>& headers,
+                   absl::string_view body);
 
   // ListenerHooks
   void onWorkerListenerAdded() override {}
