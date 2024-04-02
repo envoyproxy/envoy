@@ -777,6 +777,9 @@ public:
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   const std::string& responseBody() const override {
     absl::MutexLock lock(&direct_response_mutex_);
+    if (!direct_response_body_) {
+      return EMPTY_STRING;
+    }
     return *direct_response_body_.get();
   }
 
