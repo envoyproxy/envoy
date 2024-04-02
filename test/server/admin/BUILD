@@ -263,3 +263,14 @@ envoy_cc_test(
         "//test/mocks:common_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "clusters_request_test",
+    srcs = envoy_select_admin_functionality(["clusters_request_test.cc"]),
+    deps = [
+        "//envoy/http:codes_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/server/admin:clusters_request_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

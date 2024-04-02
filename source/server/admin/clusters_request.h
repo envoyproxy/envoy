@@ -12,7 +12,7 @@ namespace Server {
 // Captures context for a streaming request, implementing the Admin::Request interface.
 class ClustersRequest : public Admin::Request {
 public:
-  static constexpr uint64_t DefaultChunkSize = 2 * 1000 * 1000;
+  static constexpr uint64_t DefaultChunkSize = 2 << 20; // 2 MB
 
   Http::Code start(Http::ResponseHeaderMap& response_headers) override;
   bool nextChunk(Buffer::Instance& response) override;

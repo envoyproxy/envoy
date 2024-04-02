@@ -133,7 +133,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
               // configuration. See
               // https://en.cppreference.com/w/cpp/language/aggregate_initialization#Designated_initializers.
               .prefix_ = "/clusters",
-              .help_text_ = "retrieve clusters data",
+              .help_text_ = "upstream clusters status",
               .handler_ = MAKE_STREAMING_HANDLER(clusters_handler_.makeRequest),
               .removable_ = false,
               .mutates_server_state_ = false,
@@ -142,7 +142,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       {
                           .type_ = Admin::ParamDescriptor::Type::Enum,
                           .id_ = "format",
-                          .help_ = "the output format",
+                          .help_ = "The output format",
                           .enum_choices_ = {"text", "json"},
                       },
                   },
