@@ -2,6 +2,7 @@
 
 #include "envoy/admin/v3/clusters.pb.h"
 
+#include "source/common/common/macros.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
@@ -54,6 +55,12 @@ Http::Code ClustersHandler::handlerClusters(Http::ResponseHeaderMap& response_he
   }
 
   return Http::Code::OK;
+}
+
+// TODO(demitriswan) Implement this member function.
+Admin::RequestPtr ClustersHandler::makeRequest(AdminStream& admin_stream) {
+  UNREFERENCED_PARAMETER(admin_stream);
+  return nullptr;
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the

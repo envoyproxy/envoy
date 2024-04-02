@@ -31,6 +31,8 @@ public:
 
   Http::Code handlerClusters(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                              AdminStream&);
+  // TODO(demitriswan) Document this member function.
+  Admin::RequestPtr makeRequest(AdminStream& admin_stream);
 
 private:
   void addOutlierInfo(const std::string& cluster_name,
