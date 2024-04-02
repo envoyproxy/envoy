@@ -70,12 +70,11 @@ class SendDataTest {
     var responseEndStream = false
     client
       .newStreamPrototype()
-      .setOnResponseHeaders { headers, endStream, _ ->
-        responseStatus = headers.httpStatus
+      .setOnResponseHeaders { headers, _, _ -> responseStatus = headers.httpStatus }
+      .setOnResponseData { _, endStream, _ ->
         responseEndStream = endStream
         expectation.countDown()
       }
-      .setOnResponseData { _, endStream, _ -> responseEndStream = endStream }
       .setOnError { _, _ -> fail("Unexpected error") }
       .start()
       .sendHeaders(requestHeaders, false)
