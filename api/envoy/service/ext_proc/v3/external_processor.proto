@@ -118,8 +118,8 @@ message ProcessingRequest {
   // * A value of ``false`` indicates that the server must respond
   //   to this message by either sending back a matching ProcessingResponse message,
   //   or by closing the stream.
-  // * A value of ``true`` indicates that the server must not respond to this
-  //   message, although it may still close the stream to indicate that no more messages
+  // * A value of ``true`` indicates that the server should not respond to this message, as any
+  //   responses will be ignored. However, it may still close the stream to indicate that no more messages
   //   are needed.
   //
   bool observability_mode = 10;
