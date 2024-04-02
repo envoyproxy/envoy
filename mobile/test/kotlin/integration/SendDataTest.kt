@@ -33,7 +33,7 @@ class SendDataTest {
           "envoy.filters.http.assertion",
           "[$ASSERTION_FILTER_TYPE] { match_config { http_request_generic_body_match: { patterns: { string_match: '$REQUEST_STRING_MATCH'}}}}"
         )
-        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
+        .addNativeFilter("test_remote_response", "[$TEST_RESPONSE_FILTER_TYPE] {}")
         .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
         .build()
 
