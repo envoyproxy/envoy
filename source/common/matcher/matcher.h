@@ -339,9 +339,9 @@ private:
   InputMatcherFactoryCb createInputMatcher(const SinglePredicateType& predicate) {
     switch (predicate.matcher_case()) {
     case SinglePredicateType::kValueMatch:
-      return [value_match = predicate.value_match()]() {
+      return [&context = server_factory_context_, value_match = predicate.value_match()]() {
         return std::make_unique<StringInputMatcher<std::decay_t<decltype(value_match)>>>(
-            value_match);
+            value_match, context);
       };
     case SinglePredicateType::kCustomMatch: {
       auto& factory =

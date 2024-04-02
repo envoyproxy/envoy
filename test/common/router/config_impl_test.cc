@@ -166,8 +166,7 @@ parseRouteConfigurationFromYaml(const std::string& yaml) {
 
 class ConfigImplTestBase {
 protected:
-  ConfigImplTestBase()
-      : api_(Api::createApiForTest()), engine_(std::make_unique<Regex::GoogleReEngine>()) {
+  ConfigImplTestBase() : api_(Api::createApiForTest()) {
     ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
@@ -342,7 +341,6 @@ most_specific_header_mutations_wins: {0}
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Event::SimulatedTimeSystem test_time_;
-  ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
 class RouteMatcherTest : public testing::Test,
@@ -6414,9 +6412,9 @@ virtual_hosts:
               - name: cluster2
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Field 'weight' is missing in: name: \"cluster1\"\n");
+      "Field 'weight' is missing in:.*[\n]*name: \"cluster1\"\n");
 
   const std::string yaml2 = R"EOF(
 virtual_hosts:

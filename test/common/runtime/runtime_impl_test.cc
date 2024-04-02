@@ -107,7 +107,7 @@ public:
 
   void updateDiskLayer(uint32_t layer) {
     ASSERT_LT(layer, on_changed_cbs_.size());
-    on_changed_cbs_[layer](Filesystem::Watcher::Events::MovedTo);
+    EXPECT_TRUE(on_changed_cbs_[layer](Filesystem::Watcher::Events::MovedTo).ok());
   }
 
   ProtobufWkt::Struct base_;

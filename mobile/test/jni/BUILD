@@ -10,15 +10,16 @@ cc_library(
     name = "envoy_jni_with_test_extensions_lib",
     testonly = True,
     deps = [
-        ":server_envoy_jni_lib",
+        ":test_jni_impl_lib",
         "//library/jni:envoy_jni_lib",
         "@envoy_build_config//:test_extensions",
     ],
+    alwayslink = True,
 )
 
 # Library which contains all the JNI related targets.
 cc_library(
-    name = "server_envoy_jni_lib",
+    name = "test_jni_impl_lib",
     testonly = True,
     srcs = [
         "test_jni_impl.cc",
@@ -29,11 +30,105 @@ cc_library(
     }),
     deps = [
         "//library/jni:envoy_jni_lib",
-        "//test/common/integration:test_server_interface_lib",
-        "//test/common/integration:xds_test_server_interface_lib",
+        "@envoy//test/test_common:utility_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
+)
+
+# Library which contains JNI functions for the HttpTestServer.
+cc_library(
+    name = "jni_http_test_server_factory_lib",
+    testonly = True,
+    srcs = [
+        "jni_http_test_server_factory.cc",
+    ],
+    linkopts = select({
+        "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//library/jni:jni_helper_lib",
+        "//library/jni:jni_utility_lib",
+        "//test/common/integration:test_server_lib",
+        "@envoy//test/test_common:test_version_linkstamp",
+        "@envoy_build_config//:extension_registry",
+    ],
+    # We need this to ensure that we link this into the .so even though there are no code references.
+    alwayslink = True,
+)
+
+cc_binary(
+    name = "libenvoy_jni_http_test_server_factory.so",
+    testonly = True,
+    linkshared = True,
+    deps = [
+        ":jni_http_test_server_factory_lib",
+        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
+    ],
+)
+
+# Library which contains JNI functions for the HttpProxyTestServer.
+cc_library(
+    name = "jni_http_proxy_test_server_factory_lib",
+    testonly = True,
+    srcs = [
+        "jni_http_proxy_test_server_factory.cc",
+    ],
+    linkopts = select({
+        "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//library/jni:jni_helper_lib",
+        "//test/common/integration:test_server_lib",
+        "@envoy//test/test_common:test_version_linkstamp",
+        "@envoy_build_config//:extension_registry",
+    ],
+    # We need this to ensure that we link this into the .so even though there are no code references.
+    alwayslink = True,
+)
+
+cc_binary(
+    name = "libenvoy_jni_http_proxy_test_server_factory.so",
+    testonly = True,
+    linkshared = True,
+    deps = [
+        ":jni_http_proxy_test_server_factory_lib",
+        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
+    ],
+)
+
+# Library which contains JNI functions for the XdsTestServer.
+cc_library(
+    name = "jni_xds_test_server_factory_lib",
+    testonly = True,
+    srcs = [
+        "jni_xds_test_server_factory.cc",
+    ],
+    linkopts = select({
+        "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//library/jni:jni_helper_lib",
+        "//library/jni:jni_utility_lib",
+        "//test/common/integration:xds_test_server_lib",
+        "@envoy//test/test_common:test_version_linkstamp",
+        "@envoy_build_config//:extension_registry",
+    ],
+    # We need this to ensure that we link this into the .so even though there are no code references.
+    alwayslink = True,
+)
+
+cc_binary(
+    name = "libenvoy_jni_xds_test_server_factory.so",
+    testonly = True,
+    linkshared = True,
+    deps = [
+        ":jni_xds_test_server_factory_lib",
+        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
+    ],
 )
 
 # Base binary (.so) for testing
@@ -62,7 +157,7 @@ cc_library(
     name = "envoy_jni_with_test_and_listener_extensions_lib",
     testonly = True,
     deps = [
-        ":server_envoy_jni_lib",
+        ":test_jni_impl_lib",
         "//library/jni:envoy_jni_lib",
         "@envoy//source/common/listener_manager:listener_manager_lib",
     ],

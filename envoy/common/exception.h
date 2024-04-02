@@ -29,6 +29,12 @@ public:
   EnvoyException(const std::string& message) : std::runtime_error(message) {}
 };
 
+#define SET_AND_RETURN_IF_NOT_OK(check_status, set_status)                                         \
+  if (!check_status.ok()) {                                                                        \
+    set_status = check_status;                                                                     \
+    return;                                                                                        \
+  }
+
 #define THROW_IF_NOT_OK_REF(status)                                                                \
   do {                                                                                             \
     if (!(status).ok()) {                                                                          \
@@ -63,7 +69,7 @@ public:
 
 template <class Type> Type returnOrThrow(absl::StatusOr<Type> type_or_error) {
   THROW_IF_STATUS_NOT_OK(type_or_error, throw);
-  return type_or_error.value();
+  return std::move(type_or_error.value());
 }
 
 #define THROW_OR_RETURN_VALUE(expression, type) returnOrThrow<type>(expression)

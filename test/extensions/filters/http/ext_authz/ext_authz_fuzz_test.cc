@@ -85,7 +85,6 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
 
   static StatelessFuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
-  static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
 
   // Prepare filter.
   const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config = input.config();

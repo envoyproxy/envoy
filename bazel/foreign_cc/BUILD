@@ -157,7 +157,7 @@ configure_make(
         "--disable-manual",
         "--disable-shared",
         "--enable-static",
-        "--with-colm=$EXT_BUILD_DEPS/colm",
+        "--with-colm=$$EXT_BUILD_DEPS/colm",
     ],
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
@@ -353,8 +353,8 @@ envoy_cmake(
     name = "nghttp2",
     cache_entries = {
         "ENABLE_LIB_ONLY": "on",
-        "ENABLE_SHARED_LIB": "off",
-        "ENABLE_STATIC_LIB": "on",
+        "BUILD_SHARED_LIBS": "off",
+        "BUILD_STATIC_LIBS": "on",
         "CMAKE_INSTALL_LIBDIR": "lib",
         "CMAKE_CXX_COMPILER_FORCED": "on",
     },

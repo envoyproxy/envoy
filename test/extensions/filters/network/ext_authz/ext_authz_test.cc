@@ -17,6 +17,7 @@
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/printers.h"
 
@@ -40,7 +41,7 @@ public:
   void initialize(std::string yaml) {
     envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
-    config_ = std::make_shared<Config>(proto_config, *stats_store_.rootScope(), bootstrap_);
+    config_ = std::make_shared<Config>(proto_config, *stats_store_.rootScope(), context_);
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -133,7 +134,7 @@ public:
 
   Stats::TestUtil::TestStore stats_store_;
   ConfigSharedPtr config_;
-  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Filters::Common::ExtAuthz::MockClient* client_;
   std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;

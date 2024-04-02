@@ -109,16 +109,19 @@ type HeaderMap interface {
 
 	// Set key-value pair in header map, the previous pair will be replaced if exists.
 	// It may not take affects immediately in the Envoy thread side when it's invoked in a Go thread.
+	// This won't refresh route cache, please invoke ClearRouteCache if needed.
 	Set(key, value string)
 
 	// Add value for given key.
 	// Multiple headers with the same key may be added with this function.
 	// Use Set for setting a single header for the given key.
 	// It may not take affects immediately in the Envoy thread side when it's invoked in a Go thread.
+	// This won't refresh route cache, please invoke ClearRouteCache if needed.
 	Add(key, value string)
 
 	// Del delete pair of specified key
 	// It may not take affects immediately in the Envoy thread side when it's invoked in a Go thread.
+	// This won't refresh route cache, please invoke ClearRouteCache if needed.
 	Del(key string)
 
 	// Range calls f sequentially for each key and value present in the map.
@@ -136,6 +139,16 @@ type RequestHeaderMap interface {
 	Method() string
 	Host() string
 	Path() string
+	// SetMethod set method in header map
+	// This won't refresh route cache, please invoke ClearRouteCache if needed.
+	SetMethod(method string)
+	// SetHost set host in header map
+	// This won't refresh route cache, please invoke ClearRouteCache if needed.
+	SetHost(host string)
+	// SetPath set path in header map
+	// This won't refresh route cache, please invoke ClearRouteCache if needed.
+	SetPath(path string)
+	// Note: Scheme is the downstream protocol, we'd better not override it.
 }
 
 type RequestTrailerMap interface {

@@ -162,9 +162,10 @@ TagNameValues::TagNameValues() {
   // listener.<address|stat_prefix>.(worker_<id>.)*
   // listener_manager.(worker_<id>.)*
   // server.(worker_<id>.)*
+  // thread_local_cluster_manager.(worker_<id>.)*
   addRe2(
       WORKER_ID,
-      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)\.|server\.|listener_manager\.)worker_((\d+)\.))",
+      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)|server|listener_manager|thread_local_cluster_manager)\.worker_((\d+)\.))",
       "");
 
   // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
@@ -210,6 +211,9 @@ TagNameValues::TagNameValues() {
 
   // http.<stat_prefix>.rbac.(<rules_stat_prefix>.)*
   addTokenized(RBAC_HTTP_PREFIX, "http.*.rbac.$.**");
+
+  // proxy_proto.(versions.v<version_number>.)**
+  addRe2(PROXY_PROTOCOL_VERSION, R"(^proxy_proto\.(versions\.v(\d)\.)\w+)", "proxy_proto.versions");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,

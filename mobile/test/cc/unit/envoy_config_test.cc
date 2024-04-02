@@ -42,7 +42,7 @@ DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
   const auto& clusters = bootstrap.static_resources().clusters();
   for (const auto& cluster : clusters) {
     if (cluster.name() == "base") {
-      MessageUtil::unpackTo(cluster.cluster_type().typed_config(), cluster_config);
+      MessageUtil::unpackTo(cluster.cluster_type().typed_config(), cluster_config).IgnoreError();
     }
   }
   return cluster_config;
@@ -225,6 +225,18 @@ TEST(TestConfig, EnableDrainPostDnsRefresh) {
   engine_builder.enableDrainPostDnsRefresh(true);
   bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("enable_drain_post_dns_refresh: true"));
+}
+
+TEST(TestConfig, SetDnsQueryTimeout) {
+  EngineBuilder engine_builder;
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  // The default value.
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 5 }"));
+
+  engine_builder.addDnsQueryTimeoutSeconds(30);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 30 }"));
 }
 
 TEST(TestConfig, EnforceTrustChainVerification) {
