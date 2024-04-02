@@ -19,6 +19,13 @@ namespace Tracers {
 namespace Datadog {
 namespace {
 
+class NoopTraceContextWriter : public datadog::tracing::DictWriter {
+public:
+  ~NoopTraceContextWriter() override = default;
+
+  void set(datadog::tracing::StringView, datadog::tracing::StringView) override {}
+};
+
 class TraceContextWriter : public datadog::tracing::DictWriter {
 public:
   explicit TraceContextWriter(Tracing::TraceContext& context) : context_(context) {}
@@ -114,7 +121,17 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
   config.resource = name;
   config.start = estimateTime(start_time);
 
-  return std::make_unique<Span>(span_->create_child(config));
+  auto child_span = span_->create_child(config);
+
+  // Call `inject` to force a sampling decision as there `dd-trace-cpp` do not offer a way to
+  // actually take a sampling decision.
+  // Replicate legacy behavior. Read more:
+  //   - <https://github.com/DataDog/dd-trace-cpp/issues/92>
+  //   - <https://github.com/envoyproxy/envoy/pull/32264>
+  NoopTraceContextWriter writer;
+  child_span.inject(writer);
+
+  return std::make_unique<Span>(std::move(child_span));
 }
 
 void Span::setSampled(bool sampled) {
@@ -124,6 +141,9 @@ void Span::setSampled(bool sampled) {
 
   // Ignore the override if a sampling decision has already been made.
   // Otherwise, treat the override as a user-specified sampling decision.
+  // Replicate legacy behavior. Read more:
+  //   - <https://github.com/DataDog/dd-trace-cpp/issues/92>
+  //   - <https://github.com/envoyproxy/envoy/pull/32264>
   if (!span_->trace_segment().sampling_decision().has_value()) {
     auto priority = static_cast<int>(sampled ? datadog::tracing::SamplingPriority::USER_KEEP
                                              : datadog::tracing::SamplingPriority::USER_DROP);
