@@ -84,11 +84,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Bazel rules for fuzz tests",
         project_url = "https://github.com/bazelbuild/rules_fuzzing",
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
-        version = "0.5.1",
-        sha256 = "7528a59df503e18797ca601095e69ffe880de42610429f9168e75a96b7d9a25a",
+        version = "0.4.1",
+        sha256 = "f6f3f42c48576acd5653bf07637deee2ae4ebb77ccdb0dacc67c184508bedc8c",
         strip_prefix = "rules_fuzzing-{version}",
         urls = ["https://github.com/bazelbuild/rules_fuzzing/archive/v{version}.tar.gz"],
-        release_date = "2024-03-27",
+        release_date = "2023-10-19",
         use_category = ["test_only"],
         implied_untracked_deps = [
             # This is a repository rule generated to define an OSS-Fuzz fuzzing

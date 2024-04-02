@@ -5,39 +5,24 @@ import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.Standard
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
-import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory.HttpTestServer
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.junit.After
 import org.junit.Assert.fail
-import org.junit.Before
 import org.junit.Test
 
 private const val ASSERTION_FILTER_TYPE =
   "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+private const val TEST_RESPONSE_FILTER_TYPE =
+  "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
 private const val REQUEST_STRING_MATCH = "match_me"
 
+// TODO(fredyw): Figure out why HttpTestServer prevents EngineBuilder from using native filters.
 class SendDataTest {
   init {
-    AndroidJniLibrary.loadTestLibrary()
-    JniLibrary.load()
-  }
-
-  private lateinit var httpTestServer: HttpTestServer
-
-  @Before
-  fun setUp() {
-    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP2_WITH_TLS)
-  }
-
-  @After
-  fun tearDown() {
-    httpTestServer.shutdown()
+    JniLibrary.loadTestLibrary()
   }
 
   @Test
@@ -49,6 +34,7 @@ class SendDataTest {
           "envoy.filters.http.assertion",
           "{'@type': $ASSERTION_FILTER_TYPE, match_config: {http_request_generic_body_match: {patterns: [{string_match: $REQUEST_STRING_MATCH}]}}}"
         )
+        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
         .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
         .build()
 
@@ -58,8 +44,8 @@ class SendDataTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "localhost:${httpTestServer.port}",
-          path = "/simple.txt"
+          authority = "example.com",
+          path = "/test"
         )
         .build()
 

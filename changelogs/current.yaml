@@ -94,10 +94,19 @@ minor_behavior_changes:
     Disables recvmmsg (multi-message) for reading packets from a client QUIC UDP socket, if GRO
     is not set or not supported. recvmsg will be used instead. This behavior change can be
     reverted by setting ``envoy.reloadable_features.disallow_quic_client_udp_mmsg`` to ``false``.
+- area: config parsing, http cache filter
+  change: |
+    ``envoy.restart_features.use_fast_protobuf_hash`` was flipped to true by default.
+    The expectation is that this will improve performance of the hash operation by 2x to 10x,
+    and reduce config update time by 10-25%. This change will also cause a one-time cache flush
+    for file_system_http_cache.
 - area: xds
   change: |
     Delta SDS removals will no longer result in a "Missing SDS resources" NACK
     and instead will be ignored.
+- area: golang
+  change: |
+    Not implicitly clearing route cache in ``HeaderMap.Set``, introduce a new API ``ClearRouteCache`` to do it.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -429,6 +438,10 @@ new_features:
   change: |
     Added :ref:`%COMMON_DURATION% <config_access_log_format_common_duration>` to access log format to log the duration of the request.
     The start time point, end time point and duration precision can be configured in this new command.
+- area: admin
+  change: |
+    The ``/stats/prometheus`` endpoint can now emit prometheus ``summary`` metric types by explicitly setting the
+    ``histogram_buckets`` query parameter to ``summary``.
 
 deprecated:
 - area: listener
