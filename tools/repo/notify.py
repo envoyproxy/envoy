@@ -163,13 +163,10 @@ class RepoNotifier(runner.Runner):
         priorweek = now - datetime.timedelta(14)
 
         # Handle the event being created before today.
-        date = (
-            "%s%s%s" % (priorweek.year, str(priorweek.month).zfill(2), str(priorweek.day).zfill(2)))
-        response = await self.session.get(CALENDAR + "?getdate=" + date)
+        date = priorweek.strftime("%Y%m%d")
+        response = await self.session.get(f"{CALENDAR}?getdate={date}")
         content = await response.read()
         parsed_calendar = icalendar.Calendar.from_ical(content)
-
-        now = datetime.datetime.now()
 
         for component in parsed_calendar.walk():
             if component.name == "VEVENT":
