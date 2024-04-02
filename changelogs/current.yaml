@@ -100,6 +100,19 @@ minor_behavior_changes:
     Now, the default sampling decision of an ``httpCall`` span is inherited from the parent span,
     so that no "orphaned" sampled span associated with the ``httpCall`` is emitted. The default
     remains overridable with the ``trace_sampled`` option.
+- area: config parsing, http cache filter
+  change: |
+    ``envoy.restart_features.use_fast_protobuf_hash`` was flipped to true by default.
+    The expectation is that this will improve performance of the hash operation by 2x to 10x,
+    and reduce config update time by 10-25%. This change will also cause a one-time cache flush
+    for file_system_http_cache.
+- area: xds
+  change: |
+    Delta SDS removals will no longer result in a "Missing SDS resources" NACK
+    and instead will be ignored.
+- area: golang
+  change: |
+    Not implicitly clearing route cache in ``HeaderMap.Set``, introduce a new API ``ClearRouteCache`` to do it.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -402,6 +415,13 @@ new_features:
   change: |
     Added :ref:`formatters <envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.formatters>`
     to Fluentd access logger to allow adding extension commands when formatter access logs.
+- area: proxy_protocol
+  change: |
+    Added :ref:`disallowed_versions <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.disallowed_versions>`
+    to enforce the filter only matches specific PROXY protocol versions.
+- area: proxy_protocol
+  change: |
+    Added new statistics to the proxy protocol filter to track connections found/disallowed/errored by PROXY protocol version.
 - area: rbac
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
@@ -420,6 +440,10 @@ new_features:
 - area: aws
   change: |
     Update credential_provider utility to support EKS Pod Identity provided via token file.
+- area: admin
+  change: |
+    The ``/stats/prometheus`` endpoint can now emit prometheus ``summary`` metric types by explicitly setting the
+    ``histogram_buckets`` query parameter to ``summary``.
 
 deprecated:
 - area: listener

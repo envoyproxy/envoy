@@ -4,7 +4,6 @@
 
 #include "extension_registry.h"
 #include "library/jni/jni_helper.h"
-#include "library/jni/jni_utility.h"
 
 // NOLINT(namespace-envoy)
 

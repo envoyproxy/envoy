@@ -853,4 +853,47 @@ void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& wit
   }
 }
 
+void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
+                               ProtobufMessage::ValidationVisitor& validation_visitor,
+                               Api::Api& api) {
+  auto file_or_error = api.fileSystem().fileReadToEnd(path);
+  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  const std::string contents = file_or_error.value();
+  // If the filename ends with .pb, attempt to parse it as a binary proto.
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
+    // Attempt to parse the binary format.
+    if (message.ParseFromString(contents)) {
+      MessageUtil::checkForUnexpectedFields(message, validation_visitor);
+    }
+    // Ideally this would throw an error if ParseFromString fails for consistency
+    // but instead it will silently fail.
+    return;
+  }
+
+  // If the filename ends with .pb_text, attempt to parse it as a text proto.
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
+      return;
+    }
+#endif
+    throwEnvoyExceptionOrPanic("Unable to parse file \"" + path + "\" as a text protobuf (type " +
+                               message.GetTypeName() + ")");
+  }
+#ifdef ENVOY_ENABLE_YAML
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
+      absl::EndsWithIgnoreCase(path, FileExtensions::get().Yml)) {
+    // loadFromYaml throws an error if parsing fails.
+    loadFromYaml(contents, message, validation_visitor);
+  } else {
+    // loadFromJson does not consistently trow an error if parsing fails.
+    // Ideally we would handle that case here.
+    loadFromJson(contents, message, validation_visitor);
+  }
+#else
+  throwEnvoyExceptionOrPanic("Unable to parse file \"" + path + "\" (type " +
+                             message.GetTypeName() + ")");
+#endif
+}
+
 } // namespace Envoy

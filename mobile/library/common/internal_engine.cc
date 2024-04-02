@@ -1,7 +1,10 @@
 #include "library/common/internal_engine.h"
 
+#include <sys/resource.h>
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/common/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/synchronization/notification.h"
@@ -14,9 +17,11 @@ static std::atomic<envoy_stream_t> current_stream_handle_{0};
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
+                               absl::optional<int> thread_priority,
                                Thread::PosixThreadFactoryPtr thread_factory)
     : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
       logger_(std::move(logger)), event_tracker_(std::move(event_tracker)),
+      thread_priority_(thread_priority),
       dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
   ExtensionRegistry::registerFactories();
 
@@ -30,9 +35,10 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
 
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
-                               std::unique_ptr<EnvoyEventTracker> event_tracker)
+                               std::unique_ptr<EnvoyEventTracker> event_tracker,
+                               absl::optional<int> thread_priority)
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
-                     Thread::PosixThreadFactory::create()) {}
+                     thread_priority, Thread::PosixThreadFactory::create()) {}
 
 envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
   // Start the Envoy on the dedicated thread.
@@ -85,9 +91,20 @@ envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
 // copy-constructible type, so it's not possible to move capture `std::unique_ptr` with
 // `std::function`.
 envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options) {
-  main_thread_ =
-      thread_factory_->createThread([this, options]() mutable -> void { main(options); },
-                                    /* options= */ absl::nullopt, /* crash_on_failure= */ false);
+  main_thread_ = thread_factory_->createThread(
+      [this, options]() mutable -> void {
+        if (thread_priority_) {
+          // Set the thread priority before invoking the thread routine.
+          const int rc = setpriority(PRIO_PROCESS, thread_factory_->currentThreadId().getId(),
+                                     *thread_priority_);
+          if (rc != 0) {
+            ENVOY_LOG(debug, "failed to set thread priority: {}", Envoy::errorDetails(errno));
+          }
+        }
+
+        main(options);
+      },
+      /* options= */ absl::nullopt, /* crash_on_failure= */ false);
   return (main_thread_ != nullptr) ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
 
