@@ -282,8 +282,6 @@ build:mobile-remote-ci-macos-kotlin --fat_apk_cpu=x86_64
 build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-swift --config=mobile-test-ios
 build:mobile-remote-ci-macos-swift --@envoy//bazel:http3=False
-# TODO(alyssar) fix swift tests
-build:mobile-remote-ci-macos-swift --define=envoy_yaml=enabled
 
 build:mobile-remote-ci-core --config=mobile-remote-ci
 test:mobile-remote-ci-core --build_tests_only
@@ -293,11 +291,12 @@ test:mobile-remote-ci-core --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-ios --config=mobile-test-ios
 
+#TODO(alyssar) remove this build
 build:mobile-remote-ci-macos-ios-admin --config=mobile-remote-ci-macos-ios
-build:mobile-remote-ci-macos-ios-admin --define=admin_functionality=enabled
-
 
 build:mobile-remote-ci-macos-ios-swift --config=mobile-remote-ci-macos-ios
+# TODO(alyssar) fix swift tests
+build:mobile-remote-ci-macos-ios-swift --define=envoy_yaml=enabled
 test:mobile-remote-ci-macos-ios-swift --experimental_ui_max_stdouterr_bytes=10485760
 test:mobile-remote-ci-macos-ios-swift --build_tests_only
 
