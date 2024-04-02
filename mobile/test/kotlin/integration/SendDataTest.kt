@@ -30,7 +30,8 @@ class SendDataTest {
 
   @Before
   fun setUp() {
-    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP2_WITH_TLS)
+    httpTestServer =
+      HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP2_WITH_TLS, mapOf(), "data")
   }
 
   @After
