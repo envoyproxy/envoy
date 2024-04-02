@@ -134,8 +134,7 @@ public:
   }
 
   void verifyStaticFilePerTap(const std::string& filter_config) {
-    const std::string path_prefix = getTempPathPrefix();
-    initializeFilter(fmt::format(fmt::runtime(filter_config), path_prefix));
+    initializeFilter(filter_config);
 
     // Initial request/response with tap.
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -144,7 +143,7 @@ public:
     test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
     // Find the written .pb file and verify it.
-    auto files = TestUtility::listFiles(path_prefix, false);
+    auto files = TestUtility::listFiles(getTempPathPrefix(), false);
     auto pb_file = std::find_if(files.begin(), files.end(),
                                 [](const std::string& s) { return absl::EndsWith(s, ".pb"); });
     ASSERT_NE(pb_file, files.end());
@@ -215,7 +214,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TapIntegrationTest,
 
 // Verify a static configuration with an any matcher, writing to a file per tap sink.
 TEST_P(TapIntegrationTest, StaticFilePerTap) {
-  const std::string filter_config =
+  constexpr absl::string_view filter_config =
       R"EOF(
 name: tap
 typed_config:
@@ -231,12 +230,12 @@ typed_config:
               path_prefix: {}
 )EOF";
 
-  verifyStaticFilePerTap(filter_config);
+  verifyStaticFilePerTap(fmt::format(filter_config, getTempPathPrefix()));
 }
 
 // Verify the match field takes precedence over the deprecated match_config field.
 TEST_P(TapIntegrationTest, DEPRECATED_FEATURE_TEST(StaticFilePerTapWithMatchConfigAndMatch)) {
-  const std::string filter_config =
+  constexpr absl::string_view filter_config =
       R"EOF(
 name: tap
 typed_config:
@@ -256,12 +255,12 @@ typed_config:
               path_prefix: {}
 )EOF";
 
-  verifyStaticFilePerTap(filter_config);
+  verifyStaticFilePerTap(fmt::format(filter_config, getTempPathPrefix()));
 }
 
 // Verify the deprecated match_config field.
 TEST_P(TapIntegrationTest, DEPRECATED_FEATURE_TEST(StaticFilePerTapWithMatchConfig)) {
-  const std::string filter_config =
+  constexpr absl::string_view filter_config =
       R"EOF(
 name: tap
 typed_config:
@@ -277,7 +276,7 @@ typed_config:
               path_prefix: {}
 )EOF";
 
-  verifyStaticFilePerTap(filter_config);
+  verifyStaticFilePerTap(fmt::format(filter_config, getTempPathPrefix()));
 }
 
 // Verify a basic tap flow using the admin handler.

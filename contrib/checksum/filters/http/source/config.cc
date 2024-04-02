@@ -14,8 +14,9 @@ namespace ChecksumFilter {
 
 Http::FilterFactoryCb ChecksumFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig& proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
-  ChecksumFilterConfigSharedPtr filter_config(new ChecksumFilterConfig(proto_config));
+    const std::string&, Server::Configuration::FactoryContext& context) {
+  ChecksumFilterConfigSharedPtr filter_config(
+      new ChecksumFilterConfig(proto_config, context.serverFactoryContext()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<ChecksumFilter>(filter_config));
   };

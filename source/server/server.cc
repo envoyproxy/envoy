@@ -106,20 +106,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
-
-  // These are needed for string matcher extensions. It is too painful to pass these objects through
-  // all call chains that construct a `StringMatcherImpl`, so these are singletons.
-  //
-  // They must be cleared before being set to make the multi-envoy integration test pass. Note that
-  // this means that extensions relying on these singletons probably will not function correctly in
-  // some Envoy mobile setups where multiple Envoy engines are used in the same process. The same
-  // caveat also applies to a few other singletons, such as the global regex engine.
-  InjectableSingleton<ThreadLocal::SlotAllocator>::clear();
-  InjectableSingleton<ThreadLocal::SlotAllocator>::initialize(&thread_local_);
-  InjectableSingleton<Api::Api>::clear();
-  InjectableSingleton<Api::Api>::initialize(api_.get());
-}
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {}
 
 InstanceBase::~InstanceBase() {
   terminate();
@@ -151,9 +138,6 @@ InstanceBase::~InstanceBase() {
     close(tracing_fd_);
   }
 #endif
-
-  InjectableSingleton<ThreadLocal::SlotAllocator>::clear();
-  InjectableSingleton<Api::Api>::clear();
 }
 
 Upstream::ClusterManager& InstanceBase::clusterManager() {
@@ -379,24 +363,18 @@ absl::Status InstanceUtil::loadBootstrapConfig(
   }
 
   if (!config_path.empty()) {
-#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
-#else
-    if (!config_path.empty()) {
-      return absl::InvalidArgumentError("Cannot load from file with YAML disabled\n");
-    }
-    UNREFERENCED_PARAMETER(api);
-#endif
   }
   if (!config_yaml.empty()) {
-#ifdef ENVOY_ENABLE_YAML
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
+#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
-    bootstrap.MergeFrom(bootstrap_override);
 #else
-    return absl::InvalidArgumentError("Cannot load from YAML with YAML disabled\n");
+    // Treat the yaml as proto
+    Protobuf::TextFormat::ParseFromString(config_yaml, &bootstrap_override);
 #endif
+    bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSizeLong() != 0) {
     bootstrap.MergeFrom(config_proto);
@@ -522,9 +500,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   stats_store_.setTagProducer(
       Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags()));
   stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
-      bootstrap_.stats_config(), stats_store_.symbolTable()));
+      bootstrap_.stats_config(), stats_store_.symbolTable(), server_contexts_));
   stats_store_.setHistogramSettings(
-      std::make_unique<Stats::HistogramSettingsImpl>(bootstrap_.stats_config()));
+      std::make_unique<Stats::HistogramSettingsImpl>(bootstrap_.stats_config(), server_contexts_));
 
   const std::string server_stats_prefix = "server.";
   const std::string server_compilation_settings_stats_prefix = "server.compilation_settings";
@@ -1089,9 +1067,15 @@ InstanceBase::registerCallback(Stage stage, StageCallbackWithCompletion callback
 
 void InstanceBase::notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  const auto it = stage_callbacks_.find(stage);
-  if (it != stage_callbacks_.end()) {
-    for (const StageCallback& callback : it->second) {
+  const auto stage_it = stage_callbacks_.find(stage);
+  if (stage_it != stage_callbacks_.end()) {
+    LifecycleNotifierCallbacks& callbacks = stage_it->second;
+    for (auto callback_it = callbacks.begin(); callback_it != callbacks.end();) {
+      StageCallback callback = *callback_it;
+      // Increment the iterator before invoking the callback in case the
+      // callback deletes the handle which will unregister itself and
+      // invalidate this iterator if we're still pointing at it.
+      ++callback_it;
       callback();
     }
   }

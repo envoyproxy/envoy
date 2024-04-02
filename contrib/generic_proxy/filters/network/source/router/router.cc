@@ -30,6 +30,86 @@ constexpr absl::string_view RouterFilterName = "envoy.filters.generic.router";
 
 } // namespace
 
+GenericUpstream::~GenericUpstream() {
+  // In case we doesn't clean up the pending connecting request.
+  if (tcp_pool_handle_ != nullptr) {
+    // Clear the data first.
+    auto local_handle = tcp_pool_handle_;
+    tcp_pool_handle_ = nullptr;
+
+    local_handle->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+  }
+}
+
+void GenericUpstream::initialize() {
+  if (!initialized_) {
+    initialized_ = true;
+    tcp_pool_handle_ = tcp_pool_data_.newConnection(*this);
+  }
+}
+
+void GenericUpstream::cleanUp(bool close_connection) {
+  ENVOY_LOG(debug, "generic proxy upstream manager: clean up upstream (close: {})",
+            close_connection);
+
+  if (close_connection && owned_conn_data_ != nullptr) {
+    ENVOY_LOG(debug, "generic proxy upstream request: close upstream connection");
+    ASSERT(tcp_pool_handle_ == nullptr);
+
+    // Clear the data first to avoid re-entering this function in the close callback.
+    auto local_data = std::move(owned_conn_data_);
+    owned_conn_data_.reset();
+
+    local_data->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
+
+  if (tcp_pool_handle_ != nullptr) {
+    ENVOY_LOG(debug, "generic proxy upstream manager: cacel upstream connection");
+    ASSERT(owned_conn_data_ == nullptr);
+
+    // Clear the data first.
+    auto local_handle = tcp_pool_handle_;
+    tcp_pool_handle_ = nullptr;
+
+    local_handle->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+  }
+}
+
+void GenericUpstream::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                    absl::string_view transport_failure_reason,
+                                    Upstream::HostDescriptionConstSharedPtr host) {
+  ENVOY_LOG(debug, "generic proxy upstream manager: on upstream connection failure (host: {})",
+            host != nullptr ? host->address()->asStringView() : absl::string_view{});
+
+  tcp_pool_handle_ = nullptr;
+  upstream_host_ = std::move(host);
+
+  onPoolFailureImpl(reason, transport_failure_reason);
+}
+
+void GenericUpstream::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+                                  Upstream::HostDescriptionConstSharedPtr host) {
+  ASSERT(host != nullptr);
+  ENVOY_LOG(debug, "generic proxy upstream manager: on upstream connection ready (host: {})",
+            host->address()->asStringView());
+
+  tcp_pool_handle_ = nullptr;
+  upstream_host_ = std::move(host);
+
+  owned_conn_data_ = std::move(conn_data);
+  owned_conn_data_->addUpstreamCallbacks(*this);
+
+  onPoolSuccessImpl();
+}
+
+void GenericUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+  if (data.length() == 0) {
+    return;
+  }
+
+  client_codec_->decode(data, end_stream);
+}
+
 void GenericUpstream::writeToConnection(Buffer::Instance& buffer) {
   if (owned_conn_data_ != nullptr &&
       owned_conn_data_->connection().state() == Network::Connection::State::Open) {
@@ -142,7 +222,7 @@ void BoundGenericUpstream::cleanUp(bool close_connection) {
     return;
   }
   // Only actually do the cleanup when we want to close the connection.
-  UpstreamConnection::cleanUp(true);
+  GenericUpstream::cleanUp(true);
 }
 
 void BoundGenericUpstream::onPoolSuccessImpl() {
@@ -355,7 +435,7 @@ void UpstreamRequest::sendRequestStartToUpstream() {
 
   // The first frame of request is sent.
   upstream_info_->upstreamTiming().onFirstUpstreamTxByteSent(parent_.time_source_);
-  generic_upstream_->clientCodec()->encode(*parent_.request_stream_, *this);
+  generic_upstream_->clientCodec().encode(*parent_.request_stream_, *this);
 }
 
 void UpstreamRequest::sendRequestFrameToUpstream() {
@@ -370,7 +450,7 @@ void UpstreamRequest::sendRequestFrameToUpstream() {
     parent_.request_stream_frames_.pop_front();
 
     ASSERT(generic_upstream_ != nullptr);
-    generic_upstream_->clientCodec()->encode(*frame, *this);
+    generic_upstream_->clientCodec().encode(*frame, *this);
   }
 }
 
@@ -393,6 +473,10 @@ void UpstreamRequest::onEncodingSuccess(Buffer::Instance& buffer, bool end_strea
     parent_.completeDirectly();
     return;
   }
+}
+
+OptRef<const RouteEntry> UpstreamRequest::routeEntry() const {
+  return makeOptRefFromPtr(parent_.route_entry_);
 }
 
 void UpstreamRequest::onUpstreamFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
@@ -624,7 +708,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
         return;
       }
       auto new_bound_upstream = std::make_shared<BoundGenericUpstream>(
-          callbacks_->downstreamCodec(), std::move(pool_data.value()), *downstream_connection);
+          callbacks_->codecFactory(), std::move(pool_data.value()), *downstream_connection);
       bound_upstream = new_bound_upstream.get();
       downstream_connection->streamInfo().filterState()->setData(
           RouterFilterName, std::move(new_bound_upstream),
@@ -643,7 +727,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
       callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"));
       return;
     }
-    generic_upstream = std::make_shared<OwnedGenericUpstream>(callbacks_->downstreamCodec(),
+    generic_upstream = std::make_shared<OwnedGenericUpstream>(callbacks_->codecFactory(),
                                                               std::move(pool_data.value()));
   }
 

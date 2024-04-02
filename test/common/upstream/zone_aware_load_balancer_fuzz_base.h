@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -49,6 +51,13 @@ public:
   void setupZoneAwareLoadBalancingSpecificLogic();
 
   void addWeightsToHosts();
+
+  // A helper function to validate the SlowStart config values.
+  // TODO(adisuissa): This should probably be reflected in the real LB config
+  // constraints (see https://github.com/envoyproxy/envoy/pull/32506#issuecomment-1970047351).
+  // For now, it is sufficient to validate these constraints only in the fuzzer.
+  static bool
+  validateSlowStart(const envoy::config::cluster::v3::Cluster_SlowStartConfig& slow_start_config);
 
   // If fuzzing Zone Aware Load Balancers, local priority set will get constructed sometimes. If not
   // constructed, a local_priority_set_.get() call will return a nullptr.

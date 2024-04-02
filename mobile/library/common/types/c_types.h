@@ -73,9 +73,6 @@ typedef enum {
   ENVOY_NET_WWAN = 2,
 } envoy_network_t;
 
-// The name used to registered event tracker api.
-extern const char* envoy_event_tracker_api_name;
-
 #ifdef __cplusplus
 extern "C" { // release function
 #endif
@@ -221,17 +218,6 @@ typedef struct {
   // Http3 == 3
   int64_t upstream_protocol;
 } envoy_final_stream_intel;
-
-/** The log level for the Envoy logger. The values should match with `Logger::Levels`. */
-typedef enum {
-  ENVOY_LOG_LEVEL_TRACE = 0,
-  ENVOY_LOG_LEVEL_DEBUG = 1,
-  ENVOY_LOG_LEVEL_INFO = 2,
-  ENVOY_LOG_LEVEL_WARN = 3,
-  ENVOY_LOG_LEVEL_ERROR = 4,
-  ENVOY_LOG_LEVEL_CRITICAL = 5,
-  ENVOY_LOG_LEVEL_OFF = 6,
-} envoy_log_level;
 
 #ifdef __cplusplus
 extern "C" { // utility functions
@@ -408,24 +394,6 @@ typedef void (*envoy_on_cancel_f)(envoy_stream_intel stream_intel,
                                   envoy_final_stream_intel final_stream_intel, void* context);
 
 /**
- * Called when envoy's logger logs data.
- *
- * @param level the log level
- * @param data, the logged data.
- * @param context, contains the necessary state to carry out platform-specific dispatch and
- * execution.
- */
-typedef void (*envoy_logger_log_f)(envoy_log_level level, envoy_data data, const void* context);
-
-/**
- * Called when Envoy is done with the logger.
- *
- * @param context, contains the necessary state to carry out platform-specific dispatch and
- * execution.
- */
-typedef void (*envoy_logger_release_f)(const void* context);
-
-/**
  * Callback signature which notify when there is buffer available for request
  * body upload.
  *
@@ -439,15 +407,6 @@ typedef void (*envoy_logger_release_f)(const void* context);
  * execution.
  */
 typedef void (*envoy_on_send_window_available_f)(envoy_stream_intel stream_intel, void* context);
-
-/**
- * Called when envoy's event tracker tracks an event.
- *
- * @param event, the dictionary with attributes that describe the event.
- * @param context, contains the necessary state to carry out platform-specific dispatch and
- * execution.
- */
-typedef void (*envoy_event_tracker_track_f)(envoy_map event, const void* context);
 
 #ifdef __cplusplus
 } // function pointers
@@ -468,46 +427,3 @@ typedef struct {
   // Context passed through to callbacks to provide dispatch and execution state.
   void* context;
 } envoy_http_callbacks;
-
-/**
- * Interface for logging.
- */
-typedef struct {
-  envoy_logger_log_f log;
-  envoy_logger_release_f release;
-  // Context passed through to callbacks to provide dispatch and execution state.
-  const void* context;
-} envoy_logger;
-
-/**
- * Interface for event tracking.
- */
-typedef struct {
-  envoy_event_tracker_track_f track;
-  // Context passed through to callbacks to provide dispatch and execution state.
-  const void* context;
-} envoy_event_tracker;
-
-/**
- * The list of certificate verification results returned from Java side to the
- * C++ side.
- * A Java counterpart lives in org.chromium.net.CertVerifyStatusAndroid.java
- */
-typedef enum {
-  // Certificate is trusted.
-  CERT_VERIFY_STATUS_OK = 0,
-  // Certificate verification could not be conducted.
-  CERT_VERIFY_STATUS_FAILED = -1,
-  // Certificate is not trusted due to non-trusted root of the certificate
-  // chain.
-  CERT_VERIFY_STATUS_NO_TRUSTED_ROOT = -2,
-  // Certificate is not trusted because it has expired.
-  CERT_VERIFY_STATUS_EXPIRED = -3,
-  // Certificate is not trusted because it is not valid yet.
-  CERT_VERIFY_STATUS_NOT_YET_VALID = -4,
-  // Certificate is not trusted because it could not be parsed.
-  CERT_VERIFY_STATUS_UNABLE_TO_PARSE = -5,
-  // Certificate is not trusted because it has an extendedKeyUsage field, but
-  // its value is not correct for a web server.
-  CERT_VERIFY_STATUS_INCORRECT_KEY_USAGE = -6,
-} envoy_cert_verify_status_t;

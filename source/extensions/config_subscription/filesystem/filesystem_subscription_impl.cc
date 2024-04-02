@@ -131,7 +131,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
   Protobuf::DynamicMessageFactory dmf;
   ProtobufTypes::MessagePtr collection_message;
   collection_message.reset(dmf.GetPrototype(collection_descriptor)->New());
-  MessageUtil::unpackTo(resource_message.resource(), *collection_message);
+  THROW_IF_NOT_OK(MessageUtil::unpackTo(resource_message.resource(), *collection_message));
   const auto* collection_entries_field_descriptor = collection_descriptor->field(0);
   // Verify collection message type structure.
   if (collection_entries_field_descriptor == nullptr ||

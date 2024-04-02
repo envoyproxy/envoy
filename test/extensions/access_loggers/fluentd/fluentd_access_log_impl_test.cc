@@ -532,6 +532,33 @@ TEST_F(FluentdAccessLogTest, InvalidBackoffConfig) {
       EnvoyException, "max_backoff_interval must be greater or equal to base_backoff_interval");
 }
 
+TEST_F(FluentdAccessLogTest, InvalidFormatterConfig) {
+  FluentdAccessLogFactory factory;
+
+  config_.set_cluster("unknown");
+  config_.set_tag("tag");
+  config_.set_stat_prefix("prefix");
+  auto* record = config_.mutable_record();
+  (*record->mutable_fields())["Message"].set_string_value("SomeValue");
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_, checkActiveStaticCluster(_))
+      .WillOnce(Return(absl::OkStatus()));
+
+  const std::string yaml = R"EOF(
+      name: envoy.formatter.TestFormatterUnknown
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Any
+  )EOF";
+
+  auto* formatter = config_.add_formatters();
+  envoy::config::core::v3::TypedExtensionConfig proto;
+  TestUtility::loadFromYaml(yaml, proto);
+  *formatter = proto;
+
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createAccessLogInstance(config_, AccessLog::FilterPtr{filter_}, context_),
+      EnvoyException, "Formatter not found: envoy.formatter.TestFormatterUnknown");
+}
+
 } // namespace
 } // namespace Fluentd
 } // namespace AccessLoggers

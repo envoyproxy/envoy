@@ -58,8 +58,6 @@ public:
 
 DECLARE_FACTORY(GoogleReEngineFactory);
 
-using EngineSingleton = InjectableSingleton<Engine>;
-
 enum class Type { Re2, StdRegex };
 
 /**
@@ -67,19 +65,6 @@ enum class Type { Re2, StdRegex };
  */
 class Utility {
 public:
-  /**
-   * Construct a compiled regex matcher from a match config.
-   */
-  template <class RegexMatcherType>
-  static CompiledMatcherPtr parseRegex(const RegexMatcherType& matcher) {
-    // Fallback deprecated engine type in regex matcher.
-    if (matcher.has_google_re2()) {
-      return std::make_unique<CompiledGoogleReMatcher>(matcher);
-    }
-
-    return EngineSingleton::get().matcher(matcher.regex());
-  }
-
   template <class RegexMatcherType>
   static CompiledMatcherPtr parseRegex(const RegexMatcherType& matcher, Engine& engine) {
     // Fallback deprecated engine type in regex matcher.
