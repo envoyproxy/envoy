@@ -1,8 +1,4 @@
 load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
-)
-load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_extension_package",
@@ -16,6 +12,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    extra_visibility = [
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
@@ -28,5 +27,4 @@ envoy_cc_extension(
         "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
-    alwayslink = LEGACY_ALWAYSLINK,
 )

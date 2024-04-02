@@ -1579,6 +1579,7 @@ envoy_cc_test(
     srcs = ["extension_discovery_integration_test.cc"],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/filters/http/match_delegate:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
         "//test/integration/filters:set_is_terminal_filter_config_proto_cc_proto",
