@@ -24,6 +24,7 @@ class SetLoggerTest {
     val engine =
       EngineBuilder(Standard())
         .addLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .addNativeFilter(
           "test_logger",
           "[type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger] {}"

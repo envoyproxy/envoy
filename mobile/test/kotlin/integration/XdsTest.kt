@@ -38,6 +38,7 @@ class XdsTest {
     engine =
       AndroidEngineBuilder(appContext)
         .addLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .setOnEngineRunning { latch.countDown() }
         .setXds(
           XdsBuilder(
