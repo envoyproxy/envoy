@@ -157,17 +157,26 @@ class RepoNotifier(runner.Runner):
 
     @async_property(cache=True)
     async def oncall_string(self):
-        response = await self.session.get(CALENDAR)
+        now = datetime.datetime.now()
+        sunday = now - datetime.timedelta(days=now.weekday() + 1)
+        monday = now - datetime.timedelta(days=now.weekday())
+        priorweek = now - datetime.timedelta(14)
+
+        # Handle the event being created before today.
+        date = ("%s%s%s" % (priorweek.year, str(priorweek.month).zfill(2), str(priorweek.day).zfill(2)))
+        response = await self.session.get(CALENDAR + "?getdate=" + date)
         content = await response.read()
         parsed_calendar = icalendar.Calendar.from_ical(content)
 
         now = datetime.datetime.now()
-        sunday = now - datetime.timedelta(days=now.weekday() + 1)
 
         for component in parsed_calendar.walk():
             if component.name == "VEVENT":
                 if (sunday.date() == component.decoded("dtstart").date()):
                     return component.get("summary")
+                if (monday.date() == component.decoded("dtstart").date()):
+                    return component.get("summary")
+        print( "unable to find this week's oncall")
         return "unable to find this week's oncall"
 
     @async_property
