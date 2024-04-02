@@ -130,7 +130,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false),
           {
               // Using designated initialization to improve readability of request routing
-              // configuration.
+              // configuration. See
+              // https://en.cppreference.com/w/cpp/language/aggregate_initialization#Designated_initializers.
               .prefix_ = "/clusters",
               .help_text_ = "retrieve clusters data",
               .handler_ = MAKE_STREAMING_HANDLER(clusters_handler_.makeRequest),
