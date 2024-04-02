@@ -32,7 +32,7 @@ message ProxyProtocolPassThroughTLVs {
   repeated uint32 tlv_type = 2 [(validate.rules).repeated = {items {uint32 {lt: 256}}}];
 
   // Whether TLVs should be base64-encoded before being passed to filter state.
-  // This is useful in cases where the TLVs aren't UTF-8 encoded but need to be passed through without lossy sanitisation.
+  // This is useful in cases where the TLVs aren't UTF-8 encoded but need to be passed through without lossy sanitization.
   // Defaults to false.
   bool encode_tlvs = 3;
 }

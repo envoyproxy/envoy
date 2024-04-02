@@ -434,7 +434,7 @@ new_features:
     ``histogram_buckets`` query parameter to ``summary``.
 - area: proxy_protocol
   change: |
-    Added :ref:`encode_tlvs<envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs.encode_tlvs>` to proxy protocol filter
+    Added :ref:`encode_tlvs<envoy_v3_api_field_config.core.v3.ProxyProtocolPassThroughTLVs.encode_tlvs>` to proxy protocol filter
     configuration which turns on the safe writing of base64-encoded proxy protocol TLVs (both utf-8 and non utf-8) to filter state metadata.
 
 deprecated:

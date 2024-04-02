@@ -542,10 +542,10 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
       ProtobufWkt::Value metadata_value;
 
       // Base64-encode or sanitize any non utf8 characters.
-      auto sanitised_tlv_value = config_->encodeTlvs()
-                                     ? Envoy::Base64::encode(tlv_value.data(), tlv_value.size())
-                                     : MessageUtil::sanitizeUtf8String(tlv_value);
-      metadata_value.set_string_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
+      auto tlv_value_string = config_->encodeTlvs()
+                                  ? Envoy::Base64::encode(tlv_value.data(), tlv_value.size())
+                                  : MessageUtil::sanitizeUtf8String(tlv_value);
+      metadata_value.set_string_value(tlv_value_string.data(), tlv_value_string.size());
 
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
                                      ? "envoy.filters.listener.proxy_protocol"

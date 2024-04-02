@@ -1782,12 +1782,11 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndBase64Encode) {
   EXPECT_EQ(1, fields.count("PP2 type authority"));
   EXPECT_EQ(1, fields.count("PP2 vpc id"));
 
+  // Base64-encoded values of passed-through TLVs
   auto value_type_authority = fields.at("PP2 type authority").string_value();
-  // Base64 encoded value of the value section of tlv_type_authority.
   ASSERT_EQ(value_type_authority, "Zv5vLmNvwQ==");
 
   auto value_vpc_id = fields.at("PP2 vpc id").string_value();
-  // Base64 encoded value of the value section of tlv_vpc_id.
   ASSERT_EQ(value_vpc_id, "AXZwYy0wwDV0ZXN0MmZhNmM2M2j5Nw==");
 
   disconnect();
