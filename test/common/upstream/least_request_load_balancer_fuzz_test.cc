@@ -53,17 +53,23 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCa
                    MaxChoiceCountForTest);
     return;
   }
-  // Validate the correctness of the Slow-Start config values.
-  if (input.has_least_request_lb_config() &&
-      input.least_request_lb_config().has_slow_start_config()) {
-    if (!ZoneAwareLoadBalancerFuzzBase::validateSlowStart(
-            input.least_request_lb_config().slow_start_config())) {
-      return;
-    }
-  }
 
   const test::common::upstream::ZoneAwareLoadBalancerTestCase& zone_aware_load_balancer_test_case =
       input.zone_aware_load_balancer_test_case();
+
+  // Validate the correctness of the Slow-Start config values.
+  if (input.has_least_request_lb_config() &&
+      input.least_request_lb_config().has_slow_start_config()) {
+    uint32_t num_hosts = 0;
+    for (const auto& setup_priority_level :
+         zone_aware_load_balancer_test_case.load_balancer_test_case().setup_priority_levels()) {
+      num_hosts += setup_priority_level.num_hosts_in_priority_level();
+    }
+    if (!ZoneAwareLoadBalancerFuzzBase::validateSlowStart(
+            input.least_request_lb_config().slow_start_config(), num_hosts)) {
+      return;
+    }
+  }
 
   ZoneAwareLoadBalancerFuzzBase zone_aware_load_balancer_fuzz = ZoneAwareLoadBalancerFuzzBase(
       zone_aware_load_balancer_test_case.need_local_priority_set(),
