@@ -410,3 +410,15 @@ envoy_cc_library(
         "//source/common/common:macros",
     ],
 )
+
+envoy_cc_library(
+    name = "clusters_request_lib",
+    srcs = ["clusters_request.cc"],
+    hdrs = ["clusters_request.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/server:admin_interface",
+    ],
+)
