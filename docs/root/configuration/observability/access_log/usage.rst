@@ -399,7 +399,8 @@ The following command operators are supported:
 %COMMON_DURATION(START:END:PRECISION)%
   HTTP
     Total duration between the START time point and the END time point in specific PRECISION.
-    The START and END time points are specified by the following values:
+    The START and END time points are specified by the following values (NOTE: all values
+    here are case-sensitive):
 
     * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
     * ``DS_RX_END``: The time point of the downstream request receiving end.
@@ -409,9 +410,9 @@ The following command operators are supported:
     * ``US_RX_END``: The time point of the upstream response receiving end.
     * ``DS_TX_BEG``: The time point of the downstream response sending begin.
     * ``DS_TX_END``: The time point of the downstream response sending end.
-    * Dynamic value: Other values will be treated as custom time points that set by named keys.
+    * Dynamic value: Other values will be treated as custom time points that are set by named keys.
 
-    The PRECISION is specified by the following values:
+    The PRECISION is specified by the following values (NOTE: all values here are case-sensitive):
 
     * ``ms``: Millisecond precision.
     * ``us``: Microsecond precision.

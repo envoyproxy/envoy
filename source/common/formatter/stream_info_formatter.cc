@@ -1016,7 +1016,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   });
             }}},
           {"COMMON_DURATION",
-           {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
+           {CommandSyntaxChecker::PARAMS_REQUIRED,
             [](const std::string& sub_command, absl::optional<size_t>) {
               return CommonDurationFormatter::create(sub_command);
             }}},
