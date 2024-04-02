@@ -542,29 +542,26 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   auto body_or_error = ConfigUtility::parseDirectResponseBody(
       route, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
   THROW_IF_STATUS_NOT_OK(body_or_error, throw);
-  std::string& direct_response_body = body_or_error.value();
-  tls_ = factory_context.threadLocal().allocateSlot();
-  tls_->set([direct_response_body](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalDirectResponseBody>(direct_response_body);
-  });
-  if (envoy::config::core::v3::DataSource::SpecifierCase::kFilename ==
-      route.direct_response().body().specifier_case()) {
-    direct_response_file_watcher_ =
-        factory_context.mainThreadDispatcher().createFilesystemWatcher();
-    THROW_IF_NOT_OK(direct_response_file_watcher_->addWatch(
-        route.direct_response().body().filename(),
-        Filesystem::Watcher::Events::Modified | Filesystem::Watcher::Events::MovedTo,
-        [this, &api, file_name = route.direct_response().body().filename()](uint32_t) {
-          auto file_or_error = Envoy::Config::DataSource::readFileDatasource(
-              file_name, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
-          RETURN_IF_STATUS_NOT_OK(file_or_error);
-          std::string& direct_response_body = file_or_error.value();
-          tls_->set([direct_response_body](
-                        Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-            return std::make_shared<ThreadLocalDirectResponseBody>(direct_response_body);
-          });
-          return absl::OkStatus();
-        }));
+  if (route.has_direct_response() && route.direct_response().has_body()) {
+    std::string& direct_response_body = body_or_error.value();
+    direct_response_body_ = std::make_shared<std::string>(direct_response_body);
+    if (envoy::config::core::v3::DataSource::SpecifierCase::kFilename ==
+        route.direct_response().body().specifier_case()) {
+      direct_response_file_watcher_ =
+          factory_context.mainThreadDispatcher().createFilesystemWatcher();
+      THROW_IF_NOT_OK(direct_response_file_watcher_->addWatch(
+          route.direct_response().body().filename(),
+          Filesystem::Watcher::Events::Modified | Filesystem::Watcher::Events::MovedTo,
+          [this, &api, file_name = route.direct_response().body().filename()](uint32_t) {
+            auto file_or_error = Envoy::Config::DataSource::readFileDatasource(
+                file_name, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
+            RETURN_IF_STATUS_NOT_OK(file_or_error);
+            std::string& direct_response_body = file_or_error.value();
+            absl::MutexLock lock(&direct_response_mutex_);
+            direct_response_body_ = std::make_shared<std::string>(direct_response_body);
+            return absl::OkStatus();
+          }));
+    }
   }
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
     request_headers_parser_ =

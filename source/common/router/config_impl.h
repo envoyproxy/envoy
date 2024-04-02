@@ -776,7 +776,8 @@ public:
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   const std::string& responseBody() const override {
-    return tls_->getTyped<ThreadLocalDirectResponseBody>().direct_response_body_;
+    absl::MutexLock lock(&direct_response_mutex_);
+    return *direct_response_body_.get();
   }
 
   // Router::Route
@@ -1087,13 +1088,6 @@ private:
     envoy::type::v3::FractionalPercent fractional_runtime_default_{};
   };
 
-  struct ThreadLocalDirectResponseBody : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalDirectResponseBody(const std::string& direct_response_body)
-        : direct_response_body_(direct_response_body) {}
-
-    const std::string direct_response_body_;
-  };
-
   /**
    * Returns a vector of request header parsers which applied or will apply header transformations
    * to the request in this route.
@@ -1211,7 +1205,8 @@ private:
 
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
-  ThreadLocal::SlotPtr tls_;
+  std::shared_ptr<std::string> direct_response_body_ ABSL_GUARDED_BY(direct_response_mutex_){};
+  mutable absl::Mutex direct_response_mutex_;
   Filesystem::WatcherPtr direct_response_file_watcher_;
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;
