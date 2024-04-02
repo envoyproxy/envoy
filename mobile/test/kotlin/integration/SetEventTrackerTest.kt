@@ -30,7 +30,7 @@ class SetEventTrackerTest {
         }
         .addNativeFilter(
           "envoy.filters.http.test_event_tracker",
-          "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker\",\"attributes\":{\"foo\":\"bar\"}}"
+          """[type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker] { attributes { key: "foo" value: "bar" } } }"""
         )
         .build()
 
@@ -59,7 +59,7 @@ class SetEventTrackerTest {
       EngineBuilder()
         .addNativeFilter(
           "envoy.filters.http.test_event_tracker",
-          "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker\",\"attributes\":{\"foo\":\"bar\"}}"
+          """[type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker] { attributes { key: "foo" value: "bar" } } }"""
         )
         .build()
 
