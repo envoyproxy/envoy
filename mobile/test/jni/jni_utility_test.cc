@@ -1,5 +1,7 @@
 #include <jni.h>
 
+#include "test/test_common/utility.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "library/jni/jni_utility.h"
 
@@ -31,4 +33,13 @@ Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_javaCppMapConversion(JNIEnv* e
   Envoy::JNI::JniHelper jni_helper(env);
   auto cpp_map = Envoy::JNI::javaMapToCppMap(jni_helper, java_map);
   return Envoy::JNI::cppMapToJavaMap(jni_helper, cpp_map).release();
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_javaCppHeadersConversion(JNIEnv* env, jclass,
+                                                                           jobject java_headers) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::Http::TestRequestHeaderMapImpl cpp_headers;
+  Envoy::JNI::javaHeadersToCppHeaders(jni_helper, java_headers, cpp_headers);
+  return Envoy::JNI::cppHeadersToJavaHeaders(jni_helper, cpp_headers).release();
 }

@@ -42,8 +42,7 @@ public class EnvoyHTTPStream {
    * @param endStream, supplies whether this is headers only.
    */
   public void sendHeaders(Map<String, List<String>> headers, boolean endStream) {
-    JniLibrary.sendHeaders(engineHandle, streamHandle, JniBridgeUtility.toJniHeaders(headers),
-                           endStream);
+    JniLibrary.sendHeaders(engineHandle, streamHandle, headers, endStream);
   }
 
   /**

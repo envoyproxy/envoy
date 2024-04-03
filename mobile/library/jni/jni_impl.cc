@@ -984,13 +984,20 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendDataByteArray(JNIEnv* env, 
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendHeaders(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobjectArray headers,
+    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject headers,
     jboolean end_stream) {
-  Envoy::JNI::JniHelper jni_helper(env);
+  // Create a global ref for the headers because `sendHeaders` may be executed
+  // in a different thread.
+  jobject global_ref_headers = env->NewGlobalRef(headers);
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendHeaders(static_cast<envoy_stream_t>(stream_handle),
-                    Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, headers),
-                    end_stream);
+      ->sendHeaders(
+          static_cast<envoy_stream_t>(stream_handle),
+          [global_ref_headers](Envoy::Http::RequestHeaderMap& cpp_headers) {
+            Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
+            Envoy::JNI::javaHeadersToCppHeaders(jni_helper, global_ref_headers, cpp_headers);
+            jni_helper.getEnv()->DeleteGlobalRef(global_ref_headers);
+          },
+          end_stream);
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendTrailers(

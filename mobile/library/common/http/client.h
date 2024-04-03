@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
@@ -74,11 +76,12 @@ public:
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and needs to be called
    * before send_data.
-   * @param stream, the stream to send headers over.
-   * @param headers, the headers to send.
-   * @param end_stream, indicates whether to close the stream locally after sending this frame.
+   * @param stream the stream to send headers over.
+   * @param header_func the function that takes the header reference to be modified.
+   * @param end_stream indicates whether to close the stream locally after sending this frame.
    */
-  void sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream);
+  void sendHeaders(envoy_stream_t stream, std::function<void(RequestHeaderMap&)> header_func,
+                   bool end_stream);
 
   /**
    * Notify the stream that the caller is ready to receive more data from the response stream. Only

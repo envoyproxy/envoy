@@ -201,11 +201,13 @@ cc_binary(
 
 cc_library(
     name = "jni_utility_test_lib",
+    testonly = True,
     srcs = [
         "jni_utility_test.cc",
     ],
     deps = [
         "//library/jni:jni_utility_lib",
+        "@envoy//test/test_common:utility_lib",
     ],
     alwayslink = True,
 )

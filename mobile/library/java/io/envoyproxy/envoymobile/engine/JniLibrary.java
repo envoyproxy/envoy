@@ -4,6 +4,8 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 
 public class JniLibrary {
 
@@ -72,14 +74,14 @@ public class JniLibrary {
    * Send headers over an open HTTP stream. This method can be invoked once and
    * needs to be called before send_data.
    *
-   * @param engine,    the stream's associated engine.
-   * @param stream,    the stream to send headers over.
-   * @param headers,   the headers to send.
-   * @param endStream, supplies whether this is headers only.
-   * @return int, the resulting status of the operation.
+   * @param engine    the stream's associated engine.
+   * @param stream    the stream to send headers over.
+   * @param headers   the headers to send.
+   * @param endStream supplies whether this is headers only.
+   * @return the resulting status of the operation.
    */
-  protected static native int sendHeaders(long engine, long stream, byte[][] headers,
-                                          boolean endStream);
+  protected static native int sendHeaders(long engine, long stream,
+                                          Map<String, List<String>> headers, boolean endStream);
 
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple

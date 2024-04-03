@@ -61,10 +61,11 @@ envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
   });
 }
 
-envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, envoy_headers headers,
+envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream,
+                                           std::function<void(Http::RequestHeaderMap&)> header_func,
                                            bool end_stream) {
-  return dispatcher_->post([&, stream, headers, end_stream]() {
-    http_client_->sendHeaders(stream, headers, end_stream);
+  return dispatcher_->post([&, stream, header_func, end_stream]() {
+    http_client_->sendHeaders(stream, header_func, end_stream);
   });
 }
 
