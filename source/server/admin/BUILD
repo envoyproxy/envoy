@@ -420,5 +420,6 @@ envoy_cc_library(
         "//envoy/http:codes_interface",
         "//envoy/http:header_map_interface",
         "//envoy/server:admin_interface",
+        "//envoy/server:instance_interface",
     ],
 )

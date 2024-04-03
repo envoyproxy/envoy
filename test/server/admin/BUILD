@@ -269,8 +269,10 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(["clusters_request_test.cc"]),
     deps = [
         "//envoy/http:codes_interface",
+        "//envoy/server:instance_interface",
         "//source/common/buffer:buffer_lib",
         "//source/server/admin:clusters_request_lib",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:utility_lib",
     ],
 )
