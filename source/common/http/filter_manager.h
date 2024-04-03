@@ -1096,12 +1096,12 @@ public:
                           FilterChainFactory& filter_chain_factory,
                           const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
                           TimeSource& time_source,
-                          StreamInfo::FilterStateSharedPtr parent_filter_state,
-                          StreamInfo::FilterState::LifeSpan filter_state_life_span)
+                          StreamInfo::FilterStateSharedPtr ancestor_filter_state)
       : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
                       proxy_100_continue, buffer_limit, filter_chain_factory),
         stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
-                     parent_filter_state, filter_state_life_span),
+                     StreamInfo::FilterState::LifeSpan::FilterChain,
+                     std::move(ancestor_filter_state)),
         local_reply_(local_reply) {}
   ~DownstreamFilterManager() override {
     ASSERT(prepared_local_reply_ == nullptr,
