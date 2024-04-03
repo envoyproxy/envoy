@@ -763,6 +763,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
     retry_connection_failure_buffer_limit_ =
         std::max(retry_shadow_buffer_limit_, cluster_connection_buffer_limit);
+    callbacks_->setDecoderBufferLimit(retry_connection_failure_buffer_limit_);
   }
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
@@ -911,9 +912,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
           StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
-  } else if (getLength(callbacks_->decodingBuffer()) + data.length() >=
-             callbacks_->decoderBufferLimit()) {
-    callbacks_->setDecoderBufferLimit(retry_connection_failure_buffer_limit_);
   }
 
   for (auto* shadow_stream : shadow_streams_) {
