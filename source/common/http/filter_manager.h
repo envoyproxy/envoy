@@ -700,6 +700,7 @@ public:
         filter_manager_callbacks_.requestHeaders().ptr(),
         filter_manager_callbacks_.responseHeaders().ptr(),
         filter_manager_callbacks_.responseTrailers().ptr(),
+        filter_manager_callbacks_.activeSpan(),
         {},
         access_log_type};
 

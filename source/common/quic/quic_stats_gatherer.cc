@@ -34,6 +34,7 @@ void QuicStatsGatherer::maybeDoDeferredLog(bool record_ack_timing) {
   const Formatter::HttpFormatterContext log_context{request_header_map_.get(),
                                                     response_header_map_.get(),
                                                     response_trailer_map_.get(),
+                                                    Tracing::NullSpan::instance(),
                                                     {},
                                                     AccessLog::AccessLogType::DownstreamEnd};
 

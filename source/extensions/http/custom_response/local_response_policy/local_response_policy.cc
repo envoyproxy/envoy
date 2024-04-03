@@ -53,8 +53,9 @@ void LocalResponsePolicy::formatBody(const Envoy::Http::RequestHeaderMap& reques
   }
 
   if (formatter_) {
-    body = formatter_->formatWithContext({&request_headers, &response_headers, nullptr, body},
-                                         stream_info);
+    body = formatter_->formatWithContext(
+        {&request_headers, &response_headers, nullptr, Tracing::NullSpan::instance(), body},
+        stream_info);
   }
 }
 

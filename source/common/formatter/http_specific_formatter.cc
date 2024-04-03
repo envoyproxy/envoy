@@ -22,11 +22,12 @@ namespace Formatter {
 HttpFormatterContext::HttpFormatterContext(const Http::RequestHeaderMap* request_headers,
                                            const Http::ResponseHeaderMap* response_headers,
                                            const Http::ResponseTrailerMap* response_trailers,
+                                           const Tracing::Span& active_span,
                                            absl::string_view local_reply_body,
                                            AccessLog::AccessLogType log_type)
     : request_headers_(request_headers), response_headers_(response_headers),
-      response_trailers_(response_trailers), local_reply_body_(local_reply_body),
-      log_type_(log_type) {}
+      response_trailers_(response_trailers), active_span_(active_span),
+      local_reply_body_(local_reply_body), log_type_(log_type) {}
 
 const Http::RequestHeaderMap& HttpFormatterContext::requestHeaders() const {
   return request_headers_ != nullptr ? *request_headers_
@@ -43,6 +44,7 @@ const Http::ResponseTrailerMap& HttpFormatterContext::responseTrailers() const {
 
 absl::string_view HttpFormatterContext::localReplyBody() const { return local_reply_body_; }
 AccessLog::AccessLogType HttpFormatterContext::accessLogType() const { return log_type_; }
+const Tracing::Span& HttpFormatterContext::activeSpan() const { return active_span_; }
 
 absl::optional<std::string>
 LocalReplyBodyFormatter::formatWithContext(const HttpFormatterContext& context,
