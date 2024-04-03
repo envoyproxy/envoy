@@ -44,7 +44,13 @@ const Http::ResponseTrailerMap& HttpFormatterContext::responseTrailers() const {
 
 absl::string_view HttpFormatterContext::localReplyBody() const { return local_reply_body_; }
 AccessLog::AccessLogType HttpFormatterContext::accessLogType() const { return log_type_; }
-const Tracing::Span& HttpFormatterContext::activeSpan() const { return *active_span_; }
+const Tracing::Span& HttpFormatterContext::activeSpan() const {
+  if (active_span_ == nullptr) {
+    return Tracing::NullSpan::instance();
+  }
+
+  return *active_span_;
+}
 
 absl::optional<std::string>
 LocalReplyBodyFormatter::formatWithContext(const HttpFormatterContext& context,
