@@ -34,9 +34,7 @@ public:
   virtual void onLoadClusterComplete() PURE;
 };
 
-class ProxyFilterConfig : public Upstream::ClusterUpdateCallbacks,
-                          public std::enable_shared_from_this<ProxyFilterConfig>,
-                          Logger::Loggable<Logger::Id::forward_proxy> {
+class ProxyFilterConfig : Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   ProxyFilterConfig(
       const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
@@ -57,13 +55,6 @@ public:
   addDynamicCluster(Extensions::Common::DynamicForwardProxy::DfpClusterSharedPtr cluster,
                     const std::string& cluster_name, const std::string& host, const int port,
                     LoadClusterEntryCallbacks& callback);
-  // run in each worker thread.
-  Upstream::ClusterUpdateCallbacksHandlePtr addThreadLocalClusterUpdateCallbacks();
-
-  // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(absl::string_view cluster_name,
-                            Upstream::ThreadLocalClusterCommand&) override;
-  void onClusterRemoval(const std::string&) override;
 
 private:
   struct LoadClusterEntryHandleImpl
@@ -79,14 +70,20 @@ private:
   };
 
   // Per-thread cluster info including pending callbacks.
-  struct ThreadLocalClusterInfo : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalClusterInfo(std::shared_ptr<ProxyFilterConfig> parent) : parent_{parent} {
-      handle_ = parent->addThreadLocalClusterUpdateCallbacks();
+  struct ThreadLocalClusterInfo : public ThreadLocal::ThreadLocalObject,
+                                  public Envoy::Upstream::ClusterUpdateCallbacks,
+                                  Logger::Loggable<Logger::Id::forward_proxy> {
+    ThreadLocalClusterInfo(ProxyFilterConfig& parent) {
+      // run in each worker thread.
+      handle_ = parent.cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
     }
     ~ThreadLocalClusterInfo() override;
+
+    void onClusterAddOrUpdate(absl::string_view cluster_name,
+                              Upstream::ThreadLocalClusterCommand& command) override;
+    void onClusterRemoval(const std::string& name) override;
+
     absl::flat_hash_map<std::string, std::list<LoadClusterEntryHandleImpl*>> pending_clusters_;
-    std::weak_ptr<ProxyFilterConfig> parent_;
-    //ProxyFilterConfig& parent_;
     Upstream::ClusterUpdateCallbacksHandlePtr handle_;
   };
 
