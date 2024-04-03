@@ -22,7 +22,8 @@ class EngineApiTest {
     val countDownLatch = CountDownLatch(1)
     val engine =
       EngineBuilder()
-        .addLogLevel(LogLevel.INFO)
+        .addLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .setNodeId("node-id")
         .setNodeLocality("region", "zone", "subzone")
         .setNodeMetadata(

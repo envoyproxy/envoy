@@ -31,6 +31,7 @@ build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
 build --define=google_grpc=disabled
 build --define=envoy_mobile_xds=disabled
+build --define=envoy_yaml=disabled
 
 # We don't have a ton of Swift in Envoy Mobile, so always build with WMO
 # This also helps work around a bug in rules_swift: https://github.com/bazelbuild/rules_swift/issues/949
@@ -81,8 +82,6 @@ build:mobile-test-android --define=static_extension_registration=disabled
 # enabled for //test/kotlin/integration:xds_test and
 # //test/java/io/envoyproxy/envoymobile/engine:envoy_configuration_test
 build:mobile-test-android --define=envoy_mobile_xds=enabled
-# TODO(alyssar) fix
-build:mobile-test-android --define=envoy_yaml=enabled
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
@@ -119,6 +118,8 @@ build:mobile-tsan-dev --test_env="TSAN_OPTIONS=report_atomic_races=0"
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
 build:mobile-release-common --define=no_debug_info=1
+# TODO(alyssar) fix example apps
+build:mobile-release-common --define=envoy_yaml=enabled
 
 # order matters here to ensure downloads
 build:mobile-remote-release-clang --config=mobile-remote-ci-linux-clang
@@ -175,6 +176,7 @@ build:mobile-remote-ci-common --config=rbe-engflow
 build:mobile-remote-ci-common --jobs=40
 build:mobile-remote-ci-common --verbose_failures
 build:mobile-remote-ci-common --spawn_strategy=remote,sandboxed,local
+build:mobile-remote-ci-common --experimental_ui_max_stdouterr_bytes=10485760
 
 #############################################################################
 # mobile-remote-ci-linux: These options are linux-only using GCC by default
@@ -255,6 +257,8 @@ build:mobile-remote-ci-macos --xcode_version_config=//ci:xcode_config
 build:mobile-remote-ci-macos --remote_download_toplevel
 build:mobile-remote-ci-macos --config=ci
 build:mobile-remote-ci-macos --config=remote
+# TODO(alyssar) fix swift tests
+build:mobile-remote-ci-macos --define=envoy_yaml=enabled
 
 build:mobile-remote-ci --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci --config=remote-ci
@@ -269,20 +273,18 @@ build:mobile-remote-ci-cc --config=mobile-remote-ci
 build:mobile-remote-ci-cc --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
 
+# TODO(alyssar) remove.
 build:mobile-remote-ci-cc-no-yaml --config=mobile-remote-ci-cc
-build:mobile-remote-ci-cc-no-yaml --define=envoy_yaml=disabled
 build:mobile-remote-ci-cc-no-yaml --define=envoy_full_protos=disabled
 build:mobile-remote-ci-cc-no-yaml --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci-cc
-build:mobile-remote-ci-cc-no-exceptions --define=envoy_yaml=disabled
 build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
 build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
 
 build:mobile-remote-ci-cc-test --config=mobile-remote-ci-cc
 test:mobile-remote-ci-cc-test --test_output=all
 test:mobile-remote-ci-cc-test --config=mobile-remote-ci-cc
-test:mobile-remote-ci-cc-test --define=envoy_yaml=disabled
 
 build:mobile-remote-ci-macos-kotlin --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-kotlin --fat_apk_cpu=x86_64
@@ -296,7 +298,6 @@ build:mobile-remote-ci-core --config=mobile-remote-ci
 test:mobile-remote-ci-core --build_tests_only
 test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
 test:mobile-remote-ci-core --test_env=ENVOY_IP_TEST_VERSIONS=v4only
-test:mobile-remote-ci-core --define=envoy_yaml=disabled
 
 build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-ios --config=mobile-test-ios
@@ -306,7 +307,6 @@ build:mobile-remote-ci-macos-ios-admin --define=admin_functionality=enabled
 
 
 build:mobile-remote-ci-macos-ios-swift --config=mobile-remote-ci-macos-ios
-test:mobile-remote-ci-macos-ios-swift --experimental_ui_max_stdouterr_bytes=10485760
 test:mobile-remote-ci-macos-ios-swift --build_tests_only
 
 build:mobile-remote-ci-macos-ios-obj-c --config=mobile-remote-ci-macos-ios

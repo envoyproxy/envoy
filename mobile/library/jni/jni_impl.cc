@@ -45,7 +45,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   if (on_start_context != nullptr) {
     jobject retained_on_start_context =
         env->NewGlobalRef(on_start_context); // Required to keep context in memory
-    callbacks->on_engine_running = [retained_on_start_context] {
+    callbacks->on_engine_running_ = [retained_on_start_context] {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
       Envoy::JNI::LocalRefUniquePtr<jclass> java_on_engine_running_class =
           jni_helper.getObjectClass(retained_on_start_context);
@@ -58,7 +58,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
       jni_helper.getEnv()->DeleteGlobalRef(retained_on_start_context);
     };
-    callbacks->on_exit = [] {
+    callbacks->on_exit_ = [] {
       // Note that this is not dispatched because the thread that
       // needs to be detached is the engine thread.
       // This function is called from the context of the engine's
@@ -72,8 +72,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   std::unique_ptr<Envoy::EnvoyLogger> logger = std::make_unique<Envoy::EnvoyLogger>();
   if (envoy_logger_context != nullptr) {
     const jobject retained_logger_context = env->NewGlobalRef(envoy_logger_context);
-    logger->on_log = [retained_logger_context](Envoy::Logger::Logger::Levels level,
-                                               const std::string& message) {
+    logger->on_log_ = [retained_logger_context](Envoy::Logger::Logger::Levels level,
+                                                const std::string& message) {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
       Envoy::JNI::LocalRefUniquePtr<jstring> java_message =
           jni_helper.newStringUtf(message.c_str());
@@ -85,7 +85,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       jni_helper.callVoidMethod(retained_logger_context, java_log_method_id, java_level,
                                 java_message.get());
     };
-    logger->on_exit = [retained_logger_context] {
+    logger->on_exit_ = [retained_logger_context] {
       Envoy::JNI::getEnv()->DeleteGlobalRef(retained_logger_context);
     };
   }
@@ -96,8 +96,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       std::make_unique<Envoy::EnvoyEventTracker>();
   if (event_tracker_context != nullptr) {
     const jobject retained_event_tracker_context = env->NewGlobalRef(event_tracker_context);
-    event_tracker->on_track = [retained_event_tracker_context](
-                                  const absl::flat_hash_map<std::string, std::string>& events) {
+    event_tracker->on_track_ = [retained_event_tracker_context](
+                                   const absl::flat_hash_map<std::string, std::string>& events) {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
       Envoy::JNI::LocalRefUniquePtr<jobject> java_events =
           Envoy::JNI::cppMapToJavaMap(jni_helper, events);
@@ -108,7 +108,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       jni_helper.callVoidMethod(retained_event_tracker_context, java_track_method_id,
                                 java_events.get());
     };
-    event_tracker->on_exit = [retained_event_tracker_context] {
+    event_tracker->on_exit_ = [retained_event_tracker_context] {
       Envoy::JNI::getEnv()->DeleteGlobalRef(retained_event_tracker_context);
     };
   }
@@ -1198,6 +1198,16 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_getNativeFilterConfig(JNIEnv* env, jclass,
+                                                                       jstring filter_name_jstr) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  std::string filter_name = Envoy::JNI::javaStringToCppString(jni_helper, filter_name_jstr);
+  std::string filter_config = EngineBuilder::nativeNameToConfig(filter_name);
+
+  return jni_helper.newStringUtf(filter_config.c_str()).release();
+}
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(
     JNIEnv* env, jclass, jlong connect_timeout_seconds, jlong dns_refresh_seconds,

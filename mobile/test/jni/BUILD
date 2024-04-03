@@ -48,10 +48,11 @@ cc_library(
         "//conditions:default": [],
     }),
     deps = [
-        "//library/jni:envoy_jni_lib",
         "//library/jni:jni_helper_lib",
         "//library/jni:jni_utility_lib",
         "//test/common/integration:test_server_lib",
+        "@envoy//test/test_common:test_version_linkstamp",
+        "@envoy_build_config//:extension_registry",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
@@ -79,10 +80,10 @@ cc_library(
         "//conditions:default": [],
     }),
     deps = [
-        "//library/jni:envoy_jni_lib",
         "//library/jni:jni_helper_lib",
-        "//library/jni:jni_utility_lib",
         "//test/common/integration:test_server_lib",
+        "@envoy//test/test_common:test_version_linkstamp",
+        "@envoy_build_config//:extension_registry",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
@@ -110,10 +111,11 @@ cc_library(
         "//conditions:default": [],
     }),
     deps = [
-        "//library/jni:envoy_jni_lib",
         "//library/jni:jni_helper_lib",
         "//library/jni:jni_utility_lib",
         "//test/common/integration:xds_test_server_lib",
+        "@envoy//test/test_common:test_version_linkstamp",
+        "@envoy_build_config//:extension_registry",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
