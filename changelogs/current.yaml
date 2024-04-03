@@ -276,6 +276,11 @@ new_features:
   change: |
     Update ``aws_lambda`` filter to support use as an upstream HTTP filter. This allows successful calculation of
     signatures after the forwarding stage has completed, particularly if the path element is modified.
+- area: aws_lambda
+  change: |
+    The ``aws_lambda`` filter now supports the
+    :ref:`credentials_profile <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.credentials_profile>` parameter.
+    This enables you to choose different credential profiles for each filter instance.
 - area: grpc reverse bridge
   change: |
     Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter

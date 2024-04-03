@@ -32,6 +32,19 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+Extensions::Common::Aws::CredentialsProviderSharedPtr
+getCredentialsProvider(const std::string& profile,
+                       Server::Configuration::ServerFactoryContext& server_context,
+                       const std::string& region) {
+  if (!profile.empty()) {
+    return std::make_shared<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
+        server_context.api(), profile);
+  }
+  return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
+      server_context.api(), makeOptRef(server_context), region,
+      Extensions::Common::Aws::Utility::fetchMetadata);
+}
+
 } // namespace
 
 absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
@@ -46,9 +59,7 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
   const std::string region = arn->region();
 
   auto credentials_provider =
-      std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          server_context.api(), makeOptRef(server_context), region,
-          Extensions::Common::Aws::Utility::fetchMetadata);
+      getCredentialsProvider(proto_config.credentials_profile(), server_context, region);
 
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name, region, std::move(credentials_provider), server_context,
@@ -79,11 +90,8 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
         fmt::format("aws_lambda_filter: Invalid ARN: {}", per_route_config.invoke_config().arn()));
   }
   const std::string region = arn->region();
-
-  auto credentials_provider =
-      std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          server_context.api(), makeOptRef(server_context), region,
-          Extensions::Common::Aws::Utility::fetchMetadata);
+  auto credentials_provider = getCredentialsProvider(
+      per_route_config.invoke_config().credentials_profile(), server_context, region);
 
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name, region, std::move(credentials_provider), server_context,
