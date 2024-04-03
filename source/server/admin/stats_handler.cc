@@ -10,6 +10,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/server/admin/clusters_request.h"
 #include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/stats_request.h"
 

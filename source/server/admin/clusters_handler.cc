@@ -2,11 +2,14 @@
 
 #include "envoy/admin/v3/clusters.pb.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/macros.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/host_utility.h"
+#include "source/server/admin/clusters_params.h"
+#include "source/server/admin/clusters_request.h"
 #include "source/server/admin/utils.h"
 
 namespace Envoy {
@@ -59,8 +62,11 @@ Http::Code ClustersHandler::handlerClusters(Http::ResponseHeaderMap& response_he
 
 // TODO(demitriswan) Implement this member function.
 Admin::RequestPtr ClustersHandler::makeRequest(AdminStream& admin_stream) {
-  UNREFERENCED_PARAMETER(admin_stream);
-  return nullptr;
+  Buffer::OwnedImpl response;
+  ClustersParams params;
+  params.parse(admin_stream.getRequestHeaders().getPathValue(), response);
+  return std::make_unique<ClustersRequest>(ClustersRequest::DefaultChunkLimit, server_, response,
+                                           params);
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
