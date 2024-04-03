@@ -50,7 +50,11 @@ public class AndroidEnvoyExplicitFlowTest {
     CountDownLatch latch = new CountDownLatch(1);
     Context appContext = ApplicationProvider.getApplicationContext();
     engine = new AndroidEngineBuilder(appContext)
-                 .addLogLevel(LogLevel.OFF)
+                 .addLogLevel(LogLevel.DEBUG)
+                 .setLogger((level, message) -> {
+                   System.out.print(message);
+                   return null;
+                 })
                  .setOnEngineRunning(() -> {
                    latch.countDown();
                    return null;

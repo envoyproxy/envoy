@@ -287,6 +287,14 @@ public class JniLibrary {
    */
   public static native void callClearTestRootCertificateFromNative();
 
+  /*
+   * Given a filter name, create the proto or YAML config for adding the native filter
+   *
+   * @param filterName the name of the native filter
+   * @return a filter config which can be passed back to createBootstrap
+   */
+  public static native String getNativeFilterConfig(String filterName);
+
   /**
    * Uses the provided fields to generate an Envoy bootstrap proto.
    * The returned pointer is "owned" by the caller until ownership is passed back to C++ via
