@@ -440,6 +440,10 @@ new_features:
 - area: aws
   change: |
     Update credential_provider utility to support EKS Pod Identity provided via token file.
+- area: access_log
+  change: |
+    Added :ref:`%COMMON_DURATION% <config_access_log_format_common_duration>` to access log format to log the duration of the request.
+    The start time point, end time point and duration precision can be configured in this new command.
 - area: admin
   change: |
     The ``/stats/prometheus`` endpoint can now emit prometheus ``summary`` metric types by explicitly setting the
