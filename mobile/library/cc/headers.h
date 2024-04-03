@@ -53,6 +53,8 @@ public:
 
   const std::vector<std::string>& operator[](absl::string_view key) const;
   const RawHeaderMap& allHeaders() const;
+  // Moves the ownership of the header map to caller.
+  RawHeaderMap releaseAllHeaders();
   bool contains(const std::string& key) const;
 
 protected:

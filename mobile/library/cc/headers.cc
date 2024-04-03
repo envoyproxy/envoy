@@ -15,6 +15,8 @@ const std::vector<std::string>& Headers::operator[](absl::string_view key) const
 
 const RawHeaderMap& Headers::allHeaders() const { return headers_; }
 
+RawHeaderMap Headers::releaseAllHeaders() { return std::move(headers_); }
+
 bool Headers::contains(const std::string& key) const { return headers_.contains(key); }
 
 Headers::Headers(const RawHeaderMap& headers) : headers_(headers) {}
