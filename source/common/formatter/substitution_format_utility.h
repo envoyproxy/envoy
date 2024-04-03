@@ -54,6 +54,14 @@ public:
   static void truncate(std::string& str, absl::optional<size_t> max_length);
 
   /**
+   * Truncate an input string view to a maximum length, and return the resulting string view. Do not
+   * truncate if max_length is not set or max_length is greater than the length of the input string
+   * view.
+   */
+  static absl::string_view truncateStringView(absl::string_view str,
+                                              absl::optional<size_t> max_length);
+
+  /**
    * Parse a header subcommand of the form: X?Y .
    * Will populate a main_header and an optional alternative header if specified.
    * See doc:
