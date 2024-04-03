@@ -1891,7 +1891,8 @@ public:
   static std::vector<FrameIntegrationTestParam> testParams() {
     std::vector<FrameIntegrationTestParam> v;
     for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-      v.push_back({ip_version});
+      v.push_back({ip_version, Http2Impl::Nghttp2});
+      v.push_back({ip_version, Http2Impl::Oghttp2});
     }
     return v;
   }
