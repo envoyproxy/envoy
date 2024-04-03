@@ -7,6 +7,8 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
+#include "source/server/admin/clusters_params.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -15,7 +17,7 @@ class ClustersRequest : public Admin::Request {
 public:
   static constexpr uint64_t DefaultChunkSize = 2 << 20; // 2 MB
 
-  ClustersRequest(Instance& server);
+  ClustersRequest(Instance& server, const ClustersParams& params);
 
   Http::Code start(Http::ResponseHeaderMap& response_headers) override;
   bool nextChunk(Buffer::Instance& response) override;
@@ -23,6 +25,7 @@ public:
 private:
   uint64_t chunk_size_{DefaultChunkSize};
   Server::Instance& server_;
+  const ClustersParams& params_;
 };
 
 } // namespace Server

@@ -3,6 +3,8 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codes.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -12,7 +14,7 @@ class ClustersParams {
     Json,
   };
 
-  Http::Code parse(std::string_view url, Buffer::Instance& response);
+  Http::Code parse(absl::string_view url, Buffer::Instance& response);
 
   Format format_;
 };
