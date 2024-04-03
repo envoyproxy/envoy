@@ -2,14 +2,13 @@ package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.EngineBuilder
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.Standard
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
-import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory.HttpTestServer
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -24,15 +23,20 @@ private const val REQUEST_STRING_MATCH = "match_me"
 
 class SendDataTest {
   init {
-    AndroidJniLibrary.loadTestLibrary()
-    JniLibrary.load()
+    JniLibrary.loadTestLibrary()
   }
 
-  private lateinit var httpTestServer: HttpTestServer
+  private lateinit var httpTestServer: HttpTestServerFactory.HttpTestServer
 
   @Before
   fun setUp() {
-    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP2_WITH_TLS)
+    httpTestServer =
+      HttpTestServerFactory.start(
+        HttpTestServerFactory.Type.HTTP2_WITH_TLS,
+        mapOf(),
+        "data",
+        mapOf()
+      )
   }
 
   @After
@@ -45,11 +49,13 @@ class SendDataTest {
     val expectation = CountDownLatch(1)
     val engine =
       EngineBuilder(Standard())
+        .addLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
+        .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
         .addNativeFilter(
           "envoy.filters.http.assertion",
-          "{'@type': $ASSERTION_FILTER_TYPE, match_config: {http_request_generic_body_match: {patterns: [{string_match: $REQUEST_STRING_MATCH}]}}}"
+          "[$ASSERTION_FILTER_TYPE] { match_config { http_request_generic_body_match: { patterns: { string_match: '$REQUEST_STRING_MATCH'}}}}"
         )
-        .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
         .build()
 
     val client = engine.streamClient()
@@ -69,12 +75,11 @@ class SendDataTest {
     var responseEndStream = false
     client
       .newStreamPrototype()
-      .setOnResponseHeaders { headers, endStream, _ ->
-        responseStatus = headers.httpStatus
+      .setOnResponseHeaders { headers, _, _ -> responseStatus = headers.httpStatus }
+      .setOnResponseData { _, endStream, _ ->
         responseEndStream = endStream
         expectation.countDown()
       }
-      .setOnResponseData { _, endStream, _ -> responseEndStream = endStream }
       .setOnError { _, _ -> fail("Unexpected error") }
       .start()
       .sendHeaders(requestHeaders, false)
