@@ -5,6 +5,32 @@
 namespace Envoy {
 namespace StreamInfo {
 
+void FilterStateImpl::maybeCreateParent(FilterStateSharedPtr ancestor) {
+  // If we already have a parent, or we're at the top span, we don't need to create
+  // a parent.
+  if (parent_ != nullptr || life_span_ >= FilterState::LifeSpan::TopSpan) {
+    return;
+  }
+
+  const auto parent_life_span = FilterState::LifeSpan(life_span_ + 1);
+
+  // No ancestor, or the provided ancestor has a shorter life span than the parent
+  // we need to create, so we create a new parent.
+  if (ancestor == nullptr || ancestor->lifeSpan() < parent_life_span) {
+    parent_ = std::make_shared<FilterStateImpl>(parent_life_span);
+    return;
+  }
+
+  // The ancestor is our immediate parent, use it.
+  if (ancestor->lifeSpan() == parent_life_span) {
+    parent_ = std::move(ancestor);
+    return;
+  }
+
+  // The ancestor is not our immediate parent, so we need to create a chain of parents.
+  parent_ = std::make_shared<FilterStateImpl>(std::move(ancestor), parent_life_span);
+}
+
 void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Object> data,
                               FilterState::StateType state_type, FilterState::LifeSpan life_span,
                               StreamSharingMayImpactPooling stream_sharing) {
@@ -124,30 +150,6 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
 
 bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) const {
   return data_storage_.contains(data_name);
-}
-
-void FilterStateImpl::maybeCreateParent(FilterStateSharedPtr ancestor) {
-  // If we already have a parent, or we're at the top span, we don't need to create a parent.
-  if (parent_ != nullptr || life_span_ >= FilterState::LifeSpan::TopSpan) {
-    return;
-  }
-
-  const auto parent_life_span = FilterState::LifeSpan(life_span_ + 1);
-
-  // No ancestor, and create a immediate parent directly.
-  if (ancestor == nullptr) {
-    parent_ = std::make_shared<FilterStateImpl>(parent_life_span);
-    return;
-  }
-
-  // The ancestor is our parent.
-  if (ancestor->lifeSpan() == parent_life_span) {
-    parent_ = std::move(ancestor);
-    return;
-  }
-
-  // The ancestor is not our parent, so we need to create a chain of parents.
-  parent_ = std::make_shared<FilterStateImpl>(std::move(ancestor), parent_life_span);
 }
 
 } // namespace StreamInfo

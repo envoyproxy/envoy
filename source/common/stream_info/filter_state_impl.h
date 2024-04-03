@@ -28,7 +28,6 @@ public:
     // If ancestor is nullptr, we will create the parent lazily, otherwise we will create
     // the parent immediately.
     if (ancestor != nullptr) {
-      ASSERT(ancestor->lifeSpan() > life_span_);
       maybeCreateParent(std::move(ancestor));
     }
   }
