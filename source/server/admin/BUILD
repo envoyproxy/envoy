@@ -417,6 +417,7 @@ envoy_cc_library(
     hdrs = ["clusters_request.h"],
     deps = [
         ":clusters_params_lib",
+        ":clusters_renderer_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:header_map_interface",

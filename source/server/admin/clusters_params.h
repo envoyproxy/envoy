@@ -8,11 +8,13 @@
 namespace Envoy {
 namespace Server {
 
-class ClustersParams {
+struct ClustersParams {
   enum class Format {
     Text,
     Json,
   };
+
+  ClustersParams() = default;
 
   Http::Code parse(absl::string_view url, Buffer::Instance& response);
 

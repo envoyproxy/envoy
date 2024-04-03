@@ -8,6 +8,7 @@
 #include "envoy/server/instance.h"
 
 #include "source/server/admin/clusters_params.h"
+#include "source/server/admin/clusters_renderer.h"
 
 namespace Envoy {
 namespace Server {
@@ -15,17 +16,22 @@ namespace Server {
 // Captures context for a streaming request, implementing the Admin::Request interface.
 class ClustersRequest : public Admin::Request {
 public:
-  static constexpr uint64_t DefaultChunkSize = 2 << 20; // 2 MB
+  static constexpr uint64_t DefaultChunkLimit = 2 << 20; // 2 MB
 
-  ClustersRequest(Instance& server, const ClustersParams& params);
+  ClustersRequest(uint64_t chunk_limit, Instance& server, Buffer::Instance& response,
+                  const ClustersParams& params);
 
   Http::Code start(Http::ResponseHeaderMap& response_headers) override;
   bool nextChunk(Buffer::Instance& response) override;
 
 private:
-  uint64_t chunk_size_{DefaultChunkSize};
+  using ClustersRendererPtr = std::unique_ptr<ClustersRenderer>;
+
+  uint64_t chunk_limit_{DefaultChunkLimit};
   Server::Instance& server_;
+  Buffer::Instance& response_;
   const ClustersParams& params_;
+  ClustersRendererPtr renderer_;
 };
 
 } // namespace Server

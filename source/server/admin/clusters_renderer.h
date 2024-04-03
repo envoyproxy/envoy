@@ -21,35 +21,35 @@ protected:
   virtual void render(std::reference_wrapper<const Upstream::Cluster> cluster) PURE;
 };
 
-class ClustersTextRenderer : ClustersRenderer {
+class ClustersTextRenderer : public ClustersRenderer {
 public:
-  ClustersTextRenderer(Buffer::Instance& response,
-                       const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map,
-                       uint64_t chunk_limit);
+  ClustersTextRenderer(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
+                       Buffer::Instance& response,
+                       const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map);
   bool nextChunk() override;
 
 private:
   void render(std::reference_wrapper<const Upstream::Cluster> cluster) override;
-
+  const uint64_t chunk_limit_;
+  Http::ResponseHeaderMap& response_headers_;
   Buffer::Instance& response_;
   const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map_;
-  const uint64_t chunk_limit_;
   Upstream::ClusterManager::ClusterInfoMap::const_iterator it_;
 };
 
-class ClustersJsonRenderer : ClustersRenderer {
+class ClustersJsonRenderer : public ClustersRenderer {
 public:
-  ClustersJsonRenderer(Buffer::Instance& response,
-                       const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map,
-                       uint64_t chunk_limit);
+  ClustersJsonRenderer(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
+                       Buffer::Instance& response,
+                       const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map);
   bool nextChunk() override;
 
 private:
   void render(std::reference_wrapper<const Upstream::Cluster> cluster) override;
-
+  const uint64_t chunk_limit_;
+  Http::ResponseHeaderMap& response_headers_;
   Buffer::Instance& response_;
   const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map_;
-  const uint64_t chunk_limit_;
   Upstream::ClusterManager::ClusterInfoMap::const_iterator it_;
 };
 
