@@ -32,8 +32,8 @@ public:
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override {
     ENVOY_LOG(debug, "adding new query [{}] to pending queries", dns_name);
-    auto new_query = std::make_unique<PendingQuery>(dns_name, dns_lookup_family, callback);
     absl::MutexLock guard(&mutex_);
+    auto new_query = std::make_unique<PendingQuery>(dns_name, dns_lookup_family, callback, mutex_);
     pending_queries_.emplace_back(std::move(new_query));
     return pending_queries_.back().get();
   }
@@ -43,14 +43,18 @@ public:
 private:
   class PendingQuery : public ActiveDnsQuery {
   public:
-    PendingQuery(const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback)
-        : dns_name_(dns_name), dns_lookup_family_(dns_lookup_family), callback_(callback) {}
+    PendingQuery(const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback,
+                 absl::Mutex& mutex)
+        : mutex_(mutex), dns_name_(dns_name), dns_lookup_family_(dns_lookup_family),
+          callback_(callback) {}
 
     void cancel(CancelReason) override {
       ENVOY_LOG(debug, "cancelling query [{}]", dns_name_);
+      absl::MutexLock guard(&mutex_);
       cancelled_ = true;
     }
 
+    absl::Mutex& mutex_;
     const std::string dns_name_;
     const DnsLookupFamily dns_lookup_family_;
     ResolveCb callback_;
