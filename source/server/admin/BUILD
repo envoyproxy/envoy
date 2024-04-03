@@ -423,3 +423,18 @@ envoy_cc_library(
         "//envoy/server:instance_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "clusters_params_lib",
+    srcs = ["clusters_params.cc"],
+    hdrs = ["clusters_params.h"],
+    external_deps = [
+        "abseil_optional",
+        "abseil_strings",
+    ],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:query_params_interface",
+    ],
+)

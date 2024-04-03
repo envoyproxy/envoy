@@ -165,6 +165,7 @@ envoy_cc_library(
     name = "query_params_interface",
     hdrs = ["query_params.h"],
     external_deps = ["abseil_btree"],
+    deps = [":header_map_interface"],
 )
 
 envoy_cc_library(
