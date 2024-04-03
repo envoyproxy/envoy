@@ -267,7 +267,6 @@ resources:
                                  downstream_filter_);
   }
 
-
   const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "GET"},
                                                                  {":path", "/somepath"},
                                                                  {":scheme", "http"},

@@ -138,14 +138,6 @@ private:
       callbacks.addStreamFilter(std::make_shared<SetResponseCodeFilter>(filter_config));
     };
   }
-
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-      const test::integration::filters::SetResponseCodePerRouteFilterConfigDownstream& proto_config,
-      Server::Configuration::ServerFactoryContext& context,
-      ProtobufMessage::ValidationVisitor&) override {
-    return std::make_shared<const SetResponseCodeFilterRouteSpecificConfig>(
-        proto_config.prefix(), proto_config.code(), proto_config.body(), context);
-  }
 };
 
 REGISTER_FACTORY(SetResponseCodeFilterFactoryDownstream,
@@ -158,8 +150,7 @@ class SetResponseCodeFilterFactoryDual
           test::integration::filters::SetResponseCodeFilterConfigDual,
           test::integration::filters::SetResponseCodePerRouteFilterConfigDual> {
 public:
-  SetResponseCodeFilterFactoryDual()
-      : DualFactoryBase("set-response-code-filter-dual") {}
+  SetResponseCodeFilterFactoryDual() : DualFactoryBase("set-response-code-filter-dual") {}
 
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
@@ -170,15 +161,6 @@ private:
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<SetResponseCodeFilter>(filter_config));
     };
-  }
-
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-      const test::integration::filters::SetResponseCodePerRouteFilterConfigDual&
-          proto_config,
-      Server::Configuration::ServerFactoryContext& context,
-      ProtobufMessage::ValidationVisitor&) override {
-    return std::make_shared<const SetResponseCodeFilterRouteSpecificConfig>(
-        proto_config.prefix(), proto_config.code(), proto_config.body(), context);
   }
 };
 
@@ -213,15 +195,6 @@ private:
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<SetResponseCodeFilter>(filter_config));
     };
-  }
-
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-      const test::integration::filters::SetResponseCodePerRouteFilterConfigServerContext&
-          proto_config,
-      Server::Configuration::ServerFactoryContext& context,
-      ProtobufMessage::ValidationVisitor&) override {
-    return std::make_shared<const SetResponseCodeFilterRouteSpecificConfig>(
-        proto_config.prefix(), proto_config.code(), proto_config.body(), context);
   }
 };
 
