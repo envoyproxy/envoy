@@ -954,8 +954,7 @@ void Filter::onAccessLogFlushInterval() {
 }
 
 void Filter::flushAccessLog(AccessLog::AccessLogType access_log_type) {
-  const Formatter::HttpFormatterContext log_context{
-      nullptr, nullptr, nullptr, Tracing::NullSpan::instance(), {}, access_log_type};
+  const Formatter::HttpFormatterContext log_context{nullptr, nullptr, nullptr, {}, access_log_type};
 
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(log_context, getStreamInfo());

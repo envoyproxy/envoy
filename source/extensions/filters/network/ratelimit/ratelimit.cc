@@ -50,8 +50,7 @@ Config::applySubstitutionFormatter(StreamInfo::StreamInfo& stream_info) {
 
       std::string value = descriptor_entry.value_;
       value = formatter_it->get()->formatWithContext(
-          {request_headers_.get(), response_headers_.get(), response_trailers_.get(),
-           Tracing::NullSpan::instance(), value},
+          {request_headers_.get(), response_headers_.get(), response_trailers_.get(), value},
           stream_info);
       formatter_it++;
       new_descriptor.entries_.push_back({descriptor_entry.key_, value});

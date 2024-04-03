@@ -700,9 +700,10 @@ public:
         filter_manager_callbacks_.requestHeaders().ptr(),
         filter_manager_callbacks_.responseHeaders().ptr(),
         filter_manager_callbacks_.responseTrailers().ptr(),
-        filter_manager_callbacks_.activeSpan(),
         {},
-        access_log_type};
+        access_log_type,
+        &filter_manager_callbacks_.activeSpan()
+    };
 
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(log_context, streamInfo());

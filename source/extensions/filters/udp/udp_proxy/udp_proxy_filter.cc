@@ -328,9 +328,7 @@ void UdpProxyFilter::ActiveSession::onSessionComplete() {
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
     const Formatter::HttpFormatterContext log_context{
-        nullptr, nullptr,
-        nullptr, Tracing::NullSpan::instance(),
-        {},      AccessLog::AccessLogType::UdpSessionEnd};
+        nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpSessionEnd};
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
       access_log->log(log_context, udp_session_info_);
     }
@@ -683,9 +681,8 @@ void UdpProxyFilter::ActiveSession::writeDownstream(Network::UdpRecvData& recv_d
 
 void UdpProxyFilter::ActiveSession::onAccessLogFlushInterval() {
   fillSessionStreamInfo();
-  const Formatter::HttpFormatterContext log_context{nullptr, nullptr,
-                                                    nullptr, Tracing::NullSpan::instance(),
-                                                    {},      AccessLog::AccessLogType::UdpPeriodic};
+  const Formatter::HttpFormatterContext log_context{
+      nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpPeriodic};
   for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
     access_log->log(log_context, udp_session_info_);
   }
@@ -861,9 +858,7 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
 
   if (flush_access_log_on_tunnel_connected_) {
     const Formatter::HttpFormatterContext log_context{
-        nullptr, nullptr,
-        nullptr, Tracing::NullSpan::instance(),
-        {},      AccessLog::AccessLogType::UdpTunnelUpstreamConnected};
+        nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpTunnelUpstreamConnected};
     for (const auto& access_log : session_access_logs_) {
       access_log->log(log_context, downstream_info_);
     }

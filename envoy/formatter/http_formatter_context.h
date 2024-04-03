@@ -31,9 +31,9 @@ public:
   HttpFormatterContext(const Http::RequestHeaderMap* request_headers = nullptr,
                        const Http::ResponseHeaderMap* response_headers = nullptr,
                        const Http::ResponseTrailerMap* response_trailers = nullptr,
-                       const Tracing::Span& active_span = Tracing::NullSpan::instance(),
                        absl::string_view local_reply_body = {},
-                       AccessLogType log_type = AccessLogType::NotSet);
+                       AccessLogType log_type = AccessLogType::NotSet,
+                       const Tracing::Span* active_span = nullptr);
   /**
    * Set or overwrite the request headers.
    * @param request_headers supplies the request headers.
@@ -131,9 +131,9 @@ private:
   const Http::RequestHeaderMap* request_headers_{};
   const Http::ResponseHeaderMap* response_headers_{};
   const Http::ResponseTrailerMap* response_trailers_{};
-  const Tracing::Span& active_span_ = Tracing::NullSpan::instance();
   absl::string_view local_reply_body_{};
   AccessLogType log_type_{AccessLogType::NotSet};
+  const Tracing::Span* active_span_ = nullptr;
 };
 
 } // namespace Formatter
