@@ -76,8 +76,11 @@ Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
 
 Router::RouteSpecificFilterConfigConstSharedPtr BasicAuthFilterFactory::createRouteSpecificFilterConfigTyped(
     const BasicAuthPerRoute& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<FilterConfigPerRoute>(proto_config);
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  UserMap users = readHtpasswd(THROW_OR_RETURN_VALUE(
+      Config::DataSource::read(proto_config.users(), true, context.api()),
+      std::string));
+  return std::make_unique<FilterConfigPerRoute>(std::move(users), proto_config.disabled());
 }
 
 REGISTER_FACTORY(BasicAuthFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);

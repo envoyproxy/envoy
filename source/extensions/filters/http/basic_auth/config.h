@@ -23,7 +23,7 @@ private:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute& proto_config,
-      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor&) override;
 };
 

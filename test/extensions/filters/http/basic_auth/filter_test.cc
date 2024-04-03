@@ -6,6 +6,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <algorithm>
 
 namespace Envoy {
 namespace Extensions {
@@ -145,8 +146,8 @@ TEST_F(FilterTest, ExistingUsernameHeader) {
 
 TEST_F(FilterTest, BasicAuthPerRouteDefaultSettings) {
   Http::TestRequestHeaderMapImpl empty_request_headers;
-  envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute settings;
-  FilterConfigPerRoute basic_auth_per_route(settings);
+  UserMap empty_users;
+  FilterConfigPerRoute basic_auth_per_route(std::move(empty_users), false);
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(testing::Return(&basic_auth_per_route));
@@ -168,15 +169,33 @@ TEST_F(FilterTest, BasicAuthPerRouteDefaultSettings) {
 
 TEST_F(FilterTest, BasicAuthPerRouteDisabled) {
   Http::TestRequestHeaderMapImpl empty_request_headers;
-  envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute settings;
-  settings.set_disabled(true);
-  FilterConfigPerRoute basic_auth_per_route(settings);
+  UserMap empty_users;
+  FilterConfigPerRoute basic_auth_per_route(std::move(empty_users), true);
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(testing::Return(&basic_auth_per_route));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(empty_request_headers, true));
+}
+
+TEST_F(FilterTest, BasicAuthPerRouteEnabled) {
+  UserMap users_for_route;
+  users_for_route.insert({"admin", {"admin", "0DPiKuNIrrVmD8IUCuw1hQxNqZc="}}); // admin:admin
+  FilterConfigPerRoute basic_auth_per_route(std::move(users_for_route), false);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(testing::Return(&basic_auth_per_route));
+
+  Http::TestRequestHeaderMapImpl valid_credentials{{"Authorization", "Basic YWRtaW46YWRtaW4="}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(valid_credentials, true));
+
+  Http::TestRequestHeaderMapImpl invalid_credentials{{"Authorization", "Basic dXNlcjE6dGVzdDE="}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(invalid_credentials, true));
 }
 
 } // namespace BasicAuth

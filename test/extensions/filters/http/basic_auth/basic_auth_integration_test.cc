@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/http/basic_auth/v3/basic_auth.pb.h"
 
 #include "gtest/gtest.h"
+#include <string>
 
 namespace Envoy {
 namespace Extensions {
@@ -13,7 +14,7 @@ namespace {
 
 // user1, test1
 // user2, test2
-const std::string BASIC_AUTH_FILTER_CONFIG =
+const std::string BasicAuthFilterConfig =
   R"EOF(
 name: envoy.filters.http.basic_auth
 typed_config:
@@ -25,10 +26,36 @@ typed_config:
   forward_username_header: x-username
 )EOF";
 
+// admin, admin
+const std::string AdminUsers =
+  R"EOF(
+users:
+  inline_string: |-
+    admin:{SHA}0DPiKuNIrrVmD8IUCuw1hQxNqZc=
+)EOF";
+
 class BasicAuthIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initializeFilter() {
-    config_helper_.prependFilter(BASIC_AUTH_FILTER_CONFIG);
+    config_helper_.prependFilter(BasicAuthFilterConfig);
+    initialize();
+  }
+
+  void initializePerRouteFilter(std::string yaml_config) {
+    config_helper_.addConfigModifier(
+      [&yaml_config](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cfg) {
+        envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute per_route_config;
+        TestUtility::loadFromYaml(yaml_config, per_route_config);
+
+        auto* config = cfg.mutable_route_config()
+                           ->mutable_virtual_hosts()
+                           ->Mutable(0)
+                           ->mutable_typed_per_filter_config();
+
+        (*config)["envoy.filters.http.basic_auth"].PackFrom(per_route_config);
+      });
+    config_helper_.prependFilter(BasicAuthFilterConfig);
     initialize();
   }
 };
@@ -148,22 +175,10 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, ExistingUsernameHeader) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthDisabledForRoute) {
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             cfg) {
-        envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute per_route_config;
-        per_route_config.set_disabled(true);
-
-        auto* config = cfg.mutable_route_config()
-                           ->mutable_virtual_hosts()
-                           ->Mutable(0)
-                           ->mutable_typed_per_filter_config();
-
-        (*config)["envoy.filters.http.basic_auth"].PackFrom(per_route_config);
-      });
-  config_helper_.prependFilter(BASIC_AUTH_FILTER_CONFIG);
-  initialize();
+TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteDisabled) {
+  initializePerRouteFilter(R"EOF(
+disabled: true
+)EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
@@ -178,6 +193,43 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthDisabledForRoute) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteEnabled) {
+  initializePerRouteFilter(AdminUsers);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Basic YWRtaW46YWRtaW4="}, // admin, admin
+  });
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteEnabledInvalidCredentials) {
+  initializePerRouteFilter(AdminUsers);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Basic dXNlcjE6dGVzdDE="}, // user1, test1
+  });
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("401", response->headers().getStatusValue());
+  EXPECT_EQ("User authentication failed. Invalid username/password combination.", response->body());
 }
 
 } // namespace

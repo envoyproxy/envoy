@@ -32,24 +32,17 @@ FilterConfig::FilterConfig(UserMap&& users, const std::string& forward_username_
     : users_(std::move(users)), forward_username_header_(forward_username_header),
       stats_(generateStats(stats_prefix + "basic_auth.", scope)) {}
 
-bool FilterConfig::validateUser(absl::string_view username, absl::string_view password) const {
-  auto user = users_.find(username);
-  if (user == users_.end()) {
-    return false;
-  }
-
-  return computeSHA1(password) == user->second.hash;
-}
-
 BasicAuthFilter::BasicAuthFilter(FilterConfigConstSharedPtr config) : config_(std::move(config)) {}
 
 Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const auto* specific_check_settings =
+  const auto* route_specific_settings =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
-  if (specific_check_settings != nullptr) {
-    if (specific_check_settings->disabled()) {
+  auto users = config_->users();
+  if (route_specific_settings != nullptr) {
+    if (route_specific_settings->disabled()) {
       return Http::FilterHeadersStatus::Continue;
     }
+    users = route_specific_settings->users();
   }
 
   auto auth_header = headers.get(Http::CustomHeaders::get().Authorization);
@@ -81,7 +74,7 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
   absl::string_view username = decoded_view.substr(0, colon_pos);
   absl::string_view password = decoded_view.substr(colon_pos + 1);
 
-  if (!config_->validateUser(username, password)) {
+  if (!validateUser(users, username, password)) {
     return onDenied("User authentication failed. Invalid username/password combination.",
                     "invalid_credential_for_basic_auth");
   }
@@ -92,6 +85,15 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
 
   config_->stats().allowed_.inc();
   return Http::FilterHeadersStatus::Continue;
+}
+
+bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view username, absl::string_view password) const {
+  auto user = users.find(username);
+  if (user == users.end()) {
+    return false;
+  }
+
+  return computeSHA1(password) == user->second.hash;
 }
 
 Http::FilterHeadersStatus BasicAuthFilter::onDenied(absl::string_view body,
