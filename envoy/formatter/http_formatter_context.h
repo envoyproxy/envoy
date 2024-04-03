@@ -24,9 +24,9 @@ public:
    * @param request_headers supplies the request headers.
    * @param response_headers supplies the response headers.
    * @param response_trailers supplies the response trailers.
-   * @param active_span supplies the active span.
    * @param local_reply_body supplies the local reply body.
    * @param log_type supplies the access log type.
+   * @param active_span supplies the active span.
    */
   HttpFormatterContext(const Http::RequestHeaderMap* request_headers = nullptr,
                        const Http::ResponseHeaderMap* response_headers = nullptr,

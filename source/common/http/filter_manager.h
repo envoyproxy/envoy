@@ -702,8 +702,7 @@ public:
         filter_manager_callbacks_.responseTrailers().ptr(),
         {},
         access_log_type,
-        &filter_manager_callbacks_.activeSpan()
-    };
+        &filter_manager_callbacks_.activeSpan()};
 
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(log_context, streamInfo());
