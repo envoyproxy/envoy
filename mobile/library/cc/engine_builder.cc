@@ -172,7 +172,7 @@ EngineBuilder& EngineBuilder::setEngineCallbacks(std::unique_ptr<EngineCallbacks
 }
 
 EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) {
-  callbacks_->on_engine_running = std::move(closure);
+  callbacks_->on_engine_running_ = std::move(closure);
   return *this;
 }
 

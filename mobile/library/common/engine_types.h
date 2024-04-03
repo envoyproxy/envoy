@@ -22,24 +22,24 @@ namespace Envoy {
 
 /** The callbacks for the Envoy Engine. */
 struct EngineCallbacks {
-  std::function<void()> on_engine_running = [] {};
-  std::function<void()> on_exit = [] {};
+  std::function<void()> on_engine_running_ = [] {};
+  std::function<void()> on_exit_ = [] {};
 };
 
 /** The callbacks for Envoy Logger. */
 struct EnvoyLogger {
-  std::function<void(Logger::Logger::Levels, const std::string&)> on_log =
+  std::function<void(Logger::Logger::Levels, const std::string&)> on_log_ =
       [](Logger::Logger::Levels, const std::string&) {};
-  std::function<void()> on_exit = [] {};
+  std::function<void()> on_exit_ = [] {};
 };
 
 inline constexpr absl::string_view ENVOY_EVENT_TRACKER_API_NAME = "event_tracker_api";
 
 /** The callbacks for Envoy Event Tracker. */
 struct EnvoyEventTracker {
-  std::function<void(const absl::flat_hash_map<std::string, std::string>&)> on_track =
+  std::function<void(const absl::flat_hash_map<std::string, std::string>&)> on_track_ =
       [](const absl::flat_hash_map<std::string, std::string>&) {};
-  std::function<void()> on_exit = [] {};
+  std::function<void()> on_exit_ = [] {};
 };
 
 } // namespace Envoy

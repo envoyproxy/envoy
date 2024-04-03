@@ -40,14 +40,20 @@ public final class HttpTestServerFactory {
    * @param type the value in {@link HttpTestServerFactory.Type}
    * @param headers the response headers
    * @param body the response body
+   * @param trailers the response headers
+   * @return the `HttpTestServer` instance
    */
-  public static native HttpTestServer start(int type, Map<String, String> headers, String body);
+  public static native HttpTestServer start(int type, Map<String, String> headers, String body,
+                                            Map<String, String> trailers);
 
   /**
-   * A convenience method to start the server with an empty response headers and body. This server
-   * will always return 200 HTTP status code.
+   * A convenience method to start the server with an empty response headers, body, and trailers.
+   * This server will always return 200 HTTP status code.
    *
    * @param type the value in {@link HttpTestServerFactory.Type}
+   * @return the `HttpTestServer` instance
    */
-  public static HttpTestServer start(int type) { return start(type, Collections.emptyMap(), ""); }
+  public static HttpTestServer start(int type) {
+    return start(type, Collections.emptyMap(), "", Collections.emptyMap());
+  }
 }

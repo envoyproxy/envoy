@@ -105,6 +105,7 @@ class FilterThrowingExceptionTest {
     val engine =
       builder
         .addLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .setEventTracker { event ->
           if (
             event["name"] == "event_log" && event["log_name"] == "jni_cleared_pending_exception"
