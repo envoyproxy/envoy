@@ -22,6 +22,7 @@ public:
     {
       absl::MutexLock guard(&mutex_);
       shutting_down_ = true;
+      pending_queries_.clear();
     }
 
     resolver_thread_->join();
