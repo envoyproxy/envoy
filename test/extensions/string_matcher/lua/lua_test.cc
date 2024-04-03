@@ -2,8 +2,7 @@
 
 #include "source/extensions/string_matcher/lua/match.h"
 
-#include "test/mocks/api/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
@@ -88,21 +87,16 @@ TEST(LuaStringMatcher, LuaStdLib) {
 }
 
 TEST(LuaStringMatcher, NoCode) {
-  ScopedInjectableLoader<Api::Api> api_inject(std::make_unique<Api::MockApi>());
-  ScopedInjectableLoader<ThreadLocal::SlotAllocator> tls_inject(
-      std::make_unique<ThreadLocal::MockInstance>());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   LuaStringMatcherFactory factory;
   ::envoy::extensions::string_matcher::lua::v3::Lua empty_config;
-  ProtobufWkt::Any any;
-  any.PackFrom(empty_config);
-  EXPECT_THROW_WITH_MESSAGE(factory.createStringMatcher(any), EnvoyException,
-                            "Failed to get lua string matcher code from source: INVALID_ARGUMENT: "
-                            "Unexpected DataSource::specifier_case(): 0");
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createStringMatcher(empty_config, context), EnvoyException,
+      "Proto constraint validation failed (LuaValidationError.SourceCode: value is required): ");
 
   empty_config.mutable_source_code()->set_inline_string("");
-  any.PackFrom(empty_config);
-  EXPECT_THROW_WITH_MESSAGE(factory.createStringMatcher(any), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(factory.createStringMatcher(empty_config, context), EnvoyException,
                             "Failed to get lua string matcher code from source: INVALID_ARGUMENT: "
                             "DataSource cannot be empty");
 }

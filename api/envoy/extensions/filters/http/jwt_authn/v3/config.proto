@@ -54,7 +54,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 20]
+// [#next-free-field: 22]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -118,6 +118,34 @@ message JwtProvider {
   //       prefix: spiffe://spiffe.example.com/
   //
   type.matcher.v3.StringMatcher subjects = 19;
+
+  // Requires that the credential contains an `expiration <https://tools.ietf.org/html/rfc7519#section-4.1.4>`_.
+  // For instance, this could implement JWT-SVID
+  // `expiration restrictions <https://github.com/spiffe/spiffe/blob/main/standards/JWT-SVID.md#33-expiration-time>`_.
+  // Unlike ``max_lifetime``, this only requires that expiration is present, where ``max_lifetime`` also checks the value.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //     require_expiration: true
+  //
+  bool require_expiration = 20;
+
+  // Restrict the maximum remaining lifetime of a credential from the JwtProvider. Credential lifetime
+  // is the difference between the current time and the expiration of the credential. For instance,
+  // the following example will reject credentials that have a lifetime longer than 24 hours. If not set,
+  // expiration checking still occurs, but there is no limit on credential lifetime. If set, takes precedence
+  // over ``require_expiration``.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //     max_lifetime:
+  //       seconds: 86400
+  //
+  google.protobuf.Duration max_lifetime = 21;
 
   // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
   // validate signature of a JWT. This field specifies where to fetch JWKS.

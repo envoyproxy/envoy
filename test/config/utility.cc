@@ -832,9 +832,10 @@ void ConfigHelper::setConnectConfig(
     match->mutable_connect_matcher();
   }
 
+  auto* upgrade = route->mutable_route()->add_upgrade_configs();
+  upgrade->set_upgrade_type("CONNECT");
+
   if (terminate_connect) {
-    auto* upgrade = route->mutable_route()->add_upgrade_configs();
-    upgrade->set_upgrade_type("CONNECT");
     auto* config = upgrade->mutable_connect_config();
     if (allow_post) {
       config->set_allow_post(true);
@@ -862,9 +863,11 @@ void ConfigHelper::setConnectUdpConfig(
   match->Clear();
   match->mutable_connect_matcher();
 
+  auto* upgrade = route->mutable_route()->add_upgrade_configs();
+  upgrade->set_upgrade_type("connect-udp");
+
   if (terminate_connect) {
-    auto* upgrade = route->mutable_route()->add_upgrade_configs();
-    upgrade->set_upgrade_type("connect-udp");
+    upgrade->mutable_connect_config();
   }
 
   hcm.add_upgrade_configs()->set_upgrade_type("connect-udp");
@@ -1748,8 +1751,8 @@ void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3::Cluster>& c
   }
   // Past the initial write, need move semantics to trigger inotify move event that the
   // FilesystemSubscriptionImpl is subscribed to.
-  std::string path =
-      TestEnvironment::writeStringToFileForTest("cds.update.pb_text", cds_response.DebugString());
+  std::string path = TestEnvironment::writeStringToFileForTest(
+      "cds.update.pb_text", MessageUtil::toTextProto(cds_response));
   TestEnvironment::renameFile(path, cds_path_);
 }
 
@@ -1770,8 +1773,8 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoa
   }
   // Past the initial write, need move semantics to trigger inotify move event that the
   // FilesystemSubscriptionImpl is subscribed to.
-  std::string path =
-      TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
+  std::string path = TestEnvironment::writeStringToFileForTest(
+      "eds.update.pb_text", MessageUtil::toTextProto(eds_response));
   TestEnvironment::renameFile(path, eds_path_);
 }
 

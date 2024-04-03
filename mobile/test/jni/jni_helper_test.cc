@@ -7,6 +7,45 @@
 // This file contains JNI implementation used by
 // `test/java/io/envoyproxy/envoymobile/jni/JniHelperTest.java` unit tests.
 
+extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getFieldId(
+    JNIEnv* env, jclass, jclass clazz, jstring name, jstring signature) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr name_ptr = jni_helper.getStringUtfChars(name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);
+  jni_helper.getFieldId(clazz, name_ptr.get(), sig_ptr.get());
+}
+
+#define DEFINE_JNI_GET_FIELD(JAVA_TYPE, JNI_TYPE)                                                  \
+  extern "C" JNIEXPORT JNI_TYPE JNICALL                                                            \
+      Java_io_envoyproxy_envoymobile_jni_JniHelperTest_get##JAVA_TYPE##Field(                      \
+          JNIEnv* env, jclass, jclass clazz, jobject object, jstring name, jstring signature) {    \
+    Envoy::JNI::JniHelper jni_helper(env);                                                         \
+    Envoy::JNI::StringUtfUniquePtr name_ptr = jni_helper.getStringUtfChars(name, nullptr);         \
+    Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);     \
+    jfieldID field_id = jni_helper.getFieldId(clazz, name_ptr.get(), sig_ptr.get());               \
+    return jni_helper.get##JAVA_TYPE##Field(object, field_id);                                     \
+  }
+
+DEFINE_JNI_GET_FIELD(Byte, jbyte)
+DEFINE_JNI_GET_FIELD(Char, jchar)
+DEFINE_JNI_GET_FIELD(Short, jshort)
+DEFINE_JNI_GET_FIELD(Int, jint)
+DEFINE_JNI_GET_FIELD(Long, jlong)
+DEFINE_JNI_GET_FIELD(Float, jfloat)
+DEFINE_JNI_GET_FIELD(Double, jdouble)
+DEFINE_JNI_GET_FIELD(Boolean, jboolean)
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getObjectField(JNIEnv* env, jclass, jclass clazz,
+                                                                jobject object, jstring name,
+                                                                jstring signature) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr name_ptr = jni_helper.getStringUtfChars(name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);
+  jfieldID field_id = jni_helper.getFieldId(clazz, name_ptr.get(), sig_ptr.get());
+  return jni_helper.getObjectField(object, field_id).release();
+}
+
 extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getMethodId(
     JNIEnv* env, jclass, jclass clazz, jstring name, jstring signature) {
   Envoy::JNI::JniHelper jni_helper(env);

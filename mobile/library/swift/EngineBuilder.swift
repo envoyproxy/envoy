@@ -138,7 +138,7 @@ open class EngineBuilder: NSObject {
   private var connectTimeoutSeconds: UInt32 = 30
   private var dnsFailureRefreshSecondsBase: UInt32 = 2
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
-  private var dnsQueryTimeoutSeconds: UInt32 = 25
+  private var dnsQueryTimeoutSeconds: UInt32 = 5
   private var dnsMinRefreshSeconds: UInt32 = 60
   private var dnsPreresolveHostnames: [String] = []
   private var dnsRefreshSeconds: UInt32 = 60

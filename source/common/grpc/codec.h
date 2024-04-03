@@ -128,8 +128,8 @@ public:
   // error happened, the input buffer remains unchanged.
   // @param input supplies the binary octets wrapped in a GRPC data frame.
   // @param output supplies the buffer to store the decoded data.
-  // @return bool whether the decoding succeeded or not.
-  bool decode(Buffer::Instance& input, std::vector<Frame>& output);
+  // @return absl::status whether the decoding succeeded or not.
+  absl::Status decode(Buffer::Instance& input, std::vector<Frame>& output);
 
   // Determine the length of the current frame being decoded. This is useful when supplying a
   // partial frame to decode() and wanting to know how many more bytes need to be read to complete

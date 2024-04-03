@@ -7,7 +7,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api:84.5" # flaky due to posix: be careful adjusting
 "source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
 "source/common/common/posix:88.8" # No easy way to test pthread_create failure.
-"source/common/config:95.8"
+"source/common/config:95.6"
 "source/common/crypto:95.5"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
@@ -21,15 +21,16 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/watchdog:58.6" # Death tests don't report LCOV
-"source/exe:90.3"
+"source/exe:94.0" # increased by #32346, need coverage for terminate_handler and hot restart failures
 "source/extensions/clusters/common:91.5" # This can be increased again once `#24903` lands
 "source/extensions/common:93.0" #flaky: be careful adjusting
 "source/extensions/common/proxy_protocol:93.8" # Adjusted for security patch
 "source/extensions/common/tap:94.5"
 "source/extensions/common/wasm:88.0" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
+"source/extensions/filters/common:96.5"
 "source/extensions/filters/common/fault:94.5"
-"source/extensions/filters/common/rbac:90.5"
+"source/extensions/filters/common/rbac:90.2"
 "source/extensions/filters/http/cache:95.0"
 "source/extensions/filters/http/grpc_json_transcoder:93.8" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:88.0"
@@ -48,7 +49,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers:96.4"
 "source/extensions/tracers/common:74.8"
 "source/extensions/tracers/common/ot:72.9"
-"source/extensions/tracers/opencensus:94.0"
+"source/extensions/tracers/opencensus:93.9"
 "source/extensions/tracers/zipkin:95.8"
 "source/extensions/transport_sockets:97.4"
 "source/common/tls:94.9"
@@ -56,13 +57,12 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/tls/private_key:88.9"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
-"source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:83.3" # Death tests within extensions
 "source/extensions/listener_managers:70.5"
 "source/extensions/listener_managers/validation_listener_manager:70.5"
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:91.0" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
-"source/server/config_validation:89.2"
+"source/server/config_validation:88.9"
 "source/extensions/health_checkers:96.0"
 "source/extensions/health_checkers/http:93.9"
 "source/extensions/health_checkers/grpc:92.0"

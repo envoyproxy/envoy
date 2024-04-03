@@ -191,6 +191,7 @@ envoy_cc_test_library(
         "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
     ],
@@ -223,6 +224,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
@@ -719,6 +721,7 @@ envoy_cc_test_library(
         ":zone_aware_load_balancer_fuzz_proto_cc_proto",
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:priority_set_mocks",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 

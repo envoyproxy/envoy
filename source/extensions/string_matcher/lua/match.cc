@@ -1,6 +1,7 @@
 #include "source/extensions/string_matcher/lua/match.h"
 
 #include "envoy/extensions/string_matcher/lua/v3/lua.pb.h"
+#include "envoy/extensions/string_matcher/lua/v3/lua.pb.validate.h"
 
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
@@ -77,12 +78,11 @@ bool LuaStringMatcher::match(const absl::string_view value) const {
 // Lua state is not thread safe, so a state needs to be stored in thread local storage.
 class LuaStringMatcherThreadWrapper : public Matchers::StringMatcher {
 public:
-  LuaStringMatcherThreadWrapper(const std::string& code) {
+  LuaStringMatcherThreadWrapper(const std::string& code, ThreadLocal::SlotAllocator& tls) {
     // Validate that there are no errors while creating on the main thread.
     LuaStringMatcher validator(code);
 
-    tls_slot_ = ThreadLocal::TypedSlot<LuaStringMatcher>::makeUnique(
-        *InjectableSingleton<ThreadLocal::SlotAllocator>::getExisting());
+    tls_slot_ = ThreadLocal::TypedSlot<LuaStringMatcher>::makeUnique(tls);
     tls_slot_->set([code](Event::Dispatcher&) -> std::shared_ptr<LuaStringMatcher> {
       return std::make_shared<LuaStringMatcher>(code);
     });
@@ -95,18 +95,19 @@ private:
 };
 
 Matchers::StringMatcherPtr
-LuaStringMatcherFactory::createStringMatcher(const ProtobufWkt::Any& message) {
-  ::envoy::extensions::string_matcher::lua::v3::Lua config;
-  Config::Utility::translateOpaqueConfig(message, ProtobufMessage::getStrictValidationVisitor(),
-                                         config);
-  Api::Api* api = InjectableSingleton<Api::Api>::getExisting();
+LuaStringMatcherFactory::createStringMatcher(const Protobuf::Message& untyped_config,
+                                             Server::Configuration::CommonFactoryContext& context) {
+  const auto& config =
+      MessageUtil::downcastAndValidate<const ::envoy::extensions::string_matcher::lua::v3::Lua&>(
+          untyped_config, context.messageValidationContext().staticValidationVisitor());
+
   absl::StatusOr<std::string> result = Config::DataSource::read(
-      config.source_code(), false /* allow_empty */, *api, 0 /* max_size */);
+      config.source_code(), false /* allow_empty */, context.api(), 0 /* max_size */);
   if (!result.ok()) {
     throw EnvoyException(
         fmt::format("Failed to get lua string matcher code from source: {}", result.status()));
   }
-  return std::make_unique<LuaStringMatcherThreadWrapper>(*result);
+  return std::make_unique<LuaStringMatcherThreadWrapper>(*result, context.threadLocal());
 }
 
 ProtobufTypes::MessagePtr LuaStringMatcherFactory::createEmptyConfigProto() {

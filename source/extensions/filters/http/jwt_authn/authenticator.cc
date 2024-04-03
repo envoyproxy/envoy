@@ -13,6 +13,7 @@
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_split.h"
+#include "absl/time/time.h"
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/struct_utils.h"
 #include "jwt_verify_lib/verify.h"
@@ -244,6 +245,18 @@ void AuthenticatorImpl::startVerify() {
   const bool sub_allowed = jwks_data_->isSubjectAllowed(jwt_->sub_);
 
   if (!sub_allowed) {
+    doneWithStatus(Status::JwtVerificationFail);
+    return;
+  }
+
+  absl::optional<absl::Time> exp;
+  if (jwt_->exp_) {
+    exp = absl::FromUnixSeconds(jwt_->exp_);
+  }
+  const bool exp_allowed = jwks_data_->isLifetimeAllowed(
+      absl::FromChrono(timeSource().systemTime()), exp ? &exp.value() : nullptr);
+
+  if (!exp_allowed) {
     doneWithStatus(Status::JwtVerificationFail);
     return;
   }
