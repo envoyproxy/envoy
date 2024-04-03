@@ -439,3 +439,13 @@ envoy_cc_library(
         "//envoy/http:query_params_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "clusters_renderer_lib",
+    hdrs = ["clusters_renderer.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/common:pure_lib",
+        "//envoy/upstream:cluster_manager_interface",
+    ],
+)
