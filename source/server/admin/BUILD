@@ -442,6 +442,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "clusters_renderer_lib",
+    srcs = ["clusters_renderer.cc"],
     hdrs = ["clusters_renderer.h"],
     deps = [
         "//envoy/buffer:buffer_interface",

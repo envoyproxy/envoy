@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
@@ -33,6 +34,7 @@ private:
   Buffer::Instance& response_;
   const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map_;
   const uint64_t chunk_limit_;
+  Upstream::ClusterManager::ClusterInfoMap::const_iterator it_;
 };
 
 class ClustersJsonRenderer : ClustersRenderer {
@@ -47,7 +49,8 @@ private:
 
   Buffer::Instance& response_;
   const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map_;
-  const uint16_t chunk_limit_;
+  const uint64_t chunk_limit_;
+  Upstream::ClusterManager::ClusterInfoMap::const_iterator it_;
 };
 
 } // namespace Server
