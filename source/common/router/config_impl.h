@@ -626,7 +626,8 @@ public:
   RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                      const envoy::config::route::v3::Route& route,
                      Server::Configuration::ServerFactoryContext& factory_context,
-                     ProtobufMessage::ValidationVisitor& validator);
+                     ProtobufMessage::ValidationVisitor& validator,
+                     absl::Status& creation_status);
 
   bool isDirectResponse() const { return direct_response_code_.has_value(); }
 
@@ -644,7 +645,7 @@ public:
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                   uint64_t random_value) const;
-  void validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
+  absl::Status validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -1238,11 +1239,6 @@ private:
  */
 class UriTemplateMatcherRouteEntryImpl : public RouteEntryImplBase {
 public:
-  UriTemplateMatcherRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
-                                   const envoy::config::route::v3::Route& route,
-                                   Server::Configuration::ServerFactoryContext& factory_context,
-                                   ProtobufMessage::ValidationVisitor& validator);
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return uri_template_; }
   PathMatchType matchType() const override { return PathMatchType::Template; }
@@ -1261,6 +1257,14 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
+  friend class RouteCreator;
+
+  UriTemplateMatcherRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
+                                   const envoy::config::route::v3::Route& route,
+                                   Server::Configuration::ServerFactoryContext& factory_context,
+                                   ProtobufMessage::ValidationVisitor& validator,
+                                   absl::Status& creation_status);
+
   const std::string uri_template_;
 };
 
@@ -1272,7 +1276,8 @@ public:
   PrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                        const envoy::config::route::v3::Route& route,
                        Server::Configuration::ServerFactoryContext& factory_context,
-                       ProtobufMessage::ValidationVisitor& validator);
+                       ProtobufMessage::ValidationVisitor& validator,
+                       absl::Status& creation_status);
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
@@ -1305,7 +1310,8 @@ public:
   PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                      const envoy::config::route::v3::Route& route,
                      Server::Configuration::ServerFactoryContext& factory_context,
-                     ProtobufMessage::ValidationVisitor& validator);
+                     ProtobufMessage::ValidationVisitor& validator,
+                     absl::Status& creation_status);
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
@@ -1338,7 +1344,8 @@ public:
   RegexRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                       const envoy::config::route::v3::Route& route,
                       Server::Configuration::ServerFactoryContext& factory_context,
-                      ProtobufMessage::ValidationVisitor& validator);
+                      ProtobufMessage::ValidationVisitor& validator,
+                      absl::Status& creation_status);
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
@@ -1372,7 +1379,8 @@ public:
   ConnectRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                         const envoy::config::route::v3::Route& route,
                         Server::Configuration::ServerFactoryContext& factory_context,
-                        ProtobufMessage::ValidationVisitor& validator);
+                        ProtobufMessage::ValidationVisitor& validator,
+                        absl::Status& creation_status);
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return EMPTY_STRING; }
@@ -1401,7 +1409,8 @@ public:
   PathSeparatedPrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                     const envoy::config::route::v3::Route& route,
                                     Server::Configuration::ServerFactoryContext& factory_context,
-                                    ProtobufMessage::ValidationVisitor& validator);
+                                    ProtobufMessage::ValidationVisitor& validator,
+                                    absl::Status& creation_status);
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
