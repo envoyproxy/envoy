@@ -1875,7 +1875,6 @@ TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
 
 struct FrameIntegrationTestParam {
   Network::Address::IpVersion ip_version;
-  Http2Impl http2_implementation;
 };
 
 std::string
@@ -1891,8 +1890,7 @@ public:
   static std::vector<FrameIntegrationTestParam> testParams() {
     std::vector<FrameIntegrationTestParam> v;
     for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-      v.push_back({ip_version, Http2Impl::Nghttp2});
-      v.push_back({ip_version, Http2Impl::Oghttp2});
+      v.push_back({ip_version});
     }
     return v;
   }
@@ -2188,9 +2186,7 @@ TEST_P(Http2FrameIntegrationTest, HostConcatenatedWithAuthorityWithOverride) {
 TEST_P(Http2FrameIntegrationTest, HostBeforeAuthorityIsRejected) {
 #ifdef ENVOY_ENABLE_UHV
   // TODO(yanavlasov): fix this check for oghttp2 in UHV mode.
-  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
-    return;
-  }
+  return;
 #endif
   beginSession();
 
