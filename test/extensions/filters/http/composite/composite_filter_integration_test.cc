@@ -234,6 +234,40 @@ resources:
                                  downstream_filter_);
   }
 
+  void prependCompositeFilterServerFactoryContext(const std::string& name = "composite") {
+    config_helper_.prependFilter(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        xds_matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      typed_config:
+                        name: server-factory-context-filter
+                        typed_config:
+                          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigServerContext
+                          code: 403
+    )EOF",
+                                                 name),
+                                 downstream_filter_);
+  }
+
+
   const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "GET"},
                                                                  {":path", "/somepath"},
                                                                  {":scheme", "http"},
@@ -456,6 +490,22 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcherMultipleFilters) 
   auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
+}
+
+// Verifies the filter can be created with server factory context in both downstream and upstream.
+TEST_P(CompositeFilterIntegrationTest, TestCreateFilterWithServerFactoryContext) {
+  prependCompositeFilterServerFactoryContext();
+  if (!downstream_filter_) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
+  }
 }
 
 } // namespace

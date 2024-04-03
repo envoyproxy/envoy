@@ -382,7 +382,7 @@ TEST(ConfigTest, TestDualServerContextStaticConfig) {
       typed_config:
         name: composite-action
         typed_config:
-          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigServerContext
+          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigDual
           code: 403
   )EOF";
 
