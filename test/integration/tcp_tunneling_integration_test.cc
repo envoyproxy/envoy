@@ -8,6 +8,7 @@
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/integration/tcp_tunneling_integration.h"
 
 #include "gtest/gtest.h"
 
@@ -716,7 +717,7 @@ TEST_P(ProxyingConnectIntegrationTest, 2xxStatusCode) {
 }
 
 // Tunneling downstream TCP over an upstream HTTP CONNECT tunnel.
-class TcpTunnelingIntegrationTest : public HttpProtocolIntegrationTest {
+class TcpTunnelingIntegrationTest : public BaseTcpTunnelingIntegrationTest {
 public:
   void SetUp() override {
     enableHalfClose(true);
@@ -739,7 +740,7 @@ public:
           filter->mutable_typed_config()->PackFrom(proxy_config);
           filter->set_name("envoy.filters.network.tcp_proxy");
         });
-    HttpProtocolIntegrationTest::SetUp();
+    BaseTcpTunnelingIntegrationTest::SetUp();
   }
 
   void setUpConnection(FakeHttpConnectionPtr& fake_upstream_connection) {
@@ -1842,9 +1843,9 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
 
 INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+    testing::ValuesIn(BaseTcpTunnelingIntegrationTest::getProtocolTestParams(
         {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3},
         {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3})),
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
+    BaseTcpTunnelingIntegrationTest::protocolTestParamsToString);
 } // namespace
 } // namespace Envoy

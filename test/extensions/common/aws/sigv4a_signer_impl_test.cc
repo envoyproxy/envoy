@@ -92,10 +92,10 @@ public:
     }
 
     std::string short_date = "20180102";
-    std::string credential_scope = fmt::format(fmt::runtime("{}/service/aws4_request"), short_date);
+    std::string credential_scope = fmt::format("{}/service/aws4_request", short_date);
     std::string long_date = "20180102T030400Z";
     std::string string_to_sign =
-        fmt::format(fmt::runtime(SigV4ASignatureConstants::SigV4AStringToSignFormat),
+        fmt::format(SigV4ASignatureConstants::SigV4AStringToSignFormat,
                     SigV4ASignatureConstants::SigV4AAlgorithm, long_date, credential_scope,
                     Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
     auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));

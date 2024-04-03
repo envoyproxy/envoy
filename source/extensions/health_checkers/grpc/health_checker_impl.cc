@@ -135,7 +135,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeData(Buffer::Ins
   }
   // We should end up with only one frame here.
   std::vector<Grpc::Frame> decoded_frames;
-  if (!decoder_.decode(data, decoded_frames)) {
+  if (!decoder_.decode(data, decoded_frames).ok()) {
     onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "gRPC wire protocol decode error",
                   false);
     return;

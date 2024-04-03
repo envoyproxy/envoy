@@ -11,7 +11,7 @@
 namespace Envoy {
 #define BACKTRACE_LOG()                                                                            \
   do {                                                                                             \
-    BackwardsTrace t;                                                                              \
+    ::Envoy::BackwardsTrace t;                                                                     \
     t.capture();                                                                                   \
     t.logTrace();                                                                                  \
   } while (0)
@@ -37,6 +37,26 @@ namespace Envoy {
 class BackwardsTrace : Logger::Loggable<Logger::Id::backtrace> {
 public:
   BackwardsTrace() = default;
+
+  /**
+   * Attempts to get the memory offsets of the current process, so the
+   * stack trace addresses can be mapped to line numbers even after the
+   * process is not running.
+   *
+   * This acts as a global singleton since it will be the same values for
+   * the duration of an execution - as such, it should be called once
+   * during startup, to avoid performing the lookup during the
+   * crash process.
+   *
+   * @return a string representing the memory offset from `ASLR` of the
+   * current process, or an empty string if the information is not
+   * available.
+   * The format of this line is
+   *   `[start_addr]-[end_addr] [path_to_binary]`
+   * e.g.
+   *   `7d34c0e28000-7d34c1e0d000 /build/foo/bar/source/exe/envoy-static`
+   */
+  static const std::string& addrMapping(bool setup = false);
 
   /**
    * Directs the output of logTrace() to directly stderr rather than the
@@ -90,6 +110,9 @@ public:
 
     ENVOY_LOG(critical, "Backtrace (use tools/stack_decode.py to get line numbers):");
     ENVOY_LOG(critical, "Envoy version: {}", VersionInfo::version());
+    if (!addrMapping().empty()) {
+      ENVOY_LOG(critical, "Address mapping: {}", addrMapping());
+    }
 
     visitTrace([](int index, const char* symbol, void* address) {
       if (symbol != nullptr) {

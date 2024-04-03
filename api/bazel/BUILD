@@ -1,13 +1,13 @@
 load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@io_bazel_rules_go//proto:compiler.bzl", "go_proto_compiler")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
-load(":repository_locations_utils.bzl", "load_repository_locations_spec")
 load(
     ":external_proto_deps.bzl",
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
     "EXTERNAL_PROTO_GO_BAZEL_DEP_MAP",
     "EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP",
 )
+load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+load(":repository_locations_utils.bzl", "load_repository_locations_spec")
 
 licenses(["notice"])  # Apache 2
 

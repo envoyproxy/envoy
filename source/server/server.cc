@@ -363,24 +363,18 @@ absl::Status InstanceUtil::loadBootstrapConfig(
   }
 
   if (!config_path.empty()) {
-#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
-#else
-    if (!config_path.empty()) {
-      return absl::InvalidArgumentError("Cannot load from file with YAML disabled\n");
-    }
-    UNREFERENCED_PARAMETER(api);
-#endif
   }
   if (!config_yaml.empty()) {
-#ifdef ENVOY_ENABLE_YAML
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
+#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
-    bootstrap.MergeFrom(bootstrap_override);
 #else
-    return absl::InvalidArgumentError("Cannot load from YAML with YAML disabled\n");
+    // Treat the yaml as proto
+    Protobuf::TextFormat::ParseFromString(config_yaml, &bootstrap_override);
 #endif
+    bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSizeLong() != 0) {
     bootstrap.MergeFrom(config_proto);
@@ -1073,9 +1067,15 @@ InstanceBase::registerCallback(Stage stage, StageCallbackWithCompletion callback
 
 void InstanceBase::notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  const auto it = stage_callbacks_.find(stage);
-  if (it != stage_callbacks_.end()) {
-    for (const StageCallback& callback : it->second) {
+  const auto stage_it = stage_callbacks_.find(stage);
+  if (stage_it != stage_callbacks_.end()) {
+    LifecycleNotifierCallbacks& callbacks = stage_it->second;
+    for (auto callback_it = callbacks.begin(); callback_it != callbacks.end();) {
+      StageCallback callback = *callback_it;
+      // Increment the iterator before invoking the callback in case the
+      // callback deletes the handle which will unregister itself and
+      // invalidate this iterator if we're still pointing at it.
+      ++callback_it;
       callback();
     }
   }

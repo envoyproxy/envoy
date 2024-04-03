@@ -66,8 +66,8 @@ Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
   UserMap users = readHtpasswd(THROW_OR_RETURN_VALUE(
       Config::DataSource::read(proto_config.users(), false, context.serverFactoryContext().api()),
       std::string));
-  FilterConfigConstSharedPtr config =
-      std::make_unique<FilterConfig>(std::move(users), stats_prefix, context.scope());
+  FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
+      std::move(users), proto_config.forward_username_header(), stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<BasicAuthFilter>(config));
   };

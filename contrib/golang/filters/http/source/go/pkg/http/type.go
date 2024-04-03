@@ -182,6 +182,18 @@ func (h *requestHeaderMapImpl) Host() string {
 	return v
 }
 
+func (h *requestHeaderMapImpl) SetMethod(method string) {
+	h.Set(":method", method)
+}
+
+func (h *requestHeaderMapImpl) SetPath(path string) {
+	h.Set(":path", path)
+}
+
+func (h *requestHeaderMapImpl) SetHost(host string) {
+	h.Set(":authority", host)
+}
+
 // api.ResponseHeaderMap
 type responseHeaderMapImpl struct {
 	requestOrResponseHeaderMapImpl

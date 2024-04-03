@@ -43,7 +43,11 @@ public class AndroidEngineSocketTagTest {
     CountDownLatch latch = new CountDownLatch(1);
     Context appContext = ApplicationProvider.getApplicationContext();
     engine = new AndroidEngineBuilder(appContext)
-                 .addLogLevel(LogLevel.OFF)
+                 .addLogLevel(LogLevel.DEBUG)
+                 .setLogger((level, message) -> {
+                   System.out.print(message);
+                   return null;
+                 })
                  .enableSocketTagging(true)
                  .setOnEngineRunning(() -> {
                    latch.countDown();

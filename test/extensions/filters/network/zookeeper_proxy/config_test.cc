@@ -53,7 +53,9 @@ latency_threshold_overrides:)EOF";
 
 TEST_F(ZookeeperFilterConfigTest, ValidateFail) {
   EXPECT_THROW_WITH_REGEX(
-      ZooKeeperConfigFactory().createFilterFactoryFromProto(ZooKeeperProxyProtoConfig(), context_),
+      ZooKeeperConfigFactory()
+          .createFilterFactoryFromProto(ZooKeeperProxyProtoConfig(), context_)
+          .IgnoreError(),
       ProtoValidationException,
       "Proto constraint validation failed \\(ZooKeeperProxyValidationError.StatPrefix: value "
       "length must be at least 1 characters\\)");
@@ -166,7 +168,7 @@ latency_threshold_overrides:
 
   TestUtility::loadFromYamlAndValidate(yaml, proto_config_);
   EXPECT_THROW_WITH_REGEX(
-      ZooKeeperConfigFactory().createFilterFactoryFromProto(proto_config_, context_),
+      ZooKeeperConfigFactory().createFilterFactoryFromProto(proto_config_, context_).IgnoreError(),
       EnvoyException, "Duplicated opcode find in config");
 }
 
@@ -186,7 +188,8 @@ stat_prefix: test_prefix
             ProtobufWkt::util::TimeUtil::SecondsToDuration(0));
   EXPECT_EQ(proto_config_.latency_threshold_overrides_size(), 0);
 
-  Network::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(proto_config_, context_);
+  Network::FilterFactoryCb cb =
+      factory_.createFilterFactoryFromProto(proto_config_, context_).value();
   EXPECT_CALL(connection_, addFilter(_));
   cb(connection_);
 }
@@ -208,7 +211,8 @@ default_latency_threshold: "0.15s"
             ProtobufWkt::util::TimeUtil::MillisecondsToDuration(150));
   EXPECT_EQ(proto_config_.latency_threshold_overrides_size(), 0);
 
-  Network::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(proto_config_, context_);
+  Network::FilterFactoryCb cb =
+      factory_.createFilterFactoryFromProto(proto_config_, context_).value();
   EXPECT_CALL(connection_, addFilter(_));
   cb(connection_);
 }
@@ -236,7 +240,8 @@ latency_threshold_overrides:
   EXPECT_EQ(threshold_override.threshold(),
             ProtobufWkt::util::TimeUtil::MillisecondsToDuration(151));
 
-  Network::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(proto_config_, context_);
+  Network::FilterFactoryCb cb =
+      factory_.createFilterFactoryFromProto(proto_config_, context_).value();
   EXPECT_CALL(connection_, addFilter(_));
   cb(connection_);
 }
@@ -268,7 +273,8 @@ TEST_F(ZookeeperFilterConfigTest, FullConfig) {
               ProtobufWkt::util::TimeUtil::MillisecondsToDuration(150 + threshold_delta));
   }
 
-  Network::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(proto_config_, context_);
+  Network::FilterFactoryCb cb =
+      factory_.createFilterFactoryFromProto(proto_config_, context_).value();
   EXPECT_CALL(connection_, addFilter(_));
   cb(connection_);
 }
