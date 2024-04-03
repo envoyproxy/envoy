@@ -23,9 +23,9 @@ public:
   static constexpr CommandSyntaxFlags PARAMS_OPTIONAL = 1 << 1;
   static constexpr CommandSyntaxFlags LENGTH_ALLOWED = 1 << 2;
 
-  static void verifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags,
-                           const std::string& command, const std::string& subcommand,
-                           const absl::optional<size_t>& length);
+  static absl::Status verifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags,
+                                   const std::string& command, const std::string& subcommand,
+                                   const absl::optional<size_t>& length);
 };
 
 /**
