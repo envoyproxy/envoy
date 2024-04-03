@@ -25,7 +25,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   }
 
   if (composite_action.has_dynamic_config()) {
-    if (!context.is_downstream) {
+    if (!context.is_downstream_) {
       throw EnvoyException(fmt::format("When composite filter is in upstream, the composite action "
                                        "config must not be dynamic."));
     }
@@ -58,7 +58,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     };
   }
 
-  if (context.is_downstream) {
+  if (context.is_downstream_) {
     return createActionFactoryCbTyped<Server::Configuration::FactoryContext,
                                       Server::Configuration::NamedHttpFilterConfigFactory>(
         composite_action, context, validation_visitor, context.factory_context_);

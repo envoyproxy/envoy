@@ -68,7 +68,7 @@ using HttpMatchingDataImplSharedPtr = std::shared_ptr<HttpMatchingDataImpl>;
 
 struct HttpFilterActionContext {
   // Identify whether the filter is in downstream filter chain or upstream filter chain.
-  const bool is_downstream = true;
+  const bool is_downstream_ = true;
   const std::string& stat_prefix_;
   OptRef<Server::Configuration::FactoryContext> factory_context_;
   OptRef<Server::Configuration::UpstreamFactoryContext> upstream_factory_context_;

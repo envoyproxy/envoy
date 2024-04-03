@@ -328,7 +328,11 @@ TEST(ConfigTest, TestConfig) {
   testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
   for (bool is_downstream : {false, true}) {
     Envoy::Http::Matching::HttpFilterActionContext action_context{
-        is_downstream, "test", factory_context, upstream_factory_context, server_factory_context};
+        .is_downstream_ = is_downstream,
+        .stat_prefix_ = "test",
+        .factory_context_ = factory_context,
+        .upstream_factory_context_ = upstream_factory_context,
+        .server_factory_context_ = server_factory_context};
     ExecuteFilterActionFactory factory;
     EXPECT_THROW_WITH_MESSAGE(
         factory.createActionFactoryCb(config, action_context,
@@ -357,7 +361,11 @@ TEST(ConfigTest, TestDynamicConfigInUpstream) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
   Envoy::Http::Matching::HttpFilterActionContext action_context{
-      false, "test", factory_context, upstream_factory_context, server_factory_context};
+      .is_downstream_ = false,
+      .stat_prefix_ = "test",
+      .factory_context_ = factory_context,
+      .upstream_factory_context_ = upstream_factory_context,
+      .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createActionFactoryCb(config, action_context,
@@ -383,7 +391,11 @@ TEST(ConfigTest, TestDualServerContextStaticConfig) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   for (bool is_downstream : {false, true}) {
     Envoy::Http::Matching::HttpFilterActionContext action_context{
-        is_downstream, "test", absl::nullopt, absl::nullopt, server_factory_context};
+        .is_downstream_ = is_downstream,
+        .stat_prefix_ = "test",
+        .factory_context_ = absl::nullopt,
+        .upstream_factory_context_ = absl::nullopt,
+        .server_factory_context_ = server_factory_context};
     ExecuteFilterActionFactory factory;
     EXPECT_THROW_WITH_MESSAGE(
         factory.createActionFactoryCb(config, action_context,
@@ -408,7 +420,11 @@ TEST(ConfigTest, TestDownstreamServerContextStaticConfig) {
   TestUtility::loadFromYaml(yaml_string, config);
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   Envoy::Http::Matching::HttpFilterActionContext action_context{
-      true, "test", absl::nullopt, absl::nullopt, server_factory_context};
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createActionFactoryCb(config, action_context,
@@ -435,7 +451,11 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConf
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
   Envoy::Http::Matching::HttpFilterActionContext action_context{
-      true, "test", factory_context, upstream_factory_context, server_factory_context};
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = factory_context,
+      .upstream_factory_context_ = upstream_factory_context,
+      .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   auto action = factory.createActionFactoryCb(config, action_context,
                                               ProtobufMessage::getStrictValidationVisitor())();
@@ -462,7 +482,11 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForTypedConfig
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
   Envoy::Http::Matching::HttpFilterActionContext action_context{
-      true, "test", factory_context, upstream_factory_context, server_factory_context};
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = factory_context,
+      .upstream_factory_context_ = upstream_factory_context,
+      .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   auto action = factory.createActionFactoryCb(config, action_context,
                                               ProtobufMessage::getStrictValidationVisitor())();
