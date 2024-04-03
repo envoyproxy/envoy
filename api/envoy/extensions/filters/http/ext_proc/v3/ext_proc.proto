@@ -208,10 +208,12 @@ message ExternalProcessor {
   //
   // 1. Only STREAMED body processing mode is supported and any other body processing modes will be
   // ignored. NONE mode(i.e., skip body processing) will still work as expected.
+  //
   // 2. External processor should not send back processing response, as any responses will be ignored.
   // This also means that
   // :ref:`message_timeout <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.message_timeout>`
   // restriction doesn't apply to this mode.
+  //
   // 3. External processor may still close the stream to indicate that no more messages are needed.
   //
   // .. warning::
