@@ -7,8 +7,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/container/flat_hash_map.h"
-#include <algorithm>
-#include <memory>
 
 namespace Envoy {
 namespace Extensions {
