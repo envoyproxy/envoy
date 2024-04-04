@@ -1334,6 +1334,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
+        "//source/extensions/filters/http/match_delegate:config",
         "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
@@ -1579,6 +1580,7 @@ envoy_cc_test(
     srcs = ["extension_discovery_integration_test.cc"],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/filters/http/match_delegate:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
         "//test/integration/filters:set_is_terminal_filter_config_proto_cc_proto",

@@ -1,4 +1,4 @@
-#include "source/common/http/match_delegate/config.h"
+#include "source/extensions/filters/http/match_delegate/config.h"
 
 #include <memory>
 
