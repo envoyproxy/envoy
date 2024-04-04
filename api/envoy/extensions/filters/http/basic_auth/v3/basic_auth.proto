@@ -8,8 +8,6 @@ import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-import "validate/validate.proto";
-
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.basic_auth.v3";
 option java_outer_classname = "BasicAuthProto";
 option java_multiple_files = true;

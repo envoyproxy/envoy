@@ -153,6 +153,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, NoneExistedUser) {
 TEST_P(BasicAuthIntegrationTestAllProtocols, ExistingUsernameHeader) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
+
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
@@ -168,7 +169,6 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, ExistingUsernameHeader) {
   EXPECT_FALSE(username_entry.empty());
   EXPECT_EQ(username_entry[0]->value().getStringView(), "user1");
 
-  waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
