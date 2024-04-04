@@ -72,7 +72,7 @@ TEST_F(DatadogTracerTest, Breathing) {
   // Verify that constructing a `Tracer` instance with mocked dependencies
   // does not throw exceptions.
   datadog::tracing::TracerConfig config;
-  config.defaults.service = "envoy";
+  config.service = "envoy";
   config.report_traces = false;
   config.report_telemetry = false;
 
@@ -84,7 +84,7 @@ TEST_F(DatadogTracerTest, NoOpMode) {
   // Verify that when the tracer fails to validate its configuration,
   // `startSpan` subsequently returns `NullSpan` instances.
   datadog::tracing::TracerConfig config;
-  config.defaults.service = "envoy";
+  config.service = "envoy";
   config.report_traces = false;
   config.report_telemetry = false;
   datadog::tracing::TraceSamplerConfig::Rule invalid_rule;
@@ -119,7 +119,7 @@ TEST_F(DatadogTracerTest, SpanProperties) {
   // Verify that span-affecting parameters to `startSpan` are reflected in the
   // resulting span.
   datadog::tracing::TracerConfig config;
-  config.defaults.service = "envoy";
+  config.service = "envoy";
   config.report_traces = false;
   config.report_telemetry = false;
   // Configure the tracer to keep all spans. We then override that
@@ -170,7 +170,7 @@ TEST_F(DatadogTracerTest, ExtractionSuccess) {
   // `TraceContext` supplied to `startSpan`, that the resulting span is part of
   // the extracted trace.
   datadog::tracing::TracerConfig config;
-  config.defaults.service = "envoy";
+  config.service = "envoy";
   config.report_traces = false;
   config.report_telemetry = false;
 
@@ -211,7 +211,7 @@ TEST_F(DatadogTracerTest, ExtractionFailure) {
   // supplied to `startSpan`, that the resulting span is nonetheless valid (it
   // will be the start of a new trace).
   datadog::tracing::TracerConfig config;
-  config.defaults.service = "envoy";
+  config.service = "envoy";
   config.report_traces = false;
   config.report_telemetry = false;
 
@@ -320,7 +320,7 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
 
     EnvVarGuard guard{"DD_TRACE_PROPAGATION_STYLE", style_name};
     datadog::tracing::TracerConfig config;
-    config.defaults.service = "envoy";
+    config.service = "envoy";
     config.report_traces = false;
     config.report_telemetry = false;
     Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
