@@ -300,10 +300,11 @@ AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
 
 void AsyncRequestImpl::initialize() {
   Tracing::HttpTraceContext trace_context(request_->headers());
-  Tracing::UpstreamContext upstream_context{.host_ = nullptr,
-                                            .cluster_info_ = parent_.cluster_,
-                                            .service_type_ = Tracing::ServiceType::Http,
-                                            .is_side_stream_ = true};
+  Tracing::UpstreamContext upstream_context(nullptr,                    // host_
+                                            parent_.cluster_,           // cluster_info_
+                                            Tracing::ServiceType::Http, // service_type_
+                                            true                        // is_side_stream_
+  );
   child_span_->injectContext(trace_context, upstream_context);
   sendHeaders(request_->headers(), request_->body().length() == 0);
   if (request_->body().length() != 0) {
@@ -316,10 +317,11 @@ void AsyncRequestImpl::initialize() {
 
 void AsyncOngoingRequestImpl::initialize() {
   Tracing::HttpTraceContext trace_context(*request_headers_);
-  Tracing::UpstreamContext upstream_context{.host_ = nullptr,
-                                            .cluster_info_ = parent_.cluster_,
-                                            .service_type_ = Tracing::ServiceType::Http,
-                                            .is_side_stream_ = true};
+  Tracing::UpstreamContext upstream_context(nullptr,                    // host_
+                                            parent_.cluster_,           // cluster_info_
+                                            Tracing::ServiceType::Http, // service_type_
+                                            true                        // is_side_stream_
+  );
   child_span_->injectContext(trace_context, upstream_context);
   sendHeaders(*request_headers_, false);
 }

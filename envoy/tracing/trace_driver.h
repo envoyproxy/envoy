@@ -29,7 +29,12 @@ enum class ServiceType {
 };
 
 struct UpstreamContext {
-  Upstream::HostDescriptionConstSharedPtr host_{nullptr};
+  UpstreamContext(const Upstream::HostDescriptionConstSharedPtr& host = nullptr,
+                  const Upstream::ClusterInfoConstSharedPtr& cluster_info = nullptr,
+                  const Tracing::ServiceType service_type = Tracing::ServiceType::Http,
+                  const bool is_side_stream = false)
+      : host_(host), cluster_info_(cluster_info) service_type_(service_type),
+        is_side_stream_(is_side_stream) Upstream::HostDescriptionConstSharedPtr host_{nullptr};
   Upstream::ClusterInfoConstSharedPtr cluster_info_{nullptr};
   ServiceType service_type_ = ServiceType::Unknown;
   bool is_side_stream_ = false;
@@ -72,7 +77,7 @@ public:
    * Mutate the provided headers with the context necessary to propagate this
    * (implementation-specific) trace.
    * @param request_headers the headers to which propagation context will be added
-   * @param upstream connecting host description
+   * @param upstream upstream context info
    */
   virtual void injectContext(TraceContext& trace_conext, const UpstreamContext& upstream) PURE;
 

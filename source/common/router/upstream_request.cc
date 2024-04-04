@@ -115,11 +115,12 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       parent_.callbacks()->streamInfo().upstreamClusterInfo();
 
   Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
-  Tracing::UpstreamContext upstream_context{
-      .host_ = upstream_host,
-      .cluster_info_ = cluster_info.has_value() ? cluster_info.value() : nullptr,
-      .service_type_ = Tracing::ServiceType::Http,
-      .is_side_stream_ = true};
+  Tracing::UpstreamContext upstream_context(upstream_host, // host_
+                                            cluster_info.has_value() ? cluster_info.value()
+                                                                     : nullptr, // cluster_info_
+                                            Tracing::ServiceType::Http,         // service_type_
+                                            true                                // is_side_stream_
+  );
 
   if (span_ != nullptr) {
     span_->injectContext(trace_context, upstream_context);
