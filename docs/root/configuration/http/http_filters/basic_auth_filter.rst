@@ -26,10 +26,14 @@ An example configuration of the filter may look like the following:
 
 .. code-block:: yaml
 
-  users:
-    inline_string: |-
-        user1:{SHA}hashed_user1_password
-        user2:{SHA}hashed_user2_password
+  http_filters:
+  - name: envoy.filters.http.basic_auth
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuth
+      users:
+        inline_string: |-
+          user1:{SHA}hashed_user1_password
+          user2:{SHA}hashed_user2_password
 
 Note that only SHA format is currently supported. Other formats may be added in the future.
 
