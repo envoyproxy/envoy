@@ -1,28 +1,18 @@
-date: Pending
+date: April 4, 2024
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: http
   change: |
     Remove the hop by hop TE header from downstream request headers if it's not set to ``trailers``, else keep it. This change can be
     temporarily reverted by setting ``envoy.reloadable_features.sanitize_te`` to false.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: http2
   change: |
     Simplifies integration with the codec by removing translation between nghttp2 callbacks and Http2VisitorInterface events.
     Guarded by ``envoy.reloadable_features.http2_skip_callback_visitor``.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: http2
   change: |
     Update nghttp2 to resolve (CVE-2024-30255 https://github.com/envoyproxy/envoy/security/advisories/GHSA-j654-3ccm-vfmm).
-
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-new_features:
-
-deprecated:
