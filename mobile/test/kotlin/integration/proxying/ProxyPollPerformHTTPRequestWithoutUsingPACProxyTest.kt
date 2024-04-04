@@ -72,6 +72,7 @@ class ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest {
     val engine =
       builder
         .addLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .enableProxying(true)
         .setOnEngineRunning { onEngineRunningLatch.countDown() }
         .build()

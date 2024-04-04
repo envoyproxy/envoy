@@ -110,7 +110,6 @@ class MatchDelegateConfig
       public Server::Configuration::NamedHttpFilterConfigFactory,
       public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
-  // TODO(wbpcode): move this filter to 'source/extensions/filters/http'.
   MatchDelegateConfig()
       : CommonFactoryBase<envoy::extensions::common::matching::v3::ExtensionWithMatcher,
                           envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>(

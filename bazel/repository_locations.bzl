@@ -84,11 +84,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Bazel rules for fuzz tests",
         project_url = "https://github.com/bazelbuild/rules_fuzzing",
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
-        version = "0.5.1",
-        sha256 = "7528a59df503e18797ca601095e69ffe880de42610429f9168e75a96b7d9a25a",
+        version = "0.4.1",
+        sha256 = "f6f3f42c48576acd5653bf07637deee2ae4ebb77ccdb0dacc67c184508bedc8c",
         strip_prefix = "rules_fuzzing-{version}",
         urls = ["https://github.com/bazelbuild/rules_fuzzing/archive/v{version}.tar.gz"],
-        release_date = "2024-03-27",
+        release_date = "2023-10-19",
         use_category = ["test_only"],
         implied_untracked_deps = [
             # This is a repository rule generated to define an OSS-Fuzz fuzzing
@@ -780,7 +780,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.compression.zstd.compressor",
             "envoy.compression.zstd.decompressor",
         ],
-        release_date = "2024-03-27",
+        release_date = "2024-03-30",
         cpe = "cpe:2.3:a:facebook:zstandard:*",
     ),
     com_github_zlib_ng_zlib_ng = dict(
@@ -1025,11 +1025,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Rules for using foreign build systems in Bazel",
         project_desc = "Rules for using foreign build systems in Bazel",
         project_url = "https://github.com/bazelbuild/rules_foreign_cc",
-        version = "0.9.0",
-        sha256 = "2a4d07cd64b0719b39a7c12218a3e507672b82a97b98c6a89d38565894cf7c51",
+        version = "0.10.1",
+        sha256 = "476303bd0f1b04cc311fc258f1708a5f6ef82d3091e53fd1977fa20383425a6a",
         strip_prefix = "rules_foreign_cc-{version}",
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/{version}.tar.gz"],
-        release_date = "2022-08-02",
+        release_date = "2023-10-25",
         use_category = ["build", "dataplane_core", "controlplane"],
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_foreign_cc/blob/{version}/LICENSE",

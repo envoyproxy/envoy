@@ -1256,9 +1256,11 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            // We are actively deferring to the parent span's sampled state.
+            EXPECT_FALSE(options.sampled_.has_value());
             const Http::TestRequestHeaderMapImpl expected_headers{
                 {":path", "/"}, {":method", "GET"}, {":authority", "foo"}};
             EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
@@ -1627,7 +1629,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
-// HTTP request flow with timeout and sampled flag in options.
+// HTTP request flow with timeout and invalid flag in options.
 TEST_F(LuaHttpFilterTest, HttpCallWithInvalidOption) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)

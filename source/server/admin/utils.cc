@@ -24,13 +24,14 @@ void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& h
                           Http::Headers::get().XContentTypeOptionValues.Nosniff);
 }
 
-// Helper method to get the histogram_buckets parameter. Returns false if histogram_buckets query
-// param is found and value is not "cumulative" or "disjoint", true otherwise.
+// Helper method to get the histogram_buckets parameter. Returns an InvalidArgumentError
+// if histogram_buckets query param is found and value is not "cumulative" or "disjoint",
+// Ok otherwise.
 absl::Status histogramBucketsParam(const Http::Utility::QueryParamsMulti& params,
                                    HistogramBucketsMode& histogram_buckets_mode) {
   absl::optional<std::string> histogram_buckets_query_param =
       nonEmptyQueryParam(params, "histogram_buckets");
-  histogram_buckets_mode = HistogramBucketsMode::NoBuckets;
+  histogram_buckets_mode = HistogramBucketsMode::Unset;
   if (histogram_buckets_query_param.has_value()) {
     if (histogram_buckets_query_param.value() == "cumulative") {
       histogram_buckets_mode = HistogramBucketsMode::Cumulative;
@@ -38,9 +39,13 @@ absl::Status histogramBucketsParam(const Http::Utility::QueryParamsMulti& params
       histogram_buckets_mode = HistogramBucketsMode::Disjoint;
     } else if (histogram_buckets_query_param.value() == "detailed") {
       histogram_buckets_mode = HistogramBucketsMode::Detailed;
-    } else if (histogram_buckets_query_param.value() != "none") {
+      // "none" is a synonym for "summary", and exists to maintain backwards compatibility
+    } else if (histogram_buckets_query_param.value() == "summary" ||
+               histogram_buckets_query_param.value() == "none") {
+      histogram_buckets_mode = HistogramBucketsMode::Summary;
+    } else {
       return absl::InvalidArgumentError(
-          "usage: /stats?histogram_buckets=(cumulative|disjoint|none)\n");
+          "usage: /stats?histogram_buckets=(cumulative|disjoint|detailed|summary)\n");
     }
   }
   return absl::OkStatus();

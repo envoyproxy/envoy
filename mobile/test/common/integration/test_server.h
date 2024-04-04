@@ -83,11 +83,12 @@ public:
                          absl::string_view response_body);
 
   /**
-   * Sets the response headers and body for the test server to return on all future request.
-   * Can only be called once the server has been started.
+   * Sets the response headers, body, and trailers for the test server to return
+   * on all future request. Can only be called once the server has been started.
    */
   void setResponse(const absl::flat_hash_map<std::string, std::string>& headers,
-                   absl::string_view body);
+                   absl::string_view body,
+                   const absl::flat_hash_map<std::string, std::string>& trailers);
 
   // ListenerHooks
   void onWorkerListenerAdded() override {}
