@@ -13,6 +13,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http2
+  change: |
+    Update nghttp2 to resolve CVE-2024-30255 (https://github.com/envoyproxy/envoy/security/advisories/GHSA-j654-3ccm-vfmm).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
