@@ -15,6 +15,27 @@ class Span;
 using SpanPtr = std::unique_ptr<Span>;
 
 /**
+ * The peer sevice type.
+ */
+enum class ServiceType {
+  // Service type is unknown.
+  Unknown,
+  // Service is treated as HTTP.
+  Http,
+  // Service is treated as GoogleGrpc.
+  GoogleGrpc,
+  // Service is treated as EnvoyGrpc.
+  EnvoyGrpc
+};
+
+struct UpstreamContext {
+  Upstream::HostDescriptionConstSharedPtr host_{nullptr};
+  Upstream::ClusterInfoConstSharedPtr cluster_info_{nullptr};
+  ServiceType service_type_ = ServiceType::Unknown;
+  bool is_side_stream_ = false;
+};
+
+/**
  * Basic abstraction for span.
  */
 class Span {
@@ -53,8 +74,7 @@ public:
    * @param request_headers the headers to which propagation context will be added
    * @param upstream connecting host description
    */
-  virtual void injectContext(TraceContext& trace_conext,
-                             const Upstream::HostDescriptionConstSharedPtr& upstream) PURE;
+  virtual void injectContext(TraceContext& trace_conext, const UpstreamContext& upstream) PURE;
 
   /**
    * Create and start a child Span, with this Span as its parent in the trace.

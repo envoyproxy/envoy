@@ -502,7 +502,12 @@ void UpstreamRequest::onUpstreamSuccess(Upstream::HostDescriptionConstSharedPtr 
 
   if (span_ != nullptr) {
     TraceContextBridge trace_context{*parent_.request_stream_};
-    span_->injectContext(trace_context, upstream_info_->upstream_host_);
+    Tracing::UpstreamContext upstream_context{
+        .host_ = upstream_info_->upstream_host_,
+        .cluster_info_ = cluster_,
+        .service_type_ = Tracing::ServiceType::Http,
+        .is_side_stream_ = false};
+    span_->injectContext(trace_context, upstream_context);
   }
 
   sendRequestStartToUpstream();
