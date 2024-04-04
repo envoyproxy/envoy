@@ -72,7 +72,9 @@ public:
    * once and needs to be called before `sendData`.
    *
    * @param stream the stream to send headers over.
-   * @param header_func the function that takes the header reference to be modified.
+   * @param header_func the function that creates a mutable `RequestHeaderMap` with the preserve
+   *                    case header formatter. Use the `RequestHeaderMap` reference to add the
+   *                    headers.
    * @param end_stream indicates whether to close the stream locally after sending this frame.
    */
   envoy_status_t sendHeaders(envoy_stream_t stream,
