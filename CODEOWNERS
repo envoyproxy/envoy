@@ -340,7 +340,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Maxmind geolocation provider
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx
 # Match delegate extension
-/*/extensions/filters/http/match_delegate @wbpcode @jstraceski
+/*/extensions/filters/http/match_delegate @wbpcode @jstraceski @tyxia
 
 /*/extensions/health_checkers/common @zuercher @botengyao
 
