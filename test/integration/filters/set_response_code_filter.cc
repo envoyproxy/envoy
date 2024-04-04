@@ -119,7 +119,7 @@ REGISTER_FACTORY(UpstreamSetResponseCodeFilterFactory,
                  Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 // Adding below factory to test downstream filter with method
-// createFilterFactoryFromProtoWithServerContextTyped not overriden case.
+// createFilterFactoryFromProtoWithServerContextTyped not overridden case.
 class SetResponseCodeFilterFactoryDownstream
     : public Extensions::HttpFilters::Common::FactoryBase<
           test::integration::filters::SetResponseCodeFilterConfigDownstream,
@@ -144,7 +144,7 @@ REGISTER_FACTORY(SetResponseCodeFilterFactoryDownstream,
                  Server::Configuration::NamedHttpFilterConfigFactory);
 
 // Adding below factory to test dual filter with method
-// createFilterFactoryFromProtoWithServerContextTyped not overriden case.
+// createFilterFactoryFromProtoWithServerContextTyped not overridden case.
 class SetResponseCodeFilterFactoryDual
     : public Extensions::HttpFilters::Common::DualFactoryBase<
           test::integration::filters::SetResponseCodeFilterConfigDual,
