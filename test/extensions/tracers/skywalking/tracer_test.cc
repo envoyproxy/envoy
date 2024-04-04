@@ -191,7 +191,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
 
     Tracing::TestTraceContextImpl second_child_headers{{":authority", "test.com"}};
 
-    second_child_span->injectContext(second_child_headers, nullptr);
+    second_child_span->injectContext(second_child_headers, Tracing::UpstreamContext());
     auto sp = createSpanContext(std::string(second_child_headers.get("sw8").value()));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());

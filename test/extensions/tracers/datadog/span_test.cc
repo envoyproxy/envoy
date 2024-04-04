@@ -266,7 +266,7 @@ TEST_F(DatadogTracerSpanTest, InjectContext) {
   Span span{std::move(span_)};
 
   Tracing::TestTraceContextImpl context{};
-  span.injectContext(context, nullptr);
+  span.injectContext(context, Tracing::UpstreamContext());
   // Span::injectContext doesn't modify any of named fields.
   EXPECT_EQ("", context.context_protocol_);
   EXPECT_EQ("", context.context_host_);
@@ -414,7 +414,7 @@ TEST_F(DatadogTracerSpanTest, NoOpMode) {
   // `Span::log` doesn't do anything in any case.
   span.log(time_.timeSystem().systemTime(), "ignored");
   Tracing::TestTraceContextImpl context{};
-  span.injectContext(context, nullptr);
+  span.injectContext(context, Tracing::UpstreamContext());
   EXPECT_EQ("", context.context_protocol_);
   EXPECT_EQ("", context.context_host_);
   EXPECT_EQ("", context.context_path_);
