@@ -465,7 +465,11 @@ void GoogleAsyncRequestImpl::cancel() {
 
 void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   Tracing::HttpTraceContext trace_context(metadata);
-  current_span_->injectContext(trace_context, nullptr);
+  Tracing::UpstreamContext upstream_context{.host_ = nullptr,
+                                            .cluster_info_ = nullptr,
+                                            .service_type_ = Tracing::ServiceType::EnvoyGrpc,
+                                            .is_side_stream_ = true};
+  current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

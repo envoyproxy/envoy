@@ -91,6 +91,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
     return;
   }
 
+  cluster_info_ = thread_local_cluster->info();
   auto& http_async_client = thread_local_cluster->httpAsyncClient();
   dispatcher_ = &http_async_client.dispatcher();
   stream_ = http_async_client.start(*this, options_.setBufferBodyForRetry(buffer_body_for_retry));
@@ -277,7 +278,11 @@ void AsyncRequestImpl::cancel() {
 
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   Tracing::HttpTraceContext trace_context(metadata);
-  current_span_->injectContext(trace_context, nullptr);
+  Tracing::UpstreamContext upstream_context{.host_ = nullptr,
+                                            .cluster_info_ = cluster_info_,
+                                            .service_type_ = Tracing::ServiceType::EnvoyGrpc,
+                                            .is_side_stream_ = true};
+  current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

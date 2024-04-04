@@ -111,14 +111,22 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   // The router checks that the connection pool is non-null before creating the upstream request.
   auto upstream_host = conn_pool_->host();
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
+      parent_.callbacks()->streamInfo().upstreamClusterInfo();
+
   Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
+  Tracing::UpstreamContext upstream_context_{
+      .host_ = upstream_host,
+      .cluster_info_ = cluster_info.has_value() ? cluster_info.value() : nullptr,
+      .service_type_ = Tracing::ServiceType::Http,
+      .is_side_stream_ = true};
   if (span_ != nullptr) {
-    span_->injectContext(trace_context, upstream_host);
+    span_->injectContext(trace_context, upstream_context_);
   } else {
     // No independent child span for current upstream request then inject the parent span's tracing
     // context into the request headers.
     // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_host);
+    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context_);
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
@@ -127,8 +135,6 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
   stream_info_.setIsShadow(parent_.callbacks()->streamInfo().isShadow());
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      parent_.callbacks()->streamInfo().upstreamClusterInfo();
   if (cluster_info.has_value()) {
     stream_info_.setUpstreamClusterInfo(*cluster_info);
   }
