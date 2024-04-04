@@ -387,11 +387,11 @@ void InstanceProfileCredentialsProvider::extractCredentials(
     return;
   }
 
-  auto access_key_id =
+  const auto access_key_id =
       Utility::getStringFromJsonOrDefault(document_json_or_error.value(), ACCESS_KEY_ID, "");
-  auto secret_access_key =
+  const auto secret_access_key =
       Utility::getStringFromJsonOrDefault(document_json_or_error.value(), SECRET_ACCESS_KEY, "");
-  auto session_token =
+  const auto session_token =
       Utility::getStringFromJsonOrDefault(document_json_or_error.value(), TOKEN, "");
 
   ENVOY_LOG(debug,
@@ -517,11 +517,11 @@ void ContainerCredentialsProvider::extractCredentials(
     return;
   }
 
-  auto access_key_id =
+  const auto access_key_id =
       Utility::getStringFromJsonOrDefault(document_json_or_error.value(), ACCESS_KEY_ID, "");
-  auto secret_access_key =
+  const auto secret_access_key =
       Utility::getStringFromJsonOrDefault(document_json_or_error.value(), SECRET_ACCESS_KEY, "");
-  auto session_token =
+  const auto session_token =
       Utility::getStringFromJsonOrDefault(document_json_or_error.value(), TOKEN, "");
 
   ENVOY_LOG(debug, "Found following AWS credentials in the container role: {}={}, {}={}, {}={}",
@@ -667,10 +667,10 @@ void WebIdentityCredentialsProvider::extractCredentials(
     return;
   }
 
-  auto access_key_id = Utility::getStringFromJsonOrDefault(credentials.value(), ACCESS_KEY_ID, "");
-  auto secret_access_key =
+  const auto access_key_id = Utility::getStringFromJsonOrDefault(credentials.value(), ACCESS_KEY_ID, "");
+  const auto secret_access_key =
       Utility::getStringFromJsonOrDefault(credentials.value(), SECRET_ACCESS_KEY, "");
-  auto session_token = Utility::getStringFromJsonOrDefault(credentials.value(), SESSION_TOKEN, "");
+  const auto session_token = Utility::getStringFromJsonOrDefault(credentials.value(), SESSION_TOKEN, "");
 
   // Mandatory response fields
   if (access_key_id.empty() || secret_access_key.empty() || session_token.empty()) {
