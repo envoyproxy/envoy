@@ -154,7 +154,7 @@ jobs:
           target: swift-baseline-app
         - name: Build swift experimental app
           args: >-
-            --config=mobile-remote-ci-macos-ios-admin
+            --config=mobile-remote-ci-macos-ios
           app: //test/swift/apps/experimental:app
           expected-status: 200
           target: swift-experimental-app

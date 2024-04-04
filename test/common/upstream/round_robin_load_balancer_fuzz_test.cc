@@ -23,8 +23,13 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RoundRobinLoadBalancerTestCase
 
   // Validate the correctness of the Slow-Start config values.
   if (input.has_round_robin_lb_config() && input.round_robin_lb_config().has_slow_start_config()) {
+    uint32_t num_hosts = 0;
+    for (const auto& setup_priority_level :
+         zone_aware_load_balancer_test_case.load_balancer_test_case().setup_priority_levels()) {
+      num_hosts += setup_priority_level.num_hosts_in_priority_level();
+    }
     if (!ZoneAwareLoadBalancerFuzzBase::validateSlowStart(
-            input.round_robin_lb_config().slow_start_config())) {
+            input.round_robin_lb_config().slow_start_config(), num_hosts)) {
       return;
     }
   }

@@ -108,7 +108,6 @@ class MatchDelegateConfig
           envoy::extensions::common::matching::v3::ExtensionWithMatcher,
           envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute> {
 public:
-  // TODO(wbpcode): move this filter to 'source/extensions/filters/http'.
   MatchDelegateConfig() : ExceptionFreeFactoryBase("envoy.filters.http.match_delegate") {}
 
 private:

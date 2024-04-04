@@ -13,7 +13,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
 "source/common/http/http2:95.6"
 "source/common/json:94.6"
-"source/common/matcher:94.6"
+"source/common/matcher:94.4"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/quic:93.5"

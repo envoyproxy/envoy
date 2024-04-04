@@ -2,7 +2,7 @@
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
 
-#include "source/common/http/match_delegate/config.h"
+#include "source/extensions/filters/http/match_delegate/config.h"
 
 #include "test/integration/filters/set_response_code_filter_config.pb.h"
 #include "test/integration/http_integration.h"
@@ -21,10 +21,10 @@ using envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute;
 using Envoy::Protobuf::MapPair;
 using Envoy::ProtobufWkt::Any;
 
-class MatchDelegateInegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                    public HttpIntegrationTest {
+class MatchDelegateIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                     public HttpIntegrationTest {
 public:
-  MatchDelegateInegrationTest() : HttpIntegrationTest(Envoy::Http::CodecType::HTTP1, GetParam()) {}
+  MatchDelegateIntegrationTest() : HttpIntegrationTest(Envoy::Http::CodecType::HTTP1, GetParam()) {}
   void initialize() override {
     config_helper_.prependFilter(default_config_);
     HttpIntegrationTest::initialize();
@@ -66,20 +66,20 @@ public:
     )EOF";
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, MatchDelegateInegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, MatchDelegateIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(MatchDelegateInegrationTest, NoMatcherDefault) {
+TEST_P(MatchDelegateIntegrationTest, NoMatcherDefault) {
   initialize();
   Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
-  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("200"));
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(MatchDelegateInegrationTest, PerRouteConfig) {
+TEST_P(MatchDelegateIntegrationTest, PerRouteConfig) {
   config_helper_.addConfigModifier([this](ConfigHelper::HttpConnectionManager& cm) {
     auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
     auto* route = vh->mutable_routes()->Mutable(0);
@@ -94,7 +94,7 @@ TEST_P(MatchDelegateInegrationTest, PerRouteConfig) {
   initialize();
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("403"));
+  EXPECT_EQ("403", response->headers().getStatusValue());
 }
 
 } // namespace

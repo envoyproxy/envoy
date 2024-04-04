@@ -34,6 +34,10 @@ minor_behavior_changes:
 - area: dns
   change: |
     Allowing <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_min_refresh_rate>` to go as low as 1s.
+- area: dns
+  change: |
+    Fixing a bug in the getaddrinfo resolver where it did not reresolve on EAI_AGAIN. This behavioral change can be temporarily
+    reverted by setting ``envoy.reloadable_features.dns_reresolve_on_eai_again`` to false.
 - area: upstream
   change: |
     Upstream now excludes hosts set to ``DRAINING`` state via EDS from load balancing and panic routing
@@ -440,9 +444,16 @@ new_features:
   change: |
     Added support for populating the :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`
     check request attribute for network ext_authz by setting :ref:`include_tls_session <config_network_filters_ext_authz>` to true.
+- area: tracing
+  change: |
+    Datadog: span attributes and trace sampling can be configured remotely.
 - area: aws
   change: |
     Update credential_provider utility to support EKS Pod Identity provided via token file.
+- area: access_log
+  change: |
+    Added :ref:`%COMMON_DURATION% <config_access_log_format_common_duration>` to access log format to log the duration of the request.
+    The start time point, end time point and duration precision can be configured in this new command.
 - area: admin
   change: |
     The ``/stats/prometheus`` endpoint can now emit prometheus ``summary`` metric types by explicitly setting the
@@ -458,3 +469,8 @@ deprecated:
     deprecated :ref:`split_spans_for_request <envoy_v3_api_field_config.trace.v3.ZipkinConfig.split_spans_for_request>`
     in favor of :ref:`spawn_upstream_span
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`.
+- area: grpc
+  change: |
+    Added maximum gRPC message size that is allowed to be received in Envoy gRPC. If a message over this limit is received,
+    the gRPC stream is terminated with the RESOURCE_EXHAUSTED error. This limit is applied to individual messages in the
+    streaming response and not the total size of streaming response. Defaults to 0, which means unlimited.

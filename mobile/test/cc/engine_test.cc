@@ -7,7 +7,7 @@
 namespace Envoy {
 
 TEST(EngineTest, SetLogger) {
-  std::atomic logging_was_called{false};
+  std::atomic<bool> logging_was_called{false};
   auto logger = std::make_unique<EnvoyLogger>();
   logger->on_log_ = [&](Logger::Logger::Levels, const std::string&) { logging_was_called = true; };
 

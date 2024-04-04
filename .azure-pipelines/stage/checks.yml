@@ -75,7 +75,8 @@ jobs:
       api:
         CI_TARGET: "api"
   timeoutInMinutes: 180
-  pool: envoy-x64-small
+  pool:
+    vmImage: $(agentUbuntu)
   steps:
   - template: ../ci.yml
     parameters:
