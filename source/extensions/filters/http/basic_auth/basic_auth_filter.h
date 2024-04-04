@@ -75,7 +75,7 @@ public:
   const UserMap& users() const { return users_; }
 
 private:
-  UserMap users_;
+  const UserMap users_;
   bool disabled_;
 };
 
