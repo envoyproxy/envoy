@@ -252,8 +252,12 @@ TEST(NullTracerTest, BasicFunctionality) {
   Tracing::TestTraceContextImpl trace_context{};
   Upstream::HostDescriptionConstSharedPtr host{
       new testing::NiceMock<Upstream::MockHostDescription>()};
-  Upstream::ClusterInfoConstSharedPtr{new NiceMock<Upstream::MockClusterInfo>()};
-  Tracing::UpstreamContext upsteam_context{host, cluster, Tracing::ServiceType::Http, true};
+  Upstream::ClusterInfoConstSharedPtr cluster{new testing::NiceMock<Upstream::MockClusterInfo>()};
+  Tracing::UpstreamContext upstream_context{.host_ = host,
+                                            .cluster_info_ = cluster,
+                                            .service_type_ = Tracing::ServiceType::Http,
+                                            .is_side_stream_ = false};
+
   SpanPtr span_ptr =
       null_tracer.startSpan(config, trace_context, stream_info, {Reason::Sampling, true});
   EXPECT_TRUE(dynamic_cast<NullSpan*>(span_ptr.get()) != nullptr);
@@ -263,7 +267,7 @@ TEST(NullTracerTest, BasicFunctionality) {
   span_ptr->setBaggage("key", "value");
   ASSERT_EQ("", span_ptr->getBaggage("baggage_key"));
   ASSERT_EQ(span_ptr->getTraceIdAsHex(), "");
-  span_ptr->injectContext(trace_context, upsteam_context);
+  span_ptr->injectContext(trace_context, upstream_context);
   span_ptr->log(SystemTime(), "fake_event");
 
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));

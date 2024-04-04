@@ -122,12 +122,12 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       .is_side_stream_ = true};
 
   if (span_ != nullptr) {
-    span_->injectContext(trace_context, upstream_context_);
+    span_->injectContext(trace_context, upstream_context);
   } else {
     // No independent child span for current upstream request then inject the parent span's tracing
     // context into the request headers.
     // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context_);
+    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context);
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
