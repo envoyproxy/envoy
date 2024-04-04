@@ -37,6 +37,38 @@ An example configuration of the filter may look like the following:
 
 Note that only SHA format is currently supported. Other formats may be added in the future.
 
+Per-Route Configuration
+-----------------------
+
+An example configuration of the route filter may look like the following:
+
+.. code-block:: yaml
+
+  route_config:
+    name: local_route
+    virtual_hosts:
+    - name: local_service
+      domains: ["*"]
+      routes:
+      - match: { path: "/admin" }
+        route: { cluster: some_service }
+        typed_per_filter_config:
+          envoy.filters.http.basic_auth:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuthPerRoute
+            users:
+              inline_string: |-
+                admin:{SHA}0DPiKuNIrrVmD8IUCuw1hQxNqZc=
+      - match: { prefix: "/static" }
+        route: { cluster: some_service }
+        typed_per_filter_config:
+          envoy.filters.http.basic_auth:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuthPerRoute
+            disabled: true
+      - match: { prefix: "/" }
+        route: { cluster: some_service }
+
+In this example we customize users for ``/admin`` route, and disable authentication for ``/static`` prefixed routes.
+
 Statistics
 ----------
 
