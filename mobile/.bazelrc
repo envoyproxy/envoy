@@ -118,8 +118,6 @@ build:mobile-tsan-dev --test_env="TSAN_OPTIONS=report_atomic_races=0"
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
 build:mobile-release-common --define=no_debug_info=1
-# TODO(alyssar) fix example apps
-build:mobile-release-common --define=envoy_yaml=enabled
 
 # order matters here to ensure downloads
 build:mobile-remote-release-clang --config=mobile-remote-ci-linux-clang
@@ -257,8 +255,6 @@ build:mobile-remote-ci-macos --xcode_version_config=//ci:xcode_config
 build:mobile-remote-ci-macos --remote_download_toplevel
 build:mobile-remote-ci-macos --config=ci
 build:mobile-remote-ci-macos --config=remote
-# TODO(alyssar) fix swift tests
-build:mobile-remote-ci-macos --define=envoy_yaml=enabled
 
 build:mobile-remote-ci --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci --config=remote-ci
@@ -273,11 +269,6 @@ build:mobile-remote-ci-cc --config=mobile-remote-ci
 build:mobile-remote-ci-cc --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
 
-# TODO(alyssar) remove.
-build:mobile-remote-ci-cc-no-yaml --config=mobile-remote-ci-cc
-build:mobile-remote-ci-cc-no-yaml --define=envoy_full_protos=disabled
-build:mobile-remote-ci-cc-no-yaml --test_env=ENVOY_IP_TEST_VERSIONS=v4only
-
 build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci-cc
 build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
 build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
@@ -288,7 +279,6 @@ test:mobile-remote-ci-cc-test --config=mobile-remote-ci-cc
 
 build:mobile-remote-ci-macos-kotlin --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-kotlin --fat_apk_cpu=x86_64
-build:mobile-remote-ci-macos-kotlin --define=envoy_yaml=disabled
 
 build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-swift --config=mobile-test-ios
@@ -302,11 +292,11 @@ test:mobile-remote-ci-core --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-ios --config=mobile-test-ios
 
+#TODO(alyssar) remove this build
 build:mobile-remote-ci-macos-ios-admin --config=mobile-remote-ci-macos-ios
-build:mobile-remote-ci-macos-ios-admin --define=admin_functionality=enabled
-
 
 build:mobile-remote-ci-macos-ios-swift --config=mobile-remote-ci-macos-ios
+build:mobile-remote-ci-macos-ios-swift --define=envoy_yaml=enabled
 test:mobile-remote-ci-macos-ios-swift --build_tests_only
 
 build:mobile-remote-ci-macos-ios-obj-c --config=mobile-remote-ci-macos-ios
