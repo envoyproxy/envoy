@@ -14,3 +14,171 @@ diff -u -r a/CMakeLists.txt b/CMakeLists.txt
  endif()
  # AC_TYPE_UINT8_T
  # AC_TYPE_UINT16_T
+diff --git a/doc/Makefile.am b/doc/Makefile.am
+index 7d7f31c6..ce50d89e 100644
+--- a/doc/Makefile.am
++++ b/doc/Makefile.am
+@@ -74,6 +74,7 @@ APIDOCS= \
+ 	nghttp2_option_set_peer_max_concurrent_streams.rst \
+ 	nghttp2_option_set_server_fallback_rfc7540_priorities.rst \
+ 	nghttp2_option_set_user_recv_extension_type.rst \
++	nghttp2_option_set_max_continuations.rst \
+ 	nghttp2_option_set_max_outbound_ack.rst \
+ 	nghttp2_option_set_max_settings.rst \
+ 	nghttp2_option_set_stream_reset_rate_limit.rst \
+diff --git a/lib/includes/nghttp2/nghttp2.h b/lib/includes/nghttp2/nghttp2.h
+index 7910db23..a54efbfd 100644
+--- a/lib/includes/nghttp2/nghttp2.h
++++ b/lib/includes/nghttp2/nghttp2.h
+@@ -440,7 +440,12 @@ typedef enum {
+    * exhaustion on server side to send these frames forever and does
+    * not read network.
+    */
+-  NGHTTP2_ERR_FLOODED = -904
++  NGHTTP2_ERR_FLOODED = -904,
++  /**
++   * When a local endpoint receives too many CONTINUATION frames
++   * following a HEADER frame.
++   */
++  NGHTTP2_ERR_TOO_MANY_CONTINUATIONS = -905,
+ } nghttp2_error;
+ 
+ /**
+@@ -2773,6 +2778,17 @@ NGHTTP2_EXTERN void
+ nghttp2_option_set_stream_reset_rate_limit(nghttp2_option *option,
+                                            uint64_t burst, uint64_t rate);
+ 
++/**
++ * @function
++ *
++ * This function sets the maximum number of CONTINUATION frames
++ * following an incoming HEADER frame.  If more than those frames are
++ * received, the remote endpoint is considered to be misbehaving and
++ * session will be closed.  The default value is 8.
++ */
++NGHTTP2_EXTERN void nghttp2_option_set_max_continuations(nghttp2_option *option,
++                                                         size_t val);
++
+ /**
+  * @function
+  *
+diff --git a/lib/nghttp2_helper.c b/lib/nghttp2_helper.c
+index 93dd4754..b3563d98 100644
+--- a/lib/nghttp2_helper.c
++++ b/lib/nghttp2_helper.c
+@@ -336,6 +336,8 @@ const char *nghttp2_strerror(int error_code) {
+            "closed";
+   case NGHTTP2_ERR_TOO_MANY_SETTINGS:
+     return "SETTINGS frame contained more than the maximum allowed entries";
++  case NGHTTP2_ERR_TOO_MANY_CONTINUATIONS:
++    return "Too many CONTINUATION frames following a HEADER frame";
+   default:
+     return "Unknown error code";
+   }
+diff --git a/lib/nghttp2_option.c b/lib/nghttp2_option.c
+index 43d4e952..53144b9b 100644
+--- a/lib/nghttp2_option.c
++++ b/lib/nghttp2_option.c
+@@ -150,3 +150,8 @@ void nghttp2_option_set_stream_reset_rate_limit(nghttp2_option *option,
+   option->stream_reset_burst = burst;
+   option->stream_reset_rate = rate;
+ }
++
++void nghttp2_option_set_max_continuations(nghttp2_option *option, size_t val) {
++  option->opt_set_mask |= NGHTTP2_OPT_MAX_CONTINUATIONS;
++  option->max_continuations = val;
++}
+diff --git a/lib/nghttp2_option.h b/lib/nghttp2_option.h
+index 2259e184..c89cb97f 100644
+--- a/lib/nghttp2_option.h
++++ b/lib/nghttp2_option.h
+@@ -71,6 +71,7 @@ typedef enum {
+   NGHTTP2_OPT_SERVER_FALLBACK_RFC7540_PRIORITIES = 1 << 13,
+   NGHTTP2_OPT_NO_RFC9113_LEADING_AND_TRAILING_WS_VALIDATION = 1 << 14,
+   NGHTTP2_OPT_STREAM_RESET_RATE_LIMIT = 1 << 15,
++  NGHTTP2_OPT_MAX_CONTINUATIONS = 1 << 16,
+ } nghttp2_option_flag;
+ 
+ /**
+@@ -98,6 +99,10 @@ struct nghttp2_option {
+    * NGHTTP2_OPT_MAX_SETTINGS
+    */
+   size_t max_settings;
++  /**
++   * NGHTTP2_OPT_MAX_CONTINUATIONS
++   */
++  size_t max_continuations;
+   /**
+    * Bitwise OR of nghttp2_option_flag to determine that which fields
+    * are specified.
+diff --git a/lib/nghttp2_session.c b/lib/nghttp2_session.c
+index ce21caf9..18949528 100644
+--- a/lib/nghttp2_session.c
++++ b/lib/nghttp2_session.c
+@@ -496,6 +496,7 @@ static int session_new(nghttp2_session **session_ptr,
+   (*session_ptr)->max_send_header_block_length = NGHTTP2_MAX_HEADERSLEN;
+   (*session_ptr)->max_outbound_ack = NGHTTP2_DEFAULT_MAX_OBQ_FLOOD_ITEM;
+   (*session_ptr)->max_settings = NGHTTP2_DEFAULT_MAX_SETTINGS;
++  (*session_ptr)->max_continuations = NGHTTP2_DEFAULT_MAX_CONTINUATIONS;
+ 
+   if (option) {
+     if ((option->opt_set_mask & NGHTTP2_OPT_NO_AUTO_WINDOW_UPDATE) &&
+@@ -584,6 +585,10 @@ static int session_new(nghttp2_session **session_ptr,
+                            option->stream_reset_burst,
+                            option->stream_reset_rate);
+     }
++
++    if (option->opt_set_mask & NGHTTP2_OPT_MAX_CONTINUATIONS) {
++      (*session_ptr)->max_continuations = option->max_continuations;
++    }
+   }
+ 
+   rv = nghttp2_hd_deflate_init2(&(*session_ptr)->hd_deflater,
+@@ -6778,6 +6783,8 @@ ssize_t nghttp2_session_mem_recv(nghttp2_session *session, const uint8_t *in,
+           }
+         }
+         session_inbound_frame_reset(session);
++
++        session->num_continuations = 0;
+       }
+       break;
+     }
+@@ -6899,6 +6906,10 @@ ssize_t nghttp2_session_mem_recv(nghttp2_session *session, const uint8_t *in,
+       }
+ #endif /* DEBUGBUILD */
+ 
++      if (++session->num_continuations > session->max_continuations) {
++        return NGHTTP2_ERR_TOO_MANY_CONTINUATIONS;
++      }
++
+       readlen = inbound_frame_buf_read(iframe, in, last);
+       in += readlen;
+ 
+diff --git a/lib/nghttp2_session.h b/lib/nghttp2_session.h
+index b119329a..ef8f7b27 100644
+--- a/lib/nghttp2_session.h
++++ b/lib/nghttp2_session.h
+@@ -110,6 +110,10 @@ typedef struct {
+ #define NGHTTP2_DEFAULT_STREAM_RESET_BURST 1000
+ #define NGHTTP2_DEFAULT_STREAM_RESET_RATE 33
+ 
++/* The default max number of CONTINUATION frames following an incoming
++   HEADER frame. */
++#define NGHTTP2_DEFAULT_MAX_CONTINUATIONS 8
++
+ /* Internal state when receiving incoming frame */
+ typedef enum {
+   /* Receiving frame header */
+@@ -290,6 +294,12 @@ struct nghttp2_session {
+   size_t max_send_header_block_length;
+   /* The maximum number of settings accepted per SETTINGS frame. */
+   size_t max_settings;
++  /* The maximum number of CONTINUATION frames following an incoming
++     HEADER frame. */
++  size_t max_continuations;
++  /* The number of CONTINUATION frames following an incoming HEADER
++     frame.  This variable is reset when END_HEADERS flag is seen. */
++  size_t num_continuations;
+   /* Next Stream ID. Made unsigned int to detect >= (1 << 31). */
+   uint32_t next_stream_id;
+   /* The last stream ID this session initiated.  For client session,
