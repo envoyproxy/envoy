@@ -22,7 +22,7 @@ public class EnvoyConfiguration {
     // Connections where the certificate fails verification will be permitted.
     // For HTTP connections, the result of certificate verification can be used in route matching.
     // Used for testing.
-    ACCEPT_UNTRUSTED;
+    ACCEPT_UNTRUSTED
   }
 
   public final Integer connectTimeoutSeconds;
@@ -42,6 +42,7 @@ public class EnvoyConfiguration {
   public final List<String> quicCanonicalSuffixes;
   public final Boolean enableGzipDecompression;
   public final Boolean enableBrotliDecompression;
+  public final Boolean enablePortMigration;
   public final Boolean enableSocketTagging;
   public final Boolean enableInterfaceBinding;
   public final Integer h2ConnectionKeepaliveIdleIntervalMilliseconds;
@@ -110,6 +111,7 @@ public class EnvoyConfiguration {
    *     decompression.
    * @param enableBrotliDecompression                     whether to enable response brotli
    *     decompression.
+   * @param enablePortMigration                           whether to enable quic port migration.
    * @param enableSocketTagging                           whether to enable socket tagging.
    * @param enableInterfaceBinding                        whether to allow interface binding.
    * @param h2ConnectionKeepaliveIdleIntervalMilliseconds rate in milliseconds seconds to send h2
@@ -157,7 +159,7 @@ public class EnvoyConfiguration {
       boolean enableDrainPostDnsRefresh, boolean enableHttp3, String http3ConnectionOptions,
       String http3ClientConnectionOptions, Map<String, Integer> quicHints,
       List<String> quicCanonicalSuffixes, boolean enableGzipDecompression,
-      boolean enableBrotliDecompression, boolean enableSocketTagging,
+      boolean enableBrotliDecompression, boolean enablePortMigration, boolean enableSocketTagging,
       boolean enableInterfaceBinding, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
       int h2ConnectionKeepaliveTimeoutSeconds, int maxConnectionsPerHost,
       int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
@@ -192,6 +194,7 @@ public class EnvoyConfiguration {
     this.quicCanonicalSuffixes = quicCanonicalSuffixes;
     this.enableGzipDecompression = enableGzipDecompression;
     this.enableBrotliDecompression = enableBrotliDecompression;
+    this.enablePortMigration = enablePortMigration;
     this.enableSocketTagging = enableSocketTagging;
     this.enableInterfaceBinding = enableInterfaceBinding;
     this.h2ConnectionKeepaliveIdleIntervalMilliseconds =
@@ -206,9 +209,7 @@ public class EnvoyConfiguration {
     int index = 0;
     // Insert in this order to preserve prior ordering constraints.
     for (EnvoyHTTPFilterFactory filterFactory : httpPlatformFilterFactories) {
-      String config =
-          "{'@type': type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, platform_filter_name: " +
-          filterFactory.getFilterName() + "}";
+      String config = JniLibrary.getNativeFilterConfig(filterFactory.getFilterName());
       EnvoyNativeFilterConfig ins =
           new EnvoyNativeFilterConfig("envoy.filters.http.platform_bridge", config);
       nativeFilterChain.add(index++, ins);
@@ -258,8 +259,8 @@ public class EnvoyConfiguration {
         dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dnsPreresolve,
         enableDNSCache, dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
         http3ConnectionOptions, http3ClientConnectionOptions, quicHints, quicSuffixes,
-        enableGzipDecompression, enableBrotliDecompression, enableSocketTagging,
-        enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        enableGzipDecompression, enableBrotliDecompression, enablePortMigration,
+        enableSocketTagging, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
         h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
         enablePlatformCertificatesValidation, runtimeGuards, rtdsResourceName, rtdsTimeoutSeconds,

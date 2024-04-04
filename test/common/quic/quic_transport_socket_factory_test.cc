@@ -45,12 +45,12 @@ downstream_tls_context:
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF");
 
   verifyQuicServerTransportSocketFactory(yaml, true);
@@ -62,12 +62,12 @@ downstream_tls_context:
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 enable_early_data:
   value: false
 )EOF");
@@ -81,12 +81,12 @@ downstream_tls_context:
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 enable_early_data:
   value: true
 )EOF");
@@ -101,12 +101,12 @@ downstream_tls_context:
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF");
   EXPECT_THROW_WITH_MESSAGE(verifyQuicServerTransportSocketFactory(yaml, true), EnvoyException,
                             "TLS Client Authentication is not supported over QUIC");

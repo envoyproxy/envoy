@@ -46,9 +46,12 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
   return it->second;
 }
 
+// If restart_epoch is 0 there is no parent, so it's effectively already
+// drained and terminated.
 HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
                                        const std::string& socket_path, mode_t socket_mode)
-    : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
+    : HotRestartingBase(base_id), restart_epoch_(restart_epoch),
+      parent_terminated_(restart_epoch == 0), parent_drained_(restart_epoch == 0) {
   main_rpc_stream_.initDomainSocketAddress(&parent_address_);
   std::string socket_path_udp = socket_path + "_udp";
   udp_forwarding_rpc_stream_.initDomainSocketAddress(&parent_address_udp_forwarding_);
@@ -102,7 +105,7 @@ void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index, Network::Ud
 
 int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
                                                     uint32_t worker_index) {
-  if (restart_epoch_ == 0 || parent_terminated_) {
+  if (parent_terminated_) {
     return -1;
   }
 
@@ -121,7 +124,7 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
 }
 
 std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
-  if (restart_epoch_ == 0 || parent_terminated_) {
+  if (parent_terminated_) {
     return nullptr;
   }
 
@@ -138,7 +141,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
 }
 
 void HotRestartingChild::drainParentListeners() {
-  if (restart_epoch_ == 0 || parent_terminated_) {
+  if (parent_terminated_) {
     return;
   }
   // No reply expected.
@@ -154,9 +157,29 @@ void HotRestartingChild::registerUdpForwardingListener(
   udp_forwarding_context_.registerListener(address, listener_config);
 }
 
+void HotRestartingChild::registerParentDrainedCallback(
+    const Network::Address::InstanceConstSharedPtr& address, absl::AnyInvocable<void()> callback) {
+  absl::MutexLock lock(&registry_mu_);
+  if (parent_drained_) {
+    callback();
+  } else {
+    on_drained_actions_.emplace(address->asString(), std::move(callback));
+  }
+}
+
+void HotRestartingChild::allDrainsImplicitlyComplete() {
+  absl::MutexLock lock(&registry_mu_);
+  for (auto& drain_action : on_drained_actions_) {
+    // Call the callback.
+    std::move(drain_action.second)();
+  }
+  on_drained_actions_.clear();
+  parent_drained_ = true;
+}
+
 absl::optional<HotRestart::AdminShutdownResponse>
 HotRestartingChild::sendParentAdminShutdownRequest() {
-  if (restart_epoch_ == 0 || parent_terminated_) {
+  if (parent_terminated_) {
     return absl::nullopt;
   }
 
@@ -176,9 +199,11 @@ HotRestartingChild::sendParentAdminShutdownRequest() {
 }
 
 void HotRestartingChild::sendParentTerminateRequest() {
-  if (restart_epoch_ == 0 || parent_terminated_) {
+  if (parent_terminated_) {
     return;
   }
+  allDrainsImplicitlyComplete();
+
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_terminate();
   main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
@@ -186,15 +211,17 @@ void HotRestartingChild::sendParentTerminateRequest() {
 
   // Note that the 'generation' counter needs to retain the contribution from
   // the parent.
-  stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_);
+  if (stat_merger_ != nullptr) {
+    stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_);
 
-  // Now it is safe to forget our stat transferral state.
-  //
-  // This destruction is actually important far beyond memory efficiency. The
-  // scope-based temporary counter logic relies on the StatMerger getting
-  // destroyed once hot restart's stat merging is all done. (See stat_merger.h
-  // for details).
-  stat_merger_.reset();
+    // Now it is safe to forget our stat transferral state.
+    //
+    // This destruction is actually important far beyond memory efficiency. The
+    // scope-based temporary counter logic relies on the StatMerger getting
+    // destroyed once hot restart's stat merging is all done. (See stat_merger.h
+    // for details).
+    stat_merger_.reset();
+  }
 }
 
 void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,

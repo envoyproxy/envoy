@@ -20,14 +20,14 @@
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_client_transport_socket_factory.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/common/tls/context_config_impl.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/quic/test_utils.h"
+#include "test/common/tls/cert_validator/timed_cert_validator.h"
 #include "test/common/upstream/utility.h"
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/config/utility.h"
-#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
 #include "test/integration/filters/test_listener_filter.h"
 #include "test/integration/filters/test_listener_filter.pb.h"
 #include "test/integration/http_integration.h"
@@ -73,7 +73,8 @@ public:
                                 bool validation_failure_on_path_response,
                                 quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, initial_peer_address, helper, alarm_factory,
-                                  supported_versions, local_addr, dispatcher, options, generator),
+                                  supported_versions, local_addr, dispatcher, options, generator,
+                                  /*prefer_gro=*/true),
         dispatcher_(dispatcher),
         validation_failure_on_path_response_(validation_failure_on_path_response) {}
 
@@ -746,6 +747,12 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   codec_client_->close();
 }
 
+TEST_P(QuicHttpIntegrationTest, LegacyCertLoadingAndSelection) {
+  config_helper_.addRuntimeOverride("envoy.restart_features.quic_handle_certs_with_shared_tls_code",
+                                    "false");
+  testMultipleQuicConnections();
+}
+
 // Not only test multiple quic connections, but disconnect and reconnect to
 // trigger resumption.
 TEST_P(QuicHttpIntegrationTest, MultipleUpstreamQuicConnections) {
@@ -831,7 +838,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
   quic_connection_->switchConnectionSocket(
-      createConnectionSocket(server_addr_, local_addr, nullptr));
+      createConnectionSocket(server_addr_, local_addr, nullptr, /*prefer_gro=*/true));
   EXPECT_NE(old_port, local_addr->ip()->port());
   // Send the rest data.
   codec_client_->sendData(*request_encoder_, 1024u, true);
@@ -860,7 +867,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   auto options = std::make_shared<Network::Socket::Options>();
   options->push_back(option);
   quic_connection_->switchConnectionSocket(
-      createConnectionSocket(server_addr_, local_addr, options));
+      createConnectionSocket(server_addr_, local_addr, options, /*prefer_gro=*/true));
   EXPECT_TRUE(codec_client_->disconnected());
   cleanupUpstreamAndDownstream();
 }

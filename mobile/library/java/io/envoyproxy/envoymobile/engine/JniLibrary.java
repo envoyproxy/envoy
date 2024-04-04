@@ -256,9 +256,10 @@ public class JniLibrary {
   /**
    * Update the log level for all active logs
    *
-   * @param log_level The Log level to change to. Must be an integer 0-6.
+   * @param logLevel The Log level to change to. Must be an integer 0-6.
+   *                 See source/common/common/base_logger.h
    */
-  protected static native void setLogLevel(int log_level);
+  protected static native void setLogLevel(int logLevel);
 
   /**
    * Mimic a call to AndroidNetworkLibrary#verifyServerCertificates from native code.
@@ -286,6 +287,14 @@ public class JniLibrary {
    */
   public static native void callClearTestRootCertificateFromNative();
 
+  /*
+   * Given a filter name, create the proto or YAML config for adding the native filter
+   *
+   * @param filterName the name of the native filter
+   * @return a filter config which can be passed back to createBootstrap
+   */
+  public static native String getNativeFilterConfig(String filterName);
+
   /**
    * Uses the provided fields to generate an Envoy bootstrap proto.
    * The returned pointer is "owned" by the caller until ownership is passed back to C++ via
@@ -301,7 +310,7 @@ public class JniLibrary {
       boolean enableDrainPostDnsRefresh, boolean enableHttp3, String http3ConnectionOptions,
       String http3ClientConnectionOptions, byte[][] quicHints, byte[][] quicCanonicalSuffixes,
       boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      boolean enableSocketTagging, boolean enableInterfaceBinding,
+      boolean enablePortMigration, boolean enableSocketTagging, boolean enableInterfaceBinding,
       long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
       long maxConnectionsPerHost, long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds,
       String appVersion, String appId, boolean trustChainVerification, byte[][] filterChain,

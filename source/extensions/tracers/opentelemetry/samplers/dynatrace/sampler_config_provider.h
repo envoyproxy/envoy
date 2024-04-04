@@ -4,6 +4,8 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/config/core/v3/http_service.pb.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/extensions/tracers/opentelemetry/samplers/v3/dynatrace_sampler.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
@@ -40,18 +42,33 @@ public:
 };
 
 class SamplerConfigProviderImpl : public SamplerConfigProvider,
-                                  public Logger::Loggable<Logger::Id::tracing> {
+                                  public Logger::Loggable<Logger::Id::tracing>,
+                                  public Http::AsyncClient::Callbacks {
 public:
   SamplerConfigProviderImpl(
       Server::Configuration::TracerFactoryContext& context,
       const envoy::extensions::tracers::opentelemetry::samplers::v3::DynatraceSamplerConfig&
           config);
 
+  void onSuccess(const Http::AsyncClient::Request& request,
+                 Http::ResponseMessagePtr&& response) override;
+
+  void onFailure(const Http::AsyncClient::Request& request,
+                 Http::AsyncClient::FailureReason reason) override;
+
+  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span& /*span*/,
+                                    const Http::ResponseHeaderMap* /*response_headers*/) override{};
+
   const SamplerConfig& getSamplerConfig() const override;
 
-  ~SamplerConfigProviderImpl() override = default;
+  ~SamplerConfigProviderImpl() override;
 
 private:
+  Event::TimerPtr timer_;
+  Upstream::ClusterManager& cluster_manager_;
+  envoy::config::core::v3::HttpUri http_uri_;
+  std::vector<std::pair<const Http::LowerCaseString, const std::string>> parsed_headers_to_add_;
+  Http::AsyncClient::Request* active_request_{};
   SamplerConfig sampler_config_;
 };
 

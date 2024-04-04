@@ -72,7 +72,7 @@ request_rules:
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::header_to_metadata::v3::Config config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<Config>(config);
+    config_ = std::make_shared<Config>(config, regex_engine_);
     filter_ = std::make_shared<HeaderToMetadataFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -80,6 +80,7 @@ request_rules:
 
   const Config* getConfig() { return filter_->getConfig(); }
 
+  Regex::GoogleReEngine regex_engine_;
   ConfigSharedPtr config_;
   std::shared_ptr<HeaderToMetadataFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -134,7 +135,7 @@ TEST_F(HeaderToMetadataTest, PerRouteOverride) {
   // Setup per route config.
   envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
   TestUtility::loadFromYaml(request_config_yaml, config_proto);
-  Config per_route_config(config_proto, true);
+  Config per_route_config(config_proto, regex_engine_, true);
   EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config));
 
@@ -159,7 +160,7 @@ TEST_F(HeaderToMetadataTest, ConfigIsCached) {
   // Setup per route config.
   envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
   TestUtility::loadFromYaml(request_config_yaml, config_proto);
-  Config per_route_config(config_proto, true);
+  Config per_route_config(config_proto, regex_engine_, true);
   EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config));
 
@@ -454,7 +455,7 @@ request_rules:
 
 TEST_F(HeaderToMetadataTest, PerRouteEmtpyRules) {
   envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
-  EXPECT_THROW(std::make_shared<Config>(config_proto, true), EnvoyException);
+  EXPECT_THROW(std::make_shared<Config>(config_proto, regex_engine_, true), EnvoyException);
 }
 
 /**

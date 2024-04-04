@@ -105,14 +105,6 @@ absl::flat_hash_map<absl::string_view, ReloadableFlag*> makeReloadableFlagMap() 
   ASSERT(absl::GetFlag(FLAGS_envoy_quic_restart_flag_quic_testonly_default_true) == true);
 #define QUIC_FLAG(flag, ...) flags.emplace("FLAGS_envoy_" #flag, &FLAGS_envoy_##flag);
 #include "quiche/quic/core/quic_flags_list.h"
-  QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_false, false)
-  QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_true, true)
-  QUIC_FLAG(quic_restart_flag_spdy_testonly_default_false, false)
-  QUIC_FLAG(quic_restart_flag_spdy_testonly_default_true, true)
-  QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_false, false)
-  QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_true, true)
-  QUIC_FLAG(quic_restart_flag_http2_testonly_default_false, false)
-  QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true)
 #undef QUIC_FLAG
   return flags;
 }
@@ -125,7 +117,7 @@ FlagRegistry::FlagRegistry() : reloadable_flags_(makeReloadableFlagMap()) {}
 FlagRegistry& FlagRegistry::getInstance() {
   static auto* instance = new FlagRegistry();
   ASSERT(sizeof(quiche_reloadable_flag_overrides) / sizeof(std::pair<absl::string_view, bool>) ==
-         2);
+         3);
   ASSERT(sizeof(quiche_protocol_flag_overrides) /
              sizeof(std::pair<absl::string_view, absl::variant<bool, uint32_t>>) ==
          3);

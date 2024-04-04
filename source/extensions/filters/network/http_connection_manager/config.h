@@ -54,19 +54,19 @@ using FilterConfigProviderManager =
  */
 class HttpConnectionManagerFilterConfigFactory
     : Logger::Loggable<Logger::Id::config>,
-      public Common::FactoryBase<
+      public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager> {
 public:
   HttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
+      : ExceptionFreeFactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
 
-  static Network::FilterFactoryCb createFilterFactoryFromProtoAndHopByHop(
+  static absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoAndHopByHop(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
       Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers);
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
       Server::Configuration::FactoryContext& context) override;
@@ -79,14 +79,16 @@ DECLARE_FACTORY(HttpConnectionManagerFilterConfigFactory);
  */
 class MobileHttpConnectionManagerFilterConfigFactory
     : Logger::Loggable<Logger::Id::config>,
-      public Common::FactoryBase<envoy::extensions::filters::network::http_connection_manager::v3::
-                                     EnvoyMobileHttpConnectionManager> {
+      public Common::ExceptionFreeFactoryBase<
+          envoy::extensions::filters::network::http_connection_manager::v3::
+              EnvoyMobileHttpConnectionManager> {
 public:
   MobileHttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().EnvoyMobileHttpConnectionManager, true) {}
+      : ExceptionFreeFactoryBase(NetworkFilterNames::get().EnvoyMobileHttpConnectionManager, true) {
+  }
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::http_connection_manager::v3::
           EnvoyMobileHttpConnectionManager& proto_config,
       Server::Configuration::FactoryContext& context) override;
@@ -100,7 +102,8 @@ DECLARE_FACTORY(MobileHttpConnectionManagerFilterConfigFactory);
 class InternalAddressConfig : public Http::InternalAddressConfig {
 public:
   InternalAddressConfig(const envoy::extensions::filters::network::http_connection_manager::v3::
-                            HttpConnectionManager::InternalAddressConfig& config);
+                            HttpConnectionManager::InternalAddressConfig& config,
+                        absl::Status& creation_status);
 
   bool isInternalAddress(const Network::Address::Instance& address) const override {
     if (address.type() == Network::Address::Type::Pipe) {
@@ -134,7 +137,7 @@ public:
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
       Tracing::TracerManager& tracer_manager,
-      FilterConfigProviderManager& filter_config_provider_manager);
+      FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status);
 
   // Http::FilterChainFactory
   bool createFilterChain(
@@ -406,9 +409,9 @@ public:
    * @param date_provider the singleton used in config creation.
    * @param route_config_provider_manager the singleton used in config creation.
    * @param scoped_routes_config_provider_manager the singleton used in config creation.
-   * @return a shared_ptr to the created config object.
+   * @return a shared_ptr to the created config object or a creation error
    */
-  static std::shared_ptr<HttpConnectionManagerConfig> createConfig(
+  static absl::StatusOr<std::shared_ptr<HttpConnectionManagerConfig>> createConfig(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,

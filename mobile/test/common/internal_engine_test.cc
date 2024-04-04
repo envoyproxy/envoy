@@ -1,9 +1,12 @@
+#include <sys/resource.h>
+
 #include <atomic>
 
 #include "source/common/common/assert.h"
 
 #include "test/common/http/common.h"
 #include "test/common/mocks/common/mocks.h"
+#include "test/mocks/thread/mocks.h"
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
@@ -17,9 +20,8 @@
 namespace Envoy {
 
 using testing::_;
-using testing::HasSubstr;
+using testing::ByMove;
 using testing::Return;
-using testing::ReturnRef;
 
 // This config is the minimal envoy mobile config that allows for running the engine.
 const std::string MINIMAL_TEST_CONFIG = R"(
@@ -105,7 +107,7 @@ struct EngineTestContext {
   absl::Notification on_engine_running;
   absl::Notification on_exit;
   absl::Notification on_log;
-  absl::Notification on_logger_release;
+  absl::Notification on_log_exit;
   absl::Notification on_event;
 };
 
@@ -114,25 +116,29 @@ struct EngineTestContext {
 // between the main thread and the engine thread both writing to the
 // Envoy::Logger::current_log_context global.
 struct TestEngine {
-  std::unique_ptr<InternalEngine> engine_;
-  envoy_engine_t handle() const { return reinterpret_cast<envoy_engine_t>(engine_.get()); }
-  TestEngine(envoy_engine_callbacks callbacks, const std::string& level) {
-    engine_.reset(new Envoy::InternalEngine(callbacks, {}, {}));
+  TestEngine(std::unique_ptr<EngineCallbacks> callbacks, const std::string& level) {
+    engine_.reset(new Envoy::InternalEngine(std::move(callbacks), {}, {}));
     Platform::EngineBuilder builder;
     auto bootstrap = builder.generateBootstrap();
     std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
     engine_->run(yaml, level);
   }
 
+  envoy_engine_t handle() const { return reinterpret_cast<envoy_engine_t>(engine_.get()); }
+
   envoy_status_t terminate() const { return engine_->terminate(); }
+
   [[nodiscard]] bool isTerminated() const { return engine_->isTerminated(); }
 
-  ~TestEngine() {
-    if (!engine_->isTerminated()) {
-      engine_->terminate();
-    }
-  }
+  std::unique_ptr<InternalEngine> engine_;
 };
+
+std::unique_ptr<EngineCallbacks> createDefaultEngineCallbacks(EngineTestContext& test_context) {
+  std::unique_ptr<EngineCallbacks> engine_callbacks = std::make_unique<EngineCallbacks>();
+  engine_callbacks->on_engine_running_ = [&] { test_context.on_engine_running.Notify(); };
+  engine_callbacks->on_exit_ = [&] { test_context.on_exit.Notify(); };
+  return engine_callbacks;
+}
 
 // Transform C map to C++ map.
 [[maybe_unused]] static inline std::map<std::string, std::string> toMap(envoy_map map) {
@@ -176,21 +182,8 @@ private:
 };
 
 TEST_F(InternalEngineTest, EarlyExit) {
-  const std::string level = "debug";
-
   EngineTestContext test_context{};
-  envoy_engine_callbacks callbacks{[](void* context) -> void {
-                                     auto* engine_running =
-                                         static_cast<EngineTestContext*>(context);
-                                     engine_running->on_engine_running.Notify();
-                                   } /*on_engine_running*/,
-                                   [](void* context) -> void {
-                                     auto* exit = static_cast<EngineTestContext*>(context);
-                                     exit->on_exit.Notify();
-                                   } /*on_exit*/,
-                                   &test_context /*context*/};
-
-  engine_ = std::make_unique<TestEngine>(callbacks, level);
+  engine_ = std::make_unique<TestEngine>(createDefaultEngineCallbacks(test_context), LEVEL_DEBUG);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
@@ -203,17 +196,8 @@ TEST_F(InternalEngineTest, EarlyExit) {
 }
 
 TEST_F(InternalEngineTest, AccessEngineAfterInitialization) {
-  const std::string level = "debug";
-
   EngineTestContext test_context{};
-  envoy_engine_callbacks callbacks{[](void* context) -> void {
-                                     auto* engine_running =
-                                         static_cast<EngineTestContext*>(context);
-                                     engine_running->on_engine_running.Notify();
-                                   } /*on_engine_running*/,
-                                   [](void*) -> void {} /*on_exit*/, &test_context /*context*/};
-
-  engine_ = std::make_unique<TestEngine>(callbacks, level);
+  engine_ = std::make_unique<TestEngine>(createDefaultEngineCallbacks(test_context), LEVEL_DEBUG);
   engine_->handle();
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
@@ -232,17 +216,8 @@ TEST_F(InternalEngineTest, AccessEngineAfterInitialization) {
 
 TEST_F(InternalEngineTest, RecordCounter) {
   EngineTestContext test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* engine_running =
-                                          static_cast<EngineTestContext*>(context);
-                                      engine_running->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* exit = static_cast<EngineTestContext*>(context);
-                                      exit->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &test_context /*context*/};
-  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
 
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -254,31 +229,15 @@ TEST_F(InternalEngineTest, RecordCounter) {
 
 TEST_F(InternalEngineTest, Logger) {
   EngineTestContext test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* test_context = static_cast<EngineTestContext*>(context);
-                                      test_context->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* test_context = static_cast<EngineTestContext*>(context);
-                                      test_context->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &test_context /*context*/};
-
-  envoy_logger logger{[](envoy_log_level, envoy_data data, const void* context) -> void {
-                        auto* test_context =
-                            static_cast<EngineTestContext*>(const_cast<void*>(context));
-                        release_envoy_data(data);
-                        if (!test_context->on_log.HasBeenNotified()) {
-                          test_context->on_log.Notify();
-                        }
-                      } /* log */,
-                      [](const void* context) -> void {
-                        auto* test_context =
-                            static_cast<EngineTestContext*>(const_cast<void*>(context));
-                        test_context->on_logger_release.Notify();
-                      } /* release */,
-                      &test_context};
-  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, logger, {}));
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log_ = [&](Logger::Logger::Levels, const std::string&) {
+    if (!test_context.on_log.HasBeenNotified()) {
+      test_context.on_log.Notify();
+    }
+  };
+  logger->on_exit_ = [&] { test_context.on_log_exit.Notify(); };
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), std::move(logger), /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
@@ -286,31 +245,21 @@ TEST_F(InternalEngineTest, Logger) {
 
   engine->terminate();
   engine.reset();
-  ASSERT_TRUE(test_context.on_logger_release.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_log_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 
 TEST_F(InternalEngineTest, EventTrackerRegistersDefaultAPI) {
   EngineTestContext test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* test_context = static_cast<EngineTestContext*>(context);
-                                      test_context->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* test_context = static_cast<EngineTestContext*>(context);
-                                      test_context->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &test_context /*context*/};
 
-  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   // A default event tracker is registered in external API registry.
-  const auto registered_event_tracker =
-      static_cast<envoy_event_tracker*>(Api::External::retrieveApi(envoy_event_tracker_api_name));
-  EXPECT_TRUE(registered_event_tracker != nullptr);
-  EXPECT_TRUE(registered_event_tracker->track == nullptr);
-  EXPECT_TRUE(registered_event_tracker->context == nullptr);
+  const auto registered_event_tracker = static_cast<std::unique_ptr<EnvoyEventTracker>*>(
+      Api::External::retrieveApi(ENVOY_EVENT_TRACKER_API_NAME));
+  EXPECT_TRUE(registered_event_tracker != nullptr && *registered_event_tracker == nullptr);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
   // Simulate a failed assertion by invoking a debug assertion failure
@@ -325,38 +274,24 @@ TEST_F(InternalEngineTest, EventTrackerRegistersDefaultAPI) {
 
 TEST_F(InternalEngineTest, EventTrackerRegistersAPI) {
   EngineTestContext test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* test_context = static_cast<EngineTestContext*>(context);
-                                      test_context->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* test_context = static_cast<EngineTestContext*>(context);
-                                      test_context->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &test_context /*context*/};
-  envoy_event_tracker event_tracker{[](envoy_map map, const void* context) -> void {
-                                      const auto new_map = toMap(map);
-                                      if (new_map.count("foo") && new_map.at("foo") == "bar") {
-                                        auto* test_context = static_cast<EngineTestContext*>(
-                                            const_cast<void*>(context));
-                                        test_context->on_event.Notify();
-                                      }
-                                    } /*track*/,
-                                    &test_context /*context*/};
 
-  std::unique_ptr<Envoy::InternalEngine> engine(
-      new Envoy::InternalEngine(engine_cbs, {}, event_tracker));
+  auto event_tracker = std::make_unique<EnvoyEventTracker>();
+  event_tracker->on_track_ = [&](const absl::flat_hash_map<std::string, std::string>& events) {
+    if (events.count("foo") && events.at("foo") == "bar") {
+      test_context.on_event.Notify();
+    }
+  };
+
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, std::move(event_tracker));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
-  const auto registered_event_tracker =
-      static_cast<envoy_event_tracker*>(Api::External::retrieveApi(envoy_event_tracker_api_name));
-  EXPECT_TRUE(registered_event_tracker != nullptr);
-  EXPECT_EQ(event_tracker.track, registered_event_tracker->track);
-  EXPECT_EQ(event_tracker.context, registered_event_tracker->context);
+  const auto registered_event_tracker = static_cast<std::unique_ptr<EnvoyEventTracker>*>(
+      Api::External::retrieveApi(ENVOY_EVENT_TRACKER_API_NAME));
+  EXPECT_TRUE(registered_event_tracker != nullptr && *registered_event_tracker != nullptr);
 
-  event_tracker.track(Bridge::Utility::makeEnvoyMap({{"foo", "bar"}}),
-                      registered_event_tracker->context);
+  (*registered_event_tracker)->on_track_({{"foo", "bar"}});
 
   ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
   engine->terminate();
@@ -365,29 +300,17 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAPI) {
 
 TEST_F(InternalEngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
   EngineTestContext test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* test_context = static_cast<EngineTestContext*>(context);
-                                      test_context->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* test_context = static_cast<EngineTestContext*>(context);
-                                      test_context->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &test_context /*context*/};
 
-  envoy_event_tracker event_tracker{
-      [](envoy_map map, const void* context) -> void {
-        const auto new_map = toMap(map);
-        if (new_map.count("name") && new_map.at("name") == "assertion") {
-          EXPECT_EQ(new_map.at("location"), "foo_location");
-          auto* test_context = static_cast<EngineTestContext*>(const_cast<void*>(context));
-          test_context->on_event.Notify();
-        }
-      } /*track*/,
-      &test_context /*context*/};
+  auto event_tracker = std::make_unique<EnvoyEventTracker>();
+  event_tracker->on_track_ = [&](const absl::flat_hash_map<std::string, std::string>& events) {
+    if (events.count("name") && events.at("name") == "assertion") {
+      EXPECT_EQ(events.at("location"), "foo_location");
+      test_context.on_event.Notify();
+    }
+  };
 
-  std::unique_ptr<Envoy::InternalEngine> engine(
-      new Envoy::InternalEngine(engine_cbs, {}, event_tracker));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, std::move(event_tracker));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -404,29 +327,17 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
 
 TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
   EngineTestContext test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* test_context = static_cast<EngineTestContext*>(context);
-                                      test_context->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* test_context = static_cast<EngineTestContext*>(context);
-                                      test_context->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &test_context /*context*/};
 
-  envoy_event_tracker event_tracker{[](envoy_map map, const void* context) -> void {
-                                      const auto new_map = toMap(map);
-                                      if (new_map.count("name") && new_map.at("name") == "bug") {
-                                        EXPECT_EQ(new_map.at("location"), "foo_location");
-                                        auto* test_context = static_cast<EngineTestContext*>(
-                                            const_cast<void*>(context));
-                                        test_context->on_event.Notify();
-                                      }
-                                    } /*track*/,
-                                    &test_context /*context*/};
+  auto event_tracker = std::make_unique<EnvoyEventTracker>();
+  event_tracker->on_track_ = [&](const absl::flat_hash_map<std::string, std::string>& events) {
+    if (events.count("name") && events.at("name") == "bug") {
+      EXPECT_EQ(events.at("location"), "foo_location");
+      test_context.on_event.Notify();
+    }
+  };
 
-  std::unique_ptr<Envoy::InternalEngine> engine(
-      new Envoy::InternalEngine(engine_cbs, {}, event_tracker));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, std::move(event_tracker));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -442,23 +353,12 @@ TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
 }
 
 TEST_F(InternalEngineTest, BasicStream) {
-  const std::string level = "debug";
-  EngineTestContext engine_cbs_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* engine_running =
-                                          static_cast<EngineTestContext*>(context);
-                                      engine_running->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* exit = static_cast<EngineTestContext*>(context);
-                                      exit->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &engine_cbs_context /*context*/};
-  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, {}, {}));
-  engine->run(BUFFERED_TEST_CONFIG, level);
+  EngineTestContext test_context{};
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
+  engine->run(BUFFERED_TEST_CONFIG, LEVEL_DEBUG);
 
-  ASSERT_TRUE(
-      engine_cbs_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification on_complete_notification;
   envoy_http_callbacks stream_cbs{
@@ -500,29 +400,18 @@ TEST_F(InternalEngineTest, BasicStream) {
 
   engine->terminate();
 
-  ASSERT_TRUE(engine_cbs_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
+  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 }
 
 TEST_F(InternalEngineTest, ResetStream) {
-  EngineTestContext engine_cbs_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* engine_running =
-                                          static_cast<EngineTestContext*>(context);
-                                      engine_running->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* exit = static_cast<EngineTestContext*>(context);
-                                      exit->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &engine_cbs_context /*context*/};
-
+  EngineTestContext test_context{};
   // There is nothing functional about the config used to run the engine, as the created stream is
   // immediately reset.
-  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
-  ASSERT_TRUE(
-      engine_cbs_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification on_cancel_notification;
   envoy_http_callbacks stream_cbs{
@@ -549,50 +438,30 @@ TEST_F(InternalEngineTest, ResetStream) {
 
   engine->terminate();
 
-  ASSERT_TRUE(engine_cbs_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
+  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 }
 
 TEST_F(InternalEngineTest, RegisterPlatformApi) {
-  EngineTestContext engine_cbs_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* engine_running =
-                                          static_cast<EngineTestContext*>(context);
-                                      engine_running->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* exit = static_cast<EngineTestContext*>(context);
-                                      exit->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &engine_cbs_context /*context*/};
-
+  EngineTestContext test_context{};
   // Using the minimal envoy mobile config that allows for running the engine.
-  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
-  ASSERT_TRUE(
-      engine_cbs_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   uint64_t fake_api;
   Envoy::Api::External::registerApi("api", &fake_api);
 
   engine->terminate();
 
-  ASSERT_TRUE(engine_cbs_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
+  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 }
 
 TEST_F(InternalEngineTest, ResetConnectivityState) {
   EngineTestContext test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* engine_running =
-                                          static_cast<EngineTestContext*>(context);
-                                      engine_running->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* exit = static_cast<EngineTestContext*>(context);
-                                      exit->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &test_context /*context*/};
-  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, {}, {}));
+  std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+      createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
@@ -602,66 +471,91 @@ TEST_F(InternalEngineTest, ResetConnectivityState) {
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 
-TEST_F(InternalEngineTest, SetLogger) {
-  std::atomic<bool> logging_was_called{false};
-  envoy_logger logger;
-  logger.log = [](envoy_log_level, envoy_data data, const void* context) {
-    std::atomic<bool>* logging_was_called =
-        const_cast<std::atomic<bool>*>(static_cast<const std::atomic<bool>*>(context));
-    *logging_was_called = true;
-    release_envoy_data(data);
-  };
-  logger.release = envoy_noop_const_release;
-  logger.context = &logging_was_called;
+TEST_F(InternalEngineTest, ThreadCreationFailed) {
+  EngineTestContext test_context{};
+  auto thread_factory = std::make_unique<Thread::MockPosixThreadFactory>();
+  EXPECT_CALL(*thread_factory, createThread(_, _, false)).WillOnce(Return(ByMove(nullptr)));
+  std::unique_ptr<InternalEngine> engine(new InternalEngine(
+      createDefaultEngineCallbacks(test_context), {}, {}, {}, std::move(thread_factory)));
+  envoy_status_t status = engine->run(BUFFERED_TEST_CONFIG, LEVEL_DEBUG);
+  EXPECT_EQ(status, ENVOY_FAILURE);
+  // Calling `terminate()` should not crash.
+  EXPECT_EQ(engine->terminate(), ENVOY_FAILURE);
+}
 
-  absl::Notification engine_running;
-  Platform::EngineBuilder engine_builder;
-  Platform::EngineSharedPtr engine =
-      engine_builder.addLogLevel(Platform::LogLevel::debug)
-          .setLogger(logger)
-          .setOnEngineRunning([&] { engine_running.Notify(); })
-          .addNativeFilter(
-              "test_remote_response",
-              "{'@type': "
-              "type.googleapis.com/"
-              "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse}")
-          .build();
-  engine_running.WaitForNotification();
+class ThreadPriorityInternalEngineTest : public InternalEngineTest {
+protected:
+  // Starts an InternalEngine with the given priority and runs a request so the engine thread
+  // priority can be retrieved.
+  // Returns the engine's main thread priority.
+  int startEngineWithPriority(const int thread_priority) {
+    EngineTestContext test_context{};
+    std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
+        createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr,
+        thread_priority);
+    engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
 
-  int actual_status_code = 0;
-  bool actual_end_stream = false;
-  absl::Notification stream_complete;
-  auto stream_prototype = engine->streamClient()->newStreamPrototype();
-  auto stream = (*stream_prototype)
-                    .setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream,
-                                      envoy_stream_intel) {
-                      actual_status_code = headers->httpStatus();
-                      actual_end_stream = end_stream;
-                    })
-                    .setOnData([&](envoy_data data, bool end_stream) {
-                      actual_end_stream = end_stream;
-                      release_envoy_data(data);
-                    })
-                    .setOnComplete([&](envoy_stream_intel, envoy_final_stream_intel) {
-                      stream_complete.Notify();
-                    })
-                    .setOnError([&](Platform::EnvoyErrorSharedPtr, envoy_stream_intel,
-                                    envoy_final_stream_intel) { stream_complete.Notify(); })
-                    .setOnCancel([&](envoy_stream_intel, envoy_final_stream_intel) {
-                      stream_complete.Notify();
-                    })
-                    .start();
+    struct CallbackContext {
+      absl::Notification on_complete_notification;
+      int thread_priority = 0;
+    };
 
-  auto request_headers =
-      Platform::RequestHeadersBuilder(Platform::RequestMethod::GET, "https", "example.com", "/")
-          .build();
-  stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
-  stream_complete.WaitForNotification();
+    CallbackContext context;
+    envoy_http_callbacks stream_cbs{
+        [](envoy_headers c_headers, bool, envoy_stream_intel, void* context) -> void {
+          release_envoy_map(c_headers);
+          // Gets the thread priority, so we can check that it's the same thread priority we set.
+          auto* callback_context = static_cast<CallbackContext*>(context);
+          callback_context->thread_priority = getpriority(PRIO_PROCESS, 0);
+        } /* on_headers */,
+        nullptr /* on_data */,
+        nullptr /* on_metadata */,
+        nullptr /* on_trailers */,
+        nullptr /* on_error */,
+        [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void {
+          auto* callback_context = static_cast<CallbackContext*>(context);
+          callback_context->on_complete_notification.Notify();
+        } /* on_complete */,
+        nullptr /* on_cancel */,
+        nullptr /* on_send_window_available*/,
+        &context};
 
-  EXPECT_EQ(actual_status_code, 200);
-  EXPECT_EQ(actual_end_stream, true);
-  EXPECT_TRUE(logging_was_called.load());
-  EXPECT_EQ(engine->terminate(), ENVOY_SUCCESS);
+    Http::TestRequestHeaderMapImpl headers;
+    HttpTestUtility::addDefaultHeaders(headers);
+    envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
+
+    Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+    envoy_data c_data = Data::Utility::toBridgeData(request_data);
+
+    envoy_stream_t stream = engine->initStream();
+    engine->startStream(stream, stream_cbs, false);
+    engine->sendHeaders(stream, c_headers, false);
+    engine->sendData(stream, c_data, true);
+
+    EXPECT_TRUE(context.on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
+    engine->terminate();
+    EXPECT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
+
+    return context.thread_priority;
+  }
+};
+
+TEST_F(ThreadPriorityInternalEngineTest, SetThreadPriority) {
+  const int expected_thread_priority = 10;
+  const int actual_thread_priority = startEngineWithPriority(expected_thread_priority);
+  EXPECT_EQ(actual_thread_priority, expected_thread_priority);
+}
+
+TEST_F(ThreadPriorityInternalEngineTest, SetOutOfRangeThreadPriority) {
+  // 42 is outside the range of acceptable thread priorities.
+  const int expected_thread_priority = 42;
+  const int actual_thread_priority = startEngineWithPriority(expected_thread_priority);
+  // The `setpriority` system call doesn't define what happens when the thread priority is out of
+  // range, and the behavior could be system dependent. On Linux, if the supplied priority value
+  // is greater than 19, then the thread priority value that gets set is 19. But since the behavior
+  // could be system dependent, we just verify that the thread priority that gets set is not the
+  // out-of-range one that we initialiazed the engine with.
+  EXPECT_NE(actual_thread_priority, expected_thread_priority);
 }
 
 } // namespace Envoy

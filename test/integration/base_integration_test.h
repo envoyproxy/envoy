@@ -9,7 +9,7 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
@@ -525,7 +525,8 @@ protected:
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
 
   // The fake upstreams_ are created using the context_manager, so make sure
   // they are destroyed before it is.

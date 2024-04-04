@@ -62,14 +62,14 @@ public:
     std::stringstream ss;
     filter_->dumpState(ss, 0);
 
-    std::string expected_state_template =
+    constexpr absl::string_view expected_state_template =
         R"EOF(PlatformBridgeFilter, filter_name_: {}, error_response_: {}
   Request Filter, state_.iteration_state_: {}, state_.on_headers_called_: {}, state_.headers_forwarded_: {}, state_.on_data_called_: {}, state_.data_forwarded_: {}, state_.on_trailers_called_: {}, state_.trailers_forwarded_: {}, state_.on_resume_called_: {}, pending_headers_: {}, buffer: {}, pending_trailers_: {}, state_.stream_complete_: {}
   Response Filter, state_.iteration_state_: {}, state_.on_headers_called_: {}, state_.headers_forwarded_: {}, state_.on_data_called_: {}, state_.data_forwarded_: {}, state_.on_trailers_called_: {}, state_.trailers_forwarded_: {}, state_.on_resume_called_: {}, pending_headers_: {}, buffer: {}, pending_trailers_: {}, state_.stream_complete_: {}
 )EOF";
 
     std::string expected_state = fmt::format(
-        fmt::runtime(expected_state_template), name, error_response, request.iteration_state,
+        expected_state_template, name, error_response, request.iteration_state,
         request.on_headers_called, request.headers_forwarded, request.on_data_called,
         request.data_forwarded, request.on_trailers_called, request.trailers_forwarded,
         request.on_resume_called, request.pending_headers, request.buffer, request.pending_trailers,

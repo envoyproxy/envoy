@@ -42,7 +42,7 @@ DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
   const auto& clusters = bootstrap.static_resources().clusters();
   for (const auto& cluster : clusters) {
     if (cluster.name() == "base") {
-      MessageUtil::unpackTo(cluster.cluster_type().typed_config(), cluster_config);
+      MessageUtil::unpackTo(cluster.cluster_type().typed_config(), cluster_config).IgnoreError();
     }
   }
   return cluster_config;
@@ -227,6 +227,18 @@ TEST(TestConfig, EnableDrainPostDnsRefresh) {
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("enable_drain_post_dns_refresh: true"));
 }
 
+TEST(TestConfig, SetDnsQueryTimeout) {
+  EngineBuilder engine_builder;
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  // The default value.
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 5 }"));
+
+  engine_builder.addDnsQueryTimeoutSeconds(30);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 30 }"));
+}
+
 TEST(TestConfig, EnforceTrustChainVerification) {
   EngineBuilder engine_builder;
 
@@ -379,7 +391,7 @@ TEST(TestConfig, XdsConfig) {
             "com.google.envoymobile.io.myapp");
 }
 
-TEST(TestConfig, CopyConstructor) {
+TEST(TestConfig, MoveConstructor) {
   EngineBuilder engine_builder;
   engine_builder.setRuntimeGuard("test_feature_false", true).enableGzipDecompression(false);
 
@@ -388,18 +400,18 @@ TEST(TestConfig, CopyConstructor) {
   EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
   EXPECT_THAT(bootstrap_str, Not(HasSubstr("envoy.filters.http.decompressor")));
 
-  EngineBuilder engine_builder_copy(engine_builder);
-  engine_builder_copy.enableGzipDecompression(true);
+  EngineBuilder engine_builder_move1(std::move(engine_builder));
+  engine_builder_move1.enableGzipDecompression(true);
   XdsBuilder xdsBuilder("FAKE_XDS_SERVER", 0);
   xdsBuilder.addClusterDiscoveryService();
-  engine_builder_copy.setXds(xdsBuilder);
-  bootstrap_str = engine_builder_copy.generateBootstrap()->ShortDebugString();
+  engine_builder_move1.setXds(xdsBuilder);
+  bootstrap_str = engine_builder_move1.generateBootstrap()->ShortDebugString();
   EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
   EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
   EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
 
-  EngineBuilder engine_builder_copy2(engine_builder_copy);
-  bootstrap_str = engine_builder_copy2.generateBootstrap()->ShortDebugString();
+  EngineBuilder engine_builder_move2(std::move(engine_builder_move1));
+  bootstrap_str = engine_builder_move2.generateBootstrap()->ShortDebugString();
   EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
   EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
   EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));

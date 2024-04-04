@@ -22,12 +22,18 @@ public:
                                            ? default_root_spans_per_minute
                                            : ROOT_SPANS_PER_MINUTE_DEFAULT),
         root_spans_per_minute_(default_root_spans_per_minute_) {}
+
+  SamplerConfig(const SamplerConfig&) = delete;
+  SamplerConfig& operator=(const SamplerConfig&) = delete;
+
   /**
    * @brief Parses a json string containing the expected root spans per minute.
    *
    * @param json A string containing the configuration.
+   *
+   * @return true if parsing was successful, false otherwise
    */
-  void parse(const std::string& json);
+  bool parse(const std::string& json);
 
   /**
    * @brief Returns wanted root spans per minute
