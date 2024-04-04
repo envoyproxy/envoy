@@ -667,10 +667,12 @@ void WebIdentityCredentialsProvider::extractCredentials(
     return;
   }
 
-  const auto access_key_id = Utility::getStringFromJsonOrDefault(credentials.value(), ACCESS_KEY_ID, "");
+  const auto access_key_id =
+      Utility::getStringFromJsonOrDefault(credentials.value(), ACCESS_KEY_ID, "");
   const auto secret_access_key =
       Utility::getStringFromJsonOrDefault(credentials.value(), SECRET_ACCESS_KEY, "");
-  const auto session_token = Utility::getStringFromJsonOrDefault(credentials.value(), SESSION_TOKEN, "");
+  const auto session_token =
+      Utility::getStringFromJsonOrDefault(credentials.value(), SESSION_TOKEN, "");
 
   // Mandatory response fields
   if (access_key_id.empty() || secret_access_key.empty() || session_token.empty()) {
