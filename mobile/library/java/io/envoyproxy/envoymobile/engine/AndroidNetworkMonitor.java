@@ -60,7 +60,9 @@ public class AndroidNetworkMonitor extends BroadcastReceiver {
    * when a new EnvoyEngine is created.
    */
   @VisibleForTesting
-  public static void shutdown() { instance = null; }
+  public static void shutdown() {
+    instance = null;
+  }
 
   private AndroidNetworkMonitor(Context context, EnvoyEngine envoyEngine) {
     int permission =
