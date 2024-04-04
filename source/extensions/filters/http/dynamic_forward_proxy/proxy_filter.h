@@ -69,7 +69,15 @@ private:
     LoadClusterEntryCallbacks& callbacks_;
   };
 
-  // Per-thread cluster info including pending callbacks.
+  // Per-thread cluster info including pending clusters.
+  // The lifetime of ThreadLocalClusterInfo, which is allocated on each working thread
+  // may exceed lifetime of the parent object (ProxyFilterConfig), which is allocated
+  // and deleted on the main thread.
+  // Currently ThreadLocalClusterInfo does not hold any references to the parent object
+  // and therefore does not need to check if the parent object is still valid.
+  // IMPORTANT: If a reference to the parent object is added here, the validity of
+  // that object must be checked before using it. It is best achieved via
+  // combination of shared and weak pointers.
   struct ThreadLocalClusterInfo : public ThreadLocal::ThreadLocalObject,
                                   public Envoy::Upstream::ClusterUpdateCallbacks,
                                   Logger::Loggable<Logger::Id::forward_proxy> {
