@@ -463,6 +463,9 @@ new_features:
     Added maximum gRPC message size that is allowed to be received in Envoy gRPC. If a message over this limit is received,
     the gRPC stream is terminated with the RESOURCE_EXHAUSTED error. This limit is applied to individual messages in the
     streaming response and not the total size of streaming response. Defaults to 0, which means unlimited.
+- area: filters
+  change: |
+    Added :ref:`the Basic Auth per-route filter <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuthPerRoute>`.
 
 deprecated:
 - area: listener
