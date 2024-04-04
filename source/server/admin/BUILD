@@ -426,6 +426,7 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/server:admin_interface",
         "//envoy/server:instance_interface",
+        "//source/common/common:logger_lib",
     ],
 )
 
@@ -452,6 +453,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/common:pure_lib",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:logger_lib",
         "//source/common/upstream:host_utility_lib",
     ],
 )

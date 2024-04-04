@@ -96,6 +96,7 @@ void AdminFilter::onComplete() {
   bool more_data;
   do {
     Buffer::OwnedImpl response;
+    ENVOY_LOG_MISC(debug, "about to call next chunk");
     more_data = handler->nextChunk(response);
     bool end_stream = end_stream_on_complete_ && !more_data;
     ENVOY_LOG_MISC(debug, "nextChunk: response.length={} more_data={} end_stream={}",

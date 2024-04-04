@@ -15,7 +15,7 @@ namespace Server {
 
 class ClustersRenderer {
 public:
-  virtual bool nextChunk() PURE;
+  virtual bool nextChunk(Buffer::Instance& response) PURE;
   // TODO(demitriswan) make sure this is the best way to handle destruction
   // in a virtual base class such as this.
   virtual ~ClustersRenderer() = default;
@@ -29,9 +29,8 @@ protected:
 class ClustersTextRenderer : public ClustersRenderer {
 public:
   ClustersTextRenderer(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
-                       Buffer::Instance& response,
                        const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map);
-  bool nextChunk() override;
+  bool nextChunk(Buffer::Instance& response) override;
 
 private:
   void render(std::reference_wrapper<const Upstream::Cluster> cluster) override;
@@ -44,23 +43,20 @@ private:
                                         Buffer::Instance& response);
   const uint64_t chunk_limit_;
   Http::ResponseHeaderMap& response_headers_;
-  Buffer::Instance& response_;
-  const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map_;
-  Upstream::ClusterManager::ClusterInfoMap::const_iterator it_;
+  std::vector<std::reference_wrapper<const Upstream::Cluster>> clusters_;
+  uint64_t idx_;
 };
 
 class ClustersJsonRenderer : public ClustersRenderer {
 public:
   ClustersJsonRenderer(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
-                       Buffer::Instance& response,
                        const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map);
-  bool nextChunk() override;
+  bool nextChunk(Buffer::Instance& response) override;
 
 private:
   void render(std::reference_wrapper<const Upstream::Cluster> cluster) override;
   const uint64_t chunk_limit_;
   Http::ResponseHeaderMap& response_headers_;
-  Buffer::Instance& response_;
   const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map_;
   Upstream::ClusterManager::ClusterInfoMap::const_iterator it_;
 };

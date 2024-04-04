@@ -18,8 +18,7 @@ class ClustersRequest : public Admin::Request {
 public:
   static constexpr uint64_t DefaultChunkLimit = 2 << 20; // 2 MB
 
-  ClustersRequest(uint64_t chunk_limit, Instance& server, Buffer::Instance& response,
-                  const ClustersParams& params);
+  ClustersRequest(uint64_t chunk_limit, Instance& server, const ClustersParams& params);
 
   Http::Code start(Http::ResponseHeaderMap& response_headers) override;
   bool nextChunk(Buffer::Instance& response) override;
@@ -29,9 +28,8 @@ private:
 
   uint64_t chunk_limit_{DefaultChunkLimit};
   Server::Instance& server_;
-  Buffer::Instance& response_;
   const ClustersParams& params_;
-  ClustersRendererPtr renderer_;
+  ClustersRendererPtr renderer_ = nullptr;
 };
 
 } // namespace Server

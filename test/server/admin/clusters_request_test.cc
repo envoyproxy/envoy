@@ -24,9 +24,8 @@ class BaseClustersRequestFixture : public testing::Test {
 protected:
   using ClustersRequestPtr = std::unique_ptr<ClustersRequest>;
 
-  ClustersRequestPtr makeRequest(uint64_t chunk_limit, Instance& server, Buffer::Instance& buffer,
-                                 ClustersParams& params) {
-    return std::make_unique<ClustersRequest>(chunk_limit, server, buffer, params);
+  ClustersRequestPtr makeRequest(uint64_t chunk_limit, Instance& server, ClustersParams& params) {
+    return std::make_unique<ClustersRequest>(chunk_limit, server, params);
   }
 
   struct ResponseResult {
@@ -34,10 +33,10 @@ protected:
     Buffer::OwnedImpl data_;
   };
 
-  ResponseResult response(ClustersRequest& request, bool drain_after_next_chunk,
-                          Buffer::Instance& buffer) {
+  ResponseResult response(ClustersRequest& request, bool drain_after_next_chunk) {
     Http::TestResponseHeaderMapImpl response_headers;
     Http::Code code = request.start(response_headers);
+    Buffer::OwnedImpl buffer;
     Buffer::OwnedImpl result_data;
     while (request.nextChunk(buffer)) {
       if (drain_after_next_chunk) {
@@ -70,8 +69,7 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
   EXPECT_CALL(mock_server, clusterManager()).WillOnce(ReturnRef(mock_cluster_manager));
   EXPECT_CALL(mock_cluster_manager, clusters()).WillOnce(Return(cluster_info_maps));
 
-  ResponseResult result =
-      response(*makeRequest(1, mock_server, buffer, clusters_params), params.drain_, buffer);
+  ResponseResult result = response(*makeRequest(1, mock_server, clusters_params), params.drain_);
 
   EXPECT_EQ(result.code_, Http::Code::OK);
   // TODO(demtiriswan) add expection for JSON here based on mock function results

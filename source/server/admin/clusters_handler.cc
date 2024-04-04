@@ -65,8 +65,7 @@ Admin::RequestPtr ClustersHandler::makeRequest(AdminStream& admin_stream) {
   Buffer::OwnedImpl response;
   ClustersParams params;
   params.parse(admin_stream.getRequestHeaders().getPathValue(), response);
-  return std::make_unique<ClustersRequest>(ClustersRequest::DefaultChunkLimit, server_, response,
-                                           params);
+  return std::make_unique<ClustersRequest>(ClustersRequest::DefaultChunkLimit, server_, params);
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
