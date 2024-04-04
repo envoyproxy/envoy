@@ -125,8 +125,6 @@ build:mobile-remote-release-clang --config=mobile-release-common
 build:mobile-remote-release-clang --remote_download_toplevel
 build:mobile-remote-release-clang --config=ci
 build:mobile-remote-release-clang --config=remote
-# enabled because proto lite does not support added filters yet.
-build:mobile-remote-release-clang --define=envoy_full_protos=enabled
 
 build:mobile-remote-release-clang-android --config=mobile-remote-release-clang
 build:mobile-remote-release-clang-android --fat_apk_cpu=x86_64
@@ -193,8 +191,6 @@ build:mobile-remote-ci-linux --extra_toolchains=//third_party/rbe_configs/config
 build:mobile-remote-ci-linux --host_platform=//third_party/rbe_configs/config:platform
 build:mobile-remote-ci-linux --platforms=//third_party/rbe_configs/config:platform
 build:mobile-remote-ci-linux --config=mobile-remote-ci-common
-build:mobile-remote-ci-linux --define=envoy_full_protos=disabled
-build:mobile-remote-ci-linux --build_tests_only
 
 #############################################################################
 # mobile-remote-ci-linux-clang: These options are linux-only using Clang by default
@@ -211,6 +207,8 @@ build:mobile-remote-ci-linux-clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 build:mobile-remote-ci-linux-asan --config=clang-asan
 build:mobile-remote-ci-linux-asan --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci-linux-asan --config=remote-ci
+build:mobile-remote-ci-linux-asan --define=envoy_full_protos=disabled
+build:mobile-remote-ci-linux-asan --build_tests_only
 test:mobile-remote-ci-linux-asan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 #############################################################################
@@ -219,6 +217,8 @@ test:mobile-remote-ci-linux-asan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 build:mobile-remote-ci-linux-tsan --config=clang-tsan
 build:mobile-remote-ci-linux-tsan --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci-linux-tsan --config=remote-ci
+build:mobile-remote-ci-linux-tsan --define=envoy_full_protos=disabled
+build:mobile-remote-ci-linux-tsan --build_tests_only
 test:mobile-remote-ci-linux-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 #############################################################################
@@ -232,6 +232,8 @@ build:mobile-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-co
 build:mobile-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llm/bin/llvm-cov
 build:mobile-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
+build:mobile-ci-linux-coverage --define=envoy_full_protos=disabled
+build:mobile-ci-linux-coverage --build_tests_only
 
 #############################################################################
 # mobile-remote-ci-linux-coverage: These options are Linux-only using Clang and LLVM coverage
@@ -264,17 +266,15 @@ build:mobile-remote-ci --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci --config=remote-ci
 
 build:mobile-remote-ci-android --config=mobile-remote-ci
-# enabled because proto lite does not support added filters yet.
-build:mobile-remote-ci-android --define=envoy_full_protos=enabled
 test:mobile-remote-ci-android --build_tests_only
 test:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --config=mobile-test-android
-# enabled because proto lite does not support added filters yet.
-test:mobile-remote-ci-android --define=envoy_full_protos=enabled
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
 # Temporary revert to C++17 for mobile NDK builds.
 build:mobile-remote-ci-cc --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+build:mobile-remote-ci-cc --define=envoy_full_protos=disabled
+build:mobile-remote-ci-cc --build_tests_only
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
 
 build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci-cc
@@ -293,7 +293,8 @@ build:mobile-remote-ci-macos-swift --config=mobile-test-ios
 build:mobile-remote-ci-macos-swift --@envoy//bazel:http3=False
 
 build:mobile-remote-ci-core --config=mobile-remote-ci
-test:mobile-remote-ci-core --build_tests_only
+build:mobile-remote-ci-core --define=envoy_full_protos=disabled
+build:mobile-remote-ci-core --build_tests_only
 test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
 test:mobile-remote-ci-core --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
