@@ -253,10 +253,7 @@ TEST(NullTracerTest, BasicFunctionality) {
   Upstream::HostDescriptionConstSharedPtr host{
       new testing::NiceMock<Upstream::MockHostDescription>()};
   Upstream::ClusterInfoConstSharedPtr cluster{new testing::NiceMock<Upstream::MockClusterInfo>()};
-  Tracing::UpstreamContext upstream_context{.host_ = host,
-                                            .cluster_info_ = cluster,
-                                            .service_type_ = Tracing::ServiceType::Http,
-                                            .is_side_stream_ = false};
+  Tracing::UpstreamContext upstream_context(host, cluster, Tracing::ServiceType::Http, false);
 
   SpanPtr span_ptr =
       null_tracer.startSpan(config, trace_context, stream_info, {Reason::Sampling, true});

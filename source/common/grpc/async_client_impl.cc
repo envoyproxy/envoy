@@ -278,10 +278,10 @@ void AsyncRequestImpl::cancel() {
 
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   Tracing::HttpTraceContext trace_context(metadata);
-  Tracing::UpstreamContext upstream_context(nullptr,                         // host
-                                            cluster_info_,                   // cluster_info
-                                            Tracing::ServiceType::EnvoyGrpc, // service_type
-                                            true                             // is_side_stream
+  Tracing::UpstreamContext upstream_context(nullptr,                         // host_
+                                            cluster_info_,                   // cluster_info_
+                                            Tracing::ServiceType::EnvoyGrpc, // service_type_
+                                            true                             // is_side_stream_
   );
   current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(metadata);

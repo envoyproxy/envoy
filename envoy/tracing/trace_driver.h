@@ -28,16 +28,21 @@ enum class ServiceType {
   EnvoyGrpc
 };
 
+/**
+ * The upstream info used for injectContext.
+ */
 struct UpstreamContext {
   UpstreamContext(const Upstream::HostDescriptionConstSharedPtr& host = nullptr,
                   const Upstream::ClusterInfoConstSharedPtr& cluster_info = nullptr,
-                  const Tracing::ServiceType service_type = Tracing::ServiceType::Http,
+                  const Tracing::ServiceType service_type = Tracing::ServiceType::Unknown,
                   const bool is_side_stream = false)
-      : host_(host), cluster_info_(cluster_info) service_type_(service_type),
-        is_side_stream_(is_side_stream) Upstream::HostDescriptionConstSharedPtr host_{nullptr};
-  Upstream::ClusterInfoConstSharedPtr cluster_info_{nullptr};
-  ServiceType service_type_ = ServiceType::Unknown;
-  bool is_side_stream_ = false;
+      : host_(host), cluster_info_(cluster_info), service_type_(service_type),
+        is_side_stream_(is_side_stream) {}
+
+  Upstream::HostDescriptionConstSharedPtr host_;
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  ServiceType service_type_;
+  bool is_side_stream_;
 };
 
 /**
