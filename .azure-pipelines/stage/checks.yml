@@ -87,6 +87,7 @@ jobs:
       managedAgent: false
       repoFetchDepth: $(REPO_FETCH_DEPTH)
       repoFetchTags: $(REPO_FETCH_TAGS)
+      pathCacheTemp: /tmp/cache
       publishTestResults: variables.PUBLISH_TEST_RESULTS
       publishEnvoy: variables.PUBLISH_ENVOY
       tmpfsDockerDisabled: true
