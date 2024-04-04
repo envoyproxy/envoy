@@ -29,12 +29,8 @@ final class ViewController: UITableViewController {
       .enablePlatformCertificateValidation(true)
       .addNativeFilter(
         name: "envoy.filters.http.buffer",
-        typedConfig: """
-          {
-            "@type": "type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer",
-            "max_request_bytes": 5242880
-          }
-          """
+        // swiftlint:disable:next line_length
+        typedConfig: "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } }"
       )
       .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
       .addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
