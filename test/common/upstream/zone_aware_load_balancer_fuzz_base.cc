@@ -68,9 +68,17 @@ void ZoneAwareLoadBalancerFuzzBase::addWeightsToHosts() {
 }
 
 bool ZoneAwareLoadBalancerFuzzBase::validateSlowStart(
-    const envoy::config::cluster::v3::Cluster_SlowStartConfig& slow_start_config) {
+    const envoy::config::cluster::v3::Cluster_SlowStartConfig& slow_start_config,
+    uint32_t num_hosts) {
   if (slow_start_config.has_aggression()) {
     const auto& aggression = slow_start_config.aggression();
+    if (num_hosts > 5000) {
+      ENVOY_LOG_MISC(warn,
+                     "Too many hosts ({} > 5000) with aggression will slow down the runtime loader "
+                     "mock, skipping test",
+                     num_hosts);
+      return false;
+    }
     if (aggression.default_value() < 1e-30) {
       ENVOY_LOG_MISC(
           warn,

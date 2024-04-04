@@ -414,3 +414,4 @@ visibility_excludes:
 - source/extensions/load_balancing_policies/least_request/
 - source/extensions/load_balancing_policies/random/
 - source/extensions/load_balancing_policies/cluster_provided/
+- source/extensions/filters/http/match_delegate/

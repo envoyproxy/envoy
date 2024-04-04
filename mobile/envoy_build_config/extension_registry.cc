@@ -1,6 +1,5 @@
 #include "extension_registry.h"
 
-#include "source/common/http/match_delegate/config.h"
 #include "source/common/http/matching/inputs.h"
 #include "source/common/network/default_client_connection_factory.h"
 #include "source/common/network/resolver_impl.h"
@@ -69,9 +68,6 @@
 namespace Envoy {
 
 void ExtensionRegistry::registerFactories() {
-  Common::Http::MatchDelegate::Factory::forceRegisterSkipActionFactory();
-  Common::Http::MatchDelegate::forceRegisterMatchDelegateConfig();
-
   ExtensionRegistryPlatformAdditions::registerFactories();
 
   // The uuid extension is required for E-M for server mode. Ideally E-M could skip it.
