@@ -51,7 +51,7 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
-    name = "filter_reset_idle",
+    name = "filter_reset_idle_test",
     srcs = [
         "FilterResetIdleTest.swift",
     ],
@@ -65,7 +65,7 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
-    name = "grpc_receive_error",
+    name = "grpc_receive_error_test",
     srcs = [
         "GRPCReceiveErrorTest.swift",
     ],
@@ -236,6 +236,7 @@ envoy_mobile_swift_test(
     deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_server",
     ],
 )
 

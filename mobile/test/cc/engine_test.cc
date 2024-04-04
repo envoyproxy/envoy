@@ -9,11 +9,11 @@ namespace Envoy {
 TEST(EngineTest, SetLogger) {
   std::atomic logging_was_called{false};
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log = [&](Logger::Logger::Levels, const std::string&) { logging_was_called = true; };
+  logger->on_log_ = [&](Logger::Logger::Levels, const std::string&) { logging_was_called = true; };
 
   absl::Notification engine_running;
   auto engine_callbacks = std::make_unique<EngineCallbacks>();
-  engine_callbacks->on_engine_running = [&] { engine_running.Notify(); };
+  engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
   Platform::EngineBuilder engine_builder;
   Platform::EngineSharedPtr engine =
       engine_builder.setLogLevel(Logger::Logger::debug)
@@ -66,7 +66,7 @@ TEST(EngineTest, SetLogger) {
 TEST(EngineTest, SetEngineCallbacks) {
   absl::Notification engine_running;
   auto engine_callbacks = std::make_unique<EngineCallbacks>();
-  engine_callbacks->on_engine_running = [&] { engine_running.Notify(); };
+  engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
   Platform::EngineBuilder engine_builder;
   Platform::EngineSharedPtr engine =
       engine_builder.setLogLevel(Logger::Logger::debug)
@@ -117,18 +117,18 @@ TEST(EngineTest, SetEngineCallbacks) {
 TEST(EngineTest, SetEventTracker) {
   absl::Notification engine_running;
   auto engine_callbacks = std::make_unique<EngineCallbacks>();
-  engine_callbacks->on_engine_running = [&] { engine_running.Notify(); };
+  engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
 
   absl::Notification on_track;
   auto event_tracker = std::make_unique<EnvoyEventTracker>();
-  event_tracker->on_track = [&](const absl::flat_hash_map<std::string, std::string>& events) {
+  event_tracker->on_track_ = [&](const absl::flat_hash_map<std::string, std::string>& events) {
     if (events.count("name") && events.at("name") == "assertion") {
       EXPECT_EQ(events.at("location"), "foo_location");
       on_track.Notify();
     }
   };
   absl::Notification on_track_exit;
-  event_tracker->on_exit = [&] { on_track_exit.Notify(); };
+  event_tracker->on_exit_ = [&] { on_track_exit.Notify(); };
 
   Platform::EngineBuilder engine_builder;
   Platform::EngineSharedPtr engine =

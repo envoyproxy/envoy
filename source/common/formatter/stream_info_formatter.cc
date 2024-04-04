@@ -313,6 +313,165 @@ FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) con
   }
 }
 
+const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointGetter>
+    CommonDurationFormatter::KnownTimePointGetters{
+        {FirstDownstreamRxByteReceived,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           return stream_info.startTimeMonotonic();
+         }},
+        {LastDownstreamRxByteReceived,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->lastDownstreamRxByteReceived();
+           }
+           return {};
+         }},
+        {FirstUpstreamTxByteSent,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().first_upstream_tx_byte_sent_;
+           }
+           return {};
+         }},
+        {LastUpstreamTxByteSent,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().last_upstream_tx_byte_sent_;
+           }
+           return {};
+         }},
+        {FirstUpstreamRxByteReceived,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().first_upstream_rx_byte_received_;
+           }
+           return {};
+         }},
+        {LastUpstreamRxByteReceived,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().last_upstream_rx_byte_received_;
+           }
+           return {};
+         }},
+        {FirstDownstreamTxByteSent,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->firstDownstreamTxByteSent();
+           }
+           return {};
+         }},
+        {LastDownstreamTxByteSent,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->lastDownstreamTxByteSent();
+           }
+           return {};
+         }},
+    };
+
+CommonDurationFormatter::TimePointGetter
+CommonDurationFormatter::getTimePointGetterByName(absl::string_view name) {
+  auto it = KnownTimePointGetters.find(name);
+  if (it != KnownTimePointGetters.end()) {
+    return it->second;
+  }
+
+  return [key = std::string(name)](const StreamInfo::StreamInfo& info) {
+    const auto downstream_timing = info.downstreamTiming();
+    if (downstream_timing.has_value()) {
+      return downstream_timing->getValue(key);
+    }
+    return absl::optional<MonotonicTime>{};
+  };
+}
+
+std::unique_ptr<CommonDurationFormatter>
+CommonDurationFormatter::create(absl::string_view sub_command) {
+  // Split the sub_command by ':'.
+  absl::InlinedVector<absl::string_view, 3> parsed_sub_commands = absl::StrSplit(sub_command, ':');
+
+  if (parsed_sub_commands.size() < 2 || parsed_sub_commands.size() > 3) {
+    throwEnvoyExceptionOrPanic(
+        fmt::format("Invalid common duration configuration: {}.", sub_command));
+  }
+
+  absl::string_view start = parsed_sub_commands[0];
+  absl::string_view end = parsed_sub_commands[1];
+
+  // Milliseconds is the default precision.
+  DurationPrecision precision = DurationPrecision::Milliseconds;
+
+  if (parsed_sub_commands.size() == 3) {
+    absl::string_view precision_str = parsed_sub_commands[2];
+    if (precision_str == MillisecondsPrecision) {
+      precision = DurationPrecision::Milliseconds;
+    } else if (precision_str == MicrosecondsPrecision) {
+      precision = DurationPrecision::Microseconds;
+    } else if (precision_str == NanosecondsPrecision) {
+      precision = DurationPrecision::Nanoseconds;
+    } else {
+      throwEnvoyExceptionOrPanic(
+          fmt::format("Invalid common duration precision: {}.", precision_str));
+    }
+  }
+
+  TimePointGetter start_getter = getTimePointGetterByName(start);
+  TimePointGetter end_getter = getTimePointGetterByName(end);
+
+  return std::make_unique<CommonDurationFormatter>(std::move(start_getter), std::move(end_getter),
+                                                   precision);
+}
+
+absl::optional<uint64_t>
+CommonDurationFormatter::getDurationCount(const StreamInfo::StreamInfo& info) const {
+  auto time_point_beg = time_point_beg_(info);
+  auto time_point_end = time_point_end_(info);
+
+  if (!time_point_beg.has_value() || !time_point_end.has_value()) {
+    return absl::nullopt;
+  }
+
+  if (time_point_end.value() < time_point_beg.value()) {
+    return absl::nullopt;
+  }
+
+  auto duration = time_point_end.value() - time_point_beg.value();
+
+  switch (duration_precision_) {
+  case DurationPrecision::Milliseconds:
+    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+  case DurationPrecision::Microseconds:
+    return std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+  case DurationPrecision::Nanoseconds:
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+  }
+  PANIC("Invalid duration precision");
+}
+
+absl::optional<std::string>
+CommonDurationFormatter::format(const StreamInfo::StreamInfo& info) const {
+  auto duration = getDurationCount(info);
+  if (!duration.has_value()) {
+    return absl::nullopt;
+  }
+  return fmt::format_int(duration.value()).str();
+}
+ProtobufWkt::Value CommonDurationFormatter::formatValue(const StreamInfo::StreamInfo& info) const {
+  auto duration = getDurationCount(info);
+  if (!duration.has_value()) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  return ValueUtil::numberValue(duration.value());
+}
+
 // A SystemTime formatter that extracts the startTime from StreamInfo. Must be provided
 // an access log command that starts with `START_TIME`.
 StartTimeFormatter::StartTimeFormatter(const std::string& format)
@@ -855,6 +1014,11 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   [](const StreamInfo::StreamInfo& stream_info) {
                     return stream_info.currentDuration();
                   });
+            }}},
+          {"COMMON_DURATION",
+           {CommandSyntaxChecker::PARAMS_REQUIRED,
+            [](const std::string& sub_command, absl::optional<size_t>) {
+              return CommonDurationFormatter::create(sub_command);
             }}},
           {"RESPONSE_FLAGS",
            {CommandSyntaxChecker::COMMAND_ONLY,
