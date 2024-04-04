@@ -2442,7 +2442,7 @@ TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcService) {
         cluster_name: "ext_authz_server"
     )EOF");
 
-  EXPECT_TRUE(config_->requestHeaderMatchers() == nullptr);
+  EXPECT_TRUE(config_->allowedHeadersMatcher() == nullptr);
 }
 
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpService) {
@@ -2455,12 +2455,12 @@ TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpService) {
         timeout: 0.25s
     )EOF");
 
-  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Path.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher() != nullptr);
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Path.get()));
   EXPECT_TRUE(
-      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
+      config_->allowedHeadersMatcher()->matches(Http::CustomHeaders::get().Authorization.get()));
 }
 
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcServiceWithAllowedHeaders) {
@@ -2476,8 +2476,25 @@ TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcServiceWithAllowedHeader
         ignore_case: true
     )EOF");
 
-  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(foo.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher() != nullptr);
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(foo.get()));
+}
+
+TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcServiceWithDisallowedHeaders) {
+  const Http::LowerCaseString foo{"foo"};
+  initialize(R"EOF(
+    transport_api_version: V3
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "ext_authz_server"
+    disallowed_headers:
+      patterns:
+      - exact: Foo
+        ignore_case: true
+    )EOF");
+
+  EXPECT_TRUE(config_->disallowedHeadersMatcher() != nullptr);
+  EXPECT_TRUE(config_->disallowedHeadersMatcher()->matches(foo.get()));
 }
 
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithAllowedHeaders) {
@@ -2495,13 +2512,32 @@ TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithAllowedHeader
         ignore_case: true
     )EOF");
 
-  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher() != nullptr);
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Host.get()));
   EXPECT_TRUE(
-      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(foo.get()));
+      config_->allowedHeadersMatcher()->matches(Http::CustomHeaders::get().Authorization.get()));
+  EXPECT_FALSE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().ContentLength.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(foo.get()));
+}
+
+TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithDisallowedHeaders) {
+  const Http::LowerCaseString foo{"foo"};
+  initialize(R"EOF(
+    transport_api_version: V3
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+    disallowed_headers:
+      patterns:
+      - exact: Foo
+        ignore_case: true
+    )EOF");
+
+  EXPECT_TRUE(config_->disallowedHeadersMatcher() != nullptr);
+  EXPECT_TRUE(config_->disallowedHeadersMatcher()->matches(foo.get()));
 }
 
 TEST_P(HttpFilterTestParam,
@@ -2521,13 +2557,13 @@ TEST_P(HttpFilterTestParam,
             ignore_case: true
     )EOF");
 
-  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher() != nullptr);
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Host.get()));
   EXPECT_TRUE(
-      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(foo.get()));
+      config_->allowedHeadersMatcher()->matches(Http::CustomHeaders::get().Authorization.get()));
+  EXPECT_FALSE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().ContentLength.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(foo.get()));
 }
 
 TEST_P(HttpFilterTestParam, DEPRECATED_FEATURE_TEST(DuplicateAllowedHeadersConfigIsInvalid)) {
