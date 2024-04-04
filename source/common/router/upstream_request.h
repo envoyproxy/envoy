@@ -217,7 +217,6 @@ private:
 
   std::unique_ptr<UpstreamRequestFilterManagerCallbacks> filter_manager_callbacks_;
   std::unique_ptr<Http::FilterManager> filter_manager_;
-  Tracing::UpstreamContext upstream_context_;
 
   // The number of outstanding readDisable to be called with parameter value true.
   // When downstream send buffers get above high watermark before response headers arrive, we
