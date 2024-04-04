@@ -86,5 +86,23 @@ constexpr VerifyJsonOutputParameters VERIFY_JSON_CASES[] = {
 INSTANTIATE_TEST_SUITE_P(VerifyJsonOutput, VerifyJsonOutputFixture,
                          testing::ValuesIn<VerifyJsonOutputParameters>(VERIFY_JSON_CASES));
 
+struct VerifyTextOutputParameters {
+  bool drain_;
+};
+
+class VerifyTextOutputFixture : public BaseClustersRequestFixture,
+                                public testing::WithParamInterface<VerifyTextOutputParameters> {};
+
+// TODO(demitriswan) Implement test for text output verification.
+TEST_P(VerifyTextOutputFixture, VerifyTextOutput) {}
+
+constexpr VerifyTextOutputParameters VERIFY_TEXT_CASES[] = {
+    {/* drain_=*/true},
+    {/* drain_=*/false},
+};
+
+INSTANTIATE_TEST_SUITE_P(VerifyTextOutput, VerifyTextOutputFixture,
+                         testing::ValuesIn<VerifyTextOutputParameters>(VERIFY_TEXT_CASES));
+
 } // namespace Server
 } // namespace Envoy

@@ -2,10 +2,13 @@
 
 #include <cstdint>
 #include <functional>
+#include <string>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/outlier_detection.h"
+#include "envoy/upstream/resource_manager.h"
 
 namespace Envoy {
 namespace Server {
@@ -18,6 +21,8 @@ public:
   virtual ~ClustersRenderer() = default;
 
 protected:
+  // render is protected to suggest to implementations that this method should be
+  // implemented to properly implement nextChunk.
   virtual void render(std::reference_wrapper<const Upstream::Cluster> cluster) PURE;
 };
 
@@ -30,6 +35,13 @@ public:
 
 private:
   void render(std::reference_wrapper<const Upstream::Cluster> cluster) override;
+  static void addOutlierInfo(const std::string& cluster_name,
+                             const Upstream::Outlier::Detector* outlier_detector,
+                             Buffer::Instance& response);
+  static void addCircuitBreakerSettings(const std::string& cluster_name,
+                                        const std::string& priority_str,
+                                        Upstream::ResourceManager& resource_manager,
+                                        Buffer::Instance& response);
   const uint64_t chunk_limit_;
   Http::ResponseHeaderMap& response_headers_;
   Buffer::Instance& response_;
