@@ -491,7 +491,7 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcherMultipleFilters) 
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
 }
 
-// Verifies the filter can be created with server factory context in both downstream and upstream.
+// Verifies the filter can be created with server factory context in downstream.
 TEST_P(CompositeFilterIntegrationTest, TestCreateFilterWithServerFactoryContext) {
   if (!downstream_filter_) {
     return;
