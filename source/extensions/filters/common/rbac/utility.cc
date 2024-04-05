@@ -16,8 +16,10 @@ RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
                                                 Stats::Scope& scope) {
   const std::string base_prefix = Envoy::statPrefixJoin(prefix, "rbac.");
   const std::string final_rules_prefix = Envoy::statPrefixJoin(base_prefix, rules_prefix);
-  const std::string per_policy_final_rules_prefix = Envoy::statPrefixJoin(final_rules_prefix, "policy.");
-  const std::string final_shadow_rules_prefix = Envoy::statPrefixJoin(base_prefix, shadow_rules_prefix);
+  const std::string per_policy_final_rules_prefix =
+      Envoy::statPrefixJoin(final_rules_prefix, "policy.");
+  const std::string final_shadow_rules_prefix =
+      Envoy::statPrefixJoin(base_prefix, shadow_rules_prefix);
   const std::string per_policy_final_shadow_rules_prefix =
       Envoy::statPrefixJoin(final_shadow_rules_prefix, "policy.");
   return {

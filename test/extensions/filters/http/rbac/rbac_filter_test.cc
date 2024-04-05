@@ -749,7 +749,8 @@ TEST_F(RoleBasedAccessControlFilterTest, RulesStatPrefix) {
 
   EXPECT_EQ("test.rbac.rules_prefix_.allowed", config_->stats().allowed_.name());
   EXPECT_EQ("test.rbac.rules_prefix_.denied", config_->stats().denied_.name());
-  EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_allowed",
+            config_->stats().shadow_allowed_.name());
   EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 }
 
