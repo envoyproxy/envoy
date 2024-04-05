@@ -161,7 +161,7 @@ std::string SignerBaseImpl::createContentHash(Http::RequestMessage& message, boo
 std::string
 SignerBaseImpl::createAuthorizationCredential(absl::string_view access_key_id,
                                               absl::string_view credential_scope) const {
-  return fmt::format(fmt::runtime(SignatureConstants::AuthorizationCredentialFormat), access_key_id,
+  return fmt::format(SignatureConstants::AuthorizationCredentialFormat, access_key_id,
                      credential_scope);
 }
 

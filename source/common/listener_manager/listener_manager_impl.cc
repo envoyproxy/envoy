@@ -116,8 +116,9 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
         factory.isTerminalFilterByProto(*message,
                                         filter_chain_factory_context.serverFactoryContext()),
         is_terminal);
-    Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
+    Network::FilterFactoryCb callback = THROW_OR_RETURN_VALUE(
+        factory.createFilterFactoryFromProto(*message, filter_chain_factory_context),
+        Network::FilterFactoryCb);
     ret.push_back(
         config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name()));
   }

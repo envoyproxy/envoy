@@ -7,6 +7,7 @@ import io.envoyproxy.envoymobile.FilterDataStatus
 import io.envoyproxy.envoymobile.FilterHeadersStatus
 import io.envoyproxy.envoymobile.FilterTrailersStatus
 import io.envoyproxy.envoymobile.FinalStreamIntel
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.ResponseFilter
@@ -14,20 +15,32 @@ import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
 import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.StreamIntel
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
+import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 
-private const val TEST_RESPONSE_FILTER_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
-
 class CancelStreamTest {
-
   init {
     JniLibrary.loadTestLibrary()
+  }
+
+  private lateinit var httpTestServer: HttpTestServerFactory.HttpTestServer
+
+  @Before
+  fun setUp() {
+    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP2_WITH_TLS)
+  }
+
+  @After
+  fun tearDown() {
+    httpTestServer.shutdown()
   }
 
   private val filterExpectation = CountDownLatch(1)
@@ -70,11 +83,13 @@ class CancelStreamTest {
   fun `cancel stream calls onCancel callback`() {
     val engine =
       EngineBuilder(Standard())
+        .addLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
+        .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
         .addPlatformFilter(
           name = "cancel_validation_filter",
           factory = { CancelValidationFilter(filterExpectation) }
         )
-        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
         .build()
 
     val client = engine.streamClient()
@@ -83,8 +98,8 @@ class CancelStreamTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "example.com",
-          path = "/test"
+          authority = "localhost:${httpTestServer.port}",
+          path = "/simple.txt"
         )
         .build()
 

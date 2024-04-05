@@ -40,6 +40,7 @@ RUNTIME_GUARD(envoy_reloadable_features_detect_and_raise_rst_tcp_connection);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_first_resolve_complete);
+RUNTIME_GUARD(envoy_reloadable_features_dns_reresolve_on_eai_again);
 RUNTIME_GUARD(envoy_reloadable_features_edf_lb_host_scheduler_init_fix);
 RUNTIME_GUARD(envoy_reloadable_features_edf_lb_locality_scheduler_init_fix);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
@@ -108,6 +109,7 @@ RUNTIME_GUARD(envoy_restart_features_allow_client_socket_creation_failure);
 RUNTIME_GUARD(envoy_restart_features_quic_handle_certs_with_shared_tls_code);
 RUNTIME_GUARD(envoy_restart_features_send_goaway_for_premature_rst_streams);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
+RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
@@ -149,8 +151,6 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
 // TODO(pksohn): enable after fixing https://github.com/envoyproxy/envoy/issues/29930
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
-// TODO(#31276): flip this to true after some test time.
-FALSE_RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 // TODO(panting): flip this to true after some test time.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
 

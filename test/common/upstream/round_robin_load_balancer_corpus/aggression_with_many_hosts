@@ -1,0 +1,312 @@
+zone_aware_load_balancer_test_case {
+  load_balancer_test_case {
+    common_lb_config {
+      locality_weighted_lb_config {
+      }
+      consistent_hashing_lb_config {
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 2051
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 2056
+        num_excluded_hosts: 218038272
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 8
+        random_bytestring: 8
+      }
+    }
+    actions {
+      choose_host {
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 4
+        random_bytestring: 0
+      }
+    }
+    actions {
+      choose_host {
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 4
+        random_bytestring: 8
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 3
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 4
+        random_bytestring: 8
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 4
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 4
+        random_bytestring: 0
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 8
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 4
+        random_bytestring: 8
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 8
+        random_bytestring: 524288
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 4
+        random_bytestring: 8
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 8
+        num_degraded_hosts: 8
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        host_priority: 2030043136
+        num_healthy_hosts: 3
+        num_degraded_hosts: 8
+        random_bytestring: 3
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 3
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 8
+        random_bytestring: 4
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 4
+        random_bytestring: 8
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 4
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 4
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 3
+        random_bytestring: 8
+      }
+    }
+    actions {
+      preconnect {
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 4
+        random_bytestring: 0
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 4
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 4
+        random_bytestring: 8
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        random_bytestring: 8
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 4
+        random_bytestring: 4
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 3
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 3
+        random_bytestring: 0
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 8
+        random_bytestring: 8
+      }
+    }
+    actions {
+      choose_host {
+      }
+    }
+    actions {
+      choose_host {
+      }
+    }
+    actions {
+      preconnect {
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 3
+        random_bytestring: 8
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 4
+        num_degraded_hosts: 4
+        random_bytestring: 8
+      }
+    }
+    actions {
+      choose_host {
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 4
+        num_excluded_hosts: 8
+        random_bytestring: 8
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 4
+        random_bytestring: 8
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 4
+        random_bytestring: 8
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 3
+        num_degraded_hosts: 4
+        num_excluded_hosts: 16774664
+        random_bytestring: 0
+      }
+    }
+    actions {
+      choose_host {
+      }
+    }
+    setup_priority_levels {
+      num_hosts_in_priority_level: 52998
+      random_bytestring: 0
+    }
+    seed_for_prng: 3
+  }
+  random_bytestring_for_weights: " "
+}
+round_robin_lb_config {
+  slow_start_config {
+    slow_start_window {
+      seconds: 94304
+      nanos: 4096
+    }
+    aggression {
+      default_value: 2.0000612745073432
+      runtime_key: ":"
+    }
+    min_weight_percent {
+    }
+  }
+}

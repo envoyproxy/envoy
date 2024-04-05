@@ -146,11 +146,18 @@ void FilterChainManagerImpl::addFilterChains(
     if (!filter_chain_matcher) {
       const auto& matching_iter = filter_chains.find(filter_chain_match);
       if (matching_iter != filter_chains.end()) {
-        throw EnvoyException(
+        std::string error_msg =
             fmt::format("error adding listener '{}': filter chain '{}' has "
                         "the same matching rules defined as '{}'",
                         absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()),
-                        filter_chain->name(), matching_iter->second));
+                        filter_chain->name(), matching_iter->second);
+#ifdef ENVOY_ENABLE_YAML
+        error_msg =
+            absl::StrCat(error_msg, ". duplicate matcher is: ",
+                         MessageUtil::getJsonStringFromMessageOrError(filter_chain_match, false));
+#endif
+
+        throw EnvoyException(error_msg);
       }
       filter_chains.insert({filter_chain_match, filter_chain->name()});
     }
