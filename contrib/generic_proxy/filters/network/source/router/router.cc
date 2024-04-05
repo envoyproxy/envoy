@@ -503,7 +503,7 @@ void UpstreamRequest::onUpstreamSuccess(Upstream::HostDescriptionConstSharedPtr 
   if (span_ != nullptr) {
     TraceContextBridge trace_context{*parent_.request_stream_};
     Tracing::UpstreamContext upstream_context(upstream_info_->upstream_host_, // host_
-                                              cluster_,                       // cluster_info_
+                                              parent_.cluster_,               // cluster_info_
                                               Tracing::ServiceType::Http,     // service_type_
                                               false                           // is_side_stream_
     );
