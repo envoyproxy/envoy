@@ -475,11 +475,15 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
                               ProtobufMessage::getStrictValidationVisitor());
 #else
+#ifdef ENVOY_ENABLE_FULL_PROTOS
     Protobuf::TextFormat::ParseFromString((*filter).typed_config_,
                                           native_filter->mutable_typed_config());
     RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
                    "Failed to parse" + (*filter).typed_config_);
-#endif
+#else
+    IS_ENVOY_BUG("Native filter support not implemented for this build");
+#endif // !ENVOY_ENABLE_FULL_PROTOS
+#endif // !ENVOY_ENABLE_YAML
   }
 
   // Set up the optional filters
