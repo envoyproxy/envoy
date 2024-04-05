@@ -48,6 +48,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  ENVOY_LOG(debug, "aws request signing from decodeHeaders use_unsigned_payload: {}",
+            use_unsigned_payload);
   if (use_unsigned_payload) {
     status = config.signer().signUnsignedPayload(headers);
   } else {
