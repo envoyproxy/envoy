@@ -79,8 +79,8 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCbDownst
 
   // First, try to create the filter factory creation function from factory context (if exists).
   if (context.factory_context_.has_value()) {
-    auto callback_or_status = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
-                                                                   context.factory_context_.value());
+    auto callback_or_status = factory.createFilterFactoryFromProto(
+        *message, context.stat_prefix_, context.factory_context_.value());
     THROW_IF_STATUS_NOT_OK(callback_or_status, throw);
     callback = callback_or_status.value();
   }
@@ -114,10 +114,11 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCbUpstre
 
   Envoy::Http::FilterFactoryCb callback = nullptr;
 
-  // First, try to create the filter factory creation function from upstream factory context (if exists).
+  // First, try to create the filter factory creation function from upstream factory context (if
+  // exists).
   if (context.upstream_factory_context_.has_value()) {
-    auto callback_or_status = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
-                                                                   context.upstream_factory_context_.value());
+    auto callback_or_status = factory.createFilterFactoryFromProto(
+        *message, context.stat_prefix_, context.upstream_factory_context_.value());
     THROW_IF_STATUS_NOT_OK(callback_or_status, throw);
     callback = callback_or_status.value();
   }

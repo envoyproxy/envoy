@@ -390,12 +390,11 @@ TEST(ConfigTest, TestDualFilterInDowntreamNoOverridingServerContext) {
   TestUtility::loadFromYaml(yaml_string, config);
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   Envoy::Http::Matching::HttpFilterActionContext action_context{
-    .is_downstream_ = true,
-    .stat_prefix_ = "test",
-    .factory_context_ = absl::nullopt,
-    .upstream_factory_context_ = absl::nullopt,
-    .server_factory_context_ = server_factory_context
-  };
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createActionFactoryCb(config, action_context,
@@ -419,12 +418,11 @@ TEST(ConfigTest, TestDualFilterInUpstreamNoOverridingServerContext) {
   TestUtility::loadFromYaml(yaml_string, config);
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   Envoy::Http::Matching::HttpFilterActionContext action_context{
-    .is_downstream_ = false,
-    .stat_prefix_ = "test",
-    .factory_context_ = absl::nullopt,
-    .upstream_factory_context_ = absl::nullopt,
-    .server_factory_context_ = server_factory_context
-  };
+      .is_downstream_ = false,
+      .stat_prefix_ = "test",
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createActionFactoryCb(config, action_context,
