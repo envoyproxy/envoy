@@ -214,7 +214,7 @@ public:
 
   virtual ~ClusterManager() = default;
 
-  // API to initializes the ClusterManagerImpl instance based on the given Bootstrap config.
+  // API to initialize the ClusterManagerImpl instance based on the given Bootstrap config.
   //
   // This method *must* be called prior to invoking any other methods on the class and *must* only
   // be called once. This method should be called immediately after ClusterManagerImpl construction
@@ -224,7 +224,10 @@ public:
   // initialization, is done in this method. If the contents of this method are invoked during
   // construction, a derived class cannot override any of the virtual methods and have them invoked
   // instead, since the base class's methods are used when in a base class constructor.
-  virtual absl::Status init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
+  virtual absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
+
+  // API to return whether the ClusterManagerImpl instance is initialized.
+  virtual bool initialized() PURE;
 
   /**
    * Add or update a cluster via API. The semantics of this API are:

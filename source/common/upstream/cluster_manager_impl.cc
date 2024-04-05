@@ -370,7 +370,8 @@ ClusterManagerImpl::ClusterManagerImpl(
       makeOptRefFromPtr(xds_config_tracker_.get()));
 }
 
-absl::Status ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+absl::Status
+ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   ASSERT(!initialized_);
   initialized_ = true;
 

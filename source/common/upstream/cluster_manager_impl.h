@@ -246,7 +246,9 @@ class ClusterManagerImpl : public ClusterManager,
                            public MissingClusterNotifier,
                            Logger::Loggable<Logger::Id::upstream> {
 public:
-  absl::Status init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
+  absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
+
+  bool initialized() override { return initialized_; }
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
