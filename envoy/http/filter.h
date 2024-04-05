@@ -812,6 +812,11 @@ public:
    */
   virtual absl::optional<Upstream::LoadBalancerContext::OverrideHost>
   upstreamOverrideHost() const PURE;
+
+  /**
+   * @return true if the filter should load shed based on the system pressure, typically memory.
+   */
+  virtual bool shouldLoadShed() const { return false; };
 };
 
 /**
