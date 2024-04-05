@@ -493,10 +493,11 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcherMultipleFilters) 
 
 // Verifies the filter can be created with server factory context in both downstream and upstream.
 TEST_P(CompositeFilterIntegrationTest, TestCreateFilterWithServerFactoryContext) {
-  prependCompositeFilterServerFactoryContext();
   if (!downstream_filter_) {
-    setUpstreamProtocol(Http::CodecType::HTTP2);
+    return;
   }
+  prependCompositeFilterServerFactoryContext();
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

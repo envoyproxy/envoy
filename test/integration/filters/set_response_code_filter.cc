@@ -171,7 +171,7 @@ REGISTER_FACTORY(UpstreamSetResponseCodeFilterFactoryDual,
                  Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 // Adding below factory to verify createFilterFactoryFromProtoWithServerContextTyped()
-// method can be used to create filters in both downstream and upstream.
+// method can be used to create filters in downstream.
 class SetResponseCodeFilterFactoryServerContext
     : public Extensions::HttpFilters::Common::DualFactoryBase<
           test::integration::filters::SetResponseCodeFilterConfigServerContext,

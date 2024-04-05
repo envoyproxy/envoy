@@ -59,14 +59,77 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   }
 
   if (context.is_downstream_) {
-    return createActionFactoryCbTyped<Server::Configuration::FactoryContext,
-                                      Server::Configuration::NamedHttpFilterConfigFactory>(
-        composite_action, context, validation_visitor, context.factory_context_);
+    return createActionFactoryCbDownstream(composite_action, context, validation_visitor);
   } else {
-    return createActionFactoryCbTyped<Server::Configuration::UpstreamFactoryContext,
-                                      Server::Configuration::UpstreamHttpFilterConfigFactory>(
-        composite_action, context, validation_visitor, context.upstream_factory_context_);
+    return createActionFactoryCbUpstream(composite_action, context, validation_visitor);
   }
+}
+
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCbDownstream(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+    Http::Matching::HttpFilterActionContext& context,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
+          composite_action.typed_config());
+  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+      composite_action.typed_config().typed_config(), validation_visitor, factory);
+
+  Envoy::Http::FilterFactoryCb callback = nullptr;
+
+  // First, try to create the filter factory creation function from factory context (if exists).
+  if (context.factory_context_.has_value()) {
+    auto callback_or_status = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
+                                                                   context.factory_context_.value());
+    THROW_IF_STATUS_NOT_OK(callback_or_status, throw);
+    callback = callback_or_status.value();
+  }
+
+  // If above failed, for downstream case, try to create the filter factory creation function
+  // from server factory context if exists.
+  if (callback == nullptr && context.server_factory_context_.has_value()) {
+    callback = factory.createFilterFactoryFromProtoWithServerContext(
+        *message, context.stat_prefix_, context.server_factory_context_.value());
+  }
+
+  if (callback == nullptr) {
+    throw EnvoyException("Failed to get filter factory creation function");
+  }
+  std::string name = composite_action.typed_config().name();
+
+  return [cb = std::move(callback), n = std::move(name)]() -> Matcher::ActionPtr {
+    return std::make_unique<ExecuteFilterAction>(cb, n);
+  };
+}
+
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCbUpstream(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+    Http::Matching::HttpFilterActionContext& context,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Server::Configuration::UpstreamHttpFilterConfigFactory>(
+          composite_action.typed_config());
+  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+      composite_action.typed_config().typed_config(), validation_visitor, factory);
+
+  Envoy::Http::FilterFactoryCb callback = nullptr;
+
+  // First, try to create the filter factory creation function from upstream factory context (if exists).
+  if (context.upstream_factory_context_.has_value()) {
+    auto callback_or_status = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
+                                                                   context.upstream_factory_context_.value());
+    THROW_IF_STATUS_NOT_OK(callback_or_status, throw);
+    callback = callback_or_status.value();
+  }
+
+  if (callback == nullptr) {
+    throw EnvoyException("Failed to get filter factory creation function");
+  }
+  std::string name = composite_action.typed_config().name();
+
+  return [cb = std::move(callback), n = std::move(name)]() -> Matcher::ActionPtr {
+    return std::make_unique<ExecuteFilterAction>(cb, n);
+  };
 }
 
 REGISTER_FACTORY(ExecuteFilterActionFactory,

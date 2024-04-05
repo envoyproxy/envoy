@@ -160,6 +160,8 @@ public:
                                     const std::string& stats_prefix, DualInfo info,
                                     Server::Configuration::ServerFactoryContext& context) PURE;
 
+  // This method is for dual filter to create filter from server context when it is configured
+  // in downstream. If a dual filter is in upstream, it must not call this method.
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContext(
       const Protobuf::Message& proto_config, const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& server_context) override {
@@ -169,6 +171,7 @@ public:
         stats_prefix, server_context);
   }
 
+private:
   virtual Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProtoWithServerContextTyped(const ConfigProto&, const std::string&,
                                                      Server::Configuration::ServerFactoryContext&) {
