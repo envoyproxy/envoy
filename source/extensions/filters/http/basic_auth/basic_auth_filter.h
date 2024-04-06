@@ -63,7 +63,8 @@ using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
- * Per route settings for BasicAuth. Allows customizing users on a virtualhost\route\weighted cluster level.
+ * Per route settings for BasicAuth. Allows customizing users on a virtualhost\route\weighted
+ * cluster level.
  */
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:

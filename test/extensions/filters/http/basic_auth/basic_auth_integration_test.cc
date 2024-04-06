@@ -45,8 +45,9 @@ public:
 
   void initializePerRouteFilter(std::string yaml_config) {
     config_helper_.addConfigModifier(
-        [&yaml_config](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               cfg) {
+        [&yaml_config](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                cfg) {
           envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute per_route_config;
           TestUtility::loadFromYaml(yaml_config, per_route_config);
 
