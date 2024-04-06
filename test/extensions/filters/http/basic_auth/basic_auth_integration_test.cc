@@ -1,6 +1,7 @@
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
 
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/http/basic_auth/v3/basic_auth.pb.h"
 
 #include "gtest/gtest.h"
@@ -47,6 +48,24 @@ public:
              cfg) {
         envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute per_route_config;
         TestUtility::loadFromYaml(yaml_config, per_route_config);
+
+        auto* config = cfg.mutable_route_config()
+                           ->mutable_virtual_hosts()
+                           ->Mutable(0)
+                           ->mutable_typed_per_filter_config();
+
+        (*config)["envoy.filters.http.basic_auth"].PackFrom(per_route_config);
+      });
+    config_helper_.prependFilter(BasicAuthFilterConfig);
+    initialize();
+  }
+
+  void disablePerRouteFilter() {
+    config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cfg) {
+        envoy::config::route::v3::FilterConfig per_route_config;
+        per_route_config.set_disabled(true);
 
         auto* config = cfg.mutable_route_config()
                            ->mutable_virtual_hosts()
@@ -176,9 +195,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, ExistingUsernameHeader) {
 }
 
 TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteDisabled) {
-  initializePerRouteFilter(R"EOF(
-disabled: true
-)EOF");
+  disablePerRouteFilter();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{

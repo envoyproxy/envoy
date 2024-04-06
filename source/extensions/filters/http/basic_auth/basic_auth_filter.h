@@ -67,14 +67,11 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
-  FilterConfigPerRoute(UserMap&& users, bool disabled):
-      users_(std::move(users)), disabled_(disabled) {}
-  bool disabled() const { return disabled_; }
+  FilterConfigPerRoute(UserMap&& users): users_(std::move(users)) {}
   const UserMap& users() const { return users_; }
 
 private:
   const UserMap users_;
-  bool disabled_;
 };
 
 // The Envoy filter to process HTTP basic auth.

@@ -39,9 +39,6 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
   auto users = config_->users();
   if (route_specific_settings != nullptr) {
-    if (route_specific_settings->disabled()) {
-      return Http::FilterHeadersStatus::Continue;
-    }
     users = route_specific_settings->users();
   }
 

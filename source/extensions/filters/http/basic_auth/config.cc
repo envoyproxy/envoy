@@ -80,7 +80,7 @@ Router::RouteSpecificFilterConfigConstSharedPtr BasicAuthFilterFactory::createRo
   UserMap users = readHtpasswd(THROW_OR_RETURN_VALUE(
       Config::DataSource::read(proto_config.users(), true, context.api()),
       std::string));
-  return std::make_unique<FilterConfigPerRoute>(std::move(users), proto_config.disabled());
+  return std::make_unique<FilterConfigPerRoute>(std::move(users));
 }
 
 REGISTER_FACTORY(BasicAuthFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);

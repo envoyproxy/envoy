@@ -147,7 +147,7 @@ TEST_F(FilterTest, ExistingUsernameHeader) {
 TEST_F(FilterTest, BasicAuthPerRouteDefaultSettings) {
   Http::TestRequestHeaderMapImpl empty_request_headers;
   UserMap empty_users;
-  FilterConfigPerRoute basic_auth_per_route(std::move(empty_users), false);
+  FilterConfigPerRoute basic_auth_per_route(std::move(empty_users));
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(testing::Return(&basic_auth_per_route));
@@ -167,22 +167,10 @@ TEST_F(FilterTest, BasicAuthPerRouteDefaultSettings) {
             filter_->decodeHeaders(empty_request_headers, true));
 }
 
-TEST_F(FilterTest, BasicAuthPerRouteDisabled) {
-  Http::TestRequestHeaderMapImpl empty_request_headers;
-  UserMap empty_users;
-  FilterConfigPerRoute basic_auth_per_route(std::move(empty_users), true);
-
-  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(testing::Return(&basic_auth_per_route));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->decodeHeaders(empty_request_headers, true));
-}
-
 TEST_F(FilterTest, BasicAuthPerRouteEnabled) {
   UserMap users_for_route;
   users_for_route.insert({"admin", {"admin", "0DPiKuNIrrVmD8IUCuw1hQxNqZc="}}); // admin:admin
-  FilterConfigPerRoute basic_auth_per_route(std::move(users_for_route), false);
+  FilterConfigPerRoute basic_auth_per_route(std::move(users_for_route));
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(testing::Return(&basic_auth_per_route));

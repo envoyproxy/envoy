@@ -43,15 +43,9 @@ message BasicAuth {
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 }
 
+// Extra settings that may be added to per-route configuration for
+// a virtual host or a cluster.
 message BasicAuthPerRoute {
-  oneof override {
-    option (validate.required) = true;
-
-    // Disable the basic auth filter for this particular vhost or route.
-    // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
-    bool disabled = 1 [(validate.rules).bool.const = true];
-
-    // Username-password pairs for this route.
-    config.core.v3.DataSource users = 2 [(validate.rules).message.required = true, (udpa.annotations.sensitive) = true];
-  }
+  // Username-password pairs for this route.
+  config.core.v3.DataSource users = 1 [(validate.rules).message.required = true, (udpa.annotations.sensitive) = true];
 }
