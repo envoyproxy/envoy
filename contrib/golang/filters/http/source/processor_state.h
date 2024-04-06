@@ -104,6 +104,8 @@ public:
   std::string stateStr();
 
   virtual Phase phase() PURE;
+  virtual Http::StreamFilterCallbacks* getFilterCallbacks() const PURE;
+
   std::string phaseStr();
 
   bool isProcessingInGo() {
@@ -111,10 +113,9 @@ public:
            state_ == FilterState::ProcessingTrailer || state_ == FilterState::Log;
   }
   bool isProcessingHeader() { return state_ == FilterState::ProcessingHeader; }
-  Http::StreamFilterCallbacks* getFilterCallbacks() { return filter_callbacks_; };
 
-  bool isThreadSafe() { return filter_callbacks_->dispatcher().isThreadSafe(); };
-  Event::Dispatcher& getDispatcher() { return filter_callbacks_->dispatcher(); }
+  bool isThreadSafe() { return getFilterCallbacks()->dispatcher().isThreadSafe(); };
+  Event::Dispatcher& getDispatcher() { return getFilterCallbacks()->dispatcher(); }
 
   /* data buffer */
   // add data to state buffer
@@ -177,8 +178,8 @@ public:
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details) PURE;
 
-  const StreamInfo::StreamInfo& streamInfo() const { return filter_callbacks_->streamInfo(); }
-  StreamInfo::StreamInfo& streamInfo() { return filter_callbacks_->streamInfo(); }
+  const StreamInfo::StreamInfo& streamInfo() const { return getFilterCallbacks()->streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return getFilterCallbacks()->streamInfo(); }
 
   void setEndStream(bool end_stream) { end_stream_ = end_stream; }
   bool getEndStream() { return end_stream_; }
@@ -190,7 +191,6 @@ public:
 protected:
   Phase state2Phase();
   Filter& filter_;
-  Http::StreamFilterCallbacks* filter_callbacks_{nullptr};
   bool watermark_requested_{false};
   Buffer::InstancePtr data_buffer_{nullptr};
   FilterState state_{FilterState::WaitingHeader};
@@ -206,8 +206,8 @@ public:
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
     decoder_callbacks_ = &callbacks;
-    filter_callbacks_ = &callbacks;
   }
+  Http::StreamFilterCallbacks* getFilterCallbacks() const override { return decoder_callbacks_; }
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
     decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
@@ -242,8 +242,8 @@ public:
 
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
     encoder_callbacks_ = &callbacks;
-    filter_callbacks_ = &callbacks;
   }
+  Http::StreamFilterCallbacks* getFilterCallbacks() const override { return encoder_callbacks_; }
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
     encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
