@@ -792,6 +792,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      TimeSource& time_source,
                                      Ssl::ContextAdditionalInitFunc additional_init)
     : ContextImpl(scope, config, time_source, additional_init),
+      tls_context_provider_factory_cb_(config.createTlsContextProvider()),
       session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()),
       full_scan_certs_on_sni_mismatch_(config.fullScanCertsOnSNIMismatch()) {
@@ -810,8 +811,6 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     has_rsa_ |= (pkey_id == EVP_PKEY_RSA);
     populateServerNamesMap(ctx, pkey_id);
   }
-
-  tls_context_provider_factory_cb_ = config.createTlsContextProvider();
 
   // Compute the session context ID hash. We use all the certificate identities,
   // since we should have a common ID for session resumption no matter what cert

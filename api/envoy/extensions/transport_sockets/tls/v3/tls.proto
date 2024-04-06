@@ -275,9 +275,9 @@ message CommonTlsContext {
   // [#not-implemented-hide:]
   CertificateProviderPluginInstance tls_certificate_provider_instance = 14;
 
-  // Custom TLS context provider.
+  // Custom TLS certificate selector.
   //
-  // Select TLS context based on TLS client hello.
+  // Select TLS certificate based on TLS client hello.
   // If empty, defaults to native TLS context selection behavior.
   config.core.v3.TypedExtensionConfig custom_tls_context_provider = 16;
 

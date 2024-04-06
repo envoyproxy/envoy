@@ -6,8 +6,8 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/common/tls/utility.h"
 #include "source/common/tls/context_impl.h"
+#include "source/common/tls/utility.h"
 
 using Envoy::Network::PostIoAction;
 
