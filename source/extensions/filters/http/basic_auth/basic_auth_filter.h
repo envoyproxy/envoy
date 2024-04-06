@@ -67,7 +67,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
-  FilterConfigPerRoute(UserMap&& users): users_(std::move(users)) {}
+  FilterConfigPerRoute(UserMap&& users) : users_(std::move(users)) {}
   const UserMap& users() const { return users_; }
 
 private:
@@ -82,7 +82,8 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
-  bool validateUser(const UserMap& users, absl::string_view username, absl::string_view password) const;
+  bool validateUser(const UserMap& users, absl::string_view username,
+                    absl::string_view password) const;
 
 private:
   Http::FilterHeadersStatus onDenied(absl::string_view body,

@@ -1,11 +1,12 @@
-#include "test/integration/http_protocol_integration.h"
-#include "test/test_common/utility.h"
+#include <string>
 
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/http/basic_auth/v3/basic_auth.pb.h"
 
+#include "test/integration/http_protocol_integration.h"
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
-#include <string>
 
 namespace Envoy {
 namespace Extensions {
@@ -16,7 +17,7 @@ namespace {
 // user1, test1
 // user2, test2
 const std::string BasicAuthFilterConfig =
-  R"EOF(
+    R"EOF(
 name: envoy.filters.http.basic_auth
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuth
@@ -29,7 +30,7 @@ typed_config:
 
 // admin, admin
 const std::string AdminUsers =
-  R"EOF(
+    R"EOF(
 users:
   inline_string: |-
     admin:{SHA}0DPiKuNIrrVmD8IUCuw1hQxNqZc=
@@ -44,36 +45,36 @@ public:
 
   void initializePerRouteFilter(std::string yaml_config) {
     config_helper_.addConfigModifier(
-      [&yaml_config](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             cfg) {
-        envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute per_route_config;
-        TestUtility::loadFromYaml(yaml_config, per_route_config);
+        [&yaml_config](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               cfg) {
+          envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute per_route_config;
+          TestUtility::loadFromYaml(yaml_config, per_route_config);
 
-        auto* config = cfg.mutable_route_config()
-                           ->mutable_virtual_hosts()
-                           ->Mutable(0)
-                           ->mutable_typed_per_filter_config();
+          auto* config = cfg.mutable_route_config()
+                             ->mutable_virtual_hosts()
+                             ->Mutable(0)
+                             ->mutable_typed_per_filter_config();
 
-        (*config)["envoy.filters.http.basic_auth"].PackFrom(per_route_config);
-      });
+          (*config)["envoy.filters.http.basic_auth"].PackFrom(per_route_config);
+        });
     config_helper_.prependFilter(BasicAuthFilterConfig);
     initialize();
   }
 
   void disablePerRouteFilter() {
     config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             cfg) {
-        envoy::config::route::v3::FilterConfig per_route_config;
-        per_route_config.set_disabled(true);
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               cfg) {
+          envoy::config::route::v3::FilterConfig per_route_config;
+          per_route_config.set_disabled(true);
 
-        auto* config = cfg.mutable_route_config()
-                           ->mutable_virtual_hosts()
-                           ->Mutable(0)
-                           ->mutable_typed_per_filter_config();
+          auto* config = cfg.mutable_route_config()
+                             ->mutable_virtual_hosts()
+                             ->Mutable(0)
+                             ->mutable_typed_per_filter_config();
 
-        (*config)["envoy.filters.http.basic_auth"].PackFrom(per_route_config);
-      });
+          (*config)["envoy.filters.http.basic_auth"].PackFrom(per_route_config);
+        });
     config_helper_.prependFilter(BasicAuthFilterConfig);
     initialize();
   }

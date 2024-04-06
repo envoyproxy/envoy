@@ -84,7 +84,8 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
   return Http::FilterHeadersStatus::Continue;
 }
 
-bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view username, absl::string_view password) const {
+bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view username,
+                                   absl::string_view password) const {
   auto user = users.find(username);
   if (user == users.end()) {
     return false;

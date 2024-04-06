@@ -47,5 +47,6 @@ message BasicAuth {
 // a virtual host or a cluster.
 message BasicAuthPerRoute {
   // Username-password pairs for this route.
-  config.core.v3.DataSource users = 1 [(validate.rules).message.required = true, (udpa.annotations.sensitive) = true];
+  config.core.v3.DataSource users = 1
+      [(validate.rules).message = {required: true}, (udpa.annotations.sensitive) = true];
 }
