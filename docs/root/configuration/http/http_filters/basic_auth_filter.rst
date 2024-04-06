@@ -62,7 +62,7 @@ An example configuration of the route filter may look like the following:
         route: { cluster: some_service }
         typed_per_filter_config:
           envoy.filters.http.basic_auth:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuthPerRoute
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
             disabled: true
       - match: { prefix: "/" }
         route: { cluster: some_service }
