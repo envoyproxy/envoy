@@ -183,7 +183,8 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "golang filter on destroy");
 
-  if (req_->weakFilter() == nullptr) {
+  // not invoked initRequest yet, which mean not invoked into Go yet.
+  if (req_->configId == 0) {
     // should release the req object, since stream reset may happen before calling into Go side,
     // which means no GC finializer will be invoked to release this C++ object.
     delete req_;
@@ -1454,7 +1455,7 @@ CAPIStatus Filter::serializeStringValue(Filters::Common::Expr::CelValue value,
 }
 
 bool Filter::initRequest(ProcessorState& state) {
-  if (req_->weakFilter() == nullptr) {
+  if (req_->configId == 0) {
     req_->setWeakFilter(weak_from_this());
     req_->configId = getMergedConfigId(state);
     return true;
