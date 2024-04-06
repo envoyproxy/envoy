@@ -108,10 +108,10 @@ public:
 
   void selectTlsContextAsync() {
     ENVOY_LOG_MISC(info, "debug: select cert async done");
-    cb->onCertSelectionResult(true, getTlsContext(), false);
+    cb_->onCertSelectionResult(true, getTlsContext(), false);
   }
 
-  Ssl::TlsContext& getTlsContext() { return ctx_.lock()->getTlsContexts()[0]; }
+  const Ssl::TlsContext& getTlsContext() { return ctx_.lock()->getTlsContexts()[0]; }
 
   Ssl::SelectionResult mod_;
 
@@ -166,10 +166,7 @@ class TlsContextProviderFactoryTest
     : public testing::Test,
       public testing::WithParamInterface<Network::Address::IpVersion> {
 protected:
-  TlsContextProviderFactoryTest()
-      : context_manager_(
-            std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_)),
-        registered_factory_(provider_factory_), version_(GetParam()) {
+  TlsContextProviderFactoryTest() : registered_factory_(provider_factory_), version_(GetParam()) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   }
@@ -207,8 +204,9 @@ protected:
     Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
     NiceMock<Runtime::MockLoader> runtime;
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
-        server_factory_context;
-    ON_CALL(server_factory_context.server_context_, api()).WillByDefault(ReturnRef(*server_api));
+        transport_socket_factory_context;
+    ON_CALL(transport_socket_factory_context.server_context_, api())
+        .WillByDefault(ReturnRef(*server_api));
 
     ENVOY_LOG_MISC(info, "debug: 1");
 
@@ -226,13 +224,14 @@ protected:
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
     // provider factory callback will be Called here.
     auto server_cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-        server_tls_context, server_factory_context);
+        server_tls_context, transport_socket_factory_context);
 
     ENVOY_LOG_MISC(info, "debug: 2");
 
     provider_factory_.mod_ = mod;
 
-    Extensions::TransportSockets::Tls::ContextManagerImpl manager(*time_system);
+    NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+    Extensions::TransportSockets::Tls::ContextManagerImpl manager(server_factory_context);
     Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
     Extensions::TransportSockets::Tls::ServerSslSocketFactory server_ssl_socket_factory(
         std::move(server_cfg), manager, *server_stats_store.rootScope(),
@@ -339,9 +338,6 @@ protected:
     dispatcher->run(Event::Dispatcher::RunType::Block);
   }
 
-  Event::GlobalTimeSystem time_system_;
-  Stats::IsolatedStoreImpl stats_store_;
-  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_;
   TestTlsContextProviderFactory provider_factory_;
   Registry::InjectFactory<Ssl::TlsContextProviderFactory> registered_factory_;
   TestScopedRuntime scoped_runtime_;
