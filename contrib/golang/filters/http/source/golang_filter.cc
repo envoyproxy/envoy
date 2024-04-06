@@ -223,7 +223,7 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
     }
 
     state.enterLog();
-    req_->phase = static_cast<int>(state.phase());
+    req_->phase = state.phase;
     // req_->encoding_state.phase = static_cast<int>(state.state2Phase());
     dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()));
     state.leaveLog();
@@ -243,7 +243,7 @@ GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseH
 
   initRequest(state);
 
-  req_->phase = static_cast<int>(state.phase());
+  req_->phase = state.phase;
   {
     Thread::LockGuard lock(mutex_);
     headers_ = &headers;
@@ -279,7 +279,7 @@ bool Filter::doDataGo(ProcessorState& state, Buffer::Instance& data, bool end_st
   Buffer::Instance& buffer = state.doDataList.push(data);
 
   ASSERT(req_ != nullptr);
-  req_->phase = static_cast<int>(state.phase());
+  req_->phase = state.phase;
   auto status = dynamic_lib_->envoyGoFilterOnHttpData(
       req_, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());
 
@@ -334,7 +334,7 @@ bool Filter::doTrailerGo(ProcessorState& state, Http::HeaderMap& trailers) {
   state.processTrailer();
 
   ASSERT(req_ != nullptr);
-  req_->phase = static_cast<int>(state.phase());
+  req_->phase = state.phase;
   auto status =
       dynamic_lib_->envoyGoFilterOnHttpHeader(req_, 1, trailers.size(), trailers.byteSize());
 

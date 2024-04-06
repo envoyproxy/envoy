@@ -297,7 +297,7 @@ Phase ProcessorState::state2Phase() {
 };
 
 std::string ProcessorState::phaseStr() {
-  switch (phase()) {
+  switch (Phase(phase)) {
   case Phase::DecodeHeader:
     return "DecodeHeader";
   case Phase::DecodeData:

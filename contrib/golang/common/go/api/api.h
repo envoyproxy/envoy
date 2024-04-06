@@ -17,6 +17,7 @@ struct httpRequest;
 
 typedef struct { // NOLINT(modernize-use-using)
   struct httpRequest* req;
+  int is_encoding;
   int phase;
 } processState;
 

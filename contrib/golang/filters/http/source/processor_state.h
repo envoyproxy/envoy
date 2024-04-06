@@ -97,13 +97,15 @@ enum class GolangStatus {
 
 class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
 public:
-  explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) { req = r; }
+  explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) {
+    req = r;
+    phase = 0;
+  }
   virtual ~ProcessorState() = default;
 
   FilterState state() const { return state_; }
   std::string stateStr();
 
-  virtual Phase phase() PURE;
   virtual Http::StreamFilterCallbacks* getFilterCallbacks() const PURE;
 
   std::string phaseStr();
@@ -202,7 +204,9 @@ protected:
 
 class DecodingProcessorState : public ProcessorState {
 public:
-  explicit DecodingProcessorState(Filter& filter, httpRequest* r) : ProcessorState(filter, r) {}
+  explicit DecodingProcessorState(Filter& filter, httpRequest* r) : ProcessorState(filter, r) {
+    is_encoding = 0;
+  }
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
     decoder_callbacks_ = &callbacks;
@@ -212,8 +216,6 @@ public:
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
     decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
   }
-
-  Phase phase() override { return state2Phase(); };
 
   void addBufferData(Buffer::Instance& data) override;
 
@@ -238,7 +240,9 @@ private:
 
 class EncodingProcessorState : public ProcessorState {
 public:
-  explicit EncodingProcessorState(Filter& filter, httpRequest* r) : ProcessorState(filter, r) {}
+  explicit EncodingProcessorState(Filter& filter, httpRequest* r) : ProcessorState(filter, r) {
+    is_encoding = 1;
+  }
 
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
     encoder_callbacks_ = &callbacks;
@@ -248,8 +252,6 @@ public:
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
     encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
   }
-
-  Phase phase() override { return static_cast<Phase>(static_cast<int>(state2Phase()) + 3); };
 
   void addBufferData(Buffer::Instance& data) override;
 
