@@ -183,8 +183,10 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "golang filter on destroy");
 
-  // do nothing, stream reset may happen before entering this filter.
-  if (req_ == nullptr) {
+  if (req_->weakFilter() == nullptr) {
+    // should release the req object, since stream reset may happen before calling into Go side,
+    // which means no GC finializer will be invoked to release this C++ object.
+    delete req_;
     return;
   }
 
@@ -213,16 +215,15 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
   case Envoy::AccessLog::AccessLogType::DownstreamEnd: {
     auto& state = getProcessorState();
 
-    if (req_ == nullptr) {
-      // log called by AccessLogDownstreamStart will happen before doHeaders
-      initRequest(state);
-
+    // log called by AccessLogDownstreamStart will happen before doHeaders
+    if (initRequest(state)) {
       request_headers_ = static_cast<Http::RequestOrResponseHeaderMap*>(
           const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders()));
     }
 
     state.enterLog();
     req_->phase = static_cast<int>(state.phase());
+    // req_->encoding_state.phase = static_cast<int>(state.state2Phase());
     dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()));
     state.leaveLog();
   } break;
@@ -239,9 +240,7 @@ GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseH
   ENVOY_LOG(debug, "golang filter passing data to golang, state: {}, phase: {}, end_stream: {}",
             state.stateStr(), state.phaseStr(), end_stream);
 
-  if (req_ == nullptr) {
-    initRequest(state);
-  }
+  initRequest(state);
 
   req_->phase = static_cast<int>(state.phase());
   {
@@ -1454,14 +1453,13 @@ CAPIStatus Filter::serializeStringValue(Filters::Common::Expr::CelValue value,
   }
 }
 
-void Filter::initRequest(ProcessorState& state) {
-  // req is used by go, so need to use raw memory and then it is safe to release at the gc
-  // finalize phase of the go object.
-  req_ = new httpRequestInternal(weak_from_this());
-  req_->configId = getMergedConfigId(state);
-  req_->plugin_name.data = config_->pluginName().data();
-  req_->plugin_name.len = config_->pluginName().length();
-  req_->worker_id = worker_id_;
+bool Filter::initRequest(ProcessorState& state) {
+  if (req_->weakFilter() == nullptr) {
+    req_->setWeakFilter(weak_from_this());
+    req_->configId = getMergedConfigId(state);
+    return true;
+  }
+  return false;
 }
 
 /* ConfigId */

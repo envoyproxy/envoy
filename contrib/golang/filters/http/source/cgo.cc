@@ -53,7 +53,7 @@ extern "C" {
 
 CAPIStatus envoyGoFilterHandlerWrapper(void* r,
                                        std::function<CAPIStatus(std::shared_ptr<Filter>&)> f) {
-  auto req = reinterpret_cast<httpRequestInternal*>(r);
+  auto req = reinterpret_cast<HttpRequestInternal*>(r);
   auto weak_filter = req->weakFilter();
   if (auto filter = weak_filter.lock()) {
     return f(filter);
@@ -244,7 +244,7 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   UNREFERENCED_PARAMETER(reason);
   // req is used by go, so need to use raw memory and then it is safe to release at the gc finalize
   // phase of the go object.
-  auto req = reinterpret_cast<httpRequestInternal*>(r);
+  auto req = reinterpret_cast<HttpRequestInternal*>(r);
   delete req;
 }
 

@@ -14,7 +14,6 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
-#include "contrib/golang/common/dso/dso.h"
 #include "contrib/golang/filters/http/source/processor_state.h"
 #include "contrib/golang/filters/http/source/stats.h"
 
@@ -160,7 +159,7 @@ enum class EnvoyValue {
   VirtualClusterName,
 };
 
-struct httpRequestInternal;
+class HttpRequestInternal;
 
 /**
  * See docs/configuration/http_filters/golang_extension_filter.rst
@@ -173,8 +172,17 @@ class Filter : public Http::StreamFilter,
 public:
   explicit Filter(FilterConfigSharedPtr config, Dso::HttpFilterDsoPtr dynamic_lib,
                   uint32_t worker_id)
-      : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this),
-        worker_id_(worker_id) {}
+      : config_(config), dynamic_lib_(dynamic_lib) {
+    // req is used by go, so need to use raw memory and then it is safe to release at the gc
+    // finalize phase of the go object.
+    req_ = new HttpRequestInternal(*this);
+    req_->plugin_name.data = config_->pluginName().data();
+    req_->plugin_name.len = config_->pluginName().length();
+    req_->worker_id = worker_id;
+
+    decoding_state_(req_->decodingState());
+    encoding_state_(req_->encodingState());
+  }
 
   // Http::StreamFilterBase
   void onDestroy() ABSL_LOCKS_EXCLUDED(mutex_) override;
@@ -257,7 +265,8 @@ private:
   bool doTrailer(ProcessorState& state, Http::HeaderMap& trailers);
   bool doTrailerGo(ProcessorState& state, Http::HeaderMap& trailers);
 
-  void initRequest(ProcessorState& state);
+  // return true when it is first inited.
+  bool initRequest(ProcessorState& state);
 
   uint64_t getMergedConfigId(ProcessorState& state);
 
@@ -297,10 +306,12 @@ private:
   Http::RequestOrResponseHeaderMap* request_headers_{nullptr};
 
   // The state of the filter on both the encoding and decoding side.
-  DecodingProcessorState decoding_state_;
-  EncodingProcessorState encoding_state_;
+  // They are stored in HttpRequestInternal since Go need to read them,
+  // And it's safe to read them before onDestroy in C++ side.
+  DecodingProcessorState& decoding_state_;
+  EncodingProcessorState& encoding_state_;
 
-  httpRequestInternal* req_{nullptr};
+  HttpRequestInternal* req_{nullptr};
 
   // lock for has_destroyed_ and the functions get/set/copy/remove/etc that operate on the
   // headers_/trailers_/etc, to avoid race between envoy c thread and go thread (when calling back
@@ -315,19 +326,29 @@ private:
 
   // the filter enter encoding phase
   bool enter_encoding_{false};
-
-  // The ID of the worker that is processing this request, this enables the go filter to dedicate
-  // memory to each worker and not require locks
-  uint32_t worker_id_ = 0;
 };
 
 // Go code only touch the fields in httpRequest
-struct httpRequestInternal : httpRequest {
-  std::weak_ptr<Filter> filter_;
+class HttpRequestInternal : public httpRequest {
+public:
+  HttpRequestInternal(Filter& filter)
+      : decoding_state_(filter, this), encoding_state_(filter, this) {}
+
+  void setWeakFilter(std::weak_ptr<Filter> f) { filter_ = f; }
+  std::weak_ptr<Filter> weakFilter() { return filter_; }
+
+  DecodingProcessorState& decodingState() { return decoding_state_; }
+  EncodingProcessorState& encodingState() { return encoding_state_; }
+
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
   std::string strValue;
-  httpRequestInternal(std::weak_ptr<Filter> f) { filter_ = f; }
-  std::weak_ptr<Filter> weakFilter() { return filter_; }
+
+private:
+  std::weak_ptr<Filter> filter_;
+
+  // The state of the filter on both the encoding and decoding side.
+  DecodingProcessorState decoding_state_;
+  EncodingProcessorState encoding_state_;
 };
 
 struct httpConfigInternal : httpConfig {

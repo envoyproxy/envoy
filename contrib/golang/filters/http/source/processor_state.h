@@ -12,6 +12,8 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/utility.h"
 
+#include "contrib/golang/common/dso/dso.h"
+
 #include "absl/status/status.h"
 
 namespace Envoy {
@@ -21,7 +23,7 @@ namespace Golang {
 
 class Filter;
 
-class BufferList : public NonCopyable {
+class BufferList : NonCopyable {
 public:
   BufferList() = default;
 
@@ -93,9 +95,9 @@ enum class GolangStatus {
   StopNoBuffer,
 };
 
-class ProcessorState : public Logger::Loggable<Logger::Id::http>, NonCopyable {
+class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
 public:
-  explicit ProcessorState(Filter& filter) : filter_(filter) {}
+  explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) { req = r; }
   virtual ~ProcessorState() = default;
 
   FilterState state() const { return state_; }
@@ -200,7 +202,7 @@ protected:
 
 class DecodingProcessorState : public ProcessorState {
 public:
-  explicit DecodingProcessorState(Filter& filter) : ProcessorState(filter) {}
+  explicit DecodingProcessorState(Filter& filter, httpRequest* r) : ProcessorState(filter, r) {}
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
     decoder_callbacks_ = &callbacks;
@@ -236,7 +238,7 @@ private:
 
 class EncodingProcessorState : public ProcessorState {
 public:
-  explicit EncodingProcessorState(Filter& filter) : ProcessorState(filter) {}
+  explicit EncodingProcessorState(Filter& filter, httpRequest* r) : ProcessorState(filter, r) {}
 
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
     encoder_callbacks_ = &callbacks;
