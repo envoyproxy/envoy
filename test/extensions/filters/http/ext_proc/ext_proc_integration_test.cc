@@ -852,7 +852,7 @@ TEST_P(ExtProcIntegrationTest, ResponseFromExtProcServerTooLarge) {
   processRequestBodyMessage(
       *grpc_upstreams_[0], true, [&body_str](const HttpBody& body, BodyResponse& body_resp) {
         EXPECT_TRUE(body.end_of_stream());
-        // Send the over-limit reponse from ext_proc server.
+        // Send the over-limit response from ext_proc server.
         auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
         body_mut->set_body(body_str);
         return true;
