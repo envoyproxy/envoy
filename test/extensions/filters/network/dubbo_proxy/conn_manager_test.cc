@@ -117,9 +117,7 @@ public:
 
 class ConnectionManagerTest : public testing::Test {
 public:
-  ConnectionManagerTest()
-      : stats_(DubboFilterStats::generateStats("test.", *store_.rootScope())),
-        engine_(std::make_unique<Regex::GoogleReEngine>()) {
+  ConnectionManagerTest() : stats_(DubboFilterStats::generateStats("test.", *store_.rootScope())) {
 
     route_config_provider_manager_ = std::make_unique<Router::RouteConfigProviderManagerImpl>(
         factory_context_.server_factory_context_.admin_);
@@ -333,7 +331,6 @@ public:
   std::unique_ptr<ConnectionManager> conn_manager_;
   MockSerializer* custom_serializer_{};
   MockProtocol* custom_protocol_{};
-  ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
 TEST_F(ConnectionManagerTest, OnDataHandlesRequestTwoWay) {

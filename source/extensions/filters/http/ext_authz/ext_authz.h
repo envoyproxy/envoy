@@ -56,8 +56,8 @@ class FilterConfig {
 
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-               Stats::Scope& scope, Runtime::Loader& runtime, Http::Context& http_context,
-               const std::string& stats_prefix, envoy::config::bootstrap::v3::Bootstrap& bootstrap)
+               Stats::Scope& scope, const std::string& stats_prefix,
+               Server::Configuration::ServerFactoryContext& factory_context)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
         failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
@@ -69,15 +69,18 @@ public:
         // cause non UTF-8 body content to be changed when it doesn't need to.
         pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
 
+        encode_raw_headers_(config.encode_raw_headers()),
+
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
-        runtime_(runtime), http_context_(http_context),
+        runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
         filter_enabled_(config.has_filter_enabled()
                             ? absl::optional<Runtime::FractionalPercent>(
                                   Runtime::FractionalPercent(config.filter_enabled(), runtime_))
                             : absl::nullopt),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
-                ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
+                ? absl::optional<Matchers::MetadataMatcher>(
+                      Matchers::MetadataMatcher(config.filter_enabled_metadata(), factory_context))
                 : absl::nullopt),
         deny_at_disable_(config.has_deny_at_disable()
                              ? absl::optional<Runtime::FeatureFlag>(
@@ -103,6 +106,7 @@ public:
         ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
         ext_authz_failure_mode_allowed_(
             pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {
+    auto bootstrap = factory_context.bootstrap();
     auto labels_key_it =
         bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
     if (labels_key_it != bootstrap.node().metadata().fields().end()) {
@@ -123,14 +127,14 @@ public:
     // Method, Path and Host).
     if (config.has_grpc_service() && config.has_allowed_headers()) {
       request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
-          config.allowed_headers(), false);
+          config.allowed_headers(), false, factory_context);
     } else if (config.has_http_service()) {
       if (config.http_service().authorization_request().has_allowed_headers()) {
         request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
-            config.http_service().authorization_request().allowed_headers(), true);
+            config.http_service().authorization_request().allowed_headers(), true, factory_context);
       } else {
         request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
-            config.allowed_headers(), true);
+            config.allowed_headers(), true, factory_context);
       }
     }
   }
@@ -148,6 +152,8 @@ public:
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
   bool packAsBytes() const { return pack_as_bytes_; }
+
+  bool headersAsBytes() const { return encode_raw_headers_; }
 
   Http::Code statusOnError() const { return status_on_error_; }
 
@@ -229,6 +235,7 @@ private:
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const bool pack_as_bytes_;
+  const bool encode_raw_headers_;
   const Http::Code status_on_error_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;

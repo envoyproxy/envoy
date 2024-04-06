@@ -15,7 +15,7 @@ namespace SniCluster {
 class SniClusterNetworkFilterConfigFactory
     : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
-  Network::FilterFactoryCb
+  absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;

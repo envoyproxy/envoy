@@ -166,8 +166,7 @@ parseRouteConfigurationFromYaml(const std::string& yaml) {
 
 class ConfigImplTestBase {
 protected:
-  ConfigImplTestBase()
-      : api_(Api::createApiForTest()), engine_(std::make_unique<Regex::GoogleReEngine>()) {
+  ConfigImplTestBase() : api_(Api::createApiForTest()) {
     ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
@@ -342,7 +341,6 @@ most_specific_header_mutations_wins: {0}
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Event::SimulatedTimeSystem test_time_;
-  ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
 class RouteMatcherTest : public testing::Test,
@@ -3168,6 +3166,12 @@ TEST_F(RouterMatcherHashPolicyTest, HashIpv4DifferentAddresses) {
 }
 
 TEST_F(RouterMatcherHashPolicyTest, HashIpv6DifferentAddresses) {
+  if (!TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
+    // an exception like "IPv6 addresses are not supported on this machine" will be thrown
+    // if we don't add IP version check and run test on a machine that doesn't support IPv6
+    GTEST_SKIP() << "IPv6 addresses are not supported on this machine";
+  }
+
   firstRouteHashPolicy()->mutable_connection_properties()->set_source_ip(true);
   {
     // Different addresses should produce different hashes.
@@ -6410,9 +6414,9 @@ virtual_hosts:
               - name: cluster2
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Field 'weight' is missing in: name: \"cluster1\"\n");
+      "Field 'weight' is missing in:.*[\n]*name: \"cluster1\"\n");
 
   const std::string yaml2 = R"EOF(
 virtual_hosts:
@@ -9178,6 +9182,79 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "Non-CONNECT upgrade type Websocket has ConnectConfig");
+}
+
+TEST_F(RouteConfigurationV2, ConnectProxy) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: connect-proxy
+    domains: ["*"]
+    routes:
+      - match:
+          connect_matcher: {}
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: CONNECT
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  Http::TestRequestHeaderMapImpl headers = genPathlessHeaders("example.com", "CONNECT");
+
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.http_route_connect_proxy_by_default", "true"}});
+
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+    EXPECT_FALSE(config.route(headers, 0)->routeEntry()->connectConfig());
+  }
+
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.http_route_connect_proxy_by_default", "false"}});
+
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+    EXPECT_TRUE(config.route(headers, 0)->routeEntry()->connectConfig());
+  }
+}
+
+TEST_F(RouteConfigurationV2, ConnectTerminate) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: connect-terminate
+    domains: ["*"]
+    routes:
+      - match:
+          connect_matcher: {}
+        route:
+          cluster: some-cluster
+          upgrade_configs:
+            - upgrade_type: CONNECT
+              connect_config: {}
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  Http::TestRequestHeaderMapImpl headers = genPathlessHeaders("example.com", "CONNECT");
+
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.http_route_connect_proxy_by_default", "true"}});
+
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+    EXPECT_TRUE(config.route(headers, 0)->routeEntry()->connectConfig());
+  }
+
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.http_route_connect_proxy_by_default", "false"}});
+
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+    EXPECT_TRUE(config.route(headers, 0)->routeEntry()->connectConfig());
+  }
 }
 
 // Verifies that we're creating a new instance of the retry plugins on each call instead of

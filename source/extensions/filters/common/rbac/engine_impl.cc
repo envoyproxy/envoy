@@ -42,7 +42,8 @@ void generateLog(StreamInfo::StreamInfo& info, EnforcementMode mode, bool log) {
 
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     const envoy::config::rbac::v3::RBAC& rules,
-    ProtobufMessage::ValidationVisitor& validation_visitor, const EnforcementMode mode)
+    ProtobufMessage::ValidationVisitor& validation_visitor,
+    Server::Configuration::CommonFactoryContext& context, const EnforcementMode mode)
     : action_(rules.action()), mode_(mode) {
   // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {
@@ -54,7 +55,7 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
 
   for (const auto& policy : rules.policies()) {
     policies_.emplace(policy.first, std::make_unique<PolicyMatcher>(policy.second, builder_.get(),
-                                                                    validation_visitor));
+                                                                    validation_visitor, context));
   }
 }
 

@@ -93,6 +93,7 @@ envoy_cc_fuzz_test(
         ":uber_readfilter_lib",
         ":vig_anymap_ext_lib",
         "//source/common/config:utility_lib",
+        "//source/common/http:rds_lib",
         "//test/config:utility_lib",
         "//test/test_common:test_runtime_lib",
         "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",

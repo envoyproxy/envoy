@@ -2,24 +2,36 @@ package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.EngineBuilder
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.Standard
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
+import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import org.junit.After
 import org.junit.Assert.fail
+import org.junit.Before
 import org.junit.Test
 
-private const val TEST_RESPONSE_FILTER_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
-
-// This test doesn't do what it advertises (https://github.com/envoyproxy/envoy/issues/25180)
 class ResetConnectivityStateTest {
-
   init {
     JniLibrary.loadTestLibrary()
+  }
+
+  private lateinit var httpTestServer: HttpTestServerFactory.HttpTestServer
+
+  @Before
+  fun setUp() {
+    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP2_WITH_TLS)
+  }
+
+  @After
+  fun tearDown() {
+    httpTestServer.shutdown()
   }
 
   @Test
@@ -28,7 +40,9 @@ class ResetConnectivityStateTest {
 
     val engine =
       EngineBuilder(Standard())
-        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
+        .addLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
+        .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
         .build()
     val client = engine.streamClient()
 
@@ -36,8 +50,8 @@ class ResetConnectivityStateTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "example.com",
-          path = "/test"
+          authority = "localhost:${httpTestServer.port}",
+          path = "/simple.txt"
         )
         .build()
 

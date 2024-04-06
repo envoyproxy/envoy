@@ -1,5 +1,7 @@
 #include "source/server/admin/prometheus_stats.h"
 
+#include <cmath>
+
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/regex.h"
@@ -274,6 +276,35 @@ uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& 
   return result;
 }
 
+/*
+ * Returns the prometheus output for a summary. The output is a multi-line string (with embedded
+ * newlines) that contains all the individual quantile values and sum/count for a single histogram
+ * (metric_name plus all tags).
+ */
+std::string generateSummaryOutput(const Stats::ParentHistogram& histogram,
+                                  const std::string& prefixed_tag_extracted_name) {
+  const std::string tags = PrometheusStatsFormatter::formattedTags(histogram.tags());
+  const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
+
+  const Stats::HistogramStatistics& stats = histogram.intervalStatistics();
+  Stats::ConstSupportedBuckets& supported_quantiles = stats.supportedQuantiles();
+  const std::vector<double>& computed_quantiles = stats.computedQuantiles();
+  std::string output;
+  for (size_t i = 0; i < supported_quantiles.size(); ++i) {
+    double quantile = supported_quantiles[i];
+    double value = computed_quantiles[i];
+    output.append(fmt::format("{0}{{{1}quantile=\"{2}\"}} {3:.32g}\n", prefixed_tag_extracted_name,
+                              hist_tags, quantile, value));
+  }
+
+  output.append(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", prefixed_tag_extracted_name, tags,
+                            stats.sampleSum()));
+  output.append(fmt::format("{0}_count{{{1}}} {2}\n", prefixed_tag_extracted_name, tags,
+                            stats.sampleCount()));
+
+  return output;
+};
+
 } // namespace
 
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
@@ -283,6 +314,22 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
     buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), sanitizeValue(tag.value_)));
   }
   return absl::StrJoin(buf, ",");
+}
+
+absl::Status PrometheusStatsFormatter::validateParams(const StatsParams& params) {
+  absl::Status result;
+  switch (params.histogram_buckets_mode_) {
+  case Utility::HistogramBucketsMode::Summary:
+  case Utility::HistogramBucketsMode::Unset:
+  case Utility::HistogramBucketsMode::Cumulative:
+    result = absl::OkStatus();
+    break;
+  case Utility::HistogramBucketsMode::Detailed:
+  case Utility::HistogramBucketsMode::Disjoint:
+    result = absl::InvalidArgumentError("unsupported prometheus histogram bucket mode");
+    break;
+  }
+  return result;
 }
 
 absl::optional<std::string>
@@ -332,8 +379,23 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   metric_name_count += outputStatType<Stats::TextReadout>(
       response, params, text_readouts, generateTextReadoutOutput, "gauge", custom_namespaces);
 
-  metric_name_count += outputStatType<Stats::ParentHistogram>(
-      response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
+  // validation of bucket modes is handled separately
+  switch (params.histogram_buckets_mode_) {
+  case Utility::HistogramBucketsMode::Summary:
+    metric_name_count += outputStatType<Stats::ParentHistogram>(
+        response, params, histograms, generateSummaryOutput, "summary", custom_namespaces);
+    break;
+  case Utility::HistogramBucketsMode::Unset:
+  case Utility::HistogramBucketsMode::Cumulative:
+    metric_name_count += outputStatType<Stats::ParentHistogram>(
+        response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
+    break;
+  // "Detailed" and "Disjoint" don't make sense for prometheus histogram semantics
+  case Utility::HistogramBucketsMode::Detailed:
+  case Utility::HistogramBucketsMode::Disjoint:
+    IS_ENVOY_BUG("unsupported prometheus histogram bucket mode");
+    break;
+  }
 
   // Note: This assumes that there is no overlap in stat name between per-endpoint stats and all
   // other stats. If this is not true, then the counters/gauges for per-endpoint need to be combined

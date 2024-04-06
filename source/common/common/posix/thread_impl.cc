@@ -99,6 +99,7 @@ void PosixThread::join() {
 bool PosixThread::joinable() const { return !joined_; }
 
 ThreadId PosixThread::pthreadId() const {
+  ASSERT(!joined_);
 #if defined(__linux__)
   return ThreadId(static_cast<int64_t>(thread_handle_->handle()));
 #elif defined(__APPLE__)

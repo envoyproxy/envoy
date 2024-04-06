@@ -85,7 +85,7 @@ void UberWriteFilterFuzzer::fuzz(
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, factory_context_.messageValidationVisitor(), factory);
     ENVOY_LOG_MISC(debug, "Config content after decoded: {}", message->DebugString());
-    cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
+    cb_ = factory.createFilterFactoryFromProto(*message, factory_context_).value();
     // Add filter to connection_.
     cb_(write_filter_callbacks_->connection_);
   } catch (const EnvoyException& e) {
