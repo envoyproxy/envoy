@@ -93,7 +93,7 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
 }
 
 /**
- * Signing failure in decodeheaders
+ * Signing failure in decodeHeaders
  */
 TEST_F(AwsLambdaFilterTest, SigningFailureDecodeHeaders) {
   auto filter_settings_ =
@@ -110,7 +110,7 @@ TEST_F(AwsLambdaFilterTest, SigningFailureDecodeHeaders) {
 }
 
 /**
- * Signing failure in decodedata
+ * Signing failure in decodeData
  */
 TEST_F(AwsLambdaFilterTest, SigningFailureDecodeData) {
 
