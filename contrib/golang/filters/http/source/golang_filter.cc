@@ -34,8 +34,8 @@ namespace Golang {
 Http::LocalErrorStatus Filter::onLocalReply(const LocalReplyData& data) {
   auto& state = getProcessorState();
   ASSERT(state.isThreadSafe());
-  ENVOY_LOG(debug, "golang filter onLocalReply, state: {}, phase: {}, code: {}", state.stateStr(),
-            state.phaseStr(), int(data.code_));
+  ENVOY_LOG(debug, "golang filter onLocalReply, state: {}, code: {}", state.stateStr(),
+            int(data.code_));
 
   return Http::LocalErrorStatus::Continue;
 }
@@ -43,8 +43,8 @@ Http::LocalErrorStatus Filter::onLocalReply(const LocalReplyData& data) {
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   ProcessorState& state = decoding_state_;
 
-  ENVOY_LOG(debug, "golang filter decodeHeaders, state: {}, phase: {}, end_stream: {}",
-            state.stateStr(), state.phaseStr(), end_stream);
+  ENVOY_LOG(debug, "golang filter decodeHeaders, state: {}, end_stream: {}", state.stateStr(),
+            end_stream);
 
   request_headers_ = &headers;
 
@@ -57,9 +57,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   ProcessorState& state = decoding_state_;
-  ENVOY_LOG(debug,
-            "golang filter decodeData, state: {}, phase: {}, data length: {}, end_stream: {}",
-            state.stateStr(), state.phaseStr(), data.length(), end_stream);
+  ENVOY_LOG(debug, "golang filter decodeData, state: {}, data length: {}, end_stream: {}",
+            state.stateStr(), data.length(), end_stream);
 
   state.setEndStream(end_stream);
 
@@ -75,8 +74,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   ProcessorState& state = decoding_state_;
-  ENVOY_LOG(debug, "golang filter decodeTrailers, state: {}, phase: {}", state.stateStr(),
-            state.phaseStr());
+  ENVOY_LOG(debug, "golang filter decodeTrailers, state: {}", state.stateStr());
 
   state.setSeenTrailers();
 
@@ -87,20 +85,20 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
   ProcessorState& state = getProcessorState();
-  ENVOY_LOG(debug, "golang filter encodeHeaders, state: {}, phase: {}, end_stream: {}",
-            state.stateStr(), state.phaseStr(), end_stream);
+  ENVOY_LOG(debug, "golang filter encodeHeaders, state: {}, end_stream: {}", state.stateStr(),
+            end_stream);
 
   encoding_state_.setEndStream(end_stream);
 
-  // NP: may enter encodeHeaders in any phase & any state,
+  // NP: may enter encodeHeaders in any state,
   // since other filters or filtermanager could call encodeHeaders or sendLocalReply in any time.
   // eg. filtermanager may invoke sendLocalReply, when scheme is invalid,
   // with "Sending local reply with details // http1.invalid_scheme" details.
   if (state.filterState() != FilterState::Done) {
     ENVOY_LOG(debug,
               "golang filter enter encodeHeaders early, maybe sendLocalReply or encodeHeaders "
-              "happened, current state: {}, phase: {}",
-              state.stateStr(), state.phaseStr());
+              "happened, current state: {}",
+              state.stateStr());
 
     ENVOY_LOG(debug, "golang filter drain data buffer since enter encodeHeaders early");
     // NP: is safe to overwrite it since go code won't read it directly
@@ -139,9 +137,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   ProcessorState& state = getProcessorState();
-  ENVOY_LOG(debug,
-            "golang filter encodeData, state: {}, phase: {}, data length: {}, end_stream: {}",
-            state.stateStr(), state.phaseStr(), data.length(), end_stream);
+  ENVOY_LOG(debug, "golang filter encodeData, state: {}, data length: {}, end_stream: {}",
+            state.stateStr(), data.length(), end_stream);
 
   encoding_state_.setEndStream(end_stream);
 
@@ -163,8 +160,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   ProcessorState& state = getProcessorState();
-  ENVOY_LOG(debug, "golang filter encodeTrailers, state: {}, phase: {}", state.stateStr(),
-            state.phaseStr());
+  ENVOY_LOG(debug, "golang filter encodeTrailers, state: {}", state.stateStr());
 
   encoding_state_.setSeenTrailers();
 
@@ -223,8 +219,6 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
     }
 
     state.enterLog();
-    req_->phase = state.phase;
-    // req_->encoding_state.phase = static_cast<int>(state.state2Phase());
     dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()));
     state.leaveLog();
   } break;
@@ -238,12 +232,11 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
 
 GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
                                  bool end_stream) {
-  ENVOY_LOG(debug, "golang filter passing data to golang, state: {}, phase: {}, end_stream: {}",
-            state.stateStr(), state.phaseStr(), end_stream);
+  ENVOY_LOG(debug, "golang filter passing data to golang, state: {}, end_stream: {}",
+            state.stateStr(), end_stream);
 
   initRequest(state);
 
-  req_->phase = state.phase;
   {
     Thread::LockGuard lock(mutex_);
     headers_ = &headers;
@@ -255,8 +248,8 @@ GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseH
 
 bool Filter::doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
                        bool end_stream) {
-  ENVOY_LOG(debug, "golang filter doHeaders, state: {}, phase: {}, end_stream: {}",
-            state.stateStr(), state.phaseStr(), end_stream);
+  ENVOY_LOG(debug, "golang filter doHeaders, state: {}, end_stream: {}", state.stateStr(),
+            end_stream);
 
   ASSERT(state.isBufferDataEmpty());
 
@@ -271,15 +264,14 @@ bool Filter::doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& 
 }
 
 bool Filter::doDataGo(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "golang filter passing data to golang, state: {}, phase: {}, end_stream: {}",
-            state.stateStr(), state.phaseStr(), end_stream);
+  ENVOY_LOG(debug, "golang filter passing data to golang, state: {}, end_stream: {}",
+            state.stateStr(), end_stream);
 
   state.processData(end_stream);
 
   Buffer::Instance& buffer = state.doDataList.push(data);
 
   ASSERT(req_ != nullptr);
-  req_->phase = state.phase;
   auto status = dynamic_lib_->envoyGoFilterOnHttpData(
       req_, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());
 
@@ -287,8 +279,7 @@ bool Filter::doDataGo(ProcessorState& state, Buffer::Instance& data, bool end_st
 }
 
 bool Filter::doData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "golang filter doData, state: {}, phase: {}, end_stream: {}", state.stateStr(),
-            state.phaseStr(), end_stream);
+  ENVOY_LOG(debug, "golang filter doData, state: {}, end_stream: {}", state.stateStr(), end_stream);
 
   bool done = false;
   switch (state.filterState()) {
@@ -328,13 +319,11 @@ bool Filter::doData(ProcessorState& state, Buffer::Instance& data, bool end_stre
 }
 
 bool Filter::doTrailerGo(ProcessorState& state, Http::HeaderMap& trailers) {
-  ENVOY_LOG(debug, "golang filter passing trailers to golang, state: {}, phase: {}",
-            state.stateStr(), state.phaseStr());
+  ENVOY_LOG(debug, "golang filter passing trailers to golang, state: {}", state.stateStr());
 
   state.processTrailer();
 
   ASSERT(req_ != nullptr);
-  req_->phase = state.phase;
   auto status =
       dynamic_lib_->envoyGoFilterOnHttpHeader(req_, 1, trailers.size(), trailers.byteSize());
 
@@ -342,8 +331,7 @@ bool Filter::doTrailerGo(ProcessorState& state, Http::HeaderMap& trailers) {
 }
 
 bool Filter::doTrailer(ProcessorState& state, Http::HeaderMap& trailers) {
-  ENVOY_LOG(debug, "golang filter doTrailer, state: {}, phase: {}", state.stateStr(),
-            state.phaseStr());
+  ENVOY_LOG(debug, "golang filter doTrailer, state: {}", state.stateStr());
 
   ASSERT(!state.getEndStream() && !state.isProcessingEndStream());
 
@@ -414,8 +402,8 @@ CAPIStatus Filter::clearRouteCache() {
 void Filter::continueEncodeLocalReply(ProcessorState& state) {
   ENVOY_LOG(debug,
             "golang filter continue encodeHeader(local reply from other filters) after return from "
-            "go, current state: {}, phase: {}",
-            state.stateStr(), state.phaseStr());
+            "go, current state: {}",
+            state.stateStr());
 
   ENVOY_LOG(debug, "golang filter drain do data buffer before continueEncodeLocalReply");
   state.doDataList.clearAll();
@@ -447,8 +435,8 @@ void Filter::continueStatusInternal(GolangStatus status) {
   if (local_reply_waiting_go_) {
     ENVOY_LOG(debug,
               "other filter already trigger sendLocalReply, ignoring the continue status: {}, "
-              "state: {}, phase: {}",
-              int(status), state.stateStr(), state.phaseStr());
+              "state: {}",
+              int(status), state.stateStr());
 
     continueEncodeLocalReply(state);
     return;
@@ -590,8 +578,8 @@ CAPIStatus Filter::continueStatus(GolangStatus status) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
     return CAPIStatus::CAPINotInGo;
   }
-  ENVOY_LOG(debug, "golang filter continue from Go, status: {}, state: {}, phase: {}", int(status),
-            state.stateStr(), state.phaseStr());
+  ENVOY_LOG(debug, "golang filter continue from Go, status: {}, state: {}", int(status),
+            state.stateStr());
 
   auto weak_ptr = weak_from_this();
   // TODO: skip post event to dispatcher, and return continue in the caller,
@@ -620,7 +608,7 @@ CAPIStatus Filter::getHeader(absl::string_view key, uint64_t* value_data, int* v
   }
   auto m = state.isProcessingHeader() ? headers_ : trailers_;
   if (m == nullptr) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   auto result = m->get(Http::LowerCaseString(key));
@@ -672,7 +660,7 @@ CAPIStatus Filter::copyHeaders(GoString* go_strs, char* go_buf) {
     return CAPIStatus::CAPINotInGo;
   }
   if (headers_ == nullptr) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   copyHeaderMapToGo(*headers_, go_strs, go_buf);
@@ -693,7 +681,7 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value, hea
     return CAPIStatus::CAPINotInGo;
   }
   if (headers_ == nullptr) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
 
@@ -758,7 +746,7 @@ CAPIStatus Filter::removeHeader(absl::string_view key) {
     return CAPIStatus::CAPINotInGo;
   }
   if (headers_ == nullptr) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   if (state.isThreadSafe()) {
@@ -797,7 +785,7 @@ CAPIStatus Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
     return CAPIStatus::CAPINotInGo;
   }
   if (!state.doDataList.checkExisting(buffer)) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   for (const Buffer::RawSlice& slice : buffer->getRawSlices()) {
@@ -822,7 +810,7 @@ CAPIStatus Filter::drainBuffer(Buffer::Instance* buffer, uint64_t length) {
     return CAPIStatus::CAPINotInGo;
   }
   if (!state.doDataList.checkExisting(buffer)) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
 
@@ -844,7 +832,7 @@ CAPIStatus Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& 
     return CAPIStatus::CAPINotInGo;
   }
   if (!state.doDataList.checkExisting(buffer)) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   if (action == bufferAction::Set) {
@@ -870,7 +858,7 @@ CAPIStatus Filter::copyTrailers(GoString* go_strs, char* go_buf) {
     return CAPIStatus::CAPINotInGo;
   }
   if (trailers_ == nullptr) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   copyHeaderMapToGo(*trailers_, go_strs, go_buf);
@@ -889,7 +877,7 @@ CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value, he
     return CAPIStatus::CAPINotInGo;
   }
   if (trailers_ == nullptr) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   if (state.isThreadSafe()) {
@@ -949,7 +937,7 @@ CAPIStatus Filter::removeTrailer(absl::string_view key) {
     return CAPIStatus::CAPINotInGo;
   }
   if (trailers_ == nullptr) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   if (state.isThreadSafe()) {

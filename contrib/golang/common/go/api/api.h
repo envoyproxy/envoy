@@ -19,14 +19,11 @@ typedef struct { // NOLINT(modernize-use-using)
   struct httpRequest* req;
   int is_encoding;
   int state;
-  // TODO: remove
-  int phase;
 } processState;
 
 typedef struct httpRequest { // NOLINT(modernize-use-using)
   Cstring plugin_name;
   uint64_t configId;
-  int phase;
   // The ID of the worker that is processing this request, this enables the go filter to dedicate
   // memory to each worker and not require locks
   uint32_t worker_id;

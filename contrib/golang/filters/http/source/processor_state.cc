@@ -48,8 +48,8 @@ bool BufferList::checkExisting(Buffer::Instance* data) {
 
 // headers_ should set to nullptr when return true.
 bool ProcessorState::handleHeaderGolangStatus(GolangStatus status) {
-  ENVOY_LOG(debug, "golang filter handle header status, state: {}, phase: {}, status: {}",
-            stateStr(), phaseStr(), int(status));
+  ENVOY_LOG(debug, "golang filter handle header status, state: {}, status: {}", stateStr(),
+            int(status));
 
   ASSERT(filterState() == FilterState::ProcessingHeader);
   bool done = false;
@@ -85,15 +85,15 @@ bool ProcessorState::handleHeaderGolangStatus(GolangStatus status) {
     break;
   }
 
-  ENVOY_LOG(debug, "golang filter after handle header status, state: {}, phase: {}, status: {}",
-            stateStr(), phaseStr(), int(status));
+  ENVOY_LOG(debug, "golang filter after handle header status, state: {}, status: {}", stateStr(),
+            int(status));
 
   return done;
 };
 
 bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
-  ENVOY_LOG(debug, "golang filter handle data status, state: {}, phase: {}, status: {}", stateStr(),
-            phaseStr(), int(status));
+  ENVOY_LOG(debug, "golang filter handle data status, state: {}, status: {}", stateStr(),
+            int(status));
 
   ASSERT(filterState() == FilterState::ProcessingData);
 
@@ -156,8 +156,8 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
     setFilterState(FilterState::WaitingTrailer);
   }
 
-  ENVOY_LOG(debug, "golang filter after handle data status, state: {}, phase: {}, status: {}",
-            int(filterState()), phaseStr(), int(status));
+  ENVOY_LOG(debug, "golang filter after handle data status, state: {}, status: {}",
+            int(filterState()), int(status));
 
   return done;
 };
@@ -165,8 +165,8 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
 // should set trailers_ to nullptr when return true.
 // means we should not read/write trailers then, since trailers will pass to next fitler.
 bool ProcessorState::handleTrailerGolangStatus(const GolangStatus status) {
-  ENVOY_LOG(debug, "golang filter handle trailer status, state: {}, phase: {}, status: {}",
-            stateStr(), phaseStr(), int(status));
+  ENVOY_LOG(debug, "golang filter handle trailer status, state: {}, status: {}", stateStr(),
+            int(status));
 
   ASSERT(filterState() == FilterState::ProcessingTrailer);
 
@@ -192,8 +192,8 @@ bool ProcessorState::handleTrailerGolangStatus(const GolangStatus status) {
     break;
   }
 
-  ENVOY_LOG(debug, "golang filter after handle trailer status, state: {}, phase: {}, status: {}",
-            stateStr(), phaseStr(), int(status));
+  ENVOY_LOG(debug, "golang filter after handle trailer status, state: {}, status: {}", stateStr(),
+            int(status));
 
   return done;
 };
@@ -204,9 +204,9 @@ bool ProcessorState::handleGolangStatus(GolangStatus status) {
   ASSERT(isProcessingInGo(), "unexpected state");
 
   ENVOY_LOG(debug,
-            "before handle golang status, status: {}, state: {}, phase: {}, "
+            "before handle golang status, status: {}, state: {}, "
             "do_end_stream_: {}",
-            int(status), stateStr(), phaseStr(), do_end_stream_);
+            int(status), stateStr(), do_end_stream_);
 
   bool done = false;
   switch (filterState()) {
@@ -227,9 +227,9 @@ bool ProcessorState::handleGolangStatus(GolangStatus status) {
   }
 
   ENVOY_LOG(debug,
-            "after handle golang status, status: {}, state: {}, phase: {}, "
+            "after handle golang status, status: {}, state: {}, "
             "do_end_stream_: {}",
-            int(status), stateStr(), phaseStr(), do_end_stream_);
+            int(status), stateStr(), do_end_stream_);
 
   return done;
 }
@@ -244,8 +244,8 @@ void ProcessorState::drainBufferData() {
   }
 }
 
-std::string ProcessorState::stateStr() {
-  switch (filterState()) {
+std::string state2Str(FilterState state) {
+  switch (state) {
   case FilterState::WaitingHeader:
     return "WaitingHeader";
   case FilterState::ProcessingHeader:
@@ -269,52 +269,10 @@ std::string ProcessorState::stateStr() {
   }
 }
 
-Phase ProcessorState::state2Phase() {
-  Phase phase;
-  switch (filterState()) {
-  case FilterState::WaitingHeader:
-  case FilterState::ProcessingHeader:
-    phase = Phase::DecodeHeader;
-    break;
-  case FilterState::WaitingData:
-  case FilterState::WaitingAllData:
-  case FilterState::ProcessingData:
-    phase = Phase::DecodeData;
-    break;
-  case FilterState::WaitingTrailer:
-  case FilterState::ProcessingTrailer:
-    phase = Phase::DecodeTrailer;
-    break;
-  case FilterState::Log:
-    phase = Phase::Log;
-    break;
-  // decode Done state means encode header phase, encode done state means done phase
-  case FilterState::Done:
-    phase = Phase::EncodeHeader;
-    break;
-  }
-  return phase;
-};
-
-std::string ProcessorState::phaseStr() {
-  switch (Phase(phase)) {
-  case Phase::DecodeHeader:
-    return "DecodeHeader";
-  case Phase::DecodeData:
-    return "DecodeData";
-  case Phase::DecodeTrailer:
-    return "DecodeTrailer";
-  case Phase::EncodeHeader:
-    return "EncodeHeader";
-  case Phase::EncodeData:
-    return "EncodeData";
-  case Phase::EncodeTrailer:
-    return "EncodeTrailer";
-  case Phase::Log:
-    return "Log";
-  default:
-    return "unknown";
-  }
+std::string ProcessorState::stateStr() {
+  std::string prefix = is_encoding == 1 ? "encoder" : "decoder";
+  auto state_str = state2Str(filterState());
+  return prefix + ":" + state_str;
 }
 
 void DecodingProcessorState::addBufferData(Buffer::Instance& data) {

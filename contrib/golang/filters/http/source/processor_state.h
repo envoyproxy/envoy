@@ -67,20 +67,6 @@ enum class FilterState {
   Done,
 };
 
-/*
- * request phase
- */
-enum class Phase {
-  DecodeHeader = 1,
-  DecodeData,
-  DecodeTrailer,
-  EncodeHeader,
-  EncodeData,
-  EncodeTrailer,
-  Log,
-  Done,
-};
-
 /**
  * An enum specific for Golang status.
  */
@@ -97,10 +83,7 @@ enum class GolangStatus {
 
 class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
 public:
-  explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) {
-    req = r;
-    phase = 0;
-  }
+  explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) { req = r; }
   virtual ~ProcessorState() = default;
 
   FilterState filterState() const { return FilterState(state); }
@@ -108,8 +91,6 @@ public:
   std::string stateStr();
 
   virtual Http::StreamFilterCallbacks* getFilterCallbacks() const PURE;
-
-  std::string phaseStr();
 
   bool isProcessingInGo() {
     return filterState() == FilterState::ProcessingHeader ||
@@ -194,7 +175,6 @@ public:
   BufferList doDataList;
 
 protected:
-  Phase state2Phase();
   Filter& filter_;
   bool watermark_requested_{false};
   Buffer::InstancePtr data_buffer_{nullptr};
