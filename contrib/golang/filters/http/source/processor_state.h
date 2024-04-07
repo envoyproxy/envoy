@@ -61,10 +61,10 @@ enum class FilterState {
   WaitingTrailer,
   // Processing trailer in Go
   ProcessingTrailer,
-  // Log in Go
-  Log,
   // All done
   Done,
+  // Logging in Go
+  Logging = 0x80,
 };
 
 /**
@@ -86,8 +86,12 @@ public:
   explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) { req = r; }
   virtual ~ProcessorState() = default;
 
-  FilterState filterState() const { return FilterState(state); }
-  void setFilterState(FilterState st) { state = static_cast<int>(st); }
+  FilterState filterState() const {
+    return FilterState(~static_cast<int>(FilterState::Logging) & state);
+  }
+  void setFilterState(FilterState st) {
+    state = static_cast<int>(st) | (static_cast<int>(FilterState::Logging) & state);
+  }
   std::string stateStr();
 
   virtual Http::StreamFilterCallbacks* getFilterCallbacks() const PURE;
@@ -95,7 +99,7 @@ public:
   bool isProcessingInGo() {
     return filterState() == FilterState::ProcessingHeader ||
            filterState() == FilterState::ProcessingData ||
-           filterState() == FilterState::ProcessingTrailer || filterState() == FilterState::Log;
+           filterState() == FilterState::ProcessingTrailer || filterState() == FilterState::Logging;
   }
   bool isProcessingHeader() { return filterState() == FilterState::ProcessingHeader; }
 
@@ -146,14 +150,8 @@ public:
     do_end_stream_ = true;
   }
 
-  void enterLog() {
-    prev_state_ = filterState();
-    setFilterState(FilterState::Log);
-  }
-  void leaveLog() {
-    setFilterState(prev_state_);
-    prev_state_ = FilterState::Log;
-  }
+  void enterLog() { state = state | static_cast<int>(FilterState::Logging); }
+  void leaveLog() { state = ~static_cast<int>(FilterState::Logging) & state; }
 
   bool handleHeaderGolangStatus(const GolangStatus status);
   bool handleDataGolangStatus(const GolangStatus status);
@@ -178,7 +176,6 @@ protected:
   Filter& filter_;
   bool watermark_requested_{false};
   Buffer::InstancePtr data_buffer_{nullptr};
-  FilterState prev_state_{FilterState::Done};
   bool end_stream_{false};
   bool do_end_stream_{false};
   bool seen_trailers_{false};
