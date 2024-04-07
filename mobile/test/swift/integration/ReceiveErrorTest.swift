@@ -70,7 +70,6 @@ final class ReceiveErrorTests: XCTestCase {
                                 notCancelled: filterNotCancelled)
         }
       )
-      .addNativeFilter(name: localErrorFilterName, typedConfig: "[\(localErrorFilterType)]{}")
       .build()
 
     let client = engine.streamClient()
