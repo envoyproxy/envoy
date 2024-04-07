@@ -87,40 +87,55 @@ cc_library(
 
 config_setting(
     name = "windows_opt_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "compilation_mode": "opt",
     },
 )
 
 config_setting(
     name = "windows_dbg_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "compilation_mode": "dbg",
     },
 )
 
 config_setting(
     name = "windows_fastbuild_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "compilation_mode": "fastbuild",
     },
 )
 
 config_setting(
     name = "clang_cl_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
     },
 )
 
 config_setting(
     name = "clang_cl_opt_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "opt",
     },
@@ -128,8 +143,11 @@ config_setting(
 
 config_setting(
     name = "clang_cl_dbg_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "dbg",
     },
@@ -137,8 +155,11 @@ config_setting(
 
 config_setting(
     name = "clang_cl_fastbuild_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "fastbuild",
     },
@@ -277,25 +298,31 @@ config_setting(
 
 config_setting(
     name = "disable_tcmalloc_on_linux_aarch64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
     values = {
         "define": "tcmalloc=disabled",
-        "cpu": "aarch64",
     },
 )
 
 config_setting(
     name = "gperftools_tcmalloc_on_linux_aarch64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
     values = {
         "define": "tcmalloc=gperftools",
-        "cpu": "aarch64",
     },
 )
 
 config_setting(
     name = "debug_tcmalloc_on_linux_aarch64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
     values = {
         "define": "tcmalloc=debug",
-        "cpu": "aarch64",
     },
 )
 
@@ -553,59 +580,87 @@ config_setting(
 
 config_setting(
     name = "linux_aarch64",
-    values = {"cpu": "aarch64"},
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
 )
 
 config_setting(
     name = "linux_ppc",
-    values = {"cpu": "ppc"},
+    constraint_values = [
+        "@platforms//cpu:ppc",
+    ],
 )
 
 config_setting(
     name = "linux_s390x",
-    values = {"cpu": "s390x"},
+    constraint_values = [
+        "@platforms//cpu:s390x",
+    ],
 )
 
 config_setting(
     name = "linux_mips64",
-    values = {"cpu": "mips64"},
+    constraint_values = [
+        "@platforms//cpu:mips64",
+    ],
 )
 
 config_setting(
     name = "windows_x86_64",
-    values = {"cpu": "x64_windows"},
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
 )
 
 # Configuration settings to make doing selects for Apple vs non-Apple platforms
 # easier. More details: https://docs.bazel.build/versions/master/configurable-attributes.html#config_settingaliasing
 config_setting(
     name = "darwin",
-    values = {"cpu": "darwin"},
+    constraint_values = [
+        "@platforms//os:osx",
+    ],
 )
 
 config_setting(
     name = "darwin_x86_64",
-    values = {"cpu": "darwin_x86_64"},
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:osx",
+    ],
 )
 
 config_setting(
     name = "darwin_arm64",
-    values = {"cpu": "darwin_arm64"},
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:osx",
+    ],
 )
 
 config_setting(
     name = "ios_i386",
-    values = {"cpu": "ios_i386"},
+    constraint_values = [
+        "@platforms//cpu:x86_32",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_x86_64",
-    values = {"cpu": "ios_x86_64"},
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_armv7",
-    values = {"cpu": "ios_armv7"},
+    constraint_values = [
+        "@platforms//cpu:armv7",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
@@ -615,7 +670,10 @@ config_setting(
 
 config_setting(
     name = "ios_arm64",
-    values = {"cpu": "ios_arm64"},
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
@@ -625,7 +683,10 @@ config_setting(
 
 config_setting(
     name = "ios_arm64e",
-    values = {"cpu": "ios_arm64e"},
+    constraint_values = [
+        "@platforms//cpu:arm64e",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
