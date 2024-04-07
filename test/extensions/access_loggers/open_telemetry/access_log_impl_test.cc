@@ -175,14 +175,9 @@ TEST_F(AccessLogTest, TraceId) {
 
   NiceMock<Tracing::MockSpan> active_span;
 
-  const uint64_t trace_id_high = 0;
-  const uint64_t trace_id_low = 0;
-  const std::string trace_id_hex =
-      absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id_low));
-
-  EXPECT_CALL(active_span, getTraceIdAsHex()).WillOnce(Return(trace_id_hex));
+  EXPECT_CALL(active_span, getTraceIdAsHex()).WillOnce(Return("404142434445464748494a4b4c4d4e4f"));
   expectLog(R"EOF(
-      trace_id: "AAAAAAAAAAAAAAAAAAAAAA"
+      trace_id: "QEFCQ0RFRkdISUpLTE1OTw=="
       time_unix_nano: 3600000000000
     )EOF");
   access_log->log(
