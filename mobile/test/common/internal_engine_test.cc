@@ -540,11 +540,15 @@ protected:
   }
 };
 
+// The setpriority() call fails on some Apple environments.
+// TODO(abeyad): investigate what to do for Apple.
+#ifndef defined(__APPLE__)
 TEST_F(ThreadPriorityInternalEngineTest, SetThreadPriority) {
   const int expected_thread_priority = 10;
   const int actual_thread_priority = startEngineWithPriority(expected_thread_priority);
   EXPECT_EQ(actual_thread_priority, expected_thread_priority);
 }
+#endif
 
 TEST_F(ThreadPriorityInternalEngineTest, SetOutOfRangeThreadPriority) {
   // 42 is outside the range of acceptable thread priorities.
