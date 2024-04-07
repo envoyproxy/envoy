@@ -51,7 +51,7 @@ bool ProcessorState::handleHeaderGolangStatus(GolangStatus status) {
   ENVOY_LOG(debug, "golang filter handle header status, state: {}, phase: {}, status: {}",
             stateStr(), phaseStr(), int(status));
 
-  ASSERT(state_ == FilterState::ProcessingHeader);
+  ASSERT(filterState() == FilterState::ProcessingHeader);
   bool done = false;
 
   switch (status) {
@@ -65,19 +65,19 @@ bool ProcessorState::handleHeaderGolangStatus(GolangStatus status) {
 
   case GolangStatus::Continue:
     if (do_end_stream_) {
-      state_ = FilterState::Done;
+      setFilterState(FilterState::Done);
     } else {
-      state_ = FilterState::WaitingData;
+      setFilterState(FilterState::WaitingData);
     }
     done = true;
     break;
 
   case GolangStatus::StopAndBuffer:
-    state_ = FilterState::WaitingAllData;
+    setFilterState(FilterState::WaitingAllData);
     break;
 
   case GolangStatus::StopAndBufferWatermark:
-    state_ = FilterState::WaitingData;
+    setFilterState(FilterState::WaitingData);
     break;
 
   default:
@@ -95,7 +95,7 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
   ENVOY_LOG(debug, "golang filter handle data status, state: {}, phase: {}, status: {}", stateStr(),
             phaseStr(), int(status));
 
-  ASSERT(state_ == FilterState::ProcessingData);
+  ASSERT(filterState() == FilterState::ProcessingData);
 
   bool done = false;
 
@@ -112,9 +112,9 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
 
   case GolangStatus::Continue:
     if (do_end_stream_) {
-      state_ = FilterState::Done;
+      setFilterState(FilterState::Done);
     } else {
-      state_ = FilterState::WaitingData;
+      setFilterState(FilterState::WaitingData);
     }
     done = true;
     break;
@@ -124,7 +124,7 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
       ENVOY_LOG(error, "want more data while stream is end");
       // TODO: terminate the stream?
     }
-    state_ = FilterState::WaitingAllData;
+    setFilterState(FilterState::WaitingAllData);
     break;
 
   case GolangStatus::StopAndBufferWatermark:
@@ -132,7 +132,7 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
       ENVOY_LOG(error, "want more data while stream is end");
       // TODO: terminate the stream?
     }
-    state_ = FilterState::WaitingData;
+    setFilterState(FilterState::WaitingData);
     break;
 
   case GolangStatus::StopNoBuffer:
@@ -141,7 +141,7 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
       // TODO: terminate the stream?
     }
     doDataList.clearLatest();
-    state_ = FilterState::WaitingData;
+    setFilterState(FilterState::WaitingData);
     break;
 
   default:
@@ -153,11 +153,11 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
   // see trailers and no buffered data
   if (seen_trailers_ && isBufferDataEmpty()) {
     ENVOY_LOG(error, "see trailers and buffer is empty");
-    state_ = FilterState::WaitingTrailer;
+    setFilterState(FilterState::WaitingTrailer);
   }
 
   ENVOY_LOG(debug, "golang filter after handle data status, state: {}, phase: {}, status: {}",
-            int(state_), phaseStr(), int(status));
+            int(filterState()), phaseStr(), int(status));
 
   return done;
 };
@@ -168,7 +168,7 @@ bool ProcessorState::handleTrailerGolangStatus(const GolangStatus status) {
   ENVOY_LOG(debug, "golang filter handle trailer status, state: {}, phase: {}, status: {}",
             stateStr(), phaseStr(), int(status));
 
-  ASSERT(state_ == FilterState::ProcessingTrailer);
+  ASSERT(filterState() == FilterState::ProcessingTrailer);
 
   auto done = false;
 
@@ -182,7 +182,7 @@ bool ProcessorState::handleTrailerGolangStatus(const GolangStatus status) {
     break;
 
   case GolangStatus::Continue:
-    state_ = FilterState::Done;
+    setFilterState(FilterState::Done);
     done = true;
     break;
 
@@ -209,7 +209,7 @@ bool ProcessorState::handleGolangStatus(GolangStatus status) {
             int(status), stateStr(), phaseStr(), do_end_stream_);
 
   bool done = false;
-  switch (state_) {
+  switch (filterState()) {
   case FilterState::ProcessingHeader:
     done = handleHeaderGolangStatus(status);
     break;
@@ -245,7 +245,7 @@ void ProcessorState::drainBufferData() {
 }
 
 std::string ProcessorState::stateStr() {
-  switch (state_) {
+  switch (filterState()) {
   case FilterState::WaitingHeader:
     return "WaitingHeader";
   case FilterState::ProcessingHeader:
@@ -271,7 +271,7 @@ std::string ProcessorState::stateStr() {
 
 Phase ProcessorState::state2Phase() {
   Phase phase;
-  switch (state_) {
+  switch (filterState()) {
   case FilterState::WaitingHeader:
   case FilterState::ProcessingHeader:
     phase = Phase::DecodeHeader;
@@ -328,7 +328,7 @@ void DecodingProcessorState::addBufferData(Buffer::Instance& data) {
           }
         },
         [this]() -> void {
-          if (state_ == FilterState::WaitingAllData) {
+          if (filterState() == FilterState::WaitingAllData) {
             // On the request path exceeding buffer limits will result in a 413.
             ENVOY_LOG(debug, "golang filter decode data buffer is full, reply with 413");
             decoder_callbacks_->sendLocalReply(
@@ -360,7 +360,7 @@ void EncodingProcessorState::addBufferData(Buffer::Instance& data) {
           }
         },
         [this]() -> void {
-          if (state_ == FilterState::WaitingAllData) {
+          if (filterState() == FilterState::WaitingAllData) {
             // On the request path exceeding buffer limits will result in a 413.
             ENVOY_LOG(debug, "golang filter encode data buffer is full, reply with 413");
             encoder_callbacks_->sendLocalReply(

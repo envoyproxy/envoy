@@ -103,7 +103,8 @@ public:
   }
   virtual ~ProcessorState() = default;
 
-  FilterState state() const { return state_; }
+  FilterState filterState() const { return FilterState(state); }
+  void setFilterState(FilterState st) { state = static_cast<int>(st); }
   std::string stateStr();
 
   virtual Http::StreamFilterCallbacks* getFilterCallbacks() const PURE;
@@ -111,10 +112,11 @@ public:
   std::string phaseStr();
 
   bool isProcessingInGo() {
-    return state_ == FilterState::ProcessingHeader || state_ == FilterState::ProcessingData ||
-           state_ == FilterState::ProcessingTrailer || state_ == FilterState::Log;
+    return filterState() == FilterState::ProcessingHeader ||
+           filterState() == FilterState::ProcessingData ||
+           filterState() == FilterState::ProcessingTrailer || filterState() == FilterState::Log;
   }
-  bool isProcessingHeader() { return state_ == FilterState::ProcessingHeader; }
+  bool isProcessingHeader() { return filterState() == FilterState::ProcessingHeader; }
 
   bool isThreadSafe() { return getFilterCallbacks()->dispatcher().isThreadSafe(); };
   Event::Dispatcher& getDispatcher() { return getFilterCallbacks()->dispatcher(); }
@@ -143,31 +145,32 @@ public:
   }
 
   void processHeader(bool end_stream) {
-    ASSERT(state_ == FilterState::WaitingHeader);
-    state_ = FilterState::ProcessingHeader;
+    ASSERT(filterState() == FilterState::WaitingHeader);
+    setFilterState(FilterState::ProcessingHeader);
     do_end_stream_ = end_stream;
   }
 
   void processData(bool end_stream) {
-    ASSERT(state_ == FilterState::WaitingData ||
-           (state_ == FilterState::WaitingAllData && (end_stream || seen_trailers_)));
-    state_ = FilterState::ProcessingData;
+    ASSERT(filterState() == FilterState::WaitingData ||
+           (filterState() == FilterState::WaitingAllData && (end_stream || seen_trailers_)));
+    setFilterState(FilterState::ProcessingData);
     do_end_stream_ = end_stream;
   }
 
   void processTrailer() {
-    ASSERT(state_ == FilterState::WaitingTrailer || state_ == FilterState::WaitingData ||
-           state_ == FilterState::WaitingAllData);
-    state_ = FilterState::ProcessingTrailer;
+    ASSERT(filterState() == FilterState::WaitingTrailer ||
+           filterState() == FilterState::WaitingData ||
+           filterState() == FilterState::WaitingAllData);
+    setFilterState(FilterState::ProcessingTrailer);
     do_end_stream_ = true;
   }
 
   void enterLog() {
-    prev_state_ = state_;
-    state_ = FilterState::Log;
+    prev_state_ = filterState();
+    setFilterState(FilterState::Log);
   }
   void leaveLog() {
-    state_ = prev_state_;
+    setFilterState(prev_state_);
     prev_state_ = FilterState::Log;
   }
 
@@ -195,7 +198,6 @@ protected:
   Filter& filter_;
   bool watermark_requested_{false};
   Buffer::InstancePtr data_buffer_{nullptr};
-  FilterState state_{FilterState::WaitingHeader};
   FilterState prev_state_{FilterState::Done};
   bool end_stream_{false};
   bool do_end_stream_{false};
@@ -226,10 +228,10 @@ public:
   void sendLocalReply(Http::Code response_code, absl::string_view body_text,
                       std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                       Grpc::Status::GrpcStatus grpc_status, absl::string_view details) override {
-    // it's safe to reset state_, since it is read/write in safe thread.
+    // it's safe to reset filterState(), since it is read/write in safe thread.
     ENVOY_LOG(debug, "golang filter phase grow to EncodeHeader and state grow to WaitHeader before "
                      "sendLocalReply");
-    state_ = FilterState::WaitingHeader;
+    setFilterState(FilterState::WaitingHeader);
     decoder_callbacks_->sendLocalReply(response_code, body_text, modify_headers, grpc_status,
                                        details);
   };

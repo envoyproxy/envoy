@@ -92,11 +92,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 
   encoding_state_.setEndStream(end_stream);
 
-  // NP: may enter encodeHeaders in any phase & any state_,
+  // NP: may enter encodeHeaders in any phase & any state,
   // since other filters or filtermanager could call encodeHeaders or sendLocalReply in any time.
   // eg. filtermanager may invoke sendLocalReply, when scheme is invalid,
   // with "Sending local reply with details // http1.invalid_scheme" details.
-  if (state.state() != FilterState::Done) {
+  if (state.filterState() != FilterState::Done) {
     ENVOY_LOG(debug,
               "golang filter enter encodeHeaders early, maybe sendLocalReply or encodeHeaders "
               "happened, current state: {}, phase: {}",
@@ -291,7 +291,7 @@ bool Filter::doData(ProcessorState& state, Buffer::Instance& data, bool end_stre
             state.phaseStr(), end_stream);
 
   bool done = false;
-  switch (state.state()) {
+  switch (state.filterState()) {
   case FilterState::WaitingData:
     done = doDataGo(state, data, end_stream);
     break;
@@ -304,7 +304,7 @@ bool Filter::doData(ProcessorState& state, Buffer::Instance& data, bool end_stre
       }
       // check state again since data_buffer may be full and sendLocalReply with 413.
       // TODO: better not trigger 413 here.
-      if (state.state() == FilterState::WaitingAllData) {
+      if (state.filterState() == FilterState::WaitingAllData) {
         done = doDataGo(state, data, end_stream);
       }
       break;
@@ -354,7 +354,7 @@ bool Filter::doTrailer(ProcessorState& state, Http::HeaderMap& trailers) {
 
   bool done = false;
   Buffer::OwnedImpl body;
-  switch (state.state()) {
+  switch (state.filterState()) {
   case FilterState::WaitingTrailer:
     done = doTrailerGo(state, trailers);
     break;
@@ -367,9 +367,9 @@ bool Filter::doTrailer(ProcessorState& state, Http::HeaderMap& trailers) {
     if (!state.isBufferDataEmpty()) {
       done = doDataGo(state, state.getBufferData(), false);
       // NP: can not use done as condition here, since done will be false
-      // maybe we can remove the done variable totally? by using state_ only?
+      // maybe we can remove the done variable totally? by using state only?
       // continue trailers
-      if (state.state() == FilterState::WaitingTrailer) {
+      if (state.filterState() == FilterState::WaitingTrailer) {
         state.continueDoData();
         done = doTrailerGo(state, trailers);
       }
@@ -442,7 +442,7 @@ void Filter::continueEncodeLocalReply(ProcessorState& state) {
 void Filter::continueStatusInternal(GolangStatus status) {
   ProcessorState& state = getProcessorState();
   ASSERT(state.isThreadSafe());
-  auto saved_state = state.state();
+  auto saved_state = state.filterState();
 
   if (local_reply_waiting_go_) {
     ENVOY_LOG(debug,
@@ -485,7 +485,7 @@ void Filter::continueStatusInternal(GolangStatus status) {
   // TODO: state should also grow in this case
   // state == WaitingData && bufferData is empty && seen trailers
 
-  auto current_state = state.state();
+  auto current_state = state.filterState();
   if ((current_state == FilterState::WaitingData &&
        (!state.isBufferDataEmpty() || state.getEndStream())) ||
       (current_state == FilterState::WaitingAllData && state.isStreamEnd())) {
@@ -499,7 +499,7 @@ void Filter::continueStatusInternal(GolangStatus status) {
   }
 
   Thread::ReleasableLockGuard lock(mutex_);
-  if (state.state() == FilterState::WaitingTrailer && trailers_ != nullptr) {
+  if (state.filterState() == FilterState::WaitingTrailer && trailers_ != nullptr) {
     auto trailers = trailers_;
     lock.release();
     auto done = doTrailerGo(state, *trailers);
