@@ -55,6 +55,7 @@ final class ReceiveErrorTests: XCTestCase {
     let expectations = [filterReceivedError, filterNotCancelled, callbackReceivedError]
 
     let localErrorFilterName = "envoy.filters.http.local_error"
+    // swiftlint:disable:next line_length
     let localErrorFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
 
     let engine = EngineBuilder()
