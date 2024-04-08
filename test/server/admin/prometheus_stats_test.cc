@@ -325,7 +325,8 @@ TEST_F(PrometheusStatsFormatterTest, DifferentNamedScopeSameStat) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
   Stats::ThreadLocalStoreImpl store(alloc_);
   envoy::config::metrics::v3::StatsConfig stats_config;
-  store.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config));
+  const Stats::TagVector tags;
+  store.setTagProducer(Stats::TagProducerImpl::createTagProducer(stats_config, tags).value());
   Stats::StatName name = pool_.add("default.total_match_count");
 
   Stats::ScopeSharedPtr scope1 = store.rootScope()->createScope("cluster.a");
