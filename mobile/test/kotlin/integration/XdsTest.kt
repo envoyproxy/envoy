@@ -7,6 +7,7 @@ import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.XdsBuilder
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.XdsTestServerFactory
 import java.io.File
@@ -31,8 +32,6 @@ class XdsTest {
 
   @Before
   fun setUp() {
-    val upstreamCert: String =
-      File("../envoy/test/config/integration/certs/upstreamcacert.pem").readText()
     xdsTestServer = XdsTestServerFactory.create()
     val latch = CountDownLatch(1)
     engine =
@@ -40,12 +39,12 @@ class XdsTest {
         .addLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setOnEngineRunning { latch.countDown() }
+        .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
         .setXds(
           XdsBuilder(
               xdsTestServer.host,
               xdsTestServer.port,
             )
-            .setSslRootCerts(upstreamCert)
             .addClusterDiscoveryService()
         )
         .build()
