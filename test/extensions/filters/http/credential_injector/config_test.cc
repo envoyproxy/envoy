@@ -31,8 +31,8 @@ TEST(Factory, UnregisteredExtension) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THAT(
       factory.createFilterFactoryFromProto(proto_config, "stats", context).status().message(),
-      testing::HasSubstr("Didn't find a registered implementation for type: "
-                         "'test.mock_credential.Unregistered'"));
+      testing::HasSubstr("Didn't find a registered implementation for 'undefined_credential' with "
+                         "type URL: 'test.mock_credential.Unregistered'"));
 }
 
 } // namespace CredentialInjector

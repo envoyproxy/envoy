@@ -48,7 +48,7 @@ CredentialInjectorFilter::CredentialInjectorFilter(FilterConfigSharedPtr config)
 Envoy::Http::FilterHeadersStatus
 CredentialInjectorFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) {
   bool succeed = config_->injectCredential(headers);
-  if (!succeed && !config_->allowRequestWithoutCredential()) {
+  if (!succeed) {
     decoder_callbacks_->sendLocalReply(Envoy::Http::Code::Unauthorized,
                                        "Failed to inject credential.", nullptr, absl::nullopt,
                                        "failed_to_inject_credential");
