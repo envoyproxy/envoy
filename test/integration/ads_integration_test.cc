@@ -279,7 +279,7 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   // Cluster should start off warming as the secret is being requested.
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
 
-  // Ack the original CDS sub
+  // Ack the original CDS sub.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
 
   // Before we send the secret, we'll send a delta removal to make sure we don't get a NACK.
@@ -290,7 +290,7 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   // that the requested resource doesn't exist.
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
 
-  // Warming should finish, so expect LDS ACK.
+  // Ack the original LDS subscription.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(lds_type_url, {}, {}));
 
   // Ack the removal itself.
