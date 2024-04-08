@@ -57,7 +57,7 @@ An example configuration of the route filter may look like the following:
             "@type": type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuthPerRoute
             users:
               inline_string: |-
-                admin:{SHA}0DPiKuNIrrVmD8IUCuw1hQxNqZc=
+                admin:{SHA}hashed_admin_password
       - match: { prefix: "/static" }
         route: { cluster: some_service }
         typed_per_filter_config:
