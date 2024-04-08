@@ -138,7 +138,6 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
             std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
       }
 
-      std::cerr << "==> AAB Bootstrap=" << options->configProto().DebugString() << std::endl;
       main_common = std::make_unique<EngineCommon>(options);
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
