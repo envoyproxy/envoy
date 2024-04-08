@@ -839,7 +839,7 @@ open class EngineBuilder: NSObject {
 private extension EngineBuilder {
   func generateBootstrap() -> Bootstrap {
     var cxxBuilder = Envoy.Platform.EngineBuilder()
-    cxxBuilder.addLogLevel(self.logLevel.toCXX())
+    cxxBuilder.setLogLevel(self.logLevel.toCXX())
 
     cxxBuilder.addConnectTimeoutSeconds(Int32(self.connectTimeoutSeconds))
     cxxBuilder.addDnsRefreshSeconds(Int32(self.dnsRefreshSeconds))
