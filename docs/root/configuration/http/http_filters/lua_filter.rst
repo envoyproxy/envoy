@@ -414,7 +414,7 @@ the supported keys are:
   It refers to the same *asynchronous* flag as the first function signature.
 - *timeout_ms* is an integer that specifies the call timeout in milliseconds.
   It refers to the same *timeout_ms* argument as the first function signature.
-- *trace_sampled* is a boolean flag that decides whether the produced trace span will be sampled or not.
+- *trace_sampled* is a boolean flag that decides whether the produced trace span will be sampled or not. If not provided, the sampling decision of the parent span is used.
 - *return_duplicate_headers* is boolean flag that decides whether the repeated headers are allowed in response headers.
   If the *return_duplicate_headers* is set to false (default), the returned *headers* is table with value type of string.
   If the *return_duplicate_headers* is set to true, the returned *headers* is table with value type of string or value type

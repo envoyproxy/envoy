@@ -4,6 +4,7 @@ import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Engine;
+import io.envoyproxy.envoymobile.LogLevel;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -21,7 +22,13 @@ public class AndroidEnvoyEngineStartUpTest {
 
   @Test
   public void ensure_engine_starts_and_terminates() throws InterruptedException {
-    Engine engine = new AndroidEngineBuilder(appContext).build();
+    Engine engine = new AndroidEngineBuilder(appContext)
+                        .addLogLevel(LogLevel.DEBUG)
+                        .setLogger((level, message) -> {
+                          System.out.print(message);
+                          return null;
+                        })
+                        .build();
     Thread.sleep(1000);
     engine.terminate();
     assertThat(true).isTrue();

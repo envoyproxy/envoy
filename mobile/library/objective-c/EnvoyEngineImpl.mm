@@ -376,7 +376,7 @@ static envoy_data ios_get_string(const void *context) {
 
   std::unique_ptr<Envoy::EngineCallbacks> native_callbacks =
       std::make_unique<Envoy::EngineCallbacks>();
-  native_callbacks->on_engine_running = [onEngineRunning = std::move(onEngineRunning)] {
+  native_callbacks->on_engine_running_ = [onEngineRunning = std::move(onEngineRunning)] {
     // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool
     // block is necessary to act as a breaker for any Objective-C allocation that happens.
     @autoreleasepool {
@@ -385,7 +385,7 @@ static envoy_data ios_get_string(const void *context) {
       }
     }
   };
-  native_callbacks->on_exit = [] {
+  native_callbacks->on_exit_ = [] {
     // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool
     // block is necessary to act as a breaker for any Objective-C allocation that happens.
     @autoreleasepool {
@@ -395,8 +395,8 @@ static envoy_data ios_get_string(const void *context) {
 
   std::unique_ptr<Envoy::EnvoyLogger> native_logger = std::make_unique<Envoy::EnvoyLogger>();
   if (logger) {
-    native_logger->on_log = [logger = std::move(logger)](Envoy::Logger::Logger::Levels level,
-                                                         const std::string &message) {
+    native_logger->on_log_ = [logger = std::move(logger)](Envoy::Logger::Logger::Levels level,
+                                                          const std::string &message) {
       // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool
       // block is necessary to act as a breaker for any Objective-C allocation that happens.
       @autoreleasepool {
@@ -408,7 +408,7 @@ static envoy_data ios_get_string(const void *context) {
   std::unique_ptr<Envoy::EnvoyEventTracker> native_event_tracker =
       std::make_unique<Envoy::EnvoyEventTracker>();
   if (eventTracker) {
-    native_event_tracker->on_track =
+    native_event_tracker->on_track_ =
         [eventTracker =
              std::move(eventTracker)](const absl::flat_hash_map<std::string, std::string> &events) {
           NSMutableDictionary *newMap = [NSMutableDictionary new];

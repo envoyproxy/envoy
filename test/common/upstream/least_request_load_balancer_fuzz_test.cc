@@ -53,11 +53,22 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCa
                    MaxChoiceCountForTest);
     return;
   }
-  // Validate the correctness of the Slow-Start config values.
-  if (input.has_least_request_lb_config() &&
-      input.least_request_lb_config().has_slow_start_config()) {
-    if (!ZoneAwareLoadBalancerFuzzBase::validateSlowStart(
-            input.least_request_lb_config().slow_start_config())) {
+  if (input.has_least_request_lb_config()) {
+    const auto& least_request_lb_config = input.least_request_lb_config();
+    // Validate the correctness of the Slow-Start config values.
+    if (least_request_lb_config.has_slow_start_config() &&
+        !ZoneAwareLoadBalancerFuzzBase::validateSlowStart(
+            least_request_lb_config.slow_start_config())) {
+      return;
+    }
+    // Validate that the active_request_bias is not too large (or else it will
+    // effectively zero all the weights).
+    if (least_request_lb_config.has_active_request_bias() &&
+        least_request_lb_config.active_request_bias().default_value() > 25) {
+      ENVOY_LOG_MISC(debug,
+                     "active_request_bias default_value in the least-request config is too high "
+                     "({} > 25), skipping test as the config is invalid",
+                     least_request_lb_config.active_request_bias().default_value());
       return;
     }
   }
