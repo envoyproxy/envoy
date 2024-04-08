@@ -35,7 +35,7 @@ private:
   // slot as callbacks drain from workers.
   struct SlotImpl : public Slot {
     SlotImpl(InstanceImpl& parent, uint32_t index);
-    ~SlotImpl() override { parent_.removeSlot(index_); }
+    ~SlotImpl() override;
     std::function<void()> wrapCallback(const std::function<void()>& cb);
     std::function<void()> dataCallback(const UpdateCb& cb);
     static bool currentThreadRegisteredWorker(uint32_t index);

@@ -41,6 +41,26 @@ SlotPtr InstanceImpl::allocateSlot() {
 InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
 
+InstanceImpl::SlotImpl::~SlotImpl() {
+  // If the parent is already shutdown, the removeSlot() call do nothing and we can
+  // return early.
+  if (isShutdown()) {
+    return;
+  }
+
+  auto* main_thread_dispatcher = parent_.main_thread_dispatcher_;
+
+  ASSERT(main_thread_dispatcher != nullptr);
+  if (main_thread_dispatcher == InstanceImpl::thread_local_data_.dispatcher_) {
+    // If the slot is being destroyed on the main thread, we can remove it immediately.
+    parent_.removeSlot(index_);
+  } else {
+    // If the slot is being destroyed on a worker thread, we need to post the removal
+    // to the main
+    main_thread_dispatcher->post([i = index_, &tls = parent_] { tls.removeSlot(i); });
+  }
+}
+
 std::function<void()> InstanceImpl::SlotImpl::wrapCallback(const std::function<void()>& cb) {
   // See the header file comments for still_alive_guard_ for the purpose of this capture and the
   // expired check below.

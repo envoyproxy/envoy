@@ -52,10 +52,12 @@ public:
 class ThreadLocalInstanceImplTest : public testing::Test {
 public:
   ThreadLocalInstanceImplTest() {
-    tls_.registerThread(main_dispatcher_, true);
-    EXPECT_EQ(&main_dispatcher_, &tls_.dispatcher());
     EXPECT_CALL(thread_dispatcher_, post(_));
     tls_.registerThread(thread_dispatcher_, false);
+    // Register the main thread after the worker thread to ensure that the
+    // thread_local_data_.dispatcher_ of current test thread is set to the main thread dispatcher.
+    tls_.registerThread(main_dispatcher_, true);
+    EXPECT_EQ(&main_dispatcher_, &tls_.dispatcher());
   }
 
   MOCK_METHOD(ThreadLocalObjectSharedPtr, createThreadLocal, (Event::Dispatcher & dispatcher));
@@ -338,6 +340,43 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
 
   // Verify we still have the expected dispatcher for the main thread.
   EXPECT_EQ(main_dispatcher.get(), &tls.dispatcher());
+
+  tls.shutdownGlobalThreading();
+  tls.shutdownThread();
+}
+
+TEST(ThreadLocalInstanceImplDispatcherTest, DestroySlotOnWorker) {
+  InstanceImpl tls;
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher main_dispatcher{"test_main_thread"};
+  Event::DispatcherPtr thread_dispatcher(api->allocateDispatcher("test_worker_thread"));
+
+  tls.registerThread(main_dispatcher, true);
+  tls.registerThread(*thread_dispatcher, false);
+
+  // Verify we have the expected dispatcher for the main thread.
+  EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
+
+  auto slot = TypedSlot<>::makeUnique(tls);
+
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread(
+      [&main_dispatcher, &thread_dispatcher, &tls, &slot]() {
+        // Ensure that the dispatcher update in tls posted during the above registerThread happens.
+        thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+        // Verify we have the expected dispatcher for the new thread thread.
+        EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
+
+        // Destroy the slot on worker thread and expect the post() of main dispatcher to be called.
+        EXPECT_CALL(main_dispatcher, post(_));
+        slot.reset();
+
+        thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+      });
+  thread->join();
+
+  // Verify we still have the expected dispatcher for the main thread.
+  EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
 
   tls.shutdownGlobalThreading();
   tls.shutdownThread();
