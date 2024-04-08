@@ -1047,6 +1047,10 @@ void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status) {
 }
 
 void Filter::sendImmediateResponse(const ImmediateResponse& response) {
+  if (config_->isUpstream()) {
+    ENVOY_LOG(debug, "Ignoring send immediate response when ext_proc filter is in upstream");
+    return;
+  }
   auto status_code = response.has_status() ? response.status().code() : DefaultImmediateStatus;
   if (!MutationUtils::isValidHttpStatus(status_code)) {
     ENVOY_LOG(debug, "Ignoring attempt to set invalid HTTP status {}", status_code);

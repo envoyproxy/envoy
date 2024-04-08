@@ -20,7 +20,7 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
-      context.scope(), stats_prefix, dual_info.is_upstream,
+      dual_info.scope, stats_prefix, dual_info.is_upstream,
       Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context);
 
   return [filter_config, grpc_service = proto_config.grpc_service(), &context,
