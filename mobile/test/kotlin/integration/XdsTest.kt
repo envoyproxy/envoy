@@ -10,7 +10,6 @@ import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.XdsTestServerFactory
-import java.io.File
 import java.util.concurrent.CountDownLatch
 import org.junit.After
 import org.junit.Before
