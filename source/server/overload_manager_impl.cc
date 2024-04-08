@@ -317,7 +317,7 @@ LoadShedPointImpl::LoadShedPointImpl(const envoy::config::overload::v3::LoadShed
                                      Random::RandomGenerator& random_generator)
     : scale_percent_(makeGauge(stats_scope, config.name(), "scale_percent",
                                Stats::Gauge::ImportMode::NeverImport)),
-      shed_load_counter_(makeCounter(stats_scope, config.name(), "load_shed_count")),
+      shed_load_counter_(makeCounter(stats_scope, config.name(), "shed_load_count")),
       random_generator_(random_generator) {
   for (const auto& trigger_config : config.triggers()) {
     if (!triggers_.try_emplace(trigger_config.name(), createTriggerFromConfig(trigger_config))
