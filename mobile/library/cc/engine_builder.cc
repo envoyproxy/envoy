@@ -479,7 +479,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     Protobuf::TextFormat::ParseFromString((*filter).typed_config_,
                                           native_filter->mutable_typed_config());
     RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
-                   "Failed to parse" + (*filter).typed_config_);
+                   "Failed to parse: " + (*filter).typed_config_);
 #else
     IS_ENVOY_BUG("Native filter support not implemented for this build");
 #endif // !ENVOY_ENABLE_FULL_PROTOS
