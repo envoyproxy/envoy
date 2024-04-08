@@ -5,6 +5,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 
+#include "contrib/generic_proxy/filters/network/source/interface/route.h"
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
 
 namespace Envoy {
@@ -88,6 +89,14 @@ public:
    * the custom codec the full power to control the upstream connection.
    */
   virtual OptRef<Network::Connection> connection() PURE;
+
+  /**
+   * @return the upstream cluster that the request sent to and the response is received
+   * from. The gives the custom codec the power to customize the behavior based on the
+   * upstream cluster information.
+   * This return value will be nullptr iff the whole callbacks is invalid.
+   */
+  virtual OptRef<const Upstream::ClusterInfo> upstreamCluster() const PURE;
 };
 
 /**
@@ -98,11 +107,21 @@ public:
   virtual ~EncodingCallbacks() = default;
 
   /**
-   * If encoding success then this method will be called to notify the generic proxy.
+   * If encoding success then this method will be called to write the data to upstream
+   * or downstream connection and notify the generic proxy if the encoding is completed.
    * @param buffer encoding result buffer.
    * @param end_stream if last frame is encoded.
    */
   virtual void onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) PURE;
+
+  /**
+   * The route that the request is matched to. This is optional when encoding the response
+   * (by server codec) because the request may not be matched to any route  and the
+   * response is created by the server codec directly. This must be valid when encoding the
+   * request (by client codec).
+   * @return the route that the request is matched to.
+   */
+  virtual OptRef<const RouteEntry> routeEntry() const PURE;
 };
 
 } // namespace GenericProxy

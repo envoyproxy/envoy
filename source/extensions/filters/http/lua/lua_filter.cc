@@ -353,6 +353,12 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   ASSERT(state_ == State::Running);
 
   StreamHandleWrapper::HttpCallOptions options;
+  options.request_options_
+      .setParentSpan(callbacks_.activeSpan())
+      // By default, do not enforce a sampling decision on this `httpCall`'s span.
+      // Instead, reuse the parent span's sampling decision. Callers can override
+      // this default with the `trace_sampled` flag in the table argument below.
+      .setSampled(absl::nullopt);
 
   // Check if the last argument is table of options. For example:
   // handle:httpCall(cluster, headers, body, {["timeout"] = 200, ...}).
@@ -372,7 +378,6 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
     options.is_async_request_ = lua_toboolean(state, AsyncFlagIndex);
   }
 
-  options.request_options_.setParentSpan(callbacks_.activeSpan());
   return doHttpCall(state, options);
 }
 

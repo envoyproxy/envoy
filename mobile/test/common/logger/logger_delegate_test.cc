@@ -13,21 +13,22 @@ namespace Logger {
 
 class LambdaDelegateTest : public testing::Test {
 public:
-  static envoy_event_tracker tracker;
+  static std::unique_ptr<EnvoyEventTracker> event_tracker;
 
   static void SetUpTestSuite() {
-    Api::External::registerApi(std::string(envoy_event_tracker_api_name), &tracker);
+    Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker);
   }
 };
 
-envoy_event_tracker LambdaDelegateTest::tracker{};
+std::unique_ptr<EnvoyEventTracker> LambdaDelegateTest::event_tracker =
+    std::make_unique<EnvoyEventTracker>();
 
 TEST_F(LambdaDelegateTest, LogCb) {
   std::string expected_msg = "Hello LambdaDelegate";
   std::string actual_msg;
 
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log = [&](Logger::Levels, const std::string& message) { actual_msg = message; };
+  logger->on_log_ = [&](Logger::Levels, const std::string& message) { actual_msg = message; };
   LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
   ENVOY_LOG_MISC(error, expected_msg);
@@ -40,7 +41,7 @@ TEST_F(LambdaDelegateTest, LogCbWithLevels) {
   std::string actual_msg;
 
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log = [&](Logger::Levels, const std::string& message) { actual_msg = message; };
+  logger->on_log_ = [&](Logger::Levels, const std::string& message) { actual_msg = message; };
   LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
   // Set the log to critical. The message should not be logged.
@@ -64,7 +65,7 @@ TEST_F(LambdaDelegateTest, ReleaseCb) {
 
   {
     auto logger = std::make_unique<EnvoyLogger>();
-    logger->on_exit = [&] { released = true; };
+    logger->on_exit_ = [&] { released = true; };
     LambdaDelegate(std::move(logger), Registry::getSink());
   }
 
@@ -88,7 +89,7 @@ TEST_P(LambdaDelegateWithLevelTest, Log) {
   Logger::Levels actual_level;
   std::string actual_msg;
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log = [&](Logger::Levels level, const std::string& message) {
+  logger->on_log_ = [&](Logger::Levels level, const std::string& message) {
     actual_level = level;
     actual_msg = message;
   };

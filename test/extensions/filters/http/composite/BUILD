@@ -35,9 +35,9 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.composite"],
     deps = [
         "//source/common/http:header_map_lib",
-        "//source/common/http/match_delegate:config",
         "//source/extensions/filters/http/composite:config",
         "//source/extensions/filters/http/composite:filter_lib",
+        "//source/extensions/filters/http/match_delegate:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",

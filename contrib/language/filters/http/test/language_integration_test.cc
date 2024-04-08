@@ -14,15 +14,14 @@ public:
   }
 
   void initializeConfig(std::string default_language, std::string supported_languages) {
-    const std::string yaml = R"EOF(
+    constexpr absl::string_view yaml = R"EOF(
 name: envoy.filters.http.language
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.language.v3alpha.Language
   default_language: {}
   supported_languages: {}
 )EOF";
-    config_helper_.prependFilter(
-        fmt::format(fmt::runtime(yaml), default_language, supported_languages));
+    config_helper_.prependFilter(fmt::format(yaml, default_language, supported_languages));
   }
 };
 

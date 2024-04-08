@@ -3166,6 +3166,12 @@ TEST_F(RouterMatcherHashPolicyTest, HashIpv4DifferentAddresses) {
 }
 
 TEST_F(RouterMatcherHashPolicyTest, HashIpv6DifferentAddresses) {
+  if (!TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
+    // an exception like "IPv6 addresses are not supported on this machine" will be thrown
+    // if we don't add IP version check and run test on a machine that doesn't support IPv6
+    GTEST_SKIP() << "IPv6 addresses are not supported on this machine";
+  }
+
   firstRouteHashPolicy()->mutable_connection_properties()->set_source_ip(true);
   {
     // Different addresses should produce different hashes.
@@ -6408,9 +6414,9 @@ virtual_hosts:
               - name: cluster2
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Field 'weight' is missing in: name: \"cluster1\"\n");
+      "Field 'weight' is missing in:.*[\n]*name: \"cluster1\"\n");
 
   const std::string yaml2 = R"EOF(
 virtual_hosts:

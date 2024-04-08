@@ -22,6 +22,7 @@ envoy_cc_test_library(
         ":config_test_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/extensions/config_subscription/rest:http_subscription_lib",
+        "//source/extensions/filters/http/match_delegate:config",
         "//test/config:v2_link_hacks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",

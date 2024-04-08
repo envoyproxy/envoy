@@ -123,21 +123,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "upstream_lib",
-    srcs = [
-        "upstream.cc",
-    ],
-    hdrs = [
-        "upstream.h",
-    ],
-    deps = [
-        "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
-        "//envoy/network:connection_interface",
-        "//envoy/upstream:thread_local_cluster_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "stats_lib",
     srcs = ["stats.cc"],
     hdrs = ["stats.h"],
