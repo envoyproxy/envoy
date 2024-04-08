@@ -34,13 +34,10 @@ private:
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
 
-  #if 0
-  // This needs to be changed after https://github.com/envoyproxy/envoy/pull/33013 is merged.
   Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
       const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& server_context);
-  #endif
+      Server::Configuration::ServerFactoryContext& server_context) override;
 };
 
 using UpstreamExternalProcessingFilterConfig = ExternalProcessingFilterConfig;

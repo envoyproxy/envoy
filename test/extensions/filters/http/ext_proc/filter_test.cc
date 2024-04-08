@@ -3689,7 +3689,8 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutationUpstreamIgnored) {
       cluster_name: "ext_proc_server"
   processing_mode:
     response_body_mode: "BUFFERED"
-  )EOF", true);
+  )EOF",
+             true);
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
@@ -3718,7 +3719,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutationUpstreamIgnored) {
 
   filter_->onDestroy();
 
-  // The clear_router_cahce from response is ignored.
+  // The clear_router_cache from response is ignored.
   EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 1);
   EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
   EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);

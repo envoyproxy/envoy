@@ -40,7 +40,7 @@ ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
   return std::make_shared<FilterConfigPerRoute>(proto_config);
 }
 
-#if 0
+// This method will only be called when the filter is in downstream.
 Http::FilterFactoryCb
 ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
@@ -51,7 +51,7 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyp
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
-      server_context.scope(), stats_prefix,
+      server_context.scope(), stats_prefix, false,
       Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context), server_context);
 
   return [filter_config, grpc_service = proto_config.grpc_service(),
@@ -63,7 +63,6 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyp
         std::make_shared<Filter>(filter_config, std::move(client), grpc_service)});
   };
 }
-#endif
 
 LEGACY_REGISTER_FACTORY(ExternalProcessingFilterConfig,
                         Server::Configuration::NamedHttpFilterConfigFactory, "envoy.ext_proc");

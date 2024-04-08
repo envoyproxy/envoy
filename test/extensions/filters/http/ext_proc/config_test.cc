@@ -47,7 +47,7 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
       - ns2
   )EOF";
 
-  ExternalProcessingFilterFactory factory;
+  ExternalProcessingFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
 

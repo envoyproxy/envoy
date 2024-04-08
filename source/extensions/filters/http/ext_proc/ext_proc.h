@@ -162,7 +162,8 @@ public:
         allow_mode_override_(config.allow_mode_override()),
         disable_immediate_response_(config.disable_immediate_response()),
         allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
-        disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
+        disallowed_headers_(
+            initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
         is_upstream_(is_upstream),
         untyped_forwarding_namespaces_(
             config.metadata_options().forwarding_namespaces().untyped().begin(),
