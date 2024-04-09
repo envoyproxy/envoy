@@ -66,6 +66,7 @@ TEST(DelegatingRouteEntry, DelegatingRouteEntryTest) {
   TEST_METHOD(internalRedirectPolicy);
   TEST_METHOD(retryShadowBufferLimit);
   TEST_METHOD(shadowPolicies);
+  TEST_METHOD(maxRequestBufferBytes);
   TEST_METHOD(timeout);
   TEST_METHOD(idleTimeout);
   TEST_METHOD(usingNewTimeouts);
