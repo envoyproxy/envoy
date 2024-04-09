@@ -45,6 +45,7 @@ envoy_extension_cc_test(
         "//envoy/http:filter_interface",
         "//envoy/network:filter_interface",
         "//source/common/http:context_lib",
+        "//source/common/http:rds_lib",
         "//source/common/network:address_lib",
         "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",

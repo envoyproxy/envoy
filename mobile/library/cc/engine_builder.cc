@@ -48,21 +48,6 @@ namespace {
 // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
 constexpr int32_t SocketReceiveBufferSize = 1024 * 1024; // 1MB
 
-std::string nativeNameToConfig(absl::string_view name) {
-#ifndef ENVOY_ENABLE_YAML
-  return absl::StrCat("[type.googleapis.com/"
-                      "envoymobile.extensions.filters.http.platform_bridge.PlatformBridge] {"
-                      "platform_filter_name: \"",
-                      name, "\" }");
-#else
-  return absl::StrCat(
-      "{'@type': "
-      "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, "
-      "platform_filter_name: ",
-      name, "}");
-#endif
-}
-
 } // namespace
 
 #ifdef ENVOY_MOBILE_XDS
@@ -159,6 +144,11 @@ EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<EngineCallbacks>())
 #endif
 }
 
+EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
+  network_thread_priority_ = thread_priority;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
   // Envoy::Platform::LogLevel is essentially the same as Logger::Logger::Levels, so we can
   // safely cast it.
@@ -182,7 +172,7 @@ EngineBuilder& EngineBuilder::setEngineCallbacks(std::unique_ptr<EngineCallbacks
 }
 
 EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) {
-  callbacks_->on_engine_running = std::move(closure);
+  callbacks_->on_engine_running_ = std::move(closure);
   return *this;
 }
 
@@ -399,6 +389,21 @@ EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string type
   return *this;
 }
 
+std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
+#ifndef ENVOY_ENABLE_YAML
+  return absl::StrCat("[type.googleapis.com/"
+                      "envoymobile.extensions.filters.http.platform_bridge.PlatformBridge] {"
+                      "platform_filter_name: \"",
+                      name, "\" }");
+#else
+  return absl::StrCat(
+      "{'@type': "
+      "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, "
+      "platform_filter_name: ",
+      name, "}");
+#endif
+}
+
 EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
   addNativeFilter("envoy.filters.http.platform_bridge", nativeNameToConfig(name));
   return *this;
@@ -465,16 +470,20 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
        ++filter) {
     auto* native_filter = hcm->add_http_filters();
+    native_filter->set_name(filter->name_);
 #ifdef ENVOY_ENABLE_YAML
-    native_filter->set_name((*filter).name_);
     MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
                               ProtobufMessage::getStrictValidationVisitor());
 #else
+#ifdef ENVOY_ENABLE_FULL_PROTOS
     Protobuf::TextFormat::ParseFromString((*filter).typed_config_,
                                           native_filter->mutable_typed_config());
     RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
-                   "Failed to parse" + (*filter).typed_config_);
-#endif
+                   "Failed to parse: " + (*filter).typed_config_);
+#else
+    IS_ENVOY_BUG("Native filter support not implemented for this build");
+#endif // !ENVOY_ENABLE_FULL_PROTOS
+#endif // !ENVOY_ENABLE_YAML
   }
 
   // Set up the optional filters
@@ -922,7 +931,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
 EngineSharedPtr EngineBuilder::build() {
   InternalEngine* envoy_engine =
-      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_));
+      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
+                         network_thread_priority_);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

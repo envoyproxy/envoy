@@ -524,7 +524,6 @@ public:
   }
 
   Router::MockUpstreamRequest* mock_router_upstream_request_{};
-  NiceMock<Router::MockRouterFilterInterface> router_filter_interface_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;

@@ -29,7 +29,6 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
@@ -48,6 +47,7 @@
 #include "source/common/signal/fatal_error_handler.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/tls/context_manager_impl.h"
@@ -363,24 +363,18 @@ absl::Status InstanceUtil::loadBootstrapConfig(
   }
 
   if (!config_path.empty()) {
-#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
-#else
-    if (!config_path.empty()) {
-      return absl::InvalidArgumentError("Cannot load from file with YAML disabled\n");
-    }
-    UNREFERENCED_PARAMETER(api);
-#endif
   }
   if (!config_yaml.empty()) {
-#ifdef ENVOY_ENABLE_YAML
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
+#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
-    bootstrap.MergeFrom(bootstrap_override);
 #else
-    return absl::InvalidArgumentError("Cannot load from YAML with YAML disabled\n");
+    // Treat the yaml as proto
+    Protobuf::TextFormat::ParseFromString(config_yaml, &bootstrap_override);
 #endif
+    bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSizeLong() != 0) {
     bootstrap.MergeFrom(config_proto);
@@ -503,8 +497,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  stats_store_.setTagProducer(
-      Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags()));
+  auto producer_or_error =
+      Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
+  RETURN_IF_STATUS_NOT_OK(producer_or_error);
+  stats_store_.setTagProducer(std::move(producer_or_error.value()));
   stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
       bootstrap_.stats_config(), stats_store_.symbolTable(), server_contexts_));
   stats_store_.setHistogramSettings(

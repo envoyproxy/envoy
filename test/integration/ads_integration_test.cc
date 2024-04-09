@@ -236,6 +236,95 @@ TEST_P(AdsIntegrationTest, ClusterInitializationUpdateOneOfThe2Warming) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
 }
 
+// Verify that Delta SDS Removals don't result in a NACK.
+TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
+  // SOTW delivery doesn't track individual resources, so only
+  // run this test for delta xDS.
+  if (sotw_or_delta_ != Grpc::SotwOrDelta::Delta &&
+      sotw_or_delta_ != Grpc::SotwOrDelta::UnifiedDelta) {
+    GTEST_SKIP_("This test is for delta only");
+  }
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto sds_type_url =
+      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>();
+  const auto lds_type_url = Config::getTypeUrl<envoy::config::listener::v3::Listener>();
+
+  // First get the cluster sent to the test proxy
+  envoy::config::core::v3::TransportSocket sds_transport_socket;
+  TestUtility::loadFromYaml(R"EOF(
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          validation_context_sds_secret_config:
+            name: validation_context
+            sds_config:
+              resource_api_version: V3
+              ads: {}
+  )EOF",
+                            sds_transport_socket);
+  auto cluster = ConfigHelper::buildStaticCluster("cluster", 8000, "127.0.0.1");
+  *cluster.mutable_transport_socket() = sds_transport_socket;
+  cluster.set_name("cluster_0");
+
+  // Initial * Delta ADS subscription
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster}, {}, "1");
+
+  // The cluster needs this secret, so it's going to request it
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}, {}));
+
+  // Ack the original CDS sub
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
+
+  // Before we send the secret, we'll send a delta removal to make sure we don't get a NACK
+  sendDeltaDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
+      sds_type_url, {}, {"validation_context"}, "2");
+
+  // Ack the removal
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
+
+  // Cluster should still be warming
+  test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+
+  envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+    name: validation_context
+    validation_context:
+      trusted_ca:
+        filename: {}
+  )EOF",
+                                        TestEnvironment::runfilesPath(
+                                            "test/config/integration/certs/upstreamcacert.pem")),
+                            validation_context);
+
+  // Now actually send the secret
+  sendDeltaDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
+      sds_type_url, {validation_context}, {}, "2");
+
+  // we're no longer warming
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  // Ack the original LDS (now that the cluster is warmed?)
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(lds_type_url, {}, {}));
+  // Ack the secret we just sent
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
+
+  // Remove the cluster that owns the secret
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {"cluster_0"},
+                                                                  "1");
+  // Follow that up with a secret removal
+  sendDeltaDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
+      sds_type_url, {}, {"validation_context"}, "3");
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
+  // Ack the CDS removal
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
+  // Should be an ACK, not a NACK since the SDS removal is ignored
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
+}
+
 // Make sure two clusters sharing same secret are both kept warming before secret
 // arrives. Verify that the clusters are eventually initialized.
 // This is a regression test of #11120.

@@ -767,59 +767,6 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
   }
 }
 
-// TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
-void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
-    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  absl::optional<Router::ConfigConstSharedPtr> route_config = parent_.routeConfig();
-  Event::Dispatcher& thread_local_dispatcher = *parent_.connection_manager_.dispatcher_;
-  if (route_config.has_value() && route_config.value()->usesVhds()) {
-    ASSERT(!parent_.request_headers_->Host()->value().empty());
-    const auto& host_header = absl::AsciiStrToLower(parent_.request_headers_->getHostValue());
-    requestVhdsUpdate(host_header, thread_local_dispatcher, std::move(route_config_updated_cb));
-    return;
-  } else if (scope_key_builder_.has_value()) {
-    Router::ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(*parent_.request_headers_);
-    // If scope_key is not null, the scope exists but RouteConfiguration is not initialized.
-    if (scope_key != nullptr) {
-      requestSrdsUpdate(std::move(scope_key), thread_local_dispatcher,
-                        std::move(route_config_updated_cb));
-      return;
-    }
-  }
-  // Continue the filter chain if no on demand update is requested.
-  (*route_config_updated_cb)(false);
-}
-
-void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
-    const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
-    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  route_config_provider_->requestVirtualHostsUpdate(host_header, thread_local_dispatcher,
-                                                    std::move(route_config_updated_cb));
-}
-
-void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
-    Router::ScopeKeyPtr scope_key, Event::Dispatcher& thread_local_dispatcher,
-    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  // Since inline scope_route_config_provider is not fully implemented and never used,
-  // dynamic cast in constructor always succeed and the pointer should not be null here.
-  ASSERT(scoped_route_config_provider_ != nullptr);
-  Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
-      Http::RouteConfigUpdatedCallback(
-          [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
-                     route_config_updated_cb)](bool scope_exist) {
-            // If the callback can be locked, this ActiveStream is still alive.
-            if (auto cb = weak_route_config_updated_cb.lock()) {
-              // Refresh the route before continue the filter chain.
-              if (scope_exist) {
-                parent_.refreshCachedRoute();
-              }
-              (*cb)(scope_exist && parent_.hasCachedRoute());
-            }
-          });
-  scoped_route_config_provider_->onDemandRdsUpdate(std::move(scope_key), thread_local_dispatcher,
-                                                   std::move(scoped_route_config_updated_cb));
-}
-
 absl::optional<absl::string_view>
 ConnectionManagerImpl::HttpStreamIdProviderImpl::toStringView() const {
   if (parent_.request_headers_ == nullptr) {
@@ -876,18 +823,20 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   filter_manager_.streamInfo().setStreamIdProvider(
       std::make_shared<HttpStreamIdProviderImpl>(*this));
 
+  // TODO(chaoqin-li1123): can this be moved to the on demand filter?
+  static const std::string route_factory = "envoy.route_config_update_requester.default";
+  auto factory =
+      Envoy::Config::Utility::getFactoryByName<RouteConfigUpdateRequesterFactory>(route_factory);
   if (connection_manager_.config_.isRoutable() &&
-      connection_manager.config_.routeConfigProvider() != nullptr) {
+      connection_manager.config_.routeConfigProvider() != nullptr && factory) {
     route_config_update_requester_ =
-        std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
-            connection_manager.config_.routeConfigProvider(), *this);
+        factory->createRouteConfigUpdateRequester(connection_manager.config_.routeConfigProvider());
   } else if (connection_manager_.config_.isRoutable() &&
              connection_manager.config_.scopedRouteConfigProvider() != nullptr &&
-             connection_manager.config_.scopeKeyBuilder().has_value()) {
-    route_config_update_requester_ =
-        std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
-            connection_manager.config_.scopedRouteConfigProvider(),
-            connection_manager.config_.scopeKeyBuilder(), *this);
+             connection_manager.config_.scopeKeyBuilder().has_value() && factory) {
+    route_config_update_requester_ = factory->createRouteConfigUpdateRequester(
+        connection_manager.config_.scopedRouteConfigProvider(),
+        connection_manager.config_.scopeKeyBuilder());
   }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
@@ -1719,7 +1668,14 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
 // TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
 void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  route_config_update_requester_->requestRouteConfigUpdate(route_config_updated_cb);
+  ENVOY_BUG(route_config_update_requester_.has_value(),
+            "RouteConfigUpdate requested but RDS not compiled into the binary. Try linking "
+            "//source/common/http:rds_lib");
+  if (route_config_update_requester_.has_value()) {
+    (*route_config_update_requester_)
+        ->requestRouteConfigUpdate(*this, route_config_updated_cb, routeConfig(),
+                                   *connection_manager_.dispatcher_, *request_headers_);
+  }
 }
 
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {

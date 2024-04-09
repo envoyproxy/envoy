@@ -113,6 +113,7 @@ envoy_cc_library(
         "//envoy/grpc:status",
         "//envoy/matcher:matcher_interface",
         "//envoy/router:router_interface",
+        "//envoy/router:scopes_interface",
         "//envoy/ssl:connection_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/tracing:tracer_interface",

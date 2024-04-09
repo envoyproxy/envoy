@@ -35,11 +35,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
 import org.chromium.net.impl.CronvoyUrlRequest;
+import org.chromium.net.impl.CronvoyUrlRequestContext;
 import org.chromium.net.impl.Errors.EnvoyMobileError;
 import org.chromium.net.impl.Errors.NetError;
 import org.chromium.net.impl.CronvoyUrlResponseInfoImpl;
 import org.chromium.net.testing.CronetTestRule;
-import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
 import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
 import org.chromium.net.testing.FailurePhase;
 import org.chromium.net.testing.Feature;
@@ -77,7 +77,6 @@ public class CronetUrlRequestTest {
   @Rule
   public final RuleChain chain = RuleChain.outerRule(mTestRule).around(mRuntimePermissionRule);
 
-  private CronetTestFramework mTestFramework;
   private MockUrlRequestJobFactory mMockUrlRequestJobFactory;
 
   @Before
@@ -91,6 +90,11 @@ public class CronetUrlRequestTest {
   public void tearDown() {
     mMockUrlRequestJobFactory.shutdown();
     NativeTestServer.shutdownNativeTestServer();
+    // Calling AndroidNetworkMonitor.shutdown() will set the AndroidNetworkMonitor singleton
+    // instance to null so that the next EnvoyEngine creation will have a new AndroidNetworkMonitor
+    // instance instead of holding on a dangling EnvoyEngine because AndroidNetworkMonitor.load
+    // does not update the singleton instance to a new one if there is already an existing instance.
+    AndroidNetworkMonitor.shutdown();
   }
 
   private TestUrlRequestCallback startAndWaitForComplete(CronetEngine engine, String url)
