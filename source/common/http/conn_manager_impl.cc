@@ -2046,7 +2046,7 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
 /**
  * Sets the cached route to the RouteConstSharedPtr argument passed in. Handles setting the
  * cached_route_/cached_cluster_info_ ActiveStream attributes, the FilterManager streamInfo, tracing
- * tags, and timeouts.
+ * tags, request limits and timeouts.
  *
  * Declared as a StreamFilterCallbacks member function for filters to call directly, but also
  * functions as a helper to refreshCachedRoute(const Router::RouteCallback& cb).
@@ -2076,8 +2076,34 @@ void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr r
   filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
 
   refreshCachedTracingCustomTags();
+  refreshRequestLimit();
   refreshDurationTimeout();
   refreshIdleTimeout();
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshRequestLimit() {
+  if (!hasCachedRoute()) {
+    return;
+  }
+
+  const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
+  if (route_entry == nullptr) {
+    return;
+  }
+
+  uint32_t size = route_entry->maxRequestBufferBytes();
+  if (size == 0) {
+    return;
+  }
+
+  if (filter_manager_.bufferLimit() <= size) {
+    filter_manager_.setBufferLimit(size);
+  } else {
+    ENVOY_STREAM_LOG(warn,
+                     "ignore reducing max request buffer bytes from {} to {} after route changed, "
+                     "which may has unexpected result.",
+                     *this, filter_manager_.bufferLimit(), size);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshIdleTimeout() {

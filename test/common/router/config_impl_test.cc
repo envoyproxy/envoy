@@ -5137,6 +5137,33 @@ virtual_hosts:
   EXPECT_EQ(0, percent.numerator());
 }
 
+TEST_F(RouteMatcherTest, MaxRequestBufferBytes) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  routes:
+  - match: {prefix: /foo}
+    route:
+      cluster: www
+    max_request_buffer_bytes: 1024
+  - match: {prefix: /}
+    route:
+      cluster: www
+    max_request_buffer_bytes: 128
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  EXPECT_EQ(1024, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                      ->routeEntry()
+                      ->maxRequestBufferBytes());
+  EXPECT_EQ(128, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                     ->routeEntry()
+                     ->maxRequestBufferBytes());
+}
+
 TEST_F(RouteMatcherTest, TestBadDefaultConfig) {
   const std::string yaml = R"EOF(
 virtual_hosts:

@@ -358,6 +358,14 @@ message Route {
   //    every application endpoint. This is both not easily maintainable and
   //    statistics use a non-trivial amount of memory(approximately 1KiB per route).
   string stat_prefix = 19;
+
+  // Sets the maximum size of a request body that will be buffered in memory. Envoy will return
+  // ``HTTP 413`` when buffer reaches the number set in this field.
+  // This option will be ignored if the current maximum buffer size is already larger than
+  // the value set in this field.
+  // Unlike the ``max_request_bytes`` in the ``buffer`` filter, setting this field won't force
+  // Envoy to buffer the request.
+  uint32 max_request_buffer_bytes = 20;
 }
 
 // Compared to the :ref:`cluster <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` field that specifies a

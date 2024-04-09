@@ -722,6 +722,7 @@ public:
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
     return vhost_->virtualClusterFromEntries(headers);
   }
+  uint32_t maxRequestBufferBytes() const override { return max_request_buffer_bytes_; }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   bool usingNewTimeouts() const override { return using_new_timeouts_; }
 
@@ -858,6 +859,7 @@ public:
     const std::vector<ShadowPolicyPtr>& shadowPolicies() const override {
       return parent_->shadowPolicies();
     }
+    uint32_t maxRequestBufferBytes() const override { return parent_->maxRequestBufferBytes(); }
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override {
       return parent_->idleTimeout();
@@ -1222,6 +1224,7 @@ private:
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  uint32_t max_request_buffer_bytes_;
   const absl::optional<Http::Code> direct_response_code_;
   const Http::Code cluster_not_found_response_code_;
   const Upstream::ResourcePriority priority_;

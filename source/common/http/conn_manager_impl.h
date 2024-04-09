@@ -315,6 +315,7 @@ private:
 
     void refreshCachedRoute(const Router::RouteCallback& cb);
 
+    void refreshRequestLimit();
     void refreshCachedTracingCustomTags();
     void refreshDurationTimeout();
     void refreshIdleTimeout();
