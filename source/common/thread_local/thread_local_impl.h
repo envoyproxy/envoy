@@ -19,6 +19,7 @@ namespace ThreadLocal {
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
+  InstanceImpl();
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
@@ -85,6 +86,8 @@ private:
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
   Event::Dispatcher* main_thread_dispatcher_{};
   std::atomic<bool> shutdown_{};
+
+  bool allow_slot_destroy_on_worker_threads_{};
 
   // Test only.
   friend class ThreadLocalInstanceImplTest;
