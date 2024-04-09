@@ -42,21 +42,19 @@ InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
 
 InstanceImpl::SlotImpl::~SlotImpl() {
-  // If the parent is already shutdown, the removeSlot() call do nothing and we can
-  // return early.
-  if (isShutdown()) {
-    return;
-  }
-
   auto* main_thread_dispatcher = parent_.main_thread_dispatcher_;
-
   ASSERT(main_thread_dispatcher != nullptr);
   if (main_thread_dispatcher == InstanceImpl::thread_local_data_.dispatcher_) {
     // If the slot is being destroyed on the main thread, we can remove it immediately.
     parent_.removeSlot(index_);
   } else {
-    // If the slot is being destroyed on a worker thread, we need to post the removal
-    // to the main
+    // If the slot is being destroyed on a worker thread, we need to post the removal to the
+    // main thread. There are two possible cases here:
+    // 1. The removal is executed on the main thread as expected if the main thread is still
+    //    active. This is the common case.
+    // 2. The removal is not executed if the main thread has already exited and the dispatcher
+    //    is no longer alive. This is fine because the shutdown process will clean up all the
+    //    slots anyway.
     main_thread_dispatcher->post([i = index_, &tls = parent_] { tls.removeSlot(i); });
   }
 }
