@@ -542,7 +542,7 @@ protected:
 
 // The setpriority() call fails on some Apple environments.
 // TODO(abeyad): investigate what to do for Apple.
-#ifndef defined(__APPLE__)
+#ifndef __APPLE__
 TEST_F(ThreadPriorityInternalEngineTest, SetThreadPriority) {
   const int expected_thread_priority = 10;
   const int actual_thread_priority = startEngineWithPriority(expected_thread_priority);
