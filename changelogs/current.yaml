@@ -309,6 +309,9 @@ new_features:
   change: |
     added support for :ref:`%UPSTREAM_CONNECTION_ID% <config_access_log_format_upstream_connection_id>` for the upstream connection
     identifier.
+- area: opentelemetry/grpc/access log
+  change: |
+    Added support to configure trace ID in OpenTelemetry logs.
 - area: compression
   change: |
     Added Qatzstd :ref:`compressor <envoy_v3_api_msg_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd>`.
@@ -458,6 +461,11 @@ new_features:
   change: |
     The ``/stats/prometheus`` endpoint can now emit prometheus ``summary`` metric types by explicitly setting the
     ``histogram_buckets`` query parameter to ``summary``.
+- area: grpc
+  change: |
+    Added maximum gRPC message size that is allowed to be received in Envoy gRPC. If a message over this limit is received,
+    the gRPC stream is terminated with the RESOURCE_EXHAUSTED error. This limit is applied to individual messages in the
+    streaming response and not the total size of streaming response. Defaults to 0, which means unlimited.
 
 deprecated:
 - area: listener
@@ -469,8 +477,3 @@ deprecated:
     deprecated :ref:`split_spans_for_request <envoy_v3_api_field_config.trace.v3.ZipkinConfig.split_spans_for_request>`
     in favor of :ref:`spawn_upstream_span
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`.
-- area: grpc
-  change: |
-    Added maximum gRPC message size that is allowed to be received in Envoy gRPC. If a message over this limit is received,
-    the gRPC stream is terminated with the RESOURCE_EXHAUSTED error. This limit is applied to individual messages in the
-    streaming response and not the total size of streaming response. Defaults to 0, which means unlimited.
