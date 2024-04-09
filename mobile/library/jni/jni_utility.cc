@@ -519,6 +519,10 @@ void javaHeadersToCppHeaders(JniHelper& jni_helper, jobject java_headers,
       auto java_value =
           jni_helper.callObjectMethod<jstring>(java_value_object.get(), java_list_get_method_id, i);
       auto cpp_value = javaStringToCppString(jni_helper, java_value.get());
+      if (cpp_headers.formatter().has_value()) {
+        Http::StatefulHeaderKeyFormatter& formatter = cpp_headers.formatter().value();
+        formatter.processKey(cpp_key);
+      }
       cpp_headers.addCopy(Http::LowerCaseString(cpp_key), cpp_value);
     }
   }

@@ -3,6 +3,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "library/common/http/header_utility.h"
 #include "library/jni/jni_utility.h"
 
 // NOLINT(namespace-envoy)
@@ -39,7 +40,7 @@ extern "C" JNIEXPORT jobject JNICALL
 Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_javaCppHeadersConversion(JNIEnv* env, jclass,
                                                                            jobject java_headers) {
   Envoy::JNI::JniHelper jni_helper(env);
-  Envoy::Http::TestRequestHeaderMapImpl cpp_headers;
-  Envoy::JNI::javaHeadersToCppHeaders(jni_helper, java_headers, cpp_headers);
-  return Envoy::JNI::cppHeadersToJavaHeaders(jni_helper, cpp_headers).release();
+  auto cpp_headers = Envoy::Http::Utility::createRequestHeaderMapPtr();
+  Envoy::JNI::javaHeadersToCppHeaders(jni_helper, java_headers, *cpp_headers);
+  return Envoy::JNI::cppHeadersToJavaHeaders(jni_helper, *cpp_headers).release();
 }

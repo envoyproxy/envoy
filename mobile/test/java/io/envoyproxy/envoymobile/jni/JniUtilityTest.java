@@ -56,9 +56,9 @@ public class JniUtilityTest {
   @Test
   public void testJavaCppHeadersConversion() {
     Map<String, List<String>> headers = new HashMap<>();
-    headers.put("key1", Arrays.asList("value1", "value2"));
-    headers.put("key2", Arrays.asList("value1"));
-    headers.put("key3", Arrays.asList("value1"));
+    headers.put("lowercase_key_1", Arrays.asList("value1", "value2"));
+    headers.put("UPPERCASE_KEY_2", Arrays.asList("value1"));
+    headers.put("Mixed_Case_Key_3", Arrays.asList("value1"));
     assertThat(javaCppHeadersConversion(headers)).isEqualTo(headers);
   }
 }

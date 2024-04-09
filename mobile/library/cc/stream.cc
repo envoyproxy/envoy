@@ -13,10 +13,12 @@ Stream::Stream(Envoy::InternalEngine* engine, envoy_stream_t handle)
 
 Stream& Stream::sendHeaders(RequestHeadersSharedPtr headers, bool end_stream) {
   auto request_header_map = Http::Utility::createRequestHeaderMapPtr();
-  Http::StatefulHeaderKeyFormatter& formatter = request_header_map->formatter().value();
   for (const auto& [key, values] : headers->allHeaders()) {
-    // Make sure the formatter knows the original case.
-    formatter.processKey(key);
+    if (request_header_map->formatter().has_value()) {
+      Http::StatefulHeaderKeyFormatter& formatter = request_header_map->formatter().value();
+      // Make sure the formatter knows the original case.
+      formatter.processKey(key);
+    }
     for (const auto& value : values) {
       request_header_map->addCopy(Http::LowerCaseString(key), value);
     }

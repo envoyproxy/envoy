@@ -3,6 +3,7 @@
 
 #import "library/common/types/c_types.h"
 #import "library/common/internal_engine.h"
+#include "library/common/http/header_utility.h"
 
 #import <stdatomic.h>
 
@@ -178,11 +179,13 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
 
 - (void)sendHeaders:(EnvoyHeaders *)headers close:(BOOL)close {
   Envoy::Http::RequestHeaderMapPtr cppHeaders = Envoy::Http::Utility::createRequestHeaderMapPtr();
-  Envoy::Http::StatefulHeaderKeyFormatter &formatter = cppHeaders->formatter().value();
   for (id headerKey in headers) {
     std::string cppHeaderKey = std::string([headerKey UTF8String]);
-    // Make sure the formatter knows the original case.
-    formatter.processKey(cppHeaderKey);
+    if (cppHeaders->formatter().has_value()) {
+      Envoy::Http::StatefulHeaderKeyFormatter &formatter = cppHeaders->formatter().value();
+      // Make sure the formatter knows the original case.
+      formatter.processKey(cppHeaderKey);
+    }
     NSArray *headerList = headers[headerKey];
     for (NSString *headerValue in headerList) {
       std::string cppHeaderValue = std::string([headerValue UTF8String]);
