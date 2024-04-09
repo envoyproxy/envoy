@@ -32,11 +32,17 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+} // namespace
+
+// In case credentials_profile is set in the config, instead of using the default
+// providers chain, it will be used the credentials file provider with the
+// config defined profile. all others providers will be ignored
 Extensions::Common::Aws::CredentialsProviderSharedPtr
-getCredentialsProvider(const std::string& profile,
-                       Server::Configuration::ServerFactoryContext& server_context,
-                       const std::string& region) {
+AwsLambdaFilterFactory::getCredentialsProvider(
+    const std::string& profile, Server::Configuration::ServerFactoryContext& server_context,
+    const std::string& region) const {
   if (!profile.empty()) {
+    ENVOY_LOG(debug, "config profile {} is set, defaults providers will be ignored", profile);
     return std::make_shared<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
         server_context.api(), profile);
   }
@@ -44,8 +50,6 @@ getCredentialsProvider(const std::string& profile,
       server_context.api(), makeOptRef(server_context), region,
       Extensions::Common::Aws::Utility::fetchMetadata);
 }
-
-} // namespace
 
 absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
