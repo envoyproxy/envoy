@@ -177,22 +177,19 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
 }
 
 - (void)sendHeaders:(EnvoyHeaders *)headers close:(BOOL)close {
-  _engine->sendHeaders(
-      _streamHandle,
-      [headers](Envoy::Http::RequestHeaderMap &cppHeaders) {
-        Envoy::Http::StatefulHeaderKeyFormatter &formatter = cppHeaders.formatter().value();
-        for (id headerKey in headers) {
-          std::string cppHeaderKey = std::string([headerKey UTF8String]);
-          // Make sure the formatter knows the original case.
-          formatter.processKey(cppHeaderKey);
-          NSArray *headerList = headers[headerKey];
-          for (NSString *headerValue in headerList) {
-            std::string cppHeaderValue = std::string([headerValue UTF8String]);
-            cppHeaders.addCopy(Envoy::Http::LowerCaseString(cppHeaderKey), cppHeaderValue);
-          }
-        }
-      },
-      close);
+  Envoy::Http::RequestHeaderMapPtr cppHeaders = Envoy::Http::Utility::createRequestHeaderMapPtr();
+  Envoy::Http::StatefulHeaderKeyFormatter &formatter = cppHeaders->formatter().value();
+  for (id headerKey in headers) {
+    std::string cppHeaderKey = std::string([headerKey UTF8String]);
+    // Make sure the formatter knows the original case.
+    formatter.processKey(cppHeaderKey);
+    NSArray *headerList = headers[headerKey];
+    for (NSString *headerValue in headerList) {
+      std::string cppHeaderValue = std::string([headerValue UTF8String]);
+      cppHeaders->addCopy(Envoy::Http::LowerCaseString(cppHeaderKey), cppHeaderValue);
+    }
+  }
+  _engine->sendHeaders(_streamHandle, std::move(cppHeaders), close);
 }
 
 - (void)sendData:(NSData *)data close:(BOOL)close {

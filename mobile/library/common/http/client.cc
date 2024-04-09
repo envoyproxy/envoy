@@ -532,8 +532,7 @@ void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks 
   ENVOY_LOG(debug, "[S{}] start stream", new_stream_handle);
 }
 
-void Client::sendHeaders(envoy_stream_t stream, std::function<void(RequestHeaderMap&)> header_func,
-                         bool end_stream) {
+void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
@@ -553,9 +552,6 @@ void Client::sendHeaders(envoy_stream_t stream, std::function<void(RequestHeader
   }
 
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-
-  RequestHeaderMapPtr headers = Utility::createRequestHeaderMapPtr();
-  header_func(*headers);
 
   // This is largely a check for the android platform: isCleartextPermitted
   // is a no-op for other platforms.

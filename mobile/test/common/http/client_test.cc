@@ -127,6 +127,12 @@ public:
     });
   }
 
+  RequestHeaderMapPtr createDefaultRequestHeaders() {
+    auto headers = Utility::createRequestHeaderMapPtr();
+    HttpTestUtility::addDefaultHeaders(*headers);
+    return headers;
+  }
+
   void createStream() {
     ON_CALL(dispatcher_, isThreadSafe()).WillByDefault(Return(true));
     ON_CALL(*request_decoder_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
@@ -179,9 +185,7 @@ TEST_P(ClientTest, BasicStreamHeaders) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode response headers.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -300,9 +304,7 @@ TEST_P(ClientTest, MultipleDataStream) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, false));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      false);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), false);
 
   // Send request data.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -354,9 +356,7 @@ TEST_P(ClientTest, EmptyDataWithEndStream) {
   createStream();
   // Send request headers.
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode response headers and data.
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -393,9 +393,7 @@ TEST_P(ClientTest, MultipleStreams) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream1, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream1, createDefaultRequestHeaders(), true);
 
   // Start stream2.
   // Setup bridge_callbacks_ to handle the response headers.
@@ -436,9 +434,7 @@ TEST_P(ClientTest, MultipleStreams) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(request_decoder2, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream2, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream2, createDefaultRequestHeaders(), true);
 
   // Finish stream 2.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -478,9 +474,7 @@ TEST_P(ClientTest, EnvoyLocalError) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode response headers. A non-200 code triggers an on_error callback chain. In particular, a
   // 503 should have an ENVOY_CONNECTION_FAILURE error code.
@@ -560,9 +554,7 @@ TEST_P(ClientTest, RemoteResetAfterStreamStart) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode response headers.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -593,9 +585,7 @@ TEST_P(ClientTest, StreamResetAfterOnComplete) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode response headers.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -638,9 +628,7 @@ TEST_P(ClientTest, Encode100Continue) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode 100 continue should blow up.
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -660,9 +648,7 @@ TEST_P(ClientTest, EncodeMetadata) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode response headers.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -711,9 +697,7 @@ TEST_P(ExplicitFlowControlTest, ShortRead) {
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode response headers and data.
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -743,9 +727,7 @@ TEST_P(ExplicitFlowControlTest, DataArrivedWhileBufferNonempty) {
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode response headers and data.
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -775,9 +757,7 @@ TEST_P(ExplicitFlowControlTest, ResumeBeforeDataArrives) {
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode response headers and data.
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -803,9 +783,7 @@ TEST_P(ExplicitFlowControlTest, ResumeWithFin) {
   createStream();
   // Send request headers.
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode response headers and data.
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -839,9 +817,7 @@ TEST_P(ExplicitFlowControlTest, ResumeWithDataAndTrailers) {
   createStream();
   // Send request headers.
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode response headers, data, and trailers.
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -876,9 +852,7 @@ TEST_P(ExplicitFlowControlTest, CancelWithStreamComplete) {
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
   EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(
-      stream_, [](RequestHeaderMap& headers) { HttpTestUtility::addDefaultHeaders(headers); },
-      true);
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), true);
 
   // Encode response headers and data.
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
