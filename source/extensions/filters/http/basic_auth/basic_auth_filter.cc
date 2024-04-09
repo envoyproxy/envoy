@@ -37,9 +37,9 @@ BasicAuthFilter::BasicAuthFilter(FilterConfigConstSharedPtr config) : config_(st
 Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const auto* route_specific_settings =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
-  auto users = config_->users();
+  const UserMap* users = &config_->users();
   if (route_specific_settings != nullptr) {
-    users = route_specific_settings->users();
+    users = &route_specific_settings->users();
   }
 
   auto auth_header = headers.get(Http::CustomHeaders::get().Authorization);
@@ -84,10 +84,10 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
   return Http::FilterHeadersStatus::Continue;
 }
 
-bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view username,
+bool BasicAuthFilter::validateUser(const UserMap* users, absl::string_view username,
                                    absl::string_view password) const {
-  auto user = users.find(username);
-  if (user == users.end()) {
+  auto user = users->find(username);
+  if (user == users->end()) {
     return false;
   }
 
