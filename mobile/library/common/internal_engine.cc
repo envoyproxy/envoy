@@ -79,9 +79,11 @@ envoy_status_t InternalEngine::sendData(envoy_stream_t stream, envoy_data data, 
       [&, stream, data, end_stream]() { http_client_->sendData(stream, data, end_stream); });
 }
 
-envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
-  return dispatcher_->post(
-      [&, stream, trailers]() { http_client_->sendTrailers(stream, trailers); });
+envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream,
+                                            Http::RequestTrailerMapPtr trailers) {
+  return dispatcher_->post([&, stream, trailers = std::move(trailers)]() mutable {
+    http_client_->sendTrailers(stream, std::move(trailers));
+  });
 }
 
 envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {

@@ -49,8 +49,10 @@ RequestHeaderMapPtr createRequestHeaderMapPtr() {
   return transformed_headers;
 }
 
+RequestTrailerMapPtr createRequestTrailerMapPtr() { return RequestTrailerMapImpl::create(); }
+
 RequestTrailerMapPtr toRequestTrailers(envoy_headers trailers) {
-  RequestTrailerMapPtr transformed_trailers = RequestTrailerMapImpl::create();
+  RequestTrailerMapPtr transformed_trailers = createRequestTrailerMapPtr();
   for (envoy_map_size_t i = 0; i < trailers.length; i++) {
     transformed_trailers->addCopy(
         LowerCaseString(Data::Utility::copyToString(trailers.entries[i].key)),

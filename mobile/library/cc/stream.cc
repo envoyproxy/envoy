@@ -38,8 +38,13 @@ Stream& Stream::readData(size_t bytes_to_read) {
 }
 
 void Stream::close(RequestTrailersSharedPtr trailers) {
-  envoy_headers raw_headers = rawHeaderMapAsEnvoyHeaders(trailers->allHeaders());
-  engine_->sendTrailers(handle_, raw_headers);
+  auto request_trailer_map = Http::Utility::createRequestTrailerMapPtr();
+  for (const auto& [key, values] : trailers->allHeaders()) {
+    for (const auto& value : values) {
+      request_trailer_map->addCopy(Http::LowerCaseString(key), value);
+    }
+  }
+  engine_->sendTrailers(handle_, std::move(request_trailer_map));
 }
 
 void Stream::close(envoy_data data) { engine_->sendData(handle_, data, true); }

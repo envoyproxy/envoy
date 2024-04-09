@@ -246,10 +246,6 @@ TEST_P(ClientTest, BasicStreamTrailers) {
     cc->on_trailers_calls++;
   };
 
-  // Build a set of request trailers.
-  TestRequestTrailerMapImpl trailers;
-  envoy_headers c_trailers = Utility::toBridgeHeaders(trailers);
-
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
 
@@ -258,7 +254,7 @@ TEST_P(ClientTest, BasicStreamTrailers) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeTrailers_(_));
-  http_client_.sendTrailers(stream_, c_trailers);
+  http_client_.sendTrailers(stream_, Utility::createRequestTrailerMapPtr());
   resumeDataIfExplicitFlowControl(20);
 
   // Encode response trailers.
