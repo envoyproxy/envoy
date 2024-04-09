@@ -37,6 +37,9 @@ void toEnvoyHeaders(HeaderMap& envoy_result_headers, envoy_headers headers);
  */
 RequestHeaderMapPtr toRequestHeaders(envoy_headers headers);
 
+/** Creates an empty `RequestHeaderMapPtr with a preserve case header formatter. */
+RequestHeaderMapPtr createRequestHeaderMapPtr();
+
 /**
  * Transform envoy_headers to RequestHeaderMap.
  * This function copies the content.
