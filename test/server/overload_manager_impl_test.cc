@@ -1022,7 +1022,7 @@ TEST_F(OverloadManagerLoadShedPointImplTest, TriggerLoadShedCunterTest) {
   LoadShedPoint* point = manager->getLoadShedPoint("test_point");
   ASSERT_NE(point, nullptr);
 
-  Stats::Counter& shed_load_count = stats_.counter("overload.test_point.load_shed_count");
+  Stats::Counter& shed_load_count = stats_.counter("overload.test_point.shed_load_count");
 
   EXPECT_EQ(0, shed_load_count.value());
   EXPECT_FALSE(point->shouldShedLoad());
