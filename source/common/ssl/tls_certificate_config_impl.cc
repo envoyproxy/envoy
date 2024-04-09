@@ -14,13 +14,12 @@ namespace Ssl {
 namespace {
 
 // Either return the supplied string, or set error and return an empty string
-// // Either return the supplied string, or set error and return an empty
-// string..
-std::string maybeSet(absl::StatusOr<std::string> toSet, absl::Status error) {
-  if (toSet.status().ok()) {
-    return toSet.value();
+// string.
+std::string maybeSet(absl::StatusOr<std::string> to_set, absl::Status error) {
+  if (to_set.status().ok()) {
+    return to_set.value();
   }
-  error = toSet.status();
+  error = to_set.status();
   return "";
 }
 
