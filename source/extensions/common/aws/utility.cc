@@ -5,6 +5,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
+#include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 
@@ -475,6 +476,32 @@ std::string Utility::getConfigProfileName() {
   } else {
     return "profile " + profile_name;
   }
+}
+
+std::string Utility::getStringFromJsonOrDefault(Json::ObjectSharedPtr json_object,
+                                                const std::string& string_value,
+                                                const std::string& string_default) {
+  absl::StatusOr<Envoy::Json::ValueType> value_or_error;
+  value_or_error = json_object->getValue(string_value);
+  if ((!value_or_error.ok()) || (!absl::holds_alternative<std::string>(value_or_error.value()))) {
+
+    ENVOY_LOG_MISC(error, "Unable to retrieve string value from json: {}", string_value);
+    return string_default;
+  }
+  return absl::get<std::string>(value_or_error.value());
+}
+
+int64_t Utility::getIntegerFromJsonOrDefault(Json::ObjectSharedPtr json_object,
+                                             const std::string& integer_value,
+                                             const int64_t integer_default) {
+  absl::StatusOr<Envoy::Json::ValueType> value_or_error;
+  value_or_error = json_object->getValue(integer_value);
+  if ((!value_or_error.ok()) || (!absl::holds_alternative<int64_t>(value_or_error.value()))) {
+
+    ENVOY_LOG_MISC(error, "Unable to retrieve integer value from json: {}", integer_value);
+    return integer_default;
+  }
+  return absl::get<int64_t>(value_or_error.value());
 }
 
 } // namespace Aws
