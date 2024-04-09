@@ -14,7 +14,8 @@ final class SendHeadersTests: XCTestCase {
   func testSendHeaders() {
     EnvoyTestServer.startHttp1PlaintextServer()
 
-    let headersExpectation = self.expectation(description: "Run called with expected http headers status")
+    let headersExpectation = self.expectation(
+      description: "Run called with expected http headers status")
     let endStreamExpectation = self.expectation(description: "End stream encountered")
     let engine = EngineBuilder()
       .addLogLevel(.debug)
