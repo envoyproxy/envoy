@@ -83,7 +83,7 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
-  bool validateUser(const UserMap* users, absl::string_view username,
+  bool validateUser(const UserMap& users, absl::string_view username,
                     absl::string_view password) const;
 
 private:

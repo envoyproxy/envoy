@@ -71,7 +71,7 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
   absl::string_view username = decoded_view.substr(0, colon_pos);
   absl::string_view password = decoded_view.substr(colon_pos + 1);
 
-  if (!validateUser(users, username, password)) {
+  if (!validateUser(*users, username, password)) {
     return onDenied("User authentication failed. Invalid username/password combination.",
                     "invalid_credential_for_basic_auth");
   }
@@ -84,10 +84,10 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
   return Http::FilterHeadersStatus::Continue;
 }
 
-bool BasicAuthFilter::validateUser(const UserMap* users, absl::string_view username,
+bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view username,
                                    absl::string_view password) const {
-  auto user = users->find(username);
-  if (user == users->end()) {
+  auto user = users.find(username);
+  if (user == users.end()) {
     return false;
   }
 
