@@ -16,11 +16,6 @@ behavior_changes:
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
     requests and responses. A number of users have reported issues with oghttp2 including issue 32611 and issue 32401 This behavior
     can be reverted by setting the feature to ``true``.
-- area: thread_local
-  change: |
-    Changes the behavior of the ``SlotImpl`` class destructor. By this change, now the destructor could be called at any thread.
-    This behavior can be reverted by setting the runtime flag ``envoy.reloadable_features.allow_slot_destroy_on_worker_threads``
-    to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

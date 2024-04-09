@@ -16,11 +16,6 @@ namespace ThreadLocal {
 
 thread_local InstanceImpl::ThreadLocalData InstanceImpl::thread_local_data_;
 
-InstanceImpl::InstanceImpl() {
-  allow_slot_destroy_on_worker_threads_ =
-      Runtime::runtimeFeatureEnabled("envoy.restart_features.allow_slot_destroy_on_worker_threads");
-}
-
 InstanceImpl::~InstanceImpl() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(shutdown_);
@@ -46,25 +41,6 @@ SlotPtr InstanceImpl::allocateSlot() {
 
 InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
-
-InstanceImpl::SlotImpl::~SlotImpl() {
-  auto* main_thread_dispatcher = parent_.main_thread_dispatcher_;
-  ASSERT(main_thread_dispatcher != nullptr);
-  if (!parent_.allow_slot_destroy_on_worker_threads_ ||
-      main_thread_dispatcher == InstanceImpl::thread_local_data_.dispatcher_) {
-    // If the slot is being destroyed on the main thread, we can remove it immediately.
-    parent_.removeSlot(index_);
-  } else {
-    // If the slot is being destroyed on a worker thread, we need to post the removal to the
-    // main thread. There are two possible cases here:
-    // 1. The removal is executed on the main thread as expected if the main thread is still
-    //    active. This is the common case.
-    // 2. The removal is not executed if the main thread has already exited and the dispatcher
-    //    is no longer alive. This is fine because the shutdown process will clean up all the
-    //    slots anyway.
-    main_thread_dispatcher->post([i = index_, &tls = parent_] { tls.removeSlot(i); });
-  }
-}
 
 std::function<void()> InstanceImpl::SlotImpl::wrapCallback(const std::function<void()>& cb) {
   // See the header file comments for still_alive_guard_ for the purpose of this capture and the
