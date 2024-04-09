@@ -164,12 +164,19 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_UnexpectedCallCredentials
 class MockSigner : public Envoy::Extensions::Common::Aws::Signer {
 public:
   ~MockSigner() override = default;
-  void sign(Http::RequestMessage&, bool, absl::string_view) override {
-    throw(EnvoyException("test"));
-  }
-  void signEmptyPayload(Http::RequestHeaderMap&, const absl::string_view = "") override{};
-  void signUnsignedPayload(Http::RequestHeaderMap&, const absl::string_view = "") override{};
-  void sign(Http::RequestHeaderMap&, const std::string&, const absl::string_view = "") override{};
+  absl::Status sign(Http::RequestMessage&, bool, absl::string_view) override {
+    return absl::NotFoundError("test");
+  };
+  absl::Status signEmptyPayload(Http::RequestHeaderMap&, const absl::string_view = "") override {
+    return absl::OkStatus();
+  };
+  absl::Status signUnsignedPayload(Http::RequestHeaderMap&, const absl::string_view = "") override {
+    return absl::OkStatus();
+  };
+  absl::Status sign(Http::RequestHeaderMap&, const std::string&,
+                    const absl::string_view = "") override {
+    return absl::OkStatus();
+  };
 };
 
 class MockAuthContext : public ::grpc::AuthContext {
@@ -187,7 +194,7 @@ public:
   MOCK_METHOD(bool, SetPeerIdentityPropertyName, (const std::string& name), (override));
 };
 
-TEST(GrpcAwsIamClientTest, AwsIamGrpcAuth_SignerThrows) {
+TEST(GrpcAwsIamClientTest, AwsIamGrpcAuth_SignerError) {
 
   auto testAwsIamHeaderAuthenticator =
       Extensions::GrpcCredentials::AwsIam::AwsIamHeaderAuthenticator(
