@@ -666,6 +666,11 @@ match_config {
 }
 
 TEST(AssertionFilterFactoryTest, Config) {
+#ifndef ENVOY_ENABLE_FULL_PROTOS
+  // This proto is not defined in ../source/common/protobuf/create_reflectable_message.cc
+  return;
+#endif
+
   AssertionFilterFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
