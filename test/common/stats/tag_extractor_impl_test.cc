@@ -87,14 +87,17 @@ TEST(TagExtractorTest, BadRegex) {
 
 class DefaultTagRegexTester {
 public:
-  DefaultTagRegexTester() : tag_extractors_(envoy::config::metrics::v3::StatsConfig()) {}
+  DefaultTagRegexTester()
+      : tag_extractors_(std::move(
+            TagProducerImpl::createTagProducer(envoy::config::metrics::v3::StatsConfig(), tags_)
+                .value())) {}
 
   void testRegex(const std::string& stat_name, const std::string& expected_tag_extracted_name,
                  const TagVector& expected_tags) {
 
     // Test forward iteration through the regexes
     TagVector tags;
-    const std::string tag_extracted_name = tag_extractors_.produceTags(stat_name, tags);
+    const std::string tag_extracted_name = tag_extractors_->produceTags(stat_name, tags);
 
     auto cmp = [](const Tag& lhs, const Tag& rhs) {
       return lhs.name_ == rhs.name_ && lhs.value_ == rhs.value_;
@@ -138,10 +141,11 @@ public:
     // version does not add in tag_extractors_.default_tags_ into tags. That doesn't matter
     // for this test, however.
     std::list<const TagExtractor*> extractors; // Note push-front is used to reverse order.
-    tag_extractors_.forEachExtractorMatching(metric_name,
-                                             [&extractors](const TagExtractorPtr& tag_extractor) {
-                                               extractors.push_front(tag_extractor.get());
-                                             });
+    reinterpret_cast<const TagProducerImpl*>(tag_extractors_.get())
+        ->forEachExtractorMatching(metric_name,
+                                   [&extractors](const TagExtractorPtr& tag_extractor) {
+                                     extractors.push_front(tag_extractor.get());
+                                   });
 
     IntervalSetImpl<size_t> remove_characters;
     TagExtractionContext tag_extraction_context(metric_name);
@@ -151,8 +155,9 @@ public:
     return StringUtil::removeCharacters(metric_name, remove_characters);
   }
 
+  const Stats::TagVector tags_;
   SymbolTableImpl symbol_table_;
-  TagProducerImpl tag_extractors_;
+  TagProducerPtr tag_extractors_;
 };
 
 TEST(TagExtractorTest, DefaultTagExtractors) {
@@ -462,6 +467,13 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   rbac_http_prefix.value_ = "prefix";
   regex_tester.testRegex("http.hcm_prefix.rbac.prefix.allowed", "http.rbac.allowed",
                          {rbac_http_hcm_prefix, rbac_http_prefix});
+
+  // Proxy Protocol version prefix
+  Tag proxy_protocol_version;
+  proxy_protocol_version.name_ = tag_names.PROXY_PROTOCOL_VERSION;
+  proxy_protocol_version.value_ = "2";
+  regex_tester.testRegex("proxy_proto.versions.v2.error", "proxy_proto.error",
+                         {proxy_protocol_version});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {

@@ -19,7 +19,10 @@ exports_files([
 
 go_proto_compiler(
     name = "vtprotobuf_plugin_go",
-    options = ["features=marshal_strict+size"],
+    options = [
+        "features=marshal_strict+size",
+        "buildTag=vtprotobuf",
+    ],
     plugin = "@com_github_planetscale_vtprotobuf//cmd/protoc-gen-go-vtproto",
     suffix = "_vtproto.pb.go",
     valid_archive = False,

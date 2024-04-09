@@ -57,20 +57,11 @@ service ExternalProcessor {
 
 // This represents the different types of messages that Envoy can send
 // to an external processing server.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message ProcessingRequest {
-  // Specify whether the filter that sent this request is running in synchronous
-  // or asynchronous mode. The choice of synchronous or asynchronous mode
-  // can be set in the filter configuration, and defaults to false.
-  //
-  // * A value of ``false`` indicates that the server must respond
-  //   to this message by either sending back a matching ProcessingResponse message,
-  //   or by closing the stream.
-  // * A value of ``true`` indicates that the server must not respond to this
-  //   message, although it may still close the stream to indicate that no more messages
-  //   are needed.
-  //
-  bool async_mode = 1;
+  reserved 1;
+
+  reserved "async_mode";
 
   // Each request message will include one of the following sub-messages. Which
   // ones are set for a particular HTTP request/response depend on the
@@ -79,31 +70,31 @@ message ProcessingRequest {
     option (validate.required) = true;
 
     // Information about the HTTP request headers, as well as peer info and additional
-    // properties. Unless ``async_mode`` is ``true``, the server must send back a
+    // properties. Unless ``observability_mode`` is ``true``, the server must send back a
     // HeaderResponse message, an ImmediateResponse message, or close the stream.
     HttpHeaders request_headers = 2;
 
     // Information about the HTTP response headers, as well as peer info and additional
-    // properties. Unless ``async_mode`` is ``true``, the server must send back a
+    // properties. Unless ``observability_mode`` is ``true``, the server must send back a
     // HeaderResponse message or close the stream.
     HttpHeaders response_headers = 3;
 
-    // A chunk of the HTTP request body. Unless ``async_mode`` is true, the server must send back
+    // A chunk of the HTTP request body. Unless ``observability_mode`` is true, the server must send back
     // a BodyResponse message, an ImmediateResponse message, or close the stream.
     HttpBody request_body = 4;
 
-    // A chunk of the HTTP response body. Unless ``async_mode`` is ``true``, the server must send back
+    // A chunk of the HTTP response body. Unless ``observability_mode`` is ``true``, the server must send back
     // a BodyResponse message or close the stream.
     HttpBody response_body = 5;
 
-    // The HTTP trailers for the request path. Unless ``async_mode`` is ``true``, the server
+    // The HTTP trailers for the request path. Unless ``observability_mode`` is ``true``, the server
     // must send back a TrailerResponse message or close the stream.
     //
     // This message is only sent if the trailers processing mode is set to ``SEND`` and
     // the original downstream request has trailers.
     HttpTrailers request_trailers = 6;
 
-    // The HTTP trailers for the response path. Unless ``async_mode`` is ``true``, the server
+    // The HTTP trailers for the response path. Unless ``observability_mode`` is ``true``, the server
     // must send back a TrailerResponse message or close the stream.
     //
     // This message is only sent if the trailers processing mode is set to ``SEND`` and
@@ -119,9 +110,22 @@ message ProcessingRequest {
   // in the list is populated from the standard
   // :ref:`attributes <arch_overview_attributes>` supported across Envoy.
   map<string, google.protobuf.Struct> attributes = 9;
+
+  // Specify whether the filter that sent this request is running in :ref:`observability_mode
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.observability_mode>`
+  // and defaults to false.
+  //
+  // * A value of ``false`` indicates that the server must respond
+  //   to this message by either sending back a matching ProcessingResponse message,
+  //   or by closing the stream.
+  // * A value of ``true`` indicates that the server should not respond to this message, as any
+  //   responses will be ignored. However, it may still close the stream to indicate that no more messages
+  //   are needed.
+  //
+  bool observability_mode = 10;
 }
 
-// For every ProcessingRequest received by the server with the ``async_mode`` field
+// For every ProcessingRequest received by the server with the ``observability_mode`` field
 // set to false, the server must send back exactly one ProcessingResponse message.
 // [#next-free-field: 11]
 message ProcessingResponse {
