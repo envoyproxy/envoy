@@ -89,12 +89,13 @@ class ReceiveTrailersTest {
       .sendHeaders(requestHeadersDefault, false)
       .sendData(body)
       .close(requestTrailers)
+
     expectation.await(10, TimeUnit.SECONDS)
+    trailersReceived.await(10, TimeUnit.SECONDS)
 
     engine.terminate()
 
     assertThat(trailersReceived.count).isEqualTo(0)
-    trailersReceived.await(10, TimeUnit.SECONDS)
     assertThat(expectation.count).isEqualTo(0)
     assertThat(responseStatus).isEqualTo(200)
     assertThat(trailerValues).contains(TRAILER_VALUE)
