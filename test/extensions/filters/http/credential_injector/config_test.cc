@@ -10,6 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace CredentialInjector {
+namespace {
 
 using testing::NiceMock;
 
@@ -35,6 +36,7 @@ TEST(Factory, UnregisteredExtension) {
                          "type URL: 'test.mock_credential.Unregistered'"));
 }
 
+} // namespace
 } // namespace CredentialInjector
 } // namespace HttpFilters
 } // namespace Extensions

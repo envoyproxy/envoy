@@ -8,7 +8,7 @@ namespace Generic {
 
 absl::Status GenericCredentialInjector::inject(Envoy::Http::RequestHeaderMap& headers,
                                                bool overwrite) {
-  if (!overwrite && !headers.get(Envoy::Http::LowerCaseString(header_)).empty()) {
+  if (!overwrite && !headers.get(header_).empty()) {
     return absl::AlreadyExistsError("Credential already exists in the header");
   }
 
@@ -16,7 +16,7 @@ absl::Status GenericCredentialInjector::inject(Envoy::Http::RequestHeaderMap& he
     return absl::NotFoundError("Failed to get credential from secret");
   }
 
-  headers.setCopy(Envoy::Http::LowerCaseString(header_), secret_reader_->credential());
+  headers.setCopy(header_, secret_reader_->credential());
   return absl::OkStatus();
 }
 

@@ -10,6 +10,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace CredentialInjector {
+namespace {
+
 class MockSecretReader : public Http::InjectedCredentials::Common::SecretReader {
 public:
   MockSecretReader(const std::string& secret) : secret_(secret){};
@@ -139,6 +141,7 @@ TEST(Factory, FailedToInjectCredentialAllowWithoutCredential) {
   filter->onDestroy();
 }
 
+} // namespace
 } // namespace CredentialInjector
 } // namespace HttpFilters
 } // namespace Extensions

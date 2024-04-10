@@ -58,11 +58,6 @@ CredentialInjectorFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, 
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
-void CredentialInjectorFilter::setDecoderFilterCallbacks(
-    Envoy::Http::StreamDecoderFilterCallbacks& callbacks) {
-  decoder_callbacks_ = &callbacks;
-}
-
 } // namespace CredentialInjector
 } // namespace HttpFilters
 } // namespace Extensions

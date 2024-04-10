@@ -66,10 +66,8 @@ public:
   // Http::StreamDecoderFilter
   Envoy::Http::FilterHeadersStatus decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
                                                  bool) override;
-  void setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallbacks&) override;
 
 private:
-  Envoy::Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   FilterConfigSharedPtr config_;
 };
 
