@@ -306,9 +306,9 @@ public:
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
         ensure_connection_retry_(
             Runtime::runtimeFeatureEnabled("envoy.restart_features.ensure_connection_retry")),
-        waiting_for_upstream_connection_(false), request_buffer_overflowed_(false),
-        streaming_shadows_(
-            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.streaming_shadow")) {}
+        increased_retry_shadow_buffer_limit_until_got_connection_(false),
+        request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
+                                               "envoy.reloadable_features.streaming_shadow")) {}
 
   ~Filter() override;
 
@@ -620,7 +620,8 @@ private:
   // enabled, and the router is waiting to get an upcoming connection from an upstream.
   // This will potentially increase the limit to which we are willing to buffer in order to ensure
   // we retry the connection failure.
-  bool waiting_for_upstream_connection_ : 1;
+  // increased_retry_shadow_buffer_limit_until_got_connection_
+  bool increased_retry_shadow_buffer_limit_until_got_connection_ : 1;
   // Set to true when retrying on connection error, buffer limit has been exceeded and
   // the router hasn't got any connection with upstream.
   bool include_attempt_count_in_request_ : 1;
