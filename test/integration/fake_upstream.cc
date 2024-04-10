@@ -43,17 +43,8 @@ namespace Envoy {
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                        Event::TestTimeSystem& time_system)
     : parent_(parent), encoder_(encoder), time_system_(time_system),
-      header_validator_(parent.makeHeaderValidator()),
-      stream_callbacks_(std::make_unique<FakeStreamCallbacks>(*this)),
-      dispatcher_(parent.sharedConnection().dispatcher()) {
-  encoder.getStream().addCallbacks(*stream_callbacks_);
-}
-
-FakeStream::~FakeStream() {
-  // These callbacks may be triggered from the upstream thread. Post the stream callback destruction
-  // there to detach from the stream to avoid data race.
-  stream_callbacks_->detachFromFakeStream();
-  dispatcher_.post([stream_callbacks = stream_callbacks_.release()]() { delete stream_callbacks; });
+      header_validator_(parent.makeHeaderValidator()) {
+  encoder.getStream().addCallbacks(*this);
 }
 
 void FakeStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) {
@@ -599,13 +590,17 @@ void FakeConnectionBase::postToConnectionThread(std::function<void()> cb) {
 AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dispatcher,
                                                      FakeStreamPtr& stream,
                                                      std::chrono::milliseconds timeout) {
-  stream.reset();
   absl::MutexLock lock(&lock_);
   if (!waitForWithDispatcherRun(
           time_system_, lock_,
           [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return !new_streams_.empty(); },
           client_dispatcher, timeout)) {
     return AssertionFailure() << "Timed out waiting for new stream.";
+  }
+  if (stream) {
+    postToConnectionThread([last_stream = stream.release()]() {
+      delete last_stream;
+    });
   }
   stream = std::move(new_streams_.front());
   new_streams_.pop_front();

@@ -605,7 +605,7 @@ protected:
     // control window is available.
     bool useDeferredReset() const override { return true; }
     StreamDecoder& decoder() override {
-      RELEASE_ASSERT(
+    RELEASE_ASSERT(
           request_decoder_handle_ != nullptr && request_decoder_handle_->ptr() != nullptr,
           "Trying to access to the decoder without a handle or the decoder has been destroyed.");
       return *request_decoder_handle_->ptr();
