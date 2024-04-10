@@ -522,6 +522,48 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverrideWithPerRuleShadowStat
       stats_store_.counter("test.rbac.shadow_rules_prefix_.policy.foobar.shadow_denied").value());
 }
 
+TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverrideWithPerRuleShadowStatsAllow) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::DENY);
+
+  setDestinationPort(123);
+  setMetadata();
+
+  envoy::extensions::filters::http::rbac::v3::RBACPerRoute route_config;
+  route_config.mutable_rbac()->set_track_per_rule_stats(true);
+  route_config.mutable_rbac()->mutable_shadow_rules()->set_action(
+      envoy::config::rbac::v3::RBAC::ALLOW);
+
+  envoy::config::rbac::v3::Policy policy;
+  auto policy_rules = policy.add_permissions()->mutable_or_rules();
+  policy_rules->add_rules()->set_destination_port(123);
+  policy.add_principals()->set_any(true);
+
+  (*route_config.mutable_rbac()->mutable_shadow_rules()->mutable_policies())["foobar"] = policy;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Filters::Common::RBAC::MockEngine> engine{route_config.rbac().rules(), factory_context};
+  NiceMock<MockRoleBasedAccessControlRouteSpecificFilterConfig> per_route_config_{route_config,
+                                                                                  context_};
+
+  EXPECT_CALL(engine, handleAction(_, _, _, _)).WillRepeatedly(Return(true));
+  EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
+
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillRepeatedly(Return(&per_route_config_));
+
+  // Filter iteration should continue since the route-specific policy is ALLOW but the rule is
+  // shadowed.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+
+  // Expect `shadow_allowed` stat to be incremented.
+  // The shadow rule stat prefix comes from the listener.
+  EXPECT_EQ(
+      1U,
+      stats_store_.counter("test.rbac.shadow_rules_prefix_.policy.foobar.shadow_allowed").value());
+  EXPECT_EQ(
+      0U,
+      stats_store_.counter("test.rbac.shadow_rules_prefix_.policy.foobar.shadow_denied").value());
+}
+
 TEST_F(RoleBasedAccessControlFilterTest, MatcherWithCelInputsRequestNoMatch) {
   setupMatcherWithCelInputs();
   setDestinationPort(80);
