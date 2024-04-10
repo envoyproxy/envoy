@@ -62,7 +62,7 @@ jobs:
             //test/performance:test_binary_size
           # Ensure files don't leak back into the main binary
           source: >-
-            TOREMOVE=$(tail -n +2 mobile/test/performance/files_em_does_not_use)
+            TOREMOVE=$(cat mobile/test/performance/files_em_does_not_use | grep -vE '^#')
             rm $TOREMOVE
           target: size-current
         - name: Main size
