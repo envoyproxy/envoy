@@ -118,8 +118,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   Tracing::UpstreamContext upstream_context(upstream_host, // host_
                                             cluster_info.has_value() ? cluster_info.value()
                                                                      : nullptr, // cluster_info_
-                                            Tracing::ServiceType::Http,         // service_type_
-                                            true                                // is_side_stream_
+                                            Tracing::ServiceType::Unknown,      // service_type_
+                                            false                               // is_side_stream_
   );
 
   if (span_ != nullptr) {
