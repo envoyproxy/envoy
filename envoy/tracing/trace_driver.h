@@ -42,8 +42,9 @@ struct UpstreamContext {
                   const Upstream::ClusterInfoConstSharedPtr& cluster_info = nullptr,
                   const Tracing::ServiceType service_type = Tracing::ServiceType::Unknown,
                   const bool is_from_async_client_ = false)
-      : host_(nullptr == host ? absl::nullopt_t : *host),
-        cluster_info_(nullptr != cluster_info ? absl::nullopt_t : *cluster_info),
+      : host_(nullptr == host ? absl::nullopt_t : OptRef<const Upstream::HostDescription>(*host)),
+        cluster_info_(nullptr == cluster_info ? absl::nullopt_t
+                                              : OptRef<const Upstream::ClusterInfo>(*cluster_info)),
         service_type_(service_type), is_from_async_client_(is_from_async_client_) {}
 
   OptRef<const Upstream::HostDescription> host_;
