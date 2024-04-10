@@ -66,13 +66,30 @@ public:
   // (thread context switch)
   envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
                              bool explicit_flow_control);
-  envoy_status_t sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream);
+
+  /**
+   * Send the headers over an open HTTP stream. This function can be invoked
+   * once and needs to be called before `sendData`.
+   *
+   * @param stream the stream to send headers over.
+   * @param headers the headers to send.
+   * @param end_stream indicates whether to close the stream locally after sending this frame.
+   */
+  envoy_status_t sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,
+                             bool end_stream);
 
   envoy_status_t readData(envoy_stream_t stream, size_t bytes_to_read);
 
   envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream);
 
-  envoy_status_t sendTrailers(envoy_stream_t stream, envoy_headers trailers);
+  /**
+   * Send trailers over an open HTTP stream. This method can only be invoked once per stream.
+   * Note that this method implicitly closes the stream locally.
+   *
+   * @param stream the stream to send trailers over.
+   * @param trailers the trailers to send.
+   */
+  envoy_status_t sendTrailers(envoy_stream_t stream, Http::RequestTrailerMapPtr trailers);
 
   envoy_status_t cancelStream(envoy_stream_t stream);
 

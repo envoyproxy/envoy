@@ -27,15 +27,6 @@ TEST(RequestHeaderDataConstructorTest, FromCToCppEmpty) {
   ASSERT_TRUE(cpp_headers->empty());
 }
 
-TEST(RequestTrailerDataConstructorTest, FromCToCppEmpty) {
-  std::map<std::string, std::string> empty_map;
-  envoy_headers empty_trailers = Bridge::Utility::makeEnvoyMap(empty_map);
-
-  RequestTrailerMapPtr cpp_trailers = Utility::toRequestTrailers(empty_trailers);
-
-  ASSERT_TRUE(cpp_trailers->empty());
-}
-
 TEST(RequestHeaderDataConstructorTest, FromCToCpp) {
   // Backing strings for all the envoy_datas in the c_headers.
   std::vector<std::pair<std::string, std::string>> headers = {
@@ -75,48 +66,6 @@ TEST(RequestHeaderDataConstructorTest, FromCToCpp) {
     EXPECT_EQ(cpp_headers->get(expected_key)[0]->value().getStringView(), expected_value);
   }
   release_envoy_headers(c_headers_copy);
-  delete sentinel;
-}
-
-TEST(RequestTrailerDataConstructorTest, FromCToCpp) {
-  // Backing strings for all the envoy_datas in the c_trailers.
-  std::vector<std::pair<std::string, std::string>> trailers = {
-      {"processing-duration-ms", "25"}, {"response-compression-ratio", "0.61"}};
-
-  envoy_map_entry* header_array =
-      static_cast<envoy_map_entry*>(safe_malloc(sizeof(envoy_map_entry) * trailers.size()));
-
-  uint32_t* sentinel = new uint32_t;
-  *sentinel = 0;
-  for (size_t i = 0; i < trailers.size(); i++) {
-    header_array[i] = {
-        envoyTestString(trailers[i].first, sentinel),
-        envoyTestString(trailers[i].second, sentinel),
-    };
-  }
-
-  envoy_headers c_trailers = {static_cast<envoy_map_size_t>(trailers.size()), header_array};
-  // This copy is used for assertions given that envoy_trailers are released when toRequestTrailers
-  // is called.
-  envoy_headers c_trailers_copy = copy_envoy_headers(c_trailers);
-
-  RequestTrailerMapPtr cpp_trailers = Utility::toRequestTrailers(c_trailers);
-
-  // Check that the sentinel was advance due to c_trailers being released;
-  ASSERT_EQ(*sentinel, 2 * c_trailers_copy.length);
-
-  ASSERT_EQ(cpp_trailers->size(), c_trailers_copy.length);
-
-  for (envoy_map_size_t i = 0; i < c_trailers_copy.length; i++) {
-    LowerCaseString expected_key(Data::Utility::copyToString(c_trailers_copy.entries[i].key));
-    std::string expected_value = Data::Utility::copyToString(c_trailers_copy.entries[i].value);
-
-    // Key is present.
-    EXPECT_FALSE(cpp_trailers->get(expected_key).empty());
-    // Value for the key is the same.
-    EXPECT_EQ(cpp_trailers->get(expected_key)[0]->value().getStringView(), expected_value);
-  }
-  release_envoy_headers(c_trailers_copy);
   delete sentinel;
 }
 

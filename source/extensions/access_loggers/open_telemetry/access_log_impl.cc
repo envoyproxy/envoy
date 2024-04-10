@@ -90,6 +90,8 @@ void AccessLog::emitLog(const Formatter::HttpFormatterContext& log_context,
   }
   const auto formatted_attributes = attributes_formatter_->format(log_context, stream_info);
   *log_entry.mutable_attributes() = formatted_attributes.values();
+  *log_entry.mutable_trace_id() =
+      absl::HexStringToBytes(log_context.activeSpan().getTraceIdAsHex());
 
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));
 }

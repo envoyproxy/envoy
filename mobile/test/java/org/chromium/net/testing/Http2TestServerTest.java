@@ -8,6 +8,8 @@ import static org.chromium.net.testing.CronetTestRule.SERVER_KEY_PKCS8_PEM;
 import static org.junit.Assert.assertNotNull;
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
+
+import io.envoyproxy.envoymobile.LogLevel;
 import io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Engine;
@@ -62,6 +64,11 @@ public class Http2TestServerTest {
     CountDownLatch latch = new CountDownLatch(1);
     Context appContext = ApplicationProvider.getApplicationContext();
     engine = new AndroidEngineBuilder(appContext)
+                 .addLogLevel(LogLevel.DEBUG)
+                 .setLogger((level, message) -> {
+                   System.out.print(message);
+                   return null;
+                 })
                  .enablePlatformCertificatesValidation(enablePlatformCertificatesValidation)
                  .setTrustChainVerification(trustChainVerification)
                  .setOnEngineRunning(() -> {

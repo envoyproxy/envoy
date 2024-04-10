@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 tools="$(dirname "$(dirname "$(realpath "$0")")")"
 root=$(realpath "$tools/..")

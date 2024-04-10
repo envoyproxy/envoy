@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/basic_auth/v3:pkg_cc_proto",
     ],
 )
 

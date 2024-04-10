@@ -53,9 +53,11 @@ message ExecuteFilterAction {
   config.core.v3.TypedExtensionConfig typed_config = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
-  // Dynamic configuration of filter obtained via extension configuration discovery
-  // service.
+  // Dynamic configuration of filter obtained via extension configuration discovery service.
   // Only one of ``typed_config`` or ``dynamic_config`` can be set.
+  // When composite filter is in upstream filter chain, the ``dynamic_config``
+  // can not be set. TBD: Refactor cluster manager init sequence to Support this.
+  // Please check https://github.com/envoyproxy/envoy/issues/33218 for details.
   DynamicConfig dynamic_config = 2
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 }

@@ -135,8 +135,8 @@ struct TestEngine {
 
 std::unique_ptr<EngineCallbacks> createDefaultEngineCallbacks(EngineTestContext& test_context) {
   std::unique_ptr<EngineCallbacks> engine_callbacks = std::make_unique<EngineCallbacks>();
-  engine_callbacks->on_engine_running = [&] { test_context.on_engine_running.Notify(); };
-  engine_callbacks->on_exit = [&] { test_context.on_exit.Notify(); };
+  engine_callbacks->on_engine_running_ = [&] { test_context.on_engine_running.Notify(); };
+  engine_callbacks->on_exit_ = [&] { test_context.on_exit.Notify(); };
   return engine_callbacks;
 }
 
@@ -230,12 +230,12 @@ TEST_F(InternalEngineTest, RecordCounter) {
 TEST_F(InternalEngineTest, Logger) {
   EngineTestContext test_context{};
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log = [&](Logger::Logger::Levels, const std::string&) {
+  logger->on_log_ = [&](Logger::Logger::Levels, const std::string&) {
     if (!test_context.on_log.HasBeenNotified()) {
       test_context.on_log.Notify();
     }
   };
-  logger->on_exit = [&] { test_context.on_log_exit.Notify(); };
+  logger->on_exit_ = [&] { test_context.on_log_exit.Notify(); };
   std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
       createDefaultEngineCallbacks(test_context), std::move(logger), /*event_tracker=*/nullptr);
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
@@ -276,7 +276,7 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAPI) {
   EngineTestContext test_context{};
 
   auto event_tracker = std::make_unique<EnvoyEventTracker>();
-  event_tracker->on_track = [&](const absl::flat_hash_map<std::string, std::string>& events) {
+  event_tracker->on_track_ = [&](const absl::flat_hash_map<std::string, std::string>& events) {
     if (events.count("foo") && events.at("foo") == "bar") {
       test_context.on_event.Notify();
     }
@@ -291,7 +291,7 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAPI) {
       Api::External::retrieveApi(ENVOY_EVENT_TRACKER_API_NAME));
   EXPECT_TRUE(registered_event_tracker != nullptr && *registered_event_tracker != nullptr);
 
-  (*registered_event_tracker)->on_track({{"foo", "bar"}});
+  (*registered_event_tracker)->on_track_({{"foo", "bar"}});
 
   ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
   engine->terminate();
@@ -302,7 +302,7 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
   EngineTestContext test_context{};
 
   auto event_tracker = std::make_unique<EnvoyEventTracker>();
-  event_tracker->on_track = [&](const absl::flat_hash_map<std::string, std::string>& events) {
+  event_tracker->on_track_ = [&](const absl::flat_hash_map<std::string, std::string>& events) {
     if (events.count("name") && events.at("name") == "assertion") {
       EXPECT_EQ(events.at("location"), "foo_location");
       test_context.on_event.Notify();
@@ -329,7 +329,7 @@ TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
   EngineTestContext test_context{};
 
   auto event_tracker = std::make_unique<EnvoyEventTracker>();
-  event_tracker->on_track = [&](const absl::flat_hash_map<std::string, std::string>& events) {
+  event_tracker->on_track_ = [&](const absl::flat_hash_map<std::string, std::string>& events) {
     if (events.count("name") && events.at("name") == "bug") {
       EXPECT_EQ(events.at("location"), "foo_location");
       test_context.on_event.Notify();
@@ -378,23 +378,19 @@ TEST_F(InternalEngineTest, BasicStream) {
       nullptr /* on_cancel */,
       nullptr /* on_send_window_available*/,
       &on_complete_notification /* context */};
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
 
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   envoy_data c_data = Data::Utility::toBridgeData(request_data);
-
-  Http::TestRequestTrailerMapImpl trailers;
-  envoy_headers c_trailers = Http::Utility::toBridgeHeaders(trailers);
 
   envoy_stream_t stream = engine->initStream();
 
   engine->startStream(stream, stream_cbs, false);
 
-  engine->sendHeaders(stream, c_headers, false);
+  auto headers = Http::Utility::createRequestHeaderMapPtr();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  engine->sendHeaders(stream, std::move(headers), false);
   engine->sendData(stream, c_data, false);
-  engine->sendTrailers(stream, c_trailers);
+  engine->sendTrailers(stream, Http::Utility::createRequestTrailerMapPtr());
 
   ASSERT_TRUE(on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
@@ -520,16 +516,14 @@ protected:
         nullptr /* on_send_window_available*/,
         &context};
 
-    Http::TestRequestHeaderMapImpl headers;
-    HttpTestUtility::addDefaultHeaders(headers);
-    envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
-
     Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
     envoy_data c_data = Data::Utility::toBridgeData(request_data);
 
     envoy_stream_t stream = engine->initStream();
     engine->startStream(stream, stream_cbs, false);
-    engine->sendHeaders(stream, c_headers, false);
+    auto headers = Http::Utility::createRequestHeaderMapPtr();
+    HttpTestUtility::addDefaultHeaders(*headers);
+    engine->sendHeaders(stream, std::move(headers), false);
     engine->sendData(stream, c_data, true);
 
     EXPECT_TRUE(context.on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
@@ -540,11 +534,15 @@ protected:
   }
 };
 
+// The setpriority() call fails on some Apple environments.
+// TODO(abeyad): investigate what to do for Apple.
+#ifndef __APPLE__
 TEST_F(ThreadPriorityInternalEngineTest, SetThreadPriority) {
   const int expected_thread_priority = 10;
   const int actual_thread_priority = startEngineWithPriority(expected_thread_priority);
   EXPECT_EQ(actual_thread_priority, expected_thread_priority);
 }
+#endif
 
 TEST_F(ThreadPriorityInternalEngineTest, SetOutOfRangeThreadPriority) {
   // 42 is outside the range of acceptable thread priorities.

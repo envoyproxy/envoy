@@ -10,6 +10,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /* Concrete implementation of the `EnvoyEngine` interface. */
 public class EnvoyEngineImpl implements EnvoyEngine {
@@ -18,6 +19,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   private static final int ENVOY_NET_WLAN = 2;
 
   private final long engineHandle;
+  private final AtomicBoolean terminated = new AtomicBoolean(false);
 
   /**
    * @param runningCallback Called when the engine finishes its async startup and begins running.
@@ -39,6 +41,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl) {
+    checkIsTerminated();
     long streamHandle = JniLibrary.initStream(engineHandle);
     EnvoyHTTPStream stream =
         new EnvoyHTTPStream(engineHandle, streamHandle, callbacks, explicitFlowControl);
@@ -48,11 +51,14 @@ public class EnvoyEngineImpl implements EnvoyEngine {
 
   @Override
   public void terminate() {
+    checkIsTerminated();
     JniLibrary.terminateEngine(engineHandle);
+    terminated.set(true);
   }
 
   @Override
   public String dumpStats() {
+    checkIsTerminated();
     return JniLibrary.dumpStats(engineHandle);
   }
 
@@ -63,6 +69,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public void performRegistration(EnvoyConfiguration envoyConfiguration) {
+    checkIsTerminated();
     for (EnvoyHTTPFilterFactory filterFactory : envoyConfiguration.httpPlatformFilterFactories) {
       JniLibrary.registerFilterFactory(filterFactory.getFilterName(),
                                        new JvmFilterFactoryContext(filterFactory));
@@ -92,6 +99,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public EnvoyStatus runWithYaml(String configurationYAML, String logLevel) {
+    checkIsTerminated();
     return runWithResolvedYAML(configurationYAML, logLevel);
   }
 
@@ -104,6 +112,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
+    checkIsTerminated();
     performRegistration(envoyConfiguration);
     int status =
         JniLibrary.runEngine(this.engineHandle, "", envoyConfiguration.createBootstrap(), logLevel);
@@ -135,22 +144,26 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public int recordCounterInc(String elements, Map<String, String> tags, int count) {
+    checkIsTerminated();
     return JniLibrary.recordCounterInc(engineHandle, elements, JniBridgeUtility.toJniTags(tags),
                                        count);
   }
 
   @Override
   public int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor) {
+    checkIsTerminated();
     return JniLibrary.registerStringAccessor(accessor_name, new JvmStringAccessorContext(accessor));
   }
 
   @Override
   public void resetConnectivityState() {
+    checkIsTerminated();
     JniLibrary.resetConnectivityState(engineHandle);
   }
 
   @Override
   public void setPreferredNetwork(EnvoyNetworkType network) {
+    checkIsTerminated();
     switch (network) {
     case ENVOY_NETWORK_TYPE_WWAN:
       JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_WWAN);
@@ -167,11 +180,19 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   public void setProxySettings(String host, int port) {
+    checkIsTerminated();
     JniLibrary.setProxySettings(engineHandle, host, port);
   }
 
   @Override
   public void setLogLevel(LogLevel log_level) {
+    checkIsTerminated();
     JniLibrary.setLogLevel(log_level.ordinal());
+  }
+
+  private void checkIsTerminated() {
+    if (terminated.get()) {
+      throw new IllegalStateException("The EnvoyEngine has been terminated.");
+    }
   }
 }

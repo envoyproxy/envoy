@@ -61,11 +61,12 @@ envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
   });
 }
 
-envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, envoy_headers headers,
+envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,
                                            bool end_stream) {
-  return dispatcher_->post([&, stream, headers, end_stream]() {
-    http_client_->sendHeaders(stream, headers, end_stream);
+  return dispatcher_->post([this, stream, headers = std::move(headers), end_stream]() mutable {
+    http_client_->sendHeaders(stream, std::move(headers), end_stream);
   });
+  return ENVOY_SUCCESS;
 }
 
 envoy_status_t InternalEngine::readData(envoy_stream_t stream, size_t bytes_to_read) {
@@ -78,9 +79,11 @@ envoy_status_t InternalEngine::sendData(envoy_stream_t stream, envoy_data data, 
       [&, stream, data, end_stream]() { http_client_->sendData(stream, data, end_stream); });
 }
 
-envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
-  return dispatcher_->post(
-      [&, stream, trailers]() { http_client_->sendTrailers(stream, trailers); });
+envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream,
+                                            Http::RequestTrailerMapPtr trailers) {
+  return dispatcher_->post([&, stream, trailers = std::move(trailers)]() mutable {
+    http_client_->sendTrailers(stream, std::move(trailers));
+  });
 }
 
 envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
@@ -119,13 +122,13 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
             Assert::addDebugAssertionFailureRecordAction([this](const char* location) {
               absl::flat_hash_map<std::string, std::string> event{
                   {{"name", "assertion"}, {"location", std::string(location)}}};
-              event_tracker_->on_track(event);
+              event_tracker_->on_track_(event);
             });
         bug_handler_registration_ =
             Assert::addEnvoyBugFailureRecordAction([this](const char* location) {
               absl::flat_hash_map<std::string, std::string> event{
                   {{"name", "bug"}, {"location", std::string(location)}}};
-              event_tracker_->on_track(event);
+              event_tracker_->on_track_(event);
             });
       }
 
@@ -178,7 +181,7 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
                                                         server_->serverFactoryContext().scope(),
                                                         server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
-          callbacks_->on_engine_running();
+          callbacks_->on_engine_running_();
         });
   } // mutex_
 
@@ -196,9 +199,9 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
   assert_handler_registration_.reset(nullptr);
 
   if (event_tracker_ != nullptr) {
-    event_tracker_->on_exit();
+    event_tracker_->on_exit_();
   }
-  callbacks_->on_exit();
+  callbacks_->on_exit_();
 
   return run_success ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
