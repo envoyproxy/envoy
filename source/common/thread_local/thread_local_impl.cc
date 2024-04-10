@@ -57,11 +57,12 @@ InstanceImpl::SlotImpl::~SlotImpl() {
   } else {
     // If the slot is being destroyed on a worker thread, we need to post the removal to the
     // main thread. There are two possible cases here:
-    // 1. The removal is executed on the main thread as expected if the main thread is still
-    //    active. This is the common case.
-    // 2. The removal is not executed if the main thread has already exited and the dispatcher
-    //    is no longer alive. This is fine because the shutdown process will clean up all the
-    //    slots anyway.
+    // 1. The removal is executed on the main thread as expected if the main dispatcher is still
+    //    active. This is the common case and the clean up will be done as expected because the
+    //    the worker dispatchers must be active before the main dispatcher is exited.
+    // 2. The removal is not executed if the main dispatcher has already exited. This is fine
+    //    because the removal has no side effect and will be ignored. The shutdown process will
+    //    clean up all the slots anyway.
     main_thread_dispatcher->post([i = index_, &tls = parent_] { tls.removeSlot(i); });
   }
 }
