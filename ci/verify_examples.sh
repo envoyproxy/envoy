@@ -1,4 +1,6 @@
-#!/bin/bash -E
+#!/usr/bin/env bash
+
+set -E
 
 TESTFILTER="${1:-*}"
 TESTEXCLUDES="${2}"

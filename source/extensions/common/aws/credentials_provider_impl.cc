@@ -375,19 +375,24 @@ void InstanceProfileCredentialsProvider::extractCredentials(
     }
     return;
   }
-  Json::ObjectSharedPtr document_json;
-  TRY_NEEDS_AUDIT { document_json = Json::Factory::loadFromString(credential_document_value); }
-  END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Could not parse AWS credentials document: {}", e.what());
+
+  absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
+  document_json_or_error = Json::Factory::loadFromStringNoThrow(credential_document_value);
+  if (!document_json_or_error.ok()) {
+    ENVOY_LOG(error, "Could not parse AWS credentials document: {}",
+              document_json_or_error.status().message());
     if (async) {
       handleFetchDone();
     }
     return;
   }
 
-  const auto access_key_id = document_json->getString(ACCESS_KEY_ID, "");
-  const auto secret_access_key = document_json->getString(SECRET_ACCESS_KEY, "");
-  const auto session_token = document_json->getString(TOKEN, "");
+  const auto access_key_id =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), ACCESS_KEY_ID, "");
+  const auto secret_access_key =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), SECRET_ACCESS_KEY, "");
+  const auto session_token =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), TOKEN, "");
 
   ENVOY_LOG(debug,
             "Obtained following AWS credentials from the EC2MetadataService: {}={}, {}={}, {}={}",
@@ -502,25 +507,31 @@ void ContainerCredentialsProvider::extractCredentials(
     handleFetchDone();
     return;
   }
-  Json::ObjectSharedPtr document_json;
-  TRY_NEEDS_AUDIT { document_json = Json::Factory::loadFromString(credential_document_value); }
-  END_TRY catch (EnvoyException& e) {
+  absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
+
+  document_json_or_error = Json::Factory::loadFromStringNoThrow(credential_document_value);
+  if (!document_json_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from the container role: {}",
-              e.what());
+              document_json_or_error.status().message());
     handleFetchDone();
     return;
   }
 
-  const auto access_key_id = document_json->getString(ACCESS_KEY_ID, "");
-  const auto secret_access_key = document_json->getString(SECRET_ACCESS_KEY, "");
-  const auto session_token = document_json->getString(TOKEN, "");
+  const auto access_key_id =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), ACCESS_KEY_ID, "");
+  const auto secret_access_key =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), SECRET_ACCESS_KEY, "");
+  const auto session_token =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), TOKEN, "");
 
   ENVOY_LOG(debug, "Found following AWS credentials in the container role: {}={}, {}={}, {}={}",
             AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
             secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
             session_token.empty() ? "" : "*****");
 
-  const auto expiration_str = document_json->getString(EXPIRATION, "");
+  const auto expiration_str =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), EXPIRATION, "");
+
   if (!expiration_str.empty()) {
     absl::Time expiration_time;
     if (absl::ParseTime(EXPIRATION_FORMAT, expiration_str, &expiration_time, nullptr)) {
@@ -579,7 +590,12 @@ void WebIdentityCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}", sts_endpoint_);
 
   const auto web_token_file_or_error = api_.fileSystem().fileReadToEnd(token_file_path_);
-  THROW_IF_STATUS_NOT_OK(web_token_file_or_error, throw);
+  if (!web_token_file_or_error.ok()) {
+    ENVOY_LOG(debug, "Unable to read AWS web identity credentials from {}", token_file_path_);
+    cached_credentials_ = Credentials();
+    return;
+  }
+
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
@@ -620,16 +636,17 @@ void WebIdentityCredentialsProvider::extractCredentials(
     return;
   }
 
-  Json::ObjectSharedPtr document_json;
-  TRY_NEEDS_AUDIT { document_json = Json::Factory::loadFromString(credential_document_value); }
-  END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Could not parse AWS credentials document from STS: {}", e.what());
+  absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
+  document_json_or_error = Json::Factory::loadFromStringNoThrow(credential_document_value);
+  if (!document_json_or_error.ok()) {
+    ENVOY_LOG(error, "Could not parse AWS credentials document from STS: {}",
+              document_json_or_error.status().message());
     handleFetchDone();
     return;
   }
 
   absl::StatusOr<Json::ObjectSharedPtr> root_node =
-      document_json->getObjectNoThrow(WEB_IDENTITY_RESPONSE_ELEMENT);
+      document_json_or_error.value()->getObjectNoThrow(WEB_IDENTITY_RESPONSE_ELEMENT);
   if (!root_node.ok()) {
     ENVOY_LOG(error, "AWS STS credentials document is empty");
     handleFetchDone();
@@ -650,42 +667,37 @@ void WebIdentityCredentialsProvider::extractCredentials(
     return;
   }
 
-  TRY_NEEDS_AUDIT {
-    const auto access_key_id = credentials.value()->getString(ACCESS_KEY_ID, "");
-    const auto secret_access_key = credentials.value()->getString(SECRET_ACCESS_KEY, "");
-    const auto session_token = credentials.value()->getString(SESSION_TOKEN, "");
+  const auto access_key_id =
+      Utility::getStringFromJsonOrDefault(credentials.value(), ACCESS_KEY_ID, "");
+  const auto secret_access_key =
+      Utility::getStringFromJsonOrDefault(credentials.value(), SECRET_ACCESS_KEY, "");
+  const auto session_token =
+      Utility::getStringFromJsonOrDefault(credentials.value(), SESSION_TOKEN, "");
 
-    ENVOY_LOG(debug, "Received the following AWS credentials from STS: {}={}, {}={}, {}={}",
-              AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
-              secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
-              session_token.empty() ? "" : "*****");
-    setCredentialsToAllThreads(
-        std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
-  }
-  END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from STS: {}", e.what());
+  // Mandatory response fields
+  if (access_key_id.empty() || secret_access_key.empty() || session_token.empty()) {
+    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from STS");
     handleFetchDone();
     return;
   }
 
-  TRY_NEEDS_AUDIT {
-    const auto expiration = credentials.value()->getInteger(EXPIRATION, 0);
-    if (expiration != 0) {
-      expiration_time_ =
-          std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(expiration));
-      ENVOY_LOG(debug, "AWS STS credentials expiration time (unix timestamp): {}", expiration);
-    } else {
-      expiration_time_ = api_.timeSource().systemTime() + REFRESH_INTERVAL;
-      ENVOY_LOG(warn, "Could not get Expiration value of AWS credentials document from STS, so "
-                      "setting expiration to 1 hour in future");
-    }
-  }
-  END_TRY catch (EnvoyException& e) {
+  ENVOY_LOG(debug, "Received the following AWS credentials from STS: {}={}, {}={}, {}={}",
+            AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
+            secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
+            session_token.empty() ? "" : "*****");
+  setCredentialsToAllThreads(
+      std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
+
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(credentials.value(), EXPIRATION, 0);
+
+  if (expiration != 0) {
+    expiration_time_ =
+        std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(expiration));
+    ENVOY_LOG(debug, "AWS STS credentials expiration time (unix timestamp): {}", expiration);
+  } else {
     expiration_time_ = api_.timeSource().systemTime() + REFRESH_INTERVAL;
-    ENVOY_LOG(warn,
-              "Could not parse Expiration value of AWS credentials document from STS: {}, so "
-              "setting expiration to 1 hour in future",
-              e.what());
+    ENVOY_LOG(warn, "Could not get Expiration value of AWS credentials document from STS, so "
+                    "setting expiration to 1 hour in future");
   }
 
   last_updated_ = api_.timeSource().systemTime();

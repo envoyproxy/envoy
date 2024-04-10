@@ -41,6 +41,17 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterAction>();
   }
+
+private:
+  Matcher::ActionFactoryCb createActionFactoryCbDownstream(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Http::Matching::HttpFilterActionContext& context,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
+
+  Matcher::ActionFactoryCb createActionFactoryCbUpstream(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Http::Matching::HttpFilterActionContext& context,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 DECLARE_FACTORY(ExecuteFilterActionFactory);

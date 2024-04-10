@@ -533,16 +533,14 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   slice.mem_ = write_data.data();
   slice.len_ = write_data.length();
 
-  // Make sure the option for GRO is set on the socket.
-// Windows doesn't have the GRO socket options.
-#if !defined(WIN32)
+  // We already skip the test if UDP GRO is not supported, so checking the socket option is safe
+  // here.
   int sock_opt;
   socklen_t sock_len = sizeof(int);
   EXPECT_EQ(0, quic_connection_->connectionSocket()
                    ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
                    .return_value_);
   EXPECT_EQ(1, sock_opt);
-#endif
 
   // GRO uses `recvmsg`, not `recvmmsg`.
   EXPECT_CALL(os_sys_calls, supportsUdpGro()).WillRepeatedly(Return(true));
@@ -565,6 +563,10 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
 
 class EnvoyQuicClientSessionDisallowMmsgTest : public EnvoyQuicClientSessionTest {
 public:
+  EnvoyQuicClientSessionDisallowMmsgTest()
+      : is_udp_gro_supported_on_platform_(Api::OsSysCallsSingleton::get().supportsUdpGro()),
+        singleton_injector_(&os_sys_calls_) {}
+
   void SetUp() override {
     EXPECT_CALL(os_sys_calls_, supportsUdpGro()).WillRepeatedly(Return(false));
     EnvoyQuicClientSessionTest::SetUp();
@@ -572,9 +574,10 @@ public:
 
 protected:
   NiceMock<MockOsSysCallsImpl> os_sys_calls_;
+  const bool is_udp_gro_supported_on_platform_;
 
 private:
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_{&os_sys_calls_};
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_;
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionDisallowMmsgTests,
@@ -592,16 +595,17 @@ TEST_P(EnvoyQuicClientSessionDisallowMmsgTest, UsesRecvMsgWhenNoGro) {
   slice.mem_ = write_data.data();
   slice.len_ = write_data.length();
 
-// Windows doesn't have the GRO socket options.
-#if !defined(WIN32)
-  // Make sure the option for GRO is *not* set on the socket.
-  int sock_opt;
-  socklen_t sock_len = sizeof(int);
-  EXPECT_EQ(0, quic_connection_->connectionSocket()
-                   ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
-                   .return_value_);
-  EXPECT_EQ(0, sock_opt);
-#endif
+  if (is_udp_gro_supported_on_platform_) {
+    // Make sure the option for GRO is *not* set on the socket. This check cannot be called if the
+    // platform doesn't support the UDP_GRO socket option; otherwise getSocketOption() will return
+    // an error with errno set to "Protocol not supported".
+    int sock_opt;
+    socklen_t sock_len = sizeof(int);
+    EXPECT_EQ(0, quic_connection_->connectionSocket()
+                     ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
+                     .return_value_);
+    EXPECT_EQ(0, sock_opt);
+  }
 
   // Uses `recvmsg`, not `recvmmsg`.
   EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _)).Times(0);

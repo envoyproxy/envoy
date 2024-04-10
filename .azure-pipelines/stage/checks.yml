@@ -75,7 +75,8 @@ jobs:
       api:
         CI_TARGET: "api"
   timeoutInMinutes: 180
-  pool: envoy-x64-small
+  pool:
+    vmImage: $(agentUbuntu)
   steps:
   - template: ../ci.yml
     parameters:
@@ -86,6 +87,7 @@ jobs:
       managedAgent: false
       repoFetchDepth: $(REPO_FETCH_DEPTH)
       repoFetchTags: $(REPO_FETCH_TAGS)
+      pathCacheTemp: /tmp/cache
       publishTestResults: variables.PUBLISH_TEST_RESULTS
       publishEnvoy: variables.PUBLISH_ENVOY
       tmpfsDockerDisabled: true
