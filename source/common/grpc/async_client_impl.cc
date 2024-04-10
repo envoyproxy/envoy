@@ -281,7 +281,7 @@ void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata)
   Tracing::UpstreamContext upstream_context(nullptr,                         // host_
                                             cluster_info_,                   // cluster_info_
                                             Tracing::ServiceType::EnvoyGrpc, // service_type_
-                                            true                             // is_side_stream_
+                                            true // is_from_async_client_
   );
   current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(metadata);

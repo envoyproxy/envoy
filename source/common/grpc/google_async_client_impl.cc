@@ -468,7 +468,7 @@ void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& met
   Tracing::UpstreamContext upstream_context(nullptr,                          // host_
                                             nullptr,                          // cluster_info_
                                             Tracing::ServiceType::GoogleGrpc, // service_type_
-                                            true                              // is_side_stream_
+                                            true // is_from_async_client_
   );
   current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(metadata);

@@ -504,8 +504,8 @@ void UpstreamRequest::onUpstreamSuccess(Upstream::HostDescriptionConstSharedPtr 
     TraceContextBridge trace_context{*parent_.request_stream_};
     Tracing::UpstreamContext upstream_context(upstream_info_->upstream_host_, // host_
                                               parent_.cluster_,               // cluster_info_
-                                              Tracing::ServiceType::Http,     // service_type_
-                                              false                           // is_side_stream_
+                                              Tracing::ServiceType::Unknown,  // service_type_
+                                              false // is_from_async_client_
     );
     span_->injectContext(trace_context, upstream_context);
   }

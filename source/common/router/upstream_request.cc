@@ -119,7 +119,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                             cluster_info.has_value() ? cluster_info.value()
                                                                      : nullptr, // cluster_info_
                                             Tracing::ServiceType::Unknown,      // service_type_
-                                            false                               // is_side_stream_
+                                            false // is_from_async_client_
   );
 
   if (span_ != nullptr) {
