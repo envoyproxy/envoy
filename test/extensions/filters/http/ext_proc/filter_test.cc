@@ -3744,7 +3744,14 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyUpstream) {
   hdr1->mutable_header()->set_value("text/plain");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
   TestResponseHeaderMapImpl expected_response_headers{};
+  // Send local reply never happened.
   EXPECT_THAT(&immediate_response_headers, HeaderMapEqualIgnoreOrder(&expected_response_headers));
+  // The send immediate response counter is increased.
+  EXPECT_EQ(config_->stats().send_immediate_resp_upstream_ignored_.value(), 1);
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 1);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
 }
 
 class HttpFilter2Test : public HttpFilterTest,

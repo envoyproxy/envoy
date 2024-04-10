@@ -1048,6 +1048,7 @@ void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status) {
 
 void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   if (config_->isUpstream()) {
+    stats_.send_immediate_resp_upstream_ignored_.inc();
     ENVOY_LOG(debug, "Ignoring send immediate response when ext_proc filter is in upstream");
     return;
   }
