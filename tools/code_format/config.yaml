@@ -113,7 +113,6 @@ paths:
     - source/common/formatter/stream_info_formatter.h
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
-    - source/common/formatter/substitution_format_utility.cc
     - source/common/formatter/substitution_format_string.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/http/http2/codec_impl.cc
