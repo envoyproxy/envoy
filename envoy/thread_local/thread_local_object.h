@@ -28,7 +28,6 @@ public:
 using ThreadLocalObjectSharedPtr = std::shared_ptr<ThreadLocalObject>;
 
 template <class T = ThreadLocalObject> class TypedSlot;
-template <class T = ThreadLocalObject> class ThreadSafeTypedSlot;
 
 } // namespace ThreadLocal
 } // namespace Envoy

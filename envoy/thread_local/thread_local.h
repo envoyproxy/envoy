@@ -63,7 +63,6 @@ public:
 
 protected:
   template <class T> friend class TypedSlot;
-  template <class T> friend class ThreadSafeTypedSlot;
 
   /**
    * UpdateCb takes is passed a shared point to the current stored data. Use of
@@ -193,7 +192,7 @@ public:
    */
   bool isShutdown() const { return slot_->isShutdown(); };
 
-protected:
+private:
   static OptRef<T> getOpt(ThreadLocalObjectSharedPtr obj) {
     if (obj) {
       return OptRef<T>(obj->asType<T>());
@@ -205,46 +204,10 @@ protected:
     return [cb](ThreadLocalObjectSharedPtr obj) { cb(getOpt(obj)); };
   }
 
-  SlotPtr slot_;
+  const SlotPtr slot_;
 };
 
 template <class T = ThreadLocalObject> using TypedSlotPtr = std::unique_ptr<TypedSlot<T>>;
-
-template <class T> class ThreadSafeTypedSlot : public TypedSlot<T> {
-public:
-  /**
-   * Helper method to create a unique_ptr for a thread safe typed slot. This helper
-   * reduces some verbose parameterization at call-sites.
-   *
-   * @param allocator factory to allocate untyped Slot objects.
-   * @param main_thread_dispatcher the dispatcher for the main thread.
-   * @return a TypedSlotPtr<T> (the type is defined below).
-   */
-  static std::unique_ptr<ThreadSafeTypedSlot>
-  makeUnique(SlotAllocator& allocator, Event::Dispatcher& main_thread_dispatcher) {
-    return std::make_unique<ThreadSafeTypedSlot>(allocator, main_thread_dispatcher);
-  }
-
-  explicit ThreadSafeTypedSlot(SlotAllocator& allocator, Event::Dispatcher& main_thread_dispatcher)
-      : TypedSlot<T>(allocator), main_thread_dispatcher_(main_thread_dispatcher) {}
-
-  /**
-   * Destructor that will post the destruction of the slot to the main thread if the slot is not
-   * being destroyed on the main thread.
-   */
-  ~ThreadSafeTypedSlot() {
-    if (!main_thread_dispatcher_.isThreadSafe()) {
-      main_thread_dispatcher_.post([slot = std::move(this->slot_)] {});
-    }
-    this->slot_.reset();
-  }
-
-private:
-  Event::Dispatcher& main_thread_dispatcher_;
-};
-
-template <class T = ThreadLocalObject>
-using ThreadSafeTypedSlotPtr = std::unique_ptr<ThreadSafeTypedSlot<T>>;
 
 /**
  * Interface for getting and setting thread local data as well as registering a thread

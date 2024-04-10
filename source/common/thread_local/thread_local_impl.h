@@ -19,6 +19,7 @@ namespace ThreadLocal {
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
+  InstanceImpl();
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
@@ -35,7 +36,7 @@ private:
   // slot as callbacks drain from workers.
   struct SlotImpl : public Slot {
     SlotImpl(InstanceImpl& parent, uint32_t index);
-    ~SlotImpl() override { parent_.removeSlot(index_); }
+    ~SlotImpl() override;
     std::function<void()> wrapCallback(const std::function<void()>& cb);
     std::function<void()> dataCallback(const UpdateCb& cb);
     static bool currentThreadRegisteredWorker(uint32_t index);
@@ -51,7 +52,6 @@ private:
 
     InstanceImpl& parent_;
     const uint32_t index_;
-
     // The following is used to safely verify via weak_ptr that this slot is still alive. This
     // does not prevent all races if a callback does not capture appropriately, but it does fix
     // the common case of a slot destroyed immediately before anything is posted to a worker.
@@ -86,6 +86,8 @@ private:
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
   Event::Dispatcher* main_thread_dispatcher_{};
   std::atomic<bool> shutdown_{};
+
+  bool allow_slot_destroy_on_worker_threads_{};
 
   // Test only.
   friend class ThreadLocalInstanceImplTest;
