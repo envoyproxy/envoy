@@ -2496,10 +2496,10 @@ TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActions) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_add_if_absent = Http::HeaderVector{
-      {Http::LowerCaseString{"header-to-add-if-absent"}, "new-value"}};
-  response.response_headers_to_overwrite_if_exists = Http::HeaderVector{
-      {Http::LowerCaseString{"header-to-overwrite-if-exists"}, "new-value"}};
+  response.response_headers_to_add_if_absent =
+      Http::HeaderVector{{Http::LowerCaseString{"header-to-add-if-absent"}, "new-value"}};
+  response.response_headers_to_overwrite_if_exists =
+      Http::HeaderVector{{Http::LowerCaseString{"header-to-overwrite-if-exists"}, "new-value"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2517,8 +2517,7 @@ TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActions) {
 
   Buffer::OwnedImpl response_data{};
   Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "200"},
-      {"header-to-overwrite-if-exists", "original-value"}};
+      {":status", "200"}, {"header-to-overwrite-if-exists", "original-value"}};
   Http::TestResponseTrailerMapImpl response_trailers{};
   Http::MetadataMap response_metadata{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
@@ -2536,10 +2535,10 @@ TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActionsDoNotTakeEffect
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_add_if_absent = Http::HeaderVector{
-      {Http::LowerCaseString{"header-to-add-if-absent"}, "new-value"}};
-  response.response_headers_to_overwrite_if_exists = Http::HeaderVector{
-      {Http::LowerCaseString{"header-to-overwrite-if-exists"}, "new-value"}};
+  response.response_headers_to_add_if_absent =
+      Http::HeaderVector{{Http::LowerCaseString{"header-to-add-if-absent"}, "new-value"}};
+  response.response_headers_to_overwrite_if_exists =
+      Http::HeaderVector{{Http::LowerCaseString{"header-to-overwrite-if-exists"}, "new-value"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2556,9 +2555,8 @@ TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActionsDoNotTakeEffect
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   Buffer::OwnedImpl response_data{};
-  Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "200"},
-      {"header-to-add-if-absent", "original-value"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"header-to-add-if-absent", "original-value"}};
   Http::TestResponseTrailerMapImpl response_trailers{};
   Http::MetadataMap response_metadata{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));

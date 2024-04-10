@@ -83,13 +83,16 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
             switch (header.append_action()) {
               PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
             case Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-              authz_response->response_headers_to_add.emplace_back(header.header().key(), header.header().value());
+              authz_response->response_headers_to_add.emplace_back(header.header().key(),
+                                                                   header.header().value());
               break;
             case Router::HeaderValueOption::ADD_IF_ABSENT:
-              authz_response->response_headers_to_add_if_absent.emplace_back(header.header().key(), header.header().value());
+              authz_response->response_headers_to_add_if_absent.emplace_back(
+                  header.header().key(), header.header().value());
               break;
             case Router::HeaderValueOption::OVERWRITE_IF_EXISTS:
-              authz_response->response_headers_to_overwrite_if_exists.emplace_back(header.header().key(), header.header().value());
+              authz_response->response_headers_to_overwrite_if_exists.emplace_back(
+                  header.header().key(), header.header().value());
               break;
             case Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
               authz_response->response_headers_to_set.emplace_back(

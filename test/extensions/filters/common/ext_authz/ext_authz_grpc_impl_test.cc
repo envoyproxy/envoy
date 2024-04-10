@@ -379,15 +379,23 @@ ok_response:
       key: overwrite-if-exists-or-add
       value: overwrite-if-exists-or-add-value
     append_action: OVERWRITE_IF_EXISTS_OR_ADD
-)EOF", check_response);
+)EOF",
+                            check_response);
 
   auto expected_authz_response = Response{
-    .status = CheckStatus::OK,
-    .response_headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"append-if-exists-or-add"}, "append-if-exists-or-add-value"}},
-    .response_headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"overwrite-if-exists-or-add"}, "overwrite-if-exists-or-add-value"}},
-    .response_headers_to_add_if_absent = Http::HeaderVector{{Http::LowerCaseString{"add-if-absent"}, "add-if-absent-value"}},
-    .response_headers_to_overwrite_if_exists = Http::HeaderVector{{Http::LowerCaseString{"overwrite-if-exists"}, "overwrite-if-exists-value"}},
-    .status_code = Http::Code::OK,
+      .status = CheckStatus::OK,
+      .response_headers_to_add =
+          Http::HeaderVector{
+              {Http::LowerCaseString{"append-if-exists-or-add"}, "append-if-exists-or-add-value"}},
+      .response_headers_to_set =
+          Http::HeaderVector{{Http::LowerCaseString{"overwrite-if-exists-or-add"},
+                              "overwrite-if-exists-or-add-value"}},
+      .response_headers_to_add_if_absent =
+          Http::HeaderVector{{Http::LowerCaseString{"add-if-absent"}, "add-if-absent-value"}},
+      .response_headers_to_overwrite_if_exists =
+          Http::HeaderVector{
+              {Http::LowerCaseString{"overwrite-if-exists"}, "overwrite-if-exists-value"}},
+      .status_code = Http::Code::OK,
   };
 
   envoy::service::auth::v3::CheckRequest request;
@@ -398,9 +406,10 @@ ok_response:
   client_->onCreateInitialMetadata(headers);
 
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(expected_authz_response))));
-  client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response), span_);
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzOkResponse(expected_authz_response))));
+  client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
+                     span_);
 }
 
 } // namespace ExtAuthz
