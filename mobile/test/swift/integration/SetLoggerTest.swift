@@ -25,7 +25,7 @@ final class LoggerTests: XCTestCase {
       .addNativeFilter(
         name: "test_logger",
         // swiftlint:disable:next line_length
-        typedConfig: "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger\"}")
+        typedConfig: "[type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger]{}")
       .setLogger { _, msg in
         if msg.contains("starting main dispatch loop") {
           loggingExpectation.fulfill()

@@ -305,7 +305,6 @@ build:mobile-remote-ci-macos-ios --config=mobile-test-ios
 build:mobile-remote-ci-macos-ios-admin --config=mobile-remote-ci-macos-ios
 
 build:mobile-remote-ci-macos-ios-swift --config=mobile-remote-ci-macos-ios
-build:mobile-remote-ci-macos-ios-swift --define=envoy_yaml=enabled
 test:mobile-remote-ci-macos-ios-swift --build_tests_only
 
 build:mobile-remote-ci-macos-ios-obj-c --config=mobile-remote-ci-macos-ios

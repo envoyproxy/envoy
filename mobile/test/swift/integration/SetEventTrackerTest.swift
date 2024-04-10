@@ -1,5 +1,6 @@
 import Envoy
 import EnvoyEngine
+import EnvoyTestServer
 import Foundation
 import TestExtensions
 import XCTest
@@ -11,6 +12,8 @@ final class SetEventTrackerTest: XCTestCase {
   }
 
   func testEmitEventWithoutSettingEventTracker() throws {
+    EnvoyTestServer.startHttp1PlaintextServer()
+
     let eventExpectation =
       self.expectation(description: "Passed event tracker receives an event")
 
@@ -22,13 +25,14 @@ final class SetEventTrackerTest: XCTestCase {
       .addNativeFilter(
         name: "envoy.filters.http.test_event_tracker",
         // swiftlint:disable:next line_length
-        typedConfig: "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker\",\"attributes\":{\"foo\":\"bar\"}}")
+        typedConfig: "[type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker] { attributes: { key: 'foo' value: 'bar'}}")
       .build()
 
     let client = engine.streamClient()
 
-    let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
-                                               authority: "example.com", path: "/test")
+    let port = String(EnvoyTestServer.getEnvoyPort())
+    let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
+                                               authority: "localhost:" + port, path: "/simple.txt")
       .build()
 
     client
@@ -39,5 +43,6 @@ final class SetEventTrackerTest: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [eventExpectation], timeout: 10), .completed)
 
     engine.terminate()
+    EnvoyTestServer.shutdownTestServer()
   }
 }
