@@ -20,27 +20,29 @@ public:
 
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
+  std::shared_ptr<uint32_t> address_ptr_ = nullptr;
 };
 
 // Reproduces a race from https://github.com/envoyproxy/envoy/issues/32850.
 // The test is by mocking the DNS resolver to return multiple different
 // addresses, also config dns_refresh_rate to be extremely fast.
 TEST_F(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
+  address_ptr_ = std::make_shared<uint32_t>(0);
   auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .WillRepeatedly(testing::Return(dns_resolver));
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(
-          Invoke([&](const std::string&, Network::DnsLookupFamily,
+          Invoke([address_ptr = address_ptr_](
+                     const std::string&, Network::DnsLookupFamily,
                      Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
-            static uint32_t address = 0;
-            const std::string first_address_string = "::1";
+            uint32_t address = *address_ptr;
             // Keep changing the returned addresses to force address update.
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                          TestUtility::makeDnsResponse({
                              // The only significant address is the first one; the other ones are
                              // just used to populate a list whose maintenance is race-prone.
-                             first_address_string,
+                             "::1",
                              absl::StrCat("127.0.0.", address),
                              absl::StrCat("127.0.0.", address + 1),
                              absl::StrCat("127.0.0.", address + 2),
@@ -60,7 +62,7 @@ TEST_F(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
                              "::8",
                              "::9",
                          }));
-            address = (address + 1) % 128;
+            *address_ptr = (*address_ptr + 1) % 128;
             return nullptr;
           }));
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
