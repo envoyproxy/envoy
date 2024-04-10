@@ -51,18 +51,6 @@ RequestHeaderMapPtr createRequestHeaderMapPtr() {
 
 RequestTrailerMapPtr createRequestTrailerMapPtr() { return RequestTrailerMapImpl::create(); }
 
-RequestTrailerMapPtr toRequestTrailers(envoy_headers trailers) {
-  RequestTrailerMapPtr transformed_trailers = createRequestTrailerMapPtr();
-  for (envoy_map_size_t i = 0; i < trailers.length; i++) {
-    transformed_trailers->addCopy(
-        LowerCaseString(Data::Utility::copyToString(trailers.entries[i].key)),
-        Data::Utility::copyToString(trailers.entries[i].value));
-  }
-  // The C envoy_headers struct can be released now because the headers have been copied.
-  release_envoy_headers(trailers);
-  return transformed_trailers;
-}
-
 envoy_headers toBridgeHeaders(const HeaderMap& header_map, absl::string_view alpn) {
   int alpn_entry = alpn.empty() ? 0 : 1;
   envoy_map_entry* headers = static_cast<envoy_map_entry*>(

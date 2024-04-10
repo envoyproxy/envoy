@@ -44,15 +44,6 @@ RequestHeaderMapPtr createRequestHeaderMapPtr();
 RequestTrailerMapPtr createRequestTrailerMapPtr();
 
 /**
- * Transform envoy_headers to RequestHeaderMap.
- * This function copies the content.
- * @param trailers, the envoy_headers (trailers) to transform. headers is free'd. Use after function
- * return is unsafe.
- * @return RequestTrailerMapPtr, the RequestTrailerMap 1:1 transformation of the headers param.
- */
-RequestTrailerMapPtr toRequestTrailers(envoy_headers trailers);
-
-/**
  * Transform envoy_headers to HeaderMap.
  * This function copies the content.
  * Caller owns the allocated bytes for the return value, and needs to free after use.
