@@ -31,8 +31,7 @@ ActiveQuicListener::ActiveQuicListener(
     Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, bool kernel_worker_routing,
     const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
-    uint32_t packets_to_read_to_connection_count_ratio,
-    bool receive_ecn,
+    uint32_t packets_to_read_to_connection_count_ratio, bool receive_ecn,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector)
@@ -67,9 +66,8 @@ ActiveQuicListener::ActiveQuicListener(
   auto alarm_factory =
       std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
   // Set the socket to report incoming ECN.
-  if (receive_ecn &&
-      (udp_listener_->localAddress() != nullptr ||
-       udp_listener_->localAddress()->ip() != nullptr)) {
+  if (receive_ecn && (udp_listener_->localAddress() != nullptr ||
+                      udp_listener_->localAddress()->ip() != nullptr)) {
     int optval = 1;
     socklen_t optlen = sizeof(optval);
     if (udp_listener_->localAddress()->ip()->ipv6() != nullptr) {
@@ -237,9 +235,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)),
-      receive_ecn_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, receive_ecn, true)),
-      context_(context) {
+      receive_ecn_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, receive_ecn, true)), context_(context) {
   const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;

@@ -95,9 +95,7 @@ public:
 
   static bool enabled(ActiveQuicListener& listener) { return listener.enabled_->enabled(); }
 
-  static Network::Socket& socket(ActiveQuicListener& listener) {
-    return listener.listen_socket_;
-  }
+  static Network::Socket& socket(ActiveQuicListener& listener) { return listener.listen_socket_; }
 };
 
 class ActiveQuicListenerFactoryPeer {
