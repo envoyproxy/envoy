@@ -78,7 +78,8 @@ TEST_F(JsonLoaderTest, Basic) {
     EXPECT_THROW(json->getBoolean("hello"), Exception);
     EXPECT_THROW(json->getObjectArray("hello"), Exception);
     EXPECT_THROW(json->getString("hello"), Exception);
-
+    EXPECT_THROW_WITH_MESSAGE(json->getString("hello", ""), Exception,
+                              "key 'hello' missing or not a string from lines 1-1");
     EXPECT_THROW_WITH_MESSAGE(json->getString("hello"), Exception,
                               "key 'hello' missing or not a string from lines 1-1");
   }

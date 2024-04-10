@@ -97,8 +97,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message ExternalProcessor {
+  reserved 4;
+
+  reserved "async_mode";
+
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
   config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
@@ -115,14 +119,6 @@ message ExternalProcessor {
   // Specifies default options for how HTTP headers, trailers, and bodies are
   // sent. See ProcessingMode for details.
   ProcessingMode processing_mode = 3;
-
-  // [#not-implemented-hide:]
-  // If true, send each part of the HTTP request or response specified by ProcessingMode
-  // asynchronously -- in other words, send the message on the gRPC stream and then continue
-  // filter processing. If false, which is the default, suspend filter execution after
-  // each message is sent to the remote service and wait up to "message_timeout"
-  // for a reply.
-  bool async_mode = 4;
 
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
@@ -206,6 +202,30 @@ message ExternalProcessor {
 
   // Options related to the sending and receiving of dynamic metadata.
   MetadataOptions metadata_options = 16;
+
+  // If true, send each part of the HTTP request or response specified by ProcessingMode
+  // without pausing on filter chain iteration. It is "Send and Go" mode that can be used
+  // by external processor to observe Envoy data and status. In this mode:
+  //
+  // 1. Only STREAMED body processing mode is supported and any other body processing modes will be
+  // ignored. NONE mode(i.e., skip body processing) will still work as expected.
+  //
+  // 2. External processor should not send back processing response, as any responses will be ignored.
+  // This also means that
+  // :ref:`message_timeout <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.message_timeout>`
+  // restriction doesn't apply to this mode.
+  //
+  // 3. External processor may still close the stream to indicate that no more messages are needed.
+  //
+  // .. warning::
+  //
+  //    Flow control is necessary mechanism to prevent the fast sender (either downstream client or upstream server)
+  //    from overwhelming the external processor when its processing speed is slower.
+  //    This protective measure is being explored and developed but has not been ready yet, so please use your own
+  //    discretion when enabling this feature.
+  //    This work is currently tracked under https://github.com/envoyproxy/envoy/issues/33319.
+  //
+  bool observability_mode = 17;
 }
 
 // The MetadataOptions structure defines options for the sending and receiving of

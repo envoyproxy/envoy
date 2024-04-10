@@ -1002,6 +1002,50 @@ TEST_F(OverloadManagerLoadShedPointImplTest, PointUsesTriggerToDetermineWhetherT
   EXPECT_EQ(0, scale_percent.value());
 }
 
+TEST_F(OverloadManagerLoadShedPointImplTest, TriggerLoadShedCunterTest) {
+  setDispatcherExpectation();
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_resource1
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            scaled:
+              scaling_threshold: 0.8
+              saturation_threshold: 0.9
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  Stats::Counter& shed_load_count = stats_.counter("overload.test_point.shed_load_count");
+
+  EXPECT_EQ(0, shed_load_count.value());
+  EXPECT_FALSE(point->shouldShedLoad());
+
+  factory1_.monitor_->setPressure(0.65);
+  timer_cb_();
+  EXPECT_EQ(0, shed_load_count.value());
+  EXPECT_FALSE(point->shouldShedLoad());
+
+  factory1_.monitor_->setPressure(0.95);
+  timer_cb_();
+  EXPECT_TRUE(point->shouldShedLoad());
+  EXPECT_EQ(1, shed_load_count.value());
+
+  factory1_.monitor_->setPressure(0.85);
+  timer_cb_();
+  if (point->shouldShedLoad()) {
+    EXPECT_EQ(2, shed_load_count.value());
+  } else {
+    EXPECT_EQ(1, shed_load_count.value());
+  }
+}
+
 TEST_F(OverloadManagerLoadShedPointImplTest, PointWithMultipleTriggers) {
   setDispatcherExpectation();
   const std::string config = R"EOF(

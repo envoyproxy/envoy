@@ -11,13 +11,19 @@
 namespace Envoy {
 namespace Stats {
 
-TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config)
-    : TagProducerImpl(config, {}) {}
+absl::StatusOr<Stats::TagProducerPtr>
+TagProducerImpl::createTagProducer(const envoy::config::metrics::v3::StatsConfig& config,
+                                   const Stats::TagVector& cli_tags) {
+  absl::Status creation_status;
+  Stats::TagProducerPtr ret(new Stats::TagProducerImpl(config, cli_tags, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
 
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config,
-                                 const Stats::TagVector& cli_tags) {
+                                 const Stats::TagVector& cli_tags, absl::Status& creation_status) {
   reserveResources(config);
-  addDefaultExtractors(config);
+  creation_status = addDefaultExtractors(config);
 
   for (const auto& cli_tag : cli_tags) {
     addExtractor(std::make_unique<TagExtractorFixedImpl>(cli_tag.name_, cli_tag.value_));
@@ -34,14 +40,18 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& 
             envoy::config::metrics::v3::TagSpecifier::TagValueCase::kRegex) {
 
       if (tag_specifier.regex().empty()) {
-        if (addExtractorsMatching(name) == 0) {
-          throwEnvoyExceptionOrPanic(fmt::format(
-              "No regex specified for tag specifier and no default regex for name: '{}'", name));
+        creation_status = addExtractorsMatching(name);
+        if (!creation_status.ok()) {
+          return;
         }
       } else {
-        addExtractor(THROW_OR_RETURN_VALUE(
-            TagExtractorImplBase::createTagExtractor(name, tag_specifier.regex()),
-            TagExtractorPtr));
+        auto extractor_or_error =
+            TagExtractorImplBase::createTagExtractor(name, tag_specifier.regex());
+        if (!extractor_or_error.ok()) {
+          creation_status = extractor_or_error.status();
+          return;
+        }
+        addExtractor(std::move(extractor_or_error.value()));
       }
     } else if (tag_specifier.tag_value_case() ==
                envoy::config::metrics::v3::TagSpecifier::TagValueCase::kFixedValue) {
@@ -51,14 +61,16 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& 
   }
 }
 
-int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
+absl::Status TagProducerImpl::addExtractorsMatching(absl::string_view name) {
   int num_found = 0;
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     if (desc.name_ == name) {
-      addExtractor(THROW_OR_RETURN_VALUE(
-          TagExtractorImplBase::createTagExtractor(desc.name_, desc.regex_, desc.substr_,
-                                                   desc.negative_match_, desc.re_type_),
-          TagExtractorPtr));
+      auto extractor_or_error = TagExtractorImplBase::createTagExtractor(
+          desc.name_, desc.regex_, desc.substr_, desc.negative_match_, desc.re_type_);
+      if (!extractor_or_error.ok()) {
+        return extractor_or_error.status();
+      }
+      addExtractor(std::move(extractor_or_error.value()));
       ++num_found;
     }
   }
@@ -68,7 +80,11 @@ int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
       ++num_found;
     }
   }
-  return num_found;
+  if (num_found == 0) {
+    return absl::InvalidArgumentError(fmt::format(
+        "No regex specified for tag specifier and no default regex for name: '{}'", name));
+  }
+  return absl::OkStatus();
 }
 
 void TagProducerImpl::addExtractor(TagExtractorPtr extractor) {
@@ -136,18 +152,20 @@ void TagProducerImpl::reserveResources(const envoy::config::metrics::v3::StatsCo
   tag_extractors_without_prefix_.reserve(config.stats_tags().size());
 }
 
-void TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config) {
+absl::Status
+TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config) {
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& desc : Config::TagNames::get().descriptorVec()) {
-      addExtractor(THROW_OR_RETURN_VALUE(
-          TagExtractorImplBase::createTagExtractor(desc.name_, desc.regex_, desc.substr_,
-                                                   desc.negative_match_, desc.re_type_),
-          TagExtractorPtr));
+      auto extractor_or_error = TagExtractorImplBase::createTagExtractor(
+          desc.name_, desc.regex_, desc.substr_, desc.negative_match_, desc.re_type_);
+      RETURN_IF_STATUS_NOT_OK(extractor_or_error);
+      addExtractor(std::move(extractor_or_error.value()));
     }
     for (const auto& desc : Config::TagNames::get().tokenizedDescriptorVec()) {
       addExtractor(std::make_unique<TagExtractorTokensImpl>(desc.name_, desc.pattern_));
     }
   }
+  return absl::OkStatus();
 }
 
 } // namespace Stats

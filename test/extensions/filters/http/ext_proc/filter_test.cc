@@ -261,7 +261,7 @@ protected:
       bool buffering_data,
       absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
           cb) {
-    EXPECT_FALSE(last_request_.async_mode());
+    EXPECT_FALSE(last_request_.observability_mode());
     ASSERT_TRUE(last_request_.has_request_headers());
     const auto& headers = last_request_.request_headers();
     auto response = std::make_unique<ProcessingResponse>();
@@ -281,7 +281,7 @@ protected:
       bool buffering_data,
       absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
           cb) {
-    EXPECT_FALSE(last_request_.async_mode());
+    EXPECT_FALSE(last_request_.observability_mode());
     ASSERT_TRUE(last_request_.has_response_headers());
     const auto& headers = last_request_.response_headers();
     auto response = std::make_unique<ProcessingResponse>();
@@ -301,7 +301,7 @@ protected:
       absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
       bool should_continue = true,
       const std::chrono::microseconds latency = std::chrono::microseconds(10)) {
-    EXPECT_FALSE(last_request_.async_mode());
+    EXPECT_FALSE(last_request_.observability_mode());
     ASSERT_TRUE(last_request_.has_request_body());
     const auto& body = last_request_.request_body();
     auto response = std::make_unique<ProcessingResponse>();
@@ -320,7 +320,7 @@ protected:
   void processResponseBody(
       absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
       bool should_continue = true) {
-    EXPECT_FALSE(last_request_.async_mode());
+    EXPECT_FALSE(last_request_.observability_mode());
     ASSERT_TRUE(last_request_.has_response_body());
     const auto& body = last_request_.response_body();
     auto response = std::make_unique<ProcessingResponse>();
@@ -340,7 +340,7 @@ protected:
           std::function<void(const HttpTrailers&, ProcessingResponse&, TrailersResponse&)>>
           cb,
       bool should_continue = true) {
-    EXPECT_FALSE(last_request_.async_mode());
+    EXPECT_FALSE(last_request_.observability_mode());
     ASSERT_TRUE(last_request_.has_request_trailers());
     const auto& trailers = last_request_.request_trailers();
     auto response = std::make_unique<ProcessingResponse>();
@@ -360,7 +360,7 @@ protected:
           std::function<void(const HttpTrailers&, ProcessingResponse&, TrailersResponse&)>>
           cb,
       bool should_continue = true) {
-    EXPECT_FALSE(last_request_.async_mode());
+    EXPECT_FALSE(last_request_.observability_mode());
     ASSERT_TRUE(last_request_.has_response_trailers());
     const auto& trailers = last_request_.response_trailers();
     auto response = std::make_unique<ProcessingResponse>();
@@ -853,7 +853,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyOnResponse) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
 
-  EXPECT_FALSE(last_request_.async_mode());
+  EXPECT_FALSE(last_request_.observability_mode());
   ASSERT_TRUE(last_request_.has_response_headers());
 
   TestResponseHeaderMapImpl immediate_response_headers;
@@ -2332,7 +2332,7 @@ TEST_F(HttpFilterTest, PostAndClose) {
   // Create synthetic HTTP request
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
-  EXPECT_FALSE(last_request_.async_mode());
+  EXPECT_FALSE(last_request_.observability_mode());
   ASSERT_TRUE(last_request_.has_request_headers());
 
   // Close the stream, which should tell the filter to keep on going
@@ -2371,7 +2371,7 @@ TEST_F(HttpFilterTest, PostAndDownstreamReset) {
   // Create synthetic HTTP request
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
-  EXPECT_FALSE(last_request_.async_mode());
+  EXPECT_FALSE(last_request_.observability_mode());
   ASSERT_TRUE(last_request_.has_request_headers());
   EXPECT_FALSE(allTimersDisabled());
 
@@ -2877,7 +2877,7 @@ TEST_F(HttpFilterTest, OutOfOrder) {
   request_headers_.setMethod("POST");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
-  EXPECT_FALSE(last_request_.async_mode());
+  EXPECT_FALSE(last_request_.observability_mode());
   ASSERT_TRUE(last_request_.has_request_headers());
 
   // Return an out-of-order message. The server should close the stream

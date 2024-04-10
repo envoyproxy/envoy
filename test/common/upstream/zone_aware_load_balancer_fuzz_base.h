@@ -57,7 +57,8 @@ public:
   // constraints (see https://github.com/envoyproxy/envoy/pull/32506#issuecomment-1970047351).
   // For now, it is sufficient to validate these constraints only in the fuzzer.
   static bool
-  validateSlowStart(const envoy::config::cluster::v3::Cluster_SlowStartConfig& slow_start_config);
+  validateSlowStart(const envoy::config::cluster::v3::Cluster_SlowStartConfig& slow_start_config,
+                    uint32_t num_hosts);
 
   // If fuzzing Zone Aware Load Balancers, local priority set will get constructed sometimes. If not
   // constructed, a local_priority_set_.get() call will return a nullptr.

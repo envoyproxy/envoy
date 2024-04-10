@@ -225,6 +225,28 @@ TEST_P(GrpcClientIntegrationTest, BadReplyGrpcFraming) {
   dispatcher_helper_.runDispatcher();
 }
 
+// Validate that a reply that exceeds gRPC maximum frame size is handled as an RESOURCE_EXHAUSTED
+// gRPC error.
+TEST_P(GrpcClientIntegrationTest, BadReplyOverGrpcFrameLimit) {
+  // Only testing behavior of Envoy client, since `max_receive_message_length` configuration is
+  // added to Envoy-gRPC only.
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+
+  helloworld::HelloReply reply;
+  reply.set_message("HelloWorld");
+
+  initialize(/*envoy_grpc_max_recv_msg_length=*/2);
+
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->expectTrailingMetadata(empty_metadata_);
+  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::ResourceExhausted);
+  auto serialized_response = Grpc::Common::serializeToGrpcFrame(reply);
+  stream->fake_stream_->encodeData(*serialized_response, true);
+  dispatcher_helper_.runDispatcher();
+}
+
 // Validate that custom channel args can be set on the Google gRPC client.
 //
 TEST_P(GrpcClientIntegrationTest, CustomChannelArgs) {

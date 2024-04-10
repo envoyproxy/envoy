@@ -193,7 +193,8 @@ void TestServer::setHeadersAndData(absl::string_view header_key, absl::string_vi
 }
 
 void TestServer::setResponse(const absl::flat_hash_map<std::string, std::string>& headers,
-                             absl::string_view body) {
+                             absl::string_view body,
+                             const absl::flat_hash_map<std::string, std::string>& trailers) {
   ASSERT(upstream_);
   Http::TestResponseHeaderMapImpl new_headers;
   for (const auto& [key, value] : headers) {
@@ -202,6 +203,11 @@ void TestServer::setResponse(const absl::flat_hash_map<std::string, std::string>
   new_headers.addCopy(":status", "200");
   upstream_->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(new_headers));
   upstream_->setResponseBody(std::string(body));
+  Http::TestResponseTrailerMapImpl new_trailers;
+  for (const auto& [key, value] : trailers) {
+    new_trailers.addCopy(key, value);
+  }
+  upstream_->setResponseTrailers(std::make_unique<Http::TestResponseTrailerMapImpl>(new_trailers));
 }
 
 const std::string TestServer::http_proxy_config = R"EOF(

@@ -60,6 +60,7 @@ envoy_mobile_jni_kt_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -117,6 +118,7 @@ envoy_mobile_jni_kt_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -136,6 +138,7 @@ envoy_mobile_jni_kt_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -174,6 +177,7 @@ envoy_mobile_jni_kt_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -201,10 +205,6 @@ envoy_mobile_jni_kt_test(
     srcs = [
         "ReceiveDataTest.kt",
     ],
-    exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
-    },
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
@@ -216,6 +216,7 @@ envoy_mobile_jni_kt_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -235,6 +236,7 @@ envoy_mobile_jni_kt_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -254,6 +256,7 @@ envoy_mobile_jni_kt_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -273,6 +276,7 @@ envoy_mobile_jni_kt_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -292,6 +296,7 @@ envoy_mobile_jni_kt_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -311,6 +316,7 @@ envoy_mobile_jni_kt_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -357,7 +363,6 @@ envoy_mobile_android_test(
     deps = [
         ":test_utilities",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
-        "//test/java/io/envoyproxy/envoymobile/engine/testing",
         "//test/java/io/envoyproxy/envoymobile/engine/testing:xds_test_server_factory_lib",
     ],
 )
