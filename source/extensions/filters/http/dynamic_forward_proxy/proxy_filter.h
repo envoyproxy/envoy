@@ -34,8 +34,7 @@ public:
   virtual void onLoadClusterComplete() PURE;
 };
 
-class ProxyFilterConfig : public Upstream::ClusterUpdateCallbacks,
-                          Logger::Loggable<Logger::Id::forward_proxy> {
+class ProxyFilterConfig : Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   ProxyFilterConfig(
       const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
@@ -55,12 +54,6 @@ public:
   addDynamicCluster(Extensions::Common::DynamicForwardProxy::DfpClusterSharedPtr cluster,
                     const std::string& cluster_name, const std::string& host, const int port,
                     LoadClusterEntryCallbacks& callback);
-  // run in each worker thread.
-  Upstream::ClusterUpdateCallbacksHandlePtr addThreadLocalClusterUpdateCallbacks();
-
-  // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
-  void onClusterRemoval(const std::string&) override;
 
 private:
   struct LoadClusterEntryHandleImpl
@@ -75,14 +68,28 @@ private:
     LoadClusterEntryCallbacks& callbacks_;
   };
 
-  // Per-thread cluster info including pending callbacks.
-  struct ThreadLocalClusterInfo : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalClusterInfo(ProxyFilterConfig& parent) : parent_{parent} {
-      handle_ = parent.addThreadLocalClusterUpdateCallbacks();
+  // Per-thread cluster info including pending clusters.
+  // The lifetime of ThreadLocalClusterInfo, which is allocated on each working thread
+  // may exceed lifetime of the parent object (ProxyFilterConfig), which is allocated
+  // and deleted on the main thread.
+  // Currently ThreadLocalClusterInfo does not hold any references to the parent object
+  // and therefore does not need to check if the parent object is still valid.
+  // IMPORTANT: If a reference to the parent object is added here, the validity of
+  // that object must be checked before using it. It is best achieved via
+  // combination of shared and weak pointers.
+  struct ThreadLocalClusterInfo : public ThreadLocal::ThreadLocalObject,
+                                  public Envoy::Upstream::ClusterUpdateCallbacks,
+                                  Logger::Loggable<Logger::Id::forward_proxy> {
+    ThreadLocalClusterInfo(ProxyFilterConfig& parent) {
+      // run in each worker thread.
+      handle_ = parent.cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
     }
     ~ThreadLocalClusterInfo() override;
+
+    void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
+    void onClusterRemoval(const std::string& name) override;
+
     absl::flat_hash_map<std::string, std::list<LoadClusterEntryHandleImpl*>> pending_clusters_;
-    ProxyFilterConfig& parent_;
     Upstream::ClusterUpdateCallbacksHandlePtr handle_;
   };
 
