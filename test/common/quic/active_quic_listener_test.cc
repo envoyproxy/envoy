@@ -78,8 +78,9 @@ protected:
     return std::make_unique<TestActiveQuicListener>(
         runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
         listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
-        packets_to_read_to_connection_count_ratio, false, crypto_server_stream_factory,
-        proof_source_factory, std::move(cid_generator), testWorkerSelector);
+        packets_to_read_to_connection_count_ratio, /*receive_ecn=*/true,
+        crypto_server_stream_factory, proof_source_factory, std::move(cid_generator),
+        testWorkerSelector);
   }
 };
 
