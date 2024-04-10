@@ -426,9 +426,8 @@ absl::flat_hash_map<std::string, std::string> javaMapToCppMap(JniHelper& jni_hel
   return cpp_map;
 }
 
-LocalRefUniquePtr<jobject>
-cppHeadersToJavaHeaders(JniHelper& jni_helper,
-                        const Http::RequestOrResponseHeaderMap& cpp_headers) {
+LocalRefUniquePtr<jobject> cppHeadersToJavaHeaders(JniHelper& jni_helper,
+                                                   const Http::HeaderMap& cpp_headers) {
   auto java_map_class = jni_helper.findClass("java/util/HashMap");
   auto java_map_init_method_id = jni_helper.getMethodId(java_map_class.get(), "<init>", "()V");
   auto java_map_put_method_id = jni_helper.getMethodId(
@@ -475,7 +474,7 @@ cppHeadersToJavaHeaders(JniHelper& jni_helper,
 }
 
 void javaHeadersToCppHeaders(JniHelper& jni_helper, jobject java_headers,
-                             Http::RequestOrResponseHeaderMap& cpp_headers) {
+                             Http::HeaderMap& cpp_headers) {
   auto java_map_class = jni_helper.getObjectClass(java_headers);
   auto java_entry_set_method_id =
       jni_helper.getMethodId(java_map_class.get(), "entrySet", "()Ljava/util/Set;");

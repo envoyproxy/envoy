@@ -37,17 +37,11 @@ void toEnvoyHeaders(HeaderMap& envoy_result_headers, envoy_headers headers);
  */
 RequestHeaderMapPtr toRequestHeaders(envoy_headers headers);
 
-/** Creates an empty `RequestHeaderMapPtr with a preserve case header formatter. */
+/** Creates an empty `RequestHeaderMapPtr` with a preserve case header formatter. */
 RequestHeaderMapPtr createRequestHeaderMapPtr();
 
-/**
- * Transform envoy_headers to RequestHeaderMap.
- * This function copies the content.
- * @param trailers, the envoy_headers (trailers) to transform. headers is free'd. Use after function
- * return is unsafe.
- * @return RequestTrailerMapPtr, the RequestTrailerMap 1:1 transformation of the headers param.
- */
-RequestTrailerMapPtr toRequestTrailers(envoy_headers trailers);
+/** Creates an empty `RequestTrailerMapPtr`. */
+RequestTrailerMapPtr createRequestTrailerMapPtr();
 
 /**
  * Transform envoy_headers to HeaderMap.

@@ -992,11 +992,12 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendTrailers(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobjectArray trailers) {
+    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject trailers) {
   Envoy::JNI::JniHelper jni_helper(env);
+  auto cpp_trailers = Envoy::Http::Utility::createRequestTrailerMapPtr();
+  Envoy::JNI::javaHeadersToCppHeaders(jni_helper, trailers, *cpp_trailers);
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendTrailers(static_cast<envoy_stream_t>(stream_handle),
-                     Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, trailers));
+      ->sendTrailers(static_cast<envoy_stream_t>(stream_handle), std::move(cpp_trailers));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetStream(

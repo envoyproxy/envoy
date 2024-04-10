@@ -204,7 +204,17 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
 }
 
 - (void)sendTrailers:(EnvoyHeaders *)trailers {
-  _engine->sendTrailers(_streamHandle, toNativeHeaders(trailers));
+  Envoy::Http::RequestTrailerMapPtr cppTrailers =
+      Envoy::Http::Utility::createRequestTrailerMapPtr();
+  for (id trailerKey in trailers) {
+    std::string cppTrailerKey = std::string([trailerKey UTF8String]);
+    NSArray *trailerList = trailers[trailerKey];
+    for (NSString *trailerValue in trailerList) {
+      std::string cppTrailerValue = std::string([trailerValue UTF8String]);
+      cppTrailers->addCopy(Envoy::Http::LowerCaseString(cppTrailerKey), cppTrailerValue);
+    }
+  }
+  _engine->sendTrailers(_streamHandle, std::move((cppTrailers)));
 }
 
 - (int)cancel {

@@ -74,6 +74,7 @@ public:
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and needs to be called
    * before send_data.
+   *
    * @param stream the stream to send headers over.
    * @param headers the headers to send.
    * @param end_stream indicates whether to close the stream locally after sending this frame.
@@ -105,10 +106,11 @@ public:
   /**
    * Send trailers over an open HTTP stream. This method can only be invoked once per stream.
    * Note that this method implicitly closes the stream locally.
-   * @param stream, the stream to send trailers over.
-   * @param trailers, the trailers to send.
+   *
+   * @param stream the stream to send trailers over.
+   * @param trailers the trailers to send.
    */
-  void sendTrailers(envoy_stream_t stream, envoy_headers trailers);
+  void sendTrailers(envoy_stream_t stream, RequestTrailerMapPtr trailers);
 
   /**
    * Reset an open HTTP stream. This operation closes the stream locally, and remote.
