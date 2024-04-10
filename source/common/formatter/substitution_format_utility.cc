@@ -85,6 +85,15 @@ void SubstitutionFormatUtils::truncate(std::string& str, absl::optional<size_t> 
   }
 }
 
+absl::string_view SubstitutionFormatUtils::truncateStringView(absl::string_view str,
+                                                              absl::optional<size_t> max_length) {
+  if (!max_length) {
+    return str;
+  }
+
+  return str.substr(0, max_length.value());
+}
+
 void SubstitutionFormatUtils::parseSubcommandHeaders(const std::string& subcommand,
                                                      std::string& main_header,
                                                      std::string& alternative_header) {

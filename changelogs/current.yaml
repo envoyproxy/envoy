@@ -469,6 +469,10 @@ new_features:
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
+- area: filters
+  change: |
+    Added :ref:`per-route configuration support to the Basic Auth filter
+    <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuthPerRoute>`.
 
 deprecated:
 - area: listener

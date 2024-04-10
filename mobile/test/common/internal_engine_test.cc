@@ -378,9 +378,6 @@ TEST_F(InternalEngineTest, BasicStream) {
       nullptr /* on_cancel */,
       nullptr /* on_send_window_available*/,
       &on_complete_notification /* context */};
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
 
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   envoy_data c_data = Data::Utility::toBridgeData(request_data);
@@ -392,7 +389,9 @@ TEST_F(InternalEngineTest, BasicStream) {
 
   engine->startStream(stream, stream_cbs, false);
 
-  engine->sendHeaders(stream, c_headers, false);
+  auto headers = Http::Utility::createRequestHeaderMapPtr();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  engine->sendHeaders(stream, std::move(headers), false);
   engine->sendData(stream, c_data, false);
   engine->sendTrailers(stream, c_trailers);
 
@@ -520,16 +519,14 @@ protected:
         nullptr /* on_send_window_available*/,
         &context};
 
-    Http::TestRequestHeaderMapImpl headers;
-    HttpTestUtility::addDefaultHeaders(headers);
-    envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
-
     Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
     envoy_data c_data = Data::Utility::toBridgeData(request_data);
 
     envoy_stream_t stream = engine->initStream();
     engine->startStream(stream, stream_cbs, false);
-    engine->sendHeaders(stream, c_headers, false);
+    auto headers = Http::Utility::createRequestHeaderMapPtr();
+    HttpTestUtility::addDefaultHeaders(*headers);
+    engine->sendHeaders(stream, std::move(headers), false);
     engine->sendData(stream, c_data, true);
 
     EXPECT_TRUE(context.on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
