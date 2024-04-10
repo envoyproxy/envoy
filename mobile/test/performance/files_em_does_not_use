@@ -9,3 +9,4 @@ source/server/guarddog_impl.cc
 source/server/watchdog_impl.h
 source/server/options_impl.cc
 source/extensions/access_loggers/common/file_access_log_impl.h
+source/common/http/conn_pool_grid.cc
