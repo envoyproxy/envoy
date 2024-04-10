@@ -344,6 +344,11 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 
 /*/extensions/health_checkers/common @zuercher @botengyao
 
+# HTTP credential injector
+/*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov
+/*/extensions/http/injected_credentials/common @zhaohuabing @kyessenov
+/*/extensions/http/injected_credentials/generic @zhaohuabing @kyessenov
+
 # Lua cluster specifier
 /*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
 
