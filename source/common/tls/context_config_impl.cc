@@ -228,7 +228,9 @@ ContextConfigImpl::ContextConfigImpl(
   if (!tls_certificate_providers_.empty()) {
     for (auto& provider : tls_certificate_providers_) {
       if (provider->secret() != nullptr) {
-        tls_certificate_configs_.emplace_back(*provider->secret(), factory_context, api_);
+        tls_certificate_configs_.emplace_back(THROW_OR_RETURN_VALUE(
+            Ssl::TlsCertificateConfigImpl::create(*provider->secret(), factory_context, api_),
+            std::unique_ptr<Ssl::TlsCertificateConfigImpl>));
       }
     }
   }
@@ -279,7 +281,9 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
           for (const auto& tls_certificate_provider : tls_certificate_providers_) {
             auto* secret = tls_certificate_provider->secret();
             if (secret != nullptr) {
-              tls_certificate_configs_.emplace_back(*secret, factory_context_, api_);
+              tls_certificate_configs_.emplace_back(THROW_OR_RETURN_VALUE(
+                  Ssl::TlsCertificateConfigImpl::create(*secret, factory_context_, api_),
+                  std::unique_ptr<Ssl::TlsCertificateConfigImpl>));
             }
           }
           callback();

@@ -235,6 +235,7 @@ envoy.filters.http.basic_auth:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.basic_auth.v3.BasicAuth
+  - envoy.extensions.filters.http.basic_auth.v3.BasicAuthPerRoute
 envoy.filters.http.buffer:
   categories:
   - envoy.filters.http

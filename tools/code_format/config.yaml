@@ -109,7 +109,6 @@ paths:
     - source/common/network/address_impl.cc
     - source/common/network/utility.cc
     - source/common/network/dns_resolver/dns_factory_util.cc
-    - source/common/ssl/tls_certificate_config_impl.cc
     - source/common/formatter/http_specific_formatter.cc
     - source/common/formatter/stream_info_formatter.h
     - source/common/formatter/stream_info_formatter.cc

@@ -532,7 +532,7 @@ void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks 
   ENVOY_LOG(debug, "[S{}] start stream", new_stream_handle);
 }
 
-void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream) {
+void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
@@ -552,18 +552,17 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   }
 
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-  RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
 
   // This is largely a check for the android platform: isCleartextPermitted
   // is a no-op for other platforms.
-  if (internal_headers->getSchemeValue() != "https" &&
-      !SystemHelper::getInstance().isCleartextPermitted(internal_headers->getHostValue())) {
+  if (headers->getSchemeValue() != "https" &&
+      !SystemHelper::getInstance().isCleartextPermitted(headers->getHostValue())) {
     request_decoder->sendLocalReply(Http::Code::BadRequest, "Cleartext is not permitted", nullptr,
                                     absl::nullopt, "");
     return;
   }
 
-  setDestinationCluster(*internal_headers);
+  setDestinationCluster(*headers);
   // Set the x-forwarded-proto header to https because Envoy Mobile only has clusters with TLS
   // enabled. This is done here because the ApiListener's synthetic connection would make the
   // Http::ConnectionManager set the scheme to http otherwise. In the future we might want to
@@ -577,10 +576,10 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   // router relies on the present of this header to determine if it should provided a route for
   // a request here:
   // https://github.com/envoyproxy/envoy/blob/c9e3b9d2c453c7fe56a0e3615f0c742ac0d5e768/source/common/router/config_impl.cc#L1091-L1096
-  internal_headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
+  headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
   ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
-            *internal_headers);
-  request_decoder->decodeHeaders(std::move(internal_headers), end_stream);
+            *headers);
+  request_decoder->decodeHeaders(std::move(headers), end_stream);
 }
 
 void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {

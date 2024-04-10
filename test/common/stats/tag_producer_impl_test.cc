@@ -75,6 +75,15 @@ TEST_F(TagProducerTest, CheckConstructor) {
   custom_tag_extractor.set_regex("");
   EXPECT_EQ(TagProducerImpl::createTagProducer(stats_config_, {}).status().message(),
             "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
+
+  // Also invalid regex should throw
+  stats_config_.mutable_use_all_default_tags()->set_value(true);
+  stats_config_.clear_stats_tags();
+  custom_tag_extractor = *stats_config_.mutable_stats_tags()->Add();
+  custom_tag_extractor.set_tag_name("");
+  custom_tag_extractor.set_regex("...");
+  EXPECT_EQ(TagProducerImpl::createTagProducer(stats_config_, {}).status().message(),
+            "tag_name cannot be empty");
 }
 
 TEST_F(TagProducerTest, DuplicateConfigTagBehavior) {

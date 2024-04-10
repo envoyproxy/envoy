@@ -61,11 +61,12 @@ envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
   });
 }
 
-envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, envoy_headers headers,
+envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,
                                            bool end_stream) {
-  return dispatcher_->post([&, stream, headers, end_stream]() {
-    http_client_->sendHeaders(stream, headers, end_stream);
+  return dispatcher_->post([this, stream, headers = std::move(headers), end_stream]() mutable {
+    http_client_->sendHeaders(stream, std::move(headers), end_stream);
   });
+  return ENVOY_SUCCESS;
 }
 
 envoy_status_t InternalEngine::readData(envoy_stream_t stream, size_t bytes_to_read) {
