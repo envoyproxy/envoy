@@ -158,11 +158,11 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
   request_headers.iterate(
       [&request_headers, &builder](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
         std::string key = std::string(header.key().getStringView());
-        if (request_headers.formatter().has_value()) {
+/*        if (request_headers.formatter().has_value()) {
           const Envoy::Http::StatefulHeaderKeyFormatter& formatter =
               request_headers.formatter().value();
           key = formatter.format(key);
-        }
+        }*/
         auto value = std::vector<std::string>();
         value.push_back(std::string(header.value().getStringView()));
         builder.set(key, value);

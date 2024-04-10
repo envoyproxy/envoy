@@ -103,7 +103,7 @@ std::string QueryMessageInfo::parseCallingFunction(const QueryMessage& query) {
 std::string QueryMessageInfo::parseCallingFunctionJson(const std::string& json_string) {
   TRY_NEEDS_AUDIT {
     Json::ObjectSharedPtr json = Json::Factory::loadFromString(json_string);
-    return json->getString("callingFunction");
+    return THROW_IF_NOT_OK(json->getString("callingFunction"));
   }
   END_TRY catch (Json::Exception&) { return ""; }
 }

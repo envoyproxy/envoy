@@ -30,16 +30,22 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
   while (re.Match(new_header_value, 0, new_header_value.size(), re2::RE2::UNANCHORED, matches, 3)) {
     TRY_ASSERT_MAIN_THREAD {
       std::string new_format;
-      Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(std::string(matches[2]));
+      Json::ObjectSharedPtr parsed_params = THROW_OR_RETURN_VALUE(Json::Factory::loadFromString(std::string(matches[2])), Json::ObjectSharedPtr);
 
       // The given json string may be an invalid object or with an empty object array.
-      if (parsed_params == nullptr || parsed_params->asObjectArray().empty()) {
+      if (parsed_params == nullptr) {
         // return original value
         return header_value;
       }
-      new_format = parsed_params->asObjectArray()[0]->asString();
-      for (size_t i = 1; i < parsed_params->asObjectArray().size(); i++) {
-        absl::StrAppend(&new_format, ":", parsed_params->asObjectArray()[i]->asString());
+      auto array_or_error = parsed_params->asObjectArray();
+      if (!array_or_error.status().ok() || array_or_error.value().empty()) {
+        // return original value
+        return header_value;
+      }
+      new_format = THROW_OR_RETURN_VALUE((array_or_error.value())[0]->asString(), std::string);
+      THROW_IF_STATUS_NOT_OK(array_or_error, throw);
+      for (size_t i = 1; i < array_or_error.value().size(); i++) {
+        absl::StrAppend(&new_format, ":", THROW_OR_RETURN_VALUE(array_or_error.value()[i]->asString(), std::string));
       }
 
       new_format = absl::StrCat("%", matches[1], "_METADATA(", new_format, ")%");

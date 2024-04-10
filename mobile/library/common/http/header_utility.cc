@@ -62,10 +62,10 @@ envoy_headers toBridgeHeaders(const HeaderMap& header_map, absl::string_view alp
   header_map.iterate(
       [&transformed_headers, &header_map](const HeaderEntry& header) -> HeaderMap::Iterate {
         std::string key_val = std::string(header.key().getStringView());
-        if (header_map.formatter().has_value()) {
+      /*  if (header_map.formatter().has_value()) {
           const Envoy::Http::StatefulHeaderKeyFormatter& formatter = header_map.formatter().value();
           key_val = formatter.format(key_val);
-        }
+        }*/
         envoy_data key = Data::Utility::copyToBridgeData(key_val);
         envoy_data value = Data::Utility::copyToBridgeData(header.value().getStringView());
 
