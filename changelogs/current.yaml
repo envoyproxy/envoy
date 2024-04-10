@@ -408,6 +408,12 @@ new_features:
 - area: http
   change: |
     Added DownstreamRemoteReset to CoreResponseFlag, and it is set when stream is remote reset.
+- area: match_delegate
+  change: |
+    Convert match_delegate fiter into dual filter so it can be installed in the upstream filter chain.
+- area: composite
+  change: |
+    Convert composite fiter into dual filter so it can be installed in the upstream filter chain.
 - area: tracing
   change: |
     Added support for variant span attribute type for the OpenTelemetry tracer.
