@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.injected_credentials.oauth2.v3;
+package envoy.extensions.http.injected_credentials.oauth2.v3;
 
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
@@ -10,16 +10,16 @@ import "xds/annotations/v3/status.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.injected_credentials.oauth2.v3";
+option java_package = "io.envoyproxy.envoy.extensions.http.injected_credentials.oauth2.v3";
 option java_outer_classname = "Oauth2Proto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/injected_credentials/oauth2/v3;oauth2v3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/injected_credentials/oauth2/v3;oauth2v3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: OAuth2 Credential]
 // [#not-implemented-hide:]
-// [#extension: envoy.injected_credentials.oauth2]
+// [#extension: envoy.http.injected_credentials.oauth2]
 
 // OAuth2 extension can be used to retrieve an OAuth2 access token from an authorization server and inject it into the
 // proxied requests.
