@@ -98,11 +98,6 @@ LoadClusterEntryHandlePtr ProxyFilterConfig::addDynamicCluster(
                                                       cluster_name, callbacks);
 }
 
-Upstream::ClusterUpdateCallbacksHandlePtr
-ProxyFilterConfig::addThreadLocalClusterUpdateCallbacks() {
-  return cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
-}
-
 ProxyFilterConfig::ThreadLocalClusterInfo::~ThreadLocalClusterInfo() {
   for (const auto& it : pending_clusters_) {
     for (auto cluster : it.second) {
@@ -111,24 +106,24 @@ ProxyFilterConfig::ThreadLocalClusterInfo::~ThreadLocalClusterInfo() {
   }
 }
 
-void ProxyFilterConfig::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
+void ProxyFilterConfig::ThreadLocalClusterInfo::onClusterAddOrUpdate(
+    Upstream::ThreadLocalCluster& cluster) {
   const std::string& cluster_name = cluster.info()->name();
   ENVOY_LOG(debug, "thread local cluster {} added or updated", cluster_name);
-  ThreadLocalClusterInfo& tls_cluster_info = *tls_slot_;
-  auto it = tls_cluster_info.pending_clusters_.find(cluster_name);
-  if (it != tls_cluster_info.pending_clusters_.end()) {
+  auto it = pending_clusters_.find(cluster_name);
+  if (it != pending_clusters_.end()) {
     for (auto* cluster : it->second) {
       auto& callbacks = cluster->callbacks_;
       cluster->cancel();
       callbacks.onLoadClusterComplete();
     }
-    tls_cluster_info.pending_clusters_.erase(it);
+    pending_clusters_.erase(it);
   } else {
     ENVOY_LOG(debug, "but not pending request waiting on {}", cluster_name);
   }
 }
 
-void ProxyFilterConfig::onClusterRemoval(const std::string&) {
+void ProxyFilterConfig::ThreadLocalClusterInfo::onClusterRemoval(const std::string&) {
   // do nothing, should have no pending clusters.
 }
 
