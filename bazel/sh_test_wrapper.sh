@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Dummy shell implementation for nooping tests.
 # TODO(lizan): remove when we have a solution for

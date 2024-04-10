@@ -1,4 +1,6 @@
-#!/bin/bash -E
+#!/usr/bin/env bash
+
+set -E
 
 # Pre-checks for validation and linting
 #
