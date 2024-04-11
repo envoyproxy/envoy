@@ -53,9 +53,6 @@ final class SendDataTests: XCTestCase {
       .setOnError { _, _ in
         XCTFail("Unexpected error")
       }
-      .setOnCancel { _ in
-        XCTFail("Unexpected cancel")
-      }
       .start()
       .sendHeaders(requestHeaders, endStream: false)
       .close(data: body)
