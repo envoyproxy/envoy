@@ -1,6 +1,6 @@
-#if canImport(EnvoyCxxSwiftInterop)
-@_implementationOnly import EnvoyCxxSwiftInterop
-#endif
+// #if canImport(EnvoyCxxSwiftInterop)
+// @_implementationOnly import EnvoyCxxSwiftInterop
+// #endif
 @_implementationOnly import EnvoyEngine
 import Foundation
 

@@ -80,15 +80,15 @@ swift_library(
         "@envoy_mobile_extra_swift_sources//:extra_swift_srcs",
     ] + select({
         "//bazel:envoy_mobile_swift_cxx_interop": [
-            "cxx/Bootstrap.swift",
-            "cxx/DirectResponse+Cxx.swift",
-            "cxx/LogLevel+Cxx.swift",
-            "cxx/Swift+Cxx.swift",
+            # "cxx/Bootstrap.swift",
+            # "cxx/DirectResponse+Cxx.swift",
+            # "cxx/LogLevel+Cxx.swift",
+            # "cxx/Swift+Cxx.swift",
         ],
         "//conditions:default": [],
     }),
     copts = select({
-        "//bazel:envoy_mobile_swift_cxx_interop": envoy_mobile_swift_copts(True),
+        "//bazel:envoy_mobile_swift_cxx_interop": envoy_mobile_swift_copts(False),
         "//conditions:default": [],
     }),
     defines = envoy_mobile_defines("@envoy"),
@@ -103,7 +103,7 @@ swift_library(
         "@envoy_mobile_extra_swift_sources//:extra_private_dep",
     ] + select({
         "//bazel:envoy_mobile_swift_cxx_interop": [
-            "//library/swift/EnvoyCxxSwiftInterop",
+            # "//library/swift/EnvoyCxxSwiftInterop",
         ],
         "//conditions:default": [],
     }),

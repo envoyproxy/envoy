@@ -7,7 +7,7 @@ envoy_mobile_package()
 
 config_setting(
     name = "envoy_mobile_swift_cxx_interop",
-    values = {"define": "envoy_mobile_swift_cxx_interop=enabled"},
+    values = {"define": "envoy_mobile_swift_cxx_interop=disabled"},
 )
 
 kt_jvm_library(
