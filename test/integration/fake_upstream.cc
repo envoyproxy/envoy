@@ -598,9 +598,7 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
     return AssertionFailure() << "Timed out waiting for new stream.";
   }
   if (stream) {
-    postToConnectionThread([last_stream = stream.release()]() {
-      delete last_stream;
-    });
+    postToConnectionThread([last_stream = stream.release()]() { delete last_stream; });
   }
   stream = std::move(new_streams_.front());
   new_streams_.pop_front();
