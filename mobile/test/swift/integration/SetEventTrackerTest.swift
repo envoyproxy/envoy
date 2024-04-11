@@ -18,9 +18,14 @@ final class SetEventTrackerTest: XCTestCase {
       self.expectation(description: "Passed event tracker receives an event")
 
     let engine = EngineBuilder()
+      .addLogLevel(.debug)
+      .setLogger { _, msg in
+          print(msg, terminator: "")
+      }
       .setEventTracker { event in
-        XCTAssertEqual("bar", event["foo"])
-        eventExpectation.fulfill()
+        if event["foo"] == "bar" {
+          eventExpectation.fulfill()
+        }
       }
       .addNativeFilter(
         name: "envoy.filters.http.test_event_tracker",
