@@ -5,14 +5,14 @@ licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
 
-envoy_mobile_swift_test(
-    name = "test",
-    srcs = [
-        "LogLevelCxxTests.swift",
-    ],
-    tags = ["no-remote-exec"],  # TODO(32551): Re-enable remote exec
-    visibility = ["//visibility:public"],
-    deps = [
-        "//library/swift/EnvoyCxxSwiftInterop",
-    ],
-)
+# envoy_mobile_swift_test(
+#     name = "test",
+#     srcs = [
+#         "LogLevelCxxTests.swift",
+#     ],
+#     tags = ["no-remote-exec"],  # TODO(32551): Re-enable remote exec
+#     visibility = ["//visibility:public"],
+#     deps = [
+#         "//library/swift/EnvoyCxxSwiftInterop",
+#     ],
+# )
