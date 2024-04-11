@@ -28,8 +28,7 @@ int64_t getCurrentThreadIdBase() {
 }
 
 ThreadId getCurrentThreadId() {
-  static thread_local ThreadId cached_thread_id = ThreadId(getCurrentThreadIdBase());
-  return cached_thread_id;
+  THREAD_LOCAL_CONSTRUCT_ON_FIRST_USE(ThreadId, getCurrentThreadIdBase());
 }
 
 } // namespace

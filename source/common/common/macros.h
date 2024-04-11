@@ -35,6 +35,12 @@ namespace Envoy {
     return *objectptr;                                                                             \
   } while (0)
 
+#define THREAD_LOCAL_CONSTRUCT_ON_FIRST_USE(type, ...)                                             \
+  do {                                                                                             \
+    static thread_local type* objectptr = new type{__VA_ARGS__};                                   \
+    return *objectptr;                                                                             \
+  } while (0)
+
 #define MUTABLE_CONSTRUCT_ON_FIRST_USE(type, ...)                                                  \
   do {                                                                                             \
     static type* objectptr = new type{__VA_ARGS__};                                                \
