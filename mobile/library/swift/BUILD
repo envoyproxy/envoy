@@ -78,19 +78,7 @@ swift_library(
         "stats/TagsBuilder.swift",
     ] + [
         "@envoy_mobile_extra_swift_sources//:extra_swift_srcs",
-    ] + select({
-        "//bazel:envoy_mobile_swift_cxx_interop": [
-            # "cxx/Bootstrap.swift",
-            # "cxx/DirectResponse+Cxx.swift",
-            # "cxx/LogLevel+Cxx.swift",
-            # "cxx/Swift+Cxx.swift",
-        ],
-        "//conditions:default": [],
-    }),
-    copts = select({
-        "//bazel:envoy_mobile_swift_cxx_interop": envoy_mobile_swift_copts(False),
-        "//conditions:default": [],
-    }),
+    ],
     defines = envoy_mobile_defines("@envoy"),
     features = [
         "swift.emit_symbol_graph",
@@ -101,12 +89,7 @@ swift_library(
     private_deps = [
         "//library/objective-c:envoy_engine_objc_lib",
         "@envoy_mobile_extra_swift_sources//:extra_private_dep",
-    ] + select({
-        "//bazel:envoy_mobile_swift_cxx_interop": [
-            # "//library/swift/EnvoyCxxSwiftInterop",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     visibility = ["//visibility:public"],
 )
 
