@@ -81,7 +81,7 @@ bool ZoneAwareLoadBalancerFuzzBase::validateSlowStart(
                      num_hosts);
       return false;
     }
-    // If the aggerssion is too small, the weights will essentially be 0.
+    // If the aggression is too small, the weights will essentially be 0.
     if (aggression.default_value() < 1e-30) {
       ENVOY_LOG_MISC(
           warn,
