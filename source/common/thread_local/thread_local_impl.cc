@@ -48,6 +48,20 @@ InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
 
 InstanceImpl::SlotImpl::~SlotImpl() {
+  // If the runtime feature is disabled then keep the original behavior. This should
+  // be cleaned up when the runtime feature
+  // "envoy.restart_features.allow_slot_destroy_on_worker_threads" is deprecated.
+  if (!parent_.allow_slot_destroy_on_worker_threads_) {
+    parent_.removeSlot(index_);
+    return;
+  }
+
+  // Do nothing if the parent is already shutdown. Return early here to avoid accessing the main
+  // thread dispatcher because it may have been destroyed.
+  if (isShutdown()) {
+    return;
+  }
+
   auto* main_thread_dispatcher = parent_.main_thread_dispatcher_;
   // Main thread dispatcher may be nullptr if the slot is being created and destroyed during
   // server initialization.
