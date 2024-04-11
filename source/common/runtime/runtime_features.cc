@@ -152,7 +152,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 // TODO(panting): flip this to true after some test time.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
-// TODO(danzh) removed it once GRO MSG_TRUNC is fixed.
+// TODO(#33474) removed it once GRO packet dropping is fixed.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_prefer_quic_client_udp_gro);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
