@@ -372,9 +372,14 @@ TEST(ThreadLocalInstanceImplDispatcherTest, DestroySlotOnWorker) {
         // Verify we have the expected dispatcher for the new thread thread.
         EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
 
+        // Skip the asserts in the thread. Because the mock dispatcher will call
+        // callbacks directly in current thread and make the ASSERT_IS_MAIN_OR_TEST_THREAD fail.
+        Thread::SkipAsserts skip;
+
         EXPECT_CALL(main_dispatcher, isThreadSafe()).WillOnce(Return(false));
         // Destroy the slot on worker thread and expect the post() of main dispatcher to be called.
         EXPECT_CALL(main_dispatcher, post(_));
+
         slot.reset();
 
         thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
