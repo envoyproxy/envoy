@@ -198,15 +198,15 @@ Add a C++ filter to the Envoy Mobile filter chain
     library to ``envoy_build_config/extensions_build_config.bzl`` is sufficient.
     For iOS, due to enthusiastic garbage collection, and for upstream CI, to catch bugs, you will
     also need to forceRegister the filter in ``envoy_build_config/extension_registry.cc``
+    Both platforms use proto syntax by default, but YAML is supported if you build with --define=envoy_yaml=enabled
 
 **Example**::
 
   // Kotlin
-  builder.addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
+  builder.addNativeFilter("envoy.filters.http.buffer", "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } ")
 
   // Swift
-  builder.addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
-
+  builder.addNativeFilter("envoy.filters.http.buffer", "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } ")
 ~~~~~~~~~~~~~~~~~~~~~~
 ``setOnEngineRunning``
 ~~~~~~~~~~~~~~~~~~~~~~

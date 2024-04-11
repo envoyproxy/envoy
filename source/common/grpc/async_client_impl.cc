@@ -17,7 +17,9 @@ namespace Grpc {
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  const envoy::config::core::v3::GrpcService& config,
                                  TimeSource& time_source)
-    : cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
+    : max_recv_message_length_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), max_receive_message_length, 0)),
+      cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
       host_name_(config.envoy_grpc().authority()), time_source_(time_source),
       metadata_parser_(Router::HeaderParser::configure(
           config.initial_metadata(),
@@ -81,6 +83,8 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
   if (!options.retry_policy.has_value() && parent_.retryPolicy().has_value()) {
     options_.setRetryPolicy(*parent_.retryPolicy());
   }
+  // Configure the maximum frame length
+  decoder_.setMaxFrameLength(parent_.max_recv_message_length_);
 }
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {

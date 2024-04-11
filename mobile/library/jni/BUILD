@@ -44,6 +44,7 @@ envoy_cc_library(
         "//library/jni/types:jni_env_lib",
         "//library/jni/types:jni_exception_lib",
         "@envoy//source/common/common:assert_lib",
+        "@envoy//source/common/http:header_map_lib",
         "@envoy//source/common/protobuf",
     ],
 )

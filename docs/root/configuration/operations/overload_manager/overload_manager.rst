@@ -382,4 +382,5 @@ with the following statistics:
   :widths: 1, 1, 2
 
   scale_percent, Gauge, "Scaled value of the action as a percent (0-99=scaling, 100=saturated)"
+  shed_load_count, Counter, "Total count the load is sheded"
 
