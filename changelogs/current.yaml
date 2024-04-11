@@ -89,10 +89,10 @@ minor_behavior_changes:
     Guarded by ``envoy.reloadable_features.http2_skip_callback_visitor``.
 - area: http3
   change: |
-    Use GRO (Generic Receive Offload) for reading packets from a client QUIC UDP socket. See
+    Make GRO (Generic Receive Offload) for reading packets from a client QUIC UDP socket configurable. See
     https://www.kernel.org/doc/html/next/networking/segmentation-offloads.html for a description of
-    GRO. This behavior change can be reverted by setting
-    ``envoy.reloadable_features.prefer_quic_client_udp_gro`` to ``false``.
+    GRO. This behavior change can be enabled by setting
+    ``envoy.reloadable_features.prefer_quic_client_udp_gro`` to ``true``.
 - area: http3
   change: |
     Disables recvmmsg (multi-message) for reading packets from a client QUIC UDP socket, if GRO
