@@ -280,13 +280,13 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
   skipResponderId(elem);
   unwrap(Asn1Utility::skip(elem, CBS_ASN1_GENERALIZEDTIME));
   auto responses = unwrap(Asn1Utility::parseSequenceOf<SingleResponse>(
-      elem, [](CBS& cbs) -> ParsingResult<SingleResponse> { return {parseSingleResponse(cbs)}; }));
+      elem, [](CBS& cbs) -> ParsingResult<SingleResponse> { return {THROW_OR_RETURN_VALUE(parseSingleResponse(cbs), SingleResponse)}; }));
   // Extensions currently ignored.
 
   return {std::move(responses)};
 }
 
-SingleResponse Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
+absl::StatusOr<SingleResponse> Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
   // SingleResponse ::= SEQUENCE {
   //    certID                  CertID,
   //    certStatus              CertStatus,
@@ -299,7 +299,7 @@ SingleResponse Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
     throwEnvoyExceptionOrPanic("OCSP SingleResponse is not a well-formed ASN.1 SEQUENCE");
   }
 
-  auto cert_id = Asn1OcspUtility::parseCertId(elem);
+  auto cert_id = THROW_OR_RETURN_VALUENA(sn1OcspUtility::parseCertId(elem), CertId);
   skipCertStatus(elem);
   auto this_update = unwrap(Asn1Utility::parseGeneralizedTime(elem));
   auto next_update = unwrap(Asn1Utility::parseOptional<Envoy::SystemTime>(
@@ -310,7 +310,7 @@ SingleResponse Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
   return {cert_id, this_update, next_update};
 }
 
-CertId Asn1OcspUtility::parseCertId(CBS& cbs) {
+absl::StatusOr<CertId> Asn1OcspUtility::parseCertId(CBS& cbs) {
   // CertID ::= SEQUENCE {
   //    hashAlgorithm       AlgorithmIdentifier,
   //    issuerNameHash      OCTET STRING, -- Hash of issuer's `DN`
@@ -319,7 +319,7 @@ CertId Asn1OcspUtility::parseCertId(CBS& cbs) {
   // }
   CBS elem;
   if (!CBS_get_asn1(&cbs, &elem, CBS_ASN1_SEQUENCE)) {
-    throwEnvoyExceptionOrPanic("OCSP CertID is not a well-formed ASN.1 SEQUENCE");
+    return absl::InvalidArgumentError("OCSP CertID is not a well-formed ASN.1 SEQUENCE");
   }
 
   unwrap(Asn1Utility::skip(elem, CBS_ASN1_SEQUENCE));

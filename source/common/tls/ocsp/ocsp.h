@@ -293,16 +293,15 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * SingleResponse element.
    */
-  static SingleResponse parseSingleResponse(CBS& cbs);
+  static absl::StatusOr<SingleResponse> parseSingleResponse(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` CertId element
    * @returns CertId containing the information necessary to uniquely identify
-   * an SSL certificate.
-   * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
-   * CertId element.
+   * an SSL certificate or an error status if 
+   * `cbs` does not contain a well-formed CertId element.
    */
-  static CertId parseCertId(CBS& cbs);
+  static absl::StatusOr<CertId >parseCertId(CBS& cbs);
 };
 
 } // namespace Ocsp
