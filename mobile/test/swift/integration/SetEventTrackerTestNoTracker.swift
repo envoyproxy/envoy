@@ -11,7 +11,7 @@ final class SetEventTrackerTestNoTracker: XCTestCase {
     register_test_extensions()
   }
 
-  func testSetEventTracker() throws {
+  func testEmitEventWithoutSettingEventTracker() throws {
     EnvoyTestServer.startHttp1PlaintextServer()
 
     let expectation = self.expectation(description: "Response headers received")

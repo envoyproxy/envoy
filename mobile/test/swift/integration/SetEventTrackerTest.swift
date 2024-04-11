@@ -11,7 +11,7 @@ final class SetEventTrackerTest: XCTestCase {
     register_test_extensions()
   }
 
-  func testEmitEventWithoutSettingEventTracker() throws {
+  func testSetEventTracker() throws {
     EnvoyTestServer.startHttp1PlaintextServer()
 
     let eventExpectation =
