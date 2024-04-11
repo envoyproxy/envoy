@@ -11,6 +11,7 @@
 using testing::_;
 using testing::InSequence;
 using testing::Ref;
+using testing::Return;
 using testing::ReturnPointee;
 
 namespace Envoy {
@@ -368,6 +369,7 @@ TEST(ThreadLocalInstanceImplDispatcherTest, DestroySlotOnWorker) {
         // Verify we have the expected dispatcher for the new thread thread.
         EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
 
+        EXPECT_CALL(main_dispatcher, isThreadSafe()).WillOnce(Return(true));
         // Destroy the slot on worker thread and expect the post() of main dispatcher to be called.
         EXPECT_CALL(main_dispatcher, post(_));
         slot.reset();

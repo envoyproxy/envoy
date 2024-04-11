@@ -2,6 +2,7 @@
 
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -125,6 +126,21 @@ TEST_F(LuaClusterSpecifierPluginTest, ReturnTypeNotStringLuaCode) {
 }
 
 TEST_F(LuaClusterSpecifierPluginTest, DestructLuaClusterSpecifierConfig) {
+  setUpTest(normal_lua_config_yaml_);
+  InSequence s;
+  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).Times(0);
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(0);
+
+  LuaClusterSpecifierConfigProto proto_config{};
+  TestUtility::loadFromYaml(normal_lua_config_yaml_, proto_config);
+  config_ = std::make_shared<LuaClusterSpecifierConfig>(proto_config, server_factory_context_);
+  config_.reset();
+}
+
+TEST_F(LuaClusterSpecifierPluginTest, DestructLuaClusterSpecifierConfigDisableRuntime) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.restart_features.allow_slot_destroy_on_worker_threads", "false"}});
+
   setUpTest(normal_lua_config_yaml_);
   InSequence s;
   EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(false));
