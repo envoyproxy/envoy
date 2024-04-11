@@ -115,11 +115,10 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       parent_.callbacks()->streamInfo().upstreamClusterInfo();
 
   Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
-  Tracing::UpstreamContext upstream_context(upstream_host, // host_
-                                            cluster_info.has_value() ? cluster_info.value()
-                                                                     : nullptr, // cluster_info_
-                                            Tracing::ServiceType::Unknown,      // service_type_
-                                            false // is_from_async_client_
+  Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
+                                            &upstream_host->cluster(),     // cluster_
+                                            Tracing::ServiceType::Unknown, // service_type_
+                                            false                          // async_client_span_
   );
 
   if (span_ != nullptr) {

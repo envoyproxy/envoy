@@ -502,10 +502,11 @@ void UpstreamRequest::onUpstreamSuccess(Upstream::HostDescriptionConstSharedPtr 
 
   if (span_ != nullptr) {
     TraceContextBridge trace_context{*parent_.request_stream_};
-    Tracing::UpstreamContext upstream_context(upstream_info_->upstream_host_, // host_
-                                              parent_.cluster_,               // cluster_info_
-                                              Tracing::ServiceType::Unknown,  // service_type_
-                                              false // is_from_async_client_
+    Tracing::UpstreamContext upstream_context(
+        upstream_info_->upstream_host_.get(),       // host_
+        &upstream_info_->upstream_host_->cluster(), // cluster_
+        Tracing::ServiceType::Unknown,              // service_type_
+        false                                       // async_client_span_
     );
     span_->injectContext(trace_context, upstream_context);
   }

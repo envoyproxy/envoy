@@ -301,9 +301,9 @@ AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
 void AsyncRequestImpl::initialize() {
   Tracing::HttpTraceContext trace_context(request_->headers());
   Tracing::UpstreamContext upstream_context(nullptr,                    // host_
-                                            parent_.cluster_,           // cluster_info_
+                                            parent_.cluster_,           // cluster_
                                             Tracing::ServiceType::Http, // service_type_
-                                            true                        // is_from_async_client_
+                                            true                        // async_client_span_
   );
   child_span_->injectContext(trace_context, upstream_context);
   sendHeaders(request_->headers(), request_->body().length() == 0);
@@ -318,9 +318,9 @@ void AsyncRequestImpl::initialize() {
 void AsyncOngoingRequestImpl::initialize() {
   Tracing::HttpTraceContext trace_context(*request_headers_);
   Tracing::UpstreamContext upstream_context(nullptr,                    // host_
-                                            parent_.cluster_,           // cluster_info_
+                                            parent_.cluster_,           // cluster_
                                             Tracing::ServiceType::Http, // service_type_
-                                            true                        // is_from_async_client_
+                                            true                        // async_client_span_
   );
   child_span_->injectContext(trace_context, upstream_context);
   sendHeaders(*request_headers_, false);

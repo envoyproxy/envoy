@@ -32,25 +32,23 @@ enum class ServiceType {
  * Contains upstream context information essential for the injectContext process.
  *
  * @param host Optional reference to the upstream host description.
- * @param cluster_info Optional reference to the upstream cluster information.
+ * @param cluster Optional reference to the upstream cluster information.
  * @param service_type The type of service the upstream context relates to.
- * @param is_from_async_client Indicates if the injectContext originates from an asynchronous
+ * @param async_client_span Indicates if the injectContext originates from an asynchronous
  * client.
  */
 struct UpstreamContext {
-  UpstreamContext(const Upstream::HostDescriptionConstSharedPtr& host = nullptr,
-                  const Upstream::ClusterInfoConstSharedPtr& cluster_info = nullptr,
-                  const Tracing::ServiceType service_type = Tracing::ServiceType::Unknown,
-                  const bool is_from_async_client_ = false)
-      : host_(nullptr == host ? absl::nullopt_t : OptRef<const Upstream::HostDescription>(*host)),
-        cluster_info_(nullptr == cluster_info ? absl::nullopt_t
-                                              : OptRef<const Upstream::ClusterInfo>(*cluster_info)),
-        service_type_(service_type), is_from_async_client_(is_from_async_client_) {}
+  UpstreamContext(const Upstream::HostDescription* host = nullptr,
+                  const Upstream::ClusterInfo* cluster = nullptr,
+                  const ServiceType service_type = ServiceType::Unknown,
+                  const bool async_client_span = false)
+      : host_(makeOptRefFromPtr(host)), cluster_(makeOptRefFromPtr(cluster)),
+        service_type_(service_type), async_client_span_(async_client_span) {}
 
   OptRef<const Upstream::HostDescription> host_;
-  OptRef<const Upstream::ClusterInfo> cluster_info_;
+  OptRef<const Upstream::ClusterInfo> cluster_;
   const ServiceType service_type_;
-  const bool is_from_async_client_;
+  const bool async_client_span_;
 };
 
 /**
