@@ -42,7 +42,7 @@ jobs:
       command: ./bazelw
       container-command:
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12
+      runs-on: macos-12-large
       source: |
         source ./ci/mac_ci_setup.sh
         ./bazelw shutdown
@@ -81,7 +81,7 @@ jobs:
       command: ./bazelw
       container-command:
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12
+      runs-on: macos-12-large
       source: |
         source ./ci/mac_ci_setup.sh
         ./bazelw shutdown
@@ -126,7 +126,7 @@ jobs:
       command: ./bazelw
       container-command:
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12
+      runs-on: macos-12-large
       source: |
         source ./ci/mac_ci_setup.sh
       steps-post: |
@@ -137,6 +137,7 @@ jobs:
             expected: >-
               ${{ matrix.expected
                   || format('received headers with status {0}', matrix.expected-status) }}
+            timeout: ${{ matrix.timeout || '5m' }}
           env:
             ANDROID_NDK_HOME:
             ANDROID_HOME:
@@ -163,6 +164,7 @@ jobs:
           expected: >-
             \[2\] Uploaded 7 MB of data
           target: swift-async-await
+          timeout: 10m
         - name: Build objc hello world
           app: //examples/objective-c/hello_world:app
           expected-status: 301

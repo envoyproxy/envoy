@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/http/header_map.h"
+
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -162,6 +164,24 @@ LocalRefUniquePtr<jobject> cppMapToJavaMap(JniHelper& jni_helper, const MapType&
  */
 absl::flat_hash_map<std::string, std::string> javaMapToCppMap(JniHelper& jni_helper,
                                                               jobject java_map);
+
+/**
+ * Converts from C++ `HeaderMap` to Java `Map<String, List<String>>`.
+ *
+ * Both `RequestHeaderMap` and `RequestTrailerMap` inherit from `HeaderMap`. So this function can be
+ * used for converting trailers, too.
+ */
+LocalRefUniquePtr<jobject> cppHeadersToJavaHeaders(JniHelper& jni_helper,
+                                                   const Http::HeaderMap& cpp_headers);
+
+/**
+ * Converts from Java `Map<String, List<String>>` to C++ `HeaderMap`.
+ *
+ * Both `RequestHeaderMap` and `RequestTrailerMap` inherit from `HeaderMap`. So this function can be
+ * used for converting trailers, too.
+ */
+void javaHeadersToCppHeaders(JniHelper& jni_helper, jobject java_headers,
+                             Http::HeaderMap& cpp_headers);
 
 } // namespace JNI
 } // namespace Envoy

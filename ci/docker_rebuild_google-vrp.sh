@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Script to rebuild Dockerfile-envoy-google-vrp locally (i.e. not in CI) for development purposes.
 # This makes use of the latest envoy:dev base image on Docker Hub as the base and takes an

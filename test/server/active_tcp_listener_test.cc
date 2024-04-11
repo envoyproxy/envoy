@@ -491,6 +491,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
 
 // Verify that the server connection with recovered address is rebalanced at redirected listener.
 TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
+  // Prepare Listener1.
   NiceMock<Network::MockListenerConfig> listener_config1;
   NiceMock<Network::MockConnectionBalancer> balancer1;
   EXPECT_CALL(balancer1, registerHandler(_));
@@ -513,6 +514,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
       std::make_unique<ActiveTcpListener>(conn_handler_, std::move(mock_listener_will_be_moved1),
                                           normal_address, listener_config1, balancer1, runtime_);
 
+  // Prepare Listener2.
   NiceMock<Network::MockListenerConfig> listener_config2;
   Network::MockConnectionBalancer balancer2;
   EXPECT_CALL(balancer2, registerHandler(_));
@@ -534,6 +536,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
       std::make_shared<ActiveTcpListener>(conn_handler_, std::move(mock_listener_will_be_moved2),
                                           alt_address, listener_config2, balancer2, runtime_);
 
+  // Prepare listener filter for Listener1.
   auto* test_filter = new NiceMock<Network::MockListenerFilter>();
   EXPECT_CALL(*test_filter, destroy_());
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
@@ -548,8 +551,10 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   EXPECT_CALL(listener_config1, filterChainFactory())
       .WillRepeatedly(ReturnRef(filter_chain_factory_));
 
-  // Listener1 has a listener filter in the listener filter chain.
+  // Both Listener1 and Listener2 will create listener filter chain. But only Listener1 has a
+  // listener filter in the listener filter chain.
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
+      .Times(2)
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
         if (!redirected) {
@@ -563,8 +568,6 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
         cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       }));
-  // Verify that listener1 hands off the connection by not creating network filter chain.
-  EXPECT_CALL(manager_, findFilterChain(_, _)).Times(0);
 
   // 2. Redirect to Listener2.
   EXPECT_CALL(conn_handler_, getBalancedHandlerByAddress(_))
@@ -576,21 +579,24 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
           testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
           ReturnRef(*active_listener2)));
 
+  EXPECT_CALL(listener_config2, filterChainFactory())
+      .WillRepeatedly(ReturnRef(filter_chain_factory_));
+
+  // Prepare the network filter chain for Listener2.
   auto filter_factory_callback = std::make_shared<Filter::NetworkFilterFactoriesList>();
   auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
 
-  EXPECT_CALL(conn_handler_, incNumConnections());
+  // 4. Listener2 creates the active TCP connection and network filter chain.
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
   EXPECT_CALL(*filter_chain_, transportSocketFactory)
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
-  EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
-  EXPECT_CALL(listener_config2, filterChainFactory())
-      .WillRepeatedly(ReturnRef(filter_chain_factory_));
-
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  EXPECT_CALL(conn_handler_, incNumConnections());
+
   active_listener1->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   // Verify per-listener connection stats.
@@ -603,6 +609,89 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   active_listener1.reset();
   EXPECT_CALL(listener2, onDestroy());
   active_listener2.reset();
+}
+
+// Verify that the redirect decision could be overridden by the listener filter.
+TEST_F(ActiveTcpListenerTest, SkipRedirection) {
+  // Prepare Listener1.
+  NiceMock<Network::MockListenerConfig> listener_config1;
+  NiceMock<Network::MockConnectionBalancer> balancer1;
+  EXPECT_CALL(balancer1, registerHandler(_));
+  EXPECT_CALL(balancer1, unregisterHandler(_));
+
+  Network::Address::InstanceConstSharedPtr normal_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
+  EXPECT_CALL(listener_config1, listenerScope).Times(testing::AnyNumber());
+  EXPECT_CALL(listener_config1, listenerFiltersTimeout());
+  EXPECT_CALL(listener_config1, continueOnListenerFiltersTimeout());
+  EXPECT_CALL(listener_config1, filterChainManager()).WillRepeatedly(ReturnRef(manager_));
+  EXPECT_CALL(listener_config1, openConnections()).WillRepeatedly(ReturnRef(resource_limit_));
+  EXPECT_CALL(listener_config1, handOffRestoredDestinationConnections())
+      .WillRepeatedly(Return(true));
+
+  auto mock_listener_will_be_moved1 = std::make_unique<Network::MockListener>();
+  auto& listener1 = *mock_listener_will_be_moved1;
+  auto active_listener1 =
+      std::make_unique<ActiveTcpListener>(conn_handler_, std::move(mock_listener_will_be_moved1),
+                                          normal_address, listener_config1, balancer1, runtime_);
+
+  Network::Address::InstanceConstSharedPtr alt_address(
+      new Network::Address::Ipv4Instance("127.0.0.2", 20002));
+
+  // Prepare listener filter for Listener1.
+  auto* test_filter = new NiceMock<Network::MockListenerFilter>();
+  EXPECT_CALL(*test_filter, destroy_());
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+
+  // 1. Listener1 re-balance. Set the balance target to the the active listener itself.
+  EXPECT_CALL(balancer1, pickTargetHandler(_))
+      .WillOnce(testing::DoAll(
+          testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
+          ReturnRef(*active_listener1)));
+
+  EXPECT_CALL(listener_config1, filterChainFactory())
+      .WillRepeatedly(ReturnRef(filter_chain_factory_));
+
+  // Listener1 has a listener filter in the listener filter chain.
+  EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        // Insert the Mock filter.
+        manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{test_filter});
+        return true;
+      }));
+  EXPECT_CALL(*test_filter, onAccept(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
+        cb.useOriginalDst(false); // Skip the redirection.
+        return Network::FilterStatus::Continue;
+      }));
+
+  // Prepare the network filter chain for Listener1.
+  auto filter_factory_callback = std::make_shared<Filter::NetworkFilterFactoriesList>();
+  auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
+  filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
+
+  // 2. Listener1 creates the active TCP connection and network filter chain.
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
+  EXPECT_CALL(*filter_chain_, transportSocketFactory)
+      .WillOnce(testing::ReturnRef(*transport_socket_factory));
+  auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
+  EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  EXPECT_CALL(conn_handler_, incNumConnections());
+
+  active_listener1->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+
+  // Verify per-listener connection stats.
+  EXPECT_EQ(1UL, conn_handler_.numConnections());
+
+  EXPECT_CALL(conn_handler_, decNumConnections());
+  connection->close(Network::ConnectionCloseType::NoFlush);
+
+  EXPECT_CALL(listener1, onDestroy());
+  active_listener1.reset();
 }
 
 TEST_F(ActiveTcpListenerTest, Rebalance) {

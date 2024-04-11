@@ -832,6 +832,35 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, ResponseFromExtProcServerTooLarge) {
+  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+    GTEST_SKIP() << "max_receive_message_length is only supported on Envoy gRPC";
+  }
+  config_helper_.setBufferLimits(1024, 1024);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->mutable_max_receive_message_length()
+      ->set_value(1024);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = std::string(64 * 1024, 'a');
+  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], true, [&body_str](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        // Send the over-limit response from ext_proc server.
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body(body_str);
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 500);
+}
+
 TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingSucceeded) {
   proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
   initializeConfig();

@@ -262,6 +262,10 @@ removed_config_or_runtime:
     removed ``envoy_reloadable_features_initialize_upstream_filters`` and legacy code paths.
 
 new_features:
+- area: filters
+  change: |
+    Added the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`,
+    which can be used to inject credentials into the HTTP headers.
 - area: basic_auth
   change: |
     Added :ref:`forward_username_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.forward_username_header>`
@@ -404,6 +408,12 @@ new_features:
 - area: http
   change: |
     Added DownstreamRemoteReset to CoreResponseFlag, and it is set when stream is remote reset.
+- area: match_delegate
+  change: |
+    Convert match_delegate fiter into dual filter so it can be installed in the upstream filter chain.
+- area: composite
+  change: |
+    Convert composite fiter into dual filter so it can be installed in the upstream filter chain.
 - area: tracing
   change: |
     Added support for variant span attribute type for the OpenTelemetry tracer.
@@ -471,6 +481,10 @@ new_features:
     Added load shed point ``envoy.load_shed_points.http_downstream_filter_check`` that makes load shed check availabe in HTTP decoder
     filters, and right now it is only available in router. It will send local reply directly when Envoy is under pressure,
     typically memory.
+- area: filters
+  change: |
+    Added :ref:`per-route configuration support to the Basic Auth filter
+    <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuthPerRoute>`.
 
 deprecated:
 - area: listener

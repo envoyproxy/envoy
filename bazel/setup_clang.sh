@@ -1,4 +1,6 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
+
+set -e
 
 BAZELRC_FILE="${BAZELRC_FILE:-./clang.bazelrc}"
 
