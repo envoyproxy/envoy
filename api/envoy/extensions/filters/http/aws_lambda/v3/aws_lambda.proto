@@ -58,7 +58,7 @@ message Config {
   string host_rewrite = 4;
 
   // Specifies the credentials profile to be used from the AWS credentials file.
-  // This parameter is optional. If set, it will override value set in AWS_PROFILE env variable and
+  // This parameter is optional. If set, it will override the value set in the AWS_PROFILE env variable and
   // the provider chain is limited to the AWS credentials file Provider.
   // Other providers are ignored
   string credentials_profile = 5;
