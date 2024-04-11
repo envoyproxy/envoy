@@ -850,9 +850,6 @@ TEST_P(LoadShedPointIntegrationTest, HttpConnectionMnagerCloseConnectionCreating
 }
 
 TEST_P(LoadShedPointIntegrationTest, HttpDownstreamFilterLoadShed) {
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
-    return;
-  }
   autonomous_upstream_ = true;
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(

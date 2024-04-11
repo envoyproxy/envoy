@@ -468,8 +468,9 @@ new_features:
     streaming response and not the total size of streaming response. Defaults to 0, which means unlimited.
 - area: load shed point
   change: |
-    Added load shed point ``envoy.load_shed_points.http_downstream_filter_check`` that makes load shed check availabe in HTTP filters,
-    and right now it is avaiable in router. It will send local reply directly when Envoy is under pressure, typically memory.
+    Added load shed point ``envoy.load_shed_points.http_downstream_filter_check`` that makes load shed check availabe in HTTP decoder
+    filters, and right now it is only available in router. It will send local reply directly when Envoy is under pressure,
+    typically memory.
 
 deprecated:
 - area: listener

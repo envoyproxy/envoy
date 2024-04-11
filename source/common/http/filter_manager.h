@@ -1151,10 +1151,7 @@ public:
   }
 
   bool shouldLoadShed() override {
-    if (nullptr != downstream_filter_load_shed_point_) {
-      return downstream_filter_load_shed_point_->shouldShedLoad();
-    }
-    return false;
+    return downstream_filter_load_shed_point_ != nullptr && downstream_filter_load_shed_point_->shouldShedLoad();
   }
 
 private:
