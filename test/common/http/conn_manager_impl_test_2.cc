@@ -2635,8 +2635,8 @@ TEST_F(HttpConnectionManagerImplTest, CodecCreationLoadShedPointBypasscheck) {
               getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
-            getLoadShedPoint(Server::LoadShedPointName::get().HttpDownstreamFilterCheck))
-    .WillOnce(Return(nullptr));
+              getLoadShedPoint(Server::LoadShedPointName::get().HttpDownstreamFilterCheck))
+      .WillOnce(Return(nullptr));
 
   setup(false, "");
 
@@ -2665,7 +2665,7 @@ TEST_F(HttpConnectionManagerImplTest, DecodeHeaderLoadShedPointCanRejectNewStrea
               getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
-          getLoadShedPoint(Server::LoadShedPointName::get().HttpDownstreamFilterCheck))
+              getLoadShedPoint(Server::LoadShedPointName::get().HttpDownstreamFilterCheck))
       .WillRepeatedly(Return(nullptr));
 
   setup(false, "");
