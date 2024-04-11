@@ -18,7 +18,7 @@ behavior_changes:
     can be reverted by setting the feature to ``true``.
 - area: thread_local
   change: |
-    Changes the behavior of the ``SlotImpl`` class destructor. By this change, now the destructor could be called at any thread.
+    Changes the behavior of the ``SlotImpl`` class destructor. With this change the destructor can be called on any thread.
     This behavior can be reverted by setting the runtime flag ``envoy.reloadable_features.allow_slot_destroy_on_worker_threads``
     to false.
 
