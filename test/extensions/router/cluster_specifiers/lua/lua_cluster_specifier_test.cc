@@ -131,6 +131,9 @@ TEST_F(LuaClusterSpecifierPluginTest, DestructLuaClusterSpecifierConfig) {
   EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).Times(0);
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(0);
 
+  config_.reset();
+  plugin_.reset();
+
   LuaClusterSpecifierConfigProto proto_config{};
   TestUtility::loadFromYaml(normal_lua_config_yaml_, proto_config);
   config_ = std::make_shared<LuaClusterSpecifierConfig>(proto_config, server_factory_context_);
@@ -147,6 +150,9 @@ TEST_F(LuaClusterSpecifierPluginTest, DestructLuaClusterSpecifierConfigDisableRu
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
   EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(true));
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(0);
+
+  config_.reset();
+  plugin_.reset();
 
   LuaClusterSpecifierConfigProto proto_config{};
   TestUtility::loadFromYaml(normal_lua_config_yaml_, proto_config);

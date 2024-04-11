@@ -10,6 +10,7 @@
 
 using testing::_;
 using testing::InSequence;
+using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnPointee;
@@ -54,6 +55,8 @@ public:
 class ThreadLocalInstanceImplTest : public testing::Test {
 public:
   ThreadLocalInstanceImplTest() {
+    EXPECT_CALL(main_dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
+
     EXPECT_CALL(thread_dispatcher_, post(_));
     tls_.registerThread(thread_dispatcher_, false);
     // Register the main thread after the worker thread to ensure that the
@@ -79,8 +82,8 @@ public:
   int freeSlotIndexesListSize() { return tls_.free_slot_indexes_.size(); }
   InstanceImpl tls_;
 
-  Event::MockDispatcher main_dispatcher_{"test_main_thread"};
-  Event::MockDispatcher thread_dispatcher_{"test_worker_thread"};
+  NiceMock<Event::MockDispatcher> main_dispatcher_{"test_main_thread"};
+  NiceMock<Event::MockDispatcher> thread_dispatcher_{"test_worker_thread"};
 };
 
 TEST_F(ThreadLocalInstanceImplTest, All) {
@@ -369,7 +372,7 @@ TEST(ThreadLocalInstanceImplDispatcherTest, DestroySlotOnWorker) {
         // Verify we have the expected dispatcher for the new thread thread.
         EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
 
-        EXPECT_CALL(main_dispatcher, isThreadSafe()).WillOnce(Return(true));
+        EXPECT_CALL(main_dispatcher, isThreadSafe()).WillOnce(Return(false));
         // Destroy the slot on worker thread and expect the post() of main dispatcher to be called.
         EXPECT_CALL(main_dispatcher, post(_));
         slot.reset();
