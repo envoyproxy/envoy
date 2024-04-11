@@ -50,8 +50,7 @@ InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
 InstanceImpl::SlotImpl::~SlotImpl() {
   auto* main_thread_dispatcher = parent_.main_thread_dispatcher_;
   ASSERT(main_thread_dispatcher != nullptr);
-  if (!parent_.allow_slot_destroy_on_worker_threads_ ||
-      main_thread_dispatcher == InstanceImpl::thread_local_data_.dispatcher_) {
+  if (!parent_.allow_slot_destroy_on_worker_threads_ || main_thread_dispatcher->isThreadSafe()) {
     // If the slot is being destroyed on the main thread, we can remove it immediately.
     parent_.removeSlot(index_);
   } else {
