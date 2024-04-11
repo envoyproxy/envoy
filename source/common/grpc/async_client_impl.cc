@@ -279,7 +279,7 @@ void AsyncRequestImpl::cancel() {
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   Tracing::HttpTraceContext trace_context(metadata);
   Tracing::UpstreamContext upstream_context(nullptr,                         // host_
-                                            cluster_info_,                   // cluster_
+                                            cluster_info_.get(),             // cluster_
                                             Tracing::ServiceType::EnvoyGrpc, // service_type_
                                             true                             // async_client_span_
   );
