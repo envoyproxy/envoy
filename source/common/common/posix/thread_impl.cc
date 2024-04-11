@@ -15,7 +15,7 @@ namespace Thread {
 
 namespace {
 
-int64_t getCurrentThreadId() {
+int64_t getCurrentThreadIdBase() {
 #ifdef __linux__
   return static_cast<int64_t>(syscall(SYS_gettid));
 #elif defined(__APPLE__)
@@ -25,6 +25,11 @@ int64_t getCurrentThreadId() {
 #else
 #error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
 #endif
+}
+
+ThreadId getCurrentThreadId() {
+  static thread_local ThreadId cached_thread_id = ThreadId(getCurrentThreadIdBase());
+  return cached_thread_id;
 }
 
 } // namespace
@@ -153,7 +158,7 @@ public:
     return std::make_unique<PosixThread>(thread_handle, options);
   };
 
-  ThreadId currentThreadId() override { return ThreadId(getCurrentThreadId()); };
+  ThreadId currentThreadId() override { return getCurrentThreadId(); };
 
   ThreadId currentPthreadId() override {
 #if defined(__linux__)
