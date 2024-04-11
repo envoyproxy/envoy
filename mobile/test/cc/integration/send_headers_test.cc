@@ -19,9 +19,8 @@ TEST(SendHeadersTest, CanSendHeaders) {
   Platform::EngineBuilder engine_builder;
   engine_builder.addNativeFilter(
       "test_remote_response",
-      "{'@type': "
-      "type.googleapis.com/"
-      "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse}");
+      "[type.googleapis.com/"
+      "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse]{}");
   absl::Notification engine_running;
   Platform::EngineSharedPtr engine = engine_builder.addLogLevel(Platform::LogLevel::debug)
                                          .setOnEngineRunning([&]() { engine_running.Notify(); })

@@ -21,9 +21,8 @@ TEST(EngineTest, SetLogger) {
           .setEngineCallbacks(std::move(engine_callbacks))
           .addNativeFilter(
               "test_remote_response",
-              "{'@type': "
-              "type.googleapis.com/"
-              "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse}")
+              "[type.googleapis.com/"
+              "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse]{}")
           .build();
   engine_running.WaitForNotification();
 
@@ -73,9 +72,8 @@ TEST(EngineTest, SetEngineCallbacks) {
           .setEngineCallbacks(std::move(engine_callbacks))
           .addNativeFilter(
               "test_remote_response",
-              "{'@type': "
-              "type.googleapis.com/"
-              "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse}")
+              "[type.googleapis.com/"
+              "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse]{}")
           .build();
   engine_running.WaitForNotification();
 
@@ -137,9 +135,8 @@ TEST(EngineTest, SetEventTracker) {
           .setEventTracker(std::move(event_tracker))
           .addNativeFilter(
               "test_remote_response",
-              "{'@type': "
-              "type.googleapis.com/"
-              "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse}")
+              "[type.googleapis.com/"
+              "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse]{}")
           .build();
   engine_running.WaitForNotification();
 

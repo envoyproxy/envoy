@@ -458,8 +458,8 @@ TEST(TestConfig, AddNativeFilters) {
   std::string filter_name1 = "envoy.filters.http.buffer1";
   std::string filter_name2 = "envoy.filters.http.buffer2";
   std::string filter_config =
-      "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\","
-      "\"max_request_bytes\":5242880}";
+      "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes { "
+      "value: 5242880 } }";
   engine_builder.addNativeFilter(filter_name1, filter_config);
   engine_builder.addNativeFilter(filter_name2, filter_config);
 
