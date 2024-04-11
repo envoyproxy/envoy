@@ -108,7 +108,7 @@ TEST_F(AsyncTcpClientImplTest, WaterMark) {
   ASSERT_FALSE(client_->connected());
 }
 
-TEST_F(AsyncTcpClientImplTest, NoAvaiableConnection) {
+TEST_F(AsyncTcpClientImplTest, NoAvailableConnection) {
   setUpClient();
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = nullptr;
