@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # directory:coverage_percent
 # for existing directories with low coverage.

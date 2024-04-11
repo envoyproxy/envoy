@@ -4391,9 +4391,9 @@ TEST(SubstitutionFormatParser, SyntaxVerifierFail) {
       };
 
   for (const auto& test_case : test_cases) {
-    EXPECT_THROW(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
-                                                    std::get<1>(test_case), std::get<2>(test_case)),
-                 EnvoyException);
+    EXPECT_FALSE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                    std::get<1>(test_case), std::get<2>(test_case))
+                     .ok());
   }
 }
 
@@ -4422,8 +4422,9 @@ TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
            absl::nullopt}};
 
   for (const auto& test_case : test_cases) {
-    EXPECT_NO_THROW(CommandSyntaxChecker::verifySyntax(
-        std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)));
+    EXPECT_TRUE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                   std::get<1>(test_case), std::get<2>(test_case))
+                    .ok());
   }
 }
 } // namespace

@@ -214,6 +214,21 @@ public:
 
   virtual ~ClusterManager() = default;
 
+  // API to initialize the ClusterManagerImpl instance based on the given Bootstrap config.
+  //
+  // This method *must* be called prior to invoking any other methods on the class and *must* only
+  // be called once. This method should be called immediately after ClusterManagerImpl construction
+  // and from the same thread in which the ClusterManagerImpl was constructed.
+  //
+  // The initialization is separated from the constructor because lots of work, including ADS
+  // initialization, is done in this method. If the contents of this method are invoked during
+  // construction, a derived class cannot override any of the virtual methods and have them invoked
+  // instead, since the base class's methods are used when in a base class constructor.
+  virtual absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
+
+  // API to return whether the ClusterManagerImpl instance is initialized.
+  virtual bool initialized() PURE;
+
   /**
    * Add or update a cluster via API. The semantics of this API are:
    * 1) The hash of the config is used to determine if an already existing cluster has changed.
@@ -491,6 +506,8 @@ public:
 
   /**
    * Allocate a cluster manager from configuration proto.
+   * The cluster manager init() method needs to be called right after this method.
+   * Please check https://github.com/envoyproxy/envoy/issues/33218 for details.
    */
   virtual ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
