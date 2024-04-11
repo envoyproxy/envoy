@@ -100,8 +100,9 @@ build:mobile-asan-dev --copt -fsanitize=address
 build:mobile-asan-dev --linkopt -fsanitize=address
 build:mobile-asan-dev --platform_suffix=-asan
 
-build:clang-asan --linkopt --rtlib=compiler-rt
-build:clang-asan --linkopt --unwindlib=libgcc
+build:mobile-clang-asan --linkopt --rtlib=compiler-rt
+build:mobile-clang-asan --linkopt --unwindlib=libgcc
+build:mobile-clang-asan --config=clang-asan-common
 
 # Locally-runnable TSAN config
 build:mobile-tsan-dev --features=tsan
@@ -204,7 +205,7 @@ build:mobile-remote-ci-linux-clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 #############################################################################
 # mobile-remote-ci-linux-asan: These options are Linux-only using Clang and AddressSanitizer
 #############################################################################
-build:mobile-remote-ci-linux-asan --config=clang-asan
+build:mobile-remote-ci-linux-asan --config=mobile-clang-asan
 build:mobile-remote-ci-linux-asan --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci-linux-asan --config=remote-ci
 build:mobile-remote-ci-linux-asan --define=envoy_full_protos=disabled
