@@ -23,7 +23,7 @@ final class SendDataTests: XCTestCase {
     let engine = EngineBuilder()
       .addLogLevel(.debug)
       .setLogger { _, msg in
-          print(msg, terminator: "")
+        print(msg, terminator: "")
       }
       .addNativeFilter(
         name: "test_logger",

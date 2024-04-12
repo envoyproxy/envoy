@@ -22,6 +22,9 @@ final class LoggerTests: XCTestCase {
 
     let engine = EngineBuilder()
       .addLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .addNativeFilter(
         name: "test_logger",
         // swiftlint:disable:next line_length
