@@ -85,6 +85,12 @@ public:
   virtual bool useDynamicBaseId() const PURE;
 
   /**
+   * @return bool don't get hot restart information from the parent if the communication channel
+   *         to the parent instance fails to connect.
+   */
+  virtual bool skipHotRestartOnNoParent() const PURE;
+
+  /**
    * @return const std::string& the dynamic base id output file.
    */
   virtual const std::string& baseIdPath() const PURE;

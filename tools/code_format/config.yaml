@@ -91,7 +91,6 @@ paths:
     - source/common/config/utility.h
     - source/common/matcher/map_matcher.h
     - source/common/matcher/field_matcher.h
-    - source/common/protobuf/visitor_helper.h
     - source/extensions/common/matcher/trie_matcher.h
     - envoy/common/exception.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
@@ -119,9 +118,7 @@ paths:
     - source/common/http/hash_policy.cc
     - source/common/http/conn_manager_utility.cc
     - source/common/protobuf/yaml_utility.cc
-    - source/common/protobuf/visitor.cc
     - source/common/protobuf/utility.cc
-    - source/common/protobuf/message_validator_impl.cc
     - source/common/quic/quic_server_transport_socket_factory.cc
     - source/common/secret/secret_manager_impl.cc
     - source/common/grpc/google_grpc_utils.cc
