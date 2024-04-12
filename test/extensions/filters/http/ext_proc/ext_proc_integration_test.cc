@@ -130,13 +130,17 @@ protected:
         setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_wrong_server",
                        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
       }
-      // Construct a configuration proto for our filter and then re-write it
-      // to JSON so that we can add it to the overall config
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
+
       std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
-      ext_proc_filter.set_name(ext_proc_filter_name);
-      ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
+      if (downstream_filter_) {
+        // Construct a configuration proto for our filter and then re-write it
+        // to JSON so that we can add it to the overall config
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
+            ext_proc_filter;
+        ext_proc_filter.set_name(ext_proc_filter_name);
+        ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+        config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
+      }
 
       // Add set_metadata filter to inject dynamic metadata used for testing
       if (config_option.add_metadata) {
@@ -594,6 +598,7 @@ protected:
   TestScopedRuntime scoped_runtime_;
   std::string header_raw_value_{"false"};
   std::string filter_mutation_rule_{"false"};
+  bool downstream_filter_{true};
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;
 };
@@ -3757,6 +3762,72 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   verifyDownstreamResponse(*response, 200);
 }
 #endif
+
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
+  downstream_filter_ = false;
+  initializeConfig();
+  // Add ext_proc as upstream filter.
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    // Retrieve cluster_0.
+    auto* cluster = static_resources->mutable_clusters(0);
+    ConfigHelper::HttpProtocolOptions old_protocol_options;
+    if (cluster->typed_extension_protocol_options().contains(
+            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
+      old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+          (*cluster->mutable_typed_extension_protocol_options())
+              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+    }
+    if (old_protocol_options.http_filters().empty()) {
+      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+    }
+    auto* ext_proc_filter = old_protocol_options.add_http_filters();
+    ext_proc_filter->set_name("envoy.filters.http.ext_proc");
+    ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
+    for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
+      old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
+    }
+    (*cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+            .PackFrom(old_protocol_options);
+  });
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{
+            {":scheme", "http"}, {":method", "GET"},       {":authority", "host"},
+            {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_value("new");
+        response_header_mutation->add_remove_headers("x-remove-this");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+  verifyDownstreamResponse(*response, 200);
+}
 
 // Test the filter when configured, upon a grpc error, can retry the request and
 // get response back.
