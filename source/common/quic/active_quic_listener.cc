@@ -68,7 +68,7 @@ ActiveQuicListener::ActiveQuicListener(
   // Set the socket to report incoming ECN.
   if (receive_ecn) {
     if (udp_listener_->localAddress() == nullptr ||
-        udp_listener_->localAdddress()->ip() == nullptr) {
+        udp_listener_->localAddress()->ip() == nullptr) {
       IS_ENVOY_BUG("UDP Listener does not have local IP address");
     } else {
       int optval = 1;
