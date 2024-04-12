@@ -193,7 +193,7 @@ public:
             input:
               name: request-headers
               typed_config:
-                 "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
                 header_name: match-header
             exact_match_map:
               map:
@@ -214,17 +214,17 @@ public:
     )EOF",
                                                     name, path, proto_type_)),
         downstream_filter_);
-    TestEnvironment::writeStringToFileForTest(
-        "set_response_code.yaml",
-        TestEnvironment::substitute(absl::StrFormat(R"EOF(
+
+    TestEnvironment::writeStringToFileForTest("set_response_code.yaml",
+                                              absl::StrFormat(R"EOF(
 resources:
   - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
     name: set-response-code
     typed_config:
       "@type": type.googleapis.com/test.integration.filters.%s
       code: 403)EOF",
-                                                    proto_type_)),
-        false);
+                                                              proto_type_),
+                                              false);
   }
 
   void prependMissingCompositeDynamicFilter(const std::string& name = "composite") {
@@ -507,7 +507,6 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcherMultipleFilters) 
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
 }
 
-} // namespace
 class CompositeFilterSeverContextIntegrationTest
     : public HttpIntegrationTest,
       public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
@@ -665,4 +664,5 @@ TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlow) {
   EXPECT_EQ(response->headers().getStatusValue(), "200");
 }
 
+} // namespace
 } // namespace Envoy
