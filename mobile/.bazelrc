@@ -13,7 +13,6 @@ build --define=static_extension_registration=disabled
 build --define=admin_functionality=disabled
 build --define envoy_mobile_listener=disabled
 build --define=library_autolink=disabled
-build --define=envoy_mobile_swift_cxx_interop=enabled
 build --define=envoy_enable_http_datagrams=disabled
 build --experimental_inmemory_dotd_files
 build --experimental_inmemory_jdeps_files
