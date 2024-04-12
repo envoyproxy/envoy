@@ -89,7 +89,7 @@ static const std::string filter_config_name = "scooby.dooby.doo";
 
 class HttpFilterTest : public testing::Test {
 protected:
-  void initialize(std::string&& yaml) {
+  void initialize(std::string&& yaml, bool is_upstream_filter = false) {
     scoped_runtime_.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
@@ -133,7 +133,7 @@ protected:
       TestUtility::loadFromYaml(yaml, proto_config);
     }
     config_ = std::make_shared<FilterConfig>(
-        proto_config, 200ms, 10000, *stats_store_.rootScope(), "",
+        proto_config, 200ms, 10000, *stats_store_.rootScope(), "", is_upstream_filter,
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
         factory_context_);
@@ -3678,6 +3678,80 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataUseLast) {
                        .string_value());
 
   filter_->onDestroy();
+}
+
+// Verify if ext_proc filter is in the upstream filter chain, and if the ext_proc server
+// sends back response with clear_route_cache set to true, it is ignored.
+TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutationUpstreamIgnored) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_header_mode: "SKIP"
+  )EOF",
+             true);
+
+  // When ext_proc filter is in upstream, clear_route_cache response is ignored.
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+    auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
+    auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_header()->set_key("x-new-header");
+    resp_add->mutable_header()->set_value("new");
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
+
+  filter_->onDestroy();
+
+  // The clear_router_cache from response is ignored.
+  EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 1);
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 1);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
+}
+
+// When ext_proc filter is in upstream filter chain, do not sending local
+// reply to downstream in case immediate response is received.
+TEST_F(HttpFilterTest, PostAndRespondImmediatelyUpstream) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF",
+             true);
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+  TestResponseHeaderMapImpl immediate_response_headers;
+  ON_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::BadRequest, "Bad request", _,
+                                             Eq(absl::nullopt), "Got_a_bad_request"))
+      .WillByDefault(Invoke([&immediate_response_headers](
+                                Unused, Unused,
+                                std::function<void(ResponseHeaderMap & headers)> modify_headers,
+                                Unused, Unused) { modify_headers(immediate_response_headers); }));
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  auto* immediate_response = resp1->mutable_immediate_response();
+  immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
+  immediate_response->set_body("Bad request");
+  immediate_response->set_details("Got a bad request");
+  auto* immediate_headers = immediate_response->mutable_headers();
+  auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_header()->set_key("content-type");
+  hdr1->mutable_header()->set_value("text/plain");
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+  TestResponseHeaderMapImpl expected_response_headers{};
+  // Send local reply never happened.
+  EXPECT_THAT(&immediate_response_headers, HeaderMapEqualIgnoreOrder(&expected_response_headers));
+  // The send immediate response counter is increased.
+  EXPECT_EQ(config_->stats().send_immediate_resp_upstream_ignored_.value(), 1);
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 1);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
 }
 
 class HttpFilter2Test : public HttpFilterTest,
