@@ -816,7 +816,7 @@ public:
   /**
    * @return true if the filter should shed load based on the system pressure, typically memory.
    */
-  virtual bool shouldLoadShed() const { return false; };
+  virtual bool shouldLoadShed() const PURE;
 };
 
 /**
