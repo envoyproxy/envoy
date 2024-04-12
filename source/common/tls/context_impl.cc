@@ -684,7 +684,16 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
               static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
           ClientContextImpl* client_context_impl = dynamic_cast<ClientContextImpl*>(context_impl);
           RELEASE_ASSERT(client_context_impl != nullptr, ""); // for Coverity
-          return client_context_impl->newSessionKey(session);
+
+          const auto* transport_socket_options_shared_ptr_ptr =
+              static_cast<const Network::TransportSocketOptionsConstSharedPtr*>(
+                  SSL_get_app_data(ssl));
+          if (transport_socket_options_shared_ptr_ptr == nullptr) {
+            // 0 indicates that the session is not taken ownership of.
+            return 0;
+          }
+          return client_context_impl->newSessionKey(
+              (*transport_socket_options_shared_ptr_ptr)->sslSessionTag(), session);
         });
   }
 }
@@ -771,7 +780,10 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
   return ssl_con;
 }
 
-int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
+int ClientContextImpl::newSessionKey([[maybe_unused]] absl::optional<uint64_t> session_tag,
+                                     SSL_SESSION* session) {
+  // TODO(lambdai): save the session according to ``session_tag``.
+
   // In case we ever store single-use session key (TLS 1.3),
   // we need to switch to using write/write locks.
   if (SSL_SESSION_should_be_single_use(session)) {

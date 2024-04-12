@@ -180,7 +180,10 @@ public:
   newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) override;
 
 private:
-  int newSessionKey(SSL_SESSION* session);
+  /**
+   * @return 1 ClientContextImpl retains the reference, 0 otherwise.
+   */
+  int newSessionKey(absl::optional<uint64_t> session_tag, SSL_SESSION* session);
 
   const std::string server_name_indication_;
   const bool allow_renegotiation_;

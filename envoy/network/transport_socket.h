@@ -279,6 +279,12 @@ public:
    * that are marked as shared with the upstream connection.
    */
   virtual const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const PURE;
+
+  /**
+   * @return the tag as the hint to select SSL session. This value does not participate the conn
+   * pool key.
+   */
+  virtual absl::optional<uint64_t> sslSessionTag() const PURE;
 };
 
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;
