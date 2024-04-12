@@ -162,7 +162,7 @@ jobs:
         - name: Build swift async await
           app: //examples/swift/async_await:app
           expected: >-
-            \[2\] Uploaded 7 MB of data
+            Uploaded 7 MB of data
           target: swift-async-await
           timeout: 10m
         - name: Build objc hello world

@@ -279,6 +279,9 @@ new_features:
     and
     :ref:`ExtProcOverrides.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`
     with the new or updated values.
+- area: hot_restart
+  change: |
+    Added new command-line flag :option:`--skip-hot-restart-on-no-parent`.
 - area: aws_request_signing
   change: |
     Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
@@ -334,6 +337,9 @@ new_features:
     metadata may be sent to the server. If
     :ref:`receiving_namespaces <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.receiving_namespaces>`
     is defined, returned metadata may be written to the specified allowed namespaces.
+- area: ext_proc
+  change: |
+    made the :ref:`ExternalProcessor <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>` work as an upstream filter.
 - area: wasm
   change: |
     added ``verify_signature`` foreign function to verify cryptographic signatures.
@@ -480,6 +486,10 @@ new_features:
   change: |
     Added :ref:`per-route configuration support to the Basic Auth filter
     <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuthPerRoute>`.
+- area: lua
+  change: |
+    Added a new ``connectionStreamInfo()`` which could be used to access the streamInfo object on the connection. This addition
+    is helpful in scenarios requiring the retrieval of dynamic metadata from network filters, such as the Proxy Protocol, etc.
 
 deprecated:
 - area: listener

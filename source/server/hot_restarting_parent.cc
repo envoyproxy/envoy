@@ -100,6 +100,10 @@ void HotRestartingParent::onSocketEvent() {
       break;
     }
 
+    case HotRestartMessage::Request::kTestConnection: {
+      break;
+    }
+
     default: {
       ENVOY_LOG(error, "child sent us an unfamiliar type of HotRestartMessage; ignoring.");
       HotRestartMessage wrapped_reply;

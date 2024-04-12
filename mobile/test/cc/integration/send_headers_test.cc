@@ -23,7 +23,7 @@ TEST(SendHeadersTest, CanSendHeaders) {
       "type.googleapis.com/"
       "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse}");
   absl::Notification engine_running;
-  Platform::EngineSharedPtr engine = engine_builder.addLogLevel(Platform::LogLevel::debug)
+  Platform::EngineSharedPtr engine = engine_builder.setLogLevel(Logger::Logger::debug)
                                          .setOnEngineRunning([&]() { engine_running.Notify(); })
                                          .build();
   engine_running.WaitForNotification();
