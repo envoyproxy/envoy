@@ -53,8 +53,7 @@ TEST(EngineTest, SetLogger) {
   auto request_headers =
       Platform::RequestHeadersBuilder(
           Platform::RequestMethod::GET, "https",
-          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getServerPort()),
-          "/")
+          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()), "/")
           .build();
   stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
   stream_complete.WaitForNotification();
@@ -66,7 +65,7 @@ TEST(EngineTest, SetLogger) {
 
 TEST(EngineTest, SetEngineCallbacks) {
   TestServer test_server;
-  test_server.startTestServer(TestServerType::HTTP2_WITH_TLS);
+  test_server.start(TestServerType::HTTP2_WITH_TLS);
 
   absl::Notification engine_running;
   auto engine_callbacks = std::make_unique<EngineCallbacks>();
@@ -105,8 +104,7 @@ TEST(EngineTest, SetEngineCallbacks) {
   auto request_headers =
       Platform::RequestHeadersBuilder(
           Platform::RequestMethod::GET, "https",
-          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getServerPort()),
-          "/")
+          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()), "/")
           .build();
   stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
   stream_complete.WaitForNotification();

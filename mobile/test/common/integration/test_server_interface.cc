@@ -12,7 +12,7 @@ void start_server(Envoy::TestServerType test_server_type) {
   weak_test_server_ = strong_test_server_;
 
   if (auto server = test_server()) {
-    server->startTestServer(test_server_type);
+    server->start(test_server_type);
   }
 }
 
@@ -21,12 +21,12 @@ void shutdown_server() {
   // but retain it long enough to synchronously shutdown.
   auto server = strong_test_server_;
   strong_test_server_.reset();
-  server->shutdownTestServer();
+  server->shutdown();
 }
 
 int get_server_port() {
   if (auto server = test_server()) {
-    return server->getServerPort();
+    return server->getPort();
   }
   return -1; // failure
 }

@@ -45,8 +45,7 @@ void sendRequest() {
   auto request_headers =
       Platform::RequestHeadersBuilder(
           Platform::RequestMethod::GET, "https",
-          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getServerPort()),
-          "/")
+          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()), "/")
           .build();
   stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
   stream_complete.WaitForNotification();
