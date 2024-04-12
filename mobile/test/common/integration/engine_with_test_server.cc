@@ -9,13 +9,13 @@ EngineWithTestServer::EngineWithTestServer(Platform::EngineBuilder& engine_build
 }
 
 EngineWithTestServer::~EngineWithTestServer() {
-  engine_->terminate();
   // It is important that the we shutdown the TestServer first before terminating the Engine. This
   // is because when the Engine is terminated, the Logger::Context will be destroyed and
   // Logger::Context is a global variable that is used by both Engine and TestServer. By shutting
   // down the TestServer first, the TestServer will no longer access a Logger::Context that has been
   // destroyed.
   test_server_.shutdownTestServer();
+  engine_->terminate();
 }
 
 Platform::EngineSharedPtr& EngineWithTestServer::engine() { return engine_; }
