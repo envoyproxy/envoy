@@ -48,6 +48,10 @@ struct UpstreamContext {
   OptRef<const Upstream::HostDescription> host_;
   OptRef<const Upstream::ClusterInfo> cluster_;
   const ServiceType service_type_;
+
+  // TODO(botengyao), further distinguishment for the shared upstream code path
+  // in injectContext is needed, setting this flag to true only means it is called
+  // from async client at current stage.
   const bool async_client_span_;
 };
 

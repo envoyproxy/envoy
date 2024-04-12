@@ -156,8 +156,11 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
                                                       {":path", "/upstream/path"}};
     Upstream::HostDescriptionConstSharedPtr host{
         new testing::NiceMock<Upstream::MockHostDescription>()};
+    Upstream::ClusterInfoConstSharedPtr cluster{new testing::NiceMock<Upstream::MockClusterInfo>()};
+    Tracing::UpstreamContext upstream_context(host.get(), cluster.get(), Tracing::ServiceType::Http,
+                                              false);
 
-    first_child_span->injectContext(first_child_headers, host);
+    first_child_span->injectContext(first_child_headers, upstream_context);
     // Operation name of child span (EXIT span) will be override by the latest path of upstream
     // request.
     EXPECT_EQ("/upstream/path", first_child_span->spanEntity()->operationName());
