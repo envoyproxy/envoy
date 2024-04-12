@@ -545,6 +545,17 @@ Returns the current request's underlying :repo:`connection <envoy/network/connec
 
 Returns a :ref:`connection object <config_http_filters_lua_connection_wrapper>`.
 
+connectionStreamInfo()
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local connectionStreamInfo = handle:connectionStreamInfo()
+
+Returns connection-level :repo:`information <envoy/stream_info/stream_info.h>` related to the current request.
+
+Returns a connection-level :ref:`stream info object <config_http_filters_lua_cx_stream_info_wrapper>`.
+
 importPublicKey()
 ^^^^^^^^^^^^^^^^^
 
@@ -847,6 +858,20 @@ requestedServerName()
 
 Returns the string representation of :repo:`requested server name <envoy/stream_info/stream_info.h>`
 (e.g. SNI in TLS) for the current request if present.
+
+.. _config_http_filters_lua_cx_stream_info_wrapper:
+
+Connection stream info object API
+---------------------------------
+
+dynamicMetadata()
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  connectionStreamInfo:dynamicMetadata()
+
+Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>`.
 
 Dynamic metadata object API
 ---------------------------
