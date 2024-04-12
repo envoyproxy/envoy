@@ -301,7 +301,8 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
                                  ? &validation_visitor.runtime().value().get()
                                  : nullptr;
   UnexpectedFieldProtoVisitor unexpected_field_visitor(validation_visitor, runtime);
-  ProtobufMessage::traverseMessage(unexpected_field_visitor, message, recurse_into_any);
+  THROW_IF_NOT_OK(
+      ProtobufMessage::traverseMessage(unexpected_field_visitor, message, recurse_into_any));
 }
 
 namespace {
@@ -328,7 +329,7 @@ public:
 
 void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
   PgvCheckVisitor visitor;
-  ProtobufMessage::traverseMessage(visitor, message, true);
+  THROW_IF_NOT_OK(ProtobufMessage::traverseMessage(visitor, message, true));
 }
 
 void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Message& message) {
