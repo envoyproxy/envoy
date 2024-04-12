@@ -203,8 +203,8 @@ void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& sel
   // is the time to actually close the connection.
   maybeHandleCloseDuringInitialize();
   quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);
-  if (connection()->sent_server_preferred_address().IsInitialized() &&
-      self_address == connection()->sent_server_preferred_address()) {
+  if (connection()->expected_server_preferred_address().IsInitialized() &&
+      self_address == connection()->expected_server_preferred_address()) {
     connection_stats_.num_packets_rx_on_preferred_address_.inc();
   }
   maybeApplyDelayedClose();
