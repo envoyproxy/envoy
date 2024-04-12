@@ -693,7 +693,7 @@ template <class Value> struct TrieLookupTable {
    */
   Value findLongestPrefix(const char* key) const {
     const TrieEntry<Value>* current = &root_;
-    const TrieEntry<Value>* result = nullptr;
+    const TrieEntry<Value>* result = current;
 
     while (uint8_t c = *key) {
       // https://github.com/facebook/mcrouter/blob/master/mcrouter/lib/fbi/cpp/Trie-inl.h#L126-L143
@@ -706,7 +706,7 @@ template <class Value> struct TrieLookupTable {
       }
       key++;
     }
-    return result ? result->value_ : Value{};
+    return result ? result->value_ : nullptr;
   }
 
   TrieEntry<Value> root_;
