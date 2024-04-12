@@ -67,8 +67,8 @@ ActiveQuicListener::ActiveQuicListener(
       std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
   // Set the socket to report incoming ECN.
   if (receive_ecn) {
-    if (udp_listener->localAddress() == nullptr ||
-        udp_listener->localAdddress()->ip() == nullptr) {
+    if (udp_listener_->localAddress() == nullptr ||
+        udp_listener_->localAdddress()->ip() == nullptr) {
       IS_ENVOY_BUG("UDP Listener does not have local IP address");
     } else {
       int optval = 1;
