@@ -48,31 +48,6 @@ void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expec
   ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
 }
 
-// Gets the spdlog level from the test options and converts it to the Platform::LogLevel used by
-// the Envoy Mobile engine.
-Platform::LogLevel getPlatformLogLevelFromOptions() {
-  switch (TestEnvironment::getOptions().logLevel()) {
-  case spdlog::level::level_enum::trace:
-    return Platform::LogLevel::trace;
-  case spdlog::level::level_enum::debug:
-    return Platform::LogLevel::debug;
-  case spdlog::level::level_enum::info:
-    return Platform::LogLevel::info;
-  case spdlog::level::level_enum::warn:
-    return Platform::LogLevel::warn;
-  case spdlog::level::level_enum::err:
-    return Platform::LogLevel::error;
-  case spdlog::level::level_enum::critical:
-    return Platform::LogLevel::critical;
-  case spdlog::level::level_enum::off:
-    return Platform::LogLevel::off;
-  default:
-    ENVOY_LOG_MISC(warn, "Couldn't map spdlog level {}. Using `info` level.",
-                   TestEnvironment::getOptions().logLevel());
-    return Platform::LogLevel::info;
-  }
-}
-
 } // namespace
 
 // Use the Envoy mobile default config as much as possible in this test.
@@ -95,7 +70,8 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
   defer_listener_finalization_ = true;
   memset(&last_stream_final_intel_, 0, sizeof(envoy_final_stream_intel));
 
-  builder_.addLogLevel(getPlatformLogLevelFromOptions());
+  builder_.setLogLevel(
+      static_cast<Logger::Logger::Levels>(TestEnvironment::getOptions().logLevel()));
   // The admin interface gets added by default in the ConfigHelper's constructor. Since the admin
   // interface gets compiled out by default in Envoy Mobile, remove it from the ConfigHelper's
   // bootstrap config.
