@@ -91,12 +91,11 @@ void FilesystemSubscriptionImpl::refresh() {
               config_update->DebugString());
   }
   END_TRY
-  catch (const ProtobufMessage::UnknownProtoFieldException& e) {
-    configRejected(e, config_update == nullptr ? "" : config_update->DebugString());
-  }
   catch (const EnvoyException& e) {
     if (config_update != nullptr) {
       configRejected(e, config_update->DebugString());
+    } else if (absl::EndsWith(e.what(), "has unknown fields")) {
+      configRejected(e, "");
     } else {
       ENVOY_LOG(warn, "Filesystem config update failure: in {}, {}", path_, e.what());
       stats_.update_failure_.inc();
