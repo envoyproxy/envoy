@@ -1527,7 +1527,7 @@ envoy.matching.inputs.filter_state:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
 envoy.matching.inputs.uri_san:
