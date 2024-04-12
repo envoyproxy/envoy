@@ -46,7 +46,7 @@ TEST(SendHeadersTest, CanSendHeaders) {
 
   Platform::RequestHeadersBuilder request_headers_builder(
       Platform::RequestMethod::GET, "https",
-      absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getServerPort()), "/");
+      absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()), "/");
   auto request_headers = request_headers_builder.build();
   auto request_headers_ptr =
       Platform::RequestHeadersSharedPtr(new Platform::RequestHeaders(request_headers));

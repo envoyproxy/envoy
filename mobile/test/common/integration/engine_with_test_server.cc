@@ -4,7 +4,7 @@ namespace Envoy {
 
 EngineWithTestServer::EngineWithTestServer(Platform::EngineBuilder& engine_builder,
                                            TestServerType type) {
-  test_server_.startTestServer(type);
+  test_server_.start(type);
   engine_ = engine_builder.build();
 }
 
@@ -14,7 +14,7 @@ EngineWithTestServer::~EngineWithTestServer() {
   // Logger::Context is a global variable that is used by both Engine and TestServer. By shutting
   // down the TestServer first, the TestServer will no longer access a Logger::Context that has been
   // destroyed.
-  test_server_.shutdownTestServer();
+  test_server_.shutdown();
   engine_->terminate();
 }
 

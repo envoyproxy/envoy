@@ -15,7 +15,7 @@ Java_io_envoyproxy_envoymobile_engine_testing_HttpTestServerFactory_start(
 
   Envoy::ExtensionRegistry::registerFactories();
   Envoy::TestServer* test_server = new Envoy::TestServer();
-  test_server->startTestServer(static_cast<Envoy::TestServerType>(type));
+  test_server->start(static_cast<Envoy::TestServerType>(type));
 
   auto cpp_headers = Envoy::JNI::javaMapToCppMap(jni_helper, headers);
   auto cpp_body = Envoy::JNI::javaStringToCppString(jni_helper, body);
@@ -26,7 +26,7 @@ Java_io_envoyproxy_envoymobile_engine_testing_HttpTestServerFactory_start(
       "io/envoyproxy/envoymobile/engine/testing/HttpTestServerFactory$HttpTestServer");
   auto java_init_method_id =
       jni_helper.getMethodId(java_http_server_factory_class.get(), "<init>", "(JI)V");
-  int port = test_server->getServerPort();
+  int port = test_server->getPort();
   return jni_helper
       .newObject(java_http_server_factory_class.get(), java_init_method_id,
                  reinterpret_cast<jlong>(test_server), static_cast<jint>(port))
@@ -41,6 +41,6 @@ Java_io_envoyproxy_envoymobile_engine_testing_HttpTestServerFactory_00024HttpTes
   auto java_handle_field_id = jni_helper.getFieldId(java_class.get(), "handle", "J");
   jlong java_handle = jni_helper.getLongField(instance, java_handle_field_id);
   Envoy::TestServer* test_server = reinterpret_cast<Envoy::TestServer*>(java_handle);
-  test_server->shutdownTestServer();
+  test_server->shutdown();
   delete test_server;
 }
