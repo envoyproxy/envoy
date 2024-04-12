@@ -341,7 +341,7 @@ TEST(ConfigTest, TestConfig) {
   }
 }
 
-TEST(ConfigTest, TestDynamicConfigInUpstream) {
+TEST(ConfigTest, TestDynamicConfigInDownstream) {
   const std::string yaml_string = R"EOF(
       dynamic_config:
         name: set-response-code
@@ -359,19 +359,49 @@ TEST(ConfigTest, TestDynamicConfigInUpstream) {
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
   Envoy::Http::Matching::HttpFilterActionContext action_context{
-      .is_downstream_ = false,
+      .is_downstream_ = true,
       .stat_prefix_ = "test",
-      .factory_context_ = factory_context,
-      .upstream_factory_context_ = upstream_factory_context,
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
       .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createActionFactoryCb(config, action_context,
                                     ProtobufMessage::getStrictValidationVisitor()),
       EnvoyException,
-      "When composite filter is in upstream, the composite action config must not be dynamic.");
+      "Failed to get downstream factory context or server factory context.");
+}
+
+TEST(ConfigTest, TestDynamicConfigInUpstream) {
+  const std::string yaml_string = R"EOF(
+      dynamic_config:
+        name: set-response-code
+        config_discovery:
+          config_source:
+              resource_api_version: V3
+              path_config_source:
+                path: "{{ test_tmpdir }}/set_response_code.yaml"
+          type_urls:
+          - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigDual
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = false,
+      .stat_prefix_ = "test",
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = upstream_factory_context,
+      .server_factory_context_ = absl::nullopt};
+  ExecuteFilterActionFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException,
+      "Failed to get upstream factory context or server factory context.");
 }
 
 // For dual filter in downstream, if not overriding

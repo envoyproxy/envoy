@@ -43,6 +43,14 @@ public:
   }
 
 private:
+  Matcher::ActionFactoryCb createDynamicActionFactoryCbDownstream(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+    Http::Matching::HttpFilterActionContext& context);
+
+  Matcher::ActionFactoryCb createDynamicActionFactoryCbUpstream(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+    Http::Matching::HttpFilterActionContext& context);
+
   Matcher::ActionFactoryCb createActionFactoryCbDownstream(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context,

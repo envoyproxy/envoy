@@ -25,37 +25,11 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   }
 
   if (composite_action.has_dynamic_config()) {
-    if (!context.is_downstream_) {
-      throw EnvoyException(fmt::format("When composite filter is in upstream, the composite action "
-                                       "config must not be dynamic."));
+    if (context.is_downstream_) {
+      return createDynamicActionFactoryCbDownstream(composite_action, context);
+    } else {
+      return createDynamicActionFactoryCbUpstream(composite_action, context);
     }
-
-    if (!context.factory_context_.has_value() || !context.server_factory_context_.has_value()) {
-      throw EnvoyException(fmt::format("Failed to get factory context or server factory context."));
-    }
-    std::string name = composite_action.dynamic_config().name();
-    // Create a dynamic filter config provider and register it with the server factory context.
-    auto config_discovery = composite_action.dynamic_config().config_discovery();
-    Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
-    Server::Configuration::ServerFactoryContext& server_factory_context =
-        context.server_factory_context_.value();
-    auto provider_manager =
-        Envoy::Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
-            server_factory_context);
-    HttpExtensionConfigProviderSharedPtr provider =
-        provider_manager->createDynamicFilterConfigProvider(
-            config_discovery, composite_action.dynamic_config().name(), server_factory_context,
-            factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
-    return [provider = std::move(provider), n = std::move(name)]() -> Matcher::ActionPtr {
-      auto config_value = provider->config();
-      if (config_value.has_value()) {
-        auto factory_cb = config_value.value().get().factory_cb;
-        return std::make_unique<ExecuteFilterAction>(factory_cb, n);
-      }
-      // There is no dynamic config available. Apply missing config filter.
-      auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
-      return std::make_unique<ExecuteFilterAction>(factory_cb, n);
-    };
   }
 
   if (context.is_downstream_) {
@@ -63,6 +37,68 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   } else {
     return createActionFactoryCbUpstream(composite_action, context, validation_visitor);
   }
+}
+
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createDynamicActionFactoryCbDownstream(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+    Http::Matching::HttpFilterActionContext& context) {
+  if (!context.factory_context_.has_value() || !context.server_factory_context_.has_value()) {
+    throw EnvoyException(fmt::format("Failed to get downstream factory context or server factory context."));
+  }
+  std::string name = composite_action.dynamic_config().name();
+  // Create a dynamic filter config provider and register it with the server factory context.
+  auto config_discovery = composite_action.dynamic_config().config_discovery();
+  Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
+  Server::Configuration::ServerFactoryContext& server_factory_context =
+      context.server_factory_context_.value();
+  auto provider_manager =
+      Envoy::Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
+          server_factory_context);
+  HttpExtensionConfigProviderSharedPtr provider =
+      provider_manager->createDynamicFilterConfigProvider(
+          config_discovery, composite_action.dynamic_config().name(), server_factory_context,
+          factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
+  return [provider = std::move(provider), n = std::move(name)]() -> Matcher::ActionPtr {
+    auto config_value = provider->config();
+    if (config_value.has_value()) {
+      auto factory_cb = config_value.value().get().factory_cb;
+      return std::make_unique<ExecuteFilterAction>(factory_cb, n);
+    }
+    // There is no dynamic config available. Apply missing config filter.
+    auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
+    return std::make_unique<ExecuteFilterAction>(factory_cb, n);
+  };
+}
+
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createDynamicActionFactoryCbUpstream(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+    Http::Matching::HttpFilterActionContext& context) {
+  if (!context.upstream_factory_context_.has_value() || !context.server_factory_context_.has_value()) {
+    throw EnvoyException(fmt::format("Failed to get upstream factory context or server factory context."));
+  }
+  std::string name = composite_action.dynamic_config().name();
+  // Create a dynamic filter config provider and register it with the server factory context.
+  auto config_discovery = composite_action.dynamic_config().config_discovery();
+  Server::Configuration::UpstreamFactoryContext& factory_context = context.upstream_factory_context_.value();
+  Server::Configuration::ServerFactoryContext& server_factory_context =
+      context.server_factory_context_.value();
+  auto provider_manager =
+      Envoy::Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+          server_factory_context);
+  HttpExtensionConfigProviderSharedPtr provider =
+      provider_manager->createDynamicFilterConfigProvider(
+          config_discovery, composite_action.dynamic_config().name(), server_factory_context,
+          factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
+  return [provider = std::move(provider), n = std::move(name)]() -> Matcher::ActionPtr {
+    auto config_value = provider->config();
+    if (config_value.has_value()) {
+      auto factory_cb = config_value.value().get().factory_cb;
+      return std::make_unique<ExecuteFilterAction>(factory_cb, n);
+    }
+    // There is no dynamic config available. Apply missing config filter.
+    auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
+    return std::make_unique<ExecuteFilterAction>(factory_cb, n);
+  };
 }
 
 Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCbDownstream(

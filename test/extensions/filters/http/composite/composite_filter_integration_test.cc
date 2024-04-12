@@ -275,6 +275,9 @@ resources:
                                                                  {":authority", "blah"}};
 
   void initialize() override {
+    if (!downstream_filter_) {
+      setUpstreamProtocol(Http::CodecType::HTTP2);
+    }
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ecds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ecds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -294,6 +297,10 @@ resources:
     for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
       for (bool is_downstream : {true, false}) {
         for (bool is_dual_factory : {true, false}) {
+          if (!is_downstream && !is_dual_factory) {
+            // Skip upstream filter test for non-dual filter.
+            continue;
+          }
           CompositeFilterTestParams params;
           params.version = ip_version;
           params.is_downstream = is_downstream;
@@ -328,14 +335,7 @@ INSTANTIATE_TEST_SUITE_P(
 // Verifies that if we don't match the match action the request is proxied as normal, while if the
 // match action is hit we apply the specified filter to the stream.
 TEST_P(CompositeFilterIntegrationTest, TestBasic) {
-  // Skip upstream filter test for non-dual filter.
-  if (!is_dual_factory_ && !downstream_filter_) {
-    return;
-  }
   prependCompositeFilter();
-  if (!downstream_filter_) {
-    setUpstreamProtocol(Http::CodecType::HTTP2);
-  }
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -358,13 +358,15 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
 // Verifies that if we don't match the match action the request is proxied as normal, while if the
 // match action is hit we apply the specified dynamic filter to the stream.
 TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
-  if (!downstream_filter_) {
-    return;
-  }
   prependCompositeDynamicFilter("composite-dynamic");
   initialize();
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.http_filter.set-response-code.config_reload", 1);
+  if (downstream_filter_) {
+    test_server_->waitForCounterGe(
+        "extension_config_discovery.http_filter.set-response-code.config_reload", 1);
+  } else {
+    test_server_->waitForCounterGe(
+        "extension_config_discovery.upstream_http_filter.set-response-code.config_reload", 1);
+  }
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
 
@@ -389,13 +391,15 @@ TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
 // Verifies that if ECDS response is not sent, the missing filter config is applied that returns
 // 500.
 TEST_P(CompositeFilterIntegrationTest, TestMissingDynamicFilter) {
-  if (!downstream_filter_) {
-    return;
-  }
   prependMissingCompositeDynamicFilter("composite-dynamic-missing");
   initialize();
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.http_filter.missing-config.config_fail", 1);
+  if (downstream_filter_) {
+    test_server_->waitForCounterGe(
+        "extension_config_discovery.http_filter.missing-config.config_fail", 1);
+  } else {
+    test_server_->waitForCounterGe(
+        "extension_config_discovery.upstream_http_filter.missing-config.config_fail", 1);
+  }
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
 
