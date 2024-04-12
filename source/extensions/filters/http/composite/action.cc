@@ -93,7 +93,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCbDownst
   }
 
   if (callback == nullptr) {
-    throw EnvoyException("Failed to get filter factory creation function");
+    throw EnvoyException("Failed to get downstream filter factory creation function");
   }
   std::string name = composite_action.typed_config().name();
 
@@ -124,7 +124,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCbUpstre
   }
 
   if (callback == nullptr) {
-    throw EnvoyException("Failed to get filter factory creation function");
+    throw EnvoyException("Failed to get upstream filter factory creation function");
   }
   std::string name = composite_action.typed_config().name();
 
