@@ -167,8 +167,7 @@ bug_fixes:
     Fixed crash bug with QUIC upstream + X.509v1 certificates.
 - area: quic
   change: |
-    Added support for QUIC listeners to echo incoming ECN marks to the peer. 
-    This behavior can be disabled by setting runtime flag ``envoy.reloadable_features.quic_receive_ecn`` to false.
+    Added support for QUIC listeners to echo incoming ECN marks to the peer. Currently disabled. When changes are complete and this is enabled, it can be disabled by setting runtime flag ``envoy.reloadable_features.quic_receive_ecn`` to false.
 - area: proxy_protocol
   change: |
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
