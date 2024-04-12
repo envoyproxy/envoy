@@ -1,11 +1,9 @@
-#include "test_server.h"
+#include "test/common/integration/test_server.h"
 
-#include "source/common/common/random_generator.h"
 #include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/quic/server_codec_impl.h"
-#include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/common/tls/context_config_impl.h"
@@ -19,6 +17,8 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+
+#include "extension_registry.h"
 
 namespace Envoy {
 
@@ -80,6 +80,8 @@ TestServer::TestServer()
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
   ON_CALL(factory_context_, sslContextManager())
       .WillByDefault(testing::ReturnRef(context_manager_));
+
+  Envoy::ExtensionRegistry::registerFactories();
 }
 
 void TestServer::startTestServer(TestServerType test_server_type) {
