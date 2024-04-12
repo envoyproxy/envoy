@@ -237,6 +237,11 @@ bug_fixes:
 - area: http2
   change: |
     Update nghttp2 to resolve CVE-2024-30255 https://github.com/envoyproxy/envoy/security/advisories/GHSA-j654-3ccm-vfmm.
+- area: prefix_matcher_tree
+  change: |
+    Fixed issue in matcher prefix tree lookup.
+    The lookup did not function correctly when the prefix tree had overlapping prefixes.
+    For example: with prefixes ``/foo`` and ``/foo/bar``, it would have incorrectly said no prefix match for ``/foo/``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
