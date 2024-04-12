@@ -1,4 +1,4 @@
-#include "test_server.h"
+#include "test/common/integration/test_server.h"
 
 #include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/listener_manager/listener_manager_impl.h"

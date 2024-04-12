@@ -10,6 +10,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",
+        "//test/common/integration:engine_with_test_server",
         "//test/common/integration:test_server_lib",
         "@envoy_build_config//:test_extensions",
     ],
@@ -21,6 +22,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",
+        "//test/common/integration:engine_with_test_server",
         "//test/common/integration:test_server_lib",
         "@envoy_build_config//:test_extensions",
     ],

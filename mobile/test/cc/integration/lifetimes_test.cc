@@ -1,3 +1,4 @@
+#include "test/common/integration/engine_with_test_server.h"
 #include "test/common/integration/test_server.h"
 
 #include "absl/strings/str_format.h"
@@ -12,21 +13,18 @@ namespace Envoy {
 namespace {
 
 void sendRequest() {
-  TestServer test_server;
-  test_server.startTestServer(TestServerType::HTTP2_WITH_TLS);
-
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
-  Platform::EngineSharedPtr engine = engine_builder.enforceTrustChainVerification(false)
-                                         .setLogLevel(Logger::Logger::debug)
-                                         .setOnEngineRunning([&]() { engine_running.Notify(); })
-                                         .build();
+  engine_builder.enforceTrustChainVerification(false)
+      .setLogLevel(Logger::Logger::debug)
+      .setOnEngineRunning([&]() { engine_running.Notify(); });
+  EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
   engine_running.WaitForNotification();
 
   absl::Notification stream_complete;
   int actual_status_code;
   bool actual_end_stream;
-  auto stream_prototype = engine->streamClient()->newStreamPrototype();
+  auto stream_prototype = engine_with_test_server.engine()->streamClient()->newStreamPrototype();
   auto stream = (*stream_prototype)
                     .setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream,
                                       envoy_stream_intel) {
@@ -44,23 +42,17 @@ void sendRequest() {
                     })
                     .start();
 
-  auto request_headers = Platform::RequestHeadersBuilder(
-                             Platform::RequestMethod::GET, "https",
-                             absl::StrFormat("localhost:%d", test_server.getServerPort()), "/")
-                             .build();
+  auto request_headers =
+      Platform::RequestHeadersBuilder(
+          Platform::RequestMethod::GET, "https",
+          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getServerPort()),
+          "/")
+          .build();
   stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
   stream_complete.WaitForNotification();
 
-  // It is important that the we shutdown the TestServer first before terminating the Engine. This
-  // is because when the Engine is terminated, the Logger::Context will be destroyed and
-  // Logger::Context is a global variable that is used by both Engine and TestServer. By shutting
-  // down the TestServer first, the TestServer will no longer access a Logger::Context that has been
-  // destroyed.
-  test_server.shutdownTestServer();
-
   EXPECT_EQ(actual_status_code, 200);
   EXPECT_TRUE(actual_end_stream);
-  EXPECT_EQ(engine->terminate(), ENVOY_SUCCESS);
 }
 
 // this test attempts to elicit race conditions deriving from

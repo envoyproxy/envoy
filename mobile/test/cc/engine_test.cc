@@ -1,5 +1,6 @@
 #include "source/common/common/assert.h"
 
+#include "test/common/integration/engine_with_test_server.h"
 #include "test/common/integration/test_server.h"
 
 #include "absl/strings/str_format.h"
@@ -10,9 +11,6 @@
 namespace Envoy {
 
 TEST(EngineTest, SetLogger) {
-  TestServer test_server;
-  test_server.startTestServer(TestServerType::HTTP2_WITH_TLS);
-
   std::atomic<bool> logging_was_called{false};
   auto logger = std::make_unique<EnvoyLogger>();
   logger->on_log_ = [&](Logger::Logger::Levels, const std::string&) { logging_was_called = true; };
@@ -21,17 +19,17 @@ TEST(EngineTest, SetLogger) {
   auto engine_callbacks = std::make_unique<EngineCallbacks>();
   engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
   Platform::EngineBuilder engine_builder;
-  Platform::EngineSharedPtr engine = engine_builder.setLogLevel(Logger::Logger::debug)
-                                         .setLogger(std::move(logger))
-                                         .setEngineCallbacks(std::move(engine_callbacks))
-                                         .enforceTrustChainVerification(false)
-                                         .build();
+  engine_builder.setLogLevel(Logger::Logger::debug)
+      .setLogger(std::move(logger))
+      .setEngineCallbacks(std::move(engine_callbacks))
+      .enforceTrustChainVerification(false);
+  EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
   engine_running.WaitForNotification();
 
   int actual_status_code = 0;
   bool actual_end_stream = false;
   absl::Notification stream_complete;
-  auto stream_prototype = engine->streamClient()->newStreamPrototype();
+  auto stream_prototype = engine_with_test_server.engine()->streamClient()->newStreamPrototype();
   auto stream = (*stream_prototype)
                     .setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream,
                                       envoy_stream_intel) {
@@ -52,24 +50,18 @@ TEST(EngineTest, SetLogger) {
                     })
                     .start();
 
-  auto request_headers = Platform::RequestHeadersBuilder(
-                             Platform::RequestMethod::GET, "https",
-                             absl::StrFormat("localhost:%d", test_server.getServerPort()), "/")
-                             .build();
+  auto request_headers =
+      Platform::RequestHeadersBuilder(
+          Platform::RequestMethod::GET, "https",
+          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getServerPort()),
+          "/")
+          .build();
   stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
   stream_complete.WaitForNotification();
-
-  // It is important that the we shutdown the TestServer first before terminating the Engine. This
-  // is because when the Engine is terminated, the Logger::Context will be destroyed and
-  // Logger::Context is a global variable that is used by both Engine and TestServer. By shutting
-  // down the TestServer first, the TestServer will no longer access a Logger::Context that has been
-  // destroyed.
-  test_server.shutdownTestServer();
 
   EXPECT_EQ(actual_status_code, 200);
   EXPECT_TRUE(actual_end_stream);
   EXPECT_TRUE(logging_was_called.load());
-  EXPECT_EQ(engine->terminate(), ENVOY_SUCCESS);
 }
 
 TEST(EngineTest, SetEngineCallbacks) {
@@ -80,16 +72,16 @@ TEST(EngineTest, SetEngineCallbacks) {
   auto engine_callbacks = std::make_unique<EngineCallbacks>();
   engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
   Platform::EngineBuilder engine_builder;
-  Platform::EngineSharedPtr engine = engine_builder.setLogLevel(Logger::Logger::debug)
-                                         .setEngineCallbacks(std::move(engine_callbacks))
-                                         .enforceTrustChainVerification(false)
-                                         .build();
+  engine_builder.setLogLevel(Logger::Logger::debug)
+      .setEngineCallbacks(std::move(engine_callbacks))
+      .enforceTrustChainVerification(false);
+  EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
   engine_running.WaitForNotification();
 
   int actual_status_code = 0;
   bool actual_end_stream = false;
   absl::Notification stream_complete;
-  auto stream_prototype = engine->streamClient()->newStreamPrototype();
+  auto stream_prototype = engine_with_test_server.engine()->streamClient()->newStreamPrototype();
   auto stream = (*stream_prototype)
                     .setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream,
                                       envoy_stream_intel) {
@@ -110,29 +102,20 @@ TEST(EngineTest, SetEngineCallbacks) {
                     })
                     .start();
 
-  auto request_headers = Platform::RequestHeadersBuilder(
-                             Platform::RequestMethod::GET, "https",
-                             absl::StrFormat("localhost:%d", test_server.getServerPort()), "/")
-                             .build();
+  auto request_headers =
+      Platform::RequestHeadersBuilder(
+          Platform::RequestMethod::GET, "https",
+          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getServerPort()),
+          "/")
+          .build();
   stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
   stream_complete.WaitForNotification();
 
-  // It is important that the we shutdown the TestServer first before terminating the Engine. This
-  // is because when the Engine is terminated, the Logger::Context will be destroyed and
-  // Logger::Context is a global variable that is used by both Engine and TestServer. By shutting
-  // down the TestServer first, the TestServer will no longer access a Logger::Context that has been
-  // destroyed.
-  test_server.shutdownTestServer();
-
   EXPECT_EQ(actual_status_code, 200);
   EXPECT_TRUE(actual_end_stream);
-  EXPECT_EQ(engine->terminate(), ENVOY_SUCCESS);
 }
 
 TEST(EngineTest, SetEventTracker) {
-  TestServer test_server;
-  test_server.startTestServer(TestServerType::HTTP2_WITH_TLS);
-
   absl::Notification engine_running;
   auto engine_callbacks = std::make_unique<EngineCallbacks>();
   engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
@@ -149,24 +132,16 @@ TEST(EngineTest, SetEventTracker) {
   event_tracker->on_exit_ = [&] { on_track_exit.Notify(); };
 
   Platform::EngineBuilder engine_builder;
-  Platform::EngineSharedPtr engine = engine_builder.setLogLevel(Logger::Logger::debug)
-                                         .setEngineCallbacks(std::move(engine_callbacks))
-                                         .setEventTracker(std::move(event_tracker))
-                                         .enforceTrustChainVerification(false)
-                                         .build();
+  engine_builder.setLogLevel(Logger::Logger::debug)
+      .setEngineCallbacks(std::move(engine_callbacks))
+      .setEventTracker(std::move(event_tracker))
+      .enforceTrustChainVerification(false);
+  EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
   engine_running.WaitForNotification();
 
   Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly("foo_location");
 
-  // It is important that the we shutdown the TestServer first before terminating the Engine. This
-  // is because when the Engine is terminated, the Logger::Context will be destroyed and
-  // Logger::Context is a global variable that is used by both Engine and TestServer. By shutting
-  // down the TestServer first, the TestServer will no longer access a Logger::Context that has been
-  // destroyed.
-  test_server.shutdownTestServer();
-
   EXPECT_TRUE(on_track.WaitForNotificationWithTimeout(absl::Seconds(3)));
-  EXPECT_EQ(engine->terminate(), ENVOY_SUCCESS);
   EXPECT_TRUE(on_track.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 
