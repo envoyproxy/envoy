@@ -66,17 +66,21 @@ ActiveQuicListener::ActiveQuicListener(
   auto alarm_factory =
       std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
   // Set the socket to report incoming ECN.
-  if (receive_ecn && (udp_listener_->localAddress() != nullptr ||
-                      udp_listener_->localAddress()->ip() != nullptr)) {
-    int optval = 1;
-    socklen_t optlen = sizeof(optval);
-    if (udp_listener_->localAddress()->ip()->ipv6() != nullptr) {
-      listen_socket_.setSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, optlen);
-      if (!udp_listener_->localAddress()->ip()->ipv6()->v6only()) {
+  if (receive_ecn) {
+    if (udp_listener->localAddress() == nullptr ||
+        udp_listener->localAdddress()->ip() == nullptr) {
+      IS_ENVOY_BUG("UDP Listener does not have local IP address");
+    } else {
+      int optval = 1;
+      socklen_t optlen = sizeof(optval);
+      if (udp_listener_->localAddress()->ip()->ipv6() != nullptr) {
+        listen_socket_.setSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, optlen);
+        if (!udp_listener_->localAddress()->ip()->ipv6()->v6only()) {
+          listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
+        }
+      } else {
         listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
       }
-    } else {
-      listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
     }
   }
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
