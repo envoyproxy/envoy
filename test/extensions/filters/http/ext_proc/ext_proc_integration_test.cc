@@ -3767,7 +3767,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
   ConfigOptions config_option = {};
   config_option.downstream_filter = false;
 
-  initializeConfig();
+  initializeConfig(config_option);
   // Add ext_proc as upstream filter.
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();

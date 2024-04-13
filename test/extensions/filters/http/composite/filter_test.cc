@@ -369,8 +369,7 @@ TEST(ConfigTest, TestDynamicConfigInDownstream) {
   EXPECT_THROW_WITH_MESSAGE(
       factory.createActionFactoryCb(config, action_context,
                                     ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException,
-      "Failed to get downstream factory context or server factory context.");
+      EnvoyException, "Failed to get downstream factory context or server factory context.");
 }
 
 TEST(ConfigTest, TestDynamicConfigInUpstream) {
@@ -400,8 +399,7 @@ TEST(ConfigTest, TestDynamicConfigInUpstream) {
   EXPECT_THROW_WITH_MESSAGE(
       factory.createActionFactoryCb(config, action_context,
                                     ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException,
-      "Failed to get upstream factory context or server factory context.");
+      EnvoyException, "Failed to get upstream factory context or server factory context.");
 }
 
 // For dual filter in downstream, if not overriding
