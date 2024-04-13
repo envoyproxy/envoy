@@ -816,7 +816,7 @@ message RouteAction {
     google.protobuf.BoolValue trace_sampled = 4;
 
     // Disables appending the ``-shadow`` suffix to the shadowed ``Host`` header. Defaults to ``false``.
-    google.protobuf.BoolValue disable_shadow_host_suffix_append = 6;
+    bool disable_shadow_host_suffix_append = 6;
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
