@@ -153,7 +153,8 @@ public:
                Server::Configuration::CommonFactoryContext& context)
       : failure_mode_allow_(config.failure_mode_allow()),
         disable_clear_route_cache_(config.disable_clear_route_cache()),
-        message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
+        observability_mode_(config.observability_mode()), message_timeout_(message_timeout),
+        max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()),
         mutation_checker_(config.mutation_rules(), context.regexEngine()),
@@ -197,6 +198,8 @@ public:
 
   bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
+  bool observabilityMode() const { return observability_mode_; }
+
   const std::vector<Matchers::StringMatcherPtr>& allowedHeaders() const { return allowed_headers_; }
   const std::vector<Matchers::StringMatcherPtr>& disallowedHeaders() const {
     return disallowed_headers_;
@@ -228,8 +231,10 @@ private:
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
+
   const bool failure_mode_allow_;
   const bool disable_clear_route_cache_;
+  const bool observability_mode_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
 
@@ -388,6 +393,9 @@ private:
   void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 
+  Http::FilterHeadersStatus
+  sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers, ProcessorState& state,
+                                 bool end_stream);
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream);
 

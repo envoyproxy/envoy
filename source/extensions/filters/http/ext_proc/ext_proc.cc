@@ -328,6 +328,34 @@ void Filter::onDestroy() {
   encoding_state_.stopMessageTimer();
 }
 
+FilterHeadersStatus
+Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers,
+                                       ProcessorState& state, bool end_stream) {
+
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return FilterHeadersStatus::StopIteration;
+  case StreamOpenState::IgnoreError:
+    return FilterHeadersStatus::Continue;
+  case StreamOpenState::Ok:
+    // Fall through
+    break;
+  }
+
+  ProcessingRequest req;
+  addAttributes(state, req);
+  addDynamicMetadata(state, req);
+  auto* headers_req = state.mutableHeaders(req);
+  MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
+                                *headers_req->mutable_headers());
+  headers_req->set_end_of_stream(end_stream);
+  ENVOY_LOG(debug, "Sending headers message");
+  stream_->send(std::move(req), false);
+  stats_.stream_msgs_sent_.inc();
+
+  return FilterHeadersStatus::Continue;
+}
+
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
   switch (openStream()) {
@@ -342,6 +370,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
 
   state.setHeaders(&headers);
   state.setHasNoBody(end_stream);
+
   ProcessingRequest req;
   addAttributes(state, req);
   addDynamicMetadata(state, req);
@@ -361,6 +390,15 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
   mergePerRouteConfig();
+
+  // onHeaders() function will only be called when external processor wants headers to be sent.
+  // External processor may still close the stream to indicate that no more messages are needed.
+  // In this case, `processing_complete_` will be true and sending message is skipped at openStream
+  // above.
+  if (decoding_state_.sendHeaders() && config_->observabilityMode()) {
+    return sendHeadersInObservabilityMode(headers, decoding_state_, end_stream);
+  }
+
   if (end_stream) {
     decoding_state_.setCompleteBodyAvailable(true);
   }
@@ -385,6 +423,27 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 }
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
+  if (config_->observabilityMode()) {
+    if (state.bodyMode() == ProcessingMode::STREAMED) {
+      switch (openStream()) {
+      case StreamOpenState::Error:
+        return FilterDataStatus::StopIterationNoBuffer;
+      case StreamOpenState::IgnoreError:
+        return FilterDataStatus::Continue;
+      case StreamOpenState::Ok:
+        // Fall through
+        break;
+      }
+      auto req = setupBodyChunk(state, data, end_stream);
+      // LOG(INFO) << "tyxia_body_size: " << data.length() << "\n";
+
+      sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
+    } else if (state.bodyMode() != ProcessingMode::NONE) {
+      ENVOY_LOG(error, "Wrong body mode for observability mode, no data is sent.");
+    }
+    return FilterDataStatus::Continue;
+  }
+
   if (end_stream) {
     state.setCompleteBodyAvailable(true);
   }
@@ -644,6 +703,11 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   // Try to merge the route config again in case the decodeHeaders() is not called when processing
   // local reply.
   mergePerRouteConfig();
+
+  if (encoding_state_.sendHeaders() && config_->observabilityMode()) {
+    return sendHeadersInObservabilityMode(headers, encoding_state_, end_stream);
+  }
+
   if (end_stream) {
     encoding_state_.setCompleteBodyAvailable(true);
   }
@@ -861,6 +925,12 @@ void Filter::setDecoderDynamicMetadata(const ProcessingResponse& response) {
 }
 
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
+  if (config_->observabilityMode()) {
+    ENVOY_LOG(error, "Ignoring stream message received when observability mode is enabled");
+    // Ignore additional messages in the observability mode.
+    return;
+  }
+
   if (processing_complete_) {
     ENVOY_LOG(debug, "Ignoring stream message received after processing complete");
     // Ignore additional messages after we decided we were done with the stream

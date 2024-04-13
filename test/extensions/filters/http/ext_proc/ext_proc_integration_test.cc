@@ -3853,4 +3853,120 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithHeader) {
+  proto_config_.set_observability_mode(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [](const HttpHeaders&, HeadersResponse& headers_resp) {
+                                 auto* response_mutation =
+                                     headers_resp.mutable_response()->mutable_header_mutation();
+                                 auto* add1 = response_mutation->add_set_headers();
+                                 add1->mutable_header()->set_key("x-response-processed");
+                                 add1->mutable_header()->set_value("1");
+                                 return true;
+                               });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  // Header mutation response has been ignored.
+  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
+  Http::TestResponseHeaderMapImpl response_headers =
+      Http::TestResponseHeaderMapImpl{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
+  proto_config_.set_observability_mode(true);
+
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  // TODO(tyxia) skip response body.
+  // proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = std::string(1024 , 'a');
+  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
+
+  // // All the response should be just ignored in the async mode
+  // processRequestHeadersMessage(
+  //     *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+  //       auto* content_length =
+  //           headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+  //       content_length->mutable_header()->set_key("content-length");
+  //       content_length->mutable_header()->set_value("13");
+  //       return true;
+  //     });
+
+  // This avoids early filter destruction so that upstream server don't need return
+  // early.
+  bool end_stream = false;
+  int count = 0;
+  while (!end_stream) {
+     processRequestBodyMessage(
+      *grpc_upstreams_[0], count == 0 ? true : false, [&end_stream](const HttpBody& body,
+      BodyResponse&) {
+        // EXPECT_TRUE(body.end_of_stream());
+        end_stream = body.end_of_stream();
+        // check the request to sidestream server
+        return true;
+      });
+    count++;
+  }
+
+  //  processRequestBodyMessage(
+  //     *grpc_upstreams_[0], true, [&end_stream](const HttpBody& body, BodyResponse& body_resp)
+  // {
+  //       // EXPECT_TRUE(body.end_of_stream());
+  //       end_stream = body.end_of_stream();
+  //       auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+  //       body_mut->set_body("Hello, World!");
+  //       return true;
+  //     });
+
+  handleUpstreamRequest();
+
+  // processResponseHeadersMessage(
+  //     *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+  //       headers_resp.mutable_response()->mutable_header_mutation()->add_remove_headers(
+  //           "content-length");
+  //       return true;
+  //     });
+
+  /* TODO(tyxia)
+  * Header processing above is ok, Body processing here is performed after filter
+  * destroyed so it should fail
+  * But it seems that only fail in Google gRPC?
+  *
+  */
+  // gRPC stream is closed due to filter destruction on mainStream
+  // processResponseBodyMessage(
+  //     *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+  //       LOG(INFO) << "tyxia_integration_body_message\n";
+  //       EXPECT_TRUE(body.end_of_stream());
+  //       body_resp.mutable_response()->mutable_body_mutation()->set_body("123");
+  //       return true;
+  //     });
+
+  verifyDownstreamResponse(*response, 200);
+  // EXPECT_EQ("123", response->body());
+}
+
 } // namespace Envoy
