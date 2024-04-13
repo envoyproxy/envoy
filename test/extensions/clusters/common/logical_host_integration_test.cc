@@ -10,39 +10,55 @@ namespace Extensions {
 namespace Clusters {
 
 // Logical Host integration test.
-class LogicalHostIntegrationTest : public testing::Test, public HttpIntegrationTest {
+class LogicalHostIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                   public HttpIntegrationTest {
 public:
   LogicalHostIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v6),
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()),
         registered_dns_factory_(dns_resolver_factory_) {}
 
   void createUpstreams() override { HttpIntegrationTest::createUpstreams(); }
+  struct address {
+    uint32_t address_ = 0;
+    std::string first_address_string_;
+  };
 
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
-  std::shared_ptr<uint32_t> address_ptr_ = nullptr;
 };
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, LogicalHostIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Reproduces a race from https://github.com/envoyproxy/envoy/issues/32850.
 // The test is by mocking the DNS resolver to return multiple different
 // addresses, also config dns_refresh_rate to be extremely fast.
-TEST_F(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
-  address_ptr_ = std::make_shared<uint32_t>(0);
+TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
+  auto address_ptr = std::make_shared<address>();
+  address_ptr->address_ = 0;
+  // first_address_string_ is used to make connections. It needs
+  // to match with the IpVersion of the test.
+  if (version_ == Network::Address::IpVersion::v4) {
+    address_ptr->first_address_string_ = "127.0.0.1";
+  } else {
+    address_ptr->first_address_string_ = "::1";
+  }
+
   auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .WillRepeatedly(testing::Return(dns_resolver));
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
-      .WillRepeatedly(
-          Invoke([address_ptr = address_ptr_](
-                     const std::string&, Network::DnsLookupFamily,
-                     Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
-            uint32_t address = *address_ptr;
+      .WillRepeatedly(Invoke(
+          [address_ptr](const std::string&, Network::DnsLookupFamily,
+                        Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
+            uint32_t address = address_ptr->address_;
             // Keep changing the returned addresses to force address update.
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                          TestUtility::makeDnsResponse({
                              // The only significant address is the first one; the other ones are
                              // just used to populate a list whose maintenance is race-prone.
-                             "::1",
+                             address_ptr->first_address_string_,
                              absl::StrCat("127.0.0.", address),
                              absl::StrCat("127.0.0.", address + 1),
                              absl::StrCat("127.0.0.", address + 2),
@@ -62,7 +78,7 @@ TEST_F(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
                              "::8",
                              "::9",
                          }));
-            *address_ptr = (*address_ptr + 1) % 128;
+            address_ptr->address_ = (address + 1) % 128;
             return nullptr;
           }));
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
