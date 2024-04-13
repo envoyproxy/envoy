@@ -12,8 +12,8 @@
 
 #include "source/common/config/api_version.h"
 #include "source/common/network/utility.h"
+#include "source/common/tls/context_manager_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/fake_access_log.h"
 #include "test/integration/ssl_utility.h"
@@ -1429,8 +1429,8 @@ void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   TcpProxyIntegrationTest::initialize();
 
-  context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+  context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+      server_factory_context_);
   payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 }
 

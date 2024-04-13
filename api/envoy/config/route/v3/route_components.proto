@@ -673,7 +673,7 @@ message RouteMatch {
 //   :ref:`CorsPolicy in filter extension <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`
 //   as as alternative.
 //
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message CorsPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.CorsPolicy";
 
@@ -727,6 +727,10 @@ message CorsPolicy {
   //
   // More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
   google.protobuf.BoolValue allow_private_network_access = 12;
+
+  // Specifies if preflight requests not matching the configured allowed origin should be forwarded
+  // to the upstream. Default is true.
+  google.protobuf.BoolValue forward_not_matching_preflights = 13;
 }
 
 // [#next-free-field: 42]

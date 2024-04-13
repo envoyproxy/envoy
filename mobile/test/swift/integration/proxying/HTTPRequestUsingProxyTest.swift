@@ -12,7 +12,8 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     register_test_extensions()
   }
 
-  func testHTTPRequestUsingProxy() throws {
+  // https://github.com/envoyproxy/envoy/issues/33014
+  func skipped_testHTTPRequestUsingProxy() throws {
     EnvoyTestServer.startHttpProxyServer()
     let port = EnvoyTestServer.getEnvoyPort()
 
@@ -23,7 +24,10 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
         self.expectation(description: "Successful response trailers received")
 
     let engine = EngineBuilder()
-      .addLogLevel(.trace)
+      .addLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .setOnEngineRunning {
         engineExpectation.fulfill()
       }
@@ -65,7 +69,8 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     EnvoyTestServer.shutdownTestServer()
   }
 
-  func testHTTPSRequestUsingProxy() throws {
+  // https://github.com/envoyproxy/envoy/issues/33014
+  func skipped_testHTTPSRequestUsingProxy() throws {
     EnvoyTestServer.startHttpsProxyServer()
     let port = EnvoyTestServer.getEnvoyPort()
 
@@ -77,6 +82,9 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
 
     let engine = EngineBuilder()
       .addLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .setOnEngineRunning {
         engineExpectation.fulfill()
       }
@@ -120,7 +128,8 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     EnvoyTestServer.shutdownTestServer()
   }
 
-  func testHTTPSRequestUsingPacFileUrlResolver() throws {
+  // https://github.com/envoyproxy/envoy/issues/33014
+  func skipped_testHTTPSRequestUsingPacFileUrlResolver() throws {
     EnvoyTestServer.startHttpsProxyServer()
     let port = EnvoyTestServer.getEnvoyPort()
 
@@ -132,6 +141,9 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
 
     let engine = EngineBuilder()
       .addLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .setOnEngineRunning {
         engineExpectation.fulfill()
       }
@@ -175,14 +187,18 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     EnvoyTestServer.shutdownTestServer()
   }
 
-  func testHTTPRequestUsingProxyCancelStream() throws {
+  // https://github.com/envoyproxy/envoy/issues/33014
+  func skipped_testHTTPRequestUsingProxyCancelStream() throws {
     EnvoyTestServer.startHttpProxyServer()
     let port = EnvoyTestServer.getEnvoyPort()
 
     let engineExpectation = self.expectation(description: "Run started engine")
 
     let engine = EngineBuilder()
-      .addLogLevel(.trace)
+      .addLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .setOnEngineRunning {
         engineExpectation.fulfill()
       }

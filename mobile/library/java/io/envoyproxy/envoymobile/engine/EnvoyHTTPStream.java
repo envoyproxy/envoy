@@ -2,9 +2,7 @@ package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -44,8 +42,7 @@ public class EnvoyHTTPStream {
    * @param endStream, supplies whether this is headers only.
    */
   public void sendHeaders(Map<String, List<String>> headers, boolean endStream) {
-    JniLibrary.sendHeaders(engineHandle, streamHandle, JniBridgeUtility.toJniHeaders(headers),
-                           endStream);
+    JniLibrary.sendHeaders(engineHandle, streamHandle, headers, endStream);
   }
 
   /**
@@ -107,7 +104,7 @@ public class EnvoyHTTPStream {
    * @param trailers, the trailers to send.
    */
   public void sendTrailers(Map<String, List<String>> trailers) {
-    JniLibrary.sendTrailers(engineHandle, streamHandle, JniBridgeUtility.toJniHeaders(trailers));
+    JniLibrary.sendTrailers(engineHandle, streamHandle, trailers);
   }
 
   /**

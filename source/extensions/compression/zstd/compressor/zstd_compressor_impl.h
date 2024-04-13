@@ -2,7 +2,8 @@
 
 #include "envoy/compression/compressor/compressor.h"
 
-#include "source/extensions/compression/zstd/common/base.h"
+#include "source/common/compression/zstd/common/base.h"
+#include "source/common/compression/zstd/compressor/zstd_compressor_impl_base.h"
 #include "source/extensions/compression/zstd/common/dictionary_manager.h"
 
 namespace Envoy {
@@ -18,22 +19,21 @@ using ZstdCDictManagerPtr = std::unique_ptr<ZstdCDictManager>;
 /**
  * Implementation of compressor's interface.
  */
-class ZstdCompressorImpl : public Common::Base,
-                           public Envoy::Compression::Compressor::Compressor,
-                           NonCopyable {
+class ZstdCompressorImpl : public Envoy::Compression::Zstd::Compressor::ZstdCompressorImplBase {
 public:
   ZstdCompressorImpl(uint32_t compression_level, bool enable_checksum, uint32_t strategy,
                      const ZstdCDictManagerPtr& cdict_manager, uint32_t chunk_size);
 
-  // Compression::Compressor::Compressor
-  void compress(Buffer::Instance& buffer, Envoy::Compression::Compressor::State state) override;
-
 private:
-  void process(Buffer::Instance& output_buffer, ZSTD_EndDirective mode);
+  void compressPreprocess(Buffer::Instance& buffer,
+                          Envoy::Compression::Compressor::State state) override;
 
-  std::unique_ptr<ZSTD_CCtx, decltype(&ZSTD_freeCCtx)> cctx_;
+  void compressProcess(const Buffer::Instance& buffer, const Buffer::RawSlice& input_slice,
+                       Buffer::Instance& accumulation_buffer) override;
+
+  void compressPostprocess(Buffer::Instance& accumulation_buffer) override;
+
   const ZstdCDictManagerPtr& cdict_manager_;
-  const uint32_t compression_level_;
 };
 
 } // namespace Compressor

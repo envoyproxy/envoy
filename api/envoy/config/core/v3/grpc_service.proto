@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // gRPC service configuration. This is used by :ref:`ApiConfigSource
 // <envoy_v3_api_msg_config.core.v3.ApiConfigSource>` and filter configurations.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message GrpcService {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.GrpcService";
 
@@ -49,6 +49,12 @@ message GrpcService {
     // Currently only supported for xDS gRPC streams.
     // If not set, xDS gRPC streams default base interval:500ms, maximum interval:30s will be applied.
     RetryPolicy retry_policy = 3;
+
+    // Maximum gRPC message size that is allowed to be received.
+    // If a message over this limit is received, the gRPC stream is terminated with the RESOURCE_EXHAUSTED error.
+    // This limit is applied to individual messages in the streaming response and not the total size of streaming response.
+    // Defaults to 0, which means unlimited.
+    google.protobuf.UInt32Value max_receive_message_length = 4;
   }
 
   // [#next-free-field: 9]
@@ -300,4 +306,8 @@ message GrpcService {
   // documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated HeaderValue initial_metadata = 5;
+
+  // Optional default retry policy for streams toward the service.
+  // If an async stream doesn't have retry policy configured in its stream options, this retry policy is used.
+  RetryPolicy retry_policy = 6;
 }

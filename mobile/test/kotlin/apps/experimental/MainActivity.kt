@@ -66,7 +66,7 @@ class MainActivity : Activity() {
         // .enablePlatformCertificatesValidation(true)
         .addNativeFilter(
           "envoy.filters.http.buffer",
-          "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}"
+          "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } }"
         )
         .addStringAccessor("demo-accessor", { "PlatformString" })
         .setOnEngineRunning { Log.d("MainActivity", "Envoy async internal setup completed") }
@@ -78,7 +78,7 @@ class MainActivity : Activity() {
         .setLogger { _, message -> Log.d("MainActivity", message) }
         .build()
 
-    recyclerView = findViewById(R.id.recycler_view) as RecyclerView
+    recyclerView = findViewById<RecyclerView>(R.id.recycler_view)!!
     recyclerView.layoutManager = LinearLayoutManager(this)
 
     viewAdapter = ResponseRecyclerViewAdapter()

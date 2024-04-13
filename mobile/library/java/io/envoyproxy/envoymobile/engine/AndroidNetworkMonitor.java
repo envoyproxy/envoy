@@ -55,6 +55,15 @@ public class AndroidNetworkMonitor extends BroadcastReceiver {
     }
   }
 
+  /**
+   * Sets the {@link AndroidNetworkMonitor} singleton instance to null, so that it can be recreated
+   * when a new EnvoyEngine is created.
+   */
+  @VisibleForTesting
+  public static void shutdown() {
+    instance = null;
+  }
+
   private AndroidNetworkMonitor(Context context, EnvoyEngine envoyEngine) {
     int permission =
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_NETWORK_STATE);

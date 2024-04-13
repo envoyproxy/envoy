@@ -1256,9 +1256,11 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            // We are actively deferring to the parent span's sampled state.
+            EXPECT_FALSE(options.sampled_.has_value());
             const Http::TestRequestHeaderMapImpl expected_headers{
                 {":path", "/"}, {":method", "GET"}, {":authority", "foo"}};
             EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
@@ -1627,7 +1629,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
-// HTTP request flow with timeout and sampled flag in options.
+// HTTP request flow with timeout and invalid flag in options.
 TEST_F(LuaHttpFilterTest, HttpCallWithInvalidOption) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -2084,6 +2086,57 @@ TEST_F(LuaHttpFilterTest, GetRequestedServerName) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo.example.com")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// Verify that network connection level streamInfo():dynamicMetadata() could be accessed using LUA.
+TEST_F(LuaHttpFilterTest, GetConnectionDynamicMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local cx_metadata = request_handle:connectionStreamInfo():dynamicMetadata()
+      local filters_count = 0
+      for filter_name, _ in pairs(cx_metadata) do
+        filters_count = filters_count + 1
+      end
+      request_handle:logTrace('Filters Count: ' .. filters_count)
+
+      local pp_metadata_entries = cx_metadata:get("envoy.proxy_protocol")
+      for key, value in pairs(pp_metadata_entries) do
+        request_handle:logTrace('Key: ' .. key .. ', Value: ' .. value)
+      end
+
+      local lb_version = cx_metadata:get("envoy.lb")["version"]
+      request_handle:logTrace('Key: version, Value: ' .. lb_version)
+    end
+  )EOF"};
+
+  // Proxy Protocol Filter Metadata
+  ProtobufWkt::Value tlv_ea_value;
+  tlv_ea_value.set_string_value("vpce-064c279a4001a055f");
+  ProtobufWkt::Struct proxy_protocol_metadata;
+  proxy_protocol_metadata.mutable_fields()->insert({"tlv_ea", tlv_ea_value});
+  (*stream_info_.metadata_.mutable_filter_metadata())["envoy.proxy_protocol"] =
+      proxy_protocol_metadata;
+
+  // LB Filter Metadata
+  ProtobufWkt::Value lb_version_value;
+  lb_version_value.set_string_value("v1.0");
+  ProtobufWkt::Struct lb_metadata;
+  lb_metadata.mutable_fields()->insert({"version", lb_version_value});
+  (*stream_info_.metadata_.mutable_filter_metadata())["envoy.lb"] = lb_metadata;
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillOnce(Return(OptRef<const Network::Connection>{connection_}));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Filters Count: 2")));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("Key: tlv_ea, Value: vpce-064c279a4001a055f")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Key: version, Value: v1.0")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }

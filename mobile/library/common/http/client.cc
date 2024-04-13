@@ -87,7 +87,7 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_headers_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_headers_cb", "{}ms", elapsed.count());
   }
 
   response_headers_forwarded_ = true;
@@ -121,10 +121,10 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
     response_data_ = std::make_unique<Buffer::WatermarkBuffer>(
         [this]() -> void { onBufferedDataDrained(); }, [this]() -> void { onHasBufferedData(); },
         []() -> void {});
-    // Default to 1M per stream. This is fairly arbitrary and will result in
+    // Default to 2M per stream. This is fairly arbitrary and will result in
     // Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
-    // and having local data of 1M + kernel-buffer-limit for HTTP/1.1
-    response_data_->setWatermarks(1000000);
+    // and having local data of 2M + kernel-buffer-limit for HTTP/1.1
+    response_data_->setWatermarks(2 * 1024 * 1024);
   }
 
   // Send data if in default flow control mode, or if resumeData has been called in explicit
@@ -173,7 +173,7 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_data_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_data_cb", "{}ms", elapsed.count());
   }
 
   if (send_end_stream) {
@@ -214,7 +214,7 @@ void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMa
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_trailers_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_trailers_cb", "{}ms", elapsed.count());
   }
 
   onComplete();
@@ -288,7 +288,7 @@ void Client::DirectStreamCallbacks::onComplete() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_complete_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_complete_cb", "{}ms", elapsed.count());
   }
 }
 
@@ -345,7 +345,7 @@ void Client::DirectStreamCallbacks::sendErrorToBridge() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_error_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_error_cb", "{}ms", elapsed.count());
   }
 }
 
@@ -372,7 +372,7 @@ void Client::DirectStreamCallbacks::onCancel() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb", "{}ms", elapsed.count());
   }
 }
 
@@ -532,7 +532,7 @@ void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks 
   ENVOY_LOG(debug, "[S{}] start stream", new_stream_handle);
 }
 
-void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream) {
+void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
@@ -552,18 +552,17 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   }
 
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-  RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
 
   // This is largely a check for the android platform: isCleartextPermitted
   // is a no-op for other platforms.
-  if (internal_headers->getSchemeValue() != "https" &&
-      !SystemHelper::getInstance().isCleartextPermitted(internal_headers->getHostValue())) {
+  if (headers->getSchemeValue() != "https" &&
+      !SystemHelper::getInstance().isCleartextPermitted(headers->getHostValue())) {
     request_decoder->sendLocalReply(Http::Code::BadRequest, "Cleartext is not permitted", nullptr,
                                     absl::nullopt, "");
     return;
   }
 
-  setDestinationCluster(*internal_headers);
+  setDestinationCluster(*headers);
   // Set the x-forwarded-proto header to https because Envoy Mobile only has clusters with TLS
   // enabled. This is done here because the ApiListener's synthetic connection would make the
   // Http::ConnectionManager set the scheme to http otherwise. In the future we might want to
@@ -577,10 +576,10 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   // router relies on the present of this header to determine if it should provided a route for
   // a request here:
   // https://github.com/envoyproxy/envoy/blob/c9e3b9d2c453c7fe56a0e3615f0c742ac0d5e768/source/common/router/config_impl.cc#L1091-L1096
-  internal_headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
+  headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
   ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
-            *internal_headers);
-  request_decoder->decodeHeaders(std::move(internal_headers), end_stream);
+            *headers);
+  request_decoder->decodeHeaders(std::move(headers), end_stream);
 }
 
 void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {
@@ -649,7 +648,7 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
 
 void Client::sendMetadata(envoy_stream_t, envoy_headers) { PANIC("not implemented"); }
 
-void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
+void Client::sendTrailers(envoy_stream_t stream, RequestTrailerMapPtr trailers) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
@@ -668,9 +667,8 @@ void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
     return;
   }
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-  RequestTrailerMapPtr internal_trailers = Utility::toRequestTrailers(trailers);
-  ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *internal_trailers);
-  request_decoder->decodeTrailers(std::move(internal_trailers));
+  ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *trailers);
+  request_decoder->decodeTrailers(std::move(trailers));
 }
 
 void Client::cancelStream(envoy_stream_t stream) {

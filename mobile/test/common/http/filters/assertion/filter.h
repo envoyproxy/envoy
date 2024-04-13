@@ -15,7 +15,8 @@ namespace Assertion {
 class AssertionFilterConfig {
 public:
   AssertionFilterConfig(
-      const envoymobile::extensions::filters::http::assertion::Assertion& proto_config);
+      const envoymobile::extensions::filters::http::assertion::Assertion& proto_config,
+      Server::Configuration::CommonFactoryContext& context);
 
   Extensions::Common::Matcher::Matcher& rootMatcher() const;
   size_t matchersSize() const { return matchers_.size(); }

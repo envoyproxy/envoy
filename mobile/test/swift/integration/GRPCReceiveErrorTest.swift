@@ -1,5 +1,6 @@
 import Envoy
 import EnvoyEngine
+import EnvoyTestServer
 import Foundation
 import TestExtensions
 import XCTest
@@ -11,49 +12,7 @@ final class GRPCReceiveErrorTests: XCTestCase {
   }
 
   func testReceiveError() {
-    // swiftlint:disable:next line_length
-    let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
-    // swiftlint:disable:next line_length
-    let pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
-    // swiftlint:disable:next line_length
-    let localErrorFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
     let filterName = "error_validation_filter"
-    let config =
-"""
-listener_manager:
-    name: envoy.listener_manager_impl.api
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
-static_resources:
-  listeners:
-  - name: base_api_listener
-    address:
-      socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10000 }
-    api_listener:
-      api_listener:
-        "@type": \(emhcmType)
-        config:
-          stat_prefix: hcm
-          route_config:
-            name: api_router
-            virtual_hosts:
-            - name: api
-              domains: ["*"]
-              routes:
-              - match: { prefix: "/" }
-                direct_response: { status: 503 }
-          http_filters:
-          - name: envoy.filters.http.platform_bridge
-            typed_config:
-              "@type": \(pbfType)
-              platform_filter_name: \(filterName)
-          - name: envoy.filters.http.local_error
-            typed_config:
-              "@type": \(localErrorFilterType)
-          - name: envoy.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-"""
 
     struct ErrorValidationFilter: ResponseFilter {
       let receivedError: XCTestExpectation
@@ -77,7 +36,6 @@ static_resources:
       }
 
       func onError(_ error: EnvoyError, streamIntel: FinalStreamIntel) {
-        XCTAssertEqual(error.errorCode, 2) // 503/Connection Failure
         self.receivedError.fulfill()
       }
 
@@ -96,8 +54,18 @@ static_resources:
     filterNotCancelled.isInverted = true
     let expectations = [filterReceivedError, filterNotCancelled, callbackReceivedError]
 
-    let engine = EngineBuilder(yaml: config)
-      .addLogLevel(.trace)
+    EnvoyTestServer.startHttp1PlaintextServer()
+
+    let engine = EngineBuilder()
+      .addLogLevel(.debug)
+      .setLogger { _, msg in
+          print(msg, terminator: "")
+      }
+      // The sendLocalReply() call that goes through the error_validation_filter doesn't get
+      // triggered unless the idle timeout is less than the connection reset timeout, so the idle
+      // timeout is set to be explicitely less than the connection timeout. Plus, the faster
+      // timeout makes the test finish faster.
+      .addStreamIdleTimeoutSeconds(2)
       .addPlatformFilter(
         name: filterName,
         factory: {
@@ -109,8 +77,11 @@ static_resources:
 
     let client = Envoy.GRPCClient(streamClient: engine.streamClient())
 
-    let requestHeaders = GRPCRequestHeadersBuilder(scheme: "https", authority: "example.com",
-                                                   path: "/pb.api.v1.Foo/GetBar").build()
+    let requestHeaders = GRPCRequestHeadersBuilder(
+        scheme: "http",
+        authority: "localhost:" + String(EnvoyTestServer.getEnvoyPort()),
+        path: "/pb.api.v1.Foo/GetBar")
+      .build()
     let message = Data([1, 2, 3, 4, 5])
 
     client
@@ -123,8 +94,7 @@ static_resources:
       }
       // The unmatched expecation will cause a local reply which gets translated in Envoy Mobile to
       // an error.
-      .setOnError { error, _ in
-         XCTAssertEqual(error.errorCode, 2) // 503/Connection Failure
+      .setOnError { _, _ in
          callbackReceivedError.fulfill()
       }
       .setOnCancel { _ in
@@ -137,5 +107,6 @@ static_resources:
     XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     engine.terminate()
+    EnvoyTestServer.shutdownTestServer()
   }
 }

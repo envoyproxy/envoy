@@ -310,9 +310,9 @@ def envoy_dependencies(skip_targets = []):
     _com_github_rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
-    _com_github_intel_ipp_crypto_crypto_mb_fips()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
+    _com_github_qat_zstd()
     _com_github_lz4_lz4()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
@@ -358,7 +358,11 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_perfetto()
     _utf8_range()
     _rules_ruby()
-    external_http_archive("com_github_google_flatbuffers")
+    external_http_archive(
+        "com_github_google_flatbuffers",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:flatbuffers.patch"],
+    )
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
@@ -382,9 +386,7 @@ def envoy_dependencies(skip_targets = []):
     _rust_deps()
     _kafka_deps()
 
-    _org_llvm_llvm()
     _com_github_wamr()
-    _com_github_wavm_wavm()
     _com_github_wasmtime()
     _com_github_wasm_c_api()
 
@@ -544,33 +546,7 @@ def _com_github_unicode_org_icu():
 def _com_github_intel_ipp_crypto_crypto_mb():
     external_http_archive(
         name = "com_github_intel_ipp_crypto_crypto_mb",
-        # Patch removes from CMakeLists.txt instructions to
-        # to create dynamic *.so library target. Linker fails when linking
-        # with boringssl_fips library. Envoy uses only static library
-        # anyways, so created dynamic library would not be used anyways.
-        patches = [
-            "@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch",
-            "@envoy//bazel/foreign_cc:ipp-crypto-bn2lebinpad.patch",
-        ],
-        patch_args = ["-p1"],
         build_file_content = BUILD_ALL_CONTENT,
-    )
-
-def _com_github_intel_ipp_crypto_crypto_mb_fips():
-    # Temporary fix for building ipp-crypto when boringssl-fips is used.
-    # Build will fail if bn2lebinpad patch is applied. Remove this archive
-    # when upstream dependency fixes this issue.
-    external_http_archive(
-        name = "com_github_intel_ipp_crypto_crypto_mb_fips",
-        # Patch removes from CMakeLists.txt instructions to
-        # to create dynamic *.so library target. Linker fails when linking
-        # with boringssl_fips library. Envoy uses only static library
-        # anyways, so created dynamic library would not be used anyways.
-        patches = ["@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch"],
-        patch_args = ["-p1"],
-        build_file_content = BUILD_ALL_CONTENT,
-        # Use existing ipp-crypto repository location name to avoid redefinition.
-        location_name = "com_github_intel_ipp_crypto_crypto_mb",
     )
 
 def _com_github_intel_qatlib():
@@ -583,6 +559,14 @@ def _com_github_intel_qatzip():
     external_http_archive(
         name = "com_github_intel_qatzip",
         build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_qat_zstd():
+    external_http_archive(
+        name = "com_github_qat_zstd",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:qatzstd.patch"],
     )
 
 def _com_github_lz4_lz4():
@@ -1173,6 +1157,8 @@ def _com_github_grpc_grpc():
         name = "com_github_grpc_grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
+        # Needed until grpc updates its naming (v1.62.0)
+        repo_mapping = {"@com_github_cncf_udpa": "@com_github_cncf_xds"},
     )
     external_http_archive("build_bazel_rules_apple")
 
@@ -1278,7 +1264,13 @@ def _upb():
     )
 
 def _proxy_wasm_cpp_sdk():
-    external_http_archive(name = "proxy_wasm_cpp_sdk")
+    external_http_archive(
+        name = "proxy_wasm_cpp_sdk",
+        patch_args = ["-p1"],
+        patches = [
+            "@envoy//bazel:proxy_wasm_cpp_sdk.patch",
+        ],
+    )
 
 def _proxy_wasm_cpp_host():
     external_http_archive(
@@ -1351,18 +1343,6 @@ def _com_github_gperftools_gperftools():
         actual = "@envoy//bazel/foreign_cc:gperftools",
     )
 
-def _org_llvm_llvm():
-    external_http_archive(
-        name = "org_llvm_llvm",
-        build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:llvm.patch"],
-    )
-    native.bind(
-        name = "llvm",
-        actual = "@envoy//bazel/foreign_cc:llvm",
-    )
-
 def _com_github_wamr():
     external_http_archive(
         name = "com_github_wamr",
@@ -1371,16 +1351,6 @@ def _com_github_wamr():
     native.bind(
         name = "wamr",
         actual = "@envoy//bazel/foreign_cc:wamr",
-    )
-
-def _com_github_wavm_wavm():
-    external_http_archive(
-        name = "com_github_wavm_wavm",
-        build_file_content = BUILD_ALL_CONTENT,
-    )
-    native.bind(
-        name = "wavm",
-        actual = "@envoy//bazel/foreign_cc:wavm",
     )
 
 def _com_github_wasmtime():
@@ -1494,7 +1464,13 @@ def _rules_ruby():
     external_http_archive("rules_ruby")
 
 def _foreign_cc_dependencies():
-    external_http_archive("rules_foreign_cc")
+    external_http_archive(
+        name = "rules_foreign_cc",
+        # This patch is needed to fix build on macos with xcode 15.3.
+        # remove this when https://github.com/bazelbuild/rules_foreign_cc/issues/1186 fixed.
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_foreign_cc.patch"],
+    )
 
 def _com_github_maxmind_libmaxminddb():
     external_http_archive(

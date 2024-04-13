@@ -53,6 +53,7 @@ typedef enum { // NOLINT(modernize-use-using)
   CAPISerializationFailure = -8,
 } CAPIStatus;
 
+CAPIStatus envoyGoFilterHttpClearRouteCache(void* r);
 CAPIStatus envoyGoFilterHttpContinue(void* r, int status);
 CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* body_text_data,
                                            int body_text_len, void* headers, int headers_num,

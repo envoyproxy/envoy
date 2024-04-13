@@ -54,6 +54,9 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
       streaming_(proto_config.output_config().streaming()) {
 
+  using TsfContextRef =
+      std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>;
+  using HttpContextRef = std::reference_wrapper<Server::Configuration::FactoryContext>;
   using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
   auto& sinks = proto_config.output_config().sinks();
   ASSERT(sinks.size() == 1);
@@ -101,9 +104,6 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
 
     // extract message validation visitor from the context and use it to define config
     ProtobufTypes::MessagePtr config;
-    using TsfContextRef =
-        std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>;
-    using HttpContextRef = std::reference_wrapper<Server::Configuration::FactoryContext>;
     if (absl::holds_alternative<TsfContextRef>(context)) {
       Server::Configuration::TransportSocketFactoryContext& tsf_context =
           absl::get<TsfContextRef>(context).get();
@@ -142,7 +142,17 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     throw EnvoyException(fmt::format("Neither match nor match_config is set in TapConfig: {}",
                                      proto_config.DebugString()));
   }
-  buildMatcher(match, matchers_);
+
+  Server::Configuration::CommonFactoryContext* server_context = nullptr;
+  if (absl::holds_alternative<TsfContextRef>(context)) {
+    Server::Configuration::TransportSocketFactoryContext& tsf_context =
+        absl::get<TsfContextRef>(context).get();
+    server_context = &tsf_context.serverFactoryContext();
+  } else {
+    Server::Configuration::FactoryContext& http_context = absl::get<HttpContextRef>(context).get();
+    server_context = &http_context.serverFactoryContext();
+  }
+  buildMatcher(match, matchers_, *server_context);
 }
 
 const Matcher& TapConfigBaseImpl::rootMatcher() const {
@@ -258,7 +268,7 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     break;
   }
   case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
-    output_file_ << trace->DebugString();
+    output_file_ << MessageUtil::toTextProto(*trace);
     break;
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:

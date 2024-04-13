@@ -69,8 +69,9 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                            ShadowWriterPtr&& shadow_writer,
                            const envoy::extensions::filters::http::router::v3::Router& config)
     : FilterConfig(
-          stat_prefix, context.serverFactoryContext().localInfo(), context.scope(),
-          context.serverFactoryContext().clusterManager(), context.serverFactoryContext().runtime(),
+          context.serverFactoryContext(), stat_prefix, context.serverFactoryContext().localInfo(),
+          context.scope(), context.serverFactoryContext().clusterManager(),
+          context.serverFactoryContext().runtime(),
           context.serverFactoryContext().api().randomGenerator(), std::move(shadow_writer),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
           config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
@@ -710,10 +711,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ =
-      createRetryState(route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_,
-                       route_stats_context_, config_.runtime_, config_.random_,
-                       callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
+  retry_state_ = createRetryState(route_entry_->retryPolicy(), headers, *cluster_,
+                                  request_vcluster_, route_stats_context_, config_.factory_context_,
+                                  callbacks_->dispatcher(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys. Also the method CONNECT doesn't support shadowing.
@@ -744,8 +744,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // will never transition from false to true.
   bool can_use_http3 =
       !transport_socket_options_ || !transport_socket_options_->http11ProxyInfo().has_value();
-  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
-      *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3);
+  UpstreamRequestPtr upstream_request =
+      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
+                                        can_use_http3, false /*enable_half_close*/);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
   if (streaming_shadows_) {
@@ -1989,8 +1990,9 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     cleanup();
     return;
   }
-  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
-      *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3);
+  UpstreamRequestPtr upstream_request =
+      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
+                                        can_use_http3, false /*enable_tcp_tunneling*/);
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
@@ -2071,12 +2073,12 @@ bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
 RetryStatePtr
 ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                              const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                             RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
-                             Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                             TimeSource& time_source, Upstream::ResourcePriority priority) {
+                             RouteStatsContextOptRef route_stats_context,
+                             Server::Configuration::CommonFactoryContext& context,
+                             Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) {
   std::unique_ptr<RetryStateImpl> retry_state =
       RetryStateImpl::create(policy, request_headers, cluster, vcluster, route_stats_context,
-                             runtime, random, dispatcher, time_source, priority);
+                             context, dispatcher, priority);
   if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
     // only reason for doing retry, set the retry shadow buffer limit to 0 so that we don't retry or

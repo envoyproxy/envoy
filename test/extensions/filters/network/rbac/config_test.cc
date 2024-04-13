@@ -25,8 +25,8 @@ const std::string header = R"EOF(
 { "header": {"name": "key", "exact_match": "value"} }
 )EOF";
 
-const absl::string_view header_key = "key";
-const absl::string_view header_value = "value";
+constexpr absl::string_view header_key = "key";
+constexpr absl::string_view header_value = "value";
 
 } // namespace
 
@@ -36,9 +36,7 @@ public:
     checkRule(fmt::sprintf(policy_json, header));
   }
 
-  void validateMatcher(const std::string& matcher_yaml) {
-    checkMatcher(fmt::format(fmt::runtime(matcher_yaml), header_key, header_value));
-  }
+  void validateMatcher(const std::string& matcher_yaml) { checkMatcher(matcher_yaml); }
 
 private:
   void checkRule(const std::string& policy_json) {
@@ -51,11 +49,13 @@ private:
 
     NiceMock<Server::Configuration::MockFactoryContext> context;
     RoleBasedAccessControlNetworkFilterConfigFactory factory;
-    EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), Envoy::EnvoyException);
+    EXPECT_THROW(factory.createFilterFactoryFromProto(config, context).IgnoreError(),
+                 Envoy::EnvoyException);
 
     config.clear_rules();
     (*config.mutable_shadow_rules()->mutable_policies())["foo"] = policy_proto;
-    EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), Envoy::EnvoyException);
+    EXPECT_THROW(factory.createFilterFactoryFromProto(config, context).IgnoreError(),
+                 Envoy::EnvoyException);
   }
 
   void checkMatcher(const std::string& matcher_yaml) {
@@ -92,7 +92,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RoleBasedAccessControlNetworkFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -113,7 +113,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidMatcherProto) 
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RoleBasedAccessControlNetworkFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -186,7 +186,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, InvalidPrincipal) {
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, InvalidMatcher) {
-  validateMatcher(R"EOF(
+  validateMatcher(fmt::format(R"EOF(
 matcher_tree:
   input:
     name: source-ip
@@ -201,9 +201,10 @@ matcher_tree:
           typed_config:
             '@type': type.googleapis.com/envoy.config.rbac.v3.Action
             name: deny
-)EOF");
+)EOF",
+                              header_key, header_value));
 
-  validateMatcher(R"EOF(
+  validateMatcher(fmt::format(R"EOF(
 matcher_tree:
   input:
     name: source-ip
@@ -218,7 +219,8 @@ matcher_tree:
           typed_config:
             '@type': type.googleapis.com/envoy.config.rbac.v3.Action
             name: deny
-)EOF");
+)EOF",
+                              header_key, header_value));
 }
 
 } // namespace RBACFilter

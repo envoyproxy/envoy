@@ -185,7 +185,8 @@ public:
             {"verifySignature", static_luaVerifySignature},
             {"base64Escape", static_luaBase64Escape},
             {"timestamp", static_luaTimestamp},
-            {"timestampString", static_luaTimestampString}};
+            {"timestampString", static_luaTimestampString},
+            {"connectionStreamInfo", static_luaConnectionStreamInfo}};
   }
 
 private:
@@ -250,6 +251,11 @@ private:
    * @return a handle to the network connection.
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaConnection);
+
+  /**
+   * @return a handle to the network connection's stream info.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaConnectionStreamInfo);
 
   /**
    * Log a message to the Envoy log.
@@ -333,6 +339,7 @@ private:
     stream_info_wrapper_.reset();
     connection_wrapper_.reset();
     public_key_wrapper_.reset();
+    connection_stream_info_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
@@ -357,6 +364,7 @@ private:
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<ConnectionStreamInfoWrapper> connection_stream_info_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
   Filters::Common::Lua::LuaDeathRef<PublicKeyWrapper> public_key_wrapper_;
   State state_{State::Running};

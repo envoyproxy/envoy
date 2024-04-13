@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Run a CI build/test target, e.g. docs, asan.
 
@@ -134,6 +134,8 @@ function cp_binary_for_image_build() {
   # Tools for the tools image. Strip to save size.
   strip bazel-bin/test/tools/schema_validator/schema_validator_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
+  strip bazel-bin/test/tools/router_check/router_check_tool \
+    -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/router_check_tool
 
   # Copy the su-exec utility binary into the image
   cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
@@ -199,6 +201,8 @@ function bazel_binary_build() {
   # Validation tools for the tools image.
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
     //test/tools/schema_validator:schema_validator_tool "${CONFIG_ARGS[@]}"
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
+    //test/tools/router_check:router_check_tool "${CONFIG_ARGS[@]}"
 
   # Build su-exec utility
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" external:su-exec
@@ -307,13 +311,6 @@ case $CI_TARGET in
                 cp -a "$GO_FILE" "$OUTPUT_DIR"
                 if [[ "$GO_FILE" = *.validate.go ]]; then
                     sed -i '1s;^;//go:build !disable_pgv\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
-                fi
-                # TODO(https://github.com/planetscale/vtprotobuf/pull/122) do this directly in the generator.
-                # Make vtprotobuf opt-in as it has some impact on binary sizes
-                if [[ "$GO_FILE" = *_vtproto.pb.go ]]; then
-                    if ! grep -q 'package ignore' "$GO_FILE"; then
-                        sed -i '1s;^;//go:build vtprotobuf\n// +build vtprotobuf\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
-                    fi
                 fi
             done <<< "$(find "$INPUT_DIR" -name "*.go")"
         done
@@ -427,21 +424,12 @@ case $CI_TARGET in
             "${TEST_TARGETS[@]}" \
             --test_tag_filters=-nofips \
             --build_tests_only
-        echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define wasm=wavm \
-            -c fastbuild \
-            "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips \
-            --build_tests_only
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
-            --define wasm=wavm \
+            --define wasm=wasmtime \
             -c opt \
             @envoy//test/common/common:assert_test \
             @envoy//test/server:server_test
@@ -449,15 +437,15 @@ case $CI_TARGET in
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
-            --define wasm=wavm \
+            --define wasm=wamtime \
             -c opt \
             @envoy//test/common/common:assert_test \
             --define log_fast_debug_assert_in_release=enabled \
             --define log_debug_assert_in_release=disabled
-        echo "Building binary with wasm=wavm... and logging disabled"
+        echo "Building binary with wasm=wasmtime... and logging disabled"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
-            --define wasm=wavm \
+            --define wasm=wasmtime \
             --define enable_logging=disabled \
             -c fastbuild \
             @envoy//source/exe:envoy-static \
@@ -869,6 +857,12 @@ case $CI_TARGET in
         cp -a \
            bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped \
            "${ENVOY_BINARY_DIR}/schema_validator_tool"
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+              --remote_download_toplevel \
+              //test/tools/router_check:router_check_tool.stripped
+        cp -a \
+           bazel-bin/test/tools/router_check/router_check_tool.stripped \
+           "${ENVOY_BINARY_DIR}/router_check_tool"
         echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;
 

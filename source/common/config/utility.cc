@@ -11,9 +11,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/histogram_impl.h"
-#include "source/common/stats/stats_matcher_impl.h"
-#include "source/common/stats/tag_producer_impl.h"
 
 namespace Envoy {
 namespace Config {
@@ -204,12 +201,6 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
   return rate_limit_settings;
 }
 
-Stats::TagProducerPtr
-Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                           const Stats::TagVector& cli_tags) {
-  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config(), cli_tags);
-}
-
 absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(
     Grpc::AsyncClientManager& async_client_manager,
     const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
@@ -244,7 +235,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
 
     if (type == typed_struct_type) {
       xds::type::v3::TypedStruct typed_struct;
-      MessageUtil::unpackTo(typed_config, typed_struct);
+      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly
       if (out_proto.GetTypeName() == struct_type) {
         out_proto.CheckTypeAndMergeFrom(typed_struct.value());
@@ -259,7 +250,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       }
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      MessageUtil::unpackTo(typed_config, typed_struct);
+      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly
       if (out_proto.GetTypeName() == struct_type) {
         out_proto.CheckTypeAndMergeFrom(typed_struct.value());
@@ -275,11 +266,11 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       }
     } // out_proto is expecting Struct, unpack directly
     else if (type != struct_type || out_proto.GetTypeName() == struct_type) {
-      MessageUtil::unpackTo(typed_config, out_proto);
+      MessageUtil::unpackToOrThrow(typed_config, out_proto);
     } else {
 #ifdef ENVOY_ENABLE_YAML
       ProtobufWkt::Struct struct_config;
-      MessageUtil::unpackTo(typed_config, struct_config);
+      MessageUtil::unpackToOrThrow(typed_config, struct_config);
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
 #else
       IS_ENVOY_BUG("Attempting to use JSON structs with JSON compiled out");
