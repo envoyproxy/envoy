@@ -29,7 +29,6 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
@@ -48,15 +47,16 @@
 #include "source/common/signal/fatal_error_handler.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/stats/timespan_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
-#include "source/server/ssl_context_manager.h"
 #include "source/server/utils.h"
 
 namespace Envoy {
@@ -106,20 +106,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
-
-  // These are needed for string matcher extensions. It is too painful to pass these objects through
-  // all call chains that construct a `StringMatcherImpl`, so these are singletons.
-  //
-  // They must be cleared before being set to make the multi-envoy integration test pass. Note that
-  // this means that extensions relying on these singletons probably will not function correctly in
-  // some Envoy mobile setups where multiple Envoy engines are used in the same process. The same
-  // caveat also applies to a few other singletons, such as the global regex engine.
-  InjectableSingleton<ThreadLocal::SlotAllocator>::clear();
-  InjectableSingleton<ThreadLocal::SlotAllocator>::initialize(&thread_local_);
-  InjectableSingleton<Api::Api>::clear();
-  InjectableSingleton<Api::Api>::initialize(api_.get());
-}
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {}
 
 InstanceBase::~InstanceBase() {
   terminate();
@@ -151,9 +138,6 @@ InstanceBase::~InstanceBase() {
     close(tracing_fd_);
   }
 #endif
-
-  InjectableSingleton<ThreadLocal::SlotAllocator>::clear();
-  InjectableSingleton<Api::Api>::clear();
 }
 
 Upstream::ClusterManager& InstanceBase::clusterManager() {
@@ -364,45 +348,39 @@ registerCustomInlineHeadersFromBootstrap(const envoy::config::bootstrap::v3::Boo
 
 } // namespace
 
-void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                       const Options& options,
-                                       ProtobufMessage::ValidationVisitor& validation_visitor,
-                                       Api::Api& api) {
+absl::Status InstanceUtil::loadBootstrapConfig(
+    envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
 
   // One of config_path and config_yaml or bootstrap should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSizeLong() == 0) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         "At least one of --config-path or --config-yaml or Options::configProto() "
         "should be non-empty");
   }
 
   if (!config_path.empty()) {
-#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
-#else
-    if (!config_path.empty()) {
-      throwEnvoyExceptionOrPanic("Cannot load from file with YAML disabled\n");
-    }
-    UNREFERENCED_PARAMETER(api);
-#endif
   }
   if (!config_yaml.empty()) {
-#ifdef ENVOY_ENABLE_YAML
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
+#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
-    bootstrap.MergeFrom(bootstrap_override);
 #else
-    throwEnvoyExceptionOrPanic("Cannot load from YAML with YAML disabled\n");
+    // Treat the yaml as proto
+    Protobuf::TextFormat::ParseFromString(config_yaml, &bootstrap_override);
 #endif
+    bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSizeLong() != 0) {
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);
+  return absl::OkStatus();
 }
 
 void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_address,
@@ -455,8 +433,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   }
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options_,
-                                    messageValidationContext().staticValidationVisitor(), *api_);
+  RETURN_IF_NOT_OK(InstanceUtil::loadBootstrapConfig(
+      bootstrap_, options_, messageValidationContext().staticValidationVisitor(), *api_));
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   if (bootstrap_.has_application_log_config()) {
@@ -519,12 +497,14 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  stats_store_.setTagProducer(
-      Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags()));
+  auto producer_or_error =
+      Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
+  RETURN_IF_STATUS_NOT_OK(producer_or_error);
+  stats_store_.setTagProducer(std::move(producer_or_error.value()));
   stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
-      bootstrap_.stats_config(), stats_store_.symbolTable()));
+      bootstrap_.stats_config(), stats_store_.symbolTable(), server_contexts_));
   stats_store_.setHistogramSettings(
-      std::make_unique<Stats::HistogramSettingsImpl>(bootstrap_.stats_config()));
+      std::make_unique<Stats::HistogramSettingsImpl>(bootstrap_.stats_config(), server_contexts_));
 
   const std::string server_stats_prefix = "server.";
   const std::string server_compilation_settings_stats_prefix = "server.compilation_settings";
@@ -749,7 +729,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   }
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = createContextManager("ssl_context_manager", server_contexts_);
+  ssl_context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(server_contexts_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
@@ -826,7 +807,7 @@ void InstanceBase::onRuntimeReady() {
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames(),
+        *config_.clusterManager(), thread_local_, server_contexts_, grpc_context_.statNames(),
         bootstrap_.grpc_async_client_manager_config());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
@@ -1088,9 +1069,15 @@ InstanceBase::registerCallback(Stage stage, StageCallbackWithCompletion callback
 
 void InstanceBase::notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  const auto it = stage_callbacks_.find(stage);
-  if (it != stage_callbacks_.end()) {
-    for (const StageCallback& callback : it->second) {
+  const auto stage_it = stage_callbacks_.find(stage);
+  if (stage_it != stage_callbacks_.end()) {
+    LifecycleNotifierCallbacks& callbacks = stage_it->second;
+    for (auto callback_it = callbacks.begin(); callback_it != callbacks.end();) {
+      StageCallback callback = *callback_it;
+      // Increment the iterator before invoking the callback in case the
+      // callback deletes the handle which will unregister itself and
+      // invalidate this iterator if we're still pointing at it.
+      ++callback_it;
       callback();
     }
   }

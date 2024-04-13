@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/http/basic_auth/v3/basic_auth.pb.h"
+
 #include "source/extensions/filters/http/basic_auth/basic_auth_filter.h"
 #include "source/extensions/filters/http/basic_auth/config.h"
 
@@ -11,6 +13,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BasicAuth {
 
+using envoy::extensions::filters::http::basic_auth::v3::BasicAuth;
+
 TEST(Factory, ValidConfig) {
   const std::string yaml = R"(
   users:
@@ -21,12 +25,12 @@ TEST(Factory, ValidConfig) {
   )";
 
   BasicAuthFilterFactory factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
+  BasicAuth proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  auto callback = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  auto callback = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   callback.value()(filter_callback);
@@ -41,13 +45,13 @@ TEST(Factory, InvalidConfigNoColon) {
   )";
 
   BasicAuthFilterFactory factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
+  BasicAuth proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
       EnvoyException);
 }
 
@@ -60,13 +64,13 @@ TEST(Factory, InvalidConfigDuplicateUsers) {
   )";
 
   BasicAuthFilterFactory factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
+  BasicAuth proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
       EnvoyException, "basic auth: duplicate users");
 }
 
@@ -79,13 +83,13 @@ TEST(Factory, InvalidConfigNoUser) {
   )";
 
   BasicAuthFilterFactory factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
+  BasicAuth proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
       EnvoyException, "basic auth: empty user name or password");
 }
 
@@ -98,13 +102,13 @@ TEST(Factory, InvalidConfigNoPassword) {
   )";
 
   BasicAuthFilterFactory factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
+  BasicAuth proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
       EnvoyException, "basic auth: empty user name or password");
 }
 
@@ -117,13 +121,13 @@ TEST(Factory, InvalidConfigNoHash) {
   )";
 
   BasicAuthFilterFactory factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
+  BasicAuth proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
       EnvoyException, "basic auth: invalid htpasswd format, invalid SHA hash length");
 }
 
@@ -136,13 +140,13 @@ TEST(Factory, InvalidConfigNotSHA) {
   )";
 
   BasicAuthFilterFactory factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
+  BasicAuth proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
       EnvoyException, "basic auth: unsupported htpasswd format: please use {SHA}");
 }
 

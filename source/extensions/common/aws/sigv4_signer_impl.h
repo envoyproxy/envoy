@@ -41,11 +41,12 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 class SigV4SignerImpl : public SignerBaseImpl {
 public:
   SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
-                  const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
+                  const CredentialsProviderSharedPtr& credentials_provider,
+                  Server::Configuration::CommonFactoryContext& context,
                   const AwsSigningHeaderExclusionVector& matcher_config,
                   const bool query_string = false,
                   const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
-      : SignerBaseImpl(service_name, region, credentials_provider, time_source, matcher_config,
+      : SignerBaseImpl(service_name, region, credentials_provider, context, matcher_config,
                        query_string, expiration_time) {}
 
 private:

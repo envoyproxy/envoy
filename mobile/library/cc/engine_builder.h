@@ -12,13 +12,11 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
-#include "direct_response_testing.h"
 #include "library/cc/engine.h"
-#include "library/cc/engine_callbacks.h"
 #include "library/cc/key_value_store.h"
 #include "library/cc/log_level.h"
 #include "library/cc/string_accessor.h"
-#include "library/common/types/matcher_data.h"
+#include "library/common/engine_types.h"
 
 namespace Envoy {
 namespace Platform {
@@ -123,11 +121,18 @@ private:
 class EngineBuilder {
 public:
   EngineBuilder();
-  virtual ~EngineBuilder() {}
+  EngineBuilder(EngineBuilder&&) = default;
+  virtual ~EngineBuilder() = default;
+  static std::string nativeNameToConfig(absl::string_view name);
 
-  EngineBuilder& addLogLevel(LogLevel log_level);
-  EngineBuilder& setLogger(envoy_logger envoy_logger);
-  EngineBuilder& setOnEngineRunning(std::function<void()> closure);
+  [[deprecated("Use EngineBuilder::setLogLevel instead")]] EngineBuilder&
+  addLogLevel(LogLevel log_level);
+  EngineBuilder& setLogLevel(Logger::Logger::Levels log_level);
+  EngineBuilder& setLogger(std::unique_ptr<EnvoyLogger> logger);
+  EngineBuilder& setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks);
+  [[deprecated("Use EngineBuilder::setEngineCallbacks instead")]] EngineBuilder&
+  setOnEngineRunning(std::function<void()> closure);
+  EngineBuilder& setEventTracker(std::unique_ptr<EnvoyEventTracker> event_tracker);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
@@ -191,6 +196,11 @@ public:
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
   EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
 
+  // Sets the thread priority of the Envoy main (network) thread.
+  // The value must be an integer between -20 (highest priority) and 19 (lowest priority). Values
+  // outside of this range will be ignored.
+  EngineBuilder& setNetworkThreadPriority(int thread_priority);
+
 #if defined(__APPLE__)
   // Right now, this API is only used by Apple (iOS) to register the Apple proxy resolver API for
   // use in reading and using the system proxy settings.
@@ -213,15 +223,16 @@ private:
     std::string typed_config_;
   };
 
-  LogLevel log_level_ = LogLevel::info;
-  absl::optional<envoy_logger> envoy_logger_;
-  EngineCallbacksSharedPtr callbacks_;
+  Logger::Logger::Levels log_level_ = Logger::Logger::Levels::info;
+  std::unique_ptr<EnvoyLogger> logger_{nullptr};
+  std::unique_ptr<EngineCallbacks> callbacks_;
+  std::unique_ptr<EnvoyEventTracker> event_tracker_{nullptr};
 
   int connect_timeout_seconds_ = 30;
   int dns_refresh_seconds_ = 60;
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
-  int dns_query_timeout_seconds_ = 25;
+  int dns_query_timeout_seconds_ = 5;
   bool use_system_resolver_ = true;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;
@@ -239,6 +250,7 @@ private:
   absl::optional<ProtobufWkt::Struct> node_metadata_ = absl::nullopt;
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
+  absl::optional<int> network_thread_priority_ = absl::nullopt;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 

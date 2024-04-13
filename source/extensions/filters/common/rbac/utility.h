@@ -34,8 +34,10 @@ struct RoleBasedAccessControlFilterStats {
   SHADOW_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-RoleBasedAccessControlFilterStats
-generateStats(const std::string& prefix, const std::string& shadow_prefix, Stats::Scope& scope);
+RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
+                                                const std::string& rules_prefix,
+                                                const std::string& shadow_rules_prefix,
+                                                Stats::Scope& scope);
 
 template <class ConfigType>
 std::unique_ptr<RoleBasedAccessControlEngine>

@@ -743,7 +743,8 @@ key:
     registerTestServerPorts({"http"});
   }
 
-  IntegrationStreamDecoderPtr initialRDSCommunication(std::string route_config_tmpl) {
+  using RouteConfigFormatter = std::function<std::string(absl::string_view)>;
+  IntegrationStreamDecoderPtr initialRDSCommunication(RouteConfigFormatter route_config_formatter) {
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
     // Request that matches lazily loaded scope will trigger on demand loading.
     auto response = codec_client_->makeHeaderOnlyRequest(
@@ -754,7 +755,7 @@ key:
                                        {"Pick-This-Cluster", "new_cluster"},
                                        {"Addr", "x-foo-key=foo"}});
     createRdsStream("foo_route1");
-    sendRdsResponse(fmt::format(fmt::runtime(route_config_tmpl), "foo_route1"), "1");
+    sendRdsResponse(route_config_formatter("foo_route1"), "1");
     test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
     return response;
   }
@@ -771,28 +772,10 @@ key:
     Enable,
   };
 
-  std::string getRouteConfigTemplate(VHostOdCdsConfig vhost_config, RouteOdCdsConfig route_config) {
-    static const absl::string_view vhost_config_enabled = R"EOF(
-        typed_per_filter_config:
-          envoy.filters.http.on_demand:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
-            odcds:
-              source:
-                resource_api_version: V3
-                api_config_source:
-                  api_type: DELTA_GRPC
-                  transport_api_version: V3
-                  grpc_services:
-                    envoy_grpc:
-                      cluster_name: odcds_cluster
-              timeout: "2.5s"
-)EOF";
-    static const absl::string_view vhost_config_disabled = R"EOF(
-        typed_per_filter_config:
-          envoy.filters.http.on_demand:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
-)EOF";
-    static const absl::string_view route_config_enabled = R"EOF(
+  RouteConfigFormatter getRouteConfigFormatter(VHostOdCdsConfig vhost_config,
+                                               RouteOdCdsConfig route_config) {
+    RouteConfigFormatter formatter = [vhost_config, route_config](absl::string_view route_name) {
+      static constexpr absl::string_view vhost_config_enabled = R"EOF(
           typed_per_filter_config:
             envoy.filters.http.on_demand:
               "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
@@ -806,55 +789,77 @@ key:
                       envoy_grpc:
                         cluster_name: odcds_cluster
                 timeout: "2.5s"
-)EOF";
-    static const absl::string_view route_config_disabled = R"EOF(
+  )EOF";
+      static constexpr absl::string_view vhost_config_disabled = R"EOF(
           typed_per_filter_config:
             envoy.filters.http.on_demand:
               "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
-)EOF";
-    absl::string_view picked_vhost_config;
-    absl::string_view picked_route_config;
-    switch (vhost_config) {
-    case VHostOdCdsConfig::None:
-      break;
+  )EOF";
+      static constexpr absl::string_view route_config_enabled = R"EOF(
+            typed_per_filter_config:
+              envoy.filters.http.on_demand:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
+                odcds:
+                  source:
+                    resource_api_version: V3
+                    api_config_source:
+                      api_type: DELTA_GRPC
+                      transport_api_version: V3
+                      grpc_services:
+                        envoy_grpc:
+                          cluster_name: odcds_cluster
+                  timeout: "2.5s"
+  )EOF";
+      static constexpr absl::string_view route_config_disabled = R"EOF(
+            typed_per_filter_config:
+              envoy.filters.http.on_demand:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
+  )EOF";
+      absl::string_view picked_vhost_config;
+      absl::string_view picked_route_config;
+      switch (vhost_config) {
+      case VHostOdCdsConfig::None:
+        break;
 
-    case VHostOdCdsConfig::Disable:
-      picked_vhost_config = vhost_config_disabled;
-      break;
+      case VHostOdCdsConfig::Disable:
+        picked_vhost_config = vhost_config_disabled;
+        break;
 
-    case VHostOdCdsConfig::Enable:
-      picked_vhost_config = vhost_config_enabled;
-      break;
-    }
+      case VHostOdCdsConfig::Enable:
+        picked_vhost_config = vhost_config_enabled;
+        break;
+      }
 
-    switch (route_config) {
-    case RouteOdCdsConfig::None:
-      break;
+      switch (route_config) {
+      case RouteOdCdsConfig::None:
+        break;
 
-    case RouteOdCdsConfig::Disable:
-      picked_route_config = route_config_disabled;
-      break;
+      case RouteOdCdsConfig::Disable:
+        picked_route_config = route_config_disabled;
+        break;
 
-    case RouteOdCdsConfig::Enable:
-      picked_route_config = route_config_enabled;
-      break;
-    }
+      case RouteOdCdsConfig::Enable:
+        picked_route_config = route_config_enabled;
+        break;
+      }
 
-    return fmt::format(R"EOF(
-      virtual_hosts:
-      - name: integration
-        {}
-        routes:
-        - name: odcds_route
+      return fmt::format(R"EOF(
+        virtual_hosts:
+        - name: integration
           {}
-          route:
-            cluster_header: "Pick-This-Cluster"
-          match:
-            prefix: "/"
-        domains: ["*"]
-      name: {{}}
-)EOF",
-                       picked_vhost_config, picked_route_config);
+          routes:
+          - name: odcds_route
+            {}
+            route:
+              cluster_header: "Pick-This-Cluster"
+            match:
+              prefix: "/"
+          domains: ["*"]
+        name: {}
+  )EOF",
+                         picked_vhost_config, picked_route_config, route_name);
+    };
+    return formatter;
   }
 
   void serveOdCdsExpect200(IntegrationStreamDecoderPtr response) {
@@ -911,7 +916,7 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateSuccessRDSThenCDS) {
   initialize();
 
   auto response = initialRDSCommunication(
-      getRouteConfigTemplate(VHostOdCdsConfig::None, RouteOdCdsConfig::None));
+      getRouteConfigFormatter(VHostOdCdsConfig::None, RouteOdCdsConfig::None));
   serveOdCdsExpect200(std::move(response));
   cleanupUpstreamAndDownstream();
 }
@@ -926,7 +931,7 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateSuccessRDSThenCDSInVHost) {
   initialize();
 
   auto response = initialRDSCommunication(
-      getRouteConfigTemplate(VHostOdCdsConfig::Enable, RouteOdCdsConfig::None));
+      getRouteConfigFormatter(VHostOdCdsConfig::Enable, RouteOdCdsConfig::None));
   serveOdCdsExpect200(std::move(response));
   cleanupUpstreamAndDownstream();
 }
@@ -941,7 +946,7 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateSuccessRDSThenCDSInRoute) {
   initialize();
 
   auto response = initialRDSCommunication(
-      getRouteConfigTemplate(VHostOdCdsConfig::None, RouteOdCdsConfig::Enable));
+      getRouteConfigFormatter(VHostOdCdsConfig::None, RouteOdCdsConfig::Enable));
   serveOdCdsExpect200(std::move(response));
   cleanupUpstreamAndDownstream();
 }
@@ -955,7 +960,7 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabled)
   initialize();
 
   auto response = initialRDSCommunication(
-      getRouteConfigTemplate(VHostOdCdsConfig::None, RouteOdCdsConfig::None));
+      getRouteConfigFormatter(VHostOdCdsConfig::None, RouteOdCdsConfig::None));
   noOdCdsExpect503(std::move(response));
 
   cleanupUpstreamAndDownstream();
@@ -973,7 +978,7 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabledI
   initialize();
 
   auto response = initialRDSCommunication(
-      getRouteConfigTemplate(VHostOdCdsConfig::Disable, RouteOdCdsConfig::None));
+      getRouteConfigFormatter(VHostOdCdsConfig::Disable, RouteOdCdsConfig::None));
   noOdCdsExpect503(std::move(response));
   cleanupUpstreamAndDownstream();
 }
@@ -990,7 +995,7 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabledI
   initialize();
 
   auto response = initialRDSCommunication(
-      getRouteConfigTemplate(VHostOdCdsConfig::None, RouteOdCdsConfig::Disable));
+      getRouteConfigFormatter(VHostOdCdsConfig::None, RouteOdCdsConfig::Disable));
   noOdCdsExpect503(std::move(response));
 
   cleanupUpstreamAndDownstream();
@@ -1006,7 +1011,7 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabledI
   initialize();
 
   auto response = initialRDSCommunication(
-      getRouteConfigTemplate(VHostOdCdsConfig::Enable, RouteOdCdsConfig::Disable));
+      getRouteConfigFormatter(VHostOdCdsConfig::Enable, RouteOdCdsConfig::Disable));
   noOdCdsExpect503(std::move(response));
 
   cleanupUpstreamAndDownstream();

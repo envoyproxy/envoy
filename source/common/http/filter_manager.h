@@ -545,6 +545,11 @@ public:
    * Returns the DownstreamStreamFilterCallbacks for downstream HTTP filters.
    */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
+  /**
+   * Returns if close from the upstream is to be handled with half-close semantics.
+   * This is used for HTTP/1.1 codec.
+   */
+  virtual bool isHalfCloseEnabled() PURE;
 };
 
 /**
@@ -696,7 +701,8 @@ public:
         filter_manager_callbacks_.responseHeaders().ptr(),
         filter_manager_callbacks_.responseTrailers().ptr(),
         {},
-        access_log_type};
+        access_log_type,
+        &filter_manager_callbacks_.activeSpan()};
 
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(log_context, streamInfo());

@@ -4,6 +4,8 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 
 public class JniLibrary {
 
@@ -72,14 +74,14 @@ public class JniLibrary {
    * Send headers over an open HTTP stream. This method can be invoked once and
    * needs to be called before send_data.
    *
-   * @param engine,    the stream's associated engine.
-   * @param stream,    the stream to send headers over.
-   * @param headers,   the headers to send.
-   * @param endStream, supplies whether this is headers only.
-   * @return int, the resulting status of the operation.
+   * @param engine    the stream's associated engine.
+   * @param stream    the stream to send headers over.
+   * @param headers   the headers to send.
+   * @param endStream supplies whether this is headers only.
+   * @return the resulting status of the operation.
    */
-  protected static native int sendHeaders(long engine, long stream, byte[][] headers,
-                                          boolean endStream);
+  protected static native int sendHeaders(long engine, long stream,
+                                          Map<String, List<String>> headers, boolean endStream);
 
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple
@@ -124,12 +126,13 @@ public class JniLibrary {
    * Send trailers over an open HTTP stream. This method can only be invoked once
    * per stream. Note that this method implicitly ends the stream.
    *
-   * @param engine,   the stream's associated engine.
-   * @param stream,   the stream to send trailers over.
-   * @param trailers, the trailers to send.
+   * @param engine   the stream's associated engine.
+   * @param stream   the stream to send trailers over.
+   * @param trailers the trailers to send.
    * @return int, the resulting status of the operation.
    */
-  protected static native int sendTrailers(long engine, long stream, byte[][] trailers);
+  protected static native int sendTrailers(long engine, long stream,
+                                           Map<String, List<String>> trailers);
 
   /**
    * Detach all callbacks from a stream and send an interrupt upstream if
@@ -137,7 +140,7 @@ public class JniLibrary {
    *
    * @param engine, the stream's associated engine.
    * @param stream, the stream to evict.
-   * @return int, the resulting status of the operation.
+   * @return the resulting status of the operation.
    */
   protected static native int resetStream(long engine, long stream);
 
@@ -256,9 +259,10 @@ public class JniLibrary {
   /**
    * Update the log level for all active logs
    *
-   * @param log_level The Log level to change to. Must be an integer 0-6.
+   * @param logLevel The Log level to change to. Must be an integer 0-6.
+   *                 See source/common/common/base_logger.h
    */
-  protected static native void setLogLevel(int log_level);
+  protected static native void setLogLevel(int logLevel);
 
   /**
    * Mimic a call to AndroidNetworkLibrary#verifyServerCertificates from native code.
@@ -285,6 +289,14 @@ public class JniLibrary {
    *
    */
   public static native void callClearTestRootCertificateFromNative();
+
+  /*
+   * Given a filter name, create the proto or YAML config for adding the native filter
+   *
+   * @param filterName the name of the native filter
+   * @return a filter config which can be passed back to createBootstrap
+   */
+  public static native String getNativeFilterConfig(String filterName);
 
   /**
    * Uses the provided fields to generate an Envoy bootstrap proto.

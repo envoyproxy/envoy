@@ -28,7 +28,8 @@ public:
   using ChecksumMatcher = std::pair<std::unique_ptr<Matchers::PathMatcher>, Sha256Checksum>;
 
   ChecksumFilterConfig(
-      const envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig& proto_config);
+      const envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig& proto_config,
+      Server::Configuration::CommonFactoryContext& context);
 
   bool rejectUnmatched() const { return reject_unmatched_; }
   // Returns nullopt on no match.

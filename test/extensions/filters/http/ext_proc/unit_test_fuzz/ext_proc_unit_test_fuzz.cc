@@ -77,14 +77,9 @@ DEFINE_PROTO_FUZZER(
       input.config();
   ExternalProcessing::FilterConfigSharedPtr config;
 
-  // Create regex engine which is used by regex matcher code.
-  Regex::EnginePtr regex_engine = std::make_shared<Regex::GoogleReEngine>();
-  Regex::EngineSingleton::clear();
-  Regex::EngineSingleton::initialize(regex_engine.get());
-
   try {
     config = std::make_shared<ExternalProcessing::FilterConfig>(
-        proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "",
+        proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "", false,
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
         mocks.factory_context_);

@@ -51,11 +51,14 @@ public:
       std::make_shared<NiceMock<Tracing::MockTracer>>()};
   TestScopedRuntime scoped_runtime_;
   void createHttpConnectionManagerConfig(const std::string& yaml) {
+    creation_status_ = absl::OkStatus();
     HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(yaml), context_, date_provider_,
                                 route_config_provider_manager_,
                                 scoped_routes_config_provider_manager_, tracer_manager_,
-                                filter_config_provider_manager_);
+                                filter_config_provider_manager_, creation_status_);
+    THROW_IF_NOT_OK(creation_status_);
   }
+  absl::Status creation_status_{absl::OkStatus()};
 };
 
 class PassThroughFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<

@@ -63,29 +63,32 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 class SignerBaseImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
   SignerBaseImpl(absl::string_view service_name, absl::string_view region,
-                 const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
+                 const CredentialsProviderSharedPtr& credentials_provider,
+                 Server::Configuration::CommonFactoryContext& context,
                  const AwsSigningHeaderExclusionVector& matcher_config,
                  const bool query_string = false,
                  const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
-      : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
-        query_string_(query_string), expiration_time_(expiration_time), time_source_(time_source),
+      : service_name_(service_name), region_(region),
+        excluded_header_matchers_(defaultMatchers(context)),
+        credentials_provider_(credentials_provider), query_string_(query_string),
+        expiration_time_(expiration_time), time_source_(context.timeSource()),
         long_date_formatter_(std::string(SignatureConstants::LongDateFormat)),
         short_date_formatter_(std::string(SignatureConstants::ShortDateFormat)) {
     for (const auto& matcher : matcher_config) {
       excluded_header_matchers_.emplace_back(
           std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              matcher));
+              matcher, context));
     }
   }
 
-  void sign(Http::RequestMessage& message, bool sign_body = false,
-            const absl::string_view override_region = "") override;
-  void sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
-            const absl::string_view override_region = "") override;
-  void signEmptyPayload(Http::RequestHeaderMap& headers,
-                        const absl::string_view override_region = "") override;
-  void signUnsignedPayload(Http::RequestHeaderMap& headers,
-                           const absl::string_view override_region = "") override;
+  absl::Status sign(Http::RequestMessage& message, bool sign_body = false,
+                    const absl::string_view override_region = "") override;
+  absl::Status sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
+                    const absl::string_view override_region = "") override;
+  absl::Status signEmptyPayload(Http::RequestHeaderMap& headers,
+                                const absl::string_view override_region = "") override;
+  absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
+                                   const absl::string_view override_region = "") override;
 
 protected:
   std::string getRegion() const;
@@ -128,14 +131,15 @@ protected:
                          const std::map<std::string, std::string>& signed_headers,
                          const uint16_t expiration_time) const;
 
-  std::vector<Matchers::StringMatcherPtr> defaultMatchers() const {
+  std::vector<Matchers::StringMatcherPtr>
+  defaultMatchers(Server::Configuration::CommonFactoryContext& context) const {
     std::vector<Matchers::StringMatcherPtr> matcher_ptrs{};
     for (const auto& header : default_excluded_headers_) {
       envoy::type::matcher::v3::StringMatcher m;
       m.set_exact(header);
       matcher_ptrs.emplace_back(
           std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              m));
+              m, context));
     }
     return matcher_ptrs;
   }
@@ -145,7 +149,7 @@ protected:
   const std::vector<std::string> default_excluded_headers_ = {
       Http::Headers::get().ForwardedFor.get(), Http::Headers::get().ForwardedProto.get(),
       "x-amzn-trace-id"};
-  std::vector<Matchers::StringMatcherPtr> excluded_header_matchers_ = defaultMatchers();
+  std::vector<Matchers::StringMatcherPtr> excluded_header_matchers_;
   CredentialsProviderSharedPtr credentials_provider_;
   const bool query_string_;
   const uint16_t expiration_time_;

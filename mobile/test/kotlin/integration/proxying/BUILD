@@ -28,6 +28,7 @@ envoy_mobile_android_test(
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
     ],
 )
 
@@ -54,6 +55,7 @@ envoy_mobile_android_test(
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
     ],
 )
 
@@ -80,6 +82,7 @@ envoy_mobile_android_test(
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
     ],
 )
 
@@ -106,6 +109,7 @@ envoy_mobile_android_test(
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
     ],
 )
 
@@ -132,6 +136,7 @@ envoy_mobile_android_test(
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
     ],
 )
 
@@ -158,5 +163,6 @@ envoy_mobile_android_test(
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
     ],
 )

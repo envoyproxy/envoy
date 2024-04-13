@@ -278,14 +278,14 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()) {}
 
-  virtual void initialize() {
+  virtual void initialize(uint32_t envoy_grpc_max_recv_msg_length = 0) {
     if (fake_upstream_ == nullptr) {
       fake_upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
       fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), fake_upstream_config_);
     }
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
-      grpc_client_ = createAsyncClientImpl();
+      grpc_client_ = createAsyncClientImpl(envoy_grpc_max_recv_msg_length);
       break;
     case ClientType::GoogleGrpc: {
       grpc_client_ = createGoogleAsyncClientImpl();
@@ -321,7 +321,7 @@ public:
 
   // Create a Grpc::AsyncClientImpl instance backed by enough fake/mock
   // infrastructure to initiate a loopback TCP connection to fake_upstream_.
-  RawAsyncClientPtr createAsyncClientImpl() {
+  RawAsyncClientPtr createAsyncClientImpl(uint32_t envoy_grpc_max_recv_msg_length = 0) {
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
         *dispatcher_, fake_upstream_->localAddress(), nullptr,
         std::move(async_client_transport_socket_), nullptr, nullptr);
@@ -335,18 +335,23 @@ public:
     EXPECT_CALL(*mock_host_, cluster())
         .WillRepeatedly(ReturnRef(*cm_.thread_local_cluster_.cluster_.info_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
-    http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, random_, host_ptr_,
-                                                    Upstream::ResourcePriority::Default, nullptr,
-                                                    nullptr, state_);
+    http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, api_->randomGenerator(),
+                                                    host_ptr_, Upstream::ResourcePriority::Default,
+                                                    nullptr, nullptr, state_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, local_info_, cm_,
-        runtime_, random_, std::move(shadow_writer_ptr_), http_context_, router_context_);
+        cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, cm_,
+        server_factory_context_, std::move(shadow_writer_ptr_), http_context_, router_context_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .WillRepeatedly(ReturnRef(*http_async_client_));
     envoy::config::core::v3::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name("fake_cluster");
+    if (envoy_grpc_max_recv_msg_length != 0) {
+      config.mutable_envoy_grpc()->mutable_max_receive_message_length()->set_value(
+          envoy_grpc_max_recv_msg_length);
+    }
+
     fillServiceWideInitialMetadata(config);
     return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
   }
@@ -368,9 +373,9 @@ public:
 #ifdef ENVOY_GOOGLE_GRPC
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
-    return std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *google_tls_, stub_factory,
-                                                   stats_scope_, createGoogleGrpcConfig(), *api_,
-                                                   google_grpc_stat_names_);
+    return std::make_unique<GoogleAsyncClientImpl>(
+        *dispatcher_, *google_tls_, stub_factory, stats_scope_, createGoogleGrpcConfig(),
+        server_factory_context_, google_grpc_stat_names_);
 #else
     PANIC("reached unexpected code");
 #endif
@@ -507,12 +512,9 @@ public:
   // Fake/mock infrastructure for Grpc::AsyncClientImpl upstream.
   Upstream::ClusterConnectivityState state_;
   Network::TransportSocketPtr async_client_transport_socket_{new Network::RawBufferSocket()};
-  Upstream::MockClusterManager cm_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Runtime::MockLoader runtime_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
-  NiceMock<Random::MockRandomGenerator> random_;
+  Upstream::MockClusterManager& cm_{server_factory_context_.cluster_manager_};
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
   Http::ContextImpl http_context_;
@@ -533,6 +535,8 @@ class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
   GrpcSslClientIntegrationTest() {
     ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(server_factory_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(*dispatcher_));
   }
   void TearDown() override {
     // Reset some state in the superclass before we destruct context_manager_ in our destructor, it
@@ -549,7 +553,7 @@ public:
     return config;
   }
 
-  void initialize() override {
+  void initialize(uint32_t envoy_grpc_max_recv_msg_length = 0) override {
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
     auto* validation_context = common_tls_context->mutable_validation_context();
@@ -576,7 +580,7 @@ public:
     fake_upstream_ =
         std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0, ipVersion(), config);
 
-    GrpcClientIntegrationTest::initialize();
+    GrpcClientIntegrationTest::initialize(envoy_grpc_max_recv_msg_length);
   }
 
   Network::DownstreamTransportSocketFactoryPtr createUpstreamSslContext() {

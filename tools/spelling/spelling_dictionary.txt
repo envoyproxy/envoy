@@ -27,6 +27,9 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+ECN
+ECS
+EKS
 NID
 NIST
 bm
@@ -177,6 +180,7 @@ FIRSTHDR
 FQDN
 FREEBIND
 curr
+doo
 eslint
 freeifaddrs
 FUZZER
@@ -259,6 +263,7 @@ LEV
 LF
 LHS
 hls
+hoo
 iframe
 ilp
 ingressed
@@ -313,6 +318,7 @@ ODCDS
 middlewildcard
 monostate
 mpd
+mutators
 na
 oghttp
 OID
@@ -354,6 +360,7 @@ QUIC
 QoS
 qat
 qatzip
+qatzstd
 RAII
 RANLUX
 RBAC
@@ -470,7 +477,6 @@ VM
 VPN
 WAITFORONE
 WASM
-WAVM
 WIP
 WKT
 WRONGPASS
@@ -1470,6 +1476,7 @@ xxhash
 xxs
 xyz
 xyzwebservices
+yml
 zag
 zig
 zipkin

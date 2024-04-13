@@ -122,7 +122,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(Router::HeaderParser::configure(
           config.http_service().authorization_request().headers_to_add(),
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)) {}
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)),
+      encode_raw_headers_(config.encode_raw_headers()) {}
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -152,8 +153,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(Http::Headers::get().Host.get());
     matchers.push_back(
-        std::make_unique<
-            Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
             matcher, context));
 
     return std::make_shared<NotHeaderKeyMatcher>(std::move(matchers));
@@ -169,8 +169,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
     matchers.push_back(
-        std::make_unique<
-            Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
             matcher, context));
   }
 
@@ -217,18 +216,35 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(lengthZeroHeader());
   }
 
-  for (const auto& header : http_request.headers()) {
-    const Http::LowerCaseString key{header.first};
+  if (config_->encodeRawHeaders()) {
+    for (const auto& header : http_request.header_map().headers()) {
+      const Http::LowerCaseString key{header.key()};
 
-    // Skip setting content-length header since it is already configured at initialization.
-    if (key == Http::Headers::get().ContentLength) {
-      continue;
+      // Skip setting content-length header since it is already configured at initialization.
+      if (key == Http::Headers::get().ContentLength) {
+        continue;
+      }
+
+      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
+        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
+      } else {
+        headers->addCopy(key, header.raw_value());
+      }
     }
+  } else {
+    for (const auto& header : http_request.headers()) {
+      const Http::LowerCaseString key{header.first};
 
-    if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-      headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
-    } else {
-      headers->addCopy(key, header.second);
+      // Skip setting content-length header since it is already configured at initialization.
+      if (key == Http::Headers::get().ContentLength) {
+        continue;
+      }
+
+      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
+        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+      } else {
+        headers->addCopy(key, header.second);
+      }
     }
   }
 
