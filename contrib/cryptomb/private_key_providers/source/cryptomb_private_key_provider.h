@@ -40,10 +40,6 @@ public:
   enum RequestStatus getStatus() { return status_; }
   void scheduleCallback(enum RequestStatus status);
 
-  // Buffer length is the same as the max signature length (4096 bits = 512 bytes)
-  unsigned char out_buf_[MAX_SIGNATURE_SIZE];
-  // The real length of the signature.
-  size_t out_len_{};
   // Incoming data buffer.
   std::unique_ptr<uint8_t[]> in_buf_;
 
@@ -75,6 +71,10 @@ public:
   // BoringSSL ECDSA key structure, so not wrapped in smart pointers.
   const BIGNUM* priv_key_{};
   size_t sig_len_{};
+
+  // ECDSA signature.
+  uint8_t sig_r_[32]{};
+  uint8_t sig_s_[32]{};
 };
 
 // CryptoMbRsaContext is a CryptoMbContext which holds the extra RSA parameters and has
@@ -103,6 +103,11 @@ public:
 
   // Buffer for `Lenstra` check.
   unsigned char lenstra_to_[MAX_SIGNATURE_SIZE];
+
+  // Buffer length is the same as the max signature length (4096 bits = 512 bytes)
+  unsigned char out_buf_[MAX_SIGNATURE_SIZE];
+  // The real length of the signature.
+  size_t out_len_{};
 };
 
 using CryptoMbContextSharedPtr = std::shared_ptr<CryptoMbContext>;
@@ -123,8 +128,6 @@ private:
   void processRequests();
   void processRsaRequests();
   void processEcdsaRequests();
-  bool postprocessEcdsaRequest(CryptoMbEcdsaContextSharedPtr mb_ctx, const uint8_t* sign_r,
-                               const uint8_t* sign_s);
   void startTimer();
   void stopTimer();
 

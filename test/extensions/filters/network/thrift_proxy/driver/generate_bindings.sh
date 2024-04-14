@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Generates the thrift bindings for example.thrift. Requires that
 # apache-thrift's thrift generator is installed and on the path.

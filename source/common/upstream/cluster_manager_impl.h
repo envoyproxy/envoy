@@ -246,17 +246,9 @@ class ClusterManagerImpl : public ClusterManager,
                            public MissingClusterNotifier,
                            Logger::Loggable<Logger::Id::upstream> {
 public:
-  // Initializes the ClusterManagerImpl instance based on the given Bootstrap config.
-  //
-  // This method *must* be called prior to invoking any other methods on the class and *must* only
-  // be called once. This method should be called immediately after ClusterManagerImpl construction
-  // and from the same thread in which the ClusterManagerImpl was constructed.
-  //
-  // The initialization is separated from the constructor because lots of work, including ADS
-  // initialization, is done in this method. If the contents of this method are invoked during
-  // construction, a derived class cannot override any of the virtual methods and have them invoked
-  // instead, since the base class's methods are used when in a base class constructor.
-  absl::Status init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
+
+  bool initialized() override { return initialized_; }
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 

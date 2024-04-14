@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package envoy.extensions.http.injected_credentials.oauth2.v3;
+
+import "envoy/config/core/v3/http_uri.proto";
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.injected_credentials.oauth2.v3";
+option java_outer_classname = "Oauth2Proto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/injected_credentials/oauth2/v3;oauth2v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: OAuth2 Credential]
+// [#not-implemented-hide:]
+// [#extension: envoy.http.injected_credentials.oauth2]
+
+// OAuth2 extension can be used to retrieve an OAuth2 access token from an authorization server and inject it into the
+// proxied requests.
+// Currently, only the Client Credentials Grant flow is supported.
+// The access token will be injected into the request headers using the ``Authorization`` header as a bearer token.
+message OAuth2 {
+  enum AuthType {
+    // The ``client_id`` and ``client_secret`` will be sent using HTTP Basic authentication scheme.
+    BASIC_AUTH = 0;
+
+    // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
+    // This type should only be used when Auth server does not support Basic authentication.
+    URL_ENCODED_BODY = 1;
+  }
+
+  // Credentials to authenticate client to the authorization server.
+  // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-2.3) for details.
+  message ClientCredentials {
+    // Client ID.
+    // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1) for details.
+    string client_id = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Client secret.
+    // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1) for details.
+    transport_sockets.tls.v3.SdsSecretConfig client_secret = 2
+        [(validate.rules).message = {required: true}];
+
+    // The method to use when sending credentials to the authorization server.
+    // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1) for details.
+    AuthType auth_type = 3;
+  }
+
+  // Endpoint on the authorization server to retrieve the access token from.
+  // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-3.2) for details.
+  config.core.v3.HttpUri token_endpoint = 1 [(validate.rules).message = {required: true}];
+
+  // Optional list of OAuth scopes to be claimed in the authorization request.
+  // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-4.4.2) for details.
+  repeated string scopes = 2;
+
+  oneof flow_type {
+    option (validate.required) = true;
+
+    // Client Credentials Grant.
+    // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-4.4) for details.
+    ClientCredentials client_credentials = 3;
+  }
+}
