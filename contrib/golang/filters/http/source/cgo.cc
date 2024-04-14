@@ -51,6 +51,20 @@ std::vector<std::string> stringsFromGoSlice(void* slice_data, int slice_len) {
 extern "C" {
 #endif
 
+CAPIStatus envoyGoFilterHandlerWrapper2(void* s,
+                                        std::function<CAPIStatus(std::shared_ptr<Filter>&)> f) {
+  auto state = static_cast<ProcessorState*>(reinterpret_cast<processState*>(s));
+  if (!state->isProcessingInGo()) {
+    return CAPIStatus::CAPINotInGo;
+  }
+  auto req = static_cast<HttpRequestInternal*>(state->req);
+  auto weak_filter = req->weakFilter();
+  if (auto filter = weak_filter.lock()) {
+    return f(filter);
+  }
+  return CAPIStatus::CAPIFilterIsGone;
+}
+
 CAPIStatus envoyGoFilterHandlerWrapper(void* r,
                                        std::function<CAPIStatus(std::shared_ptr<Filter>&)> f) {
   auto req = reinterpret_cast<HttpRequestInternal*>(r);
@@ -71,9 +85,9 @@ envoyGoConfigHandlerWrapper(void* c, std::function<CAPIStatus(std::shared_ptr<Fi
   return CAPIStatus::CAPIFilterIsGone;
 }
 
-CAPIStatus envoyGoFilterHttpClearRouteCache(void* r) {
-  return envoyGoFilterHandlerWrapper(
-      r, [](std::shared_ptr<Filter>& filter) -> CAPIStatus { return filter->clearRouteCache(); });
+CAPIStatus envoyGoFilterHttpClearRouteCache(void* s) {
+  return envoyGoFilterHandlerWrapper2(
+      s, [](std::shared_ptr<Filter>& filter) -> CAPIStatus { return filter->clearRouteCache(); });
 }
 
 CAPIStatus envoyGoFilterHttpContinue(void* r, int status) {

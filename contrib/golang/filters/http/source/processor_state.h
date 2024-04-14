@@ -12,9 +12,8 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/utility.h"
 
-#include "contrib/golang/common/dso/dso.h"
-
 #include "absl/status/status.h"
+#include "contrib/golang/common/dso/dso.h"
 
 namespace Envoy {
 namespace Extensions {

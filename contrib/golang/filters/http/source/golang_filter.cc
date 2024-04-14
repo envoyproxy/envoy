@@ -179,7 +179,7 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "golang filter on destroy");
 
-  // not invoked initRequest yet, which mean not invoked into Go yet.
+  // initRequest haven't be called yet, which mean haven't called into Go.
   if (req_->configId == 0) {
     // should release the req object, since stream reset may happen before calling into Go side,
     // which means no GC finializer will be invoked to release this C++ object.
@@ -241,7 +241,8 @@ GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseH
     Thread::LockGuard lock(mutex_);
     headers_ = &headers;
   }
-  auto status = dynamic_lib_->envoyGoFilterOnHttpHeader(req_, end_stream ? 1 : 0, headers.size(),
+  auto s = dynamic_cast<processState*>(&state);
+  auto status = dynamic_lib_->envoyGoFilterOnHttpHeader(s, end_stream ? 1 : 0, headers.size(),
                                                         headers.byteSize());
   return static_cast<GolangStatus>(status);
 }
@@ -323,9 +324,8 @@ bool Filter::doTrailerGo(ProcessorState& state, Http::HeaderMap& trailers) {
 
   state.processTrailer();
 
-  ASSERT(req_ != nullptr);
-  auto status =
-      dynamic_lib_->envoyGoFilterOnHttpHeader(req_, 1, trailers.size(), trailers.byteSize());
+  auto s = dynamic_cast<processState*>(&state);
+  auto status = dynamic_lib_->envoyGoFilterOnHttpHeader(s, 1, trailers.size(), trailers.byteSize());
 
   return state.handleTrailerGolangStatus(static_cast<GolangStatus>(status));
 }
