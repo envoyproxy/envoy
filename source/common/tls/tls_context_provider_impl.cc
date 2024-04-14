@@ -1,4 +1,4 @@
-#include "source/common/tls/tls_context_provider.h"
+#include "source/common/tls/tls_context_provider_impl.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -29,9 +29,9 @@ TlsContextProviderImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hell
   }
 
   switch (ocsp_staple_action) {
-  case Extensions::TransportSockets::Tls::OcspStapleAction::Staple: {
+  case Extensions::TransportSockets::Tls::OcspStapleAction::Staple:
     stats.ocsp_staple_responses_.inc();
-  } break;
+    break;
   case Extensions::TransportSockets::Tls::OcspStapleAction::NoStaple:
     stats.ocsp_staple_omitted_.inc();
     break;
@@ -39,6 +39,7 @@ TlsContextProviderImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hell
     stats.ocsp_staple_failed_.inc();
     return Ssl::SelectionResult::Terminate;
   case Extensions::TransportSockets::Tls::OcspStapleAction::ClientNotCapable:
+    // This happens when client does not support OCSP, do nothing.
     break;
   }
   cb->onCertSelectionResult(true, selected_ctx,

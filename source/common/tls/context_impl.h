@@ -204,6 +204,7 @@ public:
                     Ssl::ContextAdditionalInitFunc additional_init);
 
   // Ssl::ContextSelectionCallback
+  // The returned vector has the same life-time as the Ssl::ContextSelectionCallback.
   const std::vector<Ssl::TlsContext>& getTlsContexts() const override { return tls_contexts_; };
 
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with

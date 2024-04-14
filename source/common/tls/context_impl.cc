@@ -1378,7 +1378,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   ENVOY_LOG(trace, "TLS context selection result: {}, before selectTlsContext",
             static_cast<int>(selection_result));
 
-  auto result = tls_context_provider_->selectTlsContext(
+  const auto result = tls_context_provider_->selectTlsContext(
       ssl_client_hello, extended_socket_info->createCertSelectionCallback(ssl_client_hello->ssl));
 
   ENVOY_LOG(trace, "TLS context selection result: {}, after selectTlsContext",
@@ -1393,8 +1393,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   case Ssl::SelectionResult::Stop:
     extended_socket_info->setCertSelectionAsync();
     return ssl_select_cert_retry;
-  default:
-    // Ssl::SelectionResult::Terminate:
+  case Ssl::SelectionResult::Terminate:
     return ssl_select_cert_error;
   }
 }

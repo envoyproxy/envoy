@@ -108,7 +108,7 @@ private:
   // nullopt if there is none.
   OptRef<CertSelectionCallbackImpl> cert_selection_callback_;
   // Stores the cert selection result if there is any.
-  // nullopt if no cert selection has ever been kicked off.
+  // NotStarted if no cert selection has ever been kicked off.
   Ssl::CertSelectionStatus cert_selection_result_{Ssl::CertSelectionStatus::NotStarted};
 };
 

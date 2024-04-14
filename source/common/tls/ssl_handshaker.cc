@@ -51,7 +51,7 @@ void CertSelectionCallbackImpl::onCertSelectionResult(bool succeeded,
       RELEASE_ASSERT(selected_ctx.ocsp_response_,
                      "OCSP response must be present under OcspStapleAction::Staple");
       auto& resp_bytes = selected_ctx.ocsp_response_->rawBytes();
-      int rc = SSL_set_ocsp_response(ssl_, resp_bytes.data(), resp_bytes.size());
+      const int rc = SSL_set_ocsp_response(ssl_, resp_bytes.data(), resp_bytes.size());
       RELEASE_ASSERT(rc != 0, "");
     }
   }
@@ -100,7 +100,7 @@ void SslExtendedSocketInfoImpl::onCertSelectionCompleted(bool succeeded) {
   RELEASE_ASSERT(cert_selection_result_ != Ssl::CertSelectionStatus::Successful &&
                      cert_selection_result_ != Ssl::CertSelectionStatus::Failed,
                  "onCertSelectionCompleted twice");
-  bool async = cert_selection_result_ == Ssl::CertSelectionStatus::Pending;
+  const bool async = cert_selection_result_ == Ssl::CertSelectionStatus::Pending;
   cert_selection_result_ =
       succeeded ? Ssl::CertSelectionStatus::Successful : Ssl::CertSelectionStatus::Failed;
   if (cert_selection_callback_.has_value()) {

@@ -12,6 +12,9 @@
 namespace Envoy {
 namespace Ssl {
 
+/**
+ * The default TLS context provider, selecting certificate based on SNI.
+ */
 class TlsContextProviderImpl : public Ssl::TlsContextProvider {
 public:
   TlsContextProviderImpl(Ssl::ContextSelectionCallbackWeakPtr cb) : cb_(cb){};

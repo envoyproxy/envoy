@@ -13,7 +13,7 @@
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
-#include "source/common/tls/tls_context_provider.h"
+#include "source/common/tls/tls_context_provider_impl.h"
 
 #include "openssl/ssl.h"
 

@@ -128,12 +128,12 @@ envoy_cc_library(
     srcs = [
         "context_impl.cc",
         "context_manager_impl.cc",
-        "tls_context_provider.cc",
+        "tls_context_provider_impl.cc",
     ],
     hdrs = [
         "context_impl.h",
         "context_manager_impl.h",
-        "tls_context_provider.h",
+        "tls_context_provider_impl.h",
     ],
     external_deps = [
         "abseil_node_hash_set",
