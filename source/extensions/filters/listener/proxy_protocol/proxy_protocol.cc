@@ -453,7 +453,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
         envoy::extensions::filters::listener::proxy_protocol::v3::TlvsMetadata tlvs_metadata;
         auto status = absl::OkStatus();
         if (typed_proxy_filter_metadata != typed_filter_metadata.end()) {
-          status = MessageUtil::unpackToNoThrow(typed_proxy_filter_metadata->second, tlvs_metadata);
+          status = MessageUtil::unpackTo(typed_proxy_filter_metadata->second, tlvs_metadata);
         }
         if (!status.ok()) {
           ENVOY_LOG(warn, "proxy_protocol: Failed to unpack typed metadata for TLV type ",
