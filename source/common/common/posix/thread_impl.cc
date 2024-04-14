@@ -27,8 +27,11 @@ int64_t getCurrentThreadIdBase() {
 #endif
 }
 
-ThreadId getCurrentThreadId() {
-  THREAD_LOCAL_CONSTRUCT_ON_FIRST_USE(ThreadId, getCurrentThreadIdBase());
+int64_t getCurrentThreadId() {
+  // Use the static value rather than the static pointer to suppress ASAN memory leak
+  // errors.
+  static thread_local const int64_t tid = getCurrentThreadIdBase();
+  return tid;
 }
 
 } // namespace
@@ -157,7 +160,7 @@ public:
     return std::make_unique<PosixThread>(thread_handle, options);
   };
 
-  ThreadId currentThreadId() override { return getCurrentThreadId(); };
+  ThreadId currentThreadId() override { return ThreadId(getCurrentThreadId()); };
 
   ThreadId currentPthreadId() override {
 #if defined(__linux__)
