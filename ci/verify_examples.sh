@@ -18,6 +18,8 @@ FLAKY_SANDBOXES=(
     # https://github.com/envoyproxy/envoy/issues/31333
     locality-load-balancing
     # https://github.com/envoyproxy/envoy/issues/28541
+    lua-cluster-specifier
+    # https://github.com/envoyproxy/envoy/issues/33533
     wasm-cc
     # https://github.com/envoyproxy/envoy/issues/28546
     websocket)
