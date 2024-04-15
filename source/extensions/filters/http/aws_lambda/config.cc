@@ -42,7 +42,10 @@ AwsLambdaFilterFactory::getCredentialsProvider(
     const std::string& profile, Server::Configuration::ServerFactoryContext& server_context,
     const std::string& region) const {
   if (!profile.empty()) {
-    ENVOY_LOG(debug, "config profile {} is set, defaults providers will be ignored", profile);
+    ENVOY_LOG(debug,
+              "credentials profile is set to \"{}\" in config, default credentials providers chain "
+              "will be ignored and only credentials file provider will be used",
+              profile);
     return std::make_shared<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
         server_context.api(), profile);
   }
