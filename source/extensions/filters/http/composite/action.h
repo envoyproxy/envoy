@@ -11,6 +11,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 
+using HttpExtensionConfigProviderSharedPtr = std::shared_ptr<
+    Config::DynamicExtensionConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>>;
+
 class ExecuteFilterAction
     : public Matcher::ActionBase<
           envoy::extensions::filters::http::composite::v3::ExecuteFilterAction> {
@@ -43,12 +46,46 @@ public:
   }
 
 private:
-  Matcher::ActionFactoryCb createActionFactoryCbDownstream(
+  template <class FactoryCtx, class FilterCfgProviderMgr>
+  Matcher::ActionFactoryCb createDynamicActionFactoryCbTyped(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Http::Matching::HttpFilterActionContext& context, const std::string& filter_chain_type,
+      FactoryCtx& factory_context, std::shared_ptr<FilterCfgProviderMgr>& provider_manager) {
+    std::string name = composite_action.dynamic_config().name();
+    // Create a dynamic filter config provider and register it with the server factory context.
+    auto config_discovery = composite_action.dynamic_config().config_discovery();
+    Server::Configuration::ServerFactoryContext& server_factory_context =
+        context.server_factory_context_.value();
+    HttpExtensionConfigProviderSharedPtr provider =
+        provider_manager->createDynamicFilterConfigProvider(
+            config_discovery, name, server_factory_context, factory_context,
+            server_factory_context.clusterManager(), false, filter_chain_type, nullptr);
+    return [provider = std::move(provider), n = std::move(name)]() -> Matcher::ActionPtr {
+      auto config_value = provider->config();
+      if (config_value.has_value()) {
+        auto factory_cb = config_value.value().get().factory_cb;
+        return std::make_unique<ExecuteFilterAction>(factory_cb, n);
+      }
+      // There is no dynamic config available. Apply missing config filter.
+      auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
+      return std::make_unique<ExecuteFilterAction>(factory_cb, n);
+    };
+  }
+
+  Matcher::ActionFactoryCb createDynamicActionFactoryCbDownstream(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Http::Matching::HttpFilterActionContext& context);
+
+  Matcher::ActionFactoryCb createDynamicActionFactoryCbUpstream(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Http::Matching::HttpFilterActionContext& context);
+
+  Matcher::ActionFactoryCb createStaticActionFactoryCbDownstream(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
-  Matcher::ActionFactoryCb createActionFactoryCbUpstream(
+  Matcher::ActionFactoryCb createStaticActionFactoryCbUpstream(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);

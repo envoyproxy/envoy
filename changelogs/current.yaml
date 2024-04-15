@@ -299,6 +299,11 @@ new_features:
   change: |
     Update ``aws_lambda`` filter to support use as an upstream HTTP filter. This allows successful calculation of
     signatures after the forwarding stage has completed, particularly if the path element is modified.
+- area: aws_lambda
+  change: |
+    The ``aws_lambda`` filter now supports the
+    :ref:`credentials_profile <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.credentials_profile>` parameter.
+    This enables choosing different credential profiles for each filter instance.
 - area: grpc reverse bridge
   change: |
     Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter
@@ -491,6 +496,11 @@ new_features:
     Added maximum gRPC message size that is allowed to be received in Envoy gRPC. If a message over this limit is received,
     the gRPC stream is terminated with the RESOURCE_EXHAUSTED error. This limit is applied to individual messages in the
     streaming response and not the total size of streaming response. Defaults to 0, which means unlimited.
+- area: load shed point
+  change: |
+    Added load shed point ``envoy.load_shed_points.http_downstream_filter_check`` that makes load shed check availabe in HTTP decoder
+    filters, and right now it is only available in router. It will send local reply directly when Envoy is under pressure,
+    typically memory.
 - area: filters
   change: |
     Added :ref:`per-route configuration support to the Basic Auth filter
