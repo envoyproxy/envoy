@@ -19,8 +19,8 @@ public:
 
   void createUpstreams() override { HttpIntegrationTest::createUpstreams(); }
   struct address {
-    uint32_t address_ = 0;
-    std::string first_address_string_;
+    uint32_t address_;
+    absl::string_view first_address_string_;
   };
 
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
@@ -58,7 +58,7 @@ TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
                          TestUtility::makeDnsResponse({
                              // The only significant address is the first one; the other ones are
                              // just used to populate a list whose maintenance is race-prone.
-                             address_ptr->first_address_string_,
+                             std::string(address_ptr->first_address_string_),
                              absl::StrCat("127.0.0.", address),
                              absl::StrCat("127.0.0.", address + 1),
                              absl::StrCat("127.0.0.", address + 2),
