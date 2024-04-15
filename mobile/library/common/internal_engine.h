@@ -80,7 +80,13 @@ public:
 
   envoy_status_t readData(envoy_stream_t stream, size_t bytes_to_read);
 
-  envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream);
+  /**
+   * Send data over an open HTTP stream. This method can be invoked multiple times.
+   * @param stream the stream to send data over.
+   * @param buffer the data to send.
+   * @param end_stream indicates whether to close the stream locally after sending this frame.
+   */
+  envoy_status_t sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool end_stream);
 
   /**
    * Send trailers over an open HTTP stream. This method can only be invoked once per stream.
