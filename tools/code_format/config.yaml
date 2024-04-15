@@ -119,7 +119,6 @@ paths:
     - source/common/http/conn_manager_utility.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/utility.cc
-    - source/common/protobuf/message_validator_impl.cc
     - source/common/quic/quic_server_transport_socket_factory.cc
     - source/common/secret/secret_manager_impl.cc
     - source/common/grpc/google_grpc_utils.cc

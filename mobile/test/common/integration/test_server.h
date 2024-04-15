@@ -25,62 +25,31 @@ enum class TestServerType : int {
 };
 
 class TestServer : public ListenerHooks {
-private:
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  Stats::IsolatedStoreImpl stats_store_;
-  Event::GlobalTimeSystem time_system_;
-  Api::ApiPtr api_;
-  Network::Address::IpVersion version_;
-  FakeUpstreamConfig upstream_config_;
-  int port_;
-  Thread::SkipAsserts skip_asserts_;
-  ProcessWide process_wide;
-  Thread::MutexBasicLockable lock;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
-  std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles_;
-
-  // Either test_server_ will be set for test_server_type is a proxy, otherwise upstream_ will be
-  // used.
-  std::unique_ptr<AutonomousUpstream> upstream_;
-  IntegrationTestServerPtr test_server_;
-
-  Network::DownstreamTransportSocketFactoryPtr createQuicUpstreamTlsContext(
-      testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&);
-
-  Network::DownstreamTransportSocketFactoryPtr createUpstreamTlsContext(
-      testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&);
-
-  static const std::string http_proxy_config;
-  static const std::string https_proxy_config;
-
 public:
   TestServer();
 
   /**
-   * Starts the server. Can only have one server active per JVM. This is blocking until the port can
-   * start accepting requests.
-   * test_server_type: selects between TestServerTypes
+   * Starts the test server. This function blocks until the test server is ready to accept requests.
    */
-  void startTestServer(TestServerType test_server_type);
+  void start(TestServerType type);
 
   /**
-   * Shutdowns the server. Can be restarted later. This is blocking until the server has freed all
-   * resources.
+   * Shutdowns the server server. This function blocks until all the resources have been freed.
    */
-  void shutdownTestServer();
+  void shutdown();
 
   /**
-   * Returns the port that got attributed. Can only be called once the server has been started.
+   * Returns the server port number. Can only once the test server has been started.
    */
-  int getServerPort();
+  int getPort();
 
   /**
    * Sets headers and data for the test server to return on all future requests.
    * Can only be called once the server has been started.
    */
-  void setHeadersAndData(absl::string_view header_key, absl::string_view header_value,
-                         absl::string_view response_body);
+  [[deprecated("Use TestServer::setResponse instead")]] void
+  setHeadersAndData(absl::string_view header_key, absl::string_view header_value,
+                    absl::string_view response_body);
 
   /**
    * Sets the response headers, body, and trailers for the test server to return
@@ -94,6 +63,32 @@ public:
   void onWorkerListenerAdded() override {}
   void onWorkerListenerRemoved() override {}
   void onWorkersStarted() override {}
+
+private:
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Event::GlobalTimeSystem time_system_;
+  Api::ApiPtr api_;
+  Network::Address::IpVersion version_;
+  FakeUpstreamConfig upstream_config_;
+  int port_;
+  Thread::SkipAsserts skip_asserts_;
+  ProcessWide process_wide_;
+  Thread::MutexBasicLockable lock_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
+  std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles_;
+
+  // Either test_server_ will be set for test_server_type is a proxy, otherwise upstream_ will be
+  // used.
+  std::unique_ptr<AutonomousUpstream> upstream_;
+  IntegrationTestServerPtr test_server_;
+
+  Network::DownstreamTransportSocketFactoryPtr createQuicUpstreamTlsContext(
+      testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&);
+
+  Network::DownstreamTransportSocketFactoryPtr createUpstreamTlsContext(
+      testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&);
 };
 
 } // namespace Envoy
