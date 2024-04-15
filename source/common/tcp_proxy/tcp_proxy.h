@@ -548,6 +548,7 @@ public:
     upstreamOverrideHost() const override {
       return absl::nullopt;
     }
+    bool shouldLoadShed() const override { return false; }
     void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
       tracked_object_stack.add(*this);
     }
