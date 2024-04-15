@@ -82,6 +82,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:http_integration_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
