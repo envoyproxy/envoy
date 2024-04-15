@@ -39,7 +39,10 @@ final class KeyValueStoreTests: XCTestCase {
     EnvoyTestServer.startHttp1PlaintextServer()
 
     let engine = EngineBuilder()
-      .addLogLevel(.trace)
+      .addLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .addKeyValueStore(
         name: "envoy.key_value.platform_test",
         keyValueStore: testStore

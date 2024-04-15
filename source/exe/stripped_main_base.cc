@@ -126,7 +126,8 @@ void StrippedMainBase::configureHotRestarter(Random::RandomGenerator& random_gen
 
         TRY_ASSERT_MAIN_THREAD {
           restarter = std::make_unique<Server::HotRestartImpl>(base_id, 0, options_.socketPath(),
-                                                               options_.socketMode());
+                                                               options_.socketMode(),
+                                                               options_.skipHotRestartOnNoParent());
         }
         END_TRY
         CATCH(Server::HotRestartDomainSocketInUseException & ex, {
@@ -142,7 +143,8 @@ void StrippedMainBase::configureHotRestarter(Random::RandomGenerator& random_gen
       restarter_.swap(restarter);
     } else {
       restarter_ = std::make_unique<Server::HotRestartImpl>(
-          base_id, options_.restartEpoch(), options_.socketPath(), options_.socketMode());
+          base_id, options_.restartEpoch(), options_.socketPath(), options_.socketMode(),
+          options_.skipHotRestartOnNoParent());
     }
 
     // Write the base-id to the requested path whether we selected it

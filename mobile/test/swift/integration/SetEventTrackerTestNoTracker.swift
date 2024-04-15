@@ -11,13 +11,16 @@ final class SetEventTrackerTestNoTracker: XCTestCase {
     register_test_extensions()
   }
 
-  func testSetEventTracker() throws {
+  func testEmitEventWithoutSettingEventTracker() throws {
     EnvoyTestServer.startHttp1PlaintextServer()
 
     let expectation = self.expectation(description: "Response headers received")
 
     let engine = EngineBuilder()
-      .addLogLevel(.trace)
+      .addLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .addNativeFilter(
         name: "envoy.filters.http.test_event_tracker",
         // swiftlint:disable:next line_length

@@ -165,6 +165,10 @@ bug_fixes:
 - area: quic
   change: |
     Fixed crash bug with QUIC upstream + X.509v1 certificates.
+- area: quic
+  change: |
+    Added support for QUIC listeners to echo incoming ECN marks to the peer. Currently disabled. When changes are complete and this is
+    enabled, it can be disabled by setting runtime flag ``envoy.reloadable_features.quic_receive_ecn`` to false.
 - area: proxy_protocol
   change: |
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
@@ -233,6 +237,11 @@ bug_fixes:
 - area: http2
   change: |
     Update nghttp2 to resolve CVE-2024-30255 https://github.com/envoyproxy/envoy/security/advisories/GHSA-j654-3ccm-vfmm.
+- area: prefix_matcher_tree
+  change: |
+    Fixed issue in matcher prefix tree lookup.
+    The lookup did not function correctly when the prefix tree had overlapping prefixes.
+    For example: with prefixes ``/foo`` and ``/foo/bar``, it would have incorrectly said no prefix match for ``/foo/``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -279,6 +288,9 @@ new_features:
     and
     :ref:`ExtProcOverrides.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`
     with the new or updated values.
+- area: hot_restart
+  change: |
+    Added new command-line flag :option:`--skip-hot-restart-on-no-parent`.
 - area: aws_request_signing
   change: |
     Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
@@ -334,6 +346,9 @@ new_features:
     metadata may be sent to the server. If
     :ref:`receiving_namespaces <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.receiving_namespaces>`
     is defined, returned metadata may be written to the specified allowed namespaces.
+- area: ext_proc
+  change: |
+    made the :ref:`ExternalProcessor <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>` work as an upstream filter.
 - area: wasm
   change: |
     added ``verify_signature`` foreign function to verify cryptographic signatures.
@@ -480,6 +495,10 @@ new_features:
   change: |
     Added :ref:`per-route configuration support to the Basic Auth filter
     <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuthPerRoute>`.
+- area: lua
+  change: |
+    Added a new ``connectionStreamInfo()`` which could be used to access the streamInfo object on the connection. This addition
+    is helpful in scenarios requiring the retrieval of dynamic metadata from network filters, such as the Proxy Protocol, etc.
 
 deprecated:
 - area: listener

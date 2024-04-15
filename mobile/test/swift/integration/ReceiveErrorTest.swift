@@ -57,6 +57,9 @@ final class ReceiveErrorTests: XCTestCase {
     let engine = EngineBuilder()
       .addLogLevel(.debug)
       .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
+      .setLogger { _, msg in
           print(msg, terminator: "")
       }
       .addPlatformFilter(

@@ -153,6 +153,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 // TODO(panting): flip this to true after some test time.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
+// TODO(martinduke): Delay enabling this guard until all receive_ecn PRs are in place.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_receive_ecn);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
