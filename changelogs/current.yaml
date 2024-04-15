@@ -509,6 +509,9 @@ new_features:
   change: |
     Added a new ``connectionStreamInfo()`` which could be used to access the streamInfo object on the connection. This addition
     is helpful in scenarios requiring the retrieval of dynamic metadata from network filters, such as the Proxy Protocol, etc.
+- area: rbac
+  change: |
+    Added additional statistics for rules and shadow rules to the RBAC HTTP filter.
 
 deprecated:
 - area: listener

@@ -64,6 +64,7 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     : stats_(Filters::Common::RBAC::generateStats(stats_prefix, proto_config.rules_stat_prefix(),
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
+      per_rule_stats_(proto_config.track_per_rule_stats()),
       engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
                                                   action_validation_visitor_)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(
@@ -82,10 +83,23 @@ RoleBasedAccessControlFilterConfig::engine(const Http::StreamFilterCallbacks* ca
   return engine(mode);
 }
 
+bool RoleBasedAccessControlFilterConfig::perRuleStatsEnabled(
+    const Http::StreamFilterCallbacks* callbacks) const {
+  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
+      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
+
+  if (route_local) {
+    return route_local->perRuleStatsEnabled();
+  }
+
+  return per_rule_stats_;
+}
+
 RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpecificFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config,
     Server::Configuration::ServerFactoryContext& context,
-    ProtobufMessage::ValidationVisitor& validation_visitor) {
+    ProtobufMessage::ValidationVisitor& validation_visitor)
+    : per_rule_stats_(per_route_config.rbac().track_per_rule_stats()) {
   // Moved from member initializer to ctor body to overcome clang false warning about memory
   // leak (clang-analyzer-cplusplus.NewDeleteLeaks,-warnings-as-errors).
   // Potentially https://lists.llvm.org/pipermail/llvm-bugs/2018-July/066769.html
@@ -119,6 +133,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
   std::string effective_policy_id;
   const auto shadow_engine =
       config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Shadow);
+  const auto per_rule_stats_enabled = config_->perRuleStatsEnabled(callbacks_);
 
   if (shadow_engine != nullptr) {
     std::string shadow_resp_code =
@@ -128,10 +143,16 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       ENVOY_LOG(debug, "shadow allowed, matched policy {}",
                 effective_policy_id.empty() ? "none" : effective_policy_id);
       config_->stats().shadow_allowed_.inc();
+      if (!effective_policy_id.empty() && per_rule_stats_enabled) {
+        config_->stats().incPolicyShadowAllowed(effective_policy_id);
+      }
     } else {
       ENVOY_LOG(debug, "shadow denied, matched policy {}",
                 effective_policy_id.empty() ? "none" : effective_policy_id);
       config_->stats().shadow_denied_.inc();
+      if (!effective_policy_id.empty() && per_rule_stats_enabled) {
+        config_->stats().incPolicyShadowDenied(effective_policy_id);
+      }
       shadow_resp_code =
           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
     }
@@ -156,6 +177,9 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
     if (allowed) {
       ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
       config_->stats().allowed_.inc();
+      if (!effective_policy_id.empty() && per_rule_stats_enabled) {
+        config_->stats().incPolicyAllowed(effective_policy_id);
+      }
       return Http::FilterHeadersStatus::Continue;
     } else {
       ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
@@ -163,6 +187,9 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
                                  absl::nullopt,
                                  Filters::Common::RBAC::responseDetail(log_policy_id));
       config_->stats().denied_.inc();
+      if (!effective_policy_id.empty() && per_rule_stats_enabled) {
+        config_->stats().incPolicyDenied(effective_policy_id);
+      }
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
