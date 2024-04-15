@@ -33,7 +33,8 @@ void GrpcMetricsStreamerImpl::send(MetricsPtr&& metrics) {
   message.mutable_envoy_metrics()->MergeFrom(*metrics);
 
   if (stream_ == nullptr) {
-    stream_ = client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
+    stream_ = client_->start(service_method_, *this, Tracing::NullSpan::instance(),
+                             Http::AsyncClient::StreamOptions());
     // For perf reasons, the identifier is only sent on establishing the stream.
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = local_info_.node();

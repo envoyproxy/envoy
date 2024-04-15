@@ -19,7 +19,7 @@ ProtobufTypes::MessagePtr parseMessageUntyped(ProtobufTypes::MessagePtr&& messag
                                               Buffer::InstancePtr&& response);
 RawAsyncStream* startUntyped(RawAsyncClient* client,
                              const Protobuf::MethodDescriptor& service_method,
-                             RawAsyncStreamCallbacks& callbacks,
+                             RawAsyncStreamCallbacks& callbacks, Tracing::Span& parent_span,
                              const Http::AsyncClient::StreamOptions& options);
 AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescriptor& service_method,
                           const Protobuf::Message& request, RawAsyncRequestCallbacks& callbacks,
@@ -117,9 +117,10 @@ public:
 
   virtual AsyncStream<Request> start(const Protobuf::MethodDescriptor& service_method,
                                      AsyncStreamCallbacks<Response>& callbacks,
+                                     Tracing::Span& parent_span,
                                      const Http::AsyncClient::StreamOptions& options) {
     return AsyncStream<Request>(
-        Internal::startUntyped(client_.get(), service_method, callbacks, options));
+        Internal::startUntyped(client_.get(), service_method, callbacks, parent_span, options));
   }
 
   absl::string_view destination() { return client_->destination(); }
