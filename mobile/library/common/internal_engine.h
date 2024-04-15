@@ -82,6 +82,7 @@ public:
 
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple times.
+   *
    * @param stream the stream to send data over.
    * @param buffer the data to send.
    * @param end_stream indicates whether to close the stream locally after sending this frame.

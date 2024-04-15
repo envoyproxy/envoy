@@ -617,8 +617,8 @@ void Client::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool en
 
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
 
-  ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream, data.length,
-            end_stream);
+  ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream,
+            buffer->length(), end_stream);
   request_decoder->decodeData(*buffer, end_stream);
 
   if (direct_stream->explicit_flow_control_ && !end_stream) {

@@ -17,9 +17,18 @@ import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 
-private const val ASSERTION_FILTER_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
-private const val REQUEST_STRING_MATCH = "match_me"
+private const val ASSERTION_FILTER_TEXT_PROTO =
+  """
+  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
+  match_config {
+    http_request_generic_body_match: {
+      patterns: {
+        string_match: 'request body'
+      }
+    }
+  }
+}
+"""
 
 class SendDataTest {
   init {
@@ -52,10 +61,7 @@ class SendDataTest {
         .addLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
-        .addNativeFilter(
-          "envoy.filters.http.assertion",
-          "[$ASSERTION_FILTER_TYPE] { match_config { http_request_generic_body_match: { patterns: { string_match: '$REQUEST_STRING_MATCH'}}}}"
-        )
+        .addNativeFilter("envoy.filters.http.assertion", ASSERTION_FILTER_TEXT_PROTO)
         .build()
 
     val client = engine.streamClient()
@@ -68,8 +74,6 @@ class SendDataTest {
           path = "/simple.txt"
         )
         .build()
-
-    val body = ByteBuffer.wrap(REQUEST_STRING_MATCH.toByteArray(Charsets.UTF_8))
 
     var responseStatus: Int? = null
     var responseEndStream = false
@@ -88,7 +92,7 @@ class SendDataTest {
       .setOnError { _, _ -> fail("Unexpected error") }
       .start()
       .sendHeaders(requestHeaders, false)
-      .close(body)
+      .close(ByteBuffer.wrap("request body".toByteArray(Charsets.UTF_8)))
 
     expectation.await(10, TimeUnit.SECONDS)
 

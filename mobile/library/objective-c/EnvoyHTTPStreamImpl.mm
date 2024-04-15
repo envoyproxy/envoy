@@ -1,6 +1,8 @@
 #import "library/objective-c/EnvoyEngine.h"
 #import "library/objective-c/EnvoyBridgeUtility.h"
 
+#include "source/common/buffer/buffer_impl.h"
+
 #import "library/common/types/c_types.h"
 #import "library/common/internal_engine.h"
 #include "library/common/http/header_utility.h"
@@ -196,7 +198,14 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
 }
 
 - (void)sendData:(NSData *)data close:(BOOL)close {
-  _engine->sendData(_streamHandle, toNativeData(data), close);
+  Envoy::Buffer::InstancePtr buffer = std::make_unique<Envoy::Buffer::OwnedImpl>();
+  Envoy::Buffer::BufferFragmentImpl *bufferFragment = new Envoy::Buffer::BufferFragmentImpl(
+      [data bytes], static_cast<size_t>(data.length),
+      [](const void *, size_t, const Envoy::Buffer::BufferFragmentImpl *thisFragment) {
+        delete thisFragment;
+      });
+  buffer->addBufferFragment(*bufferFragment);
+  _engine->sendData(_streamHandle, std::move(buffer), close);
 }
 
 - (void)readData:(size_t)byteCount {

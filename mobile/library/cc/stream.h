@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/http/header_map.h"
 
 #include "library/cc/request_headers.h"
@@ -27,7 +28,14 @@ public:
    */
   Stream& sendHeaders(Http::RequestHeaderMapPtr headers, bool end_stream);
 
-  Stream& sendData(envoy_data data);
+  [[deprecated]] Stream& sendData(envoy_data data);
+
+  /**
+   * Send data over an open HTTP stream. This method can be invoked multiple times.
+   *
+   * @param buffer the data to send.
+   */
+  Stream& sendData(Buffer::InstancePtr buffer);
 
   Stream& readData(size_t bytes_to_read);
 
@@ -41,7 +49,15 @@ public:
    */
   void close(Http::RequestTrailerMapPtr trailers);
 
-  void close(envoy_data data);
+  [[deprecated]] void close(envoy_data data);
+
+  /**
+   * Send data over an open HTTP stream and closes the stream.. This method can only be invoked
+   * once.
+   *
+   * @param buffer the last data to send.
+   */
+  void close(Buffer::InstancePtr buffer);
 
   void cancel();
 
