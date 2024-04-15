@@ -99,7 +99,6 @@ for how to update or override dependencies.
 
     ### Linux
     On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html) for Clang 14.
-    Note that newer versions of Clang do not include this package for Linux, but neither are newer versions of Clang able to build the Envoy dependencies.
 
     Extract the tar.xz and run the following:
     ```console
