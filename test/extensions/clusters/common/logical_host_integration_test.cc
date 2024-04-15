@@ -52,7 +52,7 @@ TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
       .WillRepeatedly(Invoke(
           [address_ptr](const std::string&, Network::DnsLookupFamily,
                         Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
-            uint32_t address = address_ptr->address_;
+            const uint32_t address = address_ptr->address_;
             // Keep changing the returned addresses to force address update.
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                          TestUtility::makeDnsResponse({
