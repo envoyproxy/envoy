@@ -1799,7 +1799,8 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEmitTypedMetadata) {
   EXPECT_EQ(1, typed_metadata.size());
   EXPECT_EQ(1, typed_metadata.count(ProxyProtocol));
   envoy::extensions::filters::listener::proxy_protocol::v3::TlvsMetadata tlvs_metadata;
-  MessageUtil::unpackTo(typed_metadata[ProxyProtocol], tlvs_metadata);
+  auto status = MessageUtil::unpackTo(typed_metadata[ProxyProtocol], tlvs_metadata);
+  EXPECT_EQ(absl::OkStatus(), status);
   EXPECT_EQ(2, tlvs_metadata.typed_metadata().size());
 
   auto value_type_authority = (tlvs_metadata.typed_metadata()).at("PP2 type authority").value();
@@ -1862,7 +1863,8 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestWithNonUtf8CharsAndEmit
   EXPECT_EQ(1, typed_metadata.count(ProxyProtocol));
 
   envoy::extensions::filters::listener::proxy_protocol::v3::TlvsMetadata tlvs_metadata;
-  MessageUtil::unpackTo(typed_metadata[ProxyProtocol], tlvs_metadata);
+  auto status = MessageUtil::unpackTo(typed_metadata[ProxyProtocol], tlvs_metadata);
+  EXPECT_EQ(absl::OkStatus(), status);
   EXPECT_EQ(2, tlvs_metadata.typed_metadata().size());
 
   auto value_type_authority = (tlvs_metadata.typed_metadata()).at("PP2 type authority").value();
