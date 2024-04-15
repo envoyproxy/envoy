@@ -89,7 +89,7 @@ public:
                Tracing::Span& parent_span, const Http::AsyncClient::RequestOptions& options));
   MOCK_METHOD(RawAsyncStream*, startRaw,
               (absl::string_view service_full_name, absl::string_view method_name,
-               RawAsyncStreamCallbacks& callbacks,
+               RawAsyncStreamCallbacks& callbacks, Tracing::Span& parent_span,
                const Http::AsyncClient::StreamOptions& options));
   MOCK_METHOD(absl::string_view, destination, ());
 

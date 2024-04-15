@@ -92,7 +92,8 @@ void TraceSegmentReporter::onRemoteClose(Grpc::Status::GrpcStatus status,
 
 void TraceSegmentReporter::establishNewStream() {
   ENVOY_LOG(debug, "Try to create new {} gRPC stream for reporter", service_method_.name());
-  stream_ = client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
+  stream_ = client_->start(service_method_, *this, Tracing::NullSpan::instance(),
+                           Http::AsyncClient::StreamOptions());
   if (stream_ == nullptr) {
     ENVOY_LOG(debug, "Failed to create {} gRPC stream", service_method_.name());
     return;

@@ -53,6 +53,7 @@ TEST_F(EnvoyAsyncClientImplTest, ThreadSafe) {
   Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&]() {
     // Verify that using the grpc client in a different thread cause assertion failure.
     EXPECT_DEBUG_DEATH(grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                           Tracing::NullSpan::instance(),
                                            Http::AsyncClient::StreamOptions()),
                        "isThreadSafe");
   });
@@ -80,7 +81,8 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
   EXPECT_CALL(http_stream, sendHeaders(_, _))
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
   auto grpc_stream =
-      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Tracing::NullSpan::instance(),
+                          Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
@@ -112,7 +114,8 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   EXPECT_CALL(http_stream, sendHeaders(_, _))
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
   auto grpc_stream =
-      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Tracing::NullSpan::instance(),
+                          Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
@@ -150,7 +153,8 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   Http::AsyncClient::StreamOptions stream_options;
   stream_options.setParentContext(parent_context);
 
-  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks, stream_options);
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                         Tracing::NullSpan::instance(), stream_options);
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
@@ -172,7 +176,8 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitializedWithoutStreamInfo) {
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
 
   Http::AsyncClient::StreamOptions stream_options;
-  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks, stream_options);
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                         Tracing::NullSpan::instance(), stream_options);
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
@@ -183,7 +188,8 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpStartFail) {
   ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
   auto grpc_stream =
-      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Tracing::NullSpan::instance(),
+                          Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
@@ -236,7 +242,8 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Internal, ""));
   auto grpc_stream =
-      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Tracing::NullSpan::instance(),
+                          Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
@@ -289,7 +296,8 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpClientException) {
   EXPECT_CALL(grpc_callbacks,
               onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available"));
   auto grpc_stream =
-      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Tracing::NullSpan::instance(),
+                          Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
 }
 

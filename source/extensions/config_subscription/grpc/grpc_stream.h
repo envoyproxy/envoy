@@ -55,7 +55,8 @@ public:
                 service_method_.DebugString());
       return;
     }
-    stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
+    stream_ = async_client_->start(service_method_, *this, Tracing::NullSpan::instance(),
+                                   Http::AsyncClient::StreamOptions());
     if (stream_ == nullptr) {
       ENVOY_LOG(debug, "Unable to establish new stream to configuration server {}",
                 async_client_.destination());

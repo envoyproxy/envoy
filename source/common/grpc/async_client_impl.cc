@@ -60,10 +60,11 @@ AsyncRequest* AsyncClientImpl::sendRaw(absl::string_view service_full_name,
 RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
                                           absl::string_view method_name,
                                           RawAsyncStreamCallbacks& callbacks,
+                                          Tracing::Span& parent_span,
                                           const Http::AsyncClient::StreamOptions& options) {
   ASSERT(isThreadSafe());
-  auto grpc_stream =
-      std::make_unique<AsyncStreamImpl>(*this, service_full_name, method_name, callbacks, options);
+  auto grpc_stream = std::make_unique<AsyncStreamImpl>(*this, service_full_name, method_name,
+                                                       callbacks, parent_span, options);
 
   grpc_stream->initialize(options.buffer_body_for_retry);
   if (grpc_stream->hasResetStream()) {
@@ -76,6 +77,7 @@ RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                                  absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
+                                 Tracing::Span& parent_span,
                                  const Http::AsyncClient::StreamOptions& options)
     : parent_(parent), service_full_name_(service_full_name), method_name_(method_name),
       callbacks_(callbacks), options_(options) {
@@ -85,12 +87,22 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
   }
   // Configure the maximum frame length
   decoder_.setMaxFrameLength(parent_.max_recv_message_length_);
+
+  current_span_ =
+      parent_span.spawnChild(Tracing::EgressConfig::get(),
+                             absl::StrCat("async ", service_full_name, ".", method_name, " egress"),
+                             parent.time_source_.systemTime());
+  current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.remote_cluster_name_);
+  current_span_->setTag(Tracing::Tags::get().UpstreamAddress, parent.host_name_.empty()
+                                                                  ? parent.remote_cluster_name_
+                                                                  : parent.host_name_);
+  current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 }
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   const auto thread_local_cluster = parent_.cm_.getThreadLocalCluster(parent_.remote_cluster_name_);
   if (thread_local_cluster == nullptr) {
-    callbacks_.onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available");
+    onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available");
     http_reset_ = true;
     return;
   }
@@ -99,7 +111,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   dispatcher_ = &http_async_client.dispatcher();
   stream_ = http_async_client.start(*this, options_.setBufferBodyForRetry(buffer_body_for_retry));
   if (stream_ == nullptr) {
-    callbacks_.onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, EMPTY_STRING);
+    onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, EMPTY_STRING);
     http_reset_ = true;
     return;
   }
@@ -117,7 +129,10 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   parent_.metadata_parser_->evaluateHeaders(headers_message_->headers(),
                                             options_.parent_context.stream_info);
 
+  Tracing::HttpTraceContext trace_context(headers_message_->headers());
+  current_span_->injectContext(trace_context, nullptr);
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
+
   stream_->sendHeaders(headers_message_->headers(), false);
 }
 
@@ -197,14 +212,23 @@ void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   if (!grpc_status) {
     grpc_status = Status::WellKnownGrpcStatus::Unknown;
   }
-  callbacks_.onRemoteClose(grpc_status.value(), grpc_message);
+  onRemoteClose(grpc_status.value(), grpc_message);
   cleanup();
 }
 
 void AsyncStreamImpl::streamError(Status::GrpcStatus grpc_status, const std::string& message) {
   callbacks_.onReceiveTrailingMetadata(Http::ResponseTrailerMapImpl::create());
-  callbacks_.onRemoteClose(grpc_status, message);
+  onRemoteClose(grpc_status, message);
   resetStream();
+}
+
+void AsyncStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
+  callbacks_.onRemoteClose(status, message);
+  current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(status));
+  if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
+    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  }
+  current_span_->finishSpan();
 }
 
 void AsyncStreamImpl::onComplete() {
@@ -228,6 +252,7 @@ void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& buffer, bool end_stre
 void AsyncStreamImpl::closeStream() {
   Buffer::OwnedImpl empty_buffer;
   stream_->sendData(empty_buffer, true);
+  current_span_->finishSpan();
 }
 
 void AsyncStreamImpl::resetStream() { cleanup(); }
@@ -251,19 +276,8 @@ AsyncRequestImpl::AsyncRequestImpl(AsyncClientImpl& parent, absl::string_view se
                                    absl::string_view method_name, Buffer::InstancePtr&& request,
                                    RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
                                    const Http::AsyncClient::RequestOptions& options)
-    : AsyncStreamImpl(parent, service_full_name, method_name, *this, options),
-      request_(std::move(request)), callbacks_(callbacks) {
-
-  current_span_ =
-      parent_span.spawnChild(Tracing::EgressConfig::get(),
-                             absl::StrCat("async ", service_full_name, ".", method_name, " egress"),
-                             parent.time_source_.systemTime());
-  current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.remote_cluster_name_);
-  current_span_->setTag(Tracing::Tags::get().UpstreamAddress, parent.host_name_.empty()
-                                                                  ? parent.remote_cluster_name_
-                                                                  : parent.host_name_);
-  current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
-}
+    : AsyncStreamImpl(parent, service_full_name, method_name, *this, parent_span, options),
+      request_(std::move(request)), callbacks_(callbacks) {}
 
 void AsyncRequestImpl::initialize(bool buffer_body_for_retry) {
   AsyncStreamImpl::initialize(buffer_body_for_retry);
@@ -273,15 +287,9 @@ void AsyncRequestImpl::initialize(bool buffer_body_for_retry) {
   this->sendMessageRaw(std::move(request_), true);
 }
 
-void AsyncRequestImpl::cancel() {
-  current_span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
-  current_span_->finishSpan();
-  this->resetStream();
-}
+void AsyncRequestImpl::cancel() { this->resetStream(); }
 
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  Tracing::HttpTraceContext trace_context(metadata);
-  current_span_->injectContext(trace_context, nullptr);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 
@@ -295,19 +303,13 @@ bool AsyncRequestImpl::onReceiveMessageRaw(Buffer::InstancePtr&& response) {
 void AsyncRequestImpl::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) {}
 
 void AsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-  current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(status));
-
   if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    callbacks_.onFailure(status, message, *current_span_);
+    callbacks_.onFailure(status, message, Tracing::NullSpan::instance());
   } else if (response_ == nullptr) {
-    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    callbacks_.onFailure(Status::Internal, EMPTY_STRING, *current_span_);
+    callbacks_.onFailure(Status::Internal, EMPTY_STRING, Tracing::NullSpan::instance());
   } else {
-    callbacks_.onSuccessRaw(std::move(response_), *current_span_);
+    callbacks_.onSuccessRaw(std::move(response_), Tracing::NullSpan::instance());
   }
-
-  current_span_->finishSpan();
 }
 
 } // namespace Grpc

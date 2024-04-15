@@ -175,10 +175,10 @@ public:
 
   /**
    * Start a gRPC stream asynchronously.
-   * TODO(mattklein123): Determine if tracing should be added to streaming requests.
    * @param service_full_name full name of the service (i.e. service_method.service()->full_name()).
    * @param method_name name of the method (i.e. service_method.name()).
    * @param callbacks the callbacks to be notified of stream status.
+   * @param parent_span the current parent tracing context.
    * @param options the data struct to control the stream.
    * @return a stream handle or nullptr if no stream could be started. NOTE: In this case
    *         onRemoteClose() has already been called inline. The client owns the stream and
@@ -189,6 +189,7 @@ public:
   virtual RawAsyncStream* startRaw(absl::string_view service_full_name,
                                    absl::string_view method_name,
                                    RawAsyncStreamCallbacks& callbacks,
+                                   Tracing::Span& parent_span,
                                    const Http::AsyncClient::StreamOptions& options) PURE;
 
   /**

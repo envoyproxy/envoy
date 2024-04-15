@@ -12,8 +12,8 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::RawAsyncClientPtr async_client,
                                      Event::Dispatcher& dispatcher)
-    : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
-                                POOL_COUNTER_PREFIX(scope, "load_reporter."))},
+    : cm_(cluster_manager),
+      stats_{ALL_LOAD_REPORTER_STATS(POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats")),
@@ -31,7 +31,8 @@ void LoadStatsReporter::setRetryTimer() {
 
 void LoadStatsReporter::establishNewStream() {
   ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
-  stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
+  stream_ = async_client_->start(service_method_, *this, Tracing::NullSpan::instance(),
+                                 Http::AsyncClient::StreamOptions());
   if (stream_ == nullptr) {
     ENVOY_LOG(warn, "Unable to establish new stream");
     handleFailure();

@@ -45,7 +45,8 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   // RateLimitClient methods.
-  absl::Status startStream(const StreamInfo::StreamInfo& stream_info) override;
+  absl::Status startStream(const StreamInfo::StreamInfo& stream_info,
+                           Tracing::Span& parent_span) override;
   void closeStream() override;
   // Send the usage report to RLQS server
   void sendUsageReport(absl::optional<size_t> bucket_id) override;
