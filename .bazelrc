@@ -88,6 +88,9 @@ build:clang-pch --define=ENVOY_CLANG_PCH=1
 
 # Use gold linker for gcc compiler.
 build:gcc --linkopt=-fuse-ld=gold
+build:gcc --test_env=HEAPCHECK=
+build:gcc --action_env=BAZEL_COMPILER=gcc
+build:gcc --action_env=CC=gcc --action_env=CXX=g++
 
 # Clang-tidy
 # TODO(phlax): enable this, its throwing some errors as well as finding more issues
@@ -311,6 +314,7 @@ build:remote-clang-libc++ --config=remote
 build:remote-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:remote-gcc --config=remote
+build:remote-gcc --config=gcc
 build:remote-gcc --config=rbe-toolchain-gcc
 
 build:remote-asan --config=remote
