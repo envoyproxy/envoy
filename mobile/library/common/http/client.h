@@ -90,11 +90,11 @@ public:
 
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple times.
-   * @param stream, the stream to send data over.
-   * @param data, the data to send.
-   * @param end_stream, indicates whether to close the stream locally after sending this frame.
+   * @param stream the stream to send data over.
+   * @param buffer the data to send.
+   * @param end_stream indicates whether to close the stream locally after sending this frame.
    */
-  void sendData(envoy_stream_t stream, envoy_data data, bool end_stream);
+  void sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool end_stream);
 
   /**
    * Send metadata over an HTTP stream. This method can be invoked multiple times.

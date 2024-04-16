@@ -31,6 +31,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "send_data_test",
+    srcs = ["send_data_test.cc"],
+    repository = "@envoy",
+    deps = [
+        "//library/cc:engine_builder_lib",
+        "//library/common/http:header_utility_lib",
+        "//test/common/integration:engine_with_test_server",
+        "//test/common/integration:test_server_lib",
+        "@envoy_build_config//:test_extensions",
+    ],
+)
+
+envoy_cc_test(
     name = "lifetimes_test",
     srcs = ["lifetimes_test.cc"],
     repository = "@envoy",
