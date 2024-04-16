@@ -49,7 +49,7 @@ final class CancelStreamTests: XCTestCase {
     EnvoyTestServer.startHttp1PlaintextServer()
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
       .setLogger { _, msg in
         print(msg, terminator: "")
       }
