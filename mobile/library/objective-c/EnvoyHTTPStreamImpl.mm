@@ -199,12 +199,7 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
 
 - (void)sendData:(NSData *)data close:(BOOL)close {
   Envoy::Buffer::InstancePtr buffer = std::make_unique<Envoy::Buffer::OwnedImpl>();
-  Envoy::Buffer::BufferFragmentImpl *bufferFragment = new Envoy::Buffer::BufferFragmentImpl(
-      [data bytes], static_cast<size_t>(data.length),
-      [](const void *, size_t, const Envoy::Buffer::BufferFragmentImpl *thisFragment) {
-        delete thisFragment;
-      });
-  buffer->addBufferFragment(*bufferFragment);
+  buffer->add([data bytes], data.length);
   _engine->sendData(_streamHandle, std::move(buffer), close);
 }
 
