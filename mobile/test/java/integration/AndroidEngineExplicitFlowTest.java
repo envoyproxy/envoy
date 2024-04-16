@@ -35,7 +35,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 
 @RunWith(RobolectricTestRunner.class)
-public class AndroidEnvoyExplicitFlowTest {
+public class AndroidEngineExplicitFlowTest {
 
   private final MockWebServer mockWebServer = new MockWebServer();
   private Engine engine;
