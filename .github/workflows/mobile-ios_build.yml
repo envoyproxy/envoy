@@ -86,7 +86,7 @@ jobs:
         source ./ci/mac_ci_setup.sh
         ./bazelw shutdown
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.29
+        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.30
           with:
             app: ${{ matrix.app }}
             args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
@@ -130,7 +130,7 @@ jobs:
       source: |
         source ./ci/mac_ci_setup.sh
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.29
+        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.30
           with:
             app: ${{ matrix.app }}
             args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
