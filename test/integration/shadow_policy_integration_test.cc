@@ -958,7 +958,7 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderDisabledAppendSuffi
                                   ->mutable_routes(0)
                                   ->mutable_route()
                                   ->add_request_mirror_policies();
-        mirror_policy->mutable_disable_shadow_host_suffix_append()->set_value(true);
+        mirror_policy->set_disable_shadow_host_suffix_append(true);
         mirror_policy->set_cluster("cluster_1");
       });
 
