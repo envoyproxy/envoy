@@ -42,8 +42,7 @@ public:
   virtual ExternalProcessorStreamPtr
   start(ExternalProcessorCallbacks& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-        const StreamInfo::StreamInfo& stream_info,
-        Tracing::Span& parent_span) PURE;
+        const StreamInfo::StreamInfo& stream_info, Tracing::Span& parent_span) PURE;
 };
 
 using ExternalProcessorClientPtr = std::unique_ptr<ExternalProcessorClient>;

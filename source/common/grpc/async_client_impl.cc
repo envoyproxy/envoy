@@ -222,7 +222,8 @@ void AsyncStreamImpl::streamError(Status::GrpcStatus grpc_status, const std::str
   resetStream();
 }
 
-void AsyncStreamImpl::notifyRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
+void AsyncStreamImpl::notifyRemoteClose(Grpc::Status::GrpcStatus status,
+                                        const std::string& message) {
   current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(status));
   if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);

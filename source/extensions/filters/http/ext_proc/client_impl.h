@@ -68,7 +68,7 @@ private:
   // Start the gRPC async stream: It returns true if the start succeeded. Otherwise it returns false
   // if it failed to start.
   bool startStream(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-                   const StreamInfo::StreamInfo& stream_info,Tracing::Span& parent_span);
+                   const StreamInfo::StreamInfo& stream_info, Tracing::Span& parent_span);
   ExternalProcessorCallbacks& callbacks_;
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> client_;
   Grpc::AsyncStream<ProcessingRequest> stream_;

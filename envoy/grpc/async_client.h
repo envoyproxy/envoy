@@ -188,8 +188,7 @@ public:
    */
   virtual RawAsyncStream* startRaw(absl::string_view service_full_name,
                                    absl::string_view method_name,
-                                   RawAsyncStreamCallbacks& callbacks,
-                                   Tracing::Span& parent_span,
+                                   RawAsyncStreamCallbacks& callbacks, Tracing::Span& parent_span,
                                    const Http::AsyncClient::StreamOptions& options) PURE;
 
   /**
