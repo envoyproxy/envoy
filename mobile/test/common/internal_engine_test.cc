@@ -382,9 +382,6 @@ TEST_F(InternalEngineTest, BasicStream) {
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   envoy_data c_data = Data::Utility::toBridgeData(request_data);
 
-  Http::TestRequestTrailerMapImpl trailers;
-  envoy_headers c_trailers = Http::Utility::toBridgeHeaders(trailers);
-
   envoy_stream_t stream = engine->initStream();
 
   engine->startStream(stream, stream_cbs, false);
@@ -393,7 +390,7 @@ TEST_F(InternalEngineTest, BasicStream) {
   HttpTestUtility::addDefaultHeaders(*headers);
   engine->sendHeaders(stream, std::move(headers), false);
   engine->sendData(stream, c_data, false);
-  engine->sendTrailers(stream, c_trailers);
+  engine->sendTrailers(stream, Http::Utility::createRequestTrailerMapPtr());
 
   ASSERT_TRUE(on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
 

@@ -166,16 +166,22 @@ absl::flat_hash_map<std::string, std::string> javaMapToCppMap(JniHelper& jni_hel
                                                               jobject java_map);
 
 /**
- * Converts from C++ `RequestOrResponseHeaderMap` to Java `Map<String, List<String>>`.
+ * Converts from C++ `HeaderMap` to Java `Map<String, List<String>>`.
+ *
+ * Both `RequestHeaderMap` and `RequestTrailerMap` inherit from `HeaderMap`. So this function can be
+ * used for converting trailers, too.
  */
-LocalRefUniquePtr<jobject>
-cppHeadersToJavaHeaders(JniHelper& jni_helper, const Http::RequestOrResponseHeaderMap& cpp_headers);
+LocalRefUniquePtr<jobject> cppHeadersToJavaHeaders(JniHelper& jni_helper,
+                                                   const Http::HeaderMap& cpp_headers);
 
 /**
- * Converts from Java `Map<String, List<String>>` to C++ `RequestOrResponseHeaderMap`.
+ * Converts from Java `Map<String, List<String>>` to C++ `HeaderMap`.
+ *
+ * Both `RequestHeaderMap` and `RequestTrailerMap` inherit from `HeaderMap`. So this function can be
+ * used for converting trailers, too.
  */
 void javaHeadersToCppHeaders(JniHelper& jni_helper, jobject java_headers,
-                             Http::RequestOrResponseHeaderMap& cpp_headers);
+                             Http::HeaderMap& cpp_headers);
 
 } // namespace JNI
 } // namespace Envoy

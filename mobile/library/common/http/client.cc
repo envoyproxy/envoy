@@ -648,7 +648,7 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
 
 void Client::sendMetadata(envoy_stream_t, envoy_headers) { PANIC("not implemented"); }
 
-void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
+void Client::sendTrailers(envoy_stream_t stream, RequestTrailerMapPtr trailers) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
@@ -667,9 +667,8 @@ void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
     return;
   }
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-  RequestTrailerMapPtr internal_trailers = Utility::toRequestTrailers(trailers);
-  ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *internal_trailers);
-  request_decoder->decodeTrailers(std::move(internal_trailers));
+  ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *trailers);
+  request_decoder->decodeTrailers(std::move(trailers));
 }
 
 void Client::cancelStream(envoy_stream_t stream) {

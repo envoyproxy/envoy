@@ -36,10 +36,10 @@ void traverseMessageWorkerExt(ProtoVisitor& visitor, Protobuf::Message& message,
       }
     } else if (message.GetDescriptor()->full_name() == "xds.type.v3.TypedStruct") {
       std::tie(inner_message, target_type_url) =
-          Helper::convertTypedStruct<xds::type::v3::TypedStruct>(message);
+          Helper::convertTypedStruct<xds::type::v3::TypedStruct>(message).value();
     } else if (message.GetDescriptor()->full_name() == "udpa.type.v1.TypedStruct") {
       std::tie(inner_message, target_type_url) =
-          Helper::convertTypedStruct<udpa::type::v1::TypedStruct>(message);
+          (Helper::convertTypedStruct<udpa::type::v1::TypedStruct>(message)).value();
     }
 
     if (inner_message != nullptr) {

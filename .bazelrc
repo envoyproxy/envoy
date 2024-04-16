@@ -86,6 +86,8 @@ build:sanitizer --linkopt -ldl
 build:clang --action_env=BAZEL_COMPILER=clang
 build:clang --action_env=CC=clang --action_env=CXX=clang++
 build:clang --linkopt=-fuse-ld=lld
+build:clang --action_env=CC=clang --host_action_env=CC=clang
+build:clang --action_env=CXX=clang++ --host_action_env=CXX=clang++
 
 # Flags for Clang + PCH
 build:clang-pch --spawn_strategy=local
@@ -103,7 +105,6 @@ build:clang-tidy --output_groups=report
 build:clang-tidy --build_tag_filters=-notidy
 
 # Basic ASAN/UBSAN that works for gcc
-build:asan --action_env=ENVOY_ASAN=1
 build:asan --config=sanitizer
 # ASAN install its signal handler, disable ours so the stacktrace will be printed by ASAN
 build:asan --define signal_trace=disabled
@@ -126,11 +127,18 @@ build:asan --copt -O1
 build:asan --copt -fno-optimize-sibling-calls
 
 # Clang ASAN/UBSAN
-build:clang-asan --config=clang
-build:clang-asan --config=asan
-build:clang-asan --linkopt -fuse-ld=lld
-build:clang-asan --linkopt --rtlib=compiler-rt
-build:clang-asan --linkopt --unwindlib=libgcc
+build:clang-asan-common --config=clang
+build:clang-asan-common --config=asan
+build:clang-asan-common --linkopt -fuse-ld=lld
+build:clang-asan-common --linkopt --rtlib=compiler-rt
+build:clang-asan-common --linkopt --unwindlib=libgcc
+
+build:clang-asan --config=clang-asan-common
+build:clang-asan --linkopt=-l:libclang_rt.ubsan_standalone.a
+build:clang-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
+build:clang-asan --action_env=ENVOY_UBSAN_VPTR=1
+build:clang-asan --copt=-fsanitize=vptr,function
+build:clang-asan --linkopt=-fsanitize=vptr,function
 
 # macOS
 build:macos --cxxopt=-std=c++20 --host_cxxopt=-std=c++20

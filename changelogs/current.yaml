@@ -165,6 +165,10 @@ bug_fixes:
 - area: quic
   change: |
     Fixed crash bug with QUIC upstream + X.509v1 certificates.
+- area: quic
+  change: |
+    Added support for QUIC listeners to echo incoming ECN marks to the peer. Currently disabled. When changes are complete and this is
+    enabled, it can be disabled by setting runtime flag ``envoy.reloadable_features.quic_receive_ecn`` to false.
 - area: proxy_protocol
   change: |
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
@@ -233,6 +237,11 @@ bug_fixes:
 - area: http2
   change: |
     Update nghttp2 to resolve CVE-2024-30255 https://github.com/envoyproxy/envoy/security/advisories/GHSA-j654-3ccm-vfmm.
+- area: prefix_matcher_tree
+  change: |
+    Fixed issue in matcher prefix tree lookup.
+    The lookup did not function correctly when the prefix tree had overlapping prefixes.
+    For example: with prefixes ``/foo`` and ``/foo/bar``, it would have incorrectly said no prefix match for ``/foo/``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -262,6 +271,10 @@ removed_config_or_runtime:
     removed ``envoy_reloadable_features_initialize_upstream_filters`` and legacy code paths.
 
 new_features:
+- area: filters
+  change: |
+    Added the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`,
+    which can be used to inject credentials into the HTTP headers.
 - area: basic_auth
   change: |
     Added :ref:`forward_username_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.forward_username_header>`
@@ -275,6 +288,9 @@ new_features:
     and
     :ref:`ExtProcOverrides.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`
     with the new or updated values.
+- area: hot_restart
+  change: |
+    Added new command-line flag :option:`--skip-hot-restart-on-no-parent`.
 - area: aws_request_signing
   change: |
     Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
@@ -283,6 +299,11 @@ new_features:
   change: |
     Update ``aws_lambda`` filter to support use as an upstream HTTP filter. This allows successful calculation of
     signatures after the forwarding stage has completed, particularly if the path element is modified.
+- area: aws_lambda
+  change: |
+    The ``aws_lambda`` filter now supports the
+    :ref:`credentials_profile <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.credentials_profile>` parameter.
+    This enables choosing different credential profiles for each filter instance.
 - area: grpc reverse bridge
   change: |
     Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter
@@ -330,6 +351,9 @@ new_features:
     metadata may be sent to the server. If
     :ref:`receiving_namespaces <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.receiving_namespaces>`
     is defined, returned metadata may be written to the specified allowed namespaces.
+- area: ext_proc
+  change: |
+    made the :ref:`ExternalProcessor <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>` work as an upstream filter.
 - area: wasm
   change: |
     added ``verify_signature`` foreign function to verify cryptographic signatures.
@@ -404,6 +428,12 @@ new_features:
 - area: http
   change: |
     Added DownstreamRemoteReset to CoreResponseFlag, and it is set when stream is remote reset.
+- area: match_delegate
+  change: |
+    Convert match_delegate fiter into dual filter so it can be installed in the upstream filter chain.
+- area: composite
+  change: |
+    Convert composite fiter into dual filter so it can be installed in the upstream filter chain.
 - area: tracing
   change: |
     Added support for variant span attribute type for the OpenTelemetry tracer.
@@ -469,10 +499,22 @@ new_features:
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
+- area: load shed point
+  change: |
+    Added load shed point ``envoy.load_shed_points.http_downstream_filter_check`` that makes load shed check availabe in HTTP decoder
+    filters, and right now it is only available in router. It will send local reply directly when Envoy is under pressure,
+    typically memory.
 - area: filters
   change: |
     Added :ref:`per-route configuration support to the Basic Auth filter
     <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuthPerRoute>`.
+- area: lua
+  change: |
+    Added a new ``connectionStreamInfo()`` which could be used to access the streamInfo object on the connection. This addition
+    is helpful in scenarios requiring the retrieval of dynamic metadata from network filters, such as the Proxy Protocol, etc.
+- area: rbac
+  change: |
+    Added additional statistics for rules and shadow rules to the RBAC HTTP filter.
 
 deprecated:
 - area: listener

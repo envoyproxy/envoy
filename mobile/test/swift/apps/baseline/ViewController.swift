@@ -19,6 +19,9 @@ final class ViewController: UITableViewController {
 
     let engine = EngineBuilder()
       .addLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .addPlatformFilter(DemoFilter.init)
       .addNativeFilter(
         name: "envoy.filters.http.buffer",

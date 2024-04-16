@@ -1,37 +1,9 @@
 #include "bridge_utility.h"
 
-#include <sstream>
-
 #include "library/common/data/utility.h"
 
 namespace Envoy {
 namespace Platform {
-
-envoy_headers rawHeaderMapAsEnvoyHeaders(const RawHeaderMap& headers) {
-  size_t header_count = 0;
-  for (const auto& pair : headers) {
-    header_count += pair.second.size();
-  }
-
-  envoy_map_entry* headers_list =
-      static_cast<envoy_map_entry*>(safe_malloc(sizeof(envoy_map_entry) * header_count));
-
-  size_t i = 0;
-  for (const auto& pair : headers) {
-    const auto& key = pair.first;
-    for (const auto& value : pair.second) {
-      envoy_map_entry& header = headers_list[i++];
-      header.key = Data::Utility::copyToBridgeData(key);
-      header.value = Data::Utility::copyToBridgeData(value);
-    }
-  }
-
-  envoy_headers raw_headers{
-      static_cast<envoy_map_size_t>(header_count),
-      headers_list,
-  };
-  return raw_headers;
-}
 
 RawHeaderMap envoyHeadersAsRawHeaderMap(envoy_headers raw_headers) {
   RawHeaderMap headers;

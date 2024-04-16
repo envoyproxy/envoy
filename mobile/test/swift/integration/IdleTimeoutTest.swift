@@ -75,7 +75,10 @@ final class IdleTimeoutTests: XCTestCase {
     EnvoyTestServer.startHttp1PlaintextServer()
 
     let engine = EngineBuilder()
-      .addLogLevel(.trace)
+      .addLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .addStreamIdleTimeoutSeconds(1)
       .addPlatformFilter(
         name: filterName,

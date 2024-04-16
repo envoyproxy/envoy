@@ -82,7 +82,14 @@ public:
 
   envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream);
 
-  envoy_status_t sendTrailers(envoy_stream_t stream, envoy_headers trailers);
+  /**
+   * Send trailers over an open HTTP stream. This method can only be invoked once per stream.
+   * Note that this method implicitly closes the stream locally.
+   *
+   * @param stream the stream to send trailers over.
+   * @param trailers the trailers to send.
+   */
+  envoy_status_t sendTrailers(envoy_stream_t stream, Http::RequestTrailerMapPtr trailers);
 
   envoy_status_t cancelStream(envoy_stream_t stream);
 

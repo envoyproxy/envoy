@@ -43,7 +43,7 @@ public:
   };
 
   HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
-                     mode_t socket_mode);
+                     mode_t socket_mode, bool skip_hot_restart_on_no_parent);
   ~HotRestartingChild() override = default;
 
   void initialize(Event::Dispatcher& dispatcher);
@@ -69,11 +69,13 @@ protected:
   void allDrainsImplicitlyComplete();
 
 private:
+  bool abortDueToFailedParentConnection();
   friend class HotRestartUdpForwardingTestHelper;
   absl::Mutex registry_mu_;
   const int restart_epoch_;
   bool parent_terminated_;
   bool parent_drained_ ABSL_GUARDED_BY(registry_mu_);
+  const bool skip_hot_restart_on_no_parent_;
   sockaddr_un parent_address_;
   sockaddr_un parent_address_udp_forwarding_;
   std::unique_ptr<Stats::StatMerger> stat_merger_{};

@@ -72,10 +72,14 @@ protected:
  */
 class CredentialsFileCredentialsProvider : public CachedCredentialsProviderBase {
 public:
-  CredentialsFileCredentialsProvider(Api::Api& api) : api_(api) {}
+  CredentialsFileCredentialsProvider(Api::Api& api) : CredentialsFileCredentialsProvider(api, "") {}
+
+  CredentialsFileCredentialsProvider(Api::Api& api, const std::string& profile)
+      : api_(api), profile_(profile) {}
 
 private:
   Api::Api& api_;
+  const std::string profile_;
 
   bool needsRefresh() override;
   void refresh() override;

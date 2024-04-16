@@ -104,7 +104,7 @@ public class EnvoyHTTPStream {
    * @param trailers, the trailers to send.
    */
   public void sendTrailers(Map<String, List<String>> trailers) {
-    JniLibrary.sendTrailers(engineHandle, streamHandle, JniBridgeUtility.toJniHeaders(trailers));
+    JniLibrary.sendTrailers(engineHandle, streamHandle, trailers);
   }
 
   /**

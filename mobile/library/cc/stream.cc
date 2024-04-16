@@ -8,8 +8,7 @@
 namespace Envoy {
 namespace Platform {
 
-Stream::Stream(Envoy::InternalEngine* engine, envoy_stream_t handle)
-    : engine_(engine), handle_(handle) {}
+Stream::Stream(InternalEngine* engine, envoy_stream_t handle) : engine_(engine), handle_(handle) {}
 
 Stream& Stream::sendHeaders(RequestHeadersSharedPtr headers, bool end_stream) {
   auto request_header_map = Http::Utility::createRequestHeaderMapPtr();
@@ -27,6 +26,11 @@ Stream& Stream::sendHeaders(RequestHeadersSharedPtr headers, bool end_stream) {
   return *this;
 }
 
+Stream& Stream::sendHeaders(Http::RequestHeaderMapPtr headers, bool end_stream) {
+  engine_->sendHeaders(handle_, std::move(headers), end_stream);
+  return *this;
+}
+
 Stream& Stream::sendData(envoy_data data) {
   engine_->sendData(handle_, data, false);
   return *this;
@@ -38,8 +42,17 @@ Stream& Stream::readData(size_t bytes_to_read) {
 }
 
 void Stream::close(RequestTrailersSharedPtr trailers) {
-  envoy_headers raw_headers = rawHeaderMapAsEnvoyHeaders(trailers->allHeaders());
-  engine_->sendTrailers(handle_, raw_headers);
+  auto request_trailer_map = Http::Utility::createRequestTrailerMapPtr();
+  for (const auto& [key, values] : trailers->allHeaders()) {
+    for (const auto& value : values) {
+      request_trailer_map->addCopy(Http::LowerCaseString(key), value);
+    }
+  }
+  engine_->sendTrailers(handle_, std::move(request_trailer_map));
+}
+
+void Stream::close(Http::RequestTrailerMapPtr trailers) {
+  engine_->sendTrailers(handle_, std::move(trailers));
 }
 
 void Stream::close(envoy_data data) { engine_->sendData(handle_, data, true); }

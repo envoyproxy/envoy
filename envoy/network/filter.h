@@ -324,6 +324,14 @@ public:
    * @param success boolean telling whether the filter execution was successful or not.
    */
   virtual void continueFilterChain(bool success) PURE;
+
+  /**
+   * Overwrite the default use original dst setting for current connection. This allows the
+   * listener filter to control whether the connection should be forwarded to other listeners
+   * based on the original destination address or not.
+   * @param use_original_dst whether to use original destination address or not.
+   */
+  virtual void useOriginalDst(bool use_original_dst) PURE;
 };
 
 /**

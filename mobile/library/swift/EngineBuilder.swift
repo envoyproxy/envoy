@@ -1,6 +1,3 @@
-#if canImport(EnvoyCxxSwiftInterop)
-@_implementationOnly import EnvoyCxxSwiftInterop
-#endif
 @_implementationOnly import EnvoyEngine
 import Foundation
 
@@ -182,7 +179,6 @@ open class EngineBuilder: NSObject {
 #if ENVOY_MOBILE_XDS
   private var xdsBuilder: XdsBuilder?
 #endif
-  private var enableSwiftBootstrap = false
 
   // MARK: - Public
 
@@ -687,21 +683,6 @@ open class EngineBuilder: NSObject {
   }
 #endif
 
-#if canImport(EnvoyCxxSwiftInterop)
-  /// Use Swift's experimental C++ interop support to generate the bootstrap object
-  /// instead of going through the Objective-C layer.
-  ///
-  /// - parameter enableSwiftBootstrap: Whether or not to use the Swift / C++ interop
-  ///                                   to generate the bootstrap object.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableSwiftBootstrap(_ enableSwiftBootstrap: Bool) -> Self {
-    self.enableSwiftBootstrap = enableSwiftBootstrap
-    return self
-  }
-#endif
-
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
   /// - note: Must be strongly retained in order for network requests to be performed correctly.
@@ -719,11 +700,6 @@ open class EngineBuilder: NSObject {
                                       eventTracker: self.eventTracker,
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue))
     let config = self.makeConfig()
-#if canImport(EnvoyCxxSwiftInterop)
-    if self.enableSwiftBootstrap {
-      config.bootstrapPointer = self.generateBootstrap().pointer
-    }
-#endif
 
     switch self.base {
     case .custom(let yaml):
@@ -825,12 +801,6 @@ open class EngineBuilder: NSObject {
 
   func bootstrapDebugDescription() -> String {
     let objcDescription = self.makeConfig().bootstrapDebugDescription()
-#if canImport(EnvoyCxxSwiftInterop)
-    assert(
-      self.generateBootstrap().debugDescription == objcDescription,
-      "Swift bootstrap is different from ObjC bootstrap"
-    )
-#endif
     return objcDescription
   }
 }
