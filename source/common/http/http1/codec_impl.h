@@ -99,12 +99,12 @@ protected:
   Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
   ConnectionImpl& connection_;
   uint32_t read_disable_calls_{};
-  bool disable_chunk_encoding_ : 1;
-  bool chunk_encoding_ : 1;
-  bool connect_request_ : 1;
-  bool is_tcp_tunneling_ : 1;
-  bool is_response_to_head_request_ : 1;
-  bool is_response_to_connect_request_ : 1;
+  bool disable_chunk_encoding_ : 1 {false};
+  bool chunk_encoding_ : 1 {true};
+  bool connect_request_ : 1 {false};
+  bool is_tcp_tunneling_ : 1 {false};
+  bool is_response_to_head_request_ : 1 {false};
+  bool is_response_to_connect_request_ : 1 {false};
 
 private:
   /**
@@ -308,14 +308,14 @@ protected:
   const HeaderKeyFormatterConstPtr encode_only_header_key_formatter_;
   HeaderString current_header_field_;
   HeaderString current_header_value_;
-  bool processing_trailers_ : 1;
-  bool handling_upgrade_ : 1;
-  bool reset_stream_called_ : 1;
+  bool processing_trailers_ : 1 {false};
+  bool handling_upgrade_ : 1 {false};
+  bool reset_stream_called_ : 1 {false};
   // Deferred end stream headers indicate that we are not going to raise headers until the full
   // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
   // block with end stream set to true with no further protocol data remaining.
-  bool deferred_end_stream_headers_ : 1;
-  bool dispatching_ : 1;
+  bool deferred_end_stream_headers_ : 1 {false};
+  bool dispatching_ : 1 {false};
   bool dispatching_slice_already_drained_ : 1;
   StreamInfo::BytesMeterSharedPtr bytes_meter_before_stream_;
   const uint32_t max_headers_kb_;
