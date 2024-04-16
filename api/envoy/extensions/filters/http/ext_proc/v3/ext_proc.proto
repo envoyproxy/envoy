@@ -97,7 +97,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 18]
+// [#next-free-field: 19]
 message ExternalProcessor {
   reserved 4;
 
@@ -176,6 +176,12 @@ message ExternalProcessor {
   // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
   // field is set in an external processor response.
   bool disable_clear_route_cache = 11;
+
+  // [#not-implemented-hide:]
+  // Forcibly clears the route-cache irrespective of the value of the
+  // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
+  // field in an external processor response.
+  bool force_clear_route_cache = 18;
 
   // Allow headers matching the ``forward_rules`` to be forwarded to the external processing server.
   // If not set, all headers are forwarded to the external processing server.
