@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -eo pipefail
 
 export CXXFLAGS=''
 export LDFLAGS=''
@@ -21,6 +21,7 @@ fi
 # ROOT=$(dirname $(rootpath boringssl/BUILDING.md))/..
 ROOT=./external/boringssl_fips
 pushd "$ROOT"
+export HOME="$PWD"
 
 # Build tools requirements (from section 12.1 of https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp4407.pdf):
 # - Clang compiler version 12.0.0 (https://releases.llvm.org/download.html)
@@ -29,7 +30,7 @@ pushd "$ROOT"
 # - Cmake version 3.20.1 (https://cmake.org/download/)
 
 # Override $PATH for build tools, to avoid picking up anything else.
-export PATH="$(dirname `which cmake`):/usr/bin:/bin"
+export PATH="/usr/bin:/bin"
 
 # Clang
 VERSION=12.0.0
@@ -42,9 +43,9 @@ else
 fi
 
 curl -sLO https://github.com/llvm/llvm-project/releases/download/llvmorg-"$VERSION"/clang+llvm-"$VERSION"-"$PLATFORM".tar.xz
+echo "$SHA256" clang+llvm-"$VERSION"-"$PLATFORM".tar.xz | sha256sum --check
 tar xf clang+llvm-"$VERSION"-"$PLATFORM".tar.xz
 
-export HOME="$PWD"
 printf "set(CMAKE_C_COMPILER \"clang\")\nset(CMAKE_CXX_COMPILER \"clang++\")\n" > ${HOME}/toolchain
 export PATH="$PWD/clang+llvm-$VERSION-$PLATFORM/bin:$PATH"
 
