@@ -106,6 +106,7 @@ build:clang-tidy --@envoy_toolshed//format/clang_tidy:config=//:clang_tidy_confi
 build:clang-tidy --aspects @envoy_toolshed//format/clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 build:clang-tidy --output_groups=report
 build:clang-tidy --build_tag_filters=-notidy
+build:clang-tidy --cxxopt -fmacro-backtrace-limit=2
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan --config=sanitizer
