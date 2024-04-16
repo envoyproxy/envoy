@@ -10,7 +10,6 @@
 #include "library/common/bridge/utility.h"
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
-#include "library/common/http/headers.h"
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/system/system_helper.h"
 
@@ -596,15 +595,10 @@ void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {
   }
 }
 
-void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
+void Client::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
-
-  // Take ownership of data early, in case of early returns.
-  // The buffer is moved internally, in a synchronous fashion, so we don't need the lifetime
-  // of the InstancePtr to outlive this function call.
-  Buffer::InstancePtr buf = Data::Utility::toInternalData(data);
 
   // If direct_stream is not found, it means the stream has already closed or been reset
   // and the appropriate callback has been issued to the caller. There's nothing to do here
@@ -623,9 +617,9 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
 
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
 
-  ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream, data.length,
-            end_stream);
-  request_decoder->decodeData(*buf, end_stream);
+  ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream,
+            buffer->length(), end_stream);
+  request_decoder->decodeData(*buffer, end_stream);
 
   if (direct_stream->explicit_flow_control_ && !end_stream) {
     if (direct_stream->read_disable_count_ == 0) {
