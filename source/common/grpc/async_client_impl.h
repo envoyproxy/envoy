@@ -88,6 +88,13 @@ public:
 
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_->streamInfo(); }
 
+  Tracing::Span& activeSpan() {
+    if (current_span_ != nullptr) {
+      return *current_span_;
+    }
+    return Tracing::NullSpan::instance();
+  }
+
 private:
   void streamError(Status::GrpcStatus grpc_status, const std::string& message);
   void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, EMPTY_STRING); }
