@@ -15,7 +15,7 @@ public:
   ~MockClient() override;
   MOCK_METHOD(ExternalProcessorStreamPtr, start,
               (ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-               const StreamInfo::StreamInfo&));
+               const StreamInfo::StreamInfo&, Tracing::Span& parent_span));
 };
 
 class MockStream : public ExternalProcessorStream {
