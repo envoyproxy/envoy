@@ -161,7 +161,7 @@ public:
                                     Server::Configuration::ServerFactoryContext& context) PURE;
 
   // This method is for dual filter to create filter from server context when it is configured
-  // in downstream. If a dual filter is in upstream, it must not call this method.
+  // in downstream. It won't be called if a dual filter is in upstream.
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContext(
       const Protobuf::Message& proto_config, const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& server_context) override {
@@ -176,7 +176,7 @@ private:
   createFilterFactoryFromProtoWithServerContextTyped(const ConfigProto&, const std::string&,
                                                      Server::Configuration::ServerFactoryContext&) {
     ExceptionUtil::throwEnvoyException(
-        "Creating filter factory from server factory context is not supported");
+        "DualFactoryBase: creating filter factory from server factory context is not supported");
     return nullptr;
   }
 };

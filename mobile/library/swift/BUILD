@@ -2,7 +2,6 @@ load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_xcframework")
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_static_framework")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines", "envoy_mobile_package")
-load("//bazel:apple.bzl", "envoy_mobile_swift_copts")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 load("//bazel:swift_header_collector.bzl", "swift_header_collector")
 
@@ -78,19 +77,7 @@ swift_library(
         "stats/TagsBuilder.swift",
     ] + [
         "@envoy_mobile_extra_swift_sources//:extra_swift_srcs",
-    ] + select({
-        "//bazel:envoy_mobile_swift_cxx_interop": [
-            "cxx/Bootstrap.swift",
-            "cxx/DirectResponse+Cxx.swift",
-            "cxx/LogLevel+Cxx.swift",
-            "cxx/Swift+Cxx.swift",
-        ],
-        "//conditions:default": [],
-    }),
-    copts = select({
-        "//bazel:envoy_mobile_swift_cxx_interop": envoy_mobile_swift_copts(True),
-        "//conditions:default": [],
-    }),
+    ],
     defines = envoy_mobile_defines("@envoy"),
     features = [
         "swift.emit_symbol_graph",
@@ -101,12 +88,7 @@ swift_library(
     private_deps = [
         "//library/objective-c:envoy_engine_objc_lib",
         "@envoy_mobile_extra_swift_sources//:extra_private_dep",
-    ] + select({
-        "//bazel:envoy_mobile_swift_cxx_interop": [
-            "//library/swift/EnvoyCxxSwiftInterop",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     visibility = ["//visibility:public"],
 )
 

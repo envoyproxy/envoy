@@ -17,7 +17,7 @@ namespace {
 TEST(NullValidationVisitorImpl, UnknownField) {
   NullValidationVisitorImpl null_validation_visitor;
   EXPECT_TRUE(null_validation_visitor.skipValidation());
-  EXPECT_NO_THROW(null_validation_visitor.onUnknownField("foo"));
+  EXPECT_TRUE(null_validation_visitor.onUnknownField("foo").ok());
 }
 
 // The warning validation visitor logs and bumps stats on unknown fields
@@ -30,20 +30,20 @@ TEST(WarningValidationVisitorImpl, UnknownField) {
   EXPECT_FALSE(warning_validation_visitor.skipValidation());
   // First time around we should log.
   EXPECT_LOG_CONTAINS("warn", "Unknown field: foo",
-                      warning_validation_visitor.onUnknownField("foo"));
+                      EXPECT_TRUE(warning_validation_visitor.onUnknownField("foo").ok()));
   // Duplicate descriptions don't generate a log the second time around.
   EXPECT_LOG_NOT_CONTAINS("warn", "Unknown field: foo",
-                          warning_validation_visitor.onUnknownField("foo"));
+                          EXPECT_TRUE(warning_validation_visitor.onUnknownField("foo").ok()));
   // Unrelated variable increments.
   EXPECT_LOG_CONTAINS("warn", "Unknown field: bar",
-                      warning_validation_visitor.onUnknownField("bar"));
+                      EXPECT_TRUE(warning_validation_visitor.onUnknownField("bar").ok()));
   // When we set the stats counter, the above increments are transferred.
   EXPECT_EQ(0, unknown_counter.value());
   warning_validation_visitor.setCounters(unknown_counter, wip_counter);
   EXPECT_EQ(2, unknown_counter.value());
   // A third unknown field is tracked in stats post-initialization.
   EXPECT_LOG_CONTAINS("warn", "Unknown field: baz",
-                      warning_validation_visitor.onUnknownField("baz"));
+                      EXPECT_TRUE(warning_validation_visitor.onUnknownField("baz").ok()));
   EXPECT_EQ(3, unknown_counter.value());
 }
 
@@ -51,9 +51,8 @@ TEST(WarningValidationVisitorImpl, UnknownField) {
 TEST(StrictValidationVisitorImpl, UnknownField) {
   StrictValidationVisitorImpl strict_validation_visitor;
   EXPECT_FALSE(strict_validation_visitor.skipValidation());
-  EXPECT_THROW_WITH_MESSAGE(strict_validation_visitor.onUnknownField("foo"),
-                            UnknownProtoFieldException,
-                            "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(strict_validation_visitor.onUnknownField("foo").message(),
+            "Protobuf message (foo) has unknown fields");
 }
 
 } // namespace

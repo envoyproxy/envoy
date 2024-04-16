@@ -75,8 +75,8 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
       fmt::runtime(error),
       (runtime_overridden ? "runtime overrides to continue using now fatal-by-default " : ""));
 
-  validation_visitor.onDeprecatedField("type " + message.GetTypeName() + " " + with_overridden,
-                                       warn_only);
+  THROW_IF_NOT_OK(validation_visitor.onDeprecatedField(
+      "type " + message.GetTypeName() + " " + with_overridden, warn_only));
 }
 
 } // namespace
@@ -274,7 +274,7 @@ public:
         absl::StrAppend(&error_msg, n > 0 ? ", " : "", unknown_fields.field(n).number());
       }
       if (!error_msg.empty()) {
-        validation_visitor_.onUnknownField(
+        THROW_IF_NOT_OK(validation_visitor_.onUnknownField(
             fmt::format("type {}({}) with unknown field set {{{}}}", message.GetTypeName(),
                         !parents.empty()
                             ? absl::StrJoin(parents, "::",
@@ -282,7 +282,7 @@ public:
                                               absl::StrAppend(out, m->GetTypeName());
                                             })
                             : "root",
-                        error_msg));
+                        error_msg)));
       }
     }
   }
