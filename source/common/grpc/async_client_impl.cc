@@ -304,11 +304,11 @@ void AsyncRequestImpl::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) 
 
 void AsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
   if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    callbacks_.onFailure(status, message, Tracing::NullSpan::instance());
+    callbacks_.onFailure(status, message, AsyncStreamImpl::activeSpan());
   } else if (response_ == nullptr) {
-    callbacks_.onFailure(Status::Internal, EMPTY_STRING, Tracing::NullSpan::instance());
+    callbacks_.onFailure(Status::Internal, EMPTY_STRING, AsyncStreamImpl::activeSpan());
   } else {
-    callbacks_.onSuccessRaw(std::move(response_), Tracing::NullSpan::instance());
+    callbacks_.onSuccessRaw(std::move(response_), AsyncStreamImpl::activeSpan());
   }
 }
 
