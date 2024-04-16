@@ -470,7 +470,8 @@ void GoogleAsyncRequestImpl::initialize(bool buffer_body_for_retry) {
 }
 
 void GoogleAsyncRequestImpl::cancel() {
-  GoogleAsyncStreamImpl::activeSpan().setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
+  GoogleAsyncStreamImpl::activeSpan().setTag(Tracing::Tags::get().Status,
+                                             Tracing::Tags::get().Canceled);
   GoogleAsyncStreamImpl::activeSpan().finishSpan();
   resetStream();
 }
@@ -494,7 +495,8 @@ void GoogleAsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
   if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
     callbacks_.onFailure(status, message, GoogleAsyncStreamImpl::activeSpan());
   } else if (response_ == nullptr) {
-    GoogleAsyncStreamImpl::activeSpan().setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    GoogleAsyncStreamImpl::activeSpan().setTag(Tracing::Tags::get().Error,
+                                               Tracing::Tags::get().True);
     callbacks_.onFailure(Status::Internal, EMPTY_STRING, GoogleAsyncStreamImpl::activeSpan());
   } else {
     callbacks_.onSuccessRaw(std::move(response_), GoogleAsyncStreamImpl::activeSpan());

@@ -177,8 +177,7 @@ public:
     if (stream_->stream_ == nullptr) {
       stream_->stream_ = GrpcAccessLogClient<LogRequest, LogResponse>::client_->start(
           GrpcAccessLogClient<LogRequest, LogResponse>::service_method_, *stream_,
-          Tracing::NullSpan::instance(),
-          GrpcAccessLogClient<LogRequest, LogResponse>::opts_);
+          Tracing::NullSpan::instance(), GrpcAccessLogClient<LogRequest, LogResponse>::opts_);
     }
 
     if (stream_->stream_ != nullptr) {
