@@ -14,7 +14,6 @@
 #include "absl/types/optional.h"
 #include "library/cc/engine.h"
 #include "library/cc/key_value_store.h"
-#include "library/cc/log_level.h"
 #include "library/cc/string_accessor.h"
 #include "library/common/engine_types.h"
 
@@ -125,8 +124,6 @@ public:
   virtual ~EngineBuilder() = default;
   static std::string nativeNameToConfig(absl::string_view name);
 
-  [[deprecated("Use EngineBuilder::setLogLevel instead")]] EngineBuilder&
-  addLogLevel(LogLevel log_level);
   EngineBuilder& setLogLevel(Logger::Logger::Levels log_level);
   EngineBuilder& setLogger(std::unique_ptr<EnvoyLogger> logger);
   EngineBuilder& setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks);
