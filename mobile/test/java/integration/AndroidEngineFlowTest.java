@@ -30,7 +30,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 
 @RunWith(RobolectricTestRunner.class)
-public class AndroidEnvoyFlowTest {
+public class AndroidEngineFlowTest {
 
   private final MockWebServer mockWebServer = new MockWebServer();
   private Engine engine;
