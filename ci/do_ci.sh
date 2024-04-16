@@ -752,8 +752,16 @@ case $CI_TARGET in
         ;;
 
     gcc)
-        BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
-        setup_gcc_toolchain
+        if [[ -n "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
+            echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
+            exit 1
+        fi
+        if [[ -n "${ENVOY_RBE}" ]]; then
+            CONFIG_PREFIX="remote-"
+        fi
+        CONFIG="${CONFIG_PREFIX}gcc"
+        BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
+        echo "gcc toolchain configured: ${CONFIG}"
         echo "Testing ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
