@@ -15,7 +15,7 @@ import static com.google.common.truth.Truth.assertThat;
 // NOLINT(namespace-envoy)
 
 @RunWith(RobolectricTestRunner.class)
-public class AndroidEnvoyEngineStartUpTest {
+public class AndroidEngineStartUpTest {
   static { AndroidJniLibrary.loadTestLibrary(); }
 
   private final Context appContext = ApplicationProvider.getApplicationContext();
