@@ -484,6 +484,9 @@ new_features:
   change: |
     Added a new ``connectionStreamInfo()`` which could be used to access the streamInfo object on the connection. This addition
     is helpful in scenarios requiring the retrieval of dynamic metadata from network filters, such as the Proxy Protocol, etc.
+- area: cares
+  change: |
+    Added :ref:`udp_max_queries<envoy_v3_api_field_extensions.config.core.v3.DnsResolverOptions.udp_max_queries>` option to limit the number UDP queries.
 
 deprecated:
 - area: listener

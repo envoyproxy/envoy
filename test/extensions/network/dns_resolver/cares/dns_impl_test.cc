@@ -2089,5 +2089,35 @@ TEST_P(DnsImplCustomResolverTest, CustomResolverValidAfterChannelDestruction) {
   EXPECT_FALSE(peer_->isChannelDirty());
 }
 
+class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  void updateDnsResolverOptions() override {
+    auto udp_max_queries = std::make_unique<ProtobufWkt::UInt32Value>();
+    udp_max_queries->set_value(100);
+    dns_resolver_options_.set_allocated_udp_max_queries(
+        dynamic_cast<ProtobufWkt::UInt32Value*>(udp_max_queries.get()));
+  }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForMaxUdpQueriesinTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validate that c_ares flag `ARES_OPT_UDP_MAX_QUERIES` is set when UInt32 property
+// `udp_max_queries` is set.
+TEST_P(DnsImplAresFlagsForMaxUdpQueriesinTest, UdpMaxQueriesIsSet) {
+  server_->addCName("root.cname.domain", "result.cname.domain");
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE((opts.flags & ARES_OPT_UDP_MAX_QUERIES) == ARES_OPT_UDP_MAX_QUERIES);
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("root.cname.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
+}
+
 } // namespace Network
 } // namespace Envoy
