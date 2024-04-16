@@ -3927,7 +3927,7 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
   ASSERT_OK_AND_ASSIGN(host_id_2, FakeUpstream::waitForHttpConnection(
                                       *dispatcher_, fake_upstreams_, processor_connection_2,
                                       std::chrono::milliseconds(5000)));
-  absl::Cleanup close_connection2{[&processor_connection_2]() {
+  Cleanup close_connection2{[&processor_connection_2]() {
     if (processor_connection_2 != nullptr) {
       ASSERT_TRUE(processor_connection_2->close());
       ASSERT_TRUE(processor_connection_2->waitForDisconnect());
