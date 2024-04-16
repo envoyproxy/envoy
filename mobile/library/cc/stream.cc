@@ -8,8 +8,7 @@
 namespace Envoy {
 namespace Platform {
 
-Stream::Stream(Envoy::InternalEngine* engine, envoy_stream_t handle)
-    : engine_(engine), handle_(handle) {}
+Stream::Stream(InternalEngine* engine, envoy_stream_t handle) : engine_(engine), handle_(handle) {}
 
 Stream& Stream::sendHeaders(RequestHeadersSharedPtr headers, bool end_stream) {
   auto request_header_map = Http::Utility::createRequestHeaderMapPtr();
@@ -24,6 +23,11 @@ Stream& Stream::sendHeaders(RequestHeadersSharedPtr headers, bool end_stream) {
     }
   }
   engine_->sendHeaders(handle_, std::move(request_header_map), end_stream);
+  return *this;
+}
+
+Stream& Stream::sendHeaders(Http::RequestHeaderMapPtr headers, bool end_stream) {
+  engine_->sendHeaders(handle_, std::move(headers), end_stream);
   return *this;
 }
 
@@ -45,6 +49,10 @@ void Stream::close(RequestTrailersSharedPtr trailers) {
     }
   }
   engine_->sendTrailers(handle_, std::move(request_trailer_map));
+}
+
+void Stream::close(Http::RequestTrailerMapPtr trailers) {
+  engine_->sendTrailers(handle_, std::move(trailers));
 }
 
 void Stream::close(envoy_data data) { engine_->sendData(handle_, data, true); }

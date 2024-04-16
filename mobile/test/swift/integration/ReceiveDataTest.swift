@@ -19,6 +19,9 @@ final class ReceiveDataTests: XCTestCase {
 
     let engine = EngineBuilder()
       .addLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .build()
 
     let client = engine.streamClient()

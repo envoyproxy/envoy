@@ -341,7 +341,7 @@ TEST(ConfigTest, TestConfig) {
   }
 }
 
-TEST(ConfigTest, TestDynamicConfigInUpstream) {
+TEST(ConfigTest, TestDynamicConfigInDownstream) {
   const std::string yaml_string = R"EOF(
       dynamic_config:
         name: set-response-code
@@ -359,30 +359,58 @@ TEST(ConfigTest, TestDynamicConfigInUpstream) {
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
   Envoy::Http::Matching::HttpFilterActionContext action_context{
-      .is_downstream_ = false,
+      .is_downstream_ = true,
       .stat_prefix_ = "test",
-      .factory_context_ = factory_context,
-      .upstream_factory_context_ = upstream_factory_context,
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
       .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createActionFactoryCb(config, action_context,
                                     ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException,
-      "When composite filter is in upstream, the composite action config must not be dynamic.");
+      EnvoyException, "Failed to get downstream factory context or server factory context.");
 }
 
-// Verify for dual filter in downstream without overriding
+TEST(ConfigTest, TestDynamicConfigInUpstream) {
+  const std::string yaml_string = R"EOF(
+      dynamic_config:
+        name: set-response-code
+        config_discovery:
+          config_source:
+              resource_api_version: V3
+              path_config_source:
+                path: "{{ test_tmpdir }}/set_response_code.yaml"
+          type_urls:
+          - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigDual
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = false,
+      .stat_prefix_ = "test",
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = upstream_factory_context,
+      .server_factory_context_ = absl::nullopt};
+  ExecuteFilterActionFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException, "Failed to get upstream factory context or server factory context.");
+}
+
+// For dual filter in downstream, if not overriding
 // createFilterFactoryFromProtoWithServerContext(), Envoy exception will be thrown if only
 // server_factory_context is provided in action_context.
-TEST(ConfigTest, TestDualFilterInDowntreamNoOverridingServerContext) {
+TEST(ConfigTest, CreateFilterFromServerContextDual) {
   const std::string yaml_string = R"EOF(
       typed_config:
         name: composite-action
         typed_config:
-          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigDual
+          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigDualNoServerContext
           code: 403
   )EOF";
 
@@ -399,18 +427,18 @@ TEST(ConfigTest, TestDualFilterInDowntreamNoOverridingServerContext) {
   EXPECT_THROW_WITH_MESSAGE(
       factory.createActionFactoryCb(config, action_context,
                                     ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException, "Creating filter factory from server factory context is not supported");
+      EnvoyException,
+      "DualFactoryBase: creating filter factory from server factory context is not supported");
 }
 
-// Verify for dual filter in upstream without overriding
-// createFilterFactoryFromProtoWithServerContext(), Envoy exception will be thrown if only
-// server_factory_context is provided in action_context.
-TEST(ConfigTest, TestDualFilterInUpstreamNoOverridingServerContext) {
+// For dual filter in upstream,  Envoy exception will be thrown if no
+// upstream_factory_context provided in the action_context.
+TEST(ConfigTest, DualFilterNoUpstreamFactoryContext) {
   const std::string yaml_string = R"EOF(
       typed_config:
         name: composite-action
         typed_config:
-          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigDual
+          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigDualNoServerContext
           code: 403
   )EOF";
 
@@ -427,18 +455,44 @@ TEST(ConfigTest, TestDualFilterInUpstreamNoOverridingServerContext) {
   EXPECT_THROW_WITH_MESSAGE(
       factory.createActionFactoryCb(config, action_context,
                                     ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException, "Failed to get filter factory creation function");
+      EnvoyException, "Failed to get upstream filter factory creation function");
 }
 
-// Verify for downstream factories without overriding
+// For downstream filter, Envoy exception will be thrown if no factory_context
+// or server_factory_context provided in the action_context.
+TEST(ConfigTest, DownstreamFilterNoFactoryContext) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: composite-action
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigNoServerContext
+          code: 403
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = absl::nullopt};
+  ExecuteFilterActionFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException, "Failed to get downstream filter factory creation function");
+}
+
+// For downstream filter, if not overriding
 // createFilterFactoryFromProtoWithServerContext(), Envoy exception will be thrown if only
-// server_factory_context is provided in action_context.
+// server_factory_context is provided in the action_context.
 TEST(ConfigTest, TestDownstreamFilterNoOverridingServerContext) {
   const std::string yaml_string = R"EOF(
       typed_config:
         name: composite-action
         typed_config:
-          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigDownstream
+          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigNoServerContext
           code: 403
   )EOF";
 

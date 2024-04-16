@@ -468,6 +468,22 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("http.hcm_prefix.rbac.prefix.allowed", "http.rbac.allowed",
                          {rbac_http_hcm_prefix, rbac_http_prefix});
 
+  // RBAC HTTP Filter Per-Policy Prefix
+  Tag rbac_policy_name;
+  rbac_policy_name.name_ = tag_names.RBAC_POLICY_NAME;
+  rbac_policy_name.value_ = "my_rbac_policy";
+  regex_tester.testRegex("http.hcm_prefix.rbac.policy.my_rbac_policy.allowed",
+                         "http.rbac.policy.allowed", {rbac_http_hcm_prefix, rbac_policy_name});
+  regex_tester.testRegex("http.hcm_prefix.rbac.policy.my_rbac_policy.denied",
+                         "http.rbac.policy.denied", {rbac_http_hcm_prefix, rbac_policy_name});
+  regex_tester.testRegex("http.hcm_prefix.rbac.prefix.policy.my_rbac_"
+                         "policy.shadow_allowed",
+                         "http.rbac.policy.shadow_allowed",
+                         {rbac_http_hcm_prefix, rbac_http_prefix, rbac_policy_name});
+  regex_tester.testRegex("http.hcm_prefix.rbac.prefix.policy.my_rbac_policy.shadow_denied",
+                         "http.rbac.policy.shadow_denied",
+                         {rbac_http_hcm_prefix, rbac_http_prefix, rbac_policy_name});
+
   // Proxy Protocol version prefix
   Tag proxy_protocol_version;
   proxy_protocol_version.name_ = tag_names.PROXY_PROTOCOL_VERSION;
