@@ -50,8 +50,8 @@ private:
     QatzstdThreadLocal();
     ~QatzstdThreadLocal() override;
     void* getQATSession();
-    bool initialized_;
-    void* sequenceProducerState_;
+    bool initialized_{false};
+    void* sequenceProducerState_{nullptr};
   };
   const uint32_t compression_level_;
   const bool enable_checksum_;

@@ -40,7 +40,7 @@ private:
   const uint32_t qat_zstd_fallback_threshold_;
   void* sequence_producer_state_;
   std::unique_ptr<uint8_t[]> input_ptr_;
-  uint64_t input_len_;
+  uint64_t input_len_{0};
   uint64_t chunk_size_;
 };
 

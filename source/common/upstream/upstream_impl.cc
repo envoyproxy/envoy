@@ -443,7 +443,7 @@ HostDescriptionImplBase::HostDescriptionImplBase(
 HostDescription::SharedConstAddressVector HostDescriptionImplBase::makeAddressListOrNull(
     const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list) {
   if (address_list.empty()) {
-    return SharedConstAddressVector();
+    return {};
   }
   ASSERT(*address_list.front() == *address);
   return std::make_shared<AddressVector>(address_list);
