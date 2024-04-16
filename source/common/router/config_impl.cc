@@ -1423,12 +1423,10 @@ void RouteEntryImplBase::traversePerFilterConfig(
 }
 
 const envoy::config::core::v3::Metadata& RouteEntryImplBase::metadata() const {
-  return metadata_ != nullptr ? metadata_->proto_metadata_
-                              : DefaultRouteMetadataPack::get().proto_metadata_;
+  return metadata_ ? metadata_->proto_metadata_ : DefaultRouteMetadataPack::get().proto_metadata_;
 }
 const Envoy::Config::TypedMetadata& RouteEntryImplBase::typedMetadata() const {
-  return metadata_ != nullptr ? metadata_->typed_metadata_
-                              : DefaultRouteMetadataPack::get().typed_metadata_;
+  return metadata_ ? metadata_->typed_metadata_ : DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
@@ -1804,12 +1802,10 @@ void CommonVirtualHostImpl::traversePerFilterConfig(
 }
 
 const envoy::config::core::v3::Metadata& CommonVirtualHostImpl::metadata() const {
-  return metadata_ != nullptr ? metadata_->proto_metadata_
-                              : DefaultRouteMetadataPack::get().proto_metadata_;
+  return metadata_ ? metadata_->proto_metadata_ : DefaultRouteMetadataPack::get().proto_metadata_;
 }
 const Envoy::Config::TypedMetadata& CommonVirtualHostImpl::typedMetadata() const {
-  return metadata_ != nullptr ? metadata_->typed_metadata_
-                              : DefaultRouteMetadataPack::get().typed_metadata_;
+  return metadata_ ? metadata_->typed_metadata_ : DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
 VirtualHostImpl::VirtualHostImpl(
@@ -2151,12 +2147,10 @@ CommonConfigImpl::clusterSpecifierPlugin(absl::string_view provider) const {
 }
 
 const envoy::config::core::v3::Metadata& CommonConfigImpl::metadata() const {
-  return metadata_ != nullptr ? metadata_->proto_metadata_
-                              : DefaultRouteMetadataPack::get().proto_metadata_;
+  return metadata_ ? metadata_->proto_metadata_ : DefaultRouteMetadataPack::get().proto_metadata_;
 }
 const Envoy::Config::TypedMetadata& CommonConfigImpl::typedMetadata() const {
-  return metadata_ != nullptr ? metadata_->typed_metadata_
-                              : DefaultRouteMetadataPack::get().typed_metadata_;
+  return metadata_ ? metadata_->typed_metadata_ : DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
 ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
