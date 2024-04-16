@@ -97,7 +97,7 @@ public:
   // to networkConnectivityManager after doing a dispatcher post (thread context switch)
   envoy_status_t setProxySettings(const char* host, const uint16_t port);
   envoy_status_t resetConnectivityState();
-  envoy_status_t setPreferredNetwork(envoy_network_t network);
+  envoy_status_t setPreferredNetwork(NetworkType network);
 
   /**
    * Increment a counter with a given string of elements and by the given count.
