@@ -22,8 +22,8 @@ public:
         connectivity_manager_(std::make_shared<ConnectivityManagerImpl>(cm_, dns_cache_manager_)) {
     ON_CALL(*dns_cache_manager_, lookUpCacheByName(_)).WillByDefault(Return(dns_cache_));
     // Toggle network to reset network state.
-    ConnectivityManagerImpl::setPreferredNetwork(ENVOY_NET_GENERIC);
-    ConnectivityManagerImpl::setPreferredNetwork(ENVOY_NET_WLAN);
+    ConnectivityManagerImpl::setPreferredNetwork(NetworkType::Generic);
+    ConnectivityManagerImpl::setPreferredNetwork(NetworkType::WLAN);
   }
 
   std::shared_ptr<NiceMock<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager>>
@@ -35,7 +35,7 @@ public:
 
 TEST_F(ConnectivityManagerTest, SetPreferredNetworkWithNewNetworkChangesConfigurationKey) {
   envoy_netconf_t original_key = connectivity_manager_->getConfigurationKey();
-  envoy_netconf_t new_key = ConnectivityManagerImpl::setPreferredNetwork(ENVOY_NET_WWAN);
+  envoy_netconf_t new_key = ConnectivityManagerImpl::setPreferredNetwork(NetworkType::WWAN);
   EXPECT_NE(original_key, new_key);
   EXPECT_EQ(new_key, connectivity_manager_->getConfigurationKey());
 }
@@ -43,7 +43,7 @@ TEST_F(ConnectivityManagerTest, SetPreferredNetworkWithNewNetworkChangesConfigur
 TEST_F(ConnectivityManagerTest,
        DISABLED_SetPreferredNetworkWithUnchangedNetworkReturnsStaleConfigurationKey) {
   envoy_netconf_t original_key = connectivity_manager_->getConfigurationKey();
-  envoy_netconf_t stale_key = ConnectivityManagerImpl::setPreferredNetwork(ENVOY_NET_WLAN);
+  envoy_netconf_t stale_key = ConnectivityManagerImpl::setPreferredNetwork(NetworkType::WLAN);
   EXPECT_NE(original_key, stale_key);
   EXPECT_EQ(original_key, connectivity_manager_->getConfigurationKey());
 }
@@ -168,7 +168,7 @@ TEST_F(ConnectivityManagerTest, ReportNetworkUsageDisablesOverrideAfterThirdFaul
 
 TEST_F(ConnectivityManagerTest, ReportNetworkUsageDisregardsCallsWithStaleConfigurationKey) {
   envoy_netconf_t stale_key = connectivity_manager_->getConfigurationKey();
-  envoy_netconf_t current_key = ConnectivityManagerImpl::setPreferredNetwork(ENVOY_NET_WWAN);
+  envoy_netconf_t current_key = ConnectivityManagerImpl::setPreferredNetwork(NetworkType::WWAN);
   EXPECT_NE(stale_key, current_key);
 
   connectivity_manager_->setInterfaceBindingEnabled(true);
