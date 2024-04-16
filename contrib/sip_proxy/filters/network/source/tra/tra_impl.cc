@@ -129,7 +129,7 @@ void GrpcClientImpl::subscribeTrafficRoutingAssistant(const std::string& type,
   const auto& service_method = *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
       "envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Subscribe");
   std::unique_ptr<AsyncStreamCallbacks> callback = std::make_unique<AsyncStreamCallbacks>(*this);
-  callback->stream_ = async_client_->start(service_method, *callback,
+  callback->stream_ = async_client_->start(service_method, *callback, parent_span,
                                            Http::AsyncClient::StreamOptions().setParentContext(
                                                Http::AsyncClient::ParentContext{&stream_info}));
   if (callback->stream_ == nullptr) {

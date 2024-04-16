@@ -49,7 +49,7 @@ public:
 
   void startStream() {
     Http::AsyncClient::StreamOptions options;
-    stream_ = client_.start(*method_descriptor_, *this, options);
+    stream_ = client_.start(*method_descriptor_, *this, Tracing::NullSpan::instance(), options);
   }
 
   void sendMessage(FilterCallbacks& callbacks) {

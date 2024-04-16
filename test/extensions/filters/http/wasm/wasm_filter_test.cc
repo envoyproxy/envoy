@@ -1397,10 +1397,10 @@ void WasmHttpFilterTest::setupGrpcStreamTest(Grpc::RawAsyncStreamCallbacks*& cal
       .WillRepeatedly(
           Invoke([&](const GrpcService&, Stats::Scope&, bool) -> Grpc::RawAsyncClientSharedPtr {
             auto async_client = std::make_unique<Grpc::MockAsyncClient>();
-            EXPECT_CALL(*async_client, startRaw(_, _, _, _))
+            EXPECT_CALL(*async_client, startRaw(_, _, _, _, _))
                 .WillRepeatedly(Invoke(
                     [&](absl::string_view service_full_name, absl::string_view method_name,
-                        Grpc::RawAsyncStreamCallbacks& cb,
+                        Grpc::RawAsyncStreamCallbacks& cb, Tracing::Span&,
                         const Http::AsyncClient::StreamOptions& options) -> Grpc::RawAsyncStream* {
                       EXPECT_EQ(service_full_name, "service");
                       EXPECT_EQ(options.send_xff, false);
