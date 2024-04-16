@@ -172,16 +172,35 @@ message ExternalProcessor {
     gte {}
   }];
 
-  // Prevents clearing the route-cache when the
-  // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
-  // field is set in an external processor response.
-  bool disable_clear_route_cache = 11;
-
   // [#not-implemented-hide:]
-  // Forcibly clears the route-cache irrespective of the value of the
-  // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
-  // field in an external processor response.
-  bool force_clear_route_cache = 18;
+  // Describes the action to be taken when an external processor response
+  // is received in response to request headers.
+  enum RouteCacheAction {
+    // The default behavior is to clear the route cache only when the
+    // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
+    // field is set in an external processor response.
+    DEFAULT = 0;
+
+    // Always clear the route cache irrespective of the clear_route_cache bit in
+    // the external processor response.
+    CLEAR = 1;
+
+    // Do not clear the route cache irrespective of the clear_route_cache bit in
+    // the external processor response.
+    RETAIN = 2;
+  };
+
+  oneof route_cache {
+    // Prevents clearing the route-cache when the
+    // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
+    // field is set in an external processor response.
+    bool disable_clear_route_cache = 11;
+
+    // [#not-implemented-hide:]
+    // Specifies the action to be taken when an external processor response is
+    // received in response to request headers.
+    RouteCacheAction route_cache_action = 18;    
+  }
 
   // Allow headers matching the ``forward_rules`` to be forwarded to the external processing server.
   // If not set, all headers are forwarded to the external processing server.
