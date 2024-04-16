@@ -27,7 +27,7 @@ class UpstreamCodecFilter : public Http::StreamDecoderFilter,
                             public Http::DownstreamWatermarkCallbacks,
                             public Http::UpstreamCallbacks {
 public:
-  UpstreamCodecFilter() : bridge_(*this) {}
+  UpstreamCodecFilter() : bridge_(*this), calling_encode_headers_(false), deferred_reset_(false) {}
 
   // Http::DownstreamWatermarkCallbacks
   void onBelowWriteBufferLowWatermark() override;
@@ -95,8 +95,8 @@ public:
   CodecBridge bridge_;
   OptRef<Http::RequestHeaderMap> latched_headers_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  bool calling_encode_headers_ : 1 {false};
-  bool deferred_reset_ : 1 {false};
+  bool calling_encode_headers_ : 1;
+  bool deferred_reset_ : 1;
   absl::optional<bool> latched_end_stream_;
 
 private:
