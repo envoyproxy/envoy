@@ -119,6 +119,9 @@ minor_behavior_changes:
 - area: golang
   change: |
     Not implicitly clearing route cache in ``HeaderMap.Set``, introduce a new API ``ClearRouteCache`` to do it.
+- area: tracing
+  change: |
+    Dynatrace resource detector no longer logs a warning when failing to read individual enrichment files.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
