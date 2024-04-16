@@ -30,6 +30,9 @@ public:
   // Envoy will close the connections before creating codec if Envoy is under pressure,
   // typically memory. This happens once geting data from the connection.
   const std::string HcmCodecCreation = "envoy.load_shed_points.hcm_ondata_creating_codec";
+
+  const std::string HttpDownstreamFilterCheck =
+      "envoy.load_shed_points.http_downstream_filter_check";
 };
 
 using LoadShedPointName = ConstSingleton<LoadShedPointNameValues>;

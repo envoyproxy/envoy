@@ -77,8 +77,13 @@ class SendDataTest {
       .newStreamPrototype()
       .setOnResponseHeaders { headers, _, _ -> responseStatus = headers.httpStatus }
       .setOnResponseData { _, endStream, _ ->
+        // Sometimes Envoy Mobile may send an empty data (0 byte) with `endStream` set to true
+        // to indicate an end of stream. So, we should only do `expectation.countDown()`
+        // when the `endStream` is true.
         responseEndStream = endStream
-        expectation.countDown()
+        if (endStream) {
+          expectation.countDown()
+        }
       }
       .setOnError { _, _ -> fail("Unexpected error") }
       .start()
