@@ -169,9 +169,10 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
       service_full_name_(service_full_name), method_name_(method_name), callbacks_(callbacks),
       options_(options), unused_stream_info_(Http::Protocol::Http2, dispatcher_.timeSource(),
                                              Network::ConnectionInfoProviderSharedPtr{}) {
-  parent_span.spawnChild(Tracing::EgressConfig::get(),
-                         absl::StrCat("async ", service_full_name, ".", method_name, " egress"),
-                         parent.timeSource().systemTime());
+  current_span_ =
+      parent_span.spawnChild(Tracing::EgressConfig::get(),
+                             absl::StrCat("async ", service_full_name, ".", method_name, " egress"),
+                             parent.timeSource().systemTime());
   current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.stat_prefix_);
   current_span_->setTag(Tracing::Tags::get().UpstreamAddress, parent.target_uri_);
   current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
@@ -227,6 +228,11 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
 void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
                                               Http::ResponseTrailerMapPtr trailing_metadata,
                                               const std::string& message) {
+  current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(grpc_status));
+  if (grpc_status != Grpc::Status::WellKnownGrpcStatus::Ok) {
+    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  }
+  current_span_->finishSpan();
   if (grpc_status > Status::WellKnownGrpcStatus::MaximumKnown || grpc_status < 0) {
     ENVOY_LOG(error, "notifyRemoteClose invalid gRPC status code {}", grpc_status);
     // Set the grpc_status as InvalidCode but increment the Unknown stream to avoid out-of-range
@@ -464,6 +470,8 @@ void GoogleAsyncRequestImpl::initialize(bool buffer_body_for_retry) {
 }
 
 void GoogleAsyncRequestImpl::cancel() {
+  GoogleAsyncStreamImpl::activeSpan().setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
+  GoogleAsyncStreamImpl::activeSpan().finishSpan();
   resetStream();
 }
 
@@ -484,11 +492,12 @@ void GoogleAsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                            const std::string& message) {
 
   if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    callbacks_.onFailure(status, message, Tracing::NullSpan::instance());
+    callbacks_.onFailure(status, message, GoogleAsyncStreamImpl::activeSpan());
   } else if (response_ == nullptr) {
-    callbacks_.onFailure(Status::Internal, EMPTY_STRING, Tracing::NullSpan::instance());
+    GoogleAsyncStreamImpl::activeSpan().setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    callbacks_.onFailure(Status::Internal, EMPTY_STRING, GoogleAsyncStreamImpl::activeSpan());
   } else {
-    callbacks_.onSuccessRaw(std::move(response_), Tracing::NullSpan::instance());
+    callbacks_.onSuccessRaw(std::move(response_), GoogleAsyncStreamImpl::activeSpan());
   }
 }
 
