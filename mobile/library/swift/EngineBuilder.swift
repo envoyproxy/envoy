@@ -1,8 +1,6 @@
 @_implementationOnly import EnvoyEngine
 import Foundation
 
-// swiftlint:disable file_length
-
 #if ENVOY_MOBILE_XDS
 /// Builder for generating the xDS configuration for the Envoy Mobile engine.
 /// xDS is a protocol for dynamic configuration of Envoy instances, more information can be found in
