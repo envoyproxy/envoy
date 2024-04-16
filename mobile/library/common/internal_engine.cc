@@ -268,10 +268,10 @@ envoy_status_t InternalEngine::resetConnectivityState() {
   return dispatcher_->post([&]() -> void { connectivity_manager_->resetConnectivityState(); });
 }
 
-envoy_status_t InternalEngine::setPreferredNetwork(envoy_network_t network) {
+envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
   return dispatcher_->post([&, network]() -> void {
     envoy_netconf_t configuration_key =
-        Envoy::Network::ConnectivityManagerImpl::setPreferredNetwork(network);
+        Network::ConnectivityManagerImpl::setPreferredNetwork(network);
     connectivity_manager_->refreshDns(configuration_key, true);
   });
 }
