@@ -1,7 +1,6 @@
-date: Pending
+date: April 16, 2024
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: http
   change: |
     Remove the hop by hop TE header from downstream request headers if it's not set to ``trailers``, else keep it. This change can be
@@ -19,7 +18,6 @@ behavior_changes:
     This behavior can be reverted by setting the feature to ``true``.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: sockets
   change: |
     Failure to create an upstream socket should now result in clean connection failure rather than failing a release assert. This behavior
@@ -121,7 +119,6 @@ minor_behavior_changes:
     Not implicitly clearing route cache in ``HeaderMap.Set``, introduce a new API ``ClearRouteCache`` to do it.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: http3/upstream
   change: |
     Fixing a bug with HTTP/3 upstream using a non-threadsafe cache cross-thread. Bumping HTTP/3 support down
@@ -246,7 +243,6 @@ bug_fixes:
     For example: with prefixes ``/foo`` and ``/foo/bar``, it would have incorrectly said no prefix match for ``/foo/``.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: http
   change: |
     Removed ``envoy.reloadable_features.allow_absolute_url_with_mixed_scheme`` runtime flag and legacy code paths.
