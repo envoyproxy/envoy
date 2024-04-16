@@ -103,7 +103,8 @@ private:
   void trailerResponse(absl::optional<Status::GrpcStatus> grpc_status,
                        const std::string& grpc_message);
 
-  void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message);
+  // Deliver notification and update span when the connection closes.
+  void notifyRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message);
 
   Event::Dispatcher* dispatcher_{};
   Http::RequestMessagePtr headers_message_;
@@ -145,7 +146,6 @@ private:
 
   Buffer::InstancePtr request_;
   RawAsyncRequestCallbacks& callbacks_;
-  Tracing::SpanPtr current_span_;
   Buffer::InstancePtr response_;
 };
 

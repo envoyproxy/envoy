@@ -238,6 +238,13 @@ public:
   }
   const StreamInfo::StreamInfo& streamInfo() const override { return unused_stream_info_; }
 
+  Tracing::Span& activeSpan() {
+    if (current_span_ != nullptr) {
+      return *current_span_;
+    }
+    return Tracing::NullSpan::instance();
+  }
+
 protected:
   bool callFailed() const { return call_failed_; }
 

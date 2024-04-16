@@ -102,7 +102,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   const auto thread_local_cluster = parent_.cm_.getThreadLocalCluster(parent_.remote_cluster_name_);
   if (thread_local_cluster == nullptr) {
-    onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available");
+    notifyRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available");
     http_reset_ = true;
     return;
   }
@@ -111,7 +111,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   dispatcher_ = &http_async_client.dispatcher();
   stream_ = http_async_client.start(*this, options_.setBufferBodyForRetry(buffer_body_for_retry));
   if (stream_ == nullptr) {
-    onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, EMPTY_STRING);
+    notifyRemoteClose(Status::WellKnownGrpcStatus::Unavailable, EMPTY_STRING);
     http_reset_ = true;
     return;
   }
@@ -212,22 +212,22 @@ void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   if (!grpc_status) {
     grpc_status = Status::WellKnownGrpcStatus::Unknown;
   }
-  onRemoteClose(grpc_status.value(), grpc_message);
+  notifyRemoteClose(grpc_status.value(), grpc_message);
   cleanup();
 }
 
 void AsyncStreamImpl::streamError(Status::GrpcStatus grpc_status, const std::string& message) {
   callbacks_.onReceiveTrailingMetadata(Http::ResponseTrailerMapImpl::create());
-  onRemoteClose(grpc_status, message);
+  notifyRemoteClose(grpc_status, message);
   resetStream();
 }
 
-void AsyncStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-  callbacks_.onRemoteClose(status, message);
+void AsyncStreamImpl::notifyRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
   current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(status));
   if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
+  callbacks_.onRemoteClose(status, message);
   current_span_->finishSpan();
 }
 
@@ -287,7 +287,11 @@ void AsyncRequestImpl::initialize(bool buffer_body_for_retry) {
   this->sendMessageRaw(std::move(request_), true);
 }
 
-void AsyncRequestImpl::cancel() { this->resetStream(); }
+void AsyncRequestImpl::cancel() {
+  AsyncStreamImpl::activeSpan().setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
+  AsyncStreamImpl::activeSpan().finishSpan();
+  this->resetStream();
+}
 
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   callbacks_.onCreateInitialMetadata(metadata);
@@ -306,6 +310,7 @@ void AsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std:
   if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
     callbacks_.onFailure(status, message, AsyncStreamImpl::activeSpan());
   } else if (response_ == nullptr) {
+    AsyncStreamImpl::activeSpan().setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     callbacks_.onFailure(Status::Internal, EMPTY_STRING, AsyncStreamImpl::activeSpan());
   } else {
     callbacks_.onSuccessRaw(std::move(response_), AsyncStreamImpl::activeSpan());
