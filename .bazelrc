@@ -189,6 +189,7 @@ build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
+build:clang-libc++ --config=libc++
 
 build:libc++20 --config=libc++
 # gRPC has a lot of deprecated-enum-enum-conversion warning. Remove once it is addressed
