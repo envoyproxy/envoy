@@ -193,13 +193,13 @@ open class EngineBuilder: NSObject {
     self.base = .custom(yaml)
   }
 
-  /// Add a log level to use with Envoy.
+  /// Set a log level to use with Envoy.
   ///
   /// - parameter logLevel: The log level to use with Envoy.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addLogLevel(_ logLevel: LogLevel) -> Self {
+  public func setLogLevel(_ logLevel: LogLevel) -> Self {
     self.logLevel = logLevel
     return self
   }

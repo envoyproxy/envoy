@@ -18,7 +18,7 @@ final class SendHeadersTests: XCTestCase {
       description: "Run called with expected http headers status")
     let endStreamExpectation = self.expectation(description: "End stream encountered")
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
       .setLogger { _, msg in
         print(msg, terminator: "")
       }
