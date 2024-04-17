@@ -571,8 +571,24 @@ public:
     }
 
     std::string address_prefix = "";
-    if (version_ == Network::Address::IpVersion::v6) {
+    if (ipVersion() == Network::Address::IpVersion::v6) {
       address_prefix = "ipv6:///";
+    }
+
+    std::string grpc_config;
+    if (clientType() == Grpc::ClientType::EnvoyGrpc) {
+      grpc_config = absl::StrFormat(R"EOF(
+                            envoy_grpc:
+                              cluster_name: test_server_0
+
+)EOF");
+    } else {
+      grpc_config = absl::StrFormat(R"EOF(
+                            google_grpc:
+                              target_uri: %s%s
+                              stat_prefix: test_server_0
+)EOF",
+                                    address_prefix, grpc_upstreams_[0]->localAddress()->asString());
     }
 
     config_helper_.prependFilter(absl::StrFormat(R"EOF(
@@ -602,12 +618,9 @@ public:
                         typed_config:
                           "@type": type.googleapis.com/test.integration.filters.%s
                           grpc_service:
-                            google_grpc:
-                              target_uri: %s%s
-                              stat_prefix: test_server_0
+                            %s
     )EOF",
-                                                 name, context_filter_config, address_prefix,
-                                                 grpc_upstreams_[0]->localAddress()->asString()),
+                                                 name, context_filter_config, grpc_config),
                                  downstream);
   }
 
