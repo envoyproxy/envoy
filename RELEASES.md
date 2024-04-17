@@ -96,38 +96,59 @@ deadline of 3 weeks.
 
 ### Cutting a major release
 
+#### In the week prior to the release
+
+* Check the [release milestone](https://github.com/envoyproxy/envoy/milestones).
 * Take a look at open issues tagged with the current release, by
   [searching](https://github.com/envoyproxy/envoy/issues) for
   "is:open is:issue milestone:[current milestone]" and either hold off until
   they are fixed or bump them to the next milestone.
-* Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
-  particularly risky PRs until after the release is tagged. This is because we aim for main to be
-  at release candidate quality at all times.
+* Begin marshalling the ongoing PR flow in this repo.
+* Ask maintainers to hold off merging any particularly risky PRs until after the release is tagged.
+* Conversely, encourage maintainers to land anything that should be included.
 * Do a final check of the [release notes](changelogs/current.yaml):
   * Make any needed corrections (grammar, punctuation, formatting, etc.).
   * Check to see if any security/stable version release notes are duplicated in
     the major version release notes. These should not be duplicated.
-  * Switch the repo to "release" mode by running `bazel run @envoy_repo//:release`. This tool
-    will create a commit with the necessary changes for a release.
-  * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
-    release, please also make sure there's a stable maintainer signed up for next quarter,
-    and the deadline for the next release is documented in the release schedule.
-  * Get a review and merge.
-* Create a pull request with that commit and **wait for tests to pass**.
-* Once the tests have passed, and the PR has landed, CI will automatically create the tagged release and corresponding release branch.
-* Switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`. This tool will create a commit with the
-  necessary changes to continue development.
-* Create a pull request with that commit.
-* Run the deprecate_versions.py script (`bazel run //tools/deprecate_version:deprecate_version`)
+* Make sure there's a stable maintainer signed up for next quarter.
+* Select a date for the next scheduled release.
+
+#### The day before release
+
+* Create a release PR running the Github workflow `create-release` from:
+
+    https://github.com/envoyproxy/envoy/actions/workflows/envoy-release.yml
+
+  This will warm the caches and ensure the workflow CI can run correctly.
+* Create a summary by updating the markdown in the [release summary](changelogs/summary.md).
+* Re-check the steps [above](#in-the-week-prior-to-the-release)
+* Clear the [release milestone](https://github.com/envoyproxy/envoy/milestones) as far as possible, either by finding resolutions or removing issues/PRs.
+
+#### On the day of the release
+
+* Re-create the release PR and lock the branch.
+* If necessary, make any last minute adjustments to the summary in the PR. The commit message will be used to create the release.
+* Once happy, approve the PR and **wait for tests to pass**, before landing.
+* When the PR has landed, CI will automatically create the [tagged release](https://github.com/envoyproxy/envoy/releases) and corresponding [release branch](https://github.com/envoyproxy/envoy/branches/all?query=release%2Fv).
+* Create a PR to switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`.
+* It is important that no commits land until this PR lands, and once it does the branch should be unlocked.
+* Publishing docs can take some time as they are first [archived](https://github.com/envoyproxy/archive) before [updating the website](https://app.netlify.com/sites/envoy-website/deploys).
+* Create a PR to update the [RELEASES](RELEASES.md) readme with the actual release date, the date for the next release and stable maintainer info.
+* Run the `deprecate_versions.py` script (`bazel run //tools/deprecate_version:deprecate_version`)
 * If you haven't done this before, request posting permission from admins for all the groups in the next bullet.
 * Craft a witty/uplifting email and send it to all the email aliases:
-envoy-announce@googlegroups.com
-envoy-users@googlegroups.com
-envoy-dev@googlegroups.com
-envoy-maintainers@googlegroups.com -
-include in this email a link to the latest [release page](https://github.com/envoyproxy/envoy/releases) (ending in `tag/[version]`)
-* Announce in [#envoy-dev](https://envoyproxy.slack.com/archives/C78HA81DH) and [#envoy-users](https://envoyproxy.slack.com/archives/C78M4KW76) slack channels.
+  - envoy-announce@googlegroups.com
+  - envoy-users@googlegroups.com
+  - envoy-dev@googlegroups.com
+  - envoy-maintainers@googlegroups.com -
+  Include in this email a link to the latest [release page](https://github.com/envoyproxy/envoy/releases) (ending in `tag/[version]`)
+* Announce in Slack channels:
+  - [#envoy-dev](https://envoyproxy.slack.com/archives/C78HA81DH)
+  - [#envoy-users](https://envoyproxy.slack.com/archives/C78M4KW76)
+* Close the old [release milestone](https://github.com/envoyproxy/envoy/milestones) (which should be empty!) and create a new one.
+* When the docs have been published to the [website](https://www.envoyproxy.io), create a PR to update the version history by running the Github workflow `sync-versions` from:
 
+    https://github.com/envoyproxy/envoy/actions/workflows/envoy-release.yml
 
 ## Security release schedule
 
