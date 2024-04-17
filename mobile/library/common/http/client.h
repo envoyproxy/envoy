@@ -356,18 +356,18 @@ private:
 
   using DirectStreamWrapperPtr = std::unique_ptr<DirectStreamWrapper>;
 
-  enum GetStreamFilters {
+  enum class GetStreamFilters {
     // If a stream has been finished from upstream, but stream completion has
     // not yet been communicated, the downstream mobile library should not be
     // allowed to access the stream. getStream takes an argument to ensure that
     // the mobile client won't do things like send further request data for
     // streams in this state.
-    ALLOW_ONLY_FOR_OPEN_STREAMS,
+    AllowOnlyForOpenStreams,
     // If a stream has been finished from upstream, make sure that getStream
     // will continue to work for functions such as resumeData (pushing that data
     // to the mobile library) and cancelStream (the client not wanting further
     // data for the stream).
-    ALLOW_FOR_ALL_STREAMS,
+    AllowForAllStreams,
   };
   DirectStreamSharedPtr getStream(envoy_stream_t stream_handle, GetStreamFilters filters);
   void removeStream(envoy_stream_t stream_handle);
