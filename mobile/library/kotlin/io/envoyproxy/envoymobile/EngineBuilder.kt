@@ -183,12 +183,12 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var xdsBuilder: XdsBuilder? = null
 
   /**
-   * Add a log level to use with Envoy.
+   * Sets a log level to use with Envoy.
    *
    * @param logLevel the log level to use with Envoy.
    * @return this builder.
    */
-  fun addLogLevel(logLevel: LogLevel): EngineBuilder {
+  fun setLogLevel(logLevel: LogLevel): EngineBuilder {
     this.logLevel = logLevel
     return this
   }

@@ -109,61 +109,61 @@ TEST_F(ConnectivityManagerTest,
        ReportNetworkUsageDoesntAlterNetworkConfigurationWhenBoundInterfacesAreDisabled) {
   envoy_netconf_t configuration_key = connectivity_manager_->getConfigurationKey();
   connectivity_manager_->setInterfaceBindingEnabled(false);
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
 
   EXPECT_EQ(configuration_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 }
 
 TEST_F(ConnectivityManagerTest,
        ReportNetworkUsageTriggersOverrideAfterFirstFaultAfterNetworkUpdate) {
   envoy_netconf_t configuration_key = connectivity_manager_->getConfigurationKey();
   connectivity_manager_->setInterfaceBindingEnabled(true);
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
 
   EXPECT_NE(configuration_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
 }
 
 TEST_F(ConnectivityManagerTest, ReportNetworkUsageDisablesOverrideAfterFirstFaultAfterOverride) {
   envoy_netconf_t configuration_key = connectivity_manager_->getConfigurationKey();
   connectivity_manager_->setInterfaceBindingEnabled(true);
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
 
   EXPECT_NE(configuration_key, connectivity_manager_->getConfigurationKey());
   configuration_key = connectivity_manager_->getConfigurationKey();
-  EXPECT_EQ(AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
 
   EXPECT_NE(configuration_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 }
 
 TEST_F(ConnectivityManagerTest, ReportNetworkUsageDisablesOverrideAfterThirdFaultAfterSuccess) {
   envoy_netconf_t configuration_key = connectivity_manager_->getConfigurationKey();
   connectivity_manager_->setInterfaceBindingEnabled(true);
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(configuration_key, false /* network_fault */);
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
 
   EXPECT_EQ(configuration_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
 
   EXPECT_NE(configuration_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
 }
 
 TEST_F(ConnectivityManagerTest, ReportNetworkUsageDisregardsCallsWithStaleConfigurationKey) {
@@ -172,20 +172,20 @@ TEST_F(ConnectivityManagerTest, ReportNetworkUsageDisregardsCallsWithStaleConfig
   EXPECT_NE(stale_key, current_key);
 
   connectivity_manager_->setInterfaceBindingEnabled(true);
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(stale_key, true /* network_fault */);
   connectivity_manager_->reportNetworkUsage(stale_key, true /* network_fault */);
   connectivity_manager_->reportNetworkUsage(stale_key, true /* network_fault */);
 
   EXPECT_EQ(current_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(stale_key, false /* network_fault */);
   connectivity_manager_->reportNetworkUsage(current_key, true /* network_fault */);
 
   EXPECT_NE(current_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
 }
 
 TEST_F(ConnectivityManagerTest, EnumerateInterfacesFiltersByFlags) {

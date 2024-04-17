@@ -35,7 +35,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 
 @RunWith(RobolectricTestRunner.class)
-public class AndroidEnvoyExplicitFlowTest {
+public class AndroidEngineExplicitFlowTest {
 
   private final MockWebServer mockWebServer = new MockWebServer();
   private Engine engine;
@@ -50,7 +50,7 @@ public class AndroidEnvoyExplicitFlowTest {
     CountDownLatch latch = new CountDownLatch(1);
     Context appContext = ApplicationProvider.getApplicationContext();
     engine = new AndroidEngineBuilder(appContext)
-                 .addLogLevel(LogLevel.DEBUG)
+                 .setLogLevel(LogLevel.DEBUG)
                  .setLogger((level, message) -> {
                    System.out.print(message);
                    return null;
