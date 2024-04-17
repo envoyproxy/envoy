@@ -83,13 +83,15 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
       tracer_->startSpan("/downstream/path", "HTTP", segment_context);
   Span* span = dynamic_cast<Span*>(org_span.get());
 
+  // The traceId is a uuid format string, and the '-' is removed.
+  auto excepted_trace_id = absl::StrReplaceAll(segment_context->traceId(), {{"-", ""}});
+
   {
     EXPECT_TRUE(span->spanEntity()->spanType() == skywalking::v3::SpanType::Entry);
     EXPECT_EQ("", span->getBaggage("FakeStringAndNothingToDo"));
     span->setOperation("FakeStringAndNothingToDo");
     span->setBaggage("FakeStringAndNothingToDo", "FakeStringAndNothingToDo");
-    // This method is unimplemented and a noop.
-    ASSERT_EQ(span->getTraceIdAsHex(), "");
+    EXPECT_EQ(excepted_trace_id, span->getTraceIdAsHex());
     // Test whether the basic functions of Span are normal.
     EXPECT_FALSE(span->spanEntity()->skipAnalysis());
     span->setSampled(false);

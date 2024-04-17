@@ -77,6 +77,15 @@ void Tracer::sendSegment(TracingContextPtr segment_context) {
   }
 }
 
+std::string Span::getTraceIdAsHex() const {
+  auto sw_trace_id = tracing_context_->traceId();
+  if (sw_trace_id.size() == 36) {
+    return absl::StrReplaceAll(sw_trace_id, {{"-", ""}});
+  }
+
+  return EMPTY_STRING;
+}
+
 Tracing::SpanPtr Tracer::startSpan(absl::string_view name, absl::string_view protocol,
                                    TracingContextPtr tracing_context) {
   return std::make_unique<Span>(name, protocol, tracing_context, *this);
