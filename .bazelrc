@@ -136,6 +136,7 @@ build:clang-asan-common --linkopt --rtlib=compiler-rt
 build:clang-asan-common --linkopt --unwindlib=libgcc
 
 build:clang-asan --config=clang-asan-common
+build:clang-asan --linkopt='-L/opt/llvm/lib/clang/14.0.0/lib/x86_64-unknown-linux-gnu'
 build:clang-asan --linkopt=-l:libclang_rt.ubsan_standalone.a
 build:clang-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 build:clang-asan --action_env=ENVOY_UBSAN_VPTR=1
