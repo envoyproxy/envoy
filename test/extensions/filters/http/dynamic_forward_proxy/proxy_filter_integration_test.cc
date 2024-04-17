@@ -602,6 +602,22 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
   checkSimpleRequestSuccess(0, 0, response.get());
 }
 
+TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithTooLongSni) {
+  upstream_tls_ = true;
+  initializeWithArgs();
+  std::string too_long_sni(300, 'a');
+  ASSERT_EQ(too_long_sni.size(), 300); // Validate that the expected constructor was run.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", too_long_sni}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
 // Verify that auto-SAN verification fails with an incorrect certificate.
 TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
   upstream_tls_ = true;

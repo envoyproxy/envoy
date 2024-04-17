@@ -710,7 +710,9 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
                                                  : server_name_indication_;
   if (!server_name_indication.empty()) {
     const int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());
-    RELEASE_ASSERT(rc, Utility::getLastCryptoError().value_or(""));
+    if (rc != 1) {
+      return nullptr;
+    }
   }
 
   if (options && !options->verifySubjectAltNameListOverride().empty()) {
