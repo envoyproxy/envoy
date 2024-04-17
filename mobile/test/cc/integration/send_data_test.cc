@@ -12,15 +12,17 @@ namespace Envoy {
 
 inline constexpr absl::string_view ASSERTION_FILTER_TEXT_PROTO = R"(
   [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
-    match_config: {
-      http_request_trailers_match: {
-        headers: { name: 'trailer-key', exact_match: 'trailer-value' }
+    match_config {
+      http_request_generic_body_match: {
+        patterns: {
+          string_match: 'request body'
+        }
       }
     }
   }
 )";
 
-TEST(SendTrailersTest, Success) {
+TEST(SendDataTest, Success) {
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
   engine_builder.enforceTrustChainVerification(false)
@@ -32,20 +34,20 @@ TEST(SendTrailersTest, Success) {
   EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
   engine_running.WaitForNotification();
 
-  engine_with_test_server.testServer().setResponse({}, "body", {{"trailer-key", "trailer-value"}});
-
   int actual_status_code;
-  std::string actual_trailer_value;
+  bool actual_end_stream;
   absl::Notification stream_complete;
   auto stream_prototype = engine_with_test_server.engine()->streamClient()->newStreamPrototype();
   Platform::StreamSharedPtr stream =
       (*stream_prototype)
-          .setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel) {
-            actual_status_code = headers->httpStatus();
-          })
-          .setOnTrailers([&](Platform::ResponseTrailersSharedPtr trailers, envoy_stream_intel) {
-            ASSERT_TRUE(trailers->contains("trailer-key"));
-            actual_trailer_value = (*trailers)["trailer-key"][0];
+          .setOnHeaders(
+              [&](Platform::ResponseHeadersSharedPtr headers, bool end_stream, envoy_stream_intel) {
+                actual_status_code = headers->httpStatus();
+                actual_end_stream = end_stream;
+              })
+          .setOnData([&](envoy_data data, bool end_stream) {
+            actual_end_stream = end_stream;
+            data.release(data.context);
           })
           .setOnComplete(
               [&](envoy_stream_intel, envoy_final_stream_intel) { stream_complete.Notify(); })
@@ -62,15 +64,12 @@ TEST(SendTrailersTest, Success) {
                    absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()));
   headers->addCopy(Http::LowerCaseString(":path"), "/");
   stream->sendHeaders(std::move(headers), false);
-
-  auto trailers = Http::Utility::createRequestTrailerMapPtr();
-  trailers->addCopy(Http::LowerCaseString("trailer-key"), "trailer-value");
-  stream->close(std::move(trailers));
-
+  stream->sendData(std::make_unique<Buffer::OwnedImpl>("request body"));
+  stream->close(std::make_unique<Buffer::OwnedImpl>("request body"));
   stream_complete.WaitForNotification();
 
   EXPECT_EQ(actual_status_code, 200);
-  EXPECT_EQ(actual_trailer_value, "trailer-value");
+  EXPECT_TRUE(actual_end_stream);
 }
 
 } // namespace Envoy

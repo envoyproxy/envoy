@@ -6,9 +6,9 @@ namespace Envoy {
 namespace Network {
 
 enum class ProxyResolutionResult {
-  NO_PROXY_CONFIGURED = 0,
-  RESULT_COMPLETED = 1,
-  RESULT_IN_PROGRESS = 2,
+  NoProxyConfigured = 0,
+  ResultCompleted = 1,
+  ResultInProgress = 2,
 };
 
 // An interface for resolving the system's proxy settings.
