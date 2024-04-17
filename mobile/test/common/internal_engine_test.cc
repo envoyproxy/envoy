@@ -327,7 +327,9 @@ TEST_F(InternalEngineTest, BasicStream) {
         auto response_headers = toResponseHeaders(c_headers);
         EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
       } /* on_headers */,
-      [](envoy_data, bool, envoy_stream_intel, void*) -> void {} /* on_data */,
+      [](envoy_data data, bool, envoy_stream_intel, void*) -> void {
+        data.release(data.context);
+      } /* on_data */,
       nullptr /* on_metadata */,
       [](envoy_headers, envoy_stream_intel, void*) -> void {} /* on_trailers */,
       nullptr /* on_error */,
@@ -469,7 +471,9 @@ protected:
           auto* callback_context = static_cast<CallbackContext*>(context);
           callback_context->thread_priority = getpriority(PRIO_PROCESS, 0);
         } /* on_headers */,
-        [](envoy_data, bool, envoy_stream_intel, void*) -> void {} /* on_data */,
+        [](envoy_data data, bool, envoy_stream_intel, void*) -> void {
+          data.release(data.context);
+        } /* on_data */,
         nullptr /* on_metadata */,
         [](envoy_headers, envoy_stream_intel, void*) -> void {} /* on_trailers */,
         nullptr /* on_error */,
