@@ -954,31 +954,23 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
       ->readData(static_cast<envoy_stream_t>(stream_handle), byte_count);
 }
 
-// The Java counterpart guarantees to invoke this method with a non-null direct ByteBuffer where the
-// provided length is between 0 and ByteBuffer.capacity(), inclusively.
+// This function can accept either direct (off the JVM heap) ByteBuffer or non-direct (on the JVM
+// heap) ByteBuffer.
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendData(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject data, jint length,
+    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject byte_buffer, jint length,
     jboolean end_stream) {
   Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::Buffer::InstancePtr cpp_buffer_instance;
+  if (Envoy::JNI::isJavaDirectByteBuffer(jni_helper, byte_buffer)) {
+    cpp_buffer_instance =
+        Envoy::JNI::javaDirectByteBufferToCppBufferInstance(jni_helper, byte_buffer, length);
+  } else {
+    cpp_buffer_instance =
+        Envoy::JNI::javaNonDirectByteBufferToCppBufferInstance(jni_helper, byte_buffer, length);
+  }
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendData(static_cast<envoy_stream_t>(stream_handle),
-                 Envoy::JNI::javaByteBufferToEnvoyData(jni_helper, data, length), end_stream);
-}
-
-// The Java counterpart guarantees to invoke this method with a non-null jbyteArray where the
-// provided length is between 0 and the size of the jbyteArray, inclusively. And given that this
-// jbyteArray comes from a ByteBuffer, it is also guaranteed that its length will not be greater
-// than 2^31 - this is why the length type is jint.
-extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendDataByteArray(JNIEnv* env, jclass,
-                                                                   jlong engine_handle,
-                                                                   jlong stream_handle,
-                                                                   jbyteArray data, jint length,
-                                                                   jboolean end_stream) {
-  Envoy::JNI::JniHelper jni_helper(env);
-  return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendData(static_cast<envoy_stream_t>(stream_handle),
-                 Envoy::JNI::javaByteArrayToEnvoyData(jni_helper, data, length), end_stream);
+      ->sendData(static_cast<envoy_stream_t>(stream_handle), std::move(cpp_buffer_instance),
+                 end_stream);
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendHeaders(
@@ -1297,7 +1289,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setPreferredNetwork(JNIEnv* /*e
                                                                      jclass, // class
                                                                      jlong engine, jint network) {
   return reinterpret_cast<Envoy::InternalEngine*>(engine)->setPreferredNetwork(
-      static_cast<envoy_network_t>(network));
+      static_cast<Envoy::NetworkType>(network));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_setProxySettings(

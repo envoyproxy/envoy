@@ -164,19 +164,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   @Override
   public void setPreferredNetwork(EnvoyNetworkType network) {
     checkIsTerminated();
-    switch (network) {
-    case ENVOY_NETWORK_TYPE_WWAN:
-      JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_WWAN);
-      return;
-    case ENVOY_NETWORK_TYPE_WLAN:
-      JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_WLAN);
-      return;
-    case ENVOY_NETWORK_TYPE_GENERIC:
-      JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_GENERIC);
-      return;
-    default:
-      JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_GENERIC);
-    }
+    JniLibrary.setPreferredNetwork(engineHandle, network.getValue());
   }
 
   public void setProxySettings(String host, int port) {

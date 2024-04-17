@@ -18,7 +18,7 @@ final class SetEventTrackerTest: XCTestCase {
       self.expectation(description: "Passed event tracker receives an event")
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
       .setLogger { _, msg in
           print(msg, terminator: "")
       }

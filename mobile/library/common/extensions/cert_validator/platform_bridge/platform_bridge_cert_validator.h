@@ -62,9 +62,9 @@ private:
                               SslStats& stats, Thread::PosixThreadFactoryPtr thread_factory);
 
   enum class ValidationFailureType {
-    SUCCESS,
-    FAIL_VERIFY_ERROR,
-    FAIL_VERIFY_SAN,
+    Success,
+    FailVerifyError,
+    FailVerifySan,
   };
 
   // Calls into platform APIs in a stand-alone thread to verify the given certs.

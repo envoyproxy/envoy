@@ -1,6 +1,7 @@
 #include "stream.h"
 
 #include "library/cc/bridge_utility.h"
+#include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 #include "library/common/types/c_types.h"
@@ -32,7 +33,12 @@ Stream& Stream::sendHeaders(Http::RequestHeaderMapPtr headers, bool end_stream) 
 }
 
 Stream& Stream::sendData(envoy_data data) {
-  engine_->sendData(handle_, data, false);
+  Buffer::InstancePtr buffer = Data::Utility::toInternalData(data);
+  return sendData(std::move(buffer));
+}
+
+Stream& Stream::sendData(Buffer::InstancePtr buffer) {
+  engine_->sendData(handle_, std::move(buffer), false);
   return *this;
 }
 
@@ -55,7 +61,14 @@ void Stream::close(Http::RequestTrailerMapPtr trailers) {
   engine_->sendTrailers(handle_, std::move(trailers));
 }
 
-void Stream::close(envoy_data data) { engine_->sendData(handle_, data, true); }
+void Stream::close(envoy_data data) {
+  Buffer::InstancePtr buffer = Data::Utility::toInternalData(data);
+  close(std::move(buffer));
+}
+
+void Stream::close(Buffer::InstancePtr buffer) {
+  engine_->sendData(handle_, std::move(buffer), true);
+}
 
 void Stream::cancel() { engine_->cancelStream(handle_); }
 

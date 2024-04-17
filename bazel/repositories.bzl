@@ -37,8 +37,8 @@ WINDOWS_SKIP_TARGETS = [
 NO_HTTP3_SKIP_TARGETS = [
     "envoy.quic.crypto_stream.server.quiche",
     "envoy.quic.deterministic_connection_id_generator",
-    "envoy.quic.crypto_stream.server.quiche",
     "envoy.quic.proof_source.filter_chain",
+    "envoy.quic.server_preferred_address.fixed",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
