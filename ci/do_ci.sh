@@ -75,7 +75,6 @@ retry () {
     done
 }
 
-
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
   BUILD_ARCH_DIR="/linux/amd64"
 elif [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
@@ -84,6 +83,23 @@ else
   # Fall back to use the ENVOY_BUILD_ARCH itself.
   BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
 fi
+
+setup_clang_toolchain() {
+    CONFIG_PARTS=()
+    if [[ -n "${ENVOY_RBE}" ]]; then
+        CONFIG_PARTS+=("remote")
+    fi
+    CONFIG_PARTS+=("clang")
+    ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
+    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
+        CONFIG_PARTS+=("libc++")
+    fi
+    CONFIG="$(IFS=- ; echo "${CONFIG_PARTS[*]}")"
+    BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
+    BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
+    export BAZEL_BUILD_OPTION_LIST
+    echo "clang toolchain with ${ENVOY_STDLIB} configured: ${CONFIG}"
+}
 
 function collect_build_profile() {
     local output_base
@@ -257,6 +273,7 @@ case $CI_TARGET in
         # which is built with libstdc++. Using libstdc++ for whole of the API CI job to avoid unnecessary rebuild.
         ENVOY_STDLIB="libstdc++"
         setup_clang_toolchain
+        export CLANG_TOOLCHAIN_SETUP=1
         export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
         echo "Run protoxform test"
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -282,7 +299,9 @@ case $CI_TARGET in
         ;&
 
     api.go)
-        setup_clang_toolchain
+        if [[ -z "$CLANG_TOOLCHAIN_SETUP" ]]; then
+            setup_clang_toolchain
+        fi
         GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
         GO_TARGETS=(@envoy_api//...)
         read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
@@ -749,8 +768,16 @@ case $CI_TARGET in
         ;;
 
     gcc)
-        BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
-        setup_gcc_toolchain
+        if [[ -n "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
+            echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
+            exit 1
+        fi
+        if [[ -n "${ENVOY_RBE}" ]]; then
+            CONFIG_PREFIX="remote-"
+        fi
+        CONFIG="${CONFIG_PREFIX}gcc"
+        BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
+        echo "gcc toolchain configured: ${CONFIG}"
         echo "Testing ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -767,7 +794,6 @@ case $CI_TARGET in
         ;;
 
     msan)
-        ENVOY_STDLIB=libc++
         setup_clang_toolchain
         # rbe-toolchain-msan must comes as first to win library link order.
         BAZEL_BUILD_OPTIONS=(

@@ -15,7 +15,7 @@ import static com.google.common.truth.Truth.assertThat;
 // NOLINT(namespace-envoy)
 
 @RunWith(RobolectricTestRunner.class)
-public class AndroidEnvoyEngineStartUpTest {
+public class AndroidEngineStartUpTest {
   static { AndroidJniLibrary.loadTestLibrary(); }
 
   private final Context appContext = ApplicationProvider.getApplicationContext();
@@ -23,7 +23,7 @@ public class AndroidEnvoyEngineStartUpTest {
   @Test
   public void ensure_engine_starts_and_terminates() throws InterruptedException {
     Engine engine = new AndroidEngineBuilder(appContext)
-                        .addLogLevel(LogLevel.DEBUG)
+                        .setLogLevel(LogLevel.DEBUG)
                         .setLogger((level, message) -> {
                           System.out.print(message);
                           return null;

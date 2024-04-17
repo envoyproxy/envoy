@@ -112,13 +112,19 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   // The router checks that the connection pool is non-null before creating the upstream request.
   auto upstream_host = conn_pool_->host();
   Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
+  Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
+                                            &upstream_host->cluster(),     // cluster_
+                                            Tracing::ServiceType::Unknown, // service_type_
+                                            false                          // async_client_span_
+  );
+
   if (span_ != nullptr) {
-    span_->injectContext(trace_context, upstream_host);
+    span_->injectContext(trace_context, upstream_context);
   } else {
     // No independent child span for current upstream request then inject the parent span's tracing
     // context into the request headers.
     // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_host);
+    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context);
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());

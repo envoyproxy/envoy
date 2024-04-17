@@ -35,51 +35,6 @@ echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 echo "ENVOY_BUILD_TARGET=${ENVOY_BUILD_TARGET}"
 echo "ENVOY_BUILD_ARCH=${ENVOY_BUILD_ARCH}"
 
-function setup_gcc_toolchain() {
-  if [[ -n "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
-    echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
-    exit 1
-  fi
-
-  BAZEL_BUILD_OPTIONS+=("--config=gcc")
-
-  if [[ -z "${ENVOY_RBE}" ]]; then
-    export CC=gcc
-    export CXX=g++
-    export BAZEL_COMPILER=gcc
-    echo "$CC/$CXX toolchain configured"
-  else
-    BAZEL_BUILD_OPTIONS+=("--config=remote-gcc")
-  fi
-  BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
-  export BAZEL_BUILD_OPTION_LIST
-}
-
-function setup_clang_toolchain() {
-  if [[ -n "$CLANG_TOOLCHAIN_SETUP" ]]; then
-    return
-  fi
-  export CLANG_TOOLCHAIN_SETUP=1
-  ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
-  if [[ -z "${ENVOY_RBE}" ]]; then
-    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
-      BAZEL_BUILD_OPTIONS+=("--config=libc++")
-    else
-      BAZEL_BUILD_OPTIONS+=("--config=clang")
-    fi
-  else
-    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
-      BAZEL_BUILD_OPTIONS+=("--config=remote-clang-libc++")
-    else
-      BAZEL_BUILD_OPTIONS+=("--config=remote-clang")
-    fi
-  fi
-
-  BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
-  export BAZEL_BUILD_OPTION_LIST
-  echo "clang toolchain with ${ENVOY_STDLIB} configured"
-}
-
 if [[ -z "${BUILD_DIR}" ]]; then
     echo "BUILD_DIR not set - defaulting to ~/.cache/envoy-bazel" >&2
     BUILD_DIR="${HOME}/.cache/envoy-bazel"

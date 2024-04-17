@@ -8,7 +8,6 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/bridge_utility.h"
-#include "library/cc/log_level.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 #include "spdlog/spdlog.h"

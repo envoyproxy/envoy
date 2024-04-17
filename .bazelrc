@@ -84,7 +84,6 @@ build:sanitizer --linkopt -ldl
 
 # Common flags for Clang
 build:clang --action_env=BAZEL_COMPILER=clang
-build:clang --action_env=CC=clang --action_env=CXX=clang++
 build:clang --linkopt=-fuse-ld=lld
 build:clang --action_env=CC=clang --host_action_env=CC=clang
 build:clang --action_env=CXX=clang++ --host_action_env=CXX=clang++
@@ -95,6 +94,9 @@ build:clang-pch --define=ENVOY_CLANG_PCH=1
 
 # Use gold linker for gcc compiler.
 build:gcc --linkopt=-fuse-ld=gold
+build:gcc --test_env=HEAPCHECK=
+build:gcc --action_env=BAZEL_COMPILER=gcc
+build:gcc --action_env=CC=gcc --action_env=CXX=g++
 
 # Clang-tidy
 # TODO(phlax): enable this, its throwing some errors as well as finding more issues
@@ -199,6 +201,7 @@ build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
+build:clang-libc++ --config=libc++
 
 build:libc++20 --config=libc++
 # gRPC has a lot of deprecated-enum-enum-conversion warning. Remove once it is addressed
@@ -324,6 +327,7 @@ build:remote-clang-libc++ --config=remote
 build:remote-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:remote-gcc --config=remote
+build:remote-gcc --config=gcc
 build:remote-gcc --config=rbe-toolchain-gcc
 
 build:remote-asan --config=remote

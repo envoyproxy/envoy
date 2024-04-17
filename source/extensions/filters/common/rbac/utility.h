@@ -32,6 +32,33 @@ namespace RBAC {
 struct RoleBasedAccessControlFilterStats {
   ENFORCE_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
   SHADOW_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+
+  Stats::Scope& scope_;
+  std::string per_policy_final_prefix_;
+  std::string per_policy_final_shadow_prefix_;
+
+  void incPolicyAllowed(absl::string_view name) {
+    incCounter(per_policy_final_prefix_, name, ".allowed");
+  }
+
+  void incPolicyDenied(absl::string_view name) {
+    incCounter(per_policy_final_prefix_, name, ".denied");
+  }
+
+  void incPolicyShadowAllowed(absl::string_view name) {
+    incCounter(per_policy_final_shadow_prefix_, name, ".shadow_allowed");
+  }
+
+  void incPolicyShadowDenied(absl::string_view name) {
+    incCounter(per_policy_final_shadow_prefix_, name, ".shadow_denied");
+  }
+
+  void incCounter(absl::string_view prefix, absl::string_view name, absl::string_view suffix) {
+    Stats::StatNameDynamicPool pool(scope_.symbolTable());
+    Stats::StatName metric_prefix = pool.add(prefix);
+    Stats::StatName metric_name = pool.add(absl::StrCat(name, suffix));
+    Stats::Utility::counterFromElements(scope_, {metric_prefix, metric_name}).inc();
+  }
 };
 
 RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
