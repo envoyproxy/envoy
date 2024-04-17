@@ -2122,9 +2122,9 @@ ConnectionImpl::Http2Options::Http2Options(
   nghttp2_option_set_max_outbound_ack(options_, 10000);
 
   // nghttp2 REQUIRES setting max number of CONTINUATION frames.
-  // 1024 is chosen to accommodate Envoy's 8Mb max limit of max_request_headers_kb
+  // 512 is chosen to accommodate Envoy's 8Mb max limit of max_request_headers_kb
   // in both headers and trailers
-  nghttp2_option_set_max_continuations(options_, 1024);
+  nghttp2_option_set_max_continuations(options_, 512);
 }
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
