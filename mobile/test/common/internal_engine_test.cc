@@ -339,15 +339,12 @@ TEST_F(InternalEngineTest, BasicStream) {
       nullptr /* on_send_window_available*/,
       &on_complete_notification /* context */};
 
-  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  envoy_data c_data = Data::Utility::toBridgeData(request_data);
-
   envoy_stream_t stream = engine->initStream();
 
   engine->startStream(stream, stream_cbs, false);
 
   engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getPort()), false);
-  engine->sendData(stream, c_data, false);
+  engine->sendData(stream, std::make_unique<Buffer::OwnedImpl>("request body"), false);
   engine->sendTrailers(stream, Http::Utility::createRequestTrailerMapPtr());
 
   ASSERT_TRUE(on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
@@ -484,13 +481,10 @@ protected:
         nullptr /* on_send_window_available*/,
         &context};
 
-    Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-    envoy_data c_data = Data::Utility::toBridgeData(request_data);
-
     envoy_stream_t stream = engine->initStream();
     engine->startStream(stream, stream_cbs, false);
     engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getPort()), false);
-    engine->sendData(stream, c_data, true);
+    engine->sendData(stream, std::make_unique<Buffer::OwnedImpl>("request body"), true);
 
     EXPECT_TRUE(context.on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
     test_server.shutdown();
