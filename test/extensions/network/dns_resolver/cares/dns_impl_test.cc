@@ -2096,7 +2096,7 @@ protected:
     auto udp_max_queries = std::make_unique<ProtobufWkt::UInt32Value>();
     udp_max_queries->set_value(100);
     dns_resolver_options_.set_allocated_udp_max_queries(
-      dynamic_cast<ProtobufWkt::UInt32Value*>(udp_max_queries.release()));
+        dynamic_cast<ProtobufWkt::UInt32Value*>(udp_max_queries.release()));
   }
 };
 
