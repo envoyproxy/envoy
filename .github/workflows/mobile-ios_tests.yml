@@ -57,7 +57,8 @@ jobs:
         - name: Run swift library tests
           args: >-
             test
-            --config=mobile-remote-ci-macos-ios-swift
+            --config=mobile-remote-ci-macos
+            --build_tests_only
             //test/swift/...
           target: swift-tests
           timeout-minutes: 120
