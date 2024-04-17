@@ -88,12 +88,9 @@ public:
 
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_->streamInfo(); }
 
-  Tracing::Span& activeSpan() {
-    if (current_span_ != nullptr) {
-      return *current_span_;
-    }
-    return Tracing::NullSpan::instance();
-  }
+protected:
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  Tracing::SpanPtr current_span_;
 
 private:
   void streamError(Status::GrpcStatus grpc_status, const std::string& message);
@@ -111,7 +108,6 @@ private:
   AsyncClientImpl& parent_;
   std::string service_full_name_;
   std::string method_name_;
-  Tracing::SpanPtr current_span_;
 
   RawAsyncStreamCallbacks& callbacks_;
   Http::AsyncClient::StreamOptions options_;

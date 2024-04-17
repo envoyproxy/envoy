@@ -107,6 +107,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
     return;
   }
 
+  cluster_info_ = thread_local_cluster->info();
   auto& http_async_client = thread_local_cluster->httpAsyncClient();
   dispatcher_ = &http_async_client.dispatcher();
   stream_ = http_async_client.start(*this, options_.setBufferBodyForRetry(buffer_body_for_retry));
