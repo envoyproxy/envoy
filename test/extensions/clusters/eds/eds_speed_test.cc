@@ -88,7 +88,7 @@ public:
 
     EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
     cluster_->initialize([this] { initialized_ = true; });
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(testing::Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(testing::Return(&async_stream_));
     subscription_->start({"fare"});
   }
 

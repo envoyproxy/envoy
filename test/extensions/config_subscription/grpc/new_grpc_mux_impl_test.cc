@@ -195,7 +195,7 @@ TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
   InSequence s;
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, {});
   expectSendMessage("bar", {}, {});
   grpc_mux_->start();
@@ -227,7 +227,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   // Send on connection.
   expectSendMessage(type_url, {"x", "y"}, {});
   grpc_mux_->start();
@@ -253,7 +253,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   // Grpc stream retry timer will kick in and reconnection will happen.
   EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
       .WillOnce(Invoke(grpc_stream_retry_timer_cb));
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   // initial_resource_versions should contain client side all resource:version info.
   expectSendMessage(type_url, {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
                     {{"x", "2000"}, {"y", "3000"}});
@@ -277,7 +277,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   // Send a wildcard request on new connection.
   expectSendMessage(type_url, {}, {});
   grpc_mux_->start();
@@ -339,7 +339,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
   // Grpc stream retry timer will kick in and reconnection will happen.
   EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
       .WillOnce(Invoke(grpc_stream_retry_timer_cb));
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   // initial_resource_versions should contain client side all resource:version info, and no
   // added resources because this is a wildcard request.
   expectSendMessage(type_url, {}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
@@ -355,7 +355,7 @@ TEST_P(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
 
   {
@@ -397,7 +397,7 @@ TEST_P(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   options.use_namespace_matching_ = true;
   auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, options);
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
 
   auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
@@ -434,7 +434,7 @@ TEST_P(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   options.use_namespace_matching_ = true;
   auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, options);
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
 
   auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
@@ -462,7 +462,7 @@ TEST_P(NewGrpcMuxImplTest, XdsTpGlobCollection) {
       {"xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/*?thing=some&some=thing"},
       callbacks_, resource_decoder_, options);
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
 
   auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
@@ -505,7 +505,7 @@ TEST_P(NewGrpcMuxImplTest, XdsTpSingleton) {
                                    },
                                    callbacks_, resource_decoder_, options);
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
 
   auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
@@ -548,7 +548,7 @@ TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
   setup();
 
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, {});
   grpc_mux_->start();
 
@@ -562,7 +562,7 @@ TEST_P(NewGrpcMuxImplTest, Shutdown) {
   setup();
   InSequence s;
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, {});
   grpc_mux_->start();
 
@@ -594,7 +594,7 @@ TEST_P(NewGrpcMuxImplTest, CacheEdsResource) {
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   auto watch = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder_, {});
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x"}, {});
   grpc_mux_->start();
 
@@ -639,7 +639,7 @@ TEST_P(NewGrpcMuxImplTest, UpdateCacheEdsResource) {
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   auto watch = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder_, {});
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x"}, {});
   grpc_mux_->start();
 
@@ -691,7 +691,7 @@ TEST_P(NewGrpcMuxImplTest, AddRemoveSubscriptions) {
   {
     auto watch1 = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder_, {});
 
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
     expectSendMessage(type_url, {"x"}, {});
     grpc_mux_->start();
 
