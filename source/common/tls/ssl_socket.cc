@@ -26,7 +26,6 @@ namespace {
 
 constexpr absl::string_view NotReadyReason{"TLS error: Secret is not supplied by SDS"};
 
-// This SslSocket will be used when SSL secret is not fetched from SDS server.
 class InvalidSslSocket : public Network::TransportSocket {
 public:
   // Network::TransportSocket
@@ -44,14 +43,18 @@ public:
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
 };
 
+// This SslSocket will be used when SSL secret is not fetched from SDS server.
 class NotReadySslSocket : public InvalidSslSocket {
 public:
+  // Network::TransportSocket
   absl::string_view failureReason() const override { return NotReadyReason; }
 };
 
 class ErrorSslSocket : public InvalidSslSocket {
 public:
   ErrorSslSocket(absl::string_view error) : error_(error) {}
+
+  // Network::TransportSocket
   absl::string_view failureReason() const override { return error_; }
 
 private:
