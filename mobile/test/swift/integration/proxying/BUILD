@@ -11,9 +11,9 @@ envoy_mobile_swift_test(
         "HTTPRequestUsingProxyTest.swift",
     ],
     # The test starts an Envoy test server, which requires the `no-remote-exec` tag.
-    tags = [
-        "no-remote-exec",
-    ],
+    # tags = [
+        # "no-remote-exec",
+    # ],
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_engine_objc_lib",
