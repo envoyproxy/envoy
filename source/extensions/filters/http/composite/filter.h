@@ -110,7 +110,7 @@ public:
     }
   }
 
-  bool isUpstream() { return is_upstream_; }
+  bool isUpstream() const { return is_upstream_; }
 
 private:
   friend FactoryCallbacksWrapper;
