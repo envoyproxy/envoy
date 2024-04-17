@@ -239,9 +239,9 @@ bug_fixes:
     Update nghttp2 to resolve CVE-2024-30255 https://github.com/envoyproxy/envoy/security/advisories/GHSA-j654-3ccm-vfmm.
 - area: outlier detection
   change: |
-    Fixed
-    :ref:`successful_active_health_check_uneject_host<envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`.
-    Before FAILED_ACTIVE_HC health flag was set, a failed health check as well could uneject the host.
+    Fixed :ref:`successful_active_health_check_uneject_host
+    <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`.
+    Before, a failed health check could uneject the host if the ``FAILED_ACTIVE_HC`` health flag had not been set.
 - area: prefix_matcher_tree
   change: |
     Fixed issue in matcher prefix tree lookup.
