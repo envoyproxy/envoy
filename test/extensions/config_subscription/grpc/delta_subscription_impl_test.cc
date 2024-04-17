@@ -177,7 +177,7 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
       xds_context, callbacks, resource_decoder, stats, Config::TypeUrl::get().ClusterLoadAssignment,
       dispatcher, std::chrono::milliseconds(12345), false, SubscriptionOptions());
 
-  EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*async_client, startRaw(_, _, _, _, _)).WillOnce(Return(nullptr));
 
   subscription->start({"name1"});
   subscription->updateResourceInterest({"name1", "name2"});

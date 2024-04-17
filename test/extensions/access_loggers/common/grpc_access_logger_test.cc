@@ -124,9 +124,10 @@ public:
   }
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _))
         .WillOnce(Invoke([&stream, callbacks_to_set](absl::string_view, absl::string_view,
                                                      Grpc::RawAsyncStreamCallbacks& callbacks,
+                                                     Tracing::Span&,
                                                      const Http::AsyncClient::StreamOptions&) {
           *callbacks_to_set = dynamic_cast<AccessLogCallbacks*>(&callbacks);
           return &stream;
@@ -249,10 +250,10 @@ TEST_F(StreamingGrpcAccessLogTest, WatermarksOverrun) {
 TEST_F(StreamingGrpcAccessLogTest, StreamFailure) {
   initLogger(FlushInterval, 0);
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _))
       .WillOnce(
           Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
-                    const Http::AsyncClient::StreamOptions& options) {
+                    Tracing::Span&, const Http::AsyncClient::StreamOptions& options) {
             EXPECT_FALSE(options.retry_policy.has_value());
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
             return nullptr;
@@ -269,10 +270,10 @@ TEST_F(StreamingGrpcAccessLogTest, StreamFailureAndRetry) {
       ->set_seconds(1);
   initLogger(FlushInterval, 1);
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-      .WillOnce(
-          Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks&,
-                    const Http::AsyncClient::StreamOptions& options) -> Grpc::RawAsyncStream* {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _))
+      .WillOnce(Invoke(
+          [](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks&, Tracing::Span&,
+             const Http::AsyncClient::StreamOptions& options) -> Grpc::RawAsyncStream* {
             EXPECT_TRUE(options.retry_policy.has_value());
             EXPECT_TRUE(options.retry_policy.value().has_num_retries());
             EXPECT_EQ(PROTOBUF_GET_WRAPPED_REQUIRED(options.retry_policy.value(), num_retries), 2);

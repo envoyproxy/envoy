@@ -38,9 +38,10 @@ public:
   }
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _))
         .WillOnce(Invoke([&stream, callbacks_to_set](absl::string_view, absl::string_view,
                                                      Grpc::RawAsyncStreamCallbacks& callbacks,
+                                                     Tracing::Span&,
                                                      const Http::AsyncClient::StreamOptions&) {
           *callbacks_to_set = dynamic_cast<MetricsServiceCallbacks*>(&callbacks);
           return &stream;
@@ -105,10 +106,10 @@ TEST_F(EnvoyMobileGrpcMetricsStreamerImplTest, WithResponse) {
 TEST_F(EnvoyMobileGrpcMetricsStreamerImplTest, StreamFailure) {
   InSequence s;
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _))
       .WillOnce(
           Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
-                    const Http::AsyncClient::StreamOptions&) {
+                    Tracing::Span&, const Http::AsyncClient::StreamOptions&) {
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
             return nullptr;
           }));

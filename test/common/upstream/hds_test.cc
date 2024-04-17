@@ -267,7 +267,7 @@ TEST_F(HdsTest, HealthCheckRequest) {
       envoy::service::health::v3::Capability::TCP);
 
   EXPECT_CALL(server_context_.local_info_, node()).WillOnce(ReturnRef(node_));
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(request), false));
   createHdsDelegate();
 }
@@ -275,7 +275,7 @@ TEST_F(HdsTest, HealthCheckRequest) {
 // Test if processMessage processes endpoints from a HealthCheckSpecifier
 // message correctly
 TEST_F(HdsTest, TestProcessMessageEndpoints) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -313,7 +313,7 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
 }
 
 TEST_F(HdsTest, TestHdsCluster) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -346,7 +346,7 @@ TEST_F(HdsTest, TestHdsCluster) {
 // Test if processMessage processes health checks from a HealthCheckSpecifier
 // message correctly
 TEST_F(HdsTest, TestProcessMessageHealthChecks) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -383,7 +383,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
 
 // Test if processMessage exits gracefully upon receiving a malformed message
 TEST_F(HdsTest, TestProcessMessageMissingFields) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -411,7 +411,7 @@ TEST_F(HdsTest, TestProcessMessageMissingFields) {
 // Test if processMessage exits gracefully upon receiving a malformed message
 // There was a previous valid config, so we go back to that.
 TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -469,7 +469,7 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
 
 // Test if processMessage exits gracefully if the update fails
 TEST_F(HdsTest, TestProcessMessageInvalidFieldsWithFallback) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -509,7 +509,7 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
   const uint32_t NumLocalities = 2;
   const uint32_t NumEndpoints = 2;
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -579,7 +579,7 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
 
 // Tests OnReceiveMessage given a minimal HealthCheckSpecifier message
 TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -595,7 +595,7 @@ TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
 // Test that a transport_socket_matches and transport_socket_match_criteria filter as expected to
 // build the correct TransportSocketFactory based on these fields.
 TEST_F(HdsTest, TestSocketContext) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -657,7 +657,7 @@ TEST_F(HdsTest, TestSocketContext) {
 
 // Tests OnReceiveMessage given a HealthCheckSpecifier message without interval field
 TEST_F(HdsTest, TestDefaultIntervalOnReceiveMessage) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -674,7 +674,7 @@ TEST_F(HdsTest, TestDefaultIntervalOnReceiveMessage) {
 // Tests that SendResponse responds to the server in a timely fashion
 // given a minimal HealthCheckSpecifier message
 TEST_F(HdsTest, TestMinimalSendResponse) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -691,7 +691,7 @@ TEST_F(HdsTest, TestMinimalSendResponse) {
 }
 
 TEST_F(HdsTest, TestStreamConnectionFailure) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _))
       .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr))
@@ -723,7 +723,7 @@ TEST_F(HdsTest, TestStreamConnectionFailure) {
 // a HealthCheckSpecifier message that contains a single endpoint
 // which times out
 TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -766,7 +766,7 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
 
 // Check to see if two of the same specifier does not get parsed twice in a row.
 TEST_F(HdsTest, TestSameSpecifier) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -801,7 +801,7 @@ TEST_F(HdsTest, TestSameSpecifier) {
 
 // Test to see that if a cluster is added or removed, the ones that did not change are reused.
 TEST_F(HdsTest, TestClusterChange) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -865,7 +865,7 @@ TEST_F(HdsTest, TestClusterChange) {
 
 // Edit one of two cluster's endpoints by adding and removing.
 TEST_F(HdsTest, TestUpdateEndpoints) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -933,7 +933,7 @@ TEST_F(HdsTest, TestUpdateEndpoints) {
 
 // Skip the endpoints with disabled active health check during message processing.
 TEST_F(HdsTest, TestUpdateEndpointsWithActiveHCflag) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -969,7 +969,7 @@ TEST_F(HdsTest, TestUpdateEndpointsWithActiveHCflag) {
 
 // Test adding, reusing, and removing health checks.
 TEST_F(HdsTest, TestUpdateHealthCheckers) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -1023,7 +1023,7 @@ TEST_F(HdsTest, TestUpdateHealthCheckers) {
 // Also test to see that if two clusters with the same non-empty name are used, only have
 // One cluster.
 TEST_F(HdsTest, TestClusterSameName) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -1088,7 +1088,7 @@ TEST_F(HdsTest, TestClusterSameName) {
 // Test that a transport_socket_matches and transport_socket_match_criteria filter fail when not
 // matching, and then after an update the same cluster is used but now matches.
 TEST_F(HdsTest, TestUpdateSocketContext) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -1197,7 +1197,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
 }
 
 TEST_F(HdsTest, TestCustomHealthCheckPortWhenCreate) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -1232,7 +1232,7 @@ TEST_F(HdsTest, TestCustomHealthCheckPortWhenCreate) {
 }
 
 TEST_F(HdsTest, TestCustomHealthCheckPortWhenUpdate) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 

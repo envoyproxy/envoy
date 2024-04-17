@@ -38,10 +38,10 @@ public:
   GrpcAccessLoggerImplTestHelper(LocalInfo::MockLocalInfo& local_info,
                                  Grpc::MockAsyncClient* async_client) {
     EXPECT_CALL(local_info, node());
-    EXPECT_CALL(*async_client, startRaw(_, _, _, _))
+    EXPECT_CALL(*async_client, startRaw(_, _, _, _, _))
         .WillOnce(
             Invoke([this](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& cbs,
-                          const Http::AsyncClient::StreamOptions&) {
+                          Tracing::Span&, const Http::AsyncClient::StreamOptions&) {
               this->callbacks_ = dynamic_cast<AccessLogCallbacks*>(&cbs);
               return &this->stream_;
             }));

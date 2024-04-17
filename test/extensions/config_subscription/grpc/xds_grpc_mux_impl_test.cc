@@ -153,7 +153,7 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
 
   auto foo_sub = makeWatch("type_url_foo", {"x", "y"});
   auto bar_sub = makeWatch("type_url_bar", {});
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("type_url_foo", {"x", "y"}, "", true);
   expectSendMessage("type_url_bar", {}, "");
   grpc_mux_->start();
@@ -181,7 +181,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   auto foo_sub = makeWatch("type_url_foo", {"x", "y"});
   auto bar_sub = makeWatch("type_url_bar", {});
   auto baz_sub = makeWatch("type_url_baz", {"z"});
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("type_url_foo", {"x", "y"}, "", true);
   expectSendMessage("type_url_bar", {}, "");
   expectSendMessage("type_url_baz", {"z"}, "");
@@ -200,7 +200,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   EXPECT_EQ(0, control_plane_connected_state_.value());
   EXPECT_EQ(0, control_plane_pending_requests_.value());
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("type_url_foo", {"z", "x", "y"}, "", true);
   expectSendMessage("type_url_bar", {}, "");
   expectSendMessage("type_url_baz", {"z"}, "");
@@ -221,7 +221,7 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
   auto foo = grpc_mux_->addWatch("type_url_foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   {
     ScopedResume a = grpc_mux_->pause("type_url_foo");
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
     grpc_mux_->start();
     expectSendMessage("type_url_foo", {"x", "y"}, "", true);
   }
@@ -254,7 +254,7 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   InSequence s;
   auto foo_sub = makeWatch("type_url_foo", {"x", "y"});
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("type_url_foo", {"x", "y"}, "", true);
   grpc_mux_->start();
 
@@ -294,7 +294,7 @@ TEST_F(GrpcMuxImplTest, RpcErrorMessageTruncated) {
   InSequence s;
   auto foo_sub = makeWatch("type_url_foo", {"x", "y"});
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("type_url_foo", {"x", "y"}, "", true);
   grpc_mux_->start();
 
@@ -363,7 +363,7 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
   auto* ttl_timer = new Event::MockTimer(&dispatcher_);
   auto eds_sub = makeWatch(type_url, {"x"}, callbacks_, resource_decoder);
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x"}, "", true);
   grpc_mux_->start();
 
@@ -491,7 +491,7 @@ TEST_F(GrpcMuxImplTest, LogsControlPlaneIndentifier) {
 
   std::string type_url = "foo";
   auto foo_sub = makeWatch(type_url, {}, callbacks_, resource_decoder_);
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {}, "", true);
   grpc_mux_->start();
 
@@ -525,7 +525,7 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
 
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   auto foo_sub = makeWatch(type_url, {}, callbacks_, resource_decoder_);
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {}, "", true);
   grpc_mux_->start();
 
@@ -562,7 +562,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   auto foo_sub = makeWatch(type_url, {"x", "y"}, foo_callbacks, resource_decoder_);
   NiceMock<MockSubscriptionCallbacks> bar_callbacks;
   auto bar_sub = makeWatch(type_url, {"y", "z"}, bar_callbacks, resource_decoder_);
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   // Should dedupe the "x" resource.
   expectSendMessage(type_url, {"y", "z", "x"}, "", true);
   grpc_mux_->start();
@@ -649,7 +649,7 @@ TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
   auto foo_sub = makeWatch(type_url, {"x", "y"}, foo_callbacks, resource_decoder_);
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x", "y"}, "", true);
   grpc_mux_->start();
 
@@ -671,7 +671,7 @@ TEST_F(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
   auto foo_sub = makeWatch(type_url, {}, foo_callbacks, resource_decoder_);
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {}, "", true);
   grpc_mux_->start();
 
@@ -708,7 +708,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
   setup();
 
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)).Times(AtLeast(99));
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
@@ -747,7 +747,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
 
   // Attempt to send 99 messages. One of them is rate limited (and we never drain).
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)).Times(99);
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
@@ -782,7 +782,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
   EXPECT_EQ(11, control_plane_pending_requests_.value());
   EXPECT_EQ(0, control_plane_connected_state_.value());
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   time_system_.setMonotonicTime(std::chrono::seconds(30));
   retry_timer->invokeCallback();
   EXPECT_EQ(0, control_plane_pending_requests_.value());
@@ -807,7 +807,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   setup(custom_rate_limit_settings);
 
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)).Times(AtLeast(260));
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
@@ -847,7 +847,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
 TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   setup();
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
 
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
 
@@ -886,7 +886,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
 // https://github.com/envoyproxy/envoy/pull/8350#discussion_r328218220 for discussion.
 TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsResources) {
   setup();
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   grpc_mux_->start();
 
@@ -970,7 +970,7 @@ TEST_F(GrpcMuxImplTest, ValidResourceDecoderAfterRemoval) {
             envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
     auto foo_sub = makeWatch(type_url, {"x"}, foo_callbacks, foo_decoder);
 
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
     expectSendMessage(type_url, {"x"}, "", true);
     grpc_mux_->start();
 
@@ -1041,7 +1041,7 @@ TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
   InSequence s;
   auto foo = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   auto bar = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "", true);
   expectSendMessage("bar", {}, "");
   grpc_mux_->start();
@@ -1110,7 +1110,7 @@ TEST_F(GrpcMuxImplTest, CacheEdsResource) {
   InSequence s;
   auto eds_sub = makeWatch(type_url, {"x"});
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x"}, "", true);
   grpc_mux_->start();
 
@@ -1152,7 +1152,7 @@ TEST_F(GrpcMuxImplTest, UpdateCacheEdsResource) {
   InSequence s;
   auto eds_sub = makeWatch(type_url, {"x"});
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x"}, "", true);
   grpc_mux_->start();
 
@@ -1201,7 +1201,7 @@ TEST_F(GrpcMuxImplTest, AddRemoveSubscriptions) {
   {
     auto eds_sub = makeWatch(type_url, {"x"});
 
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
     expectSendMessage(type_url, {"x"}, "", true);
     grpc_mux_->start();
 
