@@ -5,9 +5,6 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: tracing
-  change: |
-    Dynatrace resource detector no longer logs a warning when failing to read individual enrichment files.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
