@@ -1124,13 +1124,13 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
     return false;
   }
 
-  bool is_equal = std::equal(lhs.socket_options().begin(), lhs.socket_options().end(),
-                             rhs.socket_options().begin(), rhs.socket_options().end(),
-                             [](const ::envoy::config::core::v3::SocketOption& option,
-                                const ::envoy::config::core::v3::SocketOption& other_option) {
-                               Protobuf::util::MessageDifferencer differencer;
-                               return differencer.Compare(option, other_option);
-                             });
+  bool is_equal =
+      std::equal(lhs.socket_options().begin(), lhs.socket_options().end(),
+                 rhs.socket_options().begin(), rhs.socket_options().end(),
+                 [](const ::envoy::config::core::v3::SocketOption& option,
+                    const ::envoy::config::core::v3::SocketOption& other_option) {
+                   return Protobuf::util::MessageDifferencer::Equals(option, other_option);
+                 });
   if (!is_equal) {
     return false;
   }
@@ -1145,15 +1145,15 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
       return false;
     }
     if (lhs.additional_addresses(i).has_socket_options()) {
-      is_equal = std::equal(lhs.additional_addresses(i).socket_options().socket_options().begin(),
-                            lhs.additional_addresses(i).socket_options().socket_options().end(),
-                            rhs.additional_addresses(i).socket_options().socket_options().begin(),
-                            rhs.additional_addresses(i).socket_options().socket_options().end(),
-                            [](const ::envoy::config::core::v3::SocketOption& option,
-                               const ::envoy::config::core::v3::SocketOption& other_option) {
-                              Protobuf::util::MessageDifferencer differencer;
-                              return differencer.Compare(option, other_option);
-                            });
+      is_equal =
+          std::equal(lhs.additional_addresses(i).socket_options().socket_options().begin(),
+                     lhs.additional_addresses(i).socket_options().socket_options().end(),
+                     rhs.additional_addresses(i).socket_options().socket_options().begin(),
+                     rhs.additional_addresses(i).socket_options().socket_options().end(),
+                     [](const ::envoy::config::core::v3::SocketOption& option,
+                        const ::envoy::config::core::v3::SocketOption& other_option) {
+                       return Protobuf::util::MessageDifferencer::Equals(option, other_option);
+                     });
       if (!is_equal) {
         return false;
       }
@@ -1165,6 +1165,7 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
 
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
                                                 const envoy::config::listener::v3::Listener& rhs) {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   Protobuf::util::MessageDifferencer differencer;
   differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
   differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
@@ -1175,6 +1176,12 @@ bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v
   differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
       "filter_chain_matcher"));
   return differencer.Compare(lhs, rhs);
+#else
+  UNREFERENCED_PARAMETER(lhs);
+  UNREFERENCED_PARAMETER(rhs);
+  // Without message reflection, err on the side of reloads.
+  return false;
+#endif
 }
 
 } // namespace Server

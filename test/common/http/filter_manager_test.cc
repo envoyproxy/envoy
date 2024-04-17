@@ -17,6 +17,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_reply/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
@@ -35,7 +36,7 @@ public:
     filter_manager_ = std::make_unique<DownstreamFilterManager>(
         filter_manager_callbacks_, dispatcher_, connection_, 0, nullptr, true, 10000,
         filter_factory_, local_reply_, protocol_, time_source_, filter_state_,
-        StreamInfo::FilterState::LifeSpan::Connection);
+        StreamInfo::FilterState::LifeSpan::Connection, overload_manager_);
   }
 
   // Simple helper to wrapper filter to the factory function.
@@ -81,6 +82,7 @@ public:
   NiceMock<MockTimeSystem> time_source_;
   StreamInfo::FilterStateSharedPtr filter_state_ =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 };
 
 TEST_F(FilterManagerTest, RequestHeadersOrResponseHeadersAccess) {

@@ -209,6 +209,35 @@ TEST(SubstitutionFormatUtilsTest, protocolToStringOrDefault) {
   EXPECT_EQ("-", SubstitutionFormatUtils::protocolToStringOrDefault({}));
 }
 
+TEST(SubstitutionFormatUtilsTest, truncate) {
+  std::string str;
+
+  str = "abcd";
+  SubstitutionFormatUtils::truncate(str, {});
+  EXPECT_EQ("abcd", str);
+
+  str = "abcd";
+  SubstitutionFormatUtils::truncate(str, 0);
+  EXPECT_EQ("", str);
+
+  str = "abcd";
+  SubstitutionFormatUtils::truncate(str, 2);
+  EXPECT_EQ("ab", str);
+
+  str = "abcd";
+  SubstitutionFormatUtils::truncate(str, 100);
+  EXPECT_EQ("abcd", str);
+}
+
+TEST(SubstitutionFormatUtilsTest, truncateStringView) {
+  std::string str = "abcd";
+
+  EXPECT_EQ("abcd", SubstitutionFormatUtils::truncateStringView(str, {}));
+  EXPECT_EQ("", SubstitutionFormatUtils::truncateStringView(str, 0));
+  EXPECT_EQ("ab", SubstitutionFormatUtils::truncateStringView(str, 2));
+  EXPECT_EQ("abcd", SubstitutionFormatUtils::truncateStringView(str, 100));
+}
+
 TEST(SubstitutionFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
   StreamInfo::MockStreamInfo stream_info;
@@ -4362,9 +4391,9 @@ TEST(SubstitutionFormatParser, SyntaxVerifierFail) {
       };
 
   for (const auto& test_case : test_cases) {
-    EXPECT_THROW(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
-                                                    std::get<1>(test_case), std::get<2>(test_case)),
-                 EnvoyException);
+    EXPECT_FALSE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                    std::get<1>(test_case), std::get<2>(test_case))
+                     .ok());
   }
 }
 
@@ -4393,8 +4422,9 @@ TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
            absl::nullopt}};
 
   for (const auto& test_case : test_cases) {
-    EXPECT_NO_THROW(CommandSyntaxChecker::verifySyntax(
-        std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)));
+    EXPECT_TRUE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                   std::get<1>(test_case), std::get<2>(test_case))
+                    .ok());
   }
 }
 } // namespace

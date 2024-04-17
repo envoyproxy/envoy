@@ -10,7 +10,6 @@
 #include "library/common/bridge/utility.h"
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
-#include "library/common/http/headers.h"
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/system/system_helper.h"
 
@@ -532,7 +531,7 @@ void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks 
   ENVOY_LOG(debug, "[S{}] start stream", new_stream_handle);
 }
 
-void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream) {
+void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
@@ -552,18 +551,17 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   }
 
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-  RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
 
   // This is largely a check for the android platform: isCleartextPermitted
   // is a no-op for other platforms.
-  if (internal_headers->getSchemeValue() != "https" &&
-      !SystemHelper::getInstance().isCleartextPermitted(internal_headers->getHostValue())) {
+  if (headers->getSchemeValue() != "https" &&
+      !SystemHelper::getInstance().isCleartextPermitted(headers->getHostValue())) {
     request_decoder->sendLocalReply(Http::Code::BadRequest, "Cleartext is not permitted", nullptr,
                                     absl::nullopt, "");
     return;
   }
 
-  setDestinationCluster(*internal_headers);
+  setDestinationCluster(*headers);
   // Set the x-forwarded-proto header to https because Envoy Mobile only has clusters with TLS
   // enabled. This is done here because the ApiListener's synthetic connection would make the
   // Http::ConnectionManager set the scheme to http otherwise. In the future we might want to
@@ -577,10 +575,10 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   // router relies on the present of this header to determine if it should provided a route for
   // a request here:
   // https://github.com/envoyproxy/envoy/blob/c9e3b9d2c453c7fe56a0e3615f0c742ac0d5e768/source/common/router/config_impl.cc#L1091-L1096
-  internal_headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
+  headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
   ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
-            *internal_headers);
-  request_decoder->decodeHeaders(std::move(internal_headers), end_stream);
+            *headers);
+  request_decoder->decodeHeaders(std::move(headers), end_stream);
 }
 
 void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {
@@ -597,15 +595,10 @@ void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {
   }
 }
 
-void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
+void Client::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
-
-  // Take ownership of data early, in case of early returns.
-  // The buffer is moved internally, in a synchronous fashion, so we don't need the lifetime
-  // of the InstancePtr to outlive this function call.
-  Buffer::InstancePtr buf = Data::Utility::toInternalData(data);
 
   // If direct_stream is not found, it means the stream has already closed or been reset
   // and the appropriate callback has been issued to the caller. There's nothing to do here
@@ -624,9 +617,9 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
 
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
 
-  ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream, data.length,
-            end_stream);
-  request_decoder->decodeData(*buf, end_stream);
+  ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream,
+            buffer->length(), end_stream);
+  request_decoder->decodeData(*buffer, end_stream);
 
   if (direct_stream->explicit_flow_control_ && !end_stream) {
     if (direct_stream->read_disable_count_ == 0) {
@@ -649,7 +642,7 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
 
 void Client::sendMetadata(envoy_stream_t, envoy_headers) { PANIC("not implemented"); }
 
-void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
+void Client::sendTrailers(envoy_stream_t stream, RequestTrailerMapPtr trailers) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
@@ -668,9 +661,8 @@ void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
     return;
   }
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-  RequestTrailerMapPtr internal_trailers = Utility::toRequestTrailers(trailers);
-  ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *internal_trailers);
-  request_decoder->decodeTrailers(std::move(internal_trailers));
+  ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *trailers);
+  request_decoder->decodeTrailers(std::move(trailers));
 }
 
 void Client::cancelStream(envoy_stream_t stream) {

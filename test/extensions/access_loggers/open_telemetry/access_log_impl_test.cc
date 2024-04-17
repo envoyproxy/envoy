@@ -18,6 +18,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
@@ -42,6 +43,8 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace OpenTelemetry {
 namespace {
+
+using AccessLogType = envoy::data::accesslog::v3::AccessLogType;
 
 class MockGrpcAccessLogger : public GrpcAccessLogger {
 public:
@@ -159,6 +162,27 @@ TEST_F(AccessLogTest, EmptyConfig) {
       time_unix_nano: 3600000000000
     )EOF");
   access_log->log({&request_headers, &response_headers}, stream_info);
+}
+
+// Test log with trace id.
+TEST_F(AccessLogTest, TraceId) {
+  InSequence s;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.start_time_ = SystemTime(1h);
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  auto access_log = makeAccessLog({}, {});
+
+  NiceMock<Tracing::MockSpan> active_span;
+
+  EXPECT_CALL(active_span, getTraceIdAsHex()).WillOnce(Return("404142434445464748494a4b4c4d4e4f"));
+  expectLog(R"EOF(
+      trace_id: "QEFCQ0RFRkdISUpLTE1OTw=="
+      time_unix_nano: 3600000000000
+    )EOF");
+  access_log->log(
+      {&request_headers, &response_headers, nullptr, {}, AccessLogType::NotSet, &active_span},
+      stream_info);
 }
 
 } // namespace

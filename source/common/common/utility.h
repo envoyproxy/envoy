@@ -691,23 +691,20 @@ template <class Value> struct TrieLookupTable {
    * @param key the key used to find.
    * @return the value matching the longest prefix based on the key.
    */
-  Value findLongestPrefix(const char* key) const {
+  Value findLongestPrefix(absl::string_view key) const {
     const TrieEntry<Value>* current = &root_;
-    const TrieEntry<Value>* result = nullptr;
-    while (uint8_t c = *key) {
-      if (current->value_) {
-        result = current;
-      }
+    const TrieEntry<Value>* result = current;
 
-      // https://github.com/facebook/mcrouter/blob/master/mcrouter/lib/fbi/cpp/Trie-inl.h#L126-L143
+    for (uint8_t c : key) {
       current = current->entries_[c].get();
+
       if (current == nullptr) {
         return result ? result->value_ : nullptr;
+      } else if (current->value_) {
+        result = current;
       }
-
-      key++;
     }
-    return current ? current->value_ : result->value_;
+    return result ? result->value_ : nullptr;
   }
 
   TrieEntry<Value> root_;

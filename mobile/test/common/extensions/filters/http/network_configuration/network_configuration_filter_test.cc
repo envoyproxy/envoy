@@ -33,7 +33,7 @@ public:
   MOCK_METHOD(std::vector<Network::InterfacePair>, enumerateV6Interfaces, ());
   MOCK_METHOD(std::vector<Network::InterfacePair>, enumerateInterfaces,
               (unsigned short family, unsigned int select_flags, unsigned int reject_flags));
-  MOCK_METHOD(envoy_network_t, getPreferredNetwork, ());
+  MOCK_METHOD(NetworkType, getPreferredNetwork, ());
   MOCK_METHOD(envoy_socket_mode_t, getSocketMode, ());
   MOCK_METHOD(envoy_netconf_t, getConfigurationKey, ());
   MOCK_METHOD(Envoy::Network::ProxySettingsConstSharedPtr, getProxySettings, ());
@@ -44,7 +44,7 @@ public:
   MOCK_METHOD(void, refreshDns, (envoy_netconf_t configuration_key, bool drain_connections));
   MOCK_METHOD(void, resetConnectivityState, ());
   MOCK_METHOD(Network::Socket::OptionsSharedPtr, getUpstreamSocketOptions,
-              (envoy_network_t network, envoy_socket_mode_t socket_mode));
+              (NetworkType network, envoy_socket_mode_t socket_mode));
   MOCK_METHOD(envoy_netconf_t, addUpstreamSocketOptions,
               (Network::Socket::OptionsSharedPtr options));
 
