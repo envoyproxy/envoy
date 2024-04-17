@@ -62,9 +62,11 @@ public:
 private:
   using RepeatedHeaderValueOption =
       Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>;
-  void copyHeaderMutations(ResponsePtr& response, const RepeatedHeaderValueOption& headers,
-                           const RepeatedHeaderValueOption& response_headers_to_add = {},
-                           const Protobuf::RepeatedPtrField<std::string>& headers_to_remove = {});
+  void addHeaderMutationsViaMove(
+      ResponsePtr& response, RepeatedHeaderValueOption&& headers,
+      RepeatedHeaderValueOption&& response_headers_to_add = RepeatedHeaderValueOption{},
+      Protobuf::RepeatedPtrField<std::string>&& headers_to_remove =
+          Protobuf::RepeatedPtrField<std::string>{});
 
   Grpc::AsyncClient<envoy::service::auth::v3::CheckRequest, envoy::service::auth::v3::CheckResponse>
       async_client_;
