@@ -45,7 +45,7 @@ public class AndroidEngineFlowTest {
     CountDownLatch latch = new CountDownLatch(1);
     Context appContext = ApplicationProvider.getApplicationContext();
     engine = new AndroidEngineBuilder(appContext)
-                 .addLogLevel(LogLevel.DEBUG)
+                 .setLogLevel(LogLevel.DEBUG)
                  .setLogger((level, message) -> {
                    System.out.print(message);
                    return null;
