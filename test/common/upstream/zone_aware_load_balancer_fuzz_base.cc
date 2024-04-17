@@ -72,6 +72,8 @@ bool ZoneAwareLoadBalancerFuzzBase::validateSlowStart(
     uint32_t num_hosts) {
   if (slow_start_config.has_aggression()) {
     const auto& aggression = slow_start_config.aggression();
+    // If there are too many hosts, the call to the runtime mock will be too
+    // high, which will cause a timeout.
     if (num_hosts > 5000) {
       ENVOY_LOG_MISC(warn,
                      "Too many hosts ({} > 5000) with aggression will slow down the runtime loader "
@@ -79,11 +81,24 @@ bool ZoneAwareLoadBalancerFuzzBase::validateSlowStart(
                      num_hosts);
       return false;
     }
+    // If the aggression is too small, the weights will essentially be 0.
     if (aggression.default_value() < 1e-30) {
       ENVOY_LOG_MISC(
           warn,
           "Aggression value ({}) cannot be smaller than 1e-30, error in slow-start validation",
           aggression.default_value());
+      return false;
+    }
+    // Getting non-zero weights fo slow-start is not-easy, and requires the
+    // correct configuration of the aggression and time-out factors. The
+    // alternative is to set a minimal min_weight_percent config when aggression
+    // is used, that will ensure that not all of the weights are 0.
+    if (slow_start_config.has_min_weight_percent() &&
+        slow_start_config.min_weight_percent().value() < 0.1) {
+      ENVOY_LOG_MISC(warn,
+                     "When aggression is used the min_weight_percent needs to be at least 0.1, and "
+                     "is currently {}, skipping test",
+                     slow_start_config.min_weight_percent().value());
       return false;
     }
   }

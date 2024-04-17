@@ -75,8 +75,8 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
       fmt::runtime(error),
       (runtime_overridden ? "runtime overrides to continue using now fatal-by-default " : ""));
 
-  validation_visitor.onDeprecatedField("type " + message.GetTypeName() + " " + with_overridden,
-                                       warn_only);
+  THROW_IF_NOT_OK(validation_visitor.onDeprecatedField(
+      "type " + message.GetTypeName() + " " + with_overridden, warn_only));
 }
 
 } // namespace
@@ -274,7 +274,7 @@ public:
         absl::StrAppend(&error_msg, n > 0 ? ", " : "", unknown_fields.field(n).number());
       }
       if (!error_msg.empty()) {
-        validation_visitor_.onUnknownField(
+        THROW_IF_NOT_OK(validation_visitor_.onUnknownField(
             fmt::format("type {}({}) with unknown field set {{{}}}", message.GetTypeName(),
                         !parents.empty()
                             ? absl::StrJoin(parents, "::",
@@ -282,7 +282,7 @@ public:
                                               absl::StrAppend(out, m->GetTypeName());
                                             })
                             : "root",
-                        error_msg));
+                        error_msg)));
       }
     }
   }
@@ -301,7 +301,8 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
                                  ? &validation_visitor.runtime().value().get()
                                  : nullptr;
   UnexpectedFieldProtoVisitor unexpected_field_visitor(validation_visitor, runtime);
-  ProtobufMessage::traverseMessage(unexpected_field_visitor, message, recurse_into_any);
+  THROW_IF_NOT_OK(
+      ProtobufMessage::traverseMessage(unexpected_field_visitor, message, recurse_into_any));
 }
 
 namespace {
@@ -328,7 +329,7 @@ public:
 
 void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
   PgvCheckVisitor visitor;
-  ProtobufMessage::traverseMessage(visitor, message, true);
+  THROW_IF_NOT_OK(ProtobufMessage::traverseMessage(visitor, message, true));
 }
 
 void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Message& message) {

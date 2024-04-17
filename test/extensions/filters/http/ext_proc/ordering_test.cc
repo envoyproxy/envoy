@@ -72,7 +72,7 @@ protected:
       (*cb)(proto_config);
     }
     config_ = std::make_shared<FilterConfig>(
-        proto_config, kMessageTimeout, kMaxMessageTimeoutMs, *stats_store_.rootScope(), "",
+        proto_config, kMessageTimeout, kMaxMessageTimeoutMs, *stats_store_.rootScope(), "", false,
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
         factory_context_);

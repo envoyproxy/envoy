@@ -95,6 +95,9 @@ public:
     return Tracing::NullSpan::instance();
   }
 
+protected:
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+
 private:
   void streamError(Status::GrpcStatus grpc_status, const std::string& message);
   void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, EMPTY_STRING); }

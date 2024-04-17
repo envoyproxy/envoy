@@ -235,3 +235,18 @@ envoy_cc_test_library(
         "@envoy",
     ),
 )
+
+envoy_cc_test_library(
+    name = "engine_with_test_server",
+    srcs = [
+        "engine_with_test_server.cc",
+    ],
+    hdrs = [
+        "engine_with_test_server.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":test_server_lib",
+        "//library/cc:engine_builder_lib",
+    ],
+)

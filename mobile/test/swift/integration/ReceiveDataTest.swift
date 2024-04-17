@@ -18,7 +18,10 @@ final class ReceiveDataTests: XCTestCase {
       "x-response-foo", header_value: "aaa", response_body: directResponseBody)
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .build()
 
     let client = engine.streamClient()
