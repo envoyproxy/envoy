@@ -23,7 +23,7 @@ public class AndroidEngineStartUpTest {
   @Test
   public void ensure_engine_starts_and_terminates() throws InterruptedException {
     Engine engine = new AndroidEngineBuilder(appContext)
-                        .addLogLevel(LogLevel.DEBUG)
+                        .setLogLevel(LogLevel.DEBUG)
                         .setLogger((level, message) -> {
                           System.out.print(message);
                           return null;
