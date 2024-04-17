@@ -111,9 +111,6 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   // The router checks that the connection pool is non-null before creating the upstream request.
   auto upstream_host = conn_pool_->host();
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      parent_.callbacks()->streamInfo().upstreamClusterInfo();
-
   Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
   Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
                                             &upstream_host->cluster(),     // cluster_
@@ -136,6 +133,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
   stream_info_.setIsShadow(parent_.callbacks()->streamInfo().isShadow());
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
+    parent_.callbacks()->streamInfo().upstreamClusterInfo();
   if (cluster_info.has_value()) {
     stream_info_.setUpstreamClusterInfo(*cluster_info);
   }
