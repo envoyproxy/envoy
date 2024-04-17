@@ -541,17 +541,27 @@ public:
           ConfigHelper::setHttp2(
               *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
 
-          // Clusters for test gRPC servers, starting by copying an existing cluster
+          // Loading filter config from YAML for cluster_0.
+          prependServerFactoryContextFilter(downstream_filter, downstream);
+          // Clusters for test gRPC servers. The HTTP filters is not needed for these clusters.
           for (size_t i = 0; i < grpc_upstreams_.size(); ++i) {
             auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
-            server_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
             std::string cluster_name = absl::StrCat("test_server_", i);
             server_cluster->set_name(cluster_name);
             server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
+            auto* address = server_cluster->mutable_load_assignment()
+                                ->add_endpoints()
+                                ->add_lb_endpoints()
+                                ->mutable_endpoint()
+                                ->mutable_address()
+                                ->mutable_socket_address();
+            address->set_address(Network::Test::getLoopbackAddressString(ipVersion()));
+            envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
+            protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+            (*server_cluster->mutable_typed_extension_protocol_options())
+                ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                    .PackFrom(protocol_options);
           }
-          // Loading filter config from YAML.
-          prependServerFactoryContextFilter(downstream_filter, downstream);
-
           // Parameterize with defer processing to prevent bit rot as filter made
           // assumptions of data flow, prior relying on eager processing.
           config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
