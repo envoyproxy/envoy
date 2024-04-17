@@ -47,3 +47,4 @@ bazel test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
 
 # Additionally run macOS specific test suites
 bazel test "${BAZEL_BUILD_OPTIONS[@]}" //test/extensions/network/dns_resolver/apple:apple_dns_impl_test
+bazel test "${BAZEL_BUILD_OPTIONS[@]}" //test/common/network:listen_socket_impl_test
