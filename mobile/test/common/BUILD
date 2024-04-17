@@ -1,5 +1,4 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_mobile_package")
-load("@envoy//bazel:envoy_select.bzl", "envoy_select_enable_yaml")
 
 licenses(["notice"])  # Apache 2
 
@@ -18,10 +17,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "internal_engine_test",
-    srcs = envoy_select_enable_yaml(
-        ["internal_engine_test.cc"],
-        "@envoy",
-    ),
+    srcs = ["internal_engine_test.cc"],
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",
@@ -29,6 +25,7 @@ envoy_cc_test(
         "//library/common/data:utility_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
+        "//test/common/integration:test_server_lib",
         "//test/common/mocks/common:common_mocks",
         "//test/common/mocks/event:event_mocks",
         "@envoy//test/common/http:common_lib",
