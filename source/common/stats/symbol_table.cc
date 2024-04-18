@@ -636,12 +636,12 @@ void StatNamePool::clear() {
 }
 
 const uint8_t* StatNamePool::addReturningStorage(absl::string_view str) {
-  storage_vector_.push_back(Stats::StatNameStorage(str, symbol_table_));
+  storage_vector_.emplace_back(str, symbol_table_);
   return storage_vector_.back().bytes();
 }
 
 StatName StatNamePool::add(StatName name) {
-  storage_vector_.push_back(Stats::StatNameStorage(name, symbol_table_));
+  storage_vector_.emplace_back(name, symbol_table_);
   return storage_vector_.back().statName();
 }
 
