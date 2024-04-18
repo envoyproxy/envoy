@@ -11,6 +11,8 @@ import "envoy/type/matcher/v3/string.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -242,18 +244,26 @@ message ExternalProcessor {
   //
   bool observability_mode = 17;
 
-  oneof route_cache {
-    // Prevents clearing the route-cache when the
-    // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
-    // field is set in an external processor response.
-    bool disable_clear_route_cache = 11;
+  // Prevents clearing the route-cache when the
+  // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
+  // field is set in an external processor response.
+  // Only one of ``disable_clear_route_cache`` or
+  // :ref:`route_cache_action <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.route_cache_action>`
+  // can be set.
+  // This field is deprecated in favor of setting ``route_cache_action`` to RETAIN.
+  bool disable_clear_route_cache = 11 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (udpa.annotations.field_migrate).oneof_promotion = "clear_route_cache_type"
+  ];
 
-    // [#not-implemented-hide:]
-    // Specifies the action to be taken when an external processor response is
-    // received in response to request headers. It is recommended to set this field than set
-    // :ref:`disable_clear_route_cache <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
-    RouteCacheAction route_cache_action = 18;
-  }
+  // [#not-implemented-hide:]
+  // Specifies the action to be taken when an external processor response is
+  // received in response to request headers. It is recommended to set this field than set
+  // :ref:`disable_clear_route_cache <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`.
+  // Only one of ``disable_clear_route_cache`` or ``route_cache_action`` can be set.
+  RouteCacheAction route_cache_action = 18
+      [(udpa.annotations.field_migrate).oneof_promotion = "clear_route_cache_type"];
 }
 
 // The MetadataOptions structure defines options for the sending and receiving of
