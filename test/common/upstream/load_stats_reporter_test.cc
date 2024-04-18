@@ -95,16 +95,16 @@ public:
 
 // Validate that stream creation results in a timer based retry.
 TEST_F(LoadStatsReporterTest, StreamCreationFailure) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   createLoadStatsReporter();
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   retry_timer_cb_();
 }
 
 TEST_F(LoadStatsReporterTest, TestPubSub) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createLoadStatsReporter();
   deliverLoadStatsResponse({"foo"});
@@ -122,7 +122,7 @@ TEST_F(LoadStatsReporterTest, TestPubSub) {
 
 // Validate treatment of existing clusters across updates.
 TEST_F(LoadStatsReporterTest, ExistingClusters) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   // Initially, we have no clusters to report on.
   expectSendMessage({});
   createLoadStatsReporter();
@@ -276,7 +276,7 @@ void addStatExpectation(envoy::config::endpoint::v3::UpstreamLocalityStats* stat
 
 // Validate that per-locality metrics are aggregated across hosts and included in the load report.
 TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
   time_system_.setMonotonicTime(std::chrono::microseconds(3));
@@ -360,13 +360,13 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
 
 // Validate that the client can recover from a remote stream closure via retry.
 TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
   EXPECT_CALL(*response_timer_, disableTimer());
   EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   load_stats_reporter_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   retry_timer_cb_();
 }

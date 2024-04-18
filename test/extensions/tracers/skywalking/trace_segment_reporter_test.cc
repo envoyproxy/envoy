@@ -40,7 +40,8 @@ public:
 
     EXPECT_CALL(*mock_client_factory, createUncachedRawAsyncClient())
         .WillOnce(Return(ByMove(std::move(mock_client))));
-    EXPECT_CALL(*mock_client_ptr_, startRaw(_, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
+    EXPECT_CALL(*mock_client_ptr_, startRaw(_, _, _, _, _))
+        .WillOnce(Return(mock_stream_ptr_.get()));
 
     auto& local_info = context_.server_factory_context_.local_info_;
 
@@ -170,7 +171,7 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithDefaultCache) {
 
   // Simulate the situation where the connection is re-established. The remaining segments in the
   // cache will be reported.
-  EXPECT_CALL(*mock_client_ptr_, startRaw(_, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
+  EXPECT_CALL(*mock_client_ptr_, startRaw(_, _, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
   timer_cb_();
 
   EXPECT_EQ(1025U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
@@ -220,7 +221,7 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithCacheConfig) {
 
   // Simulate the situation where the connection is re-established. The remaining segments in the
   // cache will be reported.
-  EXPECT_CALL(*mock_client_ptr_, startRaw(_, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
+  EXPECT_CALL(*mock_client_ptr_, startRaw(_, _, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
   timer_cb_();
 
   EXPECT_EQ(4U, mock_scope_.counter("tracing.skywalking.segments_sent").value());

@@ -34,7 +34,7 @@ public:
                         Tracing::Span& parent_span,
                         const Http::AsyncClient::RequestOptions& options) override;
   RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
-                           RawAsyncStreamCallbacks& callbacks,
+                           RawAsyncStreamCallbacks& callbacks, Tracing::Span& parent_span,
                            const Http::AsyncClient::StreamOptions& options) override;
   absl::string_view destination() override { return remote_cluster_name_; }
 
@@ -65,7 +65,7 @@ class AsyncStreamImpl : public RawAsyncStream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                   absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
-                  const Http::AsyncClient::StreamOptions& options);
+                  Tracing::Span& parent_span, const Http::AsyncClient::StreamOptions& options);
 
   virtual void initialize(bool buffer_body_for_retry);
 
@@ -85,10 +85,12 @@ public:
   }
 
   bool hasResetStream() const { return http_reset_; }
+
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_->streamInfo(); }
 
 protected:
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  Tracing::SpanPtr current_span_;
 
 private:
   void streamError(Status::GrpcStatus grpc_status, const std::string& message);
@@ -98,11 +100,15 @@ private:
   void trailerResponse(absl::optional<Status::GrpcStatus> grpc_status,
                        const std::string& grpc_message);
 
+  // Deliver notification and update span when the connection closes.
+  void notifyRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message);
+
   Event::Dispatcher* dispatcher_{};
   Http::RequestMessagePtr headers_message_;
   AsyncClientImpl& parent_;
   std::string service_full_name_;
   std::string method_name_;
+
   RawAsyncStreamCallbacks& callbacks_;
   Http::AsyncClient::StreamOptions options_;
   bool http_reset_{};
@@ -136,7 +142,6 @@ private:
 
   Buffer::InstancePtr request_;
   RawAsyncRequestCallbacks& callbacks_;
-  Tracing::SpanPtr current_span_;
   Buffer::InstancePtr response_;
 };
 

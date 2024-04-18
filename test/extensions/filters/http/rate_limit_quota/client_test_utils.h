@@ -72,14 +72,14 @@ public:
   Grpc::RawAsyncClientSharedPtr mockCreateAsyncClient(Unused, Unused, Unused) {
     auto async_client = std::make_shared<Grpc::MockAsyncClient>();
     EXPECT_CALL(*async_client, startRaw("envoy.service.rate_limit_quota.v3.RateLimitQuotaService",
-                                        "StreamRateLimitQuotas", _, _))
+                                        "StreamRateLimitQuotas", _, _, _))
         .WillOnce(Invoke(this, &RateLimitTestClient::mockStartRaw));
 
     return async_client;
   }
 
   Grpc::RawAsyncStream* mockStartRaw(Unused, Unused, Grpc::RawAsyncStreamCallbacks& callbacks,
-                                     const Http::AsyncClient::StreamOptions&) {
+                                     Tracing::Span&, const Http::AsyncClient::StreamOptions&) {
     if (start_failed_) {
       return nullptr;
     }

@@ -61,8 +61,8 @@ public:
 
     // If we don't have a Grpc AsyncStream, we need to initialize it.
     if (stream_->stream_ == nullptr) {
-      stream_->stream_ =
-          client_->start(service_method_, *stream_, Http::AsyncClient::StreamOptions());
+      stream_->stream_ = client_->start(service_method_, *stream_, Tracing::NullSpan::instance(),
+                                        Http::AsyncClient::StreamOptions());
     }
 
     // If we do have a Grpc AsyncStream, we can first check if we are above the write buffer, and

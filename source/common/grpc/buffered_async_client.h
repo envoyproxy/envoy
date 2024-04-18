@@ -51,8 +51,8 @@ public:
 
   absl::flat_hash_set<uint64_t> sendBufferedMessages() {
     if (active_stream_ == nullptr) {
-      active_stream_ =
-          client_.start(service_method_, callbacks_, Http::AsyncClient::StreamOptions());
+      active_stream_ = client_.start(service_method_, callbacks_, Tracing::NullSpan::instance(),
+                                     Http::AsyncClient::StreamOptions());
     }
 
     if (active_stream_->isAboveWriteBufferHighWatermark()) {

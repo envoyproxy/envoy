@@ -466,7 +466,8 @@ public:
     envoy::config::core::v3::Metadata m;
     (*m.mutable_filter_metadata())["com.foo.bar"] = {};
     options.setMetadata(m);
-    stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream, options);
+    stream->grpc_stream_ =
+        grpc_client_->start(*method_descriptor_, *stream, Tracing::NullSpan::instance(), options);
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
     if (!fake_connection_) {

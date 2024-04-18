@@ -72,7 +72,7 @@ public:
         xds_context_, callbacks_, resource_decoder_, stats_,
         Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_, init_fetch_timeout, false,
         SubscriptionOptions());
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   }
 
   void doSubscriptionTearDown() override {

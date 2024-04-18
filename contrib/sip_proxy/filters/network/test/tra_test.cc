@@ -61,7 +61,7 @@ public:
         .WillRepeatedly(Return(async_client->async_request_.get()));
 
     async_stream_ = std::make_unique<testing::NiceMock<Grpc::MockAsyncStream>>();
-    EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillRepeatedly(Return(async_stream_.get()));
+    EXPECT_CALL(*async_client, startRaw(_, _, _, _, _)).WillRepeatedly(Return(async_stream_.get()));
 
     auto grpc_client = std::make_unique<TrafficRoutingAssistant::GrpcClientImpl>(
         async_client, dispatcher_, std::chrono::milliseconds(2000));
@@ -338,10 +338,10 @@ TEST_F(SipTraTest, Misc) {
       }));
 
   async_stream_ = std::make_unique<testing::NiceMock<Grpc::MockAsyncStream>>();
-  EXPECT_CALL(*async_client, startRaw(_, _, _, _))
+  EXPECT_CALL(*async_client, startRaw(_, _, _, _, _))
       .WillRepeatedly(
           Invoke([&](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
-                     const Http::AsyncClient::StreamOptions&) {
+                     Tracing::Span&, const Http::AsyncClient::StreamOptions&) {
             stream_cb = &callbacks;
             return async_stream_.get();
           }));

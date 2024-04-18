@@ -29,10 +29,10 @@ ProtobufTypes::MessagePtr parseMessageUntyped(ProtobufTypes::MessagePtr&& messag
 
 RawAsyncStream* startUntyped(RawAsyncClient* client,
                              const Protobuf::MethodDescriptor& service_method,
-                             RawAsyncStreamCallbacks& callbacks,
+                             RawAsyncStreamCallbacks& callbacks, Tracing::Span& parent_span,
                              const Http::AsyncClient::StreamOptions& options) {
   return client->startRaw(service_method.service()->full_name(), service_method.name(), callbacks,
-                          options);
+                          parent_span, options);
 }
 
 AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescriptor& service_method,

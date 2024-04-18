@@ -31,7 +31,8 @@ void LoadStatsReporter::setRetryTimer() {
 
 void LoadStatsReporter::establishNewStream() {
   ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
-  stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
+  stream_ = async_client_->start(service_method_, *this, Tracing::NullSpan::instance(),
+                                 Http::AsyncClient::StreamOptions());
   if (stream_ == nullptr) {
     ENVOY_LOG(warn, "Unable to establish new stream");
     handleFailure();

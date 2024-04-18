@@ -144,14 +144,15 @@ void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
   closeStream();
 }
 
-absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {
+absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info,
+                                              Tracing::Span& parent_span) {
   // Starts stream if it has not been opened yet.
   if (stream_ == nullptr) {
     ENVOY_LOG(debug, "Trying to start the new gRPC stream");
     stream_ = aync_client_.start(
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.rate_limit_quota.v3.RateLimitQuotaService.StreamRateLimitQuotas"),
-        *this,
+        *this, parent_span,
         Http::AsyncClient::RequestOptions().setParentContext(
             Http::AsyncClient::ParentContext{&stream_info}));
   }

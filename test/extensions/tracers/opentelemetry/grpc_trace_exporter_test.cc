@@ -29,10 +29,10 @@ public:
   }
 
   void expectTraceExportStart() {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _))
         .WillOnce(
             Invoke([this](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& cbs,
-                          const Http::AsyncClient::StreamOptions&) {
+                          Tracing::Span&, const Http::AsyncClient::StreamOptions&) {
               this->callbacks_ = dynamic_cast<TraceCallbacks*>(&cbs);
               return &this->conn_;
             }));

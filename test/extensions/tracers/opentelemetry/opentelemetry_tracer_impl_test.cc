@@ -44,7 +44,7 @@ public:
     auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
     auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
     mock_stream_ptr_ = std::make_unique<NiceMock<Grpc::MockAsyncStream>>();
-    ON_CALL(*mock_client, startRaw(_, _, _, _)).WillByDefault(Return(mock_stream_ptr_.get()));
+    ON_CALL(*mock_client, startRaw(_, _, _, _, _)).WillByDefault(Return(mock_stream_ptr_.get()));
     ON_CALL(*mock_client_factory, createUncachedRawAsyncClient())
         .WillByDefault(Return(ByMove(std::move(mock_client))));
     auto& factory_context = context_.server_factory_context_;

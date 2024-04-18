@@ -1059,8 +1059,9 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   options.setHashPolicy(hash_policy);
   options.setSendXff(false);
 
-  auto grpc_stream = grpc_client->startRaw(toAbslStringView(service_name),
-                                           toAbslStringView(method_name), handler, options);
+  auto grpc_stream =
+      grpc_client->startRaw(toAbslStringView(service_name), toAbslStringView(method_name), handler,
+                            Tracing::NullSpan::instance(), options);
   if (!grpc_stream) {
     grpc_stream_.erase(token);
     return WasmResult::InternalFailure;

@@ -186,7 +186,7 @@ public:
                         Tracing::Span& parent_span,
                         const Http::AsyncClient::RequestOptions& options) override;
   RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
-                           RawAsyncStreamCallbacks& callbacks,
+                           RawAsyncStreamCallbacks& callbacks, Tracing::Span& parent_span,
                            const Http::AsyncClient::StreamOptions& options) override;
   absl::string_view destination() override { return target_uri_; }
 
@@ -220,6 +220,7 @@ class GoogleAsyncStreamImpl : public RawAsyncStream,
 public:
   GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
                         absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
+                        Tracing::Span& parent_span,
                         const Http::AsyncClient::StreamOptions& options);
   ~GoogleAsyncStreamImpl() override;
 
@@ -239,6 +240,7 @@ public:
 
 protected:
   bool callFailed() const { return call_failed_; }
+  Tracing::SpanPtr current_span_;
 
 private:
   // Process queued events in completed_ops_ with handleOpCompletion() on
@@ -351,7 +353,6 @@ private:
 
   Buffer::InstancePtr request_;
   RawAsyncRequestCallbacks& callbacks_;
-  Tracing::SpanPtr current_span_;
   Buffer::InstancePtr response_;
 };
 

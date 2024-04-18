@@ -79,14 +79,14 @@ TEST_F(GrpcStreamTest, EstablishStream) {
   EXPECT_FALSE(grpc_stream_->grpcStreamAvailable());
   // Successful establishment
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
     EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_->establishNewStream();
     EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
   }
   // Idempotent
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).Times(0);
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).Times(0);
     EXPECT_CALL(callbacks_, onStreamEstablished()).Times(0);
     grpc_stream_->establishNewStream();
     EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
@@ -96,7 +96,7 @@ TEST_F(GrpcStreamTest, EstablishStream) {
 
   // Successful re-establishment
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
     EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_->establishNewStream();
     EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
@@ -199,7 +199,7 @@ TEST_F(GrpcStreamTest, LogClose) {
 
   // Successfully receiving a message clears close status.
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
     EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_->establishNewStream();
     EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
@@ -216,7 +216,7 @@ TEST_F(GrpcStreamTest, LogClose) {
 // A failure in the underlying gRPC machinery should result in grpcStreamAvailable() false. Calling
 // sendMessage would segfault.
 TEST_F(GrpcStreamTest, FailToEstablishNewStream) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks_, onEstablishmentFailure());
   grpc_stream_->establishNewStream();
   EXPECT_FALSE(grpc_stream_->grpcStreamAvailable());
@@ -225,7 +225,7 @@ TEST_F(GrpcStreamTest, FailToEstablishNewStream) {
 // Checks that sendMessage correctly passes a DiscoveryRequest down to the underlying gRPC
 // machinery.
 TEST_F(GrpcStreamTest, SendMessage) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_stream_->establishNewStream();
   envoy::service::discovery::v3::DiscoveryRequest request;
   request.set_response_nonce("grpc_stream_test_noncense");
@@ -290,7 +290,7 @@ TEST_F(GrpcStreamTest, RetryOnEstablishNewStreamFailure) {
 
   // simulate that first call to establish GRPC stream fails
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(nullptr));
     EXPECT_CALL(callbacks_, onEstablishmentFailure());
     // First backoff interval should be 27%25=2
     EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(std::chrono::milliseconds(2), _));
@@ -300,7 +300,7 @@ TEST_F(GrpcStreamTest, RetryOnEstablishNewStreamFailure) {
 
   // assume 2ms have passed, invoke callback, fail 2nd time
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(nullptr));
     EXPECT_CALL(callbacks_, onEstablishmentFailure());
     // Second backoff interval will be 27%30=27
     EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(std::chrono::milliseconds(27), _));
@@ -311,7 +311,7 @@ TEST_F(GrpcStreamTest, RetryOnEstablishNewStreamFailure) {
   // assume 27ms have passed, invoke callback, Successful establishment after the third
   // retry
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
     EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_retry_timer_cb();
     EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
@@ -335,7 +335,7 @@ TEST_F(GrpcStreamTest, RetryOnRemoteClose) {
 
   // successful establishment
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
     EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_->establishNewStream();
     EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
@@ -350,7 +350,7 @@ TEST_F(GrpcStreamTest, RetryOnRemoteClose) {
 
   // assume 2ms have passed, invoke callback, fail the first time
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(nullptr));
     EXPECT_CALL(callbacks_, onEstablishmentFailure());
     // Second backoff interval will be 27%30=27
     EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(std::chrono::milliseconds(27), _));
@@ -360,7 +360,7 @@ TEST_F(GrpcStreamTest, RetryOnRemoteClose) {
 
   // assume 27ms have passed, invoke callback, fail the second time
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(nullptr));
     EXPECT_CALL(callbacks_, onEstablishmentFailure());
     // First backoff interval will be 27%30=27
     EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(std::chrono::milliseconds(27), _));
@@ -370,7 +370,7 @@ TEST_F(GrpcStreamTest, RetryOnRemoteClose) {
 
   // assume 27ms have passed, Successful establishment after the third retry
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
     EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_retry_timer_cb();
     EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());

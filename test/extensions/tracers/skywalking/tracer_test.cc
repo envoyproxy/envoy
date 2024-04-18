@@ -36,7 +36,7 @@ public:
 
     mock_stream_ptr_ = std::make_unique<NiceMock<Grpc::MockAsyncStream>>();
 
-    EXPECT_CALL(*mock_client, startRaw(_, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
+    EXPECT_CALL(*mock_client, startRaw(_, _, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
     EXPECT_CALL(*mock_client_factory, createUncachedRawAsyncClient())
         .WillOnce(Return(ByMove(std::move(mock_client))));
 
