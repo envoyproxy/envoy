@@ -26,13 +26,11 @@ namespace {
 
 constexpr absl::string_view NotReadyReason{"TLS error: Secret is not supplied by SDS"};
 
-// This SslSocket will be used when SSL secret is not fetched from SDS server.
-class NotReadySslSocket : public Network::TransportSocket {
+class InvalidSslSocket : public Network::TransportSocket {
 public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
   std::string protocol() const override { return EMPTY_STRING; }
-  absl::string_view failureReason() const override { return NotReadyReason; }
   bool canFlushClose() override { return true; }
   void closeSocket(Network::ConnectionEvent) override {}
   Network::IoResult doRead(Buffer::Instance&) override { return {PostIoAction::Close, 0, false}; }
@@ -45,21 +43,62 @@ public:
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
 };
 
+// This SslSocket will be used when SSL secret is not fetched from SDS server.
+class NotReadySslSocket : public InvalidSslSocket {
+public:
+  // Network::TransportSocket
+  absl::string_view failureReason() const override { return NotReadyReason; }
+};
+
+class ErrorSslSocket : public InvalidSslSocket {
+public:
+  ErrorSslSocket(absl::string_view error) : error_(error) {}
+
+  // Network::TransportSocket
+  absl::string_view failureReason() const override { return error_; }
+
+private:
+  std::string error_;
+};
+
 } // namespace
 
-SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-                     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                     Ssl::HandshakerFactoryCb handshaker_factory_cb)
+absl::StatusOr<std::unique_ptr<SslSocket>>
+SslSocket::create(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
+                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+                  Ssl::HandshakerFactoryCb handshaker_factory_cb) {
+  std::unique_ptr<SslSocket> socket(new SslSocket(ctx, transport_socket_options));
+  auto status = socket->initialize(state, handshaker_factory_cb);
+  if (status.ok()) {
+    return socket;
+  } else {
+    return status;
+  }
+}
+
+SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx,
+                     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options)
     : transport_socket_options_(transport_socket_options),
-      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
-      info_(std::dynamic_pointer_cast<SslHandshakerImpl>(handshaker_factory_cb(
-          ctx_->newSsl(transport_socket_options_), ctx_->sslExtendedSocketInfoIndex(), this))) {
+      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)) {}
+
+absl::Status SslSocket::initialize(InitialState state,
+                                   Ssl::HandshakerFactoryCb handshaker_factory_cb) {
+  auto status_or_ssl = ctx_->newSsl(transport_socket_options_);
+  if (!status_or_ssl.ok()) {
+    return status_or_ssl.status();
+  }
+
+  info_ = std::dynamic_pointer_cast<SslHandshakerImpl>(handshaker_factory_cb(
+      std::move(status_or_ssl.value()), ctx_->sslExtendedSocketInfoIndex(), this));
+
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
   } else {
     ASSERT(state == InitialState::Server);
     SSL_set_accept_state(rawSsl());
   }
+
+  return absl::OkStatus();
 }
 
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
@@ -401,8 +440,13 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Client,
-                                       transport_socket_options, config_->createHandshaker());
+    auto status_or_socket =
+        SslSocket::create(std::move(ssl_ctx), InitialState::Client, transport_socket_options,
+                          config_->createHandshaker());
+    if (status_or_socket.ok()) {
+      return std::move(status_or_socket.value());
+    }
+    return std::make_unique<ErrorSslSocket>(status_or_socket.status().message());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();
@@ -450,8 +494,12 @@ Network::TransportSocketPtr ServerSslSocketFactory::createDownstreamTransportSoc
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr,
-                                       config_->createHandshaker());
+    auto status_or_socket = SslSocket::create(std::move(ssl_ctx), InitialState::Server, nullptr,
+                                              config_->createHandshaker());
+    if (status_or_socket.ok()) {
+      return std::move(status_or_socket.value());
+    }
+    return std::make_unique<ErrorSslSocket>(status_or_socket.status().message());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();
