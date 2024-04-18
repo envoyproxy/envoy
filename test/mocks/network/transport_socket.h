@@ -10,7 +10,9 @@
 #include "source/common/network/listen_socket_impl.h"
 
 #include "gmock/gmock.h"
+#ifdef ENVOY_ENABLE_QUIC
 #include "quiche/quic/core/crypto/quic_crypto_client_config.h"
+#endif
 
 namespace Envoy {
 namespace Network {
@@ -47,7 +49,9 @@ public:
   MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
   MOCK_METHOD(Envoy::Ssl::ClientContextSharedPtr, sslCtx, ());
   MOCK_METHOD(OptRef<const Ssl::ClientContextConfig>, clientContextConfig, (), (const));
+#ifdef ENVOY_ENABLE_QUIC
   MOCK_METHOD(std::shared_ptr<quic::QuicCryptoClientConfig>, getCryptoConfig, ());
+#endif
 
   MOCK_METHOD(TransportSocketPtr, createTransportSocket,
               (TransportSocketOptionsConstSharedPtr,
