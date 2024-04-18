@@ -640,6 +640,11 @@ const uint8_t* StatNamePool::addReturningStorage(absl::string_view str) {
   return storage_vector_.back().bytes();
 }
 
+StatName StatNamePool::add(StatName name) {
+  storage_vector_.push_back(Stats::StatNameStorage(name, symbol_table_));
+  return storage_vector_.back().statName();
+}
+
 StatName StatNamePool::add(absl::string_view str) { return StatName(addReturningStorage(str)); }
 
 StatName StatNameDynamicPool::add(absl::string_view str) {
