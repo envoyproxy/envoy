@@ -95,8 +95,7 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
   }
 
   if (dns_resolver_options_.has_udp_max_queries()) {
-    options.optmask_ |= ARES_OPT_FLAGS;
-    options.options_.flags |= ARES_OPT_UDP_MAX_QUERIES;
+    options.optmask_ |= ARES_OPT_UDP_MAX_QUERIES;
     options.options_.udp_max_queries = dns_resolver_options_.udp_max_queries().value();
   }
 

@@ -2113,7 +2113,8 @@ TEST_P(DnsImplAresFlagsForMaxUdpQueriesinTest, UdpMaxQueriesIsSet) {
   ares_options opts{};
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
-  EXPECT_TRUE((opts.flags & ARES_OPT_UDP_MAX_QUERIES) == ARES_OPT_UDP_MAX_QUERIES);
+  EXPECT_TRUE((optmask & ARES_OPT_UDP_MAX_QUERIES) == ARES_OPT_UDP_MAX_QUERIES);
+  EXPECT_TRUE(opts.udp_max_queries == 100);
   EXPECT_NE(nullptr,
             resolveWithUnreferencedParameters("root.cname.domain", DnsLookupFamily::Auto, true));
   ares_destroy_options(&opts);
