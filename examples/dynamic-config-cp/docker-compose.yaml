@@ -1,0 +1,31 @@
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+    depends_on:
+    - service1
+    - service2
+    ports:
+    - 10000:10000
+    - 19000:19000
+
+  service1:
+    build:
+      context: ../shared/echo
+    hostname: service1
+
+  service2:
+    build:
+      context: ../shared/echo
+    hostname: service2
+
+  go-control-plane:
+    build:
+      context: .
+      dockerfile: ../shared/golang/Dockerfile
+      target: golang-control-plane
+    command: /usr/local/bin/example
+    healthcheck:
+      test: nc -zv localhost 18000

@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package envoy.v2;
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+enum SomeEnum {
+  DEFAULT = 0 [deprecated = true];
+  FOO = 1;
+  BAR = 2 [deprecated = true];
+  BAZ = 3 [(udpa.annotations.enum_value_migrate).rename = "WOW"];
+  OLD = 4 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.6"];
+  DEP = 5 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.7"];
+  VERY_OLD = 6 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.5"];
+}
+
+message Sample {
+  message Entry {
+    string key = 1;
+    string value = 2;
+  }
+  enum DeprecateEnum {
+    option deprecated = true;
+    FIRST = 0;
+    SECOND = 1;
+  }
+  repeated Entry entries = 1;
+  string will_deprecated = 2 [deprecated = true];
+  string will_rename_compoent = 3 [(udpa.annotations.field_migrate).rename = "renamed_component"];
+  string old_deprecated = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.6"];
+  string new_deprecated = 5
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.7"];
+  string very_old_deprecated = 6
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.5"];
+}

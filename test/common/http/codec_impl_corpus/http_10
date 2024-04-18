@@ -1,0 +1,105 @@
+h1_settings {
+  server {
+    accept_http_10: true
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "cookie"
+        value: "foo=bar"
+      }
+      headers {
+        key: "cookie"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  mutate {
+    offset: 13
+    value: 48
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      data: 54
+    }
+  }
+}
+actions { quiesce_drain {} }
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      data: 54
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    response {
+      headers {
+        headers {
+          key: ":status"
+          value: "200"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    response {
+      data: 5
+      end_stream: true
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      trailers {
+        headers {
+          key: "foo"
+          value: "bar"
+        }
+      }
+    }
+  }
+}

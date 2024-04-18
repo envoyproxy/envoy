@@ -1,0 +1,16 @@
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
+    depends_on:
+    - web_service
+    ports:
+    - "8000:8000"
+
+  web_service:
+    environment:
+    - PORT=9000
+    build:
+      context: ../shared/echo

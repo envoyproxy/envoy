@@ -1,0 +1,16 @@
+diff -u -r a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt	2020-11-23 08:59:08.000000000 -0600
++++ b/CMakeLists.txt	2021-01-15 17:15:43.665745800 -0600
+@@ -271,7 +271,11 @@
+ if(SIZEOF_SSIZE_T STREQUAL "")
+   # ssize_t is a signed type in POSIX storing at least -1.
+   # Set it to "int" to match the behavior of AC_TYPE_SSIZE_T (autotools).
+-  set(ssize_t int)
++  if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
++    set(ssize_t ptrdiff_t)
++  else()
++    set(ssize_t int)
++  endif()
+ endif()
+ # AC_TYPE_UINT8_T
+ # AC_TYPE_UINT16_T

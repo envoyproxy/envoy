@@ -1,0 +1,31 @@
+format: "{{%PROTOCOL%}}   %RESP(not exist)%++%RESP(test)% %REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)%\t@%TRAILER(THIRD)%@\t%TRAILER(TEST?TEST-2)%[]"
+request_headers {
+  headers {
+    key: "first"
+    value: "GET"
+  }
+  headers {
+    key: ":path"
+    value: "/"
+  }
+}
+response_headers {
+  headers {
+    key: "second"
+    value: "PUT"
+  }
+  headers {
+    key: "test"
+    value: "test"
+  }
+}
+response_trailers {
+  headers {
+    key: "third"
+    value: "POST"
+  }
+  headers {
+    key: "test-2"
+    value: "test-2"
+  }
+}

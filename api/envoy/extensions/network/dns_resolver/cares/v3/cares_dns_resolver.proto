@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package envoy.extensions.network.dns_resolver.cares.v3;
+
+import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/resolver.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.network.dns_resolver.cares.v3";
+option java_outer_classname = "CaresDnsResolverProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/network/dns_resolver/cares/v3;caresv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: c-ares DNS resolver]
+// [#extension: envoy.network.dns_resolver.cares]
+
+// Configuration for c-ares DNS resolver.
+message CaresDnsResolverConfig {
+  // A list of dns resolver addresses.
+  // :ref:`use_resolvers_as_fallback<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.use_resolvers_as_fallback>`
+  // below dictates if the DNS client should override system defaults or only use the provided
+  // resolvers if the system defaults are not available, i.e., as a fallback.
+  repeated config.core.v3.Address resolvers = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // If true use the resolvers listed in the
+  // :ref:`resolvers<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.resolvers>`
+  // field only if c-ares is unable to obtain a
+  // nameserver from the system (e.g., /etc/resolv.conf).
+  // Otherwise, the resolvers listed in the resolvers list will override the default system
+  // resolvers. Defaults to false.
+  bool use_resolvers_as_fallback = 3;
+
+  // The resolver will query available network interfaces and determine if there are no available
+  // interfaces for a given IP family. It will then filter these addresses from the results it
+  // presents. e.g., if there are no available IPv4 network interfaces, the resolver will not
+  // provide IPv4 addresses.
+  bool filter_unroutable_families = 4;
+
+  // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
+  config.core.v3.DnsResolverOptions dns_resolver_options = 2;
+}

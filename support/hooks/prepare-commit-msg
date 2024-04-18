@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#
+# A git commit hook that will automatically append a DCO signoff to the bottom
+# of any commit message that doesn't have one. This append happens after the git
+# default message is generated, but before the user is dropped into the commit
+# message editor.
+#
+# To enable this hook, run `bootstrap`, or run the following from the root of
+# the repo. (Note that `bootstrap` will correctly install this even if this code
+# is located in a submodule, while the following won't.)
+#
+# $ ln -s ../../support/hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
+
+COMMIT_MESSAGE_FILE="$1"
+AUTHOR=$(git var GIT_AUTHOR_IDENT)
+SIGNOFF=$(echo "$AUTHOR" | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
+
+# Check for DCO signoff message. If one doesn't exist, append one and then warn
+# the user that you did so.
+if ! grep -qs "^$SIGNOFF" "$COMMIT_MESSAGE_FILE"; then
+  echo -e "\n$SIGNOFF" >> "$COMMIT_MESSAGE_FILE"
+  echo -e "Appended the following signoff to the end of the commit message:\n  $SIGNOFF\n"
+fi

@@ -1,0 +1,64 @@
+@import url("theme.css");
+
+/* Splits a long line descriptions in tables in to multiple lines */
+.wy-table-responsive table td, .wy-table-responsive table th {
+  white-space: normal !important;
+}
+
+/* align multi line csv table columns */
+table.docutils div.line-block {
+    margin-left: 0;
+}
+/* Breaking long words */
+.wy-nav-content {
+  overflow-wrap: break-word;
+  max-width: 1000px;
+}
+
+/* To style the API version label of a search result item */
+.api-v3-version-label {
+  border-radius: 20%;
+  background-color: #c0c0c0;
+  color: #ffffff;
+  margin-left: 4px;
+  padding: 4px;
+}
+
+/* To style the API version label of a search result item */
+.xds-version-label {
+  border-radius: 20%;
+  background-color: #aaa;
+  color: #ffffff;
+  margin-left: 4px;
+  padding: 4px;
+}
+
+/* make inline sidebars flow down the right of page */
+.rst-content .sidebar {
+  clear: right;
+}
+
+/* make code.literals more muted - dont use red! */
+.rst-content code.literal {
+    color: #555;
+    background-color: rgba(27, 31, 35, 0.05);
+    padding: 2px 2px;
+    border: solid #eee 1px;
+}
+
+/* restore margin bottom on aligned images */
+.rst-content img.align-center {
+    margin-bottom: 24px
+}
+
+/* suppress errs on pseudo-json code highlights */
+.highlight-json .highlight .err {
+    border: inherit;
+    box-sizing: inherit;
+}
+
+/* tame the search highlight colours */
+.rst-content .highlighted {
+    background: #f6f5db;
+    box-shadow: 0 0 0 2px #e7e6b6;
+}

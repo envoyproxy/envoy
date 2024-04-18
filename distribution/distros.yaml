@@ -1,0 +1,15 @@
+debian_bullseye:
+  image: debian:bullseye-slim
+  ext: bullseye.changes
+
+debian_bookworm:
+  image: debian:bookworm-slim
+  ext: bookworm.changes
+
+ubuntu_focal:
+  image: ubuntu:20.04
+  ext: focal.changes
+
+ubuntu_jammy:
+  image: ubuntu:22.04
+  ext: jammy.changes

@@ -1,0 +1,6 @@
+parse_cookie_value {
+  cookies: "somekey=somevalue; someotherkey=someothervalue"
+  cookies: "abc=def; token=abc123; Expires=Wed, 09 Jun 2021 10:18:14 GMT"
+  cookies: "key2=value2; key3=value3"
+  key: "token"
+}

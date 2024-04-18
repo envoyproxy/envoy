@@ -1,0 +1,37 @@
+// Provides protos for testing.
+
+syntax = "proto3";
+
+package test.common.config;
+
+import "google/protobuf/timestamp.proto";
+
+message DummyConfig {
+  string a = 1;
+}
+
+message DummyConfigsDump {
+  message StaticConfigs {
+    DummyConfig dummy_config = 1;
+    google.protobuf.Timestamp last_updated = 2;
+  }
+
+  message DynamicConfigs {
+    string version_info = 1;
+    DummyConfig dummy_config = 2;
+    google.protobuf.Timestamp last_updated = 3;
+  }
+
+  repeated StaticConfigs static_dummy_configs = 1;
+  repeated DynamicConfigs dynamic_dummy_configs = 2;
+}
+
+message DeltaDummyConfigsDump {
+  message DynamicConfigs {
+    string version_info = 1;
+    repeated DummyConfig dummy_configs = 2;
+    google.protobuf.Timestamp last_updated = 3;
+  }
+
+  repeated DynamicConfigs dynamic_dummy_configs = 2;
+}

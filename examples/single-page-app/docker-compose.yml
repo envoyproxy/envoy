@@ -1,0 +1,82 @@
+services:
+  ui:
+    build:
+      context: ../shared/node
+      target: yarn-routed
+    volumes:
+    - ${UI_PATH:-./ui}:/workspace
+    - ${XDS_PATH:-./xds}:/var/lib/envoy
+    working_dir: /workspace
+
+  envoy:
+    depends_on:
+      ui:
+        condition: service_healthy
+      myhub:
+        condition: service_started
+      myhub-api:
+        condition: service_started
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_CONFIG: ${ENVOY_CONFIG:-envoy.yml}
+    ports:
+    - ${PORT_DEV_PROXY:-10001}:10001
+    - ${PORT_PROXY:-10000}:10000
+    command:
+      - envoy
+      - "-c"
+      - /etc/envoy.yaml
+      - "--component-log-level"
+      - oauth2:trace,http:debug
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -eo pipefail
+        touch /var/lib/envoy/lds.yml
+        chmod +w /var/lib/envoy/lds.yml
+        exec envoy "$${@}"
+    volumes:
+    - ${SECRETS_PATH:-./secrets}:/etc/envoy/secrets
+    - ${XDS_PATH:-./xds}:/var/lib/envoy
+    - ${UI_PATH:-./ui}/dist:/var/www/html
+
+  myhub:
+    build:
+      context: ../shared/python
+      target: aiohttp-service
+      args:
+        SERVICE_PORT: 7000
+    ports:
+    - ${PORT_MYHUB:-7000}:7000
+    volumes:
+    - myhub:/var/lib/myhub
+    - ./myhub/myhub.py:/code/service.py
+    - ./myhub/data.yml:/etc/myhub/data.yml
+    - ./myhub/images:/var/lib/myhub/images
+    - ./myhub/shared.py:/code/shared.py
+    environment:
+      DATA_PATH: /etc/myhub/data.yml
+      TOKEN_STORAGE_PATH: /var/lib/myhub/auth.json
+
+  myhub-api:
+    build:
+      context: ../shared/python
+      target: aiohttp-service
+      args:
+        SERVICE_PORT: 7000
+    volumes:
+    - myhub:/var/lib/myhub
+    - ./myhub/api.py:/code/service.py
+    - ./myhub/data.yml:/etc/myhub/data.yml
+    - ./myhub/images:/var/lib/myhub/images
+    - ./myhub/shared.py:/code/shared.py
+    environment:
+      DATA_PATH: /etc/myhub/data.yml
+      MYHUB_URL: "http://localhost:${PORT_MYHUB:-7000}"
+      TOKEN_STORAGE_PATH: /var/lib/myhub/auth.json
+
+volumes:
+  myhub:

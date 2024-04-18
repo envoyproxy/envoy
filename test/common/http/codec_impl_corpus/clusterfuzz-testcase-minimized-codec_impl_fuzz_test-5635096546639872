@@ -1,0 +1,749 @@
+h2_settings { server {  max_concurrent_streams: 2 } } actions {   new_stream {   } } actions {   new_stream {     request_headers {     }   } } actions {   new_stream {   } } actions { } actions {   new_stream {     request_headers {     }   } } actions { } actions {   new_stream {     request_headers {     }   } } actions {   new_stream {   } } actions {   new_stream {     request_headers {       headers {         key: " "       }     }   } } actions {   new_stream {   } } actions { } actions {   quiesce_drain {   } } actions {   new_stream {   } } actions { } actions {   new_stream {   } } actions { } actions {   new_stream {   } } actions {   quiesce_drain {   } } actions { } actions {   new_stream {     request_headers {     }   } } actions { } actions { } actions {   new_stream {   } } actions {   new_stream {     request_headers {     }   } } actions { } actions {   new_stream {   } } actions {   new_stream {   } } actions {   new_stream {   } } actions {   new_stream {   } } actions {   new_stream {   } } actions { } actions { } actions {   new_stream {   } } actions {   new_stream {   } } actions { } actions {   new_stream {   } } actions {   new_stream {   } } actions {   new_stream {     request_headers {       headers {         key: ":method"         value: "  �"       }       headers {         key: ":path"         value: "�"       }       headers {         key: ":scheme"         value: "ttp"       }       headers {         key: ":authority"         value: "foo.com"       }     }   } } actions { } actions { } actions { } actions { } actions { } actions { } actions { } actions { } actions { } actions { } actions {   new_stream {   } } actions { } actions {   stream_action {     stream_id: 4   } } actions {   new_stream {     end_stream: true   } } actions { } actions {   new_stream {   } } actions { } actions {   new_stream {   } } actions {   new_stream {   } } actions {   swap_buffer {     server: true   } } actions { } actions { } actions { } actions {   new_stream {   } } actions { } actions {   new_stream {   } } actions { } actions {   server_drain {   } } actions {   new_stream {   } } actions { } actions {   new_stream {   } } actions { } actions { } actions {   new_stream {   } } actions {   new_stream {     request_headers {     }   } } actions {   new_stream {   } } actions { } actions {   new_stream {   } } actions {   new_stream {     request_headers {     }   } } actions {   new_stream {   } } actions {   swap_buffer {     buffer: 8    } } actions {   new_stream {   } } actions {   new_stream {   } } actions {   new_stream {   } } actions { } actions { } actions { } actions {   new_stream {   } } actions { } actions {   new_stream {   } } actions {   client_drain {   } } actions { } actions {   server_drain {   } } actions {   stream_action {   } } actions { } actions {   new_stream {   } } actions {   new_stream {   } } actions {   new_stream {   } } actions {   quiesce_drain {   } } actions { } actions { } actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  stream_action {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+  swap_buffer {
+    buffer: 350
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+    request_headers {
+    }
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+}
+actions {
+  stream_action {
+    stream_id: 65537
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+}
+actions {
+  mutate {
+    offset: 524288
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  stream_action {
+    response {
+    }
+  }
+}
+actions {
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+    }
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+    request_headers {
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+    request_headers {
+    }
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  swap_buffer {
+    buffer: 1
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  stream_action {
+    stream_id: 4
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+      }
+    }
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    request {
+    }
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  stream_action {
+    request {
+    }
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+  mutate {
+    server: true
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  stream_action {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  mutate {
+    offset: 2
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+  mutate {
+    buffer: 10223616
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}
+actions {
+}

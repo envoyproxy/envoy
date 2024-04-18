@@ -1,0 +1,99 @@
+#pragma once
+
+#include <atomic>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <vector>
+
+#include "envoy/thread_local/thread_local.h"
+
+#include "source/common/common/logger.h"
+#include "source/common/common/non_copyable.h"
+
+namespace Envoy {
+namespace ThreadLocal {
+
+/**
+ * Implementation of ThreadLocal that relies on static thread_local objects.
+ */
+class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
+public:
+  InstanceImpl();
+  ~InstanceImpl() override;
+
+  // ThreadLocal::Instance
+  SlotPtr allocateSlot() override;
+  void registerThread(Event::Dispatcher& dispatcher, bool main_thread) override;
+  void shutdownGlobalThreading() override;
+  void shutdownThread() override;
+  Event::Dispatcher& dispatcher() override;
+  bool isShutdown() const override { return shutdown_; }
+
+private:
+  // On destruction returns the slot index to the deferred delete queue (detaches it). This allows
+  // a slot to be destructed on the main thread while controlling the lifetime of the underlying
+  // slot as callbacks drain from workers.
+  struct SlotImpl : public Slot {
+    SlotImpl(InstanceImpl& parent, uint32_t index);
+    ~SlotImpl() override;
+    std::function<void()> wrapCallback(const std::function<void()>& cb);
+    std::function<void()> dataCallback(const UpdateCb& cb);
+    static bool currentThreadRegisteredWorker(uint32_t index);
+    static ThreadLocalObjectSharedPtr getWorker(uint32_t index);
+
+    // ThreadLocal::Slot
+    ThreadLocalObjectSharedPtr get() override;
+    void runOnAllThreads(const UpdateCb& cb) override;
+    void runOnAllThreads(const UpdateCb& cb, const std::function<void()>& complete_cb) override;
+    bool currentThreadRegistered() override;
+    void set(InitializeCb cb) override;
+    bool isShutdown() const override { return parent_.shutdown_; }
+
+    InstanceImpl& parent_;
+    const uint32_t index_;
+    // The following is used to safely verify via weak_ptr that this slot is still alive. This
+    // does not prevent all races if a callback does not capture appropriately, but it does fix
+    // the common case of a slot destroyed immediately before anything is posted to a worker.
+    // NOTE: The general safety model of a slot is that it is destroyed immediately on the main
+    //       thread. This means that *all* captures must not reference the slot object directly.
+    //       this is why index_ is captured manually in callbacks that require it.
+    // NOTE: When the slot is destroyed, the index is immediately recycled. This is safe because
+    //       any new posts for a recycled index must come after any previous callbacks for the
+    //       previous owner of the index.
+    // TODO(mattklein123): Add clang-tidy analysis rule to check that "this" is not captured by
+    // a TLS function call. This check will not prevent all bad captures, but it will at least
+    // make the programmer more aware of potential issues.
+    std::shared_ptr<bool> still_alive_guard_;
+  };
+
+  struct ThreadLocalData {
+    Event::Dispatcher* dispatcher_{};
+    std::vector<ThreadLocalObjectSharedPtr> data_;
+  };
+
+  void removeSlot(uint32_t slot);
+  void runOnAllThreads(std::function<void()> cb);
+  void runOnAllThreads(std::function<void()> cb, std::function<void()> main_callback);
+  static void setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr object);
+
+  static thread_local ThreadLocalData thread_local_data_;
+
+  Thread::MainThread main_thread_;
+  std::vector<Slot*> slots_;
+  // A list of index of freed slots.
+  std::list<uint32_t> free_slot_indexes_;
+  std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
+  Event::Dispatcher* main_thread_dispatcher_{};
+  std::atomic<bool> shutdown_{};
+
+  bool allow_slot_destroy_on_worker_threads_{};
+
+  // Test only.
+  friend class ThreadLocalInstanceImplTest;
+};
+
+using InstanceImplPtr = std::unique_ptr<InstanceImpl>;
+
+} // namespace ThreadLocal
+} // namespace Envoy

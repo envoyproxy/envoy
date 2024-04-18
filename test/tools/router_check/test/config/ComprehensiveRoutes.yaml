@@ -1,0 +1,28 @@
+virtual_hosts:
+- name: www2_host
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: /new_endpoint
+    route:
+      cluster: www2
+      prefix_rewrite: /api/new_endpoint
+  - match:
+      path: /
+    route:
+      cluster: root_www2
+  - match:
+      prefix: /
+    route:
+      cluster: www2
+  virtual_clusters:
+  - headers:
+    - name: :path
+      string_match:
+        safe_regex:
+          regex: ^/users/\d+$
+    - name: :method
+      string_match:
+        exact: PUT
+    name: update_user

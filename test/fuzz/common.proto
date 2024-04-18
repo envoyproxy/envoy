@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package test.fuzz;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/address.proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+
+// Common fuzzing input types.
+
+message Headers {
+  repeated envoy.config.core.v3.HeaderValue headers = 1;
+}
+
+message Metadata {
+  map<string, string> metadata = 1;
+}
+
+message HttpBody {
+  // The bytes that will be used as the request body.
+  repeated string data = 1 [(validate.rules).repeated .min_items = 1];
+}
+
+// HttpBody cannot efficiently create serialized protos.
+// Use ProtoBody instead to test grpc data.
+message ProtoBody {
+  // The proto message that will be serialized and used as the request body.
+  google.protobuf.Any message = 1 [(validate.rules).any.required = true];
+
+  // The size (in bytes) of each buffer when forming the requests.
+  uint64 chunk_size = 2 [(validate.rules).uint64 = {gt: 0, lt: 8192}];
+}
+
+message HttpData {
+  Headers headers = 1;
+
+  oneof body {
+    HttpBody http_body = 2;
+    ProtoBody proto_body = 4;
+  }
+
+  Headers trailers = 3;
+}
+
+message StreamInfo {
+  envoy.config.core.v3.Metadata dynamic_metadata = 1;
+  uint64 start_time = 2;
+  google.protobuf.UInt32Value response_code = 3;
+  envoy.config.core.v3.Metadata upstream_metadata = 4;
+  string requested_server_name = 5
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+  envoy.config.core.v3.Address address = 6;
+  envoy.config.core.v3.Address upstream_local_address = 7;
+}

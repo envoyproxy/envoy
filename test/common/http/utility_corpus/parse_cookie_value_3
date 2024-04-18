@@ -1,0 +1,7 @@
+parse_cookie_value {
+  cookies: "token1=abc123; = "
+  cookies: "token2=abc123;   "
+  cookies: "; token3=abc123;"
+  cookies: "=; token4=\"abc123\""
+  key: "token4"
+}

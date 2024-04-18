@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+#
+# A git commit hook that will automatically run format checking and DCO signoff
+# checking before the push is successful.
+#
+# To enable this hook, run `bootstrap`, or run the following from the root of
+# the repo. (Note that `bootstrap` will correctly install this even if this code
+# is located in a submodule, while the following won't.)
+#
+# $ ln -s ../../support/hooks/pre-push .git/hooks/pre-push
+
+if [[ -e .env ]]; then
+    # shellcheck disable=SC1091
+    . .env
+fi
+
+if [[ -n "$NO_VERIFY" ]]; then
+    exit 0
+fi
+
+DUMMY_SHA=0000000000000000000000000000000000000000
+
+# shellcheck disable=SC2016
+echo 'Running pre-push check; to skip this step use `push --no-verify` or add `NO_VERIFY=1` to `.env`'
+echo
+AUTHOR=$(git var GIT_AUTHOR_IDENT | sed -n 's/^\(.*>\).*$/\1/p')
+
+# shellcheck disable=SC2034
+while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA
+do
+  if [ "$LOCAL_SHA" = $DUMMY_SHA ]
+  then
+    # Branch deleted. Do nothing.
+    exit 0
+  else
+    if [ "$REMOTE_SHA" = $DUMMY_SHA ]
+    then
+      # New branch. Verify the last commit, since this is very likely where the new code is
+      # (though there is no way to know for sure). In the extremely uncommon case in which someone
+      # pushes more than 1 new commit to a branch, CI will enforce full checking.
+      RANGE="$LOCAL_SHA~1..$LOCAL_SHA"
+    else
+      # Updating branch. Verify new commits.
+      RANGE="$REMOTE_SHA..$LOCAL_SHA"
+    fi
+
+    # Verify DCO signoff. We do this before the format checker, since it has
+    # some probability of failing spuriously, while this check never should.
+    #
+    # In general, we can't assume that the commits are signed off by author
+    # pushing, so we settle for just checking that there is a signoff at all.
+    SIGNED_OFF=$(git rev-list --no-merges --author "$AUTHOR" --grep "^Signed-off-by: " "$RANGE")
+    NOT_SIGNED_OFF=$(git rev-list --no-merges --author "$AUTHOR" "$RANGE" | grep -Fxv "$SIGNED_OFF")
+    if [ -n "$NOT_SIGNED_OFF" ]
+    then
+      echo >&2 "ERROR: The following commits do not have DCO signoff:"
+      while read -r commit; do
+        echo "  $(git log --pretty=oneline --abbrev-commit -n 1 "$commit")"
+      done <<< "$NOT_SIGNED_OFF"
+      exit 1
+    fi
+
+    # NOTE: The `tools` directory will be the same relative to the support
+    # directory, independent of whether we're in a submodule, so no need to use
+    # our `relpath` helper.
+    SCRIPT_DIR="$(dirname "$(realpath "$0")")/../../tools"
+
+    _CHANGES=$(git diff --name-only "$RANGE" --diff-filter=ACMR --ignore-submodules=all 2>&1 | tr '\n' ' ')
+    IFS=' ' read -ra CHANGES <<< "$_CHANGES"
+
+    echo -ne "  Checking format for ${CHANGES[*]} - "
+    bazel run //tools/code_format:check_format -- check "${CHANGES[@]}" || exit 1
+    # TODO(phlax): It seems this is not running in CI anymore and is now finding issues
+    # in merged PRs. Unify this hook and format checks in CI when the new format tool is rolled
+    # out.
+    # echo "  Checking spelling for $i"
+    # "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "${CHANGES[@]}" || exit 1
+
+    # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
+    "$SCRIPT_DIR"/proto_format/proto_format.sh check || exit 1
+
+    bazel run //tools/code:check -- \
+          -s main \
+          -v warn || exit 1
+
+    # Check correctness of repositories definitions.
+    echo "  Checking repositories definitions"
+    "$SCRIPT_DIR"/check_repositories.sh || exit 1
+  fi
+done
+
+exit 0

@@ -1,0 +1,54 @@
+events {
+  downstream_send_event {
+    h2_frames {
+      settings {
+        flags: NONE
+      }
+    }
+    h2_frames {
+      settings {
+        flags: ACK
+      }
+    }
+    h2_frames {
+      request {
+        stream_index: 1
+        host: "host"
+        path: "/path/to/long/url"
+      }
+    }
+  }
+}
+events {
+  upstream_send_event {
+    h2_frames {
+      settings {
+        flags: NONE
+      }
+    }
+    h2_frames {
+      settings {
+        flags: ACK
+      }
+    }
+  }
+}
+events {
+  downstream_send_event {
+    h2_frames {
+      metadata {
+        stream_index: 1
+        metadata {
+          metadata {
+              key: "connections"
+              value: "15"
+          }
+          metadata {
+            key: "Timeout Seconds"
+            value: "10"
+          }
+        }
+      }
+    }
+  }
+}

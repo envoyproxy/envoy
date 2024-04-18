@@ -1,0 +1,11 @@
+date: February 7, 2023
+
+bug_fixes:
+- area: dependency
+  change: |
+    add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
+
+new_features:
+- area: docker
+  change: |
+    use new ``nossl`` images for ``distroless`` Docker build.

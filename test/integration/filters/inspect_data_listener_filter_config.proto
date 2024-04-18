@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+message InspectDataListenerFilterConfig {
+  uint64 max_read_bytes = 1;
+  bool close_connection = 2;
+  bool drain = 3;
+  uint64 new_max_read_bytes = 4;
+}

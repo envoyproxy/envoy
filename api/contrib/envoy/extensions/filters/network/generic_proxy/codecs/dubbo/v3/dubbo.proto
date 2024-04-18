@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3";
+option java_outer_classname = "DubboProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/network/generic_proxy/codecs/dubbo/v3;dubbov3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Dubbo codec configuration for Generic Proxy]
+// [#extension: envoy.generic_proxy.codecs.dubbo]
+
+message DubboCodecConfig {
+}

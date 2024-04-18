@@ -1,0 +1,39 @@
+config {
+  name: "envoy.filters.network.local_ratelimit"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit"
+    value: "\nVtype.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit\022\013\010\001\032\007\010\200^\020\200\306\001"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_data {
+    data: "\000\000"
+  }
+}
+actions {
+  on_data {
+    data: "\000\000"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 12035000
+  }
+}
+actions {
+  on_data {
+    data: "\000\000"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}

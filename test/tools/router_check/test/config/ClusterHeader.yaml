@@ -1,0 +1,17 @@
+virtual_hosts:
+- name: local_service
+  domains:
+  - '*'
+  routes:
+  - match:
+      prefix: "/foo"
+      headers:
+      - name: ":authority"
+    route:
+      cluster_header: ":authority"
+  - match:
+      prefix: "/bar"
+    route:
+      cluster_header: "some_header"
+      timeout:
+        nanos: 0

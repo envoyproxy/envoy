@@ -1,0 +1,35 @@
+{#
+  Main template for 'requests.h' file.
+  Gets filled in (by 'contents') with Kafka request structures, deserializers, and parsers.
+
+  For each request we have the following:
+  - 1 top-level structure corresponding to the request (e.g. `struct FetchRequest`),
+  - N deserializers for top-level structure, one for each request version,
+  - N parsers binding each deserializer with parser,
+  - 0+ child structures (e.g. `struct FetchRequestTopic`, `FetchRequestPartition`) that are used by
+    the request's top-level structure,
+  - deserializers for each child structure.
+
+  So for example, for FetchRequest we have:
+  - struct FetchRequest,
+  - FetchRequestV0Deserializer, FetchRequestV1Deserializer, FetchRequestV2Deserializer, etc.,
+  - FetchRequestV0Parser, FetchRequestV1Parser, FetchRequestV2Parser, etc.,
+  - struct FetchRequestTopic,
+  - FetchRequestTopicV0Deserializer, FetchRequestTopicV1Deserializer, etc.
+    (because topic data is present in every FetchRequest version),
+  - struct FetchRequestPartition,
+  - FetchRequestPartitionV0Deserializer, FetchRequestPartitionV1Deserializer, etc.
+    (because partition data is present in every FetchRequestTopic version).
+#}
+#pragma once
+#include "contrib/kafka/filters/network/source/kafka_request.h"
+#include "contrib/kafka/filters/network/source/kafka_request_parser.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+
+{{ contents }}
+
+}}}}

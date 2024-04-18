@@ -1,0 +1,38 @@
+health_check_config {
+  timeout {
+    nanos: 5
+  }
+  interval {
+    nanos: 65
+  }
+  unhealthy_threshold {
+    value: 538968064
+  }
+  healthy_threshold {
+    value: 538968064
+  }
+  reuse_connection {
+    value: true
+  }
+  grpc_health_check {
+    service_name: "\004"
+  }
+  unhealthy_interval {
+    seconds: 4227858432
+  }
+  tls_options {
+  }
+}
+actions {
+  raise_go_away: NO_ERROR
+}
+actions {
+  raise_event: LOCAL_CLOSE
+}
+actions {
+  trigger_timeout_timer {
+  }
+}
+actions {
+  raise_event: LOCAL_CLOSE
+}

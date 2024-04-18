@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.aws_request_signing.v3;
+
+import "envoy/type/matcher/v3/string.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.aws_request_signing.v3";
+option java_outer_classname = "AwsRequestSigningProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/aws_request_signing/v3;aws_request_signingv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: AwsRequestSigning]
+// AwsRequestSigning :ref:`configuration overview <config_http_filters_aws_request_signing>`.
+// [#extension: envoy.filters.http.aws_request_signing]
+
+// Top level configuration for the AWS request signing filter.
+// [#next-free-field: 8]
+message AwsRequestSigning {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.aws_request_signing.v2alpha.AwsRequestSigning";
+
+  enum SigningAlgorithm {
+    // Use SigV4 for signing
+    AWS_SIGV4 = 0;
+
+    // Use SigV4A for signing
+    AWS_SIGV4A = 1;
+  }
+
+  message QueryString {
+    // Optional expiration time for the query string parameters. As query string parameter based requests are replayable, in effect representing
+    // an API call that has already been authenticated, it is recommended to keep this expiration time as short as feasible.
+    // This value will default to 5 seconds and has a maximum value of 3600 seconds (1 hour).
+    google.protobuf.Duration expiration_time = 1 [(validate.rules).duration = {
+      lte {seconds: 3600}
+      gte {seconds: 1}
+    }];
+  }
+
+  // The `service namespace
+  // <https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#genref-aws-service-namespaces>`_
+  // of the HTTP endpoint.
+  //
+  // Example: s3
+  string service_name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Optional region string. If region is not provided, the region will be retrieved from the environment
+  // or AWS configuration files. See :ref:`config_http_filters_aws_request_signing_region` for more details.
+  //
+  // When signing_algorithm is set to ``AWS_SIGV4`` the region is a standard AWS `region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ string for the service
+  // hosting the HTTP endpoint.
+  //
+  // Example: us-west-2
+  //
+  // When signing_algorithm is set to ``AWS_SIGV4A`` the region is used as a region set.
+  //
+  // A region set is a comma separated list of AWS regions, such as ``us-east-1,us-east-2`` or wildcard ``*``
+  // or even region strings containing wildcards such as ``us-east-*``
+  //
+  // Example: '*'
+  //
+  // By configuring a region set, a SigV4A signed request can be sent to multiple regions, rather than being
+  // valid for only a single region destination.
+  string region = 2;
+
+  // Indicates that before signing headers, the host header will be swapped with
+  // this value. If not set or empty, the original host header value
+  // will be used and no rewrite will happen.
+  //
+  // Note: this rewrite affects both signing and host header forwarding. However, this
+  // option shouldn't be used with
+  // :ref:`HCM host rewrite <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>` given that the
+  // value set here would be used for signing whereas the value set in the HCM would be used
+  // for host header forwarding which is not the desired outcome.
+  string host_rewrite = 3;
+
+  // Instead of buffering the request to calculate the payload hash, use the literal string ``UNSIGNED-PAYLOAD``
+  // to calculate the payload hash. Not all services support this option. See the `S3
+  // <https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html>`_ policy for details.
+  bool use_unsigned_payload = 4;
+
+  // A list of request header string matchers that will be excluded from signing. The excluded header can be matched by
+  // any patterns defined in the StringMatcher proto (e.g. exact string, prefix, regex, etc).
+  //
+  // Example:
+  // match_excluded_headers:
+  // - prefix: x-envoy
+  // - exact: foo
+  // - exact: bar
+  // When applied, all headers that start with "x-envoy" and headers "foo" and "bar" will not be signed.
+  repeated type.matcher.v3.StringMatcher match_excluded_headers = 5;
+
+  // Optional Signing algorithm specifier, either ``AWS_SIGV4`` or ``AWS_SIGV4A``, defaulting to ``AWS_SIGV4``.
+  SigningAlgorithm signing_algorithm = 6;
+
+  // If set, use the query string to store output of SigV4 or SigV4A calculation, rather than HTTP headers. The ``Authorization`` header will not be modified if ``query_string``
+  // is configured.
+  //
+  // Example:
+  // query_string: {}
+  //
+  QueryString query_string = 7;
+}
+
+message AwsRequestSigningPerRoute {
+  // Override the global configuration of the filter with this new config.
+  // This overrides the entire message of AwsRequestSigning and not at field level.
+  AwsRequestSigning aws_request_signing = 1;
+
+  // The human readable prefix to use when emitting stats.
+  string stat_prefix = 2 [(validate.rules).string = {min_len: 1}];
+}

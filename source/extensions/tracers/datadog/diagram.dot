@@ -1,0 +1,42 @@
+// To generate diagram.svg from this file,
+//
+//     $ dot -Tsvg -o diagram.svg diagram.dot
+//
+// It requires the graphviz package, e.g.
+//
+//     $ sudo apt install graphviz
+
+digraph {
+    rankdir="TB";
+
+    tracing_driver [label="Tracing::Driver", shape="hexagon", fixedsize="shape", width=2];
+    tracer [label="Tracer", shape="box"];
+    dd_tracer [label="🐶::Tracer"];
+    dd_collector [label="🐶::Collector"];
+    dd_datadog_agent [label="🐶::DatadogAgent"];
+    dd_event_scheduler [label="🐶::EventScheduler"];
+    dd_http_client [label="🐶::HTTPClient"];
+    event_scheduler [label="EventScheduler", shape="box"];
+    agent_http_client [label="AgentHTTPClient", shape="box"];
+    http_async_client_callbacks [label="Http::AsyncClient::Callbacks", shape="hexagon", fixedsize="shape", width=3];
+    event_dispatcher [label="Event::Dispatcher", shape="hexagon", fixedsize="shape", width=2];
+
+    tracing_driver -> tracer [label="implemented by", fontsize=9];
+
+    tracer -> dd_tracer [label="has", fontsize=9];
+    dd_tracer -> dd_collector [label="has", fontsize=9];
+
+    // dd_datadog_agent -> dd_collector [label="implements", fontsize=9];
+    dd_collector -> dd_datadog_agent [label="implemented by", fontsize=9];
+    dd_datadog_agent -> dd_event_scheduler [label="has", fontsize=9];
+    dd_datadog_agent -> dd_http_client [label="has", fontsize=9];
+
+    // event_scheduler -> dd_event_scheduler [label="implements", fontsize=9];
+    dd_event_scheduler -> event_scheduler [label="implemented by", fontsize=9];
+    // agent_http_client -> dd_http_client [label="implements", fontsize=9];
+    dd_http_client -> agent_http_client [label="implemented by", fontsize=9];
+
+    http_async_client_callbacks -> agent_http_client [label="implemented by", fontsize=9];
+
+    event_scheduler -> event_dispatcher [label="contains", fontsize=9];
+}

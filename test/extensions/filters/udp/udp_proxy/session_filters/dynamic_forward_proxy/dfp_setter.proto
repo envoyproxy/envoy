@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package test.extensions.filters.udp.udp_proxy.session_filters;
+
+message DynamicForwardProxySetterFilterConfig {
+  string host = 1;
+  uint32 port = 2;
+}

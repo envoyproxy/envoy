@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Envoy CSRF Wepage</title>
+    <link rel="shortcut icon" href="https://www.envoyproxy.io/img/favicon.ico">
+    <script type="text/javascript">
+        var client = new XMLHttpRequest();
+        var resultText;
+
+        function submitToDomain() {
+            var remoteIP = document.getElementById("destinationip").value;
+            var enforcement = document.querySelector('input[name="csrf"]:checked').value;
+            var method = enforcement !== 'ignored' ? 'POST' : 'GET';
+            if(client) {
+                var url = `http://${remoteIP}:8000/csrf/${enforcement}`;
+                client.open(method, url, true);
+                client.onreadystatechange = handler;
+                client.send();
+            } else {
+                resultText = "Could not find client to make request.";
+                document.getElementById("results").textContent = resultText;
+            }
+        }
+
+        function handler() {
+            var responseCode = client.status;
+            if (client.readyState == 4 && responseCode == 403) {
+                resultText = 'Rejected by CSRF';
+            }
+            else if (client.readyState == 4 && responseCode == 200) {
+                resultText = client.responseText;
+            }
+            else if (client.readyState == 4) {
+                resultText = 'Unknown Error. Check the console.';
+            }
+            document.getElementById("results").textContent = resultText;
+        }
+    </script>
+</head>
+<body>
+    <h1>
+        Envoy CSRF Demo
+    </h1>
+    <p>
+        This page demonstrates a few scenarios for CSRF.
+    </p>
+    <p>
+        Enter the IP address of the destination Docker container.<br/>
+    </p>
+    <div>
+        <input id="destinationip" type="text" placeholder="Destination IP" value="localhost"/>
+        <button id="submit" onclick="submitToDomain()">Post to destination</button><br/>
+        <div style="width:20%;float:left;">
+            <h5>CSRF Enforcement</h5>
+            <input type="radio" name="csrf" value="disabled" checked="checked"/> Disabled<br/>
+            <input type="radio" name="csrf" value="shadow"/> Shadow Mode<br/>
+            <input type="radio" name="csrf" value="enabled"/> Enabled<br/>
+            <input type="radio" name="csrf" value="ignored"/> Ignored<br/>
+            <input type="radio" name="csrf" value="additional_origin"/> Additional Origin<br/>
+            <br/>
+        </div>
+        <div style="float:left;">
+            <h3>Request Results</h3>
+            <p id="results"></p>
+        </div>
+    </div>
+</body>
+<script>
+    var input = document.getElementById("remoteip");
+    if (input) {
+        input.addEventListener("keyup", function(event) {
+            event.preventDefault();
+            if (event.keyCode === 13) {
+                document.getElementById("submit").click();
+            }
+        });
+    }
+</script>
+</html>

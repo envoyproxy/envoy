@@ -1,0 +1,23 @@
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-dynamic-fs
+    depends_on:
+    - service1
+    - service2
+    ports:
+    - 10000:10000
+    - 19000:19000
+
+  service1:
+    build:
+      context: ../shared/echo
+    hostname: service1
+
+  service2:
+    build:
+      context: ../shared/echo
+    hostname: service2

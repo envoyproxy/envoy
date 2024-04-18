@@ -1,0 +1,9 @@
+syntax = "proto3";
+package test.protos.allowed;
+
+message RemoveReserveFieldMessage {
+    reserved 4;
+    reserved "four";
+
+    string three = 3;
+}

@@ -1,0 +1,1 @@
+foo123.foocdn.example, barcdn.example; trace="abcdef",AnotherCDN; abc=123; def="456"

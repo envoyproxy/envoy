@@ -1,0 +1,30 @@
+- hosts: all
+  become: yes
+  roles:
+  - role: config-gcc
+    gcc_version: 7
+  - role: config-bazel
+    bazel_version: 0.28.1
+  tasks:
+  - name: Build envoy
+    shell:
+      cmd: |
+        apt update
+        apt-get update
+        apt-get install -y \
+             libtool \
+             cmake \
+             automake \
+             autoconf \
+             make \
+             ninja-build \
+             curl \
+             unzip \
+             virtualenv
+
+        bazel build //source/exe:envoy-static | tee $LOGS_PATH//bazel.txt
+
+        cp -r ./bazel-bin $RESULTS_PATH
+      chdir: '{{ zuul.project.src_dir }}'
+      executable: /bin/bash
+    environment: '{{ global_env }}'

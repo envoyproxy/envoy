@@ -1,0 +1,75 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 2,
+      fin: false,
+      offset: 0,
+        h3frame {
+          settings {}
+        }
+    }
+  }
+}
+frames {
+  qframe {
+    stream {
+      unidirectional: false,
+      type: 0,
+      id: 4,
+      fin: false,
+      offset: 0,
+      h3frame {
+        headers {
+          headers {
+            headers {
+              key: ":scheme"
+              value: "http"
+            }
+            headers {
+              key: ":path"
+              value: "/"
+            }
+            headers {
+              key: ":method"
+              value: "options"
+            }
+            headers {
+              key: "upgrade"
+              value: "h2c"
+            }
+            headers {
+              key: "range"
+              value: "empty"
+            }
+            headers {
+              key: "x-forwarded-for"
+              value: "empty"
+            }
+            headers {
+              key: "x-content-type-options"
+              value: "empty"
+            }
+            headers {
+              key: "content-type"
+              value: "text/event-stream"
+            }
+            headers {
+              key: "server"
+              value: "empty"
+            }
+            headers {
+              key: "-retry-on"
+              value: "retriable-status-codes"
+            }
+            headers {
+              key: "te"
+              value: "trailers"
+            }
+          }
+        }
+      }
+    }
+  }
+}

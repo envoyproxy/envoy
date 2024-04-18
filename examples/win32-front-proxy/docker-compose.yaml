@@ -1,0 +1,24 @@
+services:
+
+  front-envoy:
+    build:
+      context: .
+      dockerfile: Dockerfile-frontenvoy
+    ports:
+    - "8080:8080"
+    - "8443:8443"
+    - "8003:8003"
+
+  service1:
+    build:
+      context: .
+      dockerfile: Dockerfile-service
+    environment:
+    - SERVICE_NAME=1
+
+  service2:
+    build:
+      context: .
+      dockerfile: Dockerfile-service
+    environment:
+    - SERVICE_NAME=2

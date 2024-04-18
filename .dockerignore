@@ -1,0 +1,15 @@
+/*
+!/VERSION.txt
+!/build_envoy
+!/ci
+!/configs/google-vrp
+!/configs/*yaml
+!/linux/amd64/release.tar.zst
+!/linux/amd64/schema_validator_tool
+!/linux/amd64/router_check_tool
+!/linux/arm64/release.tar.zst
+!/linux/arm64/schema_validator_tool
+!/linux/arm64/router_check_tool
+!/local
+!/test/config/integration/certs
+!/windows

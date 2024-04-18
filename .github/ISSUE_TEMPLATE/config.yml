@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+- name: "Crash bug"
+  url: https://github.com/envoyproxy/envoy/security/policy
+  about: "Please file any crash bug (including asserts in debug builds) with envoy-security@googlegroups.com."

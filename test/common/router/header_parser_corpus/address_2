@@ -1,0 +1,6 @@
+headers_to_add {
+  header {
+    key: "x-request-start"
+    value: "%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%"
+  }
+}

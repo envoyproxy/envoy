@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package test.common.router;
+
+import "google/protobuf/empty.proto";
+
+import "test/fuzz/common.proto";
+
+import "envoy/extensions/filters/http/router/v3/router.proto";
+
+message DirectionalAction {
+  oneof response_action_selector {
+    test.fuzz.Headers headers = 1;
+    uint32 data = 2;
+    test.fuzz.Headers trailers = 3;
+  }
+  bool end_stream = 4;
+}
+
+message StreamAction {
+  oneof stream_action_selector {
+    DirectionalAction request = 1;
+    DirectionalAction response = 2;
+  }
+}
+
+message Action {
+  oneof action_selector {
+    StreamAction stream_action = 1;
+    google.protobuf.Empty advance_time = 2;
+    google.protobuf.Empty force_retry = 3;
+  }
+}
+
+message RouterTestCase {
+  repeated Action actions = 1;
+  envoy.extensions.filters.http.router.v3.Router config = 2;
+}

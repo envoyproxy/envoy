@@ -1,0 +1,107 @@
+expression {
+  list_expr {
+    elements {
+      id: 1407374883553280
+      ident_expr {
+        name: "response"
+      }
+    }
+    elements {
+      id: 360287970189639680
+      select_expr {
+        operand {
+          id: 69242844270821376
+          select_expr {
+            field: "trailers"
+          }
+        }
+        field: "trailers"
+      }
+    }
+    elements {
+      id: 69242844270821376
+      ident_expr {
+        name: "response"
+      }
+    }
+    elements {
+      id: 69242844270821376
+      select_expr {
+        field: "trailers"
+      }
+    }
+    elements {
+      select_expr {
+        operand {
+        }
+        field: "trailers"
+      }
+    }
+    elements {
+      struct_expr {
+        entries {
+          value {
+            list_expr {
+              elements {
+                id: 21474836488
+                ident_expr {
+                  name: "response"
+                }
+              }
+              elements {
+                id: 1407374883553280
+                select_expr {
+                  operand {
+                    select_expr {
+                      field: "trailers"
+                    }
+                  }
+                  field: "trîø0Zzs¾›×’‡Æƒf$Âf!šÒÎÅ¸!žC­ÉP¸–Š>÷”ƒƒÁhŒ†uV,—b}Ö>@ì%¨Õ·â¨SPþ×Âàà­”S¢æ¬d1…¦…wÇqnî†«Qª®@-Çq)Ñ«+8Óð“À®ÁÛW„’LÔJÂ_÷@g÷ž<‰Ý¾þï]ýe[S•¿½ñ¾Tt‘—	4Èöï;–ïÏPailers"
+                }
+              }
+              elements {
+                id: 69242844270821376
+                ident_expr {
+                  name: "response"
+                }
+              }
+              elements {
+                select_expr {
+                  field: "trailers"
+                }
+              }
+              elements {
+                select_expr {
+                  field: "trailers"
+                }
+              }
+              elements {
+              }
+              elements {
+              }
+              elements {
+                id: 7277817135808643072
+              }
+              elements {
+              }
+            }
+          }
+        }
+      }
+    }
+    elements {
+    }
+    elements {
+      id: 360287970189639680
+    }
+    elements {
+    }
+    elements {
+    }
+  }
+}
+trailers {
+  headers {
+    key: "trailers"
+  }
+}

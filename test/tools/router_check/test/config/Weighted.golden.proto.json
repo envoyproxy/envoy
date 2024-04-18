@@ -1,0 +1,75 @@
+{
+  "tests": [
+    {
+      "test_name": "Test_1",
+      "input": {
+        "authority": "www1.lyft.com",
+        "path": "/foo",
+        "ssl": true,
+        "internal": true,
+        "method": "GET"
+      },
+      "validate": {"path_redirect": ""}
+    },
+    {
+      "test_name": "Test_2",
+      "input": {
+        "authority": "www1.lyft.com",
+        "path": "/test/123",
+        "method": "GET",
+        "random_value": 115
+      },
+      "validate": {"cluster_name": "cluster1", "virtual_cluster_name": "test_virtual_cluster"}
+    },
+    {
+      "test_name": "Test_3",
+      "input": {
+        "authority": "www1.lyft.com",
+        "path": "/foo",
+        "method": "GET",
+        "random_value": 445
+      },
+      "validate": {"cluster_name": "cluster2"}
+    },
+    {
+      "test_name": "Test_4",
+      "input": {
+        "authority": "www1.lyft.com",
+        "path": "/foo",
+        "method": "GET",
+        "random_value": 560
+      },
+      "validate": {"cluster_name": "cluster3"}
+    },
+    {
+      "test_name": "Test_5",
+      "input": {
+        "authority": "www2.lyft.com",
+        "path": "/foo/123",
+        "method": "GET",
+        "random_value": 10
+      },
+      "validate": {"cluster_name": "cluster1"}
+    },
+    {
+      "test_name": "Test_6",
+      "input": {
+        "authority": "www2.lyft.com",
+        "path": "/bar",
+        "method": "GET",
+        "random_value": 30
+      },
+      "validate": {"cluster_name": "cluster2"}
+    },
+    {
+      "test_name": "Test_7",
+      "input": {
+        "authority": "www2.lyft.com",
+        "path": "/foo",
+        "method": "GET",
+        "random_value": 70
+      },
+      "validate": {"cluster_name": "cluster3"}
+    }
+  ]
+}

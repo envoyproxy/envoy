@@ -1,0 +1,18 @@
+config {
+  name: "envoy.filters.network.http_connection_manager"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+    value: "\022\001l\"\000R4\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\230\001\200X"
+  }
+}
+actions {
+  on_data {
+    data: "X"
+  }
+}
+}
+actions {
+  on_data {
+    data: "-"
+  }
+}

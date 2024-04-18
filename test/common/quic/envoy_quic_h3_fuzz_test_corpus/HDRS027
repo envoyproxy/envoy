@@ -1,0 +1,67 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 2,
+      fin: false,
+      offset: 0,
+        h3frame {
+          settings {}
+        }
+    }
+  }
+}
+frames {
+  qframe {
+    stream {
+      unidirectional: false,
+      type: 0,
+      id: 4,
+      fin: false,
+      offset: 0,
+      h3frame {
+        headers {
+          headers {
+            headers {
+              key: ":scheme"
+              value: "https"
+            }
+            headers {
+              key: ":path"
+              value: "/"
+            }
+            headers {
+              key: ":method"
+              value: "get"
+            }
+            headers {
+              key: "-hedge-on-per-try-timeout"
+              value: "empty"
+            }
+            headers {
+              key: "referer"
+              value: "empty"
+            }
+            headers {
+              key: "content-encoding"
+              value: "br"
+            }
+            headers {
+              key: "vary"
+              value: "*"
+            }
+            headers {
+              key: "date"
+              value: "empty"
+            }
+            headers {
+              key: "access-control-allow-private-network"
+              value: "empty"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,294 @@
+actions {
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":scheme"
+        value: "t"
+      }
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "\'"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1634017305
+    request {
+      trailers {
+        headers {
+          headers {
+            key: "&"
+          }
+        }
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1073741824
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1073741824
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":scheme"
+        value: "\'"
+      }
+      headers {
+        key: ":method"
+        value: "GOT"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+    }
+    end_stream: true
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":scheme"
+        value: "t"
+      }
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "\'"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: "/"
+        value: "foo.com"
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  stream_action {
+    request {
+      throw_decoder_exception {
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data {
+        status: DATA_STOP_ITERATION_NO_BUFFER
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "\'"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1073741824
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data {
+        decoder_filter_callback_action {
+          add_decoded_data {
+            size: 262144
+          }
+        }
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":scheme"
+        value: "t"
+      }
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "\'"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "&"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 4294967295
+  }
+}
+actions {
+  stream_action {
+    stream_id: 4
+  }
+}

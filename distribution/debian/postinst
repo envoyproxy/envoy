@@ -1,0 +1,42 @@
+#!/bin/sh
+
+# postinst script for envoy
+
+set -e
+
+case "$1" in
+
+  configure)
+        cat <<BANNER
+
+You have installed the Envoy proxy server.
+
+You can check your Envoy version by running the following in a terminal:
+
+  $ envoy --version
+
+Documentation for your version is available at:
+
+  https://www.envoyproxy.io/docs
+
+The Envoy project can be found at:
+
+  https://github.com/envoyproxy/envoy
+
+BANNER
+  ;;
+
+  abort-upgrade|abort-remove|abort-deconfigure)
+    exit 0
+  ;;
+
+  *)
+    echo "postinst called with unknown argument \`$1'" >&2
+    exit 1
+  ;;
+
+esac
+
+#DEBHELPER#
+
+exit 0

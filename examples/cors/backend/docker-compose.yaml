@@ -1,0 +1,19 @@
+services:
+
+  front-envoy:
+    build:
+      context: .
+      dockerfile: ../../shared/envoy/Dockerfile
+    depends_on:
+      backend-service:
+        condition: service_healthy
+    ports:
+    - "${PORT_BACKEND:-8002}:10000"
+    - "${PORT_STATS:-8003}:8001"
+
+  backend-service:
+    build:
+      context: ../../shared/python
+      target: aiohttp-service
+    volumes:
+    - ./service.py:/code/service.py

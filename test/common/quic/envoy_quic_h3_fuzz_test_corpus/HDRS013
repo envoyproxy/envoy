@@ -1,0 +1,75 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 2,
+      fin: false,
+      offset: 0,
+        h3frame {
+          settings {}
+        }
+    }
+  }
+}
+frames {
+  qframe {
+    stream {
+      unidirectional: false,
+      type: 0,
+      id: 4,
+      fin: false,
+      offset: 0,
+      h3frame {
+        headers {
+          headers {
+            headers {
+              key: ":scheme"
+              value: "https"
+            }
+            headers {
+              key: ":path"
+              value: "/"
+            }
+            headers {
+              key: ":method"
+              value: "delete"
+            }
+            headers {
+              key: "content-encoding"
+              value: "zstd"
+            }
+            headers {
+              key: "proxy-connection"
+              value: "empty"
+            }
+            headers {
+              key: "x-forwarded-for"
+              value: "empty"
+            }
+            headers {
+              key: "-retry-on"
+              value: "connect-failure"
+            }
+            headers {
+              key: "content-type"
+              value: "text/event-stream"
+            }
+            headers {
+              key: "-upstream-service-time"
+              value: "empty"
+            }
+            headers {
+              key: "-downstream-service-cluster"
+              value: "empty"
+            }
+            headers {
+              key: "access-control-expose-headers"
+              value: "empty"
+            }
+          }
+        }
+      }
+    }
+  }
+}

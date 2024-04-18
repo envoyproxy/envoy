@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package envoymobile.extensions.filters.http.test_kv_store;
+
+import "validate/validate.proto";
+
+message TestKeyValueStore {
+  string kv_store_name = 1 [(validate.rules).string.min_len = 1];
+  string test_key = 2 [(validate.rules).string.min_len = 1];
+  string test_value = 3 [(validate.rules).string.min_len = 1];
+}

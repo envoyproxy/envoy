@@ -1,0 +1,43 @@
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-certs
+    ports:
+    - "${PORT_PROXY:-10000}:10000"
+
+  proxy-client:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-certs
+      args:
+        ENVOY_CONFIG: envoy-client.yaml
+    ports:
+    - "${PORT_PROXY_CLIENT:-20000}:10000"
+
+  http-upstream1:
+    build:
+      context: .
+      dockerfile: ../shared/echo2/Dockerfile
+    hostname: http-upstream1
+    environment:
+    - HTTPS_PORT=0
+
+  http-upstream2:
+    build:
+      context: .
+      dockerfile: ../shared/echo2/Dockerfile
+    hostname: http-upstream2
+    environment:
+    - HTTPS_PORT=0
+
+  https-upstream3:
+    build:
+      context: .
+      dockerfile: ../shared/echo2/Dockerfile
+    hostname: https-upstream3
+    environment:
+    - HTTP_PORT=0

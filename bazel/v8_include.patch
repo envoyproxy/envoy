@@ -1,0 +1,41 @@
+# fix include types for late clang (15.0.7) / gcc (13.2.1)
+# for Arch linux / Fedora, like in
+#     In file included from external/v8/src/torque/torque.cc:5:
+#     In file included from external/v8/src/torque/source-positions.h:10:
+#     In file included from external/v8/src/torque/contextual.h:10:
+#     In file included from external/v8/src/base/macros.h:12:
+#     external/v8/src/base/logging.h:154:26: error: use of undeclared identifier 'uint16_t'
+
+diff --git a/src/base/logging.h b/src/base/logging.h
+--- a/src/base/logging.h
++++ b/src/base/logging.h
+@@ -5,6 +5,7 @@
+ #ifndef V8_BASE_LOGGING_H_
+ #define V8_BASE_LOGGING_H_
+ 
++#include <cstdint>
+ #include <cstring>
+ #include <sstream>
+ #include <string>
+diff --git a/src/base/macros.h b/src/base/macros.h
+--- a/src/base/macros.h
++++ b/src/base/macros.h
+@@ -5,6 +5,7 @@
+ #ifndef V8_BASE_MACROS_H_
+ #define V8_BASE_MACROS_H_
+
++#include <cstdint>
+ #include <limits>
+ #include <type_traits>
+
+diff --git a/src/inspector/v8-string-conversions.h b/src/inspector/v8-string-conversions.h
+--- a/src/inspector/v8-string-conversions.h
++++ b/src/inspector/v8-string-conversions.h
+@@ -5,6 +5,7 @@
+ #ifndef V8_INSPECTOR_V8_STRING_CONVERSIONS_H_
+ #define V8_INSPECTOR_V8_STRING_CONVERSIONS_H_
+ 
++#include <cstdint>
+ #include <string>
+ 
+ // Conversion routines between UT8 and UTF16, used by string-16.{h,cc}. You may

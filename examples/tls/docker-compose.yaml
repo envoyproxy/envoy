@@ -1,0 +1,53 @@
+services:
+
+  proxy-https-to-http:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_CONFIG: ./envoy-https-http.yaml
+    ports:
+    - "${PORT_PROXY0:-10000}:10000"
+
+  proxy-https-to-https:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_CONFIG: ./envoy-https-https.yaml
+    ports:
+    - "${PORT_PROXY1:-10001}:10000"
+
+  proxy-http-to-https:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_CONFIG: ./envoy-http-https.yaml
+    ports:
+    - "${PORT_PROXY2:-10002}:10000"
+
+  proxy-https-passthrough:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_CONFIG: ./envoy-https-passthrough.yaml
+    ports:
+    - "${PORT_PROXY3:-10003}:10000"
+
+  service-http:
+    build:
+      context: .
+      dockerfile: ../shared/echo2/Dockerfile
+    hostname: service-http
+    environment:
+    - HTTPS_PORT=0
+
+  service-https:
+    build:
+      context: .
+      dockerfile: ../shared/echo2/Dockerfile
+    hostname: service-https
+    environment:
+    - HTTP_PORT=0

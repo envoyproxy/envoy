@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.language.v3alpha;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.language.v3alpha";
+option java_outer_classname = "LanguageProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/http/language/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Language]
+// Language :ref:`configuration overview <config_http_filters_language>`.
+// [#extension: envoy.filters.http.language]
+
+// Language detection filter config.
+message Language {
+  // The default language to be used as a fallback.
+  // The value will be included in the list of the supported languages.
+  //
+  // See https://unicode-org.github.io/icu/userguide/locale/
+  string default_language = 1 [(validate.rules).string = {min_len: 2}];
+
+  // The set of supported languages. There is no order priority.
+  // The order will be determined by the Accept-Language header priority list
+  // of the client.
+  //
+  // See https://unicode-org.github.io/icu/userguide/locale/
+  repeated string supported_languages = 2 [(validate.rules).repeated = {
+    min_items: 1
+    unique: true
+    items {string {min_len: 2}}
+  }];
+
+  // If the x-language header is altered, clear the route cache for the current request.
+  // This should be set if the route configuration may depend on the x-language header.
+  // Otherwise it should be unset to avoid the performance cost of route recalculation.
+  bool clear_route_cache = 3;
+}

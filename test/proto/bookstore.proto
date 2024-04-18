@@ -1,0 +1,373 @@
+syntax = "proto3";
+
+package bookstore;
+
+import "google/api/annotations.proto";
+import "google/api/httpbody.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
+
+// A simple Bookstore API.
+//
+// The API manages shelves and books resources. Shelves contain books.
+service Bookstore {
+  // Returns a list of all shelves in the bookstore.
+  rpc ListShelves(google.protobuf.Empty) returns (ListShelvesResponse) {
+    option (google.api.http) = {
+      get: "/shelves"
+    };
+  }
+  // Creates a new shelf in the bookstore.
+  rpc CreateShelf(CreateShelfRequest) returns (Shelf) {
+    option (google.api.http) = {
+      post: "/shelf"
+      body: "shelf"
+    };
+  }
+  // Creates a new shelf in the bookstore via a mapped package.service.method as its HTTP path.
+  rpc CreateShelfWithPackageServiceAndMethod(CreateShelfRequest) returns (Shelf) {
+    option (google.api.http) = {
+      post: "/bookstore.Bookstore/CreateShelfWithPackageServiceAndMethod"
+      body: "shelf"
+    };
+  }
+  // Creates multiple shelves with one streaming call
+  rpc BulkCreateShelf(stream CreateShelfRequest) returns (stream Shelf) {
+    option (google.api.http) = {
+      post: "/bulk/shelves"
+      body: "shelf"
+    };
+  }
+  // Returns a specific bookstore shelf.
+  rpc GetShelf(GetShelfRequest) returns (Shelf) {
+    option (google.api.http) = {
+      get: "/shelves/{shelf}"
+    };
+  }
+  // Deletes a shelf, including all books that are stored on the shelf.
+  rpc DeleteShelf(DeleteShelfRequest) returns (google.protobuf.Empty) {
+  }
+  // Returns a list of books on a shelf.
+  rpc ListBooks(ListBooksRequest) returns (stream Book) {
+    option (google.api.http) = {
+      get: "/shelves/{shelf}/books"
+    };
+  }
+  // Creates a new book.
+  rpc CreateBook(CreateBookRequest) returns (Book) {
+    option (google.api.http) = {
+      put: "/shelves/{shelf}/books"
+      body: "book"
+    };
+  }
+  // Returns a specific book.
+  rpc GetBook(GetBookRequest) returns (Book) {
+  }
+  // Deletes a book from a shelf.
+  rpc DeleteBook(DeleteBookRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/shelves/{shelf}/books/{book}"
+    };
+  }
+  rpc UpdateBook(UpdateBookRequest) returns (Book) {
+    option (google.api.http) = {
+      patch: "/shelves/{shelf}/books/{book.id}"
+      body: "book"
+    };
+  }
+  rpc BookstoreOptions(GetShelfRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      custom {kind: "OPTIONS" path: "/shelves/{shelf}"}
+    };
+  }
+  // Returns a specific author.
+  rpc GetAuthor(GetAuthorRequest) returns (Author) {
+    option (google.api.http) = {
+      get: "/authors/{author}"
+    };
+  }
+  // Echo an Author to test enum encode/decode.
+  rpc EchoAuthor(Author) returns (Author) {
+    option (google.api.http) = {
+      post: "/echoAuthor"
+    };
+  }
+  rpc GetIndex(google.protobuf.Empty) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/index"
+    };
+  }
+  rpc GetIndexStream(google.protobuf.Empty) returns (stream google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/indexStream"
+    };
+  }
+  rpc GetRoot(google.protobuf.Empty) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/"
+    };
+  }
+  rpc PostBody(EchoBodyRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/postBody"
+      body: "nested.content"
+    };
+  }
+  rpc StreamBody(stream EchoBodyRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/streamBody"
+      body: "nested.content"
+    };
+  }
+  rpc EchoBody(EchoBodyRequest) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      post: "/echoBody"
+      body: "nested.content"
+    };
+  }
+
+  rpc EchoRawBody(google.api.HttpBody) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/echoRawBody"
+      additional_bindings: {post: "/echoRawBody"}
+    };
+  }
+
+  rpc EchoNestedBody(EchoNestedRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/echoNestedBody"
+      body: "nested1.body"
+    };
+  }
+  rpc EchoResponseBodyPath(google.protobuf.Empty) returns (EchoBodyRequest) {
+    option (google.api.http) = {
+      get: "/echoResponseBodyPath"
+      response_body: "nested.content"
+    };
+  }
+  rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
+    option (google.api.http) = {
+      post: "/echoStruct"
+      body: "content"
+    };
+  }
+  // To test grpc transcoding with an unknown field.
+  // This could happen when the grpc server is using a updated proto with a new field,
+  // but Envoy transcoding config is still using the old version.
+  rpc GetBigBook(google.protobuf.Empty) returns (OldBigBook) {
+    option (google.api.http) = {
+      get: "/bigbook"
+    };
+  }
+  rpc PostWildcard(EchoBodyRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/wildcard/{arg=**}"
+    };
+  }
+  rpc PostCustomVerb(EchoBodyRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/foo/bar:verb"
+    };
+  }
+
+  rpc CreateShelfBodyWildcard(CreateShelfRequest) returns (Shelf) {
+    option (google.api.http) = {
+      post: "/shelf/{shelf.id}"
+      body: "*"
+    };
+  }
+}
+
+service ServiceWithResponseBody {
+  rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
+    option (google.api.http) = {
+      get: "/echoStruct"
+      response_body: "content"
+    };
+  }
+}
+
+service ServiceWithInvalidRequestBodyPath {
+  rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
+    option (google.api.http) = {
+      get: "/echoStruct"
+      body: "unknown.field"
+    };
+  }
+}
+
+service ServiceWithInvalidResponseBodyPath {
+  rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
+    option (google.api.http) = {
+      get: "/echoStruct"
+      response_body: "unknown.field"
+    };
+  }
+}
+
+// A shelf resource.
+message Shelf {
+  // A unique shelf id.
+  int64 id = 1;
+  // A theme of the shelf (fiction, poetry, etc).
+  string theme = 2;
+
+  // To test json name is percentage decoded
+  string search_decoded = 3 [json_name = "search[decoded]"];
+
+  // To test json name is percentage encoded
+  string search_encoded = 4 [json_name = "search%5Bencoded%5D"];
+}
+
+// A book resource.
+message Book {
+  // A unique book id.
+  int64 id = 1;
+  // An author of the book.
+  string author = 2;
+  // A book title.
+  string title = 3;
+  // Quotes from the book.
+  repeated string quotes = 4;
+}
+
+// An author resource.
+message Author {
+  // A unique author id.
+  int64 id = 1;
+  enum Gender {
+    UNKNOWN = 0;
+    MALE = 1;
+    FEMALE = 2;
+  };
+  Gender gender = 2;
+  string first_name = 3;
+  string last_name = 4 [json_name = "lname"];
+}
+
+// Response to ListShelves call.
+message ListShelvesResponse {
+  // Shelves in the bookstore.
+  repeated Shelf shelves = 1;
+}
+
+// Request message for CreateShelf method.
+message CreateShelfRequest {
+  // The shelf resource to create.
+  Shelf shelf = 1;
+}
+
+// Request message for GetShelf method.
+message GetShelfRequest {
+  // The ID of the shelf resource to retrieve.
+  int64 shelf = 1;
+}
+
+// Request message for DeleteShelf method.
+message DeleteShelfRequest {
+  // The ID of the shelf to delete.
+  int64 shelf = 1;
+}
+
+// Request message for ListBooks method.
+message ListBooksRequest {
+  // ID of the shelf which books to list.
+  int64 shelf = 1;
+}
+
+// Request message for CreateBook method.
+message CreateBookRequest {
+  // The ID of the shelf on which to create a book.
+  int64 shelf = 1;
+  // A book resource to create on the shelf.
+  Book book = 2;
+}
+
+// Request message for GetBook method.
+message GetBookRequest {
+  // The ID of the shelf from which to retrieve a book.
+  int64 shelf = 1;
+  // The ID of the book to retrieve.
+  int64 book = 2;
+}
+
+// Request message for UpdateBook method
+message UpdateBookRequest {
+  // The ID of the shelf from which to retrieve a book.
+  int64 shelf = 1;
+  // A book resource to update on the shelf.
+  Book book = 2;
+}
+
+// Request message for DeleteBook method.
+message DeleteBookRequest {
+  // The ID of the shelf from which to delete a book.
+  int64 shelf = 1;
+  // The ID of the book to delete.
+  int64 book = 2;
+}
+
+// Request message for GetAuthor method.
+message GetAuthorRequest {
+  // The ID of the author resource to retrieve.
+  int64 author = 1;
+}
+
+message EchoBodyRequest {
+  message Nested {
+    google.api.HttpBody content = 1;
+  }
+  string arg = 1;
+  string unused = 2;
+  Nested nested = 3;
+}
+
+message EchoNestedRequest {
+  message Nested {
+    google.api.HttpBody body = 1;
+  }
+  Nested nested1 = 1;
+  Nested nested2 = 2;
+}
+
+// Request and Response message for EchoStructReqResp method.
+message EchoStructReqResp {
+  // The content of request.
+  google.protobuf.Struct content = 1;
+}
+
+// Test message for deeply-nested HttpBody field.
+message DeepNestedBody {
+  message Nested {
+    message Nested {
+      message Nested {
+        google.api.HttpBody body = 500000000;
+      }
+      Nested nested = 100000000;
+    }
+    message Extra {
+      int32 field = 1;
+    }
+    Nested nested = 1000000;
+    Extra extra = 50;
+  }
+  message Extra {
+    string field = 1;
+  }
+  Nested nested = 1;
+  Extra extra = 2;
+}
+
+// gRPC server is using BigBook, but envoy transcoder filter is using
+// OldBigBook with missing `field1`.
+message BigBook {
+  string field1 = 1;
+  string field2 = 2;
+  string field3 = 3;
+}
+
+// The BigBook message with missing `field1`.
+message OldBigBook {
+  string field2 = 2;
+  string field3 = 3;
+}

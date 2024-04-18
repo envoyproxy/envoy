@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package envoy.extensions.quic.crypto_stream.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.quic.crypto_stream.v3";
+option java_outer_classname = "CryptoStreamProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/quic/crypto_stream/v3;crypto_streamv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: QUIC server crypto stream config]
+// [#extension: envoy.quic.crypto_stream.server.quiche]
+
+// Configuration for the default QUIC server crypto stream provided by QUICHE.
+message CryptoServerStreamConfig {
+}

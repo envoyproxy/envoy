@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.set_metadata.v3;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.set_metadata.v3";
+option java_outer_classname = "SetMetadataProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/set_metadata/v3;set_metadatav3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Set-Metadata Filter]
+//
+// This filters adds or updates dynamic metadata with static data.
+//
+// [#extension: envoy.filters.http.set_metadata]
+
+message Metadata {
+  // The metadata namespace.
+  string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Allow the filter to overwrite or merge with an existing value in the namespace.
+  bool allow_overwrite = 2;
+
+  // The value to place at the namespace. If ``allow_overwrite``, this will
+  // overwrite or merge with any existing values in that namespace. See
+  // :ref:`the filter documentation <config_http_filters_set_metadata>` for
+  // more information on how this value is merged with potentially existing
+  // ones if ``allow_overwrite`` is configured. Only one of ``value`` and
+  // ``typed_value`` may be set.
+  google.protobuf.Struct value = 3;
+
+  // The value to place at the namespace. If ``allow_overwrite``, this will
+  // overwrite any existing values in that namespace. Only one of ``value`` and
+  // ``typed_value`` may be set.
+  google.protobuf.Any typed_value = 4;
+}
+
+message Config {
+  // The metadata namespace.
+  // This field is deprecated; please use ``metadata`` as replacement.
+  string metadata_namespace = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // The untyped value to update the dynamic metadata namespace with. See
+  // :ref:`the filter documentation <config_http_filters_set_metadata>` for
+  // more information on how this value is merged with potentially existing
+  // ones.
+  // This field is deprecated; please use ``metadata`` as replacement.
+  google.protobuf.Struct value = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Defines changes to be made to dynamic metadata.
+  repeated Metadata metadata = 3;
+}

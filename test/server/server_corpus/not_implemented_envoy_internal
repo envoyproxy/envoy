@@ -1,0 +1,105 @@
+static_resources {
+  clusters {
+    name: "ser"
+    connect_timeout {
+      nanos: 813
+    }
+    lb_policy: RING_HASH
+    health_checks {
+      timeout {
+        seconds: 1000000
+        nanos: 262239
+      }
+      interval {
+        seconds: 10838081697
+        nanos: 95
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+      }
+      http_health_check {
+        host: "\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\001\037\037\037\037\037\037\037\037\037\037\037\037\037f\037\037\037\037"
+        path: "&"
+      }
+      healthy_edge_interval {
+        nanos: 95
+      }
+    }
+    circuit_breakers {
+    }
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        http_protocol_options {
+          allow_absolute_url {
+            value: true
+          }
+        }
+      }
+    }
+    load_assignment {
+      cluster_name: "."
+      endpoints {
+      }
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "f"
+              }
+            }
+          }
+          health_status: DRAINING
+        }
+      }
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            address {
+              envoy_internal_address {
+                server_listener_name: "\000\000\000\003"
+              }
+            }
+          }
+        }
+        priority: 16
+      }
+      endpoints {
+        proximity {
+          value: 10240
+        }
+      }
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            address {
+              socket_address {
+                address: "127.0.0.1"
+                port_value: 9901
+              }
+            }
+          }
+          health_status: HEALTHY
+        }
+        priority: 16
+      }
+    }
+  }
+}
+stats_flush_interval {
+  nanos: 16777216
+}
+admin {
+  address {
+    socket_address {
+      address: "\024"
+    }
+  }
+  socket_options {
+    description: "="
+    level: 4702337453602635775
+    int_value: 4702337453602635775
+  }
+}

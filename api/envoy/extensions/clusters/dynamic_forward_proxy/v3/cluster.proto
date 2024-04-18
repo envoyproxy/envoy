@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package envoy.extensions.clusters.dynamic_forward_proxy.v3;
+
+import "envoy/config/cluster/v3/cluster.proto";
+import "envoy/config/core/v3/address.proto";
+import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.clusters.dynamic_forward_proxy.v3";
+option java_outer_classname = "ClusterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/dynamic_forward_proxy/v3;dynamic_forward_proxyv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic forward proxy cluster configuration]
+
+// Configuration for the dynamic forward proxy cluster. See the :ref:`architecture overview
+// <arch_overview_http_dynamic_forward_proxy>` for more information.
+// [#extension: envoy.clusters.dynamic_forward_proxy]
+message ClusterConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig";
+
+  oneof cluster_implementation_specifier {
+    // The DNS cache configuration that the cluster will attach to. Note this configuration must
+    // match that of associated :ref:`dynamic forward proxy HTTP filter configuration
+    // <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.dns_cache_config>`.
+    common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1;
+
+    // Configuration for sub clusters, when this configuration is enabled,
+    // Envoy will create an independent sub cluster dynamically for each host:port.
+    // Most of the configuration of a sub cluster is inherited from the current cluster,
+    // i.e. health_checks, dns_resolvers and etc.
+    // And the load_assignment will be set to the only one endpoint, host:port.
+    //
+    // Compared to the dns_cache_config, it has the following advantages:
+    //
+    // 1. sub clusters will be created with the STRICT_DNS DiscoveryType,
+    //    so that Envoy will use all of the IPs resolved from the host.
+    //
+    // 2. each sub cluster is full featured cluster, with lb_policy and health check and etc enabled.
+    //
+    SubClustersConfig sub_clusters_config = 4;
+  }
+
+  // If true allow the cluster configuration to disable the auto_sni and auto_san_validation options
+  // in the :ref:`cluster's upstream_http_protocol_options
+  // <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_http_protocol_options>`
+  bool allow_insecure_cluster_options = 2;
+
+  // If true allow HTTP/2 and HTTP/3 connections to be reused for requests to different
+  // origins than the connection was initially created for. This will only happen when the
+  // resolved address for the new connection matches the peer address of the connection and
+  // the TLS certificate is also valid for the new hostname. For example, if a connection
+  // has previously been established to foo.example.com at IP 1.2.3.4 with a certificate
+  // that is valid for ``*.example.com``, then this connection could be used for requests to
+  // bar.example.com if that also resolved to 1.2.3.4.
+  //
+  // .. note::
+  //   By design, this feature will maximize reuse of connections. This means that instead
+  //   opening a new connection when an existing connection reaches the maximum number of
+  //   concurrent streams, requests will instead be sent to the existing connection.
+  //
+  // .. note::
+  //   The coalesced connections might be to upstreams that would not be otherwise
+  //   selected by Envoy. See the section `Connection Reuse in RFC 7540
+  //   <https://datatracker.ietf.org/doc/html/rfc7540#section-9.1.1>`_
+  //
+  bool allow_coalesced_connections = 3;
+}
+
+// Configuration for sub clusters. Hard code STRICT_DNS cluster type now.
+message SubClustersConfig {
+  // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
+  // when picking a host in a sub cluster. Note that CLUSTER_PROVIDED is not allowed here.
+  config.cluster.v3.Cluster.LbPolicy lb_policy = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // The maximum number of sub clusters that the DFP cluster will hold. If not specified defaults to 1024.
+  google.protobuf.UInt32Value max_sub_clusters = 2 [(validate.rules).uint32 = {gt: 0}];
+
+  // The TTL for sub clusters that are unused. Sub clusters that have not been used in the configured time
+  // interval will be purged. If not specified defaults to 5m.
+  google.protobuf.Duration sub_cluster_ttl = 3 [(validate.rules).duration = {gt {}}];
+
+  // Sub clusters that should be created & warmed upon creation. This might provide a
+  // performance improvement, in the form of cache hits, for sub clusters that are going to be
+  // warmed during steady state and are known at config load time.
+  repeated config.core.v3.SocketAddress preresolve_clusters = 4;
+}

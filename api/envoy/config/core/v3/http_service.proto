@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/http_uri.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.core.v3";
+option java_outer_classname = "HttpServiceProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/core/v3;corev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: HTTP services]
+
+// HTTP service configuration.
+message HttpService {
+  // The service's HTTP URI. For example:
+  //
+  // .. code-block:: yaml
+  //
+  //    http_uri:
+  //      uri: https://www.myserviceapi.com/v1/data
+  //      cluster: www.myserviceapi.com|443
+  //
+  HttpUri http_uri = 1;
+
+  // Specifies a list of HTTP headers that should be added to each request
+  // handled by this virtual host.
+  repeated HeaderValueOption request_headers_to_add = 2
+      [(validate.rules).repeated = {max_items: 1000}];
+}

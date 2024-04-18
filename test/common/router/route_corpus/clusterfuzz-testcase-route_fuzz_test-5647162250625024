@@ -1,0 +1,40 @@
+config {
+  virtual_hosts {
+    name: "regex"
+    domains: "bat.com"
+    domains: "*"
+    domains: "w.lyft.com"
+    routes {
+      match {
+        regex: "/"
+      }
+      route {
+        cluster: "regex"
+        prefix_rewrite: "ewrote"
+      }
+      request_headers_to_add {
+        header {
+          key: "\177\177\177\177\177\177\177\177"
+        }
+      }
+    }
+  }
+  request_headers_to_add {
+    header {
+      key: ":path"
+      value: "`"
+    }
+    append {
+    }
+  }
+  request_headers_to_add {
+    header {
+      key: "`"
+      value: "`"
+    }
+    append {
+    }
+  }
+  validate_clusters {
+  }
+}

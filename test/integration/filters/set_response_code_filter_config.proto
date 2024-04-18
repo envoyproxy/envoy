@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+import "validate/validate.proto";
+
+// For downstream filter factory: SetResponseCodeFilterFactory.
+message SetResponseCodeFilterConfig {
+  string prefix = 1;
+  uint32 code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+  string body = 3;
+}
+
+// Per route config overrides filter config, if present.
+message SetResponseCodePerRouteFilterConfig {
+  string prefix = 1;
+  uint32 code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+  string body = 3;
+}
+
+// For dual filter factory: SetResponseCodeFilterFactoryDual.
+message SetResponseCodeFilterConfigDual {
+  string prefix = 1;
+  uint32 code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+  string body = 3;
+}
+
+message SetResponseCodePerRouteFilterConfigDual {
+  string prefix = 1;
+  uint32 code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+  string body = 3;
+}
+
+// For downstream filter factory: SetResponseCodeFilterFactoryNoServerContext
+message SetResponseCodeFilterConfigNoServerContext {
+  string prefix = 1;
+  uint32 code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+  string body = 3;
+}
+
+message SetResponseCodePerRouteFilterConfigNoServerContext {
+  string prefix = 1;
+  uint32 code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+  string body = 3;
+}
+
+// For dual filter factory: SetResponseCodeFilterFactoryDualNoServerContext.
+message SetResponseCodeFilterConfigDualNoServerContext {
+  string prefix = 1;
+  uint32 code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+  string body = 3;
+}
+
+message SetResponseCodePerRouteFilterConfigDualNoServerContext {
+  string prefix = 1;
+  uint32 code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+  string body = 3;
+}

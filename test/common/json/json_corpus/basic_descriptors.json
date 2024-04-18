@@ -1,0 +1,6 @@
+    {
+      "descriptors": [
+         [{"key": "hello", "value": "world"}, {"key": "foo", "value": "bar"}],
+         [{"key": "foo2", "value": "bar2"}]
+       ]
+    }

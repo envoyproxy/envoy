@@ -1,0 +1,110 @@
+h2_settings {
+  client {
+    hpack_table_size: 29029
+  }
+  server {
+    hpack_table_size: 29029
+  }
+}
+actions {
+  mutate {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":scheme"
+        value: "p"
+      }
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+      }
+    }
+  }
+}
+actions {
+  mutate {
+    buffer: 65279
+table_size: 29029
+  }
+  server {
+    hpack_table_size: 29029
+  }
+}
+actions {
+  mutate {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":scheme"
+        value: "p"
+      }
+    }
+  }
+}
+actions {
+  quiesce_drain {
+      offset: 8
+    server: true
+  }
+}
+actions {
+  mutate {
+    offset: 3
+    value: 6
+  }
+}
+actions {
+  mutate {
+    offset: 3
+    value: 6
+    server: true
+  }
+}
+actions {
+  swap_buffer {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+        headers {
+          key: ":scheme"
+          value: "h+tpN"
+        }
+      }
+    }
+  }
+}
+actions {
+  mutate {
+    offset: 8
+    value: 3
+    server: true
+  }
+}
+actions {
+  mutate {
+    offset: 3
+    value: 6
+    server: true
+  }
+}

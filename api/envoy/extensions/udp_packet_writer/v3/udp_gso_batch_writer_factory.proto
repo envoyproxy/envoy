@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package envoy.extensions.udp_packet_writer.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.udp_packet_writer.v3";
+option java_outer_classname = "UdpGsoBatchWriterFactoryProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/udp_packet_writer/v3;udp_packet_writerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: UDP GSO batch packet writer config]
+// [#extension: envoy.udp_packet_writer.gso]
+
+// Configuration for the UDP GSO batch packet writer factory.
+message UdpGsoBatchWriterFactory {
+}

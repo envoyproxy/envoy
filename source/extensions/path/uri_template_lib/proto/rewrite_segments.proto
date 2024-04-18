@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package envoy.extensions.uri_template;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.uri_template";
+option java_outer_classname = "UriTemplateRewrite";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/url_template/url_template";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// TODO(silverstar194): Convert proto to struct
+// Holds the segments for rewriting urls base on uri pattern templates
+message RewriteSegments {
+  message RewriteSegment {
+    oneof segment_type {
+      // Represents a segment of the rewritten URL, including any path segments,
+      // slash and prefix.
+      string literal = 1;
+
+      // Represents an index into the RE2 capture which value should be used
+      // to construct the rewritten URL. Note that the index should be greater
+      // than 0 as 0 index into the whole match RE2 pattern.
+      int32 capture_index = 2;
+    }
+  }
+
+  repeated RewriteSegment segments = 3;
+}

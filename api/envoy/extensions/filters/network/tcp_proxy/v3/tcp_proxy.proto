@@ -1,0 +1,256 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.tcp_proxy.v3;
+
+import "envoy/config/accesslog/v3/accesslog.proto";
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/config_source.proto";
+import "envoy/type/v3/hash_policy.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.tcp_proxy.v3";
+option java_outer_classname = "TcpProxyProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/tcp_proxy/v3;tcp_proxyv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: TCP Proxy]
+// TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
+// [#extension: envoy.filters.network.tcp_proxy]
+
+// [#next-free-field: 18]
+message TcpProxy {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
+
+  // Allows for specification of multiple upstream clusters along with weights
+  // that indicate the percentage of traffic to be forwarded to each cluster.
+  // The router selects an upstream cluster based on these weights.
+  message WeightedCluster {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster";
+
+    message ClusterWeight {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight";
+
+      // Name of the upstream cluster.
+      string name = 1 [(validate.rules).string = {min_len: 1}];
+
+      // When a request matches the route, the choice of an upstream cluster is
+      // determined by its weight. The sum of weights across all entries in the
+      // clusters array determines the total weight.
+      uint32 weight = 2 [(validate.rules).uint32 = {gte: 1}];
+
+      // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints
+      // in the upstream cluster with metadata matching what is set in this field will be considered
+      // for load balancing. Note that this will be merged with what's provided in
+      // :ref:`TcpProxy.metadata_match
+      // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.metadata_match>`, with values
+      // here taking precedence. The filter name should be specified as ``envoy.lb``.
+      config.core.v3.Metadata metadata_match = 3;
+    }
+
+    // Specifies one or more upstream clusters associated with the route.
+    repeated ClusterWeight clusters = 1 [(validate.rules).repeated = {min_items: 1}];
+  }
+
+  // Configuration for tunneling TCP over other transports or application layers.
+  // Tunneling is supported over both HTTP/1.1 and HTTP/2. Upstream protocol is
+  // determined by the cluster configuration.
+  // [#next-free-field: 7]
+  message TunnelingConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
+
+    // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
+    // This field evaluates command operators if set, otherwise returns hostname as is.
+    //
+    // Example: dynamically set hostname using downstream SNI
+    //
+    // .. code-block:: yaml
+    //
+    //    tunneling_config:
+    //      hostname: "%REQUESTED_SERVER_NAME%:443"
+    //
+    // Example: dynamically set hostname using dynamic metadata
+    //
+    // .. code-block:: yaml
+    //
+    //    tunneling_config:
+    //      hostname: "%DYNAMIC_METADATA(tunnel:address)%"
+    //
+    string hostname = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Use POST method instead of CONNECT method to tunnel the TCP stream.
+    // The 'protocol: bytestream' header is also NOT set for HTTP/2 to comply with the spec.
+    //
+    // The upstream proxy is expected to convert POST payload as raw TCP.
+    bool use_post = 2;
+
+    // Additional request headers to upstream proxy. This is mainly used to
+    // trigger upstream to convert POST requests back to CONNECT requests.
+    //
+    // Neither ``:-prefixed`` pseudo-headers nor the Host: header can be overridden.
+    repeated config.core.v3.HeaderValueOption headers_to_add = 3
+        [(validate.rules).repeated = {max_items: 1000}];
+
+    // Save the response headers to the downstream info filter state for consumption
+    // by the network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_headers``.
+    bool propagate_response_headers = 4;
+
+    // The path used with POST method. Default path is ``/``. If post path is specified and
+    // :ref:`use_post field <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.use_post>`
+    // isn't true, it will be rejected.
+    string post_path = 5;
+
+    // Save the response trailers to the downstream info filter state for consumption
+    // by the network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_trailers``.
+    bool propagate_response_trailers = 6;
+  }
+
+  message OnDemand {
+    // An optional configuration for on-demand cluster discovery
+    // service. If not specified, the on-demand cluster discovery will
+    // be disabled. When it's specified, the filter will pause a request
+    // to an unknown cluster and will begin a cluster discovery
+    // process. When the discovery is finished (successfully or not),
+    // the request will be resumed.
+    config.core.v3.ConfigSource odcds_config = 1;
+
+    // xdstp:// resource locator for on-demand cluster collection.
+    // [#not-implemented-hide:]
+    string resources_locator = 2;
+
+    // The timeout for on demand cluster lookup. If the CDS cannot return the required cluster,
+    // the downstream request will be closed with the error code detail NO_CLUSTER_FOUND.
+    // [#not-implemented-hide:]
+    google.protobuf.Duration timeout = 3;
+  }
+
+  message TcpAccessLogOptions {
+    // The interval to flush access log. The TCP proxy will flush only one access log when the connection
+    // is closed by default. If this field is set, the TCP proxy will flush access log periodically with
+    // the specified interval.
+    // The interval must be at least 1ms.
+    google.protobuf.Duration access_log_flush_interval = 1
+        [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+    // If set to true, access log will be flushed when the TCP proxy has successfully established a
+    // connection with the upstream. If the connection failed, the access log will not be flushed.
+    bool flush_access_log_on_connected = 2;
+  }
+
+  reserved 6;
+
+  reserved "deprecated_v1";
+
+  // The prefix to use when emitting :ref:`statistics
+  // <config_network_filters_tcp_proxy_stats>`.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  oneof cluster_specifier {
+    option (validate.required) = true;
+
+    // The upstream cluster to connect to.
+    string cluster = 2;
+
+    // Multiple upstream clusters can be specified for a given route. The
+    // request is routed to one of the upstream clusters based on weights
+    // assigned to each cluster.
+    WeightedCluster weighted_clusters = 10;
+  }
+
+  // The on demand policy for the upstream cluster.
+  // It applies to both
+  // :ref:`TcpProxy.cluster <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.cluster>`
+  // and
+  // :ref:`TcpProxy.weighted_clusters <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.weighted_clusters>`.
+  OnDemand on_demand = 14;
+
+  // Optional endpoint metadata match criteria. Only endpoints in the upstream
+  // cluster with metadata matching that set in metadata_match will be
+  // considered. The filter name should be specified as ``envoy.lb``.
+  config.core.v3.Metadata metadata_match = 9;
+
+  // The idle timeout for connections managed by the TCP proxy filter. The idle timeout
+  // is defined as the period in which there are no bytes sent or received on either
+  // the upstream or downstream connection. If not set, the default idle timeout is 1 hour. If set
+  // to 0s, the timeout will be disabled.
+  // It is possible to dynamically override this configuration by setting a per-connection filter
+  // state object for the key ``envoy.tcp_proxy.per_connection_idle_timeout_ms``.
+  //
+  // .. warning::
+  //   Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP
+  //   FIN packets, etc.
+  google.protobuf.Duration idle_timeout = 8;
+
+  // [#not-implemented-hide:] The idle timeout for connections managed by the TCP proxy
+  // filter. The idle timeout is defined as the period in which there is no
+  // active traffic. If not set, there is no idle timeout. When the idle timeout
+  // is reached the connection will be closed. The distinction between
+  // downstream_idle_timeout/upstream_idle_timeout provides a means to set
+  // timeout based on the last byte sent on the downstream/upstream connection.
+  google.protobuf.Duration downstream_idle_timeout = 3;
+
+  // [#not-implemented-hide:]
+  google.protobuf.Duration upstream_idle_timeout = 4;
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>`
+  // emitted by the this tcp_proxy.
+  repeated config.accesslog.v3.AccessLog access_log = 5;
+
+  // The maximum number of unsuccessful connection attempts that will be made before
+  // giving up. If the parameter is not specified, 1 connection attempt will be made.
+  google.protobuf.UInt32Value max_connect_attempts = 7 [(validate.rules).uint32 = {gte: 1}];
+
+  // Optional configuration for TCP proxy hash policy. If hash_policy is not set, the hash-based
+  // load balancing algorithms will select a host randomly. Currently the number of hash policies is
+  // limited to 1.
+  repeated type.v3.HashPolicy hash_policy = 11 [(validate.rules).repeated = {max_items: 1}];
+
+  // If set, this configures tunneling, e.g. configuration options to tunnel TCP payload over
+  // HTTP CONNECT. If this message is absent, the payload will be proxied upstream as per usual.
+  // It is possible to dynamically override this configuration and disable tunneling per connection,
+  // by setting a per-connection filter state object for the key ``envoy.tcp_proxy.disable_tunneling``.
+  TunnelingConfig tunneling_config = 12;
+
+  // The maximum duration of a connection. The duration is defined as the period since a connection
+  // was established. If not set, there is no max duration. When max_downstream_connection_duration
+  // is reached the connection will be closed. Duration must be at least 1ms.
+  google.protobuf.Duration max_downstream_connection_duration = 13
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+  // .. attention::
+  // This field is deprecated in favor of
+  // :ref:`access_log_flush_interval
+  // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`.
+  // Note that if both this field and :ref:`access_log_flush_interval
+  // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`
+  // are specified, the former (deprecated field) is ignored.
+  google.protobuf.Duration access_log_flush_interval = 15 [
+    deprecated = true,
+    (validate.rules).duration = {gte {nanos: 1000000}},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
+
+  // .. attention::
+  // This field is deprecated in favor of
+  // :ref:`flush_access_log_on_connected
+  // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`.
+  // Note that if both this field and :ref:`flush_access_log_on_connected
+  // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`
+  // are specified, the former (deprecated field) is ignored.
+  bool flush_access_log_on_connected = 16
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Additional access log options for TCP Proxy.
+  TcpAccessLogOptions access_log_options = 17;
+}

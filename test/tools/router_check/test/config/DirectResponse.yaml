@@ -1,0 +1,39 @@
+virtual_hosts:
+- name: www2
+  domains:
+  - lyft.com
+  routes:
+  - match:
+      path: /ping
+    direct_response:
+      status: 200
+      body:
+        inline_string: "Success!"
+  - match:
+      path: /ping-json
+    direct_response:
+      status: 200
+      body:
+        inline_string: "{ 'message': 'Success!' }"
+    response_headers_to_add:
+    - header:
+        key: "content-type"
+        value: "application/json"
+      append_action: OVERWRITE_IF_EXISTS_OR_ADD
+  - match:
+      path: /ping-json2
+    direct_response:
+      status: 200
+      body:
+        inline_string: "{ 'message': 'Success!' }"
+    response_headers_to_add:
+    # This is bad, don't do it! Use append_action: OVERWRITE_IF_EXISTS_OR_ADD!
+    - header:
+        key: "content-type"
+        value: "application/json"
+  - match:
+      path: /ping-empty
+    direct_response:
+      status: 200
+      body:
+        inline_string: ""

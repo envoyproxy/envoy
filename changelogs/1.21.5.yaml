@@ -1,0 +1,6 @@
+date: July 25, 2022
+
+bug_fixes:
+- area: docker
+  change: |
+    update Docker images (``distroless`` -> ``49d2923f35d6``) to resolve CVE issues in container packages.

@@ -1,0 +1,57 @@
+actions {
+  add_buffer_fragment: 1
+}
+actions {
+  add_string: 3
+}
+actions {
+  target_index: 1
+  add_buffer: 0
+}
+actions {
+  prepend_string: 5
+}
+actions {
+  target_index: 1
+  prepend_buffer: 0
+}
+actions {
+  reserve_commit {
+    reserve_length: 2048
+    commit_length: 765
+  }
+}
+actions {
+  copy_out {
+    start: 7
+    length: 200
+  }
+}
+actions {
+  copy_out_to_slices: 200
+}
+actions {
+  drain: 98
+}
+actions {
+  linearize: 45
+}
+actions {
+  target_index: 1
+  move {
+    source_index: 0
+    length: 23
+  }
+}
+actions {
+  target_index: 0
+  move {
+    source_index: 1
+  }
+}
+actions {
+  read: 2789
+}
+actions {
+  write: {}
+}

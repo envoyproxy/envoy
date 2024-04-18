@@ -1,0 +1,30 @@
+config {
+  virtual_hosts {
+    name: "["
+    domains: "bat.com"
+    routes {
+      match {
+        safe_regex {
+          google_re2 {
+          }
+          regex: "."
+        }
+      }
+      filter_action {
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "bat.com"
+  }
+  headers {
+    key: ":path"
+    value: "b"
+  }
+  headers {
+    key: "x-forwarded-proto"
+  }
+}

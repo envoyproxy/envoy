@@ -1,0 +1,15 @@
+config {
+  name: "envoy.filters.network.rocketmq_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.rocketmq_proxy.v3.RocketmqProxy"
+    value: "\n \022\034\n\032__________________________ \001 \001"
+  }
+}
+
+actions {
+  on_data {
+    data: "\000\000\000\000\000\000\000\000\000"
+    end_stream: false
+  }
+}
+

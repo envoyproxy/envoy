@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package envoy;
+
+message HotRestartMessage {
+  // Child->parent requests
+  message Request {
+    message PassListenSocket {
+      string address = 1;
+      uint32 worker_index = 2;
+    }
+    message ShutdownAdmin {
+    }
+    message Stats {
+    }
+    message DrainListeners {
+    }
+    message Terminate {
+    }
+    // A separate socket is established for forwarding undeliverable quic udp packets
+    // from the parent instance to the child instance.
+    message ForwardedUdpPacket {
+      string local_addr = 1;
+      string peer_addr = 2;
+      uint64 receive_time_epoch_microseconds = 3;
+      bytes payload = 4;
+      uint32 worker_index = 5;
+    }
+    message TestConnection {
+    }
+    oneof request {
+      PassListenSocket pass_listen_socket = 1;
+      ShutdownAdmin shutdown_admin = 2;
+      Stats stats = 3;
+      DrainListeners drain_listeners = 4;
+      Terminate terminate = 5;
+      ForwardedUdpPacket forwarded_udp_packet = 6;
+      TestConnection test_connection = 7;
+    }
+  }
+
+  // Parent->child replies
+  message Reply {
+    message PassListenSocket {
+      int32 fd = 1;
+    }
+    message ShutdownAdmin {
+      uint64 original_start_time_unix_seconds = 1;
+      // See the comments on Server::Instance::enableReusePortDefault() for why this exists. The
+      // default is false for backwards compatibility.
+      bool enable_reuse_port_default = 2;
+    }
+    message Span {
+      uint32 first = 1;
+      uint32 last = 2; // inclusive
+    }
+    message RepeatedSpan {
+      repeated Span spans = 1;
+    }
+    message Stats {
+      // Values for server_stats, which don't fit with the "combination logic" approach.
+      uint64 memory_allocated = 1;
+      uint64 num_connections = 2;
+
+      // Keys are fully qualified stat names.
+      //
+      // The amount added to the counter since the last time a message included the counter in this
+      // map. (The first time a counter is included in this map, it's the amount added since the
+      // final latch() before hot restart began).
+      map<string, uint64> counter_deltas = 3;
+      // The parent's current values for various gauges in its stats store.
+      map<string, uint64> gauges = 4;
+      // Maps the string representation of a StatName into an array of Spans,
+      // which indicate which of the StatName tokens are dynamic. For example,
+      // if we are recording a counter or gauge named "a.b.c.d.e.f", where "a",
+      // and "d.e" were created from a StatNameDynamicPool, then we'd map
+      // "a.b.c.d.e.f" to the span array [[0,0], [3,4]], where the [0,0] span
+      // covers the "a", and the [3,4] span covers "d.e".
+      map<string, RepeatedSpan> dynamics = 5;
+    }
+    oneof reply {
+      // When this oneof is of the PassListenSocketReply type, there is a special
+      // implied meaning: the recvmsg that got this proto has control data to make
+      // the passing of the fd work, so make use of CMSG_SPACE etc.
+      PassListenSocket pass_listen_socket = 1;
+      ShutdownAdmin shutdown_admin = 2;
+      Stats stats = 3;
+    }
+  }
+
+  oneof requestreply {
+    Request request = 1;
+    Reply reply = 2;
+  }
+
+  bool didnt_recognize_your_last_message = 3;
+}

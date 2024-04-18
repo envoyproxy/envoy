@@ -1,0 +1,85 @@
+{#
+  Template for structure representing a composite entity in Kafka protocol (request or response).
+  Rendered templates for each structure in Kafka protocol will be put into 'requests.h'
+  or 'responses.h'.
+
+  Each structure is capable of holding all versions of given entity (what means its fields are
+  actually a superset of union of all versions' fields). Each version has a dedicated deserializer
+  (named "${name}V${version}Deserializer" e.g. ProduceRequestV0Deserializer or
+  FetchResponseV1Deserializer), which calls the matching constructor.
+
+  To serialize, it is necessary to pass the encoding context (that contains the version that's
+  being serialized). Depending on the version, the fields will be written to the buffer.
+#}
+struct {{ complex_type.name }} {
+
+  {#
+     Constructors invoked by deserializers.
+     Each constructor has a signature that matches the fields in at least one version (as sometimes
+     there are different Kafka versions that are actually composed of precisely the same fields).
+  #}
+  {% for field in complex_type.fields %}
+  {{ field.field_declaration() }}_;{% endfor %}
+  {% for constructor in complex_type.compute_constructors() %}
+  // constructor used in versions: {{ constructor['versions'] }}
+  {{ constructor['full_declaration'] }}{% endfor %}
+
+  {# For every field that's used in version, just compute its size using an encoder. #}
+  uint32_t computeSize(const EncodingContext& encoder) const {
+    const int16_t api_version = encoder.apiVersion();
+    uint32_t written{0};
+
+    {% for spec in complex_type.compute_serialization_specs() %}
+    if (api_version >= {{ spec.versions[0] }} && api_version < {{ spec.versions[-1] + 1 }}) {
+      written += encoder.{{ spec.compute_size_method_name }}({{ spec.field.name }}_);
+    }
+    {% endfor %}
+
+    return written;
+  }
+
+  uint32_t computeCompactSize(const EncodingContext& encoder) const {
+    return computeSize(encoder);
+  }
+
+  {# For every field that's used in version, just serialize it. #}
+  uint32_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
+    const int16_t api_version = encoder.apiVersion();
+    uint32_t written{0};
+
+    {% for spec in complex_type.compute_serialization_specs() %}
+    if (api_version >= {{ spec.versions[0] }} && api_version < {{ spec.versions[-1] + 1 }}) {
+      written += encoder.{{ spec.encode_method_name }}({{ spec.field.name }}_, dst);
+    }
+    {% endfor %}
+
+    return written;
+  }
+
+  uint32_t encodeCompact(Buffer::Instance& dst, EncodingContext& encoder) const {
+    return encode(dst, encoder);
+  }
+
+  {% if complex_type.fields|length > 0 %}
+  bool operator==(const {{ complex_type.name }}& rhs) const {
+  {% else %}
+  bool operator==(const {{ complex_type.name }}&) const {
+  {% endif %}
+    return true{% for field in complex_type.fields %}
+    && {{ field.name }}_ == rhs.{{ field.name }}_{% endfor %};
+  };
+
+};
+
+{#
+  Each structure version has a deserializer that matches the structure's field list.
+#}
+{% for field_list in complex_type.compute_field_lists() %}
+class {{ complex_type.name }}V{{ field_list.version }}Deserializer:
+  public CompositeDeserializerWith{{ field_list.field_count() }}Delegates<
+    {{ complex_type.name }}
+    {% for field in field_list.used_fields() %},
+      {{ field.deserializer_name_in_version(field_list.version, field_list.uses_compact_fields) }}
+    {% endfor %}>{};
+{% endfor %}
+

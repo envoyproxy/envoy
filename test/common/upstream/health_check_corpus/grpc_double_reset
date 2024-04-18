@@ -1,0 +1,45 @@
+health_check_config {
+  timeout {
+    seconds: 1
+  }
+  interval {
+    seconds: 1
+  }
+  unhealthy_threshold {
+    value: 2
+  }
+  healthy_threshold {
+    value: 2
+  }
+  grpc_health_check {
+    service_name: "service"
+    authority: "wwnvoyproxy.io"
+  }
+}
+actions {
+  respond {
+    http_respond {
+      status: 200
+    }
+    tcp_respond {
+    }
+    grpc_respond {
+      grpc_respond_headers {
+        headers {
+          headers {
+            key: "content-type"
+            value: "application/grpc"
+          }
+        }
+        status: 200
+      }
+      grpc_respond_bytes {
+        grpc_respond_unstructured_bytes {
+          data: "\000\000\000\000\000\000\000\000\000\000\000\000\000\00000000000000000000000000000000000\000\000\000\000\000\000\000\000\000\000\000\000\000c_r000\000\000\000\000\000\000\000"
+          data: "200"
+        }
+      }
+    }
+  }
+}
+http_verify_cluster: true

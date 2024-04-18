@@ -1,0 +1,6 @@
+date: June 10, 2022
+
+bug_fixes:
+- area: ci
+  change: |
+    fixes/workarounds for CI that prevented publication of version 1.22.1.

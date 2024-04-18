@@ -1,0 +1,84 @@
+name: Mobile/Android tests
+
+permissions:
+  contents: read
+
+on:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+
+jobs:
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
+      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: ./.github/workflows/_load.yml
+    with:
+      check-name: mobile-android-tests
+
+  linux:
+    permissions:
+      contents: read
+      packages: read
+    name: Android linux tests
+    uses: ./.github/workflows/_mobile_container_ci.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-android-tests }}
+    needs: load
+    with:
+      args: ${{ matrix.args }}
+      container: ${{ fromJSON(needs.load.outputs.build-image).mobile }}
+      diskspace-hack: true
+      request: ${{ needs.load.outputs.request }}
+      target: ${{ matrix.target }}
+      timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: java
+          target: java_tests_linux
+          args: >-
+            test
+            --config=mobile-remote-ci-android
+            //test/java/...
+        - name: kotlin
+          target: kotlin_tests_linux
+          args: >-
+            test
+            --config=mobile-remote-ci-android
+            //test/kotlin/...
+
+  request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-android-tests }}
+    needs:
+    - load
+    - linux
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}

@@ -1,0 +1,6 @@
+has_set_cookie {
+  cookies: "somekey =somevalue"
+  cookies: "abc"
+  cookies: "key2=value2; Secure"
+  key: "abc"
+}

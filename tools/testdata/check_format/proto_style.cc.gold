@@ -1,0 +1,15 @@
+namespace Envoy {
+
+ProtobufWkt::Any any;
+ProtobufWkt::Empty empty;
+ProtobufWkt::ListValue list_value;
+ProtobufWkt::Value value = ProtobufWkt::NULL_VALUE;
+ProtobufWkt::StringValue stringvalue;
+ProtobufWkt::Struct struct;
+ProtobufWkt::Value value;
+Protobuf::MapPair mappair;
+Protobuf::Map map;
+Protobuf::MapPair mappair;
+Protobuf::util::MessageDifferencer messagedifferencer;
+
+} // namespace Envoy

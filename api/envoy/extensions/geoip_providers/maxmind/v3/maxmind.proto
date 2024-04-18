@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package envoy.extensions.geoip_providers.maxmind.v3;
+
+import "envoy/extensions/geoip_providers/common/v3/common.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.geoip_providers.maxmind.v3";
+option java_outer_classname = "MaxmindProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/geoip_providers/maxmind/v3;maxmindv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: MaxMind Geolocation Provider]
+// MaxMind geolocation provider :ref:`configuration overview <config_geoip_providers_maxmind>`.
+// At least one geolocation database path :ref:`city_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.city_db_path>`,
+// :ref:`isp_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.isp_db_path>` or
+// :ref:`anon_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.anon_db_path>` must be configured.
+// [#extension: envoy.geoip_providers.maxmind]
+
+message MaxMindConfig {
+  // Full file path to the Maxmind city database, e.g. /etc/GeoLite2-City.mmdb.
+  // Database file is expected to have .mmdb extension.
+  string city_db_path = 1 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
+
+  // Full file path to the Maxmind ASN database, e.g. /etc/GeoLite2-ASN.mmdb.
+  // Database file is expected to have .mmdb extension.
+  string isp_db_path = 2 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
+
+  // Full file path to the Maxmind anonymous IP database, e.g. /etc/GeoIP2-Anonymous-IP.mmdb.
+  // Database file is expected to have .mmdb extension.
+  string anon_db_path = 3 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
+
+  // Common provider configuration that specifies which geolocation headers will be populated with geolocation data.
+  common.v3.CommonGeoipProviderConfig common_provider_config = 4
+      [(validate.rules).message = {required: true}];
+}

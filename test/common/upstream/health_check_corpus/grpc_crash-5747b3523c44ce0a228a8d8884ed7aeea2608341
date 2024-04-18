@@ -1,0 +1,43 @@
+health_check_config {
+  timeout {
+    seconds: 1
+  }
+  interval {
+    seconds: 1
+  }
+  unhealthy_threshold {
+    value: 2
+  }
+  healthy_threshold {
+    value: 2
+  }
+  grpc_health_check {
+    service_name: "service"
+    authority: "www.envoyproxy.io"
+  }
+}
+actions {
+  trigger_interval_timer {
+  }
+}
+actions {
+  respond {
+    http_respond {
+      headers {
+        headers {
+          key: ":status"
+          value: "200"
+        }
+      }
+      status: 200
+    }
+    tcp_respond {
+    }
+    grpc_respond {
+      grpc_respond_bytes {
+      }
+      grpc_respond_trailers {
+      }
+    }
+  }
+}

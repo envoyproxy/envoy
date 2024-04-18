@@ -1,0 +1,11 @@
+version_info: "0"
+resources:
+- "@type": type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment
+  cluster_name: cluster_1
+  endpoints:
+  - lb_endpoints:
+    - endpoint:
+        address:
+          socket_address:
+            address: "{{ ntop_ip_loopback_address }}"
+            port_value: "{{ upstream_0 }}"

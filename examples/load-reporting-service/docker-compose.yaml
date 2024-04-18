@@ -1,0 +1,27 @@
+services:
+
+  envoy:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+    ports:
+    - "${PORT_PROXY0:-80}-${PORT_PROXY1:-81}:80"
+    - "${PORT_ADMIN:-8081}:8081"
+    depends_on:
+      http_service:
+        condition: service_healthy
+      lrs_server:
+        condition: service_started
+
+  http_service:
+    build:
+      context: ../shared/python
+      target: aiohttp-tracing-service
+
+  lrs_server:
+    build:
+      context: .
+      dockerfile: ../shared/golang/Dockerfile
+      target: golang-lrs
+    volumes:
+    - /go/src/github.com/envoyproxy/envoy/examples/load-reporting-service

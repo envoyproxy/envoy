@@ -1,0 +1,79 @@
+{#
+  Template for 'response_utilities.cc'.
+  This file contains implementation of response-related methods contained in 'message_utilities.h'.
+#}
+
+#include <algorithm>
+
+#include "contrib/kafka/filters/network/test/message_utilities.h"
+
+#include "contrib/kafka/filters/network/source/external/responses.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+
+int16_t MessageUtilities::responseApiVersions(const int16_t api_key) {
+  switch (api_key) {
+  {% for message_type in message_types %}
+  case {{ message_type.get_extra('api_key') }} :
+    return {{ message_type.compute_field_lists() | length }} ;
+  {% endfor %}
+  default:
+    throw EnvoyException("unsupported api key used in test code");
+  }
+}
+
+std::vector<AbstractResponseSharedPtr> MessageUtilities::makeResponses(
+  const int16_t api_key, int32_t& correlation_id) {
+
+  const std::vector<int16_t> api_keys = apiKeys();
+  if (std::find(api_keys.begin(), api_keys.end(), api_key) == api_keys.end()) {
+    throw EnvoyException("unsupported api key used in test code");
+  }
+
+  std::vector<AbstractResponseSharedPtr> result;
+  {% for message_type in message_types %}
+  if ({{ message_type.get_extra('api_key') }} == api_key) {
+    {% for field_list in message_type.compute_field_lists() %}
+    {
+      const ResponseMetadata metadata = {
+          {{ message_type.get_extra('api_key') }}, {{ field_list.version }}, correlation_id++ };
+      const {{ message_type.name }} data = { {{ field_list.example_value() }} };
+      const AbstractResponseSharedPtr response =
+          std::make_shared<Response<{{ message_type.name }}>>(metadata, data);
+      result.push_back(response);
+    }
+    {% endfor %}
+  }
+  {% endfor %}
+  return result;
+}
+
+std::vector<AbstractResponseSharedPtr> MessageUtilities::makeAllResponses() {
+  std::vector<AbstractResponseSharedPtr> result;
+  int32_t correlation_id = 0;
+  for (const int16_t i : MessageUtilities::apiKeys()) {
+    const std::vector<AbstractResponseSharedPtr> tmp =
+        MessageUtilities::makeResponses(i, correlation_id);
+    result.insert(result.end(), tmp.begin(), tmp.end());
+  }
+  return result;
+}
+
+std::string MessageUtilities::responseMetric(const int16_t api_key) {
+  switch (api_key) {
+  {% for message_type in message_types %}
+  case {{ message_type.get_extra('api_key') }} :
+    return "kafka.prefix.response.{{ message_type.name_in_c_case() }}" ;
+  {% endfor %}
+  default:
+    throw EnvoyException("unsupported api key used in test code");
+  }
+}
+
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

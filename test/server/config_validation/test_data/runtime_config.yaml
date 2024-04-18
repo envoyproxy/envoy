@@ -1,0 +1,13 @@
+---
+node:
+  id: "test"
+layered_runtime:
+  layers:
+  - name: static-layer
+    static_layer:
+      "test.runtime.loaded": true
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9000

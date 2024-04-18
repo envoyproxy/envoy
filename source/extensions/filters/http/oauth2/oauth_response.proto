@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package envoy.extensions.http_filters.oauth2;
+
+import "google/protobuf/wrappers.proto";
+
+message OAuthResponse {
+  google.protobuf.StringValue access_token = 1;
+  google.protobuf.UInt64Value expires_in = 2;
+  google.protobuf.StringValue id_token = 3;
+  google.protobuf.StringValue refresh_token = 4;
+}

@@ -1,0 +1,52 @@
+static_resources {
+  clusters {
+    name: "="
+    type: LOGICAL_DNS
+    connect_timeout {
+      seconds: 1946186496
+    }
+    hosts {
+      socket_address {
+        address: "127.0.0.1"
+        port_value: 0
+      }
+    }
+    health_checks {
+      timeout {
+        nanos: 95
+      }
+      interval {
+        nanos: 95
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+        value: 2147483648
+      }
+      redis_health_check {
+        key: "="
+      }
+      healthy_edge_interval {
+        nanos: 95
+      }
+    }
+    tls_context {
+      common_tls_context {
+        tls_params {
+        }
+      }
+    }
+    alt_stat_name: "\001\000\000\000\007\\\316\230"
+  }
+}
+admin {
+  address {
+    pipe {
+      path: "%"
+    }
+  }
+}
+stats_config {
+  use_all_default_tags {
+  }
+}

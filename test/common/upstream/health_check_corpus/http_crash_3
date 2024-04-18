@@ -1,0 +1,84 @@
+health_check_config {
+  timeout {
+    seconds: 1
+  }
+  interval {
+    seconds: 1
+  }
+  interval_jitter {
+    seconds: 1
+  }
+  unhealthy_threshold {
+    value: 2
+  }
+  healthy_threshold {
+  }
+  alt_port {
+    value: 2
+  }
+  reuse_connection {
+  }
+  http_health_check {
+    path: "/healthcheck"
+    service_name_matcher {
+      prefix: "locations"
+    }
+  }
+  no_traffic_interval {
+    seconds: 1
+  }
+}
+actions {
+  respond {
+    http_respond {
+      headers {
+        headers {
+          key: ":status"
+          value: "200"
+        }
+        headers {
+          key: ":status"
+          value: "200"
+        }
+        headers {
+          key: "x-envoy-degraded"
+          value: "true"
+        }
+      }
+      status: 200
+    }
+    tcp_respond {
+
+    }
+    grpc_respond {
+      grpc_respond_headers {
+        
+      }
+    }
+  }
+}
+actions {
+  trigger_interval_timer {
+  }
+}
+actions {
+  respond {
+    http_respond {
+      headers {
+        headers {
+          key: "200"
+          value: "200"
+        }
+      }
+      status: 200
+    }
+    tcp_respond {
+            
+    }
+    grpc_respond {
+      grpc_respond_headers {
+        
+      }
+    }
+  }
+}

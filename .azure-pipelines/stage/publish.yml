@@ -1,0 +1,319 @@
+
+parameters:
+
+- name: bucketGCP
+  type: string
+  default: ""
+
+## Timeouts
+# Workaround for https://github.com/envoyproxy/envoy/issues/26634
+- name: timeoutDockerPublish
+  displayName: "Timout Docker publish"
+  type: number
+  # in seconds
+  default: 15
+- name: timeoutDockerBuild
+  displayName: "Timout Docker build"
+  type: number
+  default: 400
+
+# Auth
+- name: authGCP
+  type: string
+  default: ""
+- name: authGithubWorkflow
+  type: string
+  default: ""
+- name: authGithubWorkflowAppId
+  type: string
+  default: ""
+- name: authGithubWorkflowInstallId
+  type: string
+  default: ""
+- name: authGPGPassphrase
+  type: string
+  default: ""
+- name: authGPGPath
+  type: string
+  default: ""
+- name: authGPGKey
+  type: string
+  default: ""
+- name: authDockerUser
+  type: string
+  default: ""
+- name: authDockerPassword
+  type: string
+  default: ""
+
+- name: runDocker
+  displayName: "Run Docker"
+  type: string
+  default: true
+- name: runPackaging
+  displayName: "Run Packaging"
+  type: string
+  default: true
+
+- name: publishDockerhub
+  displayName: "Publish Dockerhub"
+  type: string
+  default: false
+- name: publishGithubRelease
+  displayName: "Publish Github release"
+  type: string
+  default: false
+
+jobs:
+- job: docker
+  displayName: "Docker (Linux multi arch)"
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runDocker }}, 'true'))
+  timeoutInMinutes: 120
+  pool:
+    vmImage: $(agentUbuntu)
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "release"
+      itemPattern: "release/**/bin/*"
+      targetPath: $(Build.StagingDirectory)
+  - template: ../ci.yml
+    parameters:
+      ciTarget: docker-upload
+      cacheName: docker-upload
+      publishEnvoy: false
+      publishTestResults: false
+      pathDockerBind: ""
+      tmpfsCacheDisabled: true
+      diskspaceHack: true
+      env:
+        GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+      stepsPre:
+      - bash: |
+          echo "disk space at beginning of Docker build:"
+          df -h
+        displayName: "Check disk space before Docker build"
+      # TODO(phlax): switch docker <> docker-upload as main task
+      - bash: |
+          set -e
+          mkdir -p $(Build.StagingDirectory)/envoy
+          rm -rf $(Build.StagingDirectory)/envoy/*
+          mv $(Build.StagingDirectory)/release/* $(Build.StagingDirectory)/envoy
+          ./ci/run_envoy_docker.sh 'ci/do_ci.sh docker'
+        displayName: Build Docker images
+        timeoutInMinutes: ${{ parameters.timeoutDockerPublish }}
+        workingDirectory: $(Build.SourcesDirectory)
+        env:
+          CI_BRANCH: $(Build.SourceBranch)
+          CI_SHA1: $(Build.SourceVersion)
+          DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
+          DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
+          DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          ENVOY_DOCKER_IN_DOCKER: 1
+
+      stepsPost:
+      - script: |
+          ci/run_envoy_docker.sh 'ci/do_ci.sh dockerhub-publish'
+        condition: |
+          and(not(canceled()), succeeded(),
+              eq(${{ parameters.publishDockerhub }}, 'true'))
+        displayName: "Publish Dockerhub description and README"
+        env:
+          GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+          DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
+          DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
+
+- job: package_x64
+  displayName: Linux debs (x64)
+  dependsOn: []
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runPackaging }}, 'true'))
+  timeoutInMinutes: 120
+  pool:
+    vmImage: $(agentUbuntu)
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "release"
+      itemPattern: "release/x64/bin/*"
+      targetPath: $(Build.StagingDirectory)
+  - template: ../ci.yml
+    parameters:
+      ciTarget: distribution
+      cacheName: distribution
+      publishTestResults: false
+      stepsPre:
+      - template: ../gpg.yml
+        parameters:
+          authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
+          authGPGPath: ${{ parameters.authGPGPath }}
+          authGPGKey: ${{ parameters.authGPGKey }}
+          pathGPGConfiguredHome: /build/.gnupg
+          pathGPGHome: $(Build.StagingDirectory)/.gnupg
+      stepsPost:
+      - bash: |
+          set -e
+          rm -rf $(Build.StagingDirectory)/.gnupg
+
+- job: package_arm64
+  displayName: Linux debs (arm64)
+  dependsOn: []
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runPackaging }}, 'true'))
+  timeoutInMinutes: 120
+  pool: "envoy-arm-small"
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "release"
+      itemPattern: "release/arm64/bin/*"
+      targetPath: $(Build.StagingDirectory)
+
+  - template: ../ci.yml
+    parameters:
+      managedAgent: false
+      ciTarget: distribution
+      cacheName: distribution
+      rbe: false
+      artifactSuffix: ".arm64"
+      bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+      publishTestResults: false
+      tmpfsDockerDisabled: true
+      stepsPre:
+      - template: ../gpg.yml
+        parameters:
+          authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
+          authGPGPath: ${{ parameters.authGPGPath }}
+          authGPGKey: ${{ parameters.authGPGKey }}
+          pathGPGConfiguredHome: /build/.gnupg
+          pathGPGHome: $(Build.StagingDirectory)/.gnupg
+      stepsPost:
+      - bash: |
+          set -e
+          rm -rf $(Build.StagingDirectory)/.gnupg
+
+- job: signed_release
+  displayName: Signed binaries
+  dependsOn:
+  - package_x64
+  - package_arm64
+  condition: |
+    and(succeeded(),
+        eq(${{ parameters.runPackaging }}, 'true'))
+  timeoutInMinutes: 120
+  pool:
+    vmImage: $(agentUbuntu)
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "release"
+      itemPattern: "release/**/bin/*"
+      targetPath: $(Build.StagingDirectory)
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "distribution"
+      itemPattern: "distribution/**/packages.*.tar.gz"
+      targetPath: $(Build.StagingDirectory)
+  - template: ../ci.yml
+    parameters:
+      ciTarget: release.signed
+      cacheName: release-signed
+      publishTestResults: false
+      env:
+        GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+      stepsPre:
+      - template: ../gpg.yml
+        parameters:
+          authGPGPassphrase: ${{ parameters.authGPGPassphrase }}
+          authGPGPath: ${{ parameters.authGPGPath }}
+          authGPGKey: ${{ parameters.authGPGKey }}
+          pathGPGConfiguredHome: /build/.gnupg
+          pathGPGHome: $(Build.StagingDirectory)/.gnupg
+      - bash: |
+          set -e -o pipefail
+          mkdir -p distribution/custom
+          cp -a $(Build.StagingDirectory)/*/*64 distribution/custom/
+        workingDirectory: $(Build.SourcesDirectory)
+
+- job: success
+  dependsOn: ["docker", "signed_release"]
+  displayName: Success (linux artefacts)
+  pool:
+    vmImage: $(agentUbuntu)
+  # This condition ensures that this (required) check passes if all of
+  # the preceding checks either pass or are skipped
+  # adapted from:
+  #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+  condition: |
+    and(
+      in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+      in(dependencies.signed_release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+  steps:
+  - checkout: none
+  - bash: |
+      echo "building publishable assets complete"
+
+- job: github
+  displayName: Publish release tag
+  dependsOn: ["success"]
+  condition: |
+    and(not(canceled()),
+        in(dependencies.success.result, 'Succeeded', 'SucceededWithIssues'),
+        eq(${{ parameters.publishGithubRelease }}, 'true'))
+  pool:
+    vmImage: $(agentUbuntu)
+  steps:
+  - task: DownloadSecureFile@1
+    name: WorkflowTriggerKey
+    displayName: 'Download workflow trigger key'
+    inputs:
+      secureFile: '${{ parameters.authGithubWorkflow }}'
+  - bash: |
+      set -e
+      KEY="$(cat $(WorkflowTriggerKey.secureFilePath) | base64 -w0)"
+      echo "##vso[task.setvariable variable=value;isoutput=true]$KEY"
+    name: key
+  - template: ../ci.yml
+    parameters:
+      ciTarget: verify.trigger
+      cacheName: verify-trigger
+      authGithub: "$(key.value)"
+      cacheVersion: $(cacheKeyBazel)
+      publishEnvoy: false
+      publishTestResults: false
+      env:
+        ENVOY_REPO: $(Build.Repository.Name)
+        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+          ENVOY_HEAD_REF: "$(Build.SourceBranch)"
+          ENVOY_BRANCH: "$(System.PullRequest.TargetBranch)"
+          ENVOY_COMMIT: "$(System.PullRequest.SourceCommitId)"
+        ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+          ENVOY_HEAD_REF: "$(Build.SourceBranchName)"
+          ENVOY_BRANCH: "$(Build.SourceBranch)"
+        # github auth
+        GITHUB_APP_ID: ${{ parameters.authGithubWorkflowAppId }}
+        GITHUB_INSTALL_ID: ${{ parameters.authGithubWorkflowInstallId }}
+        # rbe env
+        GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+      stepsPre:
+      - bash: |
+          set -e
+          if [[ "$BUILD_REASON" == "PullRequest" ]]; then
+              DOWNLOAD_PATH="$(git rev-parse HEAD | head -c7)"
+          else
+              DOWNLOAD_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
+          fi
+          curl -sLO "https://storage.googleapis.com/${{ parameters.bucketGCP }}/${DOWNLOAD_PATH}/release/release.signed.tar.zst"
+          mkdir -p $(Build.StagingDirectory)/release.signed
+          mv release.signed.tar.zst $(Build.StagingDirectory)/release.signed
+        displayName: Fetch signed release

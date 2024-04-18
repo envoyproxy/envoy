@@ -1,0 +1,65 @@
+cluster_manager {
+  load_stats_config {
+    api_type: GRPC
+    transport_api_version: V3
+    grpc_services {
+      google_grpc {
+        target_uri: "48?"
+        stat_prefix: "$"
+      }
+      initial_metadata {
+        key: "2"
+        value: "$$"
+      }
+      initial_metadata {
+        key: "2"
+        value: "2"
+      }
+      initial_metadata {
+        key: "2"
+        value: "$$"
+      }
+      initial_metadata {
+        key: "2"
+        value: "$$"
+      }
+      initial_metadata {
+        key: "2;"
+        value: "$$"
+      }
+      initial_metadata {
+        key: "1"
+        value: "$$"
+      }
+      initial_metadata {
+        key: "2"
+        value: "$$"
+      }
+      initial_metadata {
+        key: "2"
+        value: "$$"
+      }
+      initial_metadata {
+        key: "2"
+        value: "2"
+      }
+      initial_metadata {
+        key: "2"
+        value: "$$"
+      }
+      initial_metadata {
+        key: "4"
+        value: "$$"
+      }
+      initial_metadata {
+        key: "2"
+        value: "1"
+      }
+      initial_metadata {
+        key: "10"
+        value: "$$"
+      }
+    }
+  }
+}
+enable_dispatcher_stats: true

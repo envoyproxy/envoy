@@ -1,0 +1,6 @@
+date: February 7, 2023
+
+bug_fixes:
+- area: dependency
+  change: |
+    Add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.

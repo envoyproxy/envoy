@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package test.common.http;
+
+import "google/protobuf/empty.proto";
+
+import "validate/validate.proto";
+import "test/fuzz/common.proto";
+
+// Structured input for H2 codec_impl_fuzz_test.
+
+message NewStream {
+  // Optional metadata  before request headers.
+  // Metadata sent after request headers can be send via a directional action.
+  test.fuzz.Metadata metadata = 3;
+  test.fuzz.Headers request_headers = 1 [(validate.rules).message.required = true];
+  bool end_stream = 2;
+}
+
+message DirectionalAction {
+  oneof directional_action_selector {
+    option (validate.required) = true;
+    test.fuzz.Headers continue_headers = 1;
+    test.fuzz.Headers headers = 2;
+    uint32 data = 3;
+    string data_value = 8;
+    test.fuzz.Headers trailers = 4;
+    test.fuzz.Metadata metadata = 9;
+    uint32 reset_stream = 5;
+    bool read_disable = 6;
+  }
+  bool end_stream = 7;
+}
+
+message StreamAction {
+  // Index into list of created streams (not HTTP/2 level stream ID).
+  uint32 stream_id = 1;
+  oneof stream_action_selector {
+    option (validate.required) = true;
+    DirectionalAction request = 2;
+    DirectionalAction response = 3;
+  }
+  // Optionally set a dispatching action. This is a directional action that will
+  // be called while the stream action is sending headers, data, or trailers.
+  // This will only apply to request stream actions (so that the dispatching
+  // action occurs in the response direction). This may happen as a result of a
+  // filter sending a direct response.
+  DirectionalAction dispatching_action = 4;
+}
+
+message MutateAction {
+  // Buffer index.
+  uint32 buffer = 1;
+  // Offset within buffer.
+  uint32 offset = 2;
+  // Value to set (only lower byte is significant).
+  uint32 value = 3;
+  // Server connection buffer? Otherwise client.
+  bool server = 4;
+}
+
+message SwapBufferAction {
+  // Target buffer index to swap with. The buffer at index 0 is swapped with the
+  // target buffer.
+  uint32 buffer = 1;
+  // Server connection buffer? Otherwise client.
+  bool server = 2;
+}
+
+message Action {
+  oneof action_selector {
+    option (validate.required) = true;
+    // Create new stream.
+    NewStream new_stream = 1;
+    // Perform an action on an existing stream.
+    StreamAction stream_action = 2;
+    // Mutate a connection buffer.
+    MutateAction mutate = 3;
+    // Swap two fragments in a connection buffer.
+    SwapBufferAction swap_buffer = 4;
+    // Drain client connection buffer.
+    google.protobuf.Empty client_drain = 5;
+    // Drain server connection buffer.
+    google.protobuf.Empty server_drain = 6;
+    // Drain client/server buffers alternatively until both are empty.
+    google.protobuf.Empty quiesce_drain = 7;
+  }
+}
+
+message Http1ServerSettings {
+  bool allow_absolute_url = 1;
+  bool accept_http_10 = 2;
+  string default_host_for_http_10 = 3;
+}
+
+message Http1ClientServerSettings {
+  Http1ServerSettings server = 2;
+}
+
+// Setting X below is interpreted as min_valid_setting + X % (1 +
+// max_valid_setting - min_valid_setting).
+message Http2Settings {
+  uint32 hpack_table_size = 1;
+  uint32 max_concurrent_streams = 2;
+  uint32 initial_stream_window_size = 3;
+  uint32 initial_connection_window_size = 4;
+}
+
+message Http2ClientServerSettings {
+  Http2Settings client = 1;
+  Http2Settings server = 2;
+}
+
+message CodecImplFuzzTestCase {
+  // The fuzzer will run actions on both H1 and H2 codecs. The settings below
+  // provide codec-specific parameters.
+  Http1ClientServerSettings h1_settings = 1;
+  Http2ClientServerSettings h2_settings = 2;
+  repeated Action actions = 3;
+}

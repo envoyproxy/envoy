@@ -1,0 +1,12 @@
+date: February 28, 2023
+
+bug_fixes:
+- area: dependency
+  change: |
+    update Kafka to resolve CVE-2023-25194.
+
+new_features:
+- area: docker
+  change: |
+    unify published images as tag variants. For example, ``envoyproxy/envoy-dev`` is now available
+    as ``envoyproxy/envoy:dev``.
