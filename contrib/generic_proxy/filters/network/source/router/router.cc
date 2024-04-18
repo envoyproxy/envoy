@@ -345,7 +345,7 @@ void OwnedGenericUpstream::onDecodingFailure() {
 
 UpstreamRequest::UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr generic_upstream)
     : parent_(parent), generic_upstream_(std::move(generic_upstream)),
-      stream_info_(parent.time_source_, nullptr),
+      stream_info_(parent.time_source_, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain),
       upstream_info_(std::make_shared<StreamInfo::UpstreamInfoImpl>()) {
 
   // Set the upstream info for the stream info.
