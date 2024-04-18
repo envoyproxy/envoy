@@ -10,6 +10,7 @@
 #include "source/common/network/listen_socket_impl.h"
 
 #include "gmock/gmock.h"
+
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche/quic/core/crypto/quic_crypto_client_config.h"
 #endif
