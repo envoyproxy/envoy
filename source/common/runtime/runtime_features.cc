@@ -31,7 +31,6 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_abort_filter_chain_on_stream_reset);
 RUNTIME_GUARD(envoy_reloadable_features_avoid_zombie_streams);
-RUNTIME_GUARD(envoy_reloadable_features_check_mep_on_first_eject);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_convert_legacy_lb_config);
 RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
