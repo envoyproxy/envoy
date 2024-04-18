@@ -1,0 +1,51 @@
+# Fix https://github.com/envoyproxy/envoy-setec/issues/1496#issuecomment-2064844217
+
+diff --git a/quiche/quic/core/http/quic_spdy_stream.cc b/quiche/quic/core/http/quic_spdy_stream.cc
+index 4a5c2ede2..d69895055 100644
+--- a/quiche/quic/core/http/quic_spdy_stream.cc
++++ b/quiche/quic/core/http/quic_spdy_stream.cc
+@@ -1865,6 +1865,18 @@ bool QuicSpdyStream::AreHeaderFieldValuesValid(
+   return true;
+ }
+
++void QuicSpdyStream::StopReading() {
++  QuicStream::StopReading();
++  if (GetQuicReloadableFlag(
++          quic_stop_reading_also_stops_header_decompression) &&
++      VersionUsesHttp3(transport_version()) && !fin_received() &&
++      spdy_session_->qpack_decoder()) {
++    // Clean up Qpack decoding states.
++    spdy_session_->qpack_decoder()->OnStreamReset(id());
++    qpack_decoded_headers_accumulator_.reset();
++  }
++}
++
+ void QuicSpdyStream::OnInvalidHeaders() { Reset(QUIC_BAD_APPLICATION_PAYLOAD); }
+
+ void QuicSpdyStream::CloseReadSide() {
+diff --git a/quiche/quic/core/http/quic_spdy_stream.h b/quiche/quic/core/http/quic_spdy_stream.h
+index 10c34b10f..5c0cb0128 100644
+--- a/quiche/quic/core/http/quic_spdy_stream.h
++++ b/quiche/quic/core/http/quic_spdy_stream.h
+@@ -117,6 +117,7 @@ class QUICHE_EXPORT QuicSpdyStream
+
+   // QuicStream implementation
+   void OnClose() override;
++  void StopReading() override;
+
+   // Override to maybe close the write side after writing.
+   void OnCanWrite() override;
+diff --git a/quiche/quic/core/quic_flags_list.h b/quiche/quic/core/quic_flags_list.h
+index 61fa4f9e6..6737823a5 100644
+--- a/quiche/quic/core/quic_flags_list.h
++++ b/quiche/quic/core/quic_flags_list.h
+@@ -6,7 +6,8 @@
+ 
+ #ifdef QUIC_FLAG
+ 
+-QUIC_FLAG(quic_reloadable_flag_quic_stop_reading_also_stops_header_decompression, false)
++// If true, QUIC stream will not continue decompressing buffer headers after StopReading() called.
++QUIC_FLAG(quic_reloadable_flag_quic_stop_reading_also_stops_header_decompression, true)
+ // A testonly reloadable flag that will always default to false.
+ QUIC_FLAG(quic_reloadable_flag_quic_testonly_default_false, false)
+ // A testonly reloadable flag that will always default to true.
