@@ -636,9 +636,67 @@ private:
   double m2_{0};
 };
 
-template <class Value> struct TrieEntry {
+// A TrieEntry aims to be a good balance of performant and space-efficient,
+// by allocating a vector the size of the range of entries it contains.
+//
+// For example, a node with children 'a' and 'z' will contain a vector of
+// size 26, containing two values and 24 nullptrs. A node with only one
+// child will contain a vector of size 1. A node with no children will
+// contain an empty vector.
+//
+// Compared to allocating 256 entries for every node, this makes insertions
+// a little bit inefficient (especially insertions in reverse order), but
+// trie lookups remain O(length-of-longest-matching-prefix) with just a
+// couple of very cheap operations extra per step.
+//
+// By size, having 256 entries for every node makes each node's overhead
+// (excluding values) consume 8KB; even a trie containing only a single
+// prefix "foobar" consumes 56KB.
+// Using ranged vectors like this makes a single prefix "foobar" consume
+// less than 20 bytes per node, for a total of 0.14KB.
+template <class Value> class TrieEntry {
+public:
   Value value_{};
-  std::array<std::unique_ptr<TrieEntry>, 256> entries_;
+  TrieEntry* operator[](uint8_t i) const {
+    if (i < min_child_) {
+      return nullptr;
+    }
+    if (i > min_child_ + children_.size()) {
+      return nullptr;
+    }
+    return children_[i - min_child_].get();
+  }
+
+  void set(uint8_t branch, std::unique_ptr<TrieEntry<Value>> entry) {
+    if (children_.empty()) {
+      children_.reserve(1);
+      children_.emplace_back(std::move(entry));
+      min_child_ = branch;
+      return;
+    }
+    if (branch < min_child_) {
+      // expand the vector backwards, by moving the existing vector onto
+      // the end of a newly allocated one.
+      std::vector<std::unique_ptr<TrieEntry>> new_children;
+      new_children.reserve(min_child_ - branch + children_.size());
+      new_children.resize(min_child_ - branch);
+      std::move(children_.begin(), children_.end(), std::back_inserter(new_children));
+      new_children[0] = std::move(entry);
+      min_child_ = branch;
+      children_ = std::move(new_children);
+      return;
+    }
+    if (branch >= min_child_ + children_.size()) {
+      // expand the vector forwards
+      children_.resize(branch - min_child_ + 1);
+      // fall through to "insert" behavior.
+    }
+    children_[branch - min_child_] = std::move(entry);
+  }
+
+private:
+  uint8_t min_child_;
+  std::vector<std::unique_ptr<TrieEntry>> children_;
 };
 
 /**
@@ -657,10 +715,10 @@ template <class Value> struct TrieLookupTable {
   bool add(absl::string_view key, Value value, bool overwrite_existing = true) {
     TrieEntry<Value>* current = &root_;
     for (uint8_t c : key) {
-      if (!current->entries_[c]) {
-        current->entries_[c] = std::make_unique<TrieEntry<Value>>();
+      if (!(*current)[c]) {
+        current->set(c, std::make_unique<TrieEntry<Value>>());
       }
-      current = current->entries_[c].get();
+      current = (*current)[c];
     }
     if (current->value_ && !overwrite_existing) {
       return false;
@@ -677,7 +735,7 @@ template <class Value> struct TrieLookupTable {
   Value find(absl::string_view key) const {
     const TrieEntry<Value>* current = &root_;
     for (uint8_t c : key) {
-      current = current->entries_[c].get();
+      current = (*current)[c];
       if (current == nullptr) {
         return nullptr;
       }
@@ -696,7 +754,7 @@ template <class Value> struct TrieLookupTable {
     const TrieEntry<Value>* result = current;
 
     for (uint8_t c : key) {
-      current = current->entries_[c].get();
+      current = (*current)[c];
 
       if (current == nullptr) {
         return result ? result->value_ : nullptr;
