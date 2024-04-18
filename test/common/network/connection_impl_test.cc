@@ -796,29 +796,6 @@ TEST_P(ConnectionImplTest, ServerResetClose) {
   server_connection_->close(ConnectionCloseType::AbortReset);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
-
-// Test the RST close and detection feature is disabled by runtime_guard.
-TEST_P(ConnectionImplTest, ServerResetCloseRuntimeDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.detect_and_raise_rst_tcp_connection", "false"}});
-  setUpBasicConnection();
-  connect();
-
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(InvokeWithoutArgs([&]() -> void {
-        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::Normal);
-        dispatcher_->exit();
-      }));
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
-      .WillOnce(InvokeWithoutArgs([&]() -> void {
-        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::Normal);
-      }));
-
-  // Originally it should close the connection by RST.
-  server_connection_->close(ConnectionCloseType::AbortReset);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-}
 #endif
 
 struct MockConnectionStats {
