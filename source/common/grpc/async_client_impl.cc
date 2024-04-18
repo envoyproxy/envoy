@@ -131,7 +131,13 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
                                             options_.parent_context.stream_info);
 
   Tracing::HttpTraceContext trace_context(headers_message_->headers());
-  current_span_->injectContext(trace_context, nullptr);
+  Tracing::UpstreamContext upstream_context(nullptr,                         // host_
+                                            cluster_info_.get(),             // cluster_
+                                            Tracing::ServiceType::EnvoyGrpc, // service_type_
+                                            true                             // async_client_span_
+  );
+  current_span_->injectContext(trace_context, upstream_context);
+
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
 
   stream_->sendHeaders(headers_message_->headers(), false);
@@ -290,19 +296,12 @@ void AsyncRequestImpl::initialize(bool buffer_body_for_retry) {
 }
 
 void AsyncRequestImpl::cancel() {
-  AsyncStreamImpl::activeSpan().setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
-  AsyncStreamImpl::activeSpan().finishSpan();
+  current_span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
+  current_span_->finishSpan();
   this->resetStream();
 }
 
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  Tracing::HttpTraceContext trace_context(metadata);
-  Tracing::UpstreamContext upstream_context(nullptr,                         // host_
-                                            cluster_info_.get(),             // cluster_
-                                            Tracing::ServiceType::EnvoyGrpc, // service_type_
-                                            true                             // async_client_span_
-  );
-  current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 
@@ -317,12 +316,12 @@ void AsyncRequestImpl::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) 
 
 void AsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
   if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    callbacks_.onFailure(status, message, AsyncStreamImpl::activeSpan());
+    callbacks_.onFailure(status, message, *current_span_);
   } else if (response_ == nullptr) {
-    AsyncStreamImpl::activeSpan().setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    callbacks_.onFailure(Status::Internal, EMPTY_STRING, AsyncStreamImpl::activeSpan());
+    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    callbacks_.onFailure(Status::Internal, EMPTY_STRING, *current_span_);
   } else {
-    callbacks_.onSuccessRaw(std::move(response_), AsyncStreamImpl::activeSpan());
+    callbacks_.onSuccessRaw(std::move(response_), *current_span_);
   }
 }
 

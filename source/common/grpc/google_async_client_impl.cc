@@ -203,7 +203,12 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   parent_.metadata_parser_->evaluateHeaders(*initial_metadata, options_.parent_context.stream_info);
 
   Tracing::HttpTraceContext trace_context(*initial_metadata);
-  current_span_->injectContext(trace_context, nullptr);
+  Tracing::UpstreamContext upstream_context(nullptr,                          // host_
+                                            nullptr,                          // cluster_
+                                            Tracing::ServiceType::GoogleGrpc, // service_type_
+                                            true                              // async_client_span_
+  );
+  current_span_->injectContext(trace_context, upstream_context);
 
   callbacks_.onCreateInitialMetadata(*initial_metadata);
   initial_metadata->iterate([this](const Http::HeaderEntry& header) {
@@ -470,20 +475,12 @@ void GoogleAsyncRequestImpl::initialize(bool buffer_body_for_retry) {
 }
 
 void GoogleAsyncRequestImpl::cancel() {
-  GoogleAsyncStreamImpl::activeSpan().setTag(Tracing::Tags::get().Status,
-                                             Tracing::Tags::get().Canceled);
-  GoogleAsyncStreamImpl::activeSpan().finishSpan();
+  current_span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
+  current_span_->finishSpan();
   resetStream();
 }
 
 void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  Tracing::HttpTraceContext trace_context(metadata);
-  Tracing::UpstreamContext upstream_context(nullptr,                          // host_
-                                            nullptr,                          // cluster_
-                                            Tracing::ServiceType::GoogleGrpc, // service_type_
-                                            true                              // async_client_span_
-  );
-  current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 
@@ -500,13 +497,12 @@ void GoogleAsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                            const std::string& message) {
 
   if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    callbacks_.onFailure(status, message, GoogleAsyncStreamImpl::activeSpan());
+    callbacks_.onFailure(status, message, *current_span_);
   } else if (response_ == nullptr) {
-    GoogleAsyncStreamImpl::activeSpan().setTag(Tracing::Tags::get().Error,
-                                               Tracing::Tags::get().True);
-    callbacks_.onFailure(Status::Internal, EMPTY_STRING, GoogleAsyncStreamImpl::activeSpan());
+    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    callbacks_.onFailure(Status::Internal, EMPTY_STRING, *current_span_);
   } else {
-    callbacks_.onSuccessRaw(std::move(response_), GoogleAsyncStreamImpl::activeSpan());
+    callbacks_.onSuccessRaw(std::move(response_), *current_span_);
   }
 }
 

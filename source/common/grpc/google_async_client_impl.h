@@ -238,15 +238,9 @@ public:
   }
   const StreamInfo::StreamInfo& streamInfo() const override { return unused_stream_info_; }
 
-  Tracing::Span& activeSpan() {
-    if (current_span_ != nullptr) {
-      return *current_span_;
-    }
-    return Tracing::NullSpan::instance();
-  }
-
 protected:
   bool callFailed() const { return call_failed_; }
+  Tracing::SpanPtr current_span_;
 
 private:
   // Process queued events in completed_ops_ with handleOpCompletion() on
@@ -333,7 +327,6 @@ private:
 
   friend class GoogleAsyncClientImpl;
   friend class GoogleAsyncClientThreadLocal;
-  Tracing::SpanPtr current_span_;
 };
 
 class GoogleAsyncRequestImpl : public AsyncRequest,
