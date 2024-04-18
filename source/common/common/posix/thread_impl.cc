@@ -15,7 +15,7 @@ namespace Thread {
 
 namespace {
 
-int64_t getCurrentThreadId() {
+int64_t getCurrentThreadIdBase() {
 #ifdef __linux__
   return static_cast<int64_t>(syscall(SYS_gettid));
 #elif defined(__APPLE__)
@@ -25,6 +25,13 @@ int64_t getCurrentThreadId() {
 #else
 #error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
 #endif
+}
+
+int64_t getCurrentThreadId() {
+  // Use the static value rather than the static pointer to suppress ASAN memory leak
+  // errors.
+  static thread_local const int64_t tid = getCurrentThreadIdBase();
+  return tid;
 }
 
 } // namespace
