@@ -9,6 +9,8 @@
 
 #include "source/common/network/listen_socket_impl.h"
 
+#include "quiche/quic/core/crypto/quic_crypto_client_config.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
