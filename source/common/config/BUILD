@@ -241,19 +241,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "stats_utility_lib",
-    srcs = ["stats_utility.cc"],
-    hdrs = ["stats_utility.h"],
-    deps = [
-        "//source/common/stats:histogram_lib",
-        "//source/common/stats:stats_lib",
-        "//source/common/stats:stats_matcher_lib",
-        "//source/common/stats:tag_producer_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "subscription_base_interface",
     hdrs = ["subscription_base.h"],
     deps = [

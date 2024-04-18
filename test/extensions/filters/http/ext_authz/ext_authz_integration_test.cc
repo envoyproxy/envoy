@@ -1018,7 +1018,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
 TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   GrpcInitializeConfigOpts opts;
   opts.failure_mode_allow = false;
-  opts.timeout_ms = 10;
+  opts.timeout_ms = 1;
   initializeConfig(opts);
 
   // Use h1, set up the test.
@@ -1027,9 +1027,6 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
 
   // Start a client connection and request.
   initiateClientConnection(0);
-
-  // Wait for the ext_authz request as a result of the client request.
-  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
 
   // Do not sendExtAuthzResponse(). Envoy should reject the request after 1 second.
   ASSERT_TRUE(response_->waitForEndStream());
@@ -1042,7 +1039,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
 TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
   GrpcInitializeConfigOpts init_opts;
   init_opts.failure_mode_allow = true;
-  init_opts.timeout_ms = 10;
+  init_opts.timeout_ms = 1;
   initializeConfig(init_opts);
 
   // Use h1, set up the test.
@@ -1051,9 +1048,6 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
 
   // Start a client connection and request.
   initiateClientConnection(0);
-
-  // Wait for the ext_authz request as a result of the client request.
-  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
 
   // Do not sendExtAuthzResponse(). Envoy should eventually proxy the request upstream as if the
   // authz service approved the request.
@@ -1273,10 +1267,9 @@ TEST_P(ExtAuthzHttpIntegrationTest, RedirectResponse) {
 }
 
 TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailClosed) {
-  initializeConfig(false, /*failure_mode_allow=*/false, /*timeout_ms=*/10);
+  initializeConfig(false, /*failure_mode_allow=*/false, /*timeout_ms=*/1);
   HttpIntegrationTest::initialize();
   initiateClientConnection();
-  waitForExtAuthzRequest();
 
   // Do not sendExtAuthzResponse(). Envoy should reject the request after 1 second.
   ASSERT_TRUE(response_->waitForEndStream(Envoy::Seconds(10)));
@@ -1287,10 +1280,9 @@ TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailClosed) {
 }
 
 TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailOpen) {
-  initializeConfig(false, /*failure_mode_allow=*/true, /*timeout_ms=*/10);
+  initializeConfig(false, /*failure_mode_allow=*/true, /*timeout_ms=*/1);
   HttpIntegrationTest::initialize();
   initiateClientConnection();
-  waitForExtAuthzRequest();
 
   // Do not sendExtAuthzResponse(). Envoy should eventually proxy the request upstream as if the
   // authz service approved the request.

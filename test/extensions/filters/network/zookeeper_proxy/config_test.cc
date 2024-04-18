@@ -91,8 +91,8 @@ latency_threshold_overrides:
       nanos: 150000000
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config_),
-                          ProtobufMessage::UnknownProtoFieldException, "Undefined");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
+                          "Undefined");
 }
 
 TEST_F(ZookeeperFilterConfigTest, NegativeLatencyThreshold) {

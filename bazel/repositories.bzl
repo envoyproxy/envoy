@@ -37,8 +37,8 @@ WINDOWS_SKIP_TARGETS = [
 NO_HTTP3_SKIP_TARGETS = [
     "envoy.quic.crypto_stream.server.quiche",
     "envoy.quic.deterministic_connection_id_generator",
-    "envoy.quic.crypto_stream.server.quiche",
     "envoy.quic.proof_source.filter_chain",
+    "envoy.quic.server_preferred_address.fixed",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
@@ -1464,13 +1464,7 @@ def _rules_ruby():
     external_http_archive("rules_ruby")
 
 def _foreign_cc_dependencies():
-    external_http_archive(
-        name = "rules_foreign_cc",
-        # This patch is needed to fix build on macos with xcode 15.3.
-        # remove this when https://github.com/bazelbuild/rules_foreign_cc/issues/1186 fixed.
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:rules_foreign_cc.patch"],
-    )
+    external_http_archive("rules_foreign_cc")
 
 def _com_github_maxmind_libmaxminddb():
     external_http_archive(

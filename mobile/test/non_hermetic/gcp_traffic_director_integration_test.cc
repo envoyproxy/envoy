@@ -70,7 +70,7 @@ public:
     xds_builder.addInitialStreamHeader("x-goog-api-key", std::string(api_key))
         .setSslRootCerts(std::move(root_certs))
         .addClusterDiscoveryService();
-    builder_.addLogLevel(Platform::LogLevel::trace)
+    builder_.setLogLevel(Logger::Logger::Levels::trace)
         .setNodeId(absl::Substitute("projects/$0/networks/default/nodes/111222333444", PROJECT_ID))
         .setXds(std::move(xds_builder));
 

@@ -279,7 +279,7 @@ public:
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
         validation_context_, *factory_.api_, local_cluster_update_, local_hosts_removed_,
         http_context_, grpc_context_, router_context_, server_);
-    THROW_IF_NOT_OK(cluster_manager_->init(bootstrap));
+    THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
   }
 
   void createWithUpdateOverrideClusterManager(const Bootstrap& bootstrap) {
@@ -288,7 +288,7 @@ public:
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
         validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_,
         server_);
-    THROW_IF_NOT_OK(cluster_manager_->init(bootstrap));
+    THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,

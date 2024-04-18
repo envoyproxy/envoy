@@ -370,7 +370,8 @@ ClusterManagerImpl::ClusterManagerImpl(
       makeOptRefFromPtr(xds_config_tracker_.get()));
 }
 
-absl::Status ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+absl::Status
+ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   ASSERT(!initialized_);
   initialized_ = true;
 
@@ -2224,7 +2225,6 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
       context_.accessLogManager(), context_.mainThreadDispatcher(), context_.admin(),
       context_.messageValidationContext(), context_.api(), http_context_, context_.grpcContext(),
       context_.routerContext(), server_)};
-  THROW_IF_NOT_OK(cluster_manager_impl->init(bootstrap));
   return cluster_manager_impl;
 }
 

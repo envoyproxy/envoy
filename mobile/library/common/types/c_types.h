@@ -61,18 +61,6 @@ typedef enum {
   ENVOY_REQUEST_TIMEOUT,
 } envoy_error_code_t;
 
-/**
- * Networks classified by last physical link.
- * ENVOY_NET_GENERIC is default and includes cases where network characteristics are unknown.
- * ENVOY_NET_WLAN includes WiFi and other local area wireless networks.
- * ENVOY_NET_WWAN includes all mobile phone networks.
- */
-typedef enum {
-  ENVOY_NET_GENERIC = 0,
-  ENVOY_NET_WLAN = 1,
-  ENVOY_NET_WWAN = 2,
-} envoy_network_t;
-
 #ifdef __cplusplus
 extern "C" { // release function
 #endif

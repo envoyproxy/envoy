@@ -104,16 +104,53 @@ private:
 };
 
 class MatchDelegateConfig
-    : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
+    : public Extensions::HttpFilters::Common::CommonFactoryBase<
           envoy::extensions::common::matching::v3::ExtensionWithMatcher,
-          envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute> {
+          envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>,
+      public Server::Configuration::NamedHttpFilterConfigFactory,
+      public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
-  MatchDelegateConfig() : ExceptionFreeFactoryBase("envoy.filters.http.match_delegate") {}
+  MatchDelegateConfig()
+      : CommonFactoryBase<envoy::extensions::common::matching::v3::ExtensionWithMatcher,
+                          envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>(
+            "envoy.filters.http.match_delegate") {}
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) override {
+    return createFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<
+            const envoy::extensions::common::matching::v3::ExtensionWithMatcher&>(
+            proto_config, context.messageValidationVisitor()),
+        stats_prefix, context);
+  }
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
+    return createFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<
+            const envoy::extensions::common::matching::v3::ExtensionWithMatcher&&>(
+            proto_config, context.serverFactoryContext().messageValidationVisitor()),
+        stats_prefix, context);
+  }
 
 private:
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
-      const std::string&, Server::Configuration::FactoryContext& context) override;
+      const std::string& prefix, Server::Configuration::FactoryContext& context);
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+      const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
+      const std::string& prefix, Server::Configuration::UpstreamFactoryContext& context);
+
+  template <class FactoryCtx, class FilterCfgFactory>
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactory(
+      const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
+      const std::string& prefix, ProtobufMessage::ValidationVisitor& validation,
+      Envoy::Http::Matching::HttpFilterActionContext& action_context, FactoryCtx& context,
+      FilterCfgFactory& factory);
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute& proto_config,
@@ -139,7 +176,10 @@ private:
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
 };
 
+using UpstreamMatchDelegateConfig = MatchDelegateConfig;
+
 DECLARE_FACTORY(MatchDelegateConfig);
+DECLARE_FACTORY(UpstreamMatchDelegateConfig);
 
 namespace Factory {
 DECLARE_FACTORY(SkipActionFactory);
