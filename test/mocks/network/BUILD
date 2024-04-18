@@ -89,6 +89,6 @@ envoy_cc_mock(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
     ] + envoy_select_enable_http3([
-        "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
+        "@com_github_google_quiche//:quic_client_crypto_crypto_handshake_lib",
     ]),
 )
