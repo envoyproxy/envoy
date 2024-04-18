@@ -3927,6 +3927,13 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
   ASSERT_OK_AND_ASSIGN(host_id_2, FakeUpstream::waitForHttpConnection(
                                       *dispatcher_, fake_upstreams_, processor_connection_2,
                                       std::chrono::milliseconds(5000)));
+  Cleanup close_connection2{[&processor_connection_2]() {
+    if (processor_connection_2 != nullptr) {
+      ASSERT_TRUE(processor_connection_2->close());
+      ASSERT_TRUE(processor_connection_2->waitForDisconnect());
+    }
+  }};
+
   // Retry happens on a new host.
   ASSERT_NE(host_id_2, first_host_id);
   FakeStreamPtr processor_stream_2;
@@ -3945,6 +3952,7 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
   new_header->mutable_header()->set_raw_value("bluh");
   processor_stream_2->sendGrpcMessage(processing_response);
   processor_stream_2->finishGrpcStream(Grpc::Status::Ok);
+  ASSERT_TRUE(processor_stream_2->waitForReset());
 
   handleUpstreamRequest();
   EXPECT_EQ(upstream_request_->headers()

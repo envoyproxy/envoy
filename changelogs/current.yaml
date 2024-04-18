@@ -2,6 +2,11 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: thread_local
+  change: |
+    Changes the behavior of the ``SlotImpl`` class destructor. With this change the destructor can be called on any thread.
+    This behavior can be reverted by setting the runtime flag ``envoy.reloadable_features.allow_slot_destroy_on_worker_threads``
+    to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -13,6 +18,11 @@ bug_fixes:
     Fixed :ref:`successful_active_health_check_uneject_host
     <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`.
     Before, a failed health check could uneject the host if the ``FAILED_ACTIVE_HC`` health flag had not been set.
+- area: tls
+  change: |
+    Fix a RELEASE_ASSERT when using :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>`
+    if the downstream request ``:authority`` was longer than 255 characters.
+
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
