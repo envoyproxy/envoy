@@ -170,8 +170,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-  auto verify_mode = cert_validator_->initializeSslContexts(
-      ssl_contexts, config.capabilities().provides_certificates);
+  auto verify_mode =
+      THROW_OR_RETURN_VALUE(cert_validator_->initializeSslContexts(
+                                ssl_contexts, config.capabilities().provides_certificates),
+                            int);
   if (!capabilities_.verifies_peer_certificates) {
     for (auto ctx : ssl_contexts) {
       if (verify_mode != SSL_VERIFY_NONE) {
@@ -844,8 +846,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
     auto& ctx = tls_contexts_[i];
     if (!config.capabilities().verifies_peer_certificates) {
-      cert_validator_->addClientValidationContext(ctx.ssl_ctx_.get(),
-                                                  config.requireClientCertificate());
+      THROW_IF_NOT_OK(cert_validator_->addClientValidationContext(
+          ctx.ssl_ctx_.get(), config.requireClientCertificate()));
     }
 
     if (!parsed_alpn_protocols_.empty() && !config.capabilities().handles_alpn_selection) {
