@@ -356,9 +356,6 @@ public:
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
 private:
-  // Uses addViaMove to cannibalize response as much as possible.
-  void applyHeaderMutationsViaMove(Filters::Common::ExtAuthz::Response& response);
-
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);

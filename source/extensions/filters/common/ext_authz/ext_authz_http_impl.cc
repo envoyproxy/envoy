@@ -230,17 +230,17 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
       }
     }
   } else {
-    for (const auto& [key, value] : http_request.headers()) {
-      const Http::LowerCaseString lowercase_key{key};
+    for (const auto& [key_str, value] : http_request.headers()) {
+      const Http::LowerCaseString key{key_str};
 
-      if (lowercase_key == Http::Headers::get().ContentLength) {
+      if (key == Http::Headers::get().ContentLength) {
         continue;
       }
 
-      if (lowercase_key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        headers->addCopy(lowercase_key, absl::StrCat(config_->pathPrefix(), value));
+      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
+        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), value));
       } else {
-        headers->addCopy(lowercase_key, value);
+        headers->addCopy(key, value);
       }
     }
   }
