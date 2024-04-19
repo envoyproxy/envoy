@@ -837,27 +837,26 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
   absl::string_view header_key = "header-with-non-utf-8-value";
   const uint8_t non_utf_8_bytes[3] = {0xc0, 0xc0, 0};
   absl::string_view header_value = reinterpret_cast<const char*>(non_utf_8_bytes);
-  request_headers_.addCopy(Http::LowerCaseString(header_key), header_value);
+  request_headers_.addCopy(Http::LowerCaseString{header_key), header_value};
 
   envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& check_request,
                            Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
-        request_callbacks_ = &callbacks;
-        // headers should be empty.
-        EXPECT_EQ(0, check_request.attributes().request().http().headers().size());
-        ASSERT_TRUE(check_request.attributes().request().http().has_header_map());
-        // header_map should contain the header we added and it should be unchanged.
-        bool exact_match_utf_8_header = false;
-        for (const auto& header :
-             check_request.attributes().request().http().header_map().headers()) {
-          if (header.key() == header_key && header.raw_value() == header_value) {
-            exact_match_utf_8_header = true;
-            break;
-          }
-        }
-        EXPECT_TRUE(exact_match_utf_8_header);
+    request_callbacks_ = &callbacks;
+    // headers should be empty.
+    EXPECT_EQ(0, check_request.attributes().request().http().headers().size());
+    ASSERT_TRUE(check_request.attributes().request().http().has_header_map());
+    // header_map should contain the header we added and it should be unchanged.
+    bool exact_match_utf_8_header = false;
+    for (const auto& header : check_request.attributes().request().http().header_map().headers()) {
+      if (header.key() == header_key && header.raw_value() == header_value) {
+        exact_match_utf_8_header = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(exact_match_utf_8_header);
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
@@ -1016,14 +1015,11 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Let's try to remove all the headers in the request.
-  response.headers_to_remove = {
-      Http::LowerCaseString(Http::Headers::get().Host.get()),
-      Http::LowerCaseString(Http::Headers::get().HostLegacy.get()),
-      Http::LowerCaseString(Http::Headers::get().Method.get()),
-      Http::LowerCaseString(Http::Headers::get().Path.get()),
-      Http::LowerCaseString(Http::Headers::get().Protocol.get()),
-      Http::LowerCaseString(Http::Headers::get().Scheme.get()),
-      Http::LowerCaseString("remove-me"),
+  response.headers_to_remove = std::vector<Http::LowerCaseString>{
+      Http::Headers::get().Host,          Http::Headers::get().HostLegacy,
+      Http::Headers::get().Method,        Http::Headers::get().Path,
+      Http::Headers::get().Protocol,      Http::Headers::get().Scheme,
+      Http::LowerCaseString{"remove-me"},
   };
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
@@ -1073,10 +1069,10 @@ TEST_F(HttpFilterTest, ClearCache) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString("foo"), "bar"}};
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString("bar"), "foo"}};
+  response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
   response.headers_to_remove =
-      std::vector<Http::LowerCaseString>{Http::LowerCaseString("remove-me")};
+      std::vector<Http::LowerCaseString>{Http::LowerCaseString{"remove-me"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
@@ -1120,7 +1116,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString("foo"), "bar"}};
+  response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
@@ -1164,7 +1160,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString("foo"), "bar"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
@@ -1208,7 +1204,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_remove = {Http::LowerCaseString("remove-me")};
+  response.headers_to_remove = {Http::LowerCaseString{"remove-me"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
@@ -1290,8 +1286,8 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString("foo"), "bar"}};
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString("bar"), "foo"}};
+  response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
@@ -1317,7 +1313,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString("foo"), "bar"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
@@ -2400,7 +2396,7 @@ TEST_P(HttpFilterTestParam, ImmediateDeniedResponseWithHttpAttributes) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString("foo"), "bar"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   response.body = std::string{"baz"};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
@@ -2447,19 +2443,16 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append =
-      Http::HeaderVector{{Http::LowerCaseString(request_header_key.get()), "bar"}};
-  response.headers_to_set =
-      Http::HeaderVector{{Http::LowerCaseString(key_to_add.get()), "foo"},
-                         {Http::LowerCaseString(key_to_override.get()), "bar"}};
-  response.headers_to_remove = {Http::LowerCaseString(key_to_remove.get())};
+  response.headers_to_append = Http::HeaderVector{{request_header_key, "bar"}};
+  response.headers_to_set = Http::HeaderVector{{key_to_add, "foo"}, {key_to_override, "bar"}};
+  response.headers_to_remove = {key_to_remove};
   // This cookie will be appended to the encoded headers.
   response.response_headers_to_add =
-      Http::HeaderVector{{Http::LowerCaseString("set-cookie"), "cookie2=gingerbread"}};
+      Http::HeaderVector{{Http::LowerCaseString{"set-cookie"}, "cookie2=gingerbread"}};
   // This "should-be-overridden" header value from the auth server will override the
   // "should-be-overridden" entry from the upstream server.
   response.response_headers_to_set = Http::HeaderVector{
-      {Http::LowerCaseString("should-be-overridden"), "finally-set-by-auth-server"}};
+      {Http::LowerCaseString{"should-be-overridden"}, "finally-set-by-auth-server"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2491,7 +2484,7 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
   EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(response_headers,
-                                                        Http::LowerCaseString("set-cookie"))
+                                                        Http::LowerCaseString{"set-cookie")}
                 .result()
                 .value(),
             "cookie1=snickerdoodle,cookie2=gingerbread");
@@ -2710,8 +2703,8 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   response.body = std::string{"foo"};
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString("foo"), "bar"},
-                                               {Http::LowerCaseString("bar"), "foo"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
+                                               {Http::LowerCaseString{"bar"}, "foo"}};
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2769,11 +2762,11 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
   response.status_code = Http::Code::Forbidden;
   response.body = std::string{"foo"};
   response.headers_to_set =
-      Http::HeaderVector{{Http::LowerCaseString("foo"), "bar"},
-                         {Http::LowerCaseString("bar"), "foo"},
-                         {Http::LowerCaseString("set-cookie"), "cookie1=value"},
-                         {Http::LowerCaseString("set-cookie"), "cookie2=value"},
-                         {Http::LowerCaseString("accept-encoding"), "gzip,deflate"}};
+      Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
+                         {Http::LowerCaseString{"bar"}, "foo"},
+                         {Http::LowerCaseString{"set-cookie"}, "cookie1=value"},
+                         {Http::LowerCaseString{"set-cookie"}, "cookie2=value"},
+                         {Http::LowerCaseString{"accept-encoding"}, "gzip,deflate"}};
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2812,7 +2805,7 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
         EXPECT_EQ(test_headers.get_("accept-encoding"), "gzip,deflate");
         EXPECT_EQ(data.toString(), "foo");
         EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(test_headers,
-                                                              Http::LowerCaseString("set-cookie"))
+                                                              Http::LowerCaseString{"set-cookie")}
                       .result()
                       .value(),
                   "cookie1=value,cookie2=value");
@@ -2866,7 +2859,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString("foo"), "bar"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] = ext_authz_duration_value;
 
   initializeMetadata(response);
@@ -2912,7 +2905,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString("foo"), "bar"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
 
   initializeMetadata(response);
 
