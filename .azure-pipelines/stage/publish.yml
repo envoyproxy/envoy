@@ -10,12 +10,12 @@ parameters:
 - name: timeoutDockerPublish
   displayName: "Timout Docker publish"
   type: number
-  # in seconds
-  default: 15
+  # in minutes
+  default: 18
 - name: timeoutDockerBuild
   displayName: "Timout Docker build"
   type: number
-  default: 400
+  default: 500
 
 # Auth
 - name: authGCP
