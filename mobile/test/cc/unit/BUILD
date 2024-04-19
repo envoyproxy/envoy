@@ -1,5 +1,4 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_mobile_package")
-load("@envoy//bazel:envoy_select.bzl", "envoy_select_enable_yaml")
 
 licenses(["notice"])  # Apache 2
 
@@ -7,10 +6,7 @@ envoy_mobile_package()
 
 envoy_cc_test(
     name = "envoy_config_test",
-    srcs = envoy_select_enable_yaml(
-        ["envoy_config_test.cc"],
-        "@envoy",
-    ),
+    srcs = ["envoy_config_test.cc"],
     linkopts = select({
         "@envoy//bazel:apple": [
             # For the TestProxyResolutionApi test.

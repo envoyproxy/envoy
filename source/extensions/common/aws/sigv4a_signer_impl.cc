@@ -27,7 +27,7 @@ std::string SigV4ASignerImpl::createAuthorizationHeader(
     const std::map<std::string, std::string>& canonical_headers,
     absl::string_view signature) const {
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
-  return fmt::format(fmt::runtime(SigV4ASignatureConstants::SigV4AAuthorizationHeaderFormat),
+  return fmt::format(SigV4ASignatureConstants::SigV4AAuthorizationHeaderFormat,
                      createAuthorizationCredential(access_key_id, credential_scope), signed_headers,
                      signature);
 }
@@ -35,8 +35,8 @@ std::string SigV4ASignerImpl::createAuthorizationHeader(
 std::string SigV4ASignerImpl::createCredentialScope(
     const absl::string_view short_date,
     ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const {
-  return fmt::format(fmt::runtime(SigV4ASignatureConstants::SigV4ACredentialScopeFormat),
-                     short_date, service_name_);
+  return fmt::format(SigV4ASignatureConstants::SigV4ACredentialScopeFormat, short_date,
+                     service_name_);
 }
 
 std::string SigV4ASignerImpl::createStringToSign(const absl::string_view canonical_request,
@@ -44,8 +44,8 @@ std::string SigV4ASignerImpl::createStringToSign(const absl::string_view canonic
                                                  const absl::string_view credential_scope) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   return fmt::format(
-      fmt::runtime(SigV4ASignatureConstants::SigV4AStringToSignFormat), getAlgorithmString(),
-      long_date, credential_scope,
+      SigV4ASignatureConstants::SigV4AStringToSignFormat, getAlgorithmString(), long_date,
+      credential_scope,
       Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
 }
 

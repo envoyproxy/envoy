@@ -17,7 +17,7 @@ REGISTER_FACTORY(PropertyMatchDataInputFactory, Matcher::DataInputFactory<Reques
 
 REGISTER_FACTORY(RequestMatchDataInputFactory, Matcher::DataInputFactory<Request>);
 
-using StringMatcherImpl = Matchers::StringMatcherImplWithContext<StringMatcherProto>;
+using StringMatcherImpl = Matchers::StringMatcherImpl<StringMatcherProto>;
 
 RequestMatchInputMatcher::RequestMatchInputMatcher(
     const RequestMatcherProto& proto_config, Server::Configuration::CommonFactoryContext& context) {

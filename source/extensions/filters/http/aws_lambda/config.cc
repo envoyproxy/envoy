@@ -34,6 +34,26 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
 
 } // namespace
 
+// In case credentials_profile is set in the configuration, instead of using the
+// default providers chain, it will use the credentials file provider with
+// the configured profile. All other providers will be ignored.
+Extensions::Common::Aws::CredentialsProviderSharedPtr
+AwsLambdaFilterFactory::getCredentialsProvider(
+    const std::string& profile, Server::Configuration::ServerFactoryContext& server_context,
+    const std::string& region) const {
+  if (!profile.empty()) {
+    ENVOY_LOG(debug,
+              "credentials profile is set to \"{}\" in config, default credentials providers chain "
+              "will be ignored and only credentials file provider will be used",
+              profile);
+    return std::make_shared<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
+        server_context.api(), profile);
+  }
+  return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
+      server_context.api(), makeOptRef(server_context), region,
+      Extensions::Common::Aws::Utility::fetchMetadata);
+}
+
 absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
     const std::string& stats_prefix, DualInfo dual_info,
@@ -46,40 +66,52 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
   const std::string region = arn->region();
 
   auto credentials_provider =
-      std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          server_context.api(), makeOptRef(server_context), region,
-          Extensions::Common::Aws::Utility::fetchMetadata);
+      getCredentialsProvider(proto_config.credentials_profile(), server_context, region);
 
-  auto signer = std::make_shared<Extensions::Common::Aws::SigV4SignerImpl>(
+  auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name, region, std::move(credentials_provider), server_context,
       // TODO: extend API to allow specifying header exclusion. ref:
       // https://github.com/envoyproxy/envoy/pull/18998
       Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
 
-  FilterSettings filter_settings{*arn, getInvocationMode(proto_config),
-                                 proto_config.payload_passthrough(), proto_config.host_rewrite()};
+  auto filter_settings = std::make_shared<FilterSettingsImpl>(
+      *arn, getInvocationMode(proto_config), proto_config.payload_passthrough(),
+      proto_config.host_rewrite(), std::move(signer));
 
   FilterStats stats = generateStats(stats_prefix, dual_info.scope);
-  return [stats, signer, filter_settings, dual_info](Http::FilterChainFactoryCallbacks& cb) {
-    auto filter = std::make_shared<Filter>(filter_settings, stats, signer, dual_info.is_upstream);
+  return [stats, filter_settings, dual_info](Http::FilterChainFactoryCallbacks& cb) -> void {
+    auto filter = std::make_shared<Filter>(filter_settings, stats, dual_info.is_upstream);
     cb.addStreamFilter(filter);
   };
 }
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+    const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig& per_route_config,
+    Server::Configuration::ServerFactoryContext& server_context,
+    ProtobufMessage::ValidationVisitor&) {
 
-  const auto arn = parseArn(proto_config.invoke_config().arn());
+  const auto arn = parseArn(per_route_config.invoke_config().arn());
   if (!arn) {
     throw EnvoyException(
-        fmt::format("aws_lambda_filter: Invalid ARN: {}", proto_config.invoke_config().arn()));
+        fmt::format("aws_lambda_filter: Invalid ARN: {}", per_route_config.invoke_config().arn()));
   }
-  return std::make_shared<const FilterSettings>(
-      FilterSettings{*arn, getInvocationMode(proto_config.invoke_config()),
-                     proto_config.invoke_config().payload_passthrough(),
-                     proto_config.invoke_config().host_rewrite()});
+  const std::string region = arn->region();
+  auto credentials_provider = getCredentialsProvider(
+      per_route_config.invoke_config().credentials_profile(), server_context, region);
+
+  auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
+      service_name, region, std::move(credentials_provider), server_context,
+      // TODO: extend API to allow specifying header exclusion. ref:
+      // https://github.com/envoyproxy/envoy/pull/18998
+      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+
+  auto filter_settings = std::make_shared<FilterSettingsImpl>(
+      *arn, getInvocationMode(per_route_config.invoke_config()),
+      per_route_config.invoke_config().payload_passthrough(),
+      per_route_config.invoke_config().host_rewrite(), std::move(signer));
+
+  return filter_settings;
 }
 
 /*

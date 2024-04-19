@@ -52,7 +52,7 @@ public:
    * @params params the already-parsed parameters.
    * @param response buffer into which to write response
    */
-  void prometheusFlushAndRender(const StatsParams& params, Buffer::Instance& response);
+  Http::Code prometheusFlushAndRender(const StatsParams& params, Buffer::Instance& response);
 
   /**
    * Renders the stats as prometheus. This is broken out as a separately

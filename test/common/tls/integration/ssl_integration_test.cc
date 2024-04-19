@@ -925,7 +925,12 @@ TEST_P(SslCertficateIntegrationTest, BothEcdsaAndRsaOnlyEcdsaOcspResponse) {
   const uint8_t* resp;
   size_t resp_len;
   SSL_get0_ocsp_response(socket->ssl(), &resp, &resp_len);
-  EXPECT_NE(0, resp_len);
+  ASSERT_GT(resp_len, 0);
+  ASSERT_NE(resp, nullptr);
+  std::string ocsp_resp{reinterpret_cast<const char*>(resp), resp_len};
+  std::string expected_ocsp_resp{TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsa_ocsp_resp.der"))};
+  EXPECT_EQ(ocsp_resp, expected_ocsp_resp);
 }
 
 // Server has ECDSA and RSA certificates with OCSP responses and stapling required policy works.

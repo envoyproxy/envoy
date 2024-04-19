@@ -27,18 +27,16 @@ Matchers::StringMatcherPtr makeExactStringMatcher(const std::string& exact_match
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::type::matcher::v3::StringMatcher config;
   config.set_exact(exact_match);
-  return std::make_unique<
-      Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(config,
-                                                                                       context);
+  return std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+      config, context);
 }
 
 Matchers::StringMatcherPtr makeStdRegexStringMatcher(const std::string& regex) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::type::matcher::v3::StringMatcher config;
   config.MergeFrom(TestUtility::createRegexMatcher(regex));
-  return std::make_unique<
-      Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(config,
-                                                                                       context);
+  return std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+      config, context);
 }
 
 } // namespace
@@ -598,6 +596,33 @@ TEST_F(CorsFilterTest, EncodeWithExposeHeaders) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("localhost", response_headers.get_("access-control-allow-origin"));
   EXPECT_EQ("custom-header-1", response_headers.get_("access-control-expose-headers"));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
+}
+
+TEST_F(CorsFilterTest, DoNotAddResponseHeadersForNotMatchingOrigins) {
+  Http::TestRequestHeaderMapImpl request_headers{{"origin", "not_allowed_host"}};
+  cors_policy_->expose_headers_ = "custom-header-1";
+
+  cors_policy_->allow_origins_.clear();
+  cors_policy_->allow_origins_.emplace_back(makeExactStringMatcher("localhost"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
+
+  Http::TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
+
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
+
+  Http::TestResponseHeaderMapImpl response_headers{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  // None of the response headers should be added for non-matching origins.
+  EXPECT_EQ("", response_headers.get_("access-control-allow-origin"));
+  EXPECT_EQ("", response_headers.get_("access-control-expose-headers"));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));

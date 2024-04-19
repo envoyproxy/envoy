@@ -29,7 +29,6 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
@@ -48,6 +47,7 @@
 #include "source/common/signal/fatal_error_handler.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/tls/context_manager_impl.h"
@@ -363,24 +363,18 @@ absl::Status InstanceUtil::loadBootstrapConfig(
   }
 
   if (!config_path.empty()) {
-#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
-#else
-    if (!config_path.empty()) {
-      return absl::InvalidArgumentError("Cannot load from file with YAML disabled\n");
-    }
-    UNREFERENCED_PARAMETER(api);
-#endif
   }
   if (!config_yaml.empty()) {
-#ifdef ENVOY_ENABLE_YAML
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
+#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
-    bootstrap.MergeFrom(bootstrap_override);
 #else
-    return absl::InvalidArgumentError("Cannot load from YAML with YAML disabled\n");
+    // Treat the yaml as proto
+    Protobuf::TextFormat::ParseFromString(config_yaml, &bootstrap_override);
 #endif
+    bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSizeLong() != 0) {
     bootstrap.MergeFrom(config_proto);
@@ -437,6 +431,12 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
     ENVOY_LOG(info, "  {}: {}", ext.first, absl::StrJoin(ext.second->registeredNames(), ", "));
   }
+
+  // The main thread is registered for thread local updates so that code that does not care
+  // whether it runs on the main thread or on workers can still use TLS.
+  // We do this as early as possible because this has no side effect and could ensure that the
+  // TLS always contains a valid main thread dispatcher when TLS is used.
+  thread_local_.registerThread(*dispatcher_, true);
 
   // Handle configuration that needs to take place prior to the main configuration load.
   RETURN_IF_NOT_OK(InstanceUtil::loadBootstrapConfig(
@@ -503,8 +503,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  stats_store_.setTagProducer(
-      Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags()));
+  auto producer_or_error =
+      Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
+  RETURN_IF_STATUS_NOT_OK(producer_or_error);
+  stats_store_.setTagProducer(std::move(producer_or_error.value()));
   stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
       bootstrap_.stats_config(), stats_store_.symbolTable(), server_contexts_));
   stats_store_.setHistogramSettings(
@@ -669,10 +671,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // Workers get created first so they register for thread local updates.
   listener_manager_ = listener_manager_factory->createListenerManager(
       *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
-
-  // The main thread is also registered for thread local updates so that code that does not care
-  // whether it runs on the main thread or on workers can still use TLS.
-  thread_local_.registerThread(*dispatcher_, true);
 
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
@@ -1073,9 +1071,15 @@ InstanceBase::registerCallback(Stage stage, StageCallbackWithCompletion callback
 
 void InstanceBase::notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  const auto it = stage_callbacks_.find(stage);
-  if (it != stage_callbacks_.end()) {
-    for (const StageCallback& callback : it->second) {
+  const auto stage_it = stage_callbacks_.find(stage);
+  if (stage_it != stage_callbacks_.end()) {
+    LifecycleNotifierCallbacks& callbacks = stage_it->second;
+    for (auto callback_it = callbacks.begin(); callback_it != callbacks.end();) {
+      StageCallback callback = *callback_it;
+      // Increment the iterator before invoking the callback in case the
+      // callback deletes the handle which will unregister itself and
+      // invalidate this iterator if we're still pointing at it.
+      ++callback_it;
       callback();
     }
   }

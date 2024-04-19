@@ -144,10 +144,8 @@ EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<EngineCallbacks>())
 #endif
 }
 
-EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
-  // Envoy::Platform::LogLevel is essentially the same as Logger::Logger::Levels, so we can
-  // safely cast it.
-  log_level_ = static_cast<Logger::Logger::Levels>(log_level);
+EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
+  network_thread_priority_ = thread_priority;
   return *this;
 }
 
@@ -166,8 +164,18 @@ EngineBuilder& EngineBuilder::setEngineCallbacks(std::unique_ptr<EngineCallbacks
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) {
-  callbacks_->on_engine_running = std::move(closure);
+EngineBuilder& EngineBuilder::setOnEngineRunning(absl::AnyInvocable<void()> closure) {
+  callbacks_->on_engine_running_ = std::move(closure);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setOnEngineExit(absl::AnyInvocable<void()> closure) {
+  callbacks_->on_exit_ = std::move(closure);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setEventTracker(std::unique_ptr<EnvoyEventTracker> event_tracker) {
+  event_tracker_ = std::move(event_tracker);
   return *this;
 }
 
@@ -379,14 +387,23 @@ EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string type
   return *this;
 }
 
+std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
+#ifndef ENVOY_ENABLE_YAML
+  return absl::StrCat("[type.googleapis.com/"
+                      "envoymobile.extensions.filters.http.platform_bridge.PlatformBridge] {"
+                      "platform_filter_name: \"",
+                      name, "\" }");
+#else
+  return absl::StrCat(
+      "{'@type': "
+      "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, "
+      "platform_filter_name: ",
+      name, "}");
+#endif
+}
+
 EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
-  addNativeFilter(
-      "envoy.filters.http.platform_bridge",
-      absl::StrCat(
-          "{'@type': "
-          "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, "
-          "platform_filter_name: ",
-          name, "}"));
+  addNativeFilter("envoy.filters.http.platform_bridge", nativeNameToConfig(name));
   return *this;
 }
 
@@ -450,14 +467,21 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
        ++filter) {
-#ifdef ENVOY_ENABLE_YAML
     auto* native_filter = hcm->add_http_filters();
-    native_filter->set_name((*filter).name_);
+    native_filter->set_name(filter->name_);
+#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
                               ProtobufMessage::getStrictValidationVisitor());
 #else
-    IS_ENVOY_BUG("native filter chains can not be added when YAML is compiled out.");
-#endif
+#ifdef ENVOY_ENABLE_FULL_PROTOS
+    Protobuf::TextFormat::ParseFromString((*filter).typed_config_,
+                                          native_filter->mutable_typed_config());
+    RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
+                   "Failed to parse: " + (*filter).typed_config_);
+#else
+    IS_ENVOY_BUG("Native filter support not implemented for this build");
+#endif // !ENVOY_ENABLE_FULL_PROTOS
+#endif // !ENVOY_ENABLE_YAML
   }
 
   // Set up the optional filters
@@ -904,10 +928,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  envoy_event_tracker null_tracker{};
-
   InternalEngine* envoy_engine =
-      new InternalEngine(std::move(callbacks_), std::move(logger_), null_tracker);
+      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
+                         network_thread_priority_);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
@@ -940,10 +963,7 @@ EngineSharedPtr EngineBuilder::build() {
   if (bootstrap) {
     options->setConfigProto(std::move(bootstrap));
   }
-  ENVOY_BUG(
-      options->setLogLevel(logLevelToString(static_cast<Envoy::Platform::LogLevel>(log_level_)))
-          .ok(),
-      "invalid log level");
+  options->setLogLevel(static_cast<spdlog::level::level_enum>(log_level_));
   options->setConcurrency(1);
   envoy_engine->run(options);
 

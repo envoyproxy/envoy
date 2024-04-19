@@ -91,12 +91,11 @@ void FilesystemSubscriptionImpl::refresh() {
               config_update->DebugString());
   }
   END_TRY
-  catch (const ProtobufMessage::UnknownProtoFieldException& e) {
-    configRejected(e, config_update == nullptr ? "" : config_update->DebugString());
-  }
   catch (const EnvoyException& e) {
     if (config_update != nullptr) {
       configRejected(e, config_update->DebugString());
+    } else if (absl::EndsWith(e.what(), "has unknown fields")) {
+      configRejected(e, "");
     } else {
       ENVOY_LOG(warn, "Filesystem config update failure: in {}, {}", path_, e.what());
       stats_.update_failure_.inc();
@@ -131,7 +130,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
   Protobuf::DynamicMessageFactory dmf;
   ProtobufTypes::MessagePtr collection_message;
   collection_message.reset(dmf.GetPrototype(collection_descriptor)->New());
-  MessageUtil::unpackTo(resource_message.resource(), *collection_message);
+  THROW_IF_NOT_OK(MessageUtil::unpackTo(resource_message.resource(), *collection_message));
   const auto* collection_entries_field_descriptor = collection_descriptor->field(0);
   // Verify collection message type structure.
   if (collection_entries_field_descriptor == nullptr ||

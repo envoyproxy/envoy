@@ -721,6 +721,7 @@ envoy_cc_test_library(
         ":zone_aware_load_balancer_fuzz_proto_cc_proto",
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:priority_set_mocks",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 

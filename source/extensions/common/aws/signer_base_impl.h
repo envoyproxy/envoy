@@ -76,20 +76,19 @@ public:
         short_date_formatter_(std::string(SignatureConstants::ShortDateFormat)) {
     for (const auto& matcher : matcher_config) {
       excluded_header_matchers_.emplace_back(
-          std::make_unique<
-              Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
               matcher, context));
     }
   }
 
-  void sign(Http::RequestMessage& message, bool sign_body = false,
-            const absl::string_view override_region = "") override;
-  void sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
-            const absl::string_view override_region = "") override;
-  void signEmptyPayload(Http::RequestHeaderMap& headers,
-                        const absl::string_view override_region = "") override;
-  void signUnsignedPayload(Http::RequestHeaderMap& headers,
-                           const absl::string_view override_region = "") override;
+  absl::Status sign(Http::RequestMessage& message, bool sign_body = false,
+                    const absl::string_view override_region = "") override;
+  absl::Status sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
+                    const absl::string_view override_region = "") override;
+  absl::Status signEmptyPayload(Http::RequestHeaderMap& headers,
+                                const absl::string_view override_region = "") override;
+  absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
+                                   const absl::string_view override_region = "") override;
 
 protected:
   std::string getRegion() const;
@@ -139,8 +138,7 @@ protected:
       envoy::type::matcher::v3::StringMatcher m;
       m.set_exact(header);
       matcher_ptrs.emplace_back(
-          std::make_unique<
-              Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
               m, context));
     }
     return matcher_ptrs;

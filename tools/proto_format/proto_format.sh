@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Reformat API protos to canonical proto style using protoxform.
 

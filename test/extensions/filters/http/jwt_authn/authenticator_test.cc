@@ -104,7 +104,6 @@ public:
 
 // Test authenticator constraints for subjects
 TEST_F(AuthenticatorTest, TestSubject) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   TestUtility::loadFromYaml(SubjectConfig, proto_config_);
 
   {

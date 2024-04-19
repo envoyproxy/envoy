@@ -56,6 +56,66 @@
 
 namespace Envoy {
 namespace Router {
+class RouteCreator {
+public:
+  static RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
+      const envoy::config::route::v3::Route& route_config, const CommonVirtualHostSharedPtr& vhost,
+      Server::Configuration::ServerFactoryContext& factory_context,
+      ProtobufMessage::ValidationVisitor& validator,
+      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters) {
+
+    absl::Status creation_status = absl::OkStatus();
+    RouteEntryImplBaseConstSharedPtr route;
+    switch (route_config.match().path_specifier_case()) {
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
+      route.reset(new PrefixRouteEntryImpl(vhost, route_config, factory_context, validator,
+                                           creation_status));
+      break;
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
+      route.reset(
+          new PathRouteEntryImpl(vhost, route_config, factory_context, validator, creation_status));
+      break;
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex:
+      route.reset(new RegexRouteEntryImpl(vhost, route_config, factory_context, validator,
+                                          creation_status));
+      break;
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher:
+      route.reset(new ConnectRouteEntryImpl(vhost, route_config, factory_context, validator,
+                                            creation_status));
+      break;
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
+      route.reset(new PathSeparatedPrefixRouteEntryImpl(vhost, route_config, factory_context,
+                                                        validator, creation_status));
+      break;
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy:
+      route.reset(new UriTemplateMatcherRouteEntryImpl(vhost, route_config, factory_context,
+                                                       validator, creation_status));
+      break;
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
+      break; // throw the error below.
+    }
+    if (!route) {
+      throwEnvoyExceptionOrPanic("Invalid route config");
+    }
+    THROW_IF_NOT_OK(creation_status);
+
+    if (validation_clusters.has_value()) {
+      THROW_IF_NOT_OK(route->validateClusters(*validation_clusters));
+      for (const auto& shadow_policy : route->shadowPolicies()) {
+        if (!shadow_policy->cluster().empty()) {
+          ASSERT(shadow_policy->clusterHeader().get().empty());
+          if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
+            throwEnvoyExceptionOrPanic(
+                fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
+          }
+        }
+      }
+    }
+
+    return route;
+  }
+};
+
 namespace {
 
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
@@ -72,58 +132,6 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
                                        src.headers_to_add_if_absent.end());
   dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
                                 src.headers_to_remove.end());
-}
-
-RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
-    const envoy::config::route::v3::Route& route_config, const CommonVirtualHostSharedPtr& vhost,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator,
-    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters) {
-
-  RouteEntryImplBaseConstSharedPtr route;
-  switch (route_config.match().path_specifier_case()) {
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
-    route = std::make_shared<PrefixRouteEntryImpl>(vhost, route_config, factory_context, validator);
-    break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
-    route = std::make_shared<PathRouteEntryImpl>(vhost, route_config, factory_context, validator);
-    break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex:
-    route = std::make_shared<RegexRouteEntryImpl>(vhost, route_config, factory_context, validator);
-    break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher:
-    route =
-        std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, factory_context, validator);
-    break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
-    route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(vhost, route_config,
-                                                                factory_context, validator);
-    break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy:
-    route = std::make_shared<UriTemplateMatcherRouteEntryImpl>(vhost, route_config, factory_context,
-                                                               validator);
-    break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
-    break; // throw the error below.
-  }
-  if (!route) {
-    throwEnvoyExceptionOrPanic("Invalid route config");
-  }
-
-  if (validation_clusters.has_value()) {
-    route->validateClusters(*validation_clusters);
-    for (const auto& shadow_policy : route->shadowPolicies()) {
-      if (!shadow_policy->cluster().empty()) {
-        ASSERT(shadow_policy->clusterHeader().get().empty());
-        if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
-          throwEnvoyExceptionOrPanic(
-              fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
-        }
-      }
-    }
-  }
-
-  return route;
 }
 
 class RouteActionValidationVisitor
@@ -204,7 +212,7 @@ getClusterSpecifierPluginByTheProto(const envoy::config::route::v3::ClusterSpeci
 }
 
 ::Envoy::Http::Utility::RedirectConfig
-createRedirectConfig(const envoy::config::route::v3::Route& route) {
+createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine& regex_engine) {
   ::Envoy::Http::Utility::RedirectConfig redirect_config{
       route.redirect().scheme_redirect(),
       route.redirect().host_redirect(),
@@ -214,7 +222,7 @@ createRedirectConfig(const envoy::config::route::v3::Route& route) {
       route.redirect().prefix_rewrite(),
       route.redirect().has_regex_rewrite() ? route.redirect().regex_rewrite().substitution() : "",
       route.redirect().has_regex_rewrite()
-          ? Regex::Utility::parseRegex(route.redirect().regex_rewrite().pattern())
+          ? Regex::Utility::parseRegex(route.redirect().regex_rewrite().pattern(), regex_engine)
           : nullptr,
       route.redirect().path_redirect().find('?') != absl::string_view::npos,
       route.redirect().https_redirect(),
@@ -490,7 +498,8 @@ const Tracing::CustomTagMap& RouteTracingImpl::getCustomTags() const { return cu
 RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        Server::Configuration::ServerFactoryContext& factory_context,
-                                       ProtobufMessage::ValidationVisitor& validator)
+                                       ProtobufMessage::ValidationVisitor& validator,
+                                       absl::Status& creation_status)
     : prefix_rewrite_(route.route().prefix_rewrite()),
       path_matcher_(buildPathMatcher(route, validator)),
       path_rewriter_(buildPathRewriter(route, validator)),
@@ -501,7 +510,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                     : absl::nullopt),
       host_rewrite_path_regex_(
           route.route().has_host_rewrite_path_regex()
-              ? Regex::Utility::parseRegex(route.route().host_rewrite_path_regex().pattern())
+              ? Regex::Utility::parseRegex(route.route().host_rewrite_path_regex().pattern(),
+                                           factory_context.regexEngine())
               : nullptr),
       host_rewrite_path_regex_substitution_(
           route.route().has_host_rewrite_path_regex()
@@ -513,7 +523,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       runtime_(loadRuntimeData(route.match())),
       redirect_config_(route.has_redirect()
                            ? std::make_unique<::Envoy::Http::Utility::RedirectConfig>(
-                                 createRedirectConfig(route))
+                                 createRedirectConfig(route, factory_context.regexEngine()))
                            : nullptr),
       hedge_policy_(buildHedgePolicy(vhost->hedgePolicy(), route.route())),
       retry_policy_(
@@ -546,7 +556,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
   auto body_or_error = ConfigUtility::parseDirectResponseBody(
       route, factory_context.api(), vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
-  THROW_IF_STATUS_NOT_OK(body_or_error, throw);
+  SET_AND_RETURN_IF_NOT_OK(body_or_error.status(), creation_status);
   direct_response_body_ = body_or_error.value();
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
     request_headers_parser_ =
@@ -595,15 +605,18 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       weighted_clusters.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters.back()->clusterWeight();
       if (total_weight > std::numeric_limits<uint32_t>::max()) {
-        throwEnvoyExceptionOrPanic(
+        creation_status = absl::InvalidArgumentError(
             fmt::format("The sum of weights of all weighted clusters of route {} exceeds {}",
                         route_name_, std::numeric_limits<uint32_t>::max()));
+        return;
       }
     }
 
     // Reject the config if the total_weight of all clusters is 0.
     if (total_weight == 0) {
-      throwEnvoyExceptionOrPanic("Sum of weights in the weighted_cluster must be greater than 0.");
+      creation_status = absl::InvalidArgumentError(
+          "Sum of weights in the weighted_cluster must be greater than 0.");
+      return;
     }
 
     weighted_clusters_config_ =
@@ -626,7 +639,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   }
 
   if (!route.route().hash_policy().empty()) {
-    hash_policy_ = std::make_unique<Http::HashPolicyImpl>(route.route().hash_policy());
+    hash_policy_ = std::make_unique<Http::HashPolicyImpl>(route.route().hash_policy(),
+                                                          factory_context.regexEngine());
   }
 
   if (route.match().has_tls_context()) {
@@ -635,10 +649,11 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   }
 
   if (!route.route().rate_limits().empty()) {
-    absl::Status creation_status;
     rate_limit_policy_ = std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(),
                                                                factory_context, creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    if (!creation_status.ok()) {
+      return;
+    }
   }
 
   // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
@@ -658,7 +673,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                 Envoy::Http::LowerCaseString(upgrade_config.upgrade_type()).get(), enabled))
             .second;
     if (!success) {
-      throwEnvoyExceptionOrPanic(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
+      creation_status = absl::InvalidArgumentError(
+          absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
+      return;
     }
     if (absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
                                Http::Headers::get().MethodValues.Connect) ||
@@ -674,8 +691,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
       }
     } else if (upgrade_config.has_connect_config()) {
-      throwEnvoyExceptionOrPanic(absl::StrCat("Non-CONNECT upgrade type ",
-                                              upgrade_config.upgrade_type(), " has ConnectConfig"));
+      creation_status = absl::InvalidArgumentError(absl::StrCat(
+          "Non-CONNECT upgrade type ", upgrade_config.upgrade_type(), " has ConnectConfig"));
+      return;
     }
   }
 
@@ -693,25 +711,27 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   }
 
   if (num_rewrite_polices > 1) {
-    throwEnvoyExceptionOrPanic(
+    creation_status = absl::InvalidArgumentError(
         "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
+    return;
   }
 
   if (!prefix_rewrite_.empty() && path_matcher_ != nullptr) {
-    throwEnvoyExceptionOrPanic("Cannot use prefix_rewrite with matcher extension");
+    creation_status =
+        absl::InvalidArgumentError("Cannot use prefix_rewrite with matcher extension");
+    return;
   }
 
   if (route.route().has_regex_rewrite()) {
     auto rewrite_spec = route.route().regex_rewrite();
-    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_ =
+        Regex::Utility::parseRegex(rewrite_spec.pattern(), factory_context.regexEngine());
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
   if (path_rewriter_ != nullptr) {
-    absl::Status compatible_status = path_rewriter_->isCompatiblePathMatcher(path_matcher_);
-    if (!compatible_status.ok()) {
-      throwEnvoyExceptionOrPanic(std::string(compatible_status.message()));
-    }
+    SET_AND_RETURN_IF_NOT_OK(path_rewriter_->isCompatiblePathMatcher(path_matcher_),
+                             creation_status);
   }
 
   if (redirect_config_ != nullptr && redirect_config_->path_redirect_has_query_ &&
@@ -1178,10 +1198,7 @@ RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
       route.route().path_rewrite_policy().typed_config(), validator, factory);
 
   absl::StatusOr<PathRewriterSharedPtr> rewriter = factory.createPathRewriter(*config);
-
-  if (!rewriter.ok()) {
-    throwEnvoyExceptionOrPanic(std::string(rewriter.status().message()));
-  }
+  THROW_IF_STATUS_NOT_OK(rewriter, throw);
 
   return rewriter.value();
 }
@@ -1349,10 +1366,10 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
   PANIC("unexpected");
 }
 
-void RouteEntryImplBase::validateClusters(
+absl::Status RouteEntryImplBase::validateClusters(
     const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const {
   if (isDirectResponse()) {
-    return;
+    return absl::OkStatus();
   }
 
   // Currently, we verify that the cluster exists in the CM if we have an explicit cluster or
@@ -1363,14 +1380,14 @@ void RouteEntryImplBase::validateClusters(
   // route tables. This would enable the all CDS with static route table case.
   if (!cluster_name_.empty()) {
     if (!cluster_info_maps.hasCluster(cluster_name_)) {
-      throwEnvoyExceptionOrPanic(fmt::format("route: unknown cluster '{}'", cluster_name_));
+      return absl::InvalidArgumentError(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
   } else if (weighted_clusters_config_ != nullptr) {
     for (const WeightedClusterEntrySharedPtr& cluster :
          weighted_clusters_config_->weighted_clusters_) {
       if (!cluster->clusterName().empty()) {
         if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
-          throwEnvoyExceptionOrPanic(
+          return absl::InvalidArgumentError(
               fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
         }
       }
@@ -1378,10 +1395,12 @@ void RouteEntryImplBase::validateClusters(
       // not empty because the cluster name is not set yet at config time (hence the validation
       // here).
       else if (cluster->clusterHeaderName().get().empty()) {
-        throwEnvoyExceptionOrPanic("route: unknown weighted cluster with no cluster_header field");
+        return absl::InvalidArgumentError(
+            "route: unknown weighted cluster with no cluster_header field");
       }
     }
   }
+  return absl::OkStatus();
 }
 
 absl::optional<bool> RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
@@ -1477,8 +1496,8 @@ void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
 UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator),
+    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       uri_template_(path_matcher_->uriTemplate()){};
 
 void UriTemplateMatcherRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1505,8 +1524,8 @@ UriTemplateMatcherRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator),
+    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive(),
                                                         factory_context)) {}
 
@@ -1533,8 +1552,9 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& 
 PathRouteEntryImpl::PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        Server::Configuration::ServerFactoryContext& factory_context,
-                                       ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator),
+                                       ProtobufMessage::ValidationVisitor& validator,
+                                       absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive(),
                                                        factory_context)) {}
 
@@ -1562,8 +1582,8 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& he
 RegexRouteEntryImpl::RegexRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator),
+    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(
           Matchers::PathMatcher::createSafeRegex(route.match().safe_regex(), factory_context)) {
   ASSERT(route.match().path_specifier_case() ==
@@ -1599,8 +1619,8 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
 ConnectRouteEntryImpl::ConnectRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator) {}
+    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status) {}
 
 void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                               bool insert_envoy_original_path) const {
@@ -1629,8 +1649,8 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
 PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator),
+    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().path_separated_prefix(),
                                                         !case_sensitive(), factory_context)) {}
 
@@ -1831,8 +1851,8 @@ VirtualHostImpl::VirtualHostImpl(
     }
   } else {
     for (const auto& route : virtual_host.routes()) {
-      routes_.emplace_back(createAndValidateRoute(route, shared_virtual_host_, factory_context,
-                                                  validator, validation_clusters));
+      routes_.emplace_back(RouteCreator::createAndValidateRoute(
+          route, shared_virtual_host_, factory_context, validator, validation_clusters));
     }
   }
 }
@@ -2274,8 +2294,8 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
   const auto& route_config =
       MessageUtil::downcastAndValidate<const envoy::config::route::v3::Route&>(config,
                                                                                validation_visitor);
-  auto route = createAndValidateRoute(route_config, context.vhost, context.factory_context,
-                                      validation_visitor, absl::nullopt);
+  auto route = RouteCreator::createAndValidateRoute(
+      route_config, context.vhost, context.factory_context, validation_visitor, absl::nullopt);
 
   return [route]() { return std::make_unique<RouteMatchAction>(route); };
 }
@@ -2290,8 +2310,8 @@ Matcher::ActionFactoryCb RouteListMatchActionFactory::createActionFactoryCb(
 
   std::vector<RouteEntryImplBaseConstSharedPtr> routes;
   for (const auto& route : route_config.routes()) {
-    routes.emplace_back(createAndValidateRoute(route, context.vhost, context.factory_context,
-                                               validation_visitor, absl::nullopt));
+    routes.emplace_back(RouteCreator::createAndValidateRoute(
+        route, context.vhost, context.factory_context, validation_visitor, absl::nullopt));
   }
   return [routes]() { return std::make_unique<RouteListMatchAction>(routes); };
 }

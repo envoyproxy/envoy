@@ -114,7 +114,7 @@ TEST_F(DatadogConfigTest, ConfigureTracer) {
         makeConfig<envoy::config::trace::v3::DatadogConfig>("collector_cluster: fake_cluster");
     cm_.initializeClusters({"fake_cluster"}, {});
 
-    EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_));
+    EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_)).Times(2);
     Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callbacks;
     EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
@@ -171,7 +171,7 @@ TEST_F(DatadogConfigTest, AllowCollectorClusterToBeAddedViaApi) {
   auto datadog_config =
       makeConfig<envoy::config::trace::v3::DatadogConfig>("collector_cluster: fake_cluster");
 
-  EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_));
+  EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_)).Times(2);
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
@@ -209,7 +209,7 @@ TEST_F(DatadogConfigTest, CollectorHostname) {
   )EOF");
   cm_.initializeClusters({"fake_cluster"}, {});
 
-  EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_));
+  EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_)).Times(2);
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))

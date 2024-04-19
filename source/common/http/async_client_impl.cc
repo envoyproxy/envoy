@@ -102,8 +102,8 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_)),
       route_(std::make_shared<NullRouteImpl>(
           parent_.cluster_->name(),
-          retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy, options.timeout,
-          options.hash_policy)),
+          retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
+          parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy)),
       account_(options.account_), buffer_limit_(options.buffer_limit_),
       send_xff_(options.send_xff) {
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
@@ -300,7 +300,12 @@ AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
 
 void AsyncRequestImpl::initialize() {
   Tracing::HttpTraceContext trace_context(request_->headers());
-  child_span_->injectContext(trace_context, nullptr);
+  Tracing::UpstreamContext upstream_context(nullptr,                    // host_
+                                            parent_.cluster_.get(),     // cluster_
+                                            Tracing::ServiceType::Http, // service_type_
+                                            true                        // async_client_span_
+  );
+  child_span_->injectContext(trace_context, upstream_context);
   sendHeaders(request_->headers(), request_->body().length() == 0);
   if (request_->body().length() != 0) {
     // It's possible this will be a no-op due to a local response synchronously generated in
@@ -312,7 +317,12 @@ void AsyncRequestImpl::initialize() {
 
 void AsyncOngoingRequestImpl::initialize() {
   Tracing::HttpTraceContext trace_context(*request_headers_);
-  child_span_->injectContext(trace_context, nullptr);
+  Tracing::UpstreamContext upstream_context(nullptr,                    // host_
+                                            parent_.cluster_.get(),     // cluster_
+                                            Tracing::ServiceType::Http, // service_type_
+                                            true                        // async_client_span_
+  );
+  child_span_->injectContext(trace_context, upstream_context);
   sendHeaders(*request_headers_, false);
 }
 

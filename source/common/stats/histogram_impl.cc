@@ -106,10 +106,9 @@ HistogramSettingsImpl::HistogramSettingsImpl(const envoy::config::metrics::v3::S
         for (const auto& matcher : config.histogram_bucket_settings()) {
           std::vector<double> buckets{matcher.buckets().begin(), matcher.buckets().end()};
           std::sort(buckets.begin(), buckets.end());
-          configs.emplace_back(
-              Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>(
-                  matcher.match(), context),
-              std::move(buckets));
+          configs.emplace_back(Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>(
+                                   matcher.match(), context),
+                               std::move(buckets));
         }
 
         return configs;
