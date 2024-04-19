@@ -33,17 +33,17 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
   {
     absl::MutexLock l(&mutex_);
     if (!proxy_settings_.has_value()) {
-      return ProxyResolutionResult::NO_PROXY_CONFIGURED;
+      return ProxyResolutionResult::NoProxyConfigured;
     }
 
     const auto proxy_settings = proxy_settings_.value();
     if (!proxy_settings.isPacEnabled()) {
       ProxySettings settings(proxy_settings.hostname(), proxy_settings.port());
       if (settings.isDirect()) {
-        return ProxyResolutionResult::NO_PROXY_CONFIGURED;
+        return ProxyResolutionResult::NoProxyConfigured;
       }
       proxies.emplace_back(std::move(settings));
-      return ProxyResolutionResult::RESULT_COMPLETED;
+      return ProxyResolutionResult::ResultCompleted;
     }
 
     pac_file_url = proxy_settings.pacFileUrl();
@@ -60,7 +60,7 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
       [proxy_resolution_completed](const std::vector<ProxySettings>& proxies) {
         proxy_resolution_completed(proxies);
       });
-  return ProxyResolutionResult::RESULT_IN_PROGRESS;
+  return ProxyResolutionResult::ResultInProgress;
 }
 
 } // namespace Network

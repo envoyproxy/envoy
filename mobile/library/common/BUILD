@@ -37,6 +37,7 @@ envoy_cc_library(
         "@envoy//envoy/server:lifecycle_notifier_interface",
         "@envoy//envoy/stats:stats_interface",
         "@envoy//source/common/common:thread_impl_lib_posix",
+        "@envoy//source/common/common:utility_lib",
         "@envoy//source/common/runtime:runtime_lib",
         "@envoy_build_config//:extension_registry",
     ],
@@ -82,6 +83,9 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/functional:any_invocable",
+        "@com_google_absl//absl/strings",
         "@envoy//source/common/common:base_logger_lib",
     ],
 )

@@ -925,8 +925,7 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTraffic) {
 TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
   explicit_flow_control_ = true;
   autonomous_upstream_ = false;
-  // TODO(32024) remove trace logging.
-  builder_.addLogLevel(Platform::LogLevel::trace);
+  builder_.setLogLevel(Logger::Logger::debug);
   initialize();
   ConditionalInitializer headers_callback;
 
