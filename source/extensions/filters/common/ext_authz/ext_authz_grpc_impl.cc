@@ -75,8 +75,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     // The default HTTP status code for denied response is 403 Forbidden.
     authz_response->status_code = Http::Code::Forbidden;
     if (response->has_denied_response()) {
-      copyHeaderMutationsIntoResponse(
-          authz_response, std::move(*response->mutable_denied_response()->mutable_headers()));
+      copyHeaderMutationsIntoResponse(authz_response, response->denied_response().headers());
 
       const uint32_t status_code = response->denied_response().status().code();
       if (status_code > 0) {

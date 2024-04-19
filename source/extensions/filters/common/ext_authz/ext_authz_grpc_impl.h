@@ -64,7 +64,6 @@ public:
 private:
   using RepeatedHeaderValueOption =
       Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>;
-  bool headerPairIsValid(const std::pair<std::string, std::string>& header_pair);
   void copyHeaderMutationsIntoResponse(
       ResponsePtr& response, const RepeatedHeaderValueOption& headers,
       const RepeatedHeaderValueOption& response_headers_to_add = {},
@@ -76,7 +75,6 @@ private:
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
   const Protobuf::MethodDescriptor& service_method_;
-  http2::adapter::HeaderValidator header_validator_;
 };
 
 using GrpcClientImplPtr = std::unique_ptr<GrpcClientImpl>;
