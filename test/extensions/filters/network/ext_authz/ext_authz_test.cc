@@ -96,7 +96,7 @@ public:
 
     Filters::Common::ExtAuthz::Response response{};
     response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-    response.headers_to_set = Filters::Common::ExtAuthz::UnvalidatedHeaderVector{{"foo", "bar"}};
+    response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
 
     auto* fields = response.dynamic_metadata.mutable_fields();
     (*fields)["foo"] = ValueUtil::stringValue("ok");

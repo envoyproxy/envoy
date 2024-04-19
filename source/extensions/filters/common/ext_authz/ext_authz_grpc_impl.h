@@ -24,8 +24,6 @@
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
-#include "quiche/http2/adapter/header_validator.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Filters {

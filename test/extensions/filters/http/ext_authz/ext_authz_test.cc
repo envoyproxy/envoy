@@ -127,14 +127,12 @@ public:
 
     auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
-    ENVOY_LOG_MISC(trace, "about to call this expect_call");
     EXPECT_CALL(*client_, check(_, _, _, _))
         .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                              const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                              const StreamInfo::StreamInfo&) -> void {
           callbacks.onComplete(std::move(response_ptr));
         }));
-    ENVOY_LOG_MISC(trace, "done");
     EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -392,7 +390,6 @@ TEST_F(HttpFilterTest, ErrorFailOpen) {
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
@@ -837,26 +834,27 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
   absl::string_view header_key = "header-with-non-utf-8-value";
   const uint8_t non_utf_8_bytes[3] = {0xc0, 0xc0, 0};
   absl::string_view header_value = reinterpret_cast<const char*>(non_utf_8_bytes);
-  request_headers_.addCopy(Http::LowerCaseString{header_key), header_value};
+  request_headers_.addCopy(Http::LowerCaseString{header_key}, header_value);
 
   envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& check_request,
                            Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
-    request_callbacks_ = &callbacks;
-    // headers should be empty.
-    EXPECT_EQ(0, check_request.attributes().request().http().headers().size());
-    ASSERT_TRUE(check_request.attributes().request().http().has_header_map());
-    // header_map should contain the header we added and it should be unchanged.
-    bool exact_match_utf_8_header = false;
-    for (const auto& header : check_request.attributes().request().http().header_map().headers()) {
-      if (header.key() == header_key && header.raw_value() == header_value) {
-        exact_match_utf_8_header = true;
-        break;
-      }
-    }
-    EXPECT_TRUE(exact_match_utf_8_header);
+        request_callbacks_ = &callbacks;
+        // headers should be empty.
+        EXPECT_EQ(0, check_request.attributes().request().http().headers().size());
+        ASSERT_TRUE(check_request.attributes().request().http().has_header_map());
+        // header_map should contain the header we added and it should be unchanged.
+        bool exact_match_utf_8_header = false;
+        for (const auto& header :
+             check_request.attributes().request().http().header_map().headers()) {
+          if (header.key() == header_key && header.raw_value() == header_value) {
+            exact_match_utf_8_header = true;
+            break;
+          }
+        }
+        EXPECT_TRUE(exact_match_utf_8_header);
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
@@ -2432,7 +2430,7 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   const Http::LowerCaseString key_to_add{"bar"};
 
   // `foo` will be override with `bar`.
-  const Http::LowerCaseString key_to_override("foobar");
+  const Http::LowerCaseString key_to_override{"foobar"};
   request_headers_.addCopy("foobar", "foo");
 
   // `remove-me` will be removed
@@ -2484,7 +2482,7 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
   EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(response_headers,
-                                                        Http::LowerCaseString{"set-cookie")}
+                                                        Http::LowerCaseString{"set-cookie"})
                 .result()
                 .value(),
             "cookie1=snickerdoodle,cookie2=gingerbread");
@@ -2805,7 +2803,7 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
         EXPECT_EQ(test_headers.get_("accept-encoding"), "gzip,deflate");
         EXPECT_EQ(data.toString(), "foo");
         EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(test_headers,
-                                                              Http::LowerCaseString{"set-cookie")}
+                                                              Http::LowerCaseString{"set-cookie"})
                       .result()
                       .value(),
                   "cookie1=value,cookie2=value");
