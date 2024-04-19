@@ -658,13 +658,10 @@ template <class Value> class TrieEntry {
 public:
   Value value_{};
   TrieEntry* operator[](uint8_t i) const {
-    if (i < min_child_) {
-      return nullptr;
+    if (i >= min_child_ && i < min_child_ + children_.size()) {
+      return children_[i - min_child_].get();
     }
-    if (i >= min_child_ + children_.size()) {
-      return nullptr;
-    }
-    return children_[i - min_child_].get();
+    return nullptr;
   }
 
   void set(uint8_t branch, std::unique_ptr<TrieEntry<Value>> entry) {
@@ -695,7 +692,7 @@ public:
   }
 
 private:
-  uint8_t min_child_;
+  uint8_t min_child_{0};
   std::vector<std::unique_ptr<TrieEntry>> children_;
 };
 
