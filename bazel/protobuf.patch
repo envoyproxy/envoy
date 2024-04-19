@@ -122,18 +122,6 @@ diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
  // This error has been generally flaky, but we need to disable it specifically
  // to fix https://github.com/protocolbuffers/protobuf/issues/12313
  #pragma clang diagnostic ignored "-Wunused-parameter"
-diff --git a/src/google/protobuf/map_field.h b/src/google/protobuf/map_field.h
---- a/src/google/protobuf/map_field.h	2023-06-30 17:14:18.934528580 +0000
-+++ b/src/google/protobuf/map_field.h	2023-06-30 17:14:52.098500807 +0000
-@@ -345,7 +345,7 @@
-
-  protected:
-   // "protected" stops users from deleting a `MapFieldBase *`
--  ~MapFieldBase();
-+  virtual ~MapFieldBase();
-
-   struct VTable : MapFieldBaseForParse::VTable {
-     bool (*lookup_map_value)(const MapFieldBase& map, const MapKey& map_key,
 diff --git a/src/google/protobuf/compiler/BUILD.bazel b/src/google/protobuf/compiler/BUILD.bazel
 --- a/src/google/protobuf/compiler/BUILD.bazel
 +++ b/src/google/protobuf/compiler/BUILD.bazel
@@ -161,3 +149,15 @@ index 1c6a24945..c27d0bf2a 100644
  #if PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
  #define PROTOBUF_DEBUG true
  #else
+diff --git a/src/google/protobuf/message_lite.cc b/src/google/protobuf/message_lite.cc
+--- a/src/google/protobuf/message_lite.cc	2024-04-19 15:49:01.333322873 +0000
++++ b/src/google/protobuf/message_lite.cc	2024-04-19 15:50:41.065136525 +0000
+@@ -66,7 +66,7 @@
+ 
+ int MessageLite::GetCachedSize() const {
+   auto* cached_size = AccessCachedSize();
+-  if (PROTOBUF_PREDICT_FALSE(cached_size == nullptr)) return ByteSize();
++  if (PROTOBUF_PREDICT_FALSE(cached_size == nullptr)) return (int)ByteSizeLong();
+   return cached_size->Get();
+ }
+ 
