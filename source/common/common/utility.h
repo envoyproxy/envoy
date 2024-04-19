@@ -640,7 +640,7 @@ private:
 // by allocating a vector the size of the range of entries it contains.
 //
 // For example, a node with children 'a' and 'z' will contain a vector of
-// size 26, containing two values and 24 nullptrs. A node with only one
+// size 26, containing two values and 24 nulls. A node with only one
 // child will contain a vector of size 1. A node with no children will
 // contain an empty vector.
 //
