@@ -78,7 +78,7 @@ constexpr unsigned int InitialFaultThreshold = 1;
 constexpr unsigned int MaxFaultThreshold = 3;
 
 ConnectivityManagerImpl::NetworkState ConnectivityManagerImpl::network_state_{
-    1, NetworkType::Generic, MaxFaultThreshold, DefaultPreferredNetworkMode,
+    1, NetworkType::Generic, MaxFaultThreshold, SocketMode::DefaultPreferredNetworkMode,
     Thread::MutexBasicLockable{}};
 
 envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(NetworkType network) {
@@ -97,7 +97,7 @@ envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(NetworkType network
   network_state_.configuration_key_++;
   network_state_.network_ = network;
   network_state_.remaining_faults_ = 1;
-  network_state_.socket_mode_ = DefaultPreferredNetworkMode;
+  network_state_.socket_mode_ = SocketMode::DefaultPreferredNetworkMode;
 
   return network_state_.configuration_key_;
 }
@@ -125,7 +125,7 @@ NetworkType ConnectivityManagerImpl::getPreferredNetwork() {
   return network_state_.network_;
 }
 
-envoy_socket_mode_t ConnectivityManagerImpl::getSocketMode() {
+SocketMode ConnectivityManagerImpl::getSocketMode() {
   Thread::LockGuard lock{network_state_.mutex_};
   return network_state_.socket_mode_;
 }
@@ -177,13 +177,14 @@ void ConnectivityManagerImpl::reportNetworkUsage(envoy_netconf_t configuration_k
       if (network_state_.remaining_faults_ == 0) {
         configuration_updated = true;
         configuration_key = ++network_state_.configuration_key_;
-        network_state_.socket_mode_ = network_state_.socket_mode_ == DefaultPreferredNetworkMode
-                                          ? AlternateBoundInterfaceMode
-                                          : DefaultPreferredNetworkMode;
+        network_state_.socket_mode_ =
+            network_state_.socket_mode_ == SocketMode::DefaultPreferredNetworkMode
+                ? SocketMode::AlternateBoundInterfaceMode
+                : SocketMode::DefaultPreferredNetworkMode;
         network_state_.remaining_faults_ = InitialFaultThreshold;
-        if (network_state_.socket_mode_ == DefaultPreferredNetworkMode) {
+        if (network_state_.socket_mode_ == SocketMode::DefaultPreferredNetworkMode) {
           ENVOY_LOG_EVENT(debug, "netconf_mode_switch", "DefaultPreferredNetworkMode");
-        } else if (network_state_.socket_mode_ == AlternateBoundInterfaceMode) {
+        } else if (network_state_.socket_mode_ == SocketMode::AlternateBoundInterfaceMode) {
           auto v4_pair = getActiveAlternateInterface(network_state_.network_, AF_INET);
           auto v6_pair = getActiveAlternateInterface(network_state_.network_, AF_INET6);
           ENVOY_LOG_EVENT(debug, "netconf_mode_switch", "AlternateBoundInterfaceMode [{}|{}]",
@@ -285,7 +286,7 @@ void ConnectivityManagerImpl::resetConnectivityState() {
   {
     Thread::LockGuard lock{network_state_.mutex_};
     network_state_.remaining_faults_ = 1;
-    network_state_.socket_mode_ = DefaultPreferredNetworkMode;
+    network_state_.socket_mode_ = SocketMode::DefaultPreferredNetworkMode;
     configuration_key = ++network_state_.configuration_key_;
   }
 
@@ -300,10 +301,9 @@ std::vector<InterfacePair> ConnectivityManagerImpl::enumerateV6Interfaces() {
   return enumerateInterfaces(AF_INET6, 0, 0);
 }
 
-Socket::OptionsSharedPtr
-ConnectivityManagerImpl::getUpstreamSocketOptions(NetworkType network,
-                                                  envoy_socket_mode_t socket_mode) {
-  if (enable_interface_binding_ && socket_mode == AlternateBoundInterfaceMode &&
+Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(NetworkType network,
+                                                                           SocketMode socket_mode) {
+  if (enable_interface_binding_ && socket_mode == SocketMode::AlternateBoundInterfaceMode &&
       network != NetworkType::Generic) {
     return getAlternateInterfaceSocketOptions(network);
   }
@@ -360,7 +360,7 @@ envoy_netconf_t
 ConnectivityManagerImpl::addUpstreamSocketOptions(Socket::OptionsSharedPtr options) {
   envoy_netconf_t configuration_key;
   NetworkType network;
-  envoy_socket_mode_t socket_mode;
+  SocketMode socket_mode;
 
   {
     Thread::LockGuard lock{network_state_.mutex_};

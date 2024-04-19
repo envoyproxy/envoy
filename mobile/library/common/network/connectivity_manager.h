@@ -39,11 +39,14 @@
  */
 typedef uint16_t envoy_netconf_t;
 
+namespace Envoy {
+namespace Network {
+
 /**
  * These values specify the behavior of the network connectivity_manager with respect to the
  * upstream socket options it supplies.
  */
-typedef enum {
+enum class SocketMode : int {
   // In this mode, the connectivity_manager will provide socket options that result in the creation
   // of a
   // distinct connection pool for a given value of preferred network.
@@ -54,10 +57,7 @@ typedef enum {
   // options. Note this mode is experimental, and it will not be enabled at all unless
   // enable_interface_binding_ is set to true.
   AlternateBoundInterfaceMode = 1,
-} envoy_socket_mode_t;
-
-namespace Envoy {
-namespace Network {
+};
 
 using DnsCacheManagerSharedPtr = Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr;
 using InterfacePair = std::pair<const std::string, Address::InstanceConstSharedPtr>;
@@ -111,7 +111,7 @@ public:
   /**
    * @returns the current mode used to determine upstream socket options.
    */
-  virtual envoy_socket_mode_t getSocketMode() PURE;
+  virtual SocketMode getSocketMode() PURE;
 
   /**
    * @returns configuration key representing current network state.
@@ -170,7 +170,7 @@ public:
    * @returns the current socket options that should be used for connections.
    */
   virtual Socket::OptionsSharedPtr getUpstreamSocketOptions(NetworkType network,
-                                                            envoy_socket_mode_t socket_mode) PURE;
+                                                            SocketMode socket_mode) PURE;
 
   /**
    * @param options, upstream connection options to which additional options should be appended.
@@ -219,7 +219,7 @@ public:
   std::vector<InterfacePair> enumerateInterfaces(unsigned short family, unsigned int select_flags,
                                                  unsigned int reject_flags) override;
   NetworkType getPreferredNetwork() override;
-  envoy_socket_mode_t getSocketMode() override;
+  SocketMode getSocketMode() override;
   envoy_netconf_t getConfigurationKey() override;
   Envoy::Network::ProxySettingsConstSharedPtr getProxySettings() override;
   void reportNetworkUsage(envoy_netconf_t configuration_key, bool network_fault) override;
@@ -229,7 +229,7 @@ public:
   void refreshDns(envoy_netconf_t configuration_key, bool drain_connections) override;
   void resetConnectivityState() override;
   Socket::OptionsSharedPtr getUpstreamSocketOptions(NetworkType network,
-                                                    envoy_socket_mode_t socket_mode) override;
+                                                    SocketMode socket_mode) override;
   envoy_netconf_t addUpstreamSocketOptions(Socket::OptionsSharedPtr options) override;
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() override;
 
@@ -240,7 +240,7 @@ private:
     envoy_netconf_t configuration_key_ ABSL_GUARDED_BY(mutex_);
     NetworkType network_ ABSL_GUARDED_BY(mutex_);
     uint8_t remaining_faults_ ABSL_GUARDED_BY(mutex_);
-    envoy_socket_mode_t socket_mode_ ABSL_GUARDED_BY(mutex_);
+    SocketMode socket_mode_ ABSL_GUARDED_BY(mutex_);
     Thread::MutexBasicLockable mutex_;
   };
   Socket::OptionsSharedPtr getAlternateInterfaceSocketOptions(NetworkType network);

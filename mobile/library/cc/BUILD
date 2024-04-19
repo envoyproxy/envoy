@@ -113,6 +113,7 @@ envoy_cc_library(
         "//library/common/api:c_types",
         "//library/common/data:utility_lib",
         "//library/common/extensions/key_value/platform:config",
+        "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/http:header_map_lib",
         "@envoy//source/common/http:utility_lib",
     ],
