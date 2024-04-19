@@ -51,7 +51,8 @@ TEST(MatchingData, HttpDestinationIPInput) {
   auto host = "example.com";
   connection_info_provider->setRequestedServerName(host);
   StreamInfo::StreamInfoImpl stream_info(
-      Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connection_info_provider);
+      Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connection_info_provider,
+      StreamInfo::FilterState::LifeSpan::FilterChain);
   Http::Matching::HttpMatchingDataImpl data(stream_info);
   {
     DestinationIPInput<Http::HttpMatchingData> input;
