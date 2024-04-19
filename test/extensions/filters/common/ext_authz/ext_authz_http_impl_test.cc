@@ -433,6 +433,9 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
       {":status", "200", false},
       {"x-envoy-auth-headers-to-remove", " ,remove-me,, ,  remove-me-too , ", false},
       {"x-envoy-auth-headers-to-remove", " remove-me-also ", false},
+      // This is a valid header value but an invalid header name. The http client should see it and
+      // discard it (& not cause an assert failure or forward an invalid header name to the filter).
+      {"x-envoy-auth-headers-to-remove", " invalid header name ", false},
   });
   Http::ResponseMessagePtr http_response = TestCommon::makeMessageResponse(http_response_headers);
   client_->onSuccess(async_request_, std::move(http_response));

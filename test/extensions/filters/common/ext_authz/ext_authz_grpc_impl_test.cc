@@ -15,6 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using envoy::service::auth::v3::CheckResponse;
 using testing::_;
 using testing::Eq;
 using testing::Invoke;
@@ -66,7 +67,7 @@ public:
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
   initialize();
 
-  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto check_response = std::make_unique<CheckResponse>();
   auto status = check_response->mutable_status();
 
   ProtobufWkt::Struct expected_dynamic_metadata;
@@ -127,20 +128,29 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
-// Test that the client just passes through invalid headers (they will fail validation in the filter
-// later).
-TEST_F(ExtAuthzGrpcClientTest, IndifferentToInvalidHeaders) {
+// Test that the grpc client does not allow invalid headers through to the filter. Also implicitly
+// test that invalid headers do not cause an assert failure.
+TEST_F(ExtAuthzGrpcClientTest, InvalidMutations) {
   initialize();
 
   const std::string empty_body{};
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
-  const auto expected_downstream_headers = TestCommon::makeHeaderValueOption(
-      {{"invalid-key\n\n\n\n\n", "TestAuthService", false}, {"cookie", "authtoken=1234", true}});
-  auto check_response =
-      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
-                                    empty_body, expected_headers, expected_downstream_headers);
+  uint8_t raw_invalid_value[]{0x7f};
+  std::string invalid_value = reinterpret_cast<const char*>(raw_invalid_value);
+  HeaderValueOptionVector header_mutations =
+      TestCommon::makeHeaderValueOption({{"invalid-key\n\n\n\n\n", "value", false},
+                                         {"invalid-value", invalid_value, true},
+                                         {"normal-header", "blah blah", false}});
+
+  HeaderValueOptionVector only_valid_header_mutations =
+      TestCommon::makeHeaderValueOption({{"normal-header", "blah blah", false}});
+
+  auto check_response = TestCommon::makeCheckResponse(
+      Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body, header_mutations,
+      header_mutations, {"invalid-key\n\n\n\n\n", "normal-header-remove"});
+
   auto authz_response = TestCommon::makeAuthzResponse(
-      CheckStatus::OK, Http::Code::OK, empty_body, expected_headers, expected_downstream_headers);
+      CheckStatus::OK, Http::Code::OK, empty_body, only_valid_header_mutations,
+      only_valid_header_mutations, {"normal-header-remove"});
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -159,7 +169,7 @@ TEST_F(ExtAuthzGrpcClientTest, IndifferentToInvalidHeaders) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
   initialize();
 
-  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto check_response = std::make_unique<CheckResponse>();
   auto status = check_response->mutable_status();
   status->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
   auto authz_response = Response{};
@@ -183,7 +193,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
   initialize();
 
-  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto check_response = std::make_unique<CheckResponse>();
   auto status = check_response->mutable_status();
   status->set_code(Grpc::Status::WellKnownGrpcStatus::Unknown);
   auto authz_response = Response{};
@@ -307,7 +317,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   initialize();
 
-  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto check_response = std::make_unique<CheckResponse>();
   auto status = check_response->mutable_status();
 
   ProtobufWkt::Struct expected_dynamic_metadata;
@@ -346,7 +356,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
   initialize();
 
-  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto check_response = std::make_unique<CheckResponse>();
   auto status = check_response->mutable_status();
 
   status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);

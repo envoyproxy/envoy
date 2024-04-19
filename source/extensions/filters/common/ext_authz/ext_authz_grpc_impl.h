@@ -24,6 +24,8 @@
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
+#include "quiche/http2/adapter/header_validator.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -62,11 +64,11 @@ public:
 private:
   using RepeatedHeaderValueOption =
       Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>;
-  void addHeaderMutationsViaMove(
-      ResponsePtr& response, RepeatedHeaderValueOption&& headers,
-      RepeatedHeaderValueOption&& response_headers_to_add = RepeatedHeaderValueOption{},
-      Protobuf::RepeatedPtrField<std::string>&& headers_to_remove =
-          Protobuf::RepeatedPtrField<std::string>{});
+  bool headerPairIsValid(const std::pair<std::string, std::string>& header_pair);
+  void copyHeaderMutationsIntoResponse(
+      ResponsePtr& response, const RepeatedHeaderValueOption& headers,
+      const RepeatedHeaderValueOption& response_headers_to_add = {},
+      const Protobuf::RepeatedPtrField<std::string>& headers_to_remove = {});
 
   Grpc::AsyncClient<envoy::service::auth::v3::CheckRequest, envoy::service::auth::v3::CheckResponse>
       async_client_;
@@ -74,6 +76,7 @@ private:
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
   const Protobuf::MethodDescriptor& service_method_;
+  http2::adapter::HeaderValidator header_validator_;
 };
 
 using GrpcClientImplPtr = std::unique_ptr<GrpcClientImpl>;

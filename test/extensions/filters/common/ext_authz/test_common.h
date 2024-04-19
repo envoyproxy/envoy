@@ -34,9 +34,6 @@ using CheckResponsePtr = std::unique_ptr<envoy::service::auth::v3::CheckResponse
 
 class TestCommon {
 public:
-  using UnvalidatedHeaderVector =
-      Envoy::Extensions::Filters::Common::ExtAuthz::UnvalidatedHeaderVector;
-
   static Http::ResponseMessagePtr makeMessageResponse(const HeaderValueOptionVector& headers,
                                                       const std::string& body = std::string{});
 
@@ -44,22 +41,23 @@ public:
                                             envoy::type::v3::StatusCode http_status_code,
                                             const std::string& body,
                                             const HeaderValueOptionVector& headers,
-                                            const HeaderValueOptionVector& downstream_headers);
+                                            const HeaderValueOptionVector& downstream_headers,
+                                            const std::vector<std::string> headers_to_remove = {});
 
   static Response
   makeAuthzResponse(CheckStatus status, Http::Code status_code = Http::Code::OK,
                     const std::string& body = std::string{},
                     const HeaderValueOptionVector& headers = HeaderValueOptionVector{},
-                    const HeaderValueOptionVector& downstream_headers = HeaderValueOptionVector{});
+                    const HeaderValueOptionVector& downstream_headers = HeaderValueOptionVector{},
+                    const std::vector<std::string> headers_to_remove = {});
 
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
-  static bool compareHeaderVector(const UnvalidatedHeaderVector& lhs,
-                                  const UnvalidatedHeaderVector& rhs);
+  static bool compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs);
   static bool compareQueryParamsVector(const Http::Utility::QueryParamsVector& lhs,
                                        const Http::Utility::QueryParamsVector& rhs);
-  static bool compareVectorOfHeaderName(const std::vector<std::string>& lhs,
-                                        const std::vector<std::string>& rhs);
+  static bool compareVectorOfHeaderName(const std::vector<Http::LowerCaseString>& lhs,
+                                        const std::vector<Http::LowerCaseString>& rhs);
   static bool compareVectorOfUnorderedStrings(const std::vector<std::string>& lhs,
                                               const std::vector<std::string>& rhs);
 };
