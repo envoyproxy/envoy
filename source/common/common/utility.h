@@ -661,7 +661,7 @@ public:
     if (i < min_child_) {
       return nullptr;
     }
-    if (i > min_child_ + children_.size()) {
+    if (i >= min_child_ + children_.size()) {
       return nullptr;
     }
     return children_[i - min_child_].get();
