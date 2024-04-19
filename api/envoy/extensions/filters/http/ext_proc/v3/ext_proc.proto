@@ -11,7 +11,6 @@ import "envoy/type/matcher/v3/string.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
-import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -249,13 +248,9 @@ message ExternalProcessor {
   // field is set in an external processor response.
   // Only one of ``disable_clear_route_cache`` or
   // :ref:`route_cache_action <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.route_cache_action>`
-  // can be set.
-  // This field is deprecated in favor of setting ``route_cache_action`` to RETAIN.
-  bool disable_clear_route_cache = 11 [
-    deprecated = true,
-    (envoy.annotations.deprecated_at_minor_version) = "3.0",
-    (udpa.annotations.field_migrate).oneof_promotion = "clear_route_cache_type"
-  ];
+  // can be set. It is recommended to set ``route_cache_action`` which supersedes ``disable_clear_route_cache``.
+  bool disable_clear_route_cache = 11
+      [(udpa.annotations.field_migrate).oneof_promotion = "clear_route_cache_type"];
 
   // [#not-implemented-hide:]
   // Specifies the action to be taken when an external processor response is
