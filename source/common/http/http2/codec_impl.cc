@@ -115,8 +115,7 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
 std::unique_ptr<http2::adapter::Http2Adapter>
 ProdNghttp2SessionFactory::create(ConnectionImpl* connection,
                                   const http2::adapter::OgHttp2Adapter::Options& options) {
-  auto visitor =
-      std::make_unique<ConnectionImpl::Http2Visitor>(connection);
+  auto visitor = std::make_unique<ConnectionImpl::Http2Visitor>(connection);
   std::unique_ptr<http2::adapter::Http2Adapter> adapter =
       http2::adapter::OgHttp2Adapter::Create(*visitor, options);
   connection->setVisitor(std::move(visitor));
@@ -2133,11 +2132,9 @@ ClientConnectionImpl::ClientConnectionImpl(
       callbacks_(callbacks) {
   ClientHttp2Options client_http2_options(http2_options, max_response_headers_kb);
   if (use_oghttp2_library_) {
-    adapter_ = http2_session_factory.create(base(),
-                                            client_http2_options.ogOptions());
+    adapter_ = http2_session_factory.create(base(), client_http2_options.ogOptions());
   } else {
-    adapter_ = http2_session_factory.create(base(),
-                                            client_http2_options.options());
+    adapter_ = http2_session_factory.create(base(), client_http2_options.options());
   }
   http2_session_factory.init(base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
@@ -2207,8 +2204,8 @@ ServerConnectionImpl::ServerConnectionImpl(
     visitor_ = std::move(direct_visitor);
     adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.ogOptions());
   } else {
-    auto adapter = http2::adapter::NgHttp2Adapter::CreateServerAdapter(*direct_visitor,
-                                                                       h2_options.options());
+    auto adapter =
+        http2::adapter::NgHttp2Adapter::CreateServerAdapter(*direct_visitor, h2_options.options());
     auto stream_close_listener = [p = adapter.get()](http2::adapter::Http2StreamId stream_id) {
       p->RemoveStream(stream_id);
     };

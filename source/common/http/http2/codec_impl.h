@@ -90,9 +90,8 @@ public:
          const http2::adapter::OgHttp2Adapter::Options& options) PURE;
 
   // Returns a new HTTP/2 session to be used with |connection|.
-  virtual std::unique_ptr<http2::adapter::Http2Adapter>
-  create(ConnectionImplType* connection,
-         const nghttp2_option* options) PURE;
+  virtual std::unique_ptr<http2::adapter::Http2Adapter> create(ConnectionImplType* connection,
+                                                               const nghttp2_option* options) PURE;
 
   // Initializes the |session|.
   virtual void init(ConnectionImplType* connection,

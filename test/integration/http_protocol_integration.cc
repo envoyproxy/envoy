@@ -53,11 +53,11 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
         for (Http1ParserImpl http1_implementation : http1_implementations) {
           for (Http2Impl http2_implementation : http2_implementations) {
             for (bool defer_processing : http2_bool_values) {
-                for (bool use_header_validator : use_header_validator_values) {
-                  ret.push_back(HttpProtocolTestParams{
-                      ip_version, downstream_protocol, upstream_protocol, http1_implementation,
-                      http2_implementation, defer_processing, use_header_validator});
-                }
+              for (bool use_header_validator : use_header_validator_values) {
+                ret.push_back(HttpProtocolTestParams{
+                    ip_version, downstream_protocol, upstream_protocol, http1_implementation,
+                    http2_implementation, defer_processing, use_header_validator});
+              }
             }
           }
         }
