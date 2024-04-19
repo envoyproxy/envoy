@@ -531,9 +531,14 @@ TEST_F(OpenTelemetryDriverTest, SpanType) {
     Tracing::SpanPtr child_span =
         span->spawnChild(mock_tracing_config_, operation_name_, time_system_.systemTime());
 
+    child_span->setTag("http.status_code", "400");
+
     // The child span should also be a CLIENT span.
     EXPECT_EQ(dynamic_cast<Span*>(child_span.get())->spanForTest().kind(),
               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+    // The child span should have an error status.
+    EXPECT_EQ(dynamic_cast<Span*>(child_span.get())->spanForTest().status().code(),
+              ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_ERROR);
   }
 }
 
@@ -559,6 +564,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithAttributes) {
   span->setTag("", "empty_tag_value");
   // Overwrite a tag.
   span->setTag("first_tag_name", "first_tag_new_value");
+  span->setTag("http.status_code", "500");
 
   // Note the placeholders for the bytes - cleaner to manually set after.
   constexpr absl::string_view request_yaml = R"(
@@ -579,6 +585,8 @@ resource_spans:
       kind: SPAN_KIND_SERVER
       start_time_unix_nano: {}
       end_time_unix_nano: {}
+      status:
+        code: STATUS_CODE_ERROR
       attributes:
         - key: "first_tag_name"
           value:
@@ -586,6 +594,9 @@ resource_spans:
         - key: "second_tag_name"
           value:
             string_value: "second_tag_value"
+        - key: "http.status_code"
+          value:
+            string_value: "500"
   )";
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
