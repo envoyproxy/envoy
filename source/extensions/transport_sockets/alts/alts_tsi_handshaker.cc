@@ -144,7 +144,7 @@ AltsTsiHandshaker::getHandshakeResult(const grpc::gcp::HandshakerResult& result,
   tsi_result ok = alts_zero_copy_grpc_protector_create(
       grpc_core::GsecKeyFactory(
           {reinterpret_cast<const uint8_t*>(result.key_data().data()), AltsAes128GcmRekeyKeyLength},
-          /*is_rekey=*/true),
+          true),
       is_client_,
       /*is_integrity_only=*/false, /*enable_extra_copy=*/false, &max_frame_size, &protector);
   if (ok != TSI_OK) {
