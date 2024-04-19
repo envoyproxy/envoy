@@ -29,8 +29,9 @@ bool ClustersJsonRenderer::nextChunk(Buffer::Instance& response) {
 }
 
 // TODO(demitriswan) implement. See clusters_handler.cc.
-void ClustersJsonRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster) {
+void ClustersJsonRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster, Buffer::Instance& response) {
   UNREFERENCED_PARAMETER(cluster);
+  UNREFERENCED_PARAMETER(response);
 }
 
 ClustersTextRenderer::ClustersTextRenderer(
@@ -47,77 +48,78 @@ bool ClustersTextRenderer::nextChunk(Buffer::Instance& response) {
   const uint64_t original_request_size = response.length();
   for (; idx_ < clusters_.size() && response.length() - original_request_size < chunk_limit_;
        idx_++) {
-    const Upstream::Cluster& cluster = clusters_[idx_].get();
-    const std::string& cluster_name = cluster.info()->name();
-    response.add(fmt::format("{}::observability_name::{}\n", cluster_name,
-                             cluster.info()->observabilityName()));
-    addOutlierInfo(cluster_name, cluster.outlierDetector(), response);
 
-    addCircuitBreakerSettings(cluster_name, "default",
-                              cluster.info()->resourceManager(Upstream::ResourcePriority::Default),
-                              response);
-    addCircuitBreakerSettings(cluster_name, "high",
-                              cluster.info()->resourceManager(Upstream::ResourcePriority::High),
-                              response);
-
-    response.add(
-        fmt::format("{}::added_via_api::{}\n", cluster_name, cluster.info()->addedViaApi()));
-    if (const auto& name = cluster.info()->edsServiceName(); !name.empty()) {
-      response.add(fmt::format("{}::eds_service_name::{}\n", cluster_name, name));
-    }
-    for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
-      for (auto& host : host_set->hosts()) {
-        const std::string& host_address = host->address()->asString();
-        std::map<absl::string_view, uint64_t> all_stats;
-        for (const auto& [counter_name, counter] : host->counters()) {
-          all_stats[counter_name] = counter.get().value();
-        }
-
-        for (const auto& [gauge_name, gauge] : host->gauges()) {
-          all_stats[gauge_name] = gauge.get().value();
-        }
-
-        for (const auto& [stat_name, stat] : all_stats) {
-          response.add(
-              fmt::format("{}::{}::{}::{}\n", cluster_name, host_address, stat_name, stat));
-        }
-
-        response.add(
-            fmt::format("{}::{}::hostname::{}\n", cluster_name, host_address, host->hostname()));
-        response.add(fmt::format("{}::{}::health_flags::{}\n", cluster_name, host_address,
-                                 Upstream::HostUtility::healthFlagsToString(*host)));
-        response.add(
-            fmt::format("{}::{}::weight::{}\n", cluster_name, host_address, host->weight()));
-        response.add(fmt::format("{}::{}::region::{}\n", cluster_name, host_address,
-                                 host->locality().region()));
-        response.add(
-            fmt::format("{}::{}::zone::{}\n", cluster_name, host_address, host->locality().zone()));
-        response.add(fmt::format("{}::{}::sub_zone::{}\n", cluster_name, host_address,
-                                 host->locality().sub_zone()));
-        response.add(
-            fmt::format("{}::{}::canary::{}\n", cluster_name, host_address, host->canary()));
-        response.add(
-            fmt::format("{}::{}::priority::{}\n", cluster_name, host_address, host->priority()));
-        response.add(fmt::format(
-            "{}::{}::success_rate::{}\n", cluster_name, host_address,
-            host->outlierDetector().successRate(
-                Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
-        response.add(fmt::format(
-            "{}::{}::local_origin_success_rate::{}\n", cluster_name, host_address,
-            host->outlierDetector().successRate(
-                Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
-      }
-    }
+    render(clusters_[idx_], response);
   }
   // TODO(demitriswan) See if these need to be updated here.
   UNREFERENCED_PARAMETER(response_headers_);
   return idx_ < clusters_.size() ? true : false;
 }
 
-// TODO(demitriswan) implement. See clusters_handler.cc.
-void ClustersTextRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster) {
-  UNREFERENCED_PARAMETER(cluster);
+void ClustersTextRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster, Buffer::Instance& response) {
+  const Upstream::Cluster& unwrapped_cluster = cluster.get();
+  const std::string& cluster_name = unwrapped_cluster.info()->name();
+  response.add(fmt::format("{}::observability_name::{}\n", cluster_name,
+                           unwrapped_cluster.info()->observabilityName()));
+  addOutlierInfo(cluster_name, unwrapped_cluster.outlierDetector(), response);
+
+  addCircuitBreakerSettings(cluster_name, "default",
+                            unwrapped_cluster.info()->resourceManager(Upstream::ResourcePriority::Default),
+                            response);
+  addCircuitBreakerSettings(cluster_name, "high",
+                            unwrapped_cluster.info()->resourceManager(Upstream::ResourcePriority::High),
+                            response);
+
+  response.add(
+      fmt::format("{}::added_via_api::{}\n", cluster_name, unwrapped_cluster.info()->addedViaApi()));
+  if (const auto& name = unwrapped_cluster.info()->edsServiceName(); !name.empty()) {
+    response.add(fmt::format("{}::eds_service_name::{}\n", cluster_name, name));
+  }
+  for (auto& host_set : unwrapped_cluster.prioritySet().hostSetsPerPriority()) {
+    for (auto& host : host_set->hosts()) {
+      const std::string& host_address = host->address()->asString();
+      std::map<absl::string_view, uint64_t> all_stats;
+      for (const auto& [counter_name, counter] : host->counters()) {
+        all_stats[counter_name] = counter.get().value();
+      }
+
+      for (const auto& [gauge_name, gauge] : host->gauges()) {
+        all_stats[gauge_name] = gauge.get().value();
+      }
+
+      for (const auto& [stat_name, stat] : all_stats) {
+        response.add(
+            fmt::format("{}::{}::{}::{}\n", cluster_name, host_address, stat_name, stat));
+      }
+
+      response.add(
+          fmt::format("{}::{}::hostname::{}\n", cluster_name, host_address, host->hostname()));
+      response.add(fmt::format("{}::{}::health_flags::{}\n", cluster_name, host_address,
+                               Upstream::HostUtility::healthFlagsToString(*host)));
+      response.add(
+          fmt::format("{}::{}::weight::{}\n", cluster_name, host_address, host->weight()));
+      response.add(fmt::format("{}::{}::region::{}\n", cluster_name, host_address,
+                               host->locality().region()));
+      response.add(
+          fmt::format("{}::{}::zone::{}\n", cluster_name, host_address, host->locality().zone()));
+      response.add(fmt::format("{}::{}::sub_zone::{}\n", cluster_name, host_address,
+                               host->locality().sub_zone()));
+      response.add(
+          fmt::format("{}::{}::canary::{}\n", cluster_name, host_address, host->canary()));
+      response.add(
+          fmt::format("{}::{}::priority::{}\n", cluster_name, host_address, host->priority()));
+      response.add(fmt::format(
+          "{}::{}::success_rate::{}\n", cluster_name, host_address,
+          host->outlierDetector().successRate(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
+      response.add(fmt::format(
+          "{}::{}::local_origin_success_rate::{}\n", cluster_name, host_address,
+          host->outlierDetector().successRate(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
+    }
+  }
 }
+
 
 void ClustersTextRenderer::addOutlierInfo(const std::string& cluster_name,
                                           const Upstream::Outlier::Detector* outlier_detector,
