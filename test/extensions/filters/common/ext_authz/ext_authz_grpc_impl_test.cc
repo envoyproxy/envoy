@@ -352,7 +352,8 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
-// Test the client when an OK response is received with additional query string parameters.
+// Test the client when an OK response is received with additional query string parameters. Also
+// test that query parameters are percent-encoded when necessary.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
   initialize();
 
@@ -361,14 +362,16 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
 
   status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
 
-  const Http::Utility::QueryParamsVector query_parameters_to_set{{"add-me", "yes"}};
+  const Http::Utility::QueryParamsVector query_parameters_to_set{
+      {"add-me", "yes"}, {"\nencode-\nthen-add-me", "?&yes#"}};
   for (const auto& [key, value] : query_parameters_to_set) {
     auto* query_parameter = check_response->mutable_ok_response()->add_query_parameters_to_set();
     query_parameter->set_key(key);
     query_parameter->set_value(value);
   }
 
-  const std::vector<std::string> query_parameters_to_remove{"remove-me"};
+  const std::vector<std::string> query_parameters_to_remove{"remove-me",
+                                                            "\nencode-\nthen-remove-me"};
   for (const auto& key : query_parameters_to_remove) {
     check_response->mutable_ok_response()->add_query_parameters_to_remove(key);
   }
@@ -376,8 +379,9 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
   // This is the expected authz response.
   auto authz_response = Response{};
   authz_response.status = CheckStatus::OK;
-  authz_response.query_parameters_to_set = {{"add-me", "yes"}};
-  authz_response.query_parameters_to_remove = {"remove-me"};
+  authz_response.query_parameters_to_set = {{"add-me", "yes"},
+                                            {"%0Aencode-%0Athen-add-me", "%3F%26yes%23"}};
+  authz_response.query_parameters_to_remove = {"remove-me", "%0Aencode-%0Athen-remove-me"};
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);

@@ -56,16 +56,14 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
                                       ok_response.response_headers_to_add(),
                                       ok_response.headers_to_remove());
 
-      if (ok_response.query_parameters_to_set_size() > 0) {
-        for (const auto& query_parameter : ok_response.query_parameters_to_set()) {
-          authz_response->query_parameters_to_set.emplace_back(query_parameter.key(),
-                                                               query_parameter.value());
-        }
+      for (const auto& query_parameter : ok_response.query_parameters_to_set()) {
+        authz_response->query_parameters_to_set.emplace_back(
+            Http::Utility::PercentEncoding::urlEncodeQueryParameter(query_parameter.key()),
+            Http::Utility::PercentEncoding::urlEncodeQueryParameter(query_parameter.value()));
       }
-      if (ok_response.query_parameters_to_remove_size() > 0) {
-        for (const auto& key : ok_response.query_parameters_to_remove()) {
-          authz_response->query_parameters_to_remove.push_back(key);
-        }
+      for (const auto& key : ok_response.query_parameters_to_remove()) {
+        authz_response->query_parameters_to_remove.push_back(
+            Http::Utility::PercentEncoding::urlEncodeQueryParameter(key));
       }
     }
   } else {

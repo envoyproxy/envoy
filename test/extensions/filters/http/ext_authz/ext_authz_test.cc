@@ -326,15 +326,6 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   EXPECT_EQ(1U, config_->stats().error_.value());
 }
 
-// Tests that query parameters are percent encoded before being adding to the path.
-TEST_P(HttpFilterTestParam, PercentEncodeQueryParameters) {
-  const std::string original_path{"/users?remove-%0A-me=yes"};
-  const std::string expected_path{"/users?add-%0A-me=%3F%26yes%23"};
-  const Http::Utility::QueryParamsVector add_me{{"add-\n-me", "?&yes#"}};
-  const std::vector<std::string> remove_me{"remove-\n-me"};
-  queryParameterTest(original_path, expected_path, add_me, remove_me);
-}
-
 // Verifies that the filter responds with a configurable HTTP status when an network error occurs.
 TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
   InSequence s;
