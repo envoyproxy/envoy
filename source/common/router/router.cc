@@ -664,6 +664,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  if (callbacks_->shouldLoadShed()) {
+    callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "envoy overloaded", nullptr,
+                               absl::nullopt, StreamInfo::ResponseCodeDetails::get().Overload);
+    stats_.rq_overload_local_reply_.inc();
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
   hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
 
   timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_,

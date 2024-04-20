@@ -9,6 +9,7 @@ import io.envoyproxy.envoymobile.FilterHeadersStatus
 import io.envoyproxy.envoymobile.FilterTrailersStatus
 import io.envoyproxy.envoymobile.FinalStreamIntel
 import io.envoyproxy.envoymobile.GRPCRequestHeadersBuilder
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
@@ -84,6 +85,8 @@ class ReceiveErrorTest {
 
     val engine =
       EngineBuilder(Standard())
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .addPlatformFilter(
           name = FILTER_NAME,
           factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }

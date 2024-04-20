@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/basic_auth/v3/basic_auth.pb.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
@@ -46,8 +47,8 @@ public:
   FilterConfig(UserMap&& users, const std::string& forward_username_header,
                const std::string& stats_prefix, Stats::Scope& scope);
   const BasicAuthStats& stats() const { return stats_; }
-  bool validateUser(absl::string_view username, absl::string_view password) const;
   const std::string& forwardUsernameHeader() const { return forward_username_header_; }
+  const UserMap& users() const { return users_; }
 
 private:
   static BasicAuthStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -59,6 +60,20 @@ private:
   BasicAuthStats stats_;
 };
 using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+
+/**
+ * Per route settings for BasicAuth. Allows customizing users on a virtualhost\route\weighted
+ * cluster level.
+ */
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  FilterConfigPerRoute(UserMap&& users) : users_(std::move(users)) {}
+  const UserMap& users() const { return users_; }
+
+private:
+  const UserMap users_;
+};
 
 // The Envoy filter to process HTTP basic auth.
 class BasicAuthFilter : public Http::PassThroughDecoderFilter,
@@ -68,6 +83,8 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
+  bool validateUser(const UserMap& users, absl::string_view username,
+                    absl::string_view password) const;
 
 private:
   Http::FilterHeadersStatus onDenied(absl::string_view body,

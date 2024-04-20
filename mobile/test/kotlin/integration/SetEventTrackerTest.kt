@@ -2,6 +2,7 @@ package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.EngineBuilder
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
@@ -21,6 +22,8 @@ class SetEventTrackerTest {
     val countDownLatch = CountDownLatch(1)
     val engine =
       EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .setEventTracker { events ->
           for (entry in events) {
             assertThat(entry.key).isEqualTo("foo")

@@ -9,6 +9,7 @@
 #include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/extensions/key_value/platform/c_types.h"
+#include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 #include "library/common/types/managed_envoy_headers.h"
 #include "library/jni/android_network_utility.h"
@@ -36,29 +37,25 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jc
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(
-    JNIEnv* env, jclass, jobject on_start_context, jobject envoy_logger_context,
-    jobject event_tracker_context) {
+    JNIEnv* env, jclass, jobject on_engine_running, jobject envoy_logger,
+    jobject envoy_event_tracker) {
   //================================================================================================
   // EngineCallbacks
   //================================================================================================
   std::unique_ptr<Envoy::EngineCallbacks> callbacks = std::make_unique<Envoy::EngineCallbacks>();
-  if (on_start_context != nullptr) {
-    jobject retained_on_start_context =
-        env->NewGlobalRef(on_start_context); // Required to keep context in memory
-    callbacks->on_engine_running = [retained_on_start_context] {
+  if (on_engine_running != nullptr) {
+    jobject on_engine_running_global_ref = env->NewGlobalRef(on_engine_running);
+    callbacks->on_engine_running_ = [on_engine_running_global_ref] {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
       Envoy::JNI::LocalRefUniquePtr<jclass> java_on_engine_running_class =
-          jni_helper.getObjectClass(retained_on_start_context);
+          jni_helper.getObjectClass(on_engine_running_global_ref);
       jmethodID java_on_engine_running_method_id = jni_helper.getMethodId(
           java_on_engine_running_class.get(), "invokeOnEngineRunning", "()Ljava/lang/Object;");
-      Envoy::JNI::LocalRefUniquePtr<jobject> unused =
-          jni_helper.callObjectMethod(retained_on_start_context, java_on_engine_running_method_id);
-
-      // TODO(goaway): This isn't re-used by other engine callbacks, so it's safe to delete here.
-      // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
-      jni_helper.getEnv()->DeleteGlobalRef(retained_on_start_context);
+      Envoy::JNI::LocalRefUniquePtr<jobject> unused = jni_helper.callObjectMethod(
+          on_engine_running_global_ref, java_on_engine_running_method_id);
+      jni_helper.getEnv()->DeleteGlobalRef(on_engine_running_global_ref);
     };
-    callbacks->on_exit = [] {
+    callbacks->on_exit_ = [] {
       // Note that this is not dispatched because the thread that
       // needs to be detached is the engine thread.
       // This function is called from the context of the engine's
@@ -70,23 +67,23 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   // EnvoyLogger
   //================================================================================================
   std::unique_ptr<Envoy::EnvoyLogger> logger = std::make_unique<Envoy::EnvoyLogger>();
-  if (envoy_logger_context != nullptr) {
-    const jobject retained_logger_context = env->NewGlobalRef(envoy_logger_context);
-    logger->on_log = [retained_logger_context](Envoy::Logger::Logger::Levels level,
-                                               const std::string& message) {
+  if (envoy_logger != nullptr) {
+    const jobject envoy_logger_global_ref = env->NewGlobalRef(envoy_logger);
+    logger->on_log_ = [envoy_logger_global_ref](Envoy::Logger::Logger::Levels level,
+                                                const std::string& message) {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
       Envoy::JNI::LocalRefUniquePtr<jstring> java_message =
-          jni_helper.newStringUtf(message.c_str());
+          Envoy::JNI::cppStringToJavaString(jni_helper, message);
       jint java_level = static_cast<jint>(level);
       Envoy::JNI::LocalRefUniquePtr<jclass> java_envoy_logger_class =
-          jni_helper.getObjectClass(retained_logger_context);
+          jni_helper.getObjectClass(envoy_logger_global_ref);
       jmethodID java_log_method_id =
           jni_helper.getMethodId(java_envoy_logger_class.get(), "log", "(ILjava/lang/String;)V");
-      jni_helper.callVoidMethod(retained_logger_context, java_log_method_id, java_level,
+      jni_helper.callVoidMethod(envoy_logger_global_ref, java_log_method_id, java_level,
                                 java_message.get());
     };
-    logger->on_exit = [retained_logger_context] {
-      Envoy::JNI::getEnv()->DeleteGlobalRef(retained_logger_context);
+    logger->on_exit_ = [envoy_logger_global_ref] {
+      Envoy::JNI::getEnv()->DeleteGlobalRef(envoy_logger_global_ref);
     };
   }
   //================================================================================================
@@ -94,26 +91,25 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   //================================================================================================
   std::unique_ptr<Envoy::EnvoyEventTracker> event_tracker =
       std::make_unique<Envoy::EnvoyEventTracker>();
-  if (event_tracker_context != nullptr) {
-    const jobject retained_event_tracker_context = env->NewGlobalRef(event_tracker_context);
-    event_tracker->on_track = [retained_event_tracker_context](
-                                  const absl::flat_hash_map<std::string, std::string>& events) {
+  if (envoy_event_tracker != nullptr) {
+    const jobject event_tracker_global_ref = env->NewGlobalRef(envoy_event_tracker);
+    event_tracker->on_track_ = [event_tracker_global_ref](
+                                   const absl::flat_hash_map<std::string, std::string>& events) {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
       Envoy::JNI::LocalRefUniquePtr<jobject> java_events =
           Envoy::JNI::cppMapToJavaMap(jni_helper, events);
       Envoy::JNI::LocalRefUniquePtr<jclass> java_envoy_event_tracker_class =
-          jni_helper.getObjectClass(retained_event_tracker_context);
+          jni_helper.getObjectClass(event_tracker_global_ref);
       jmethodID java_track_method_id = jni_helper.getMethodId(java_envoy_event_tracker_class.get(),
                                                               "track", "(Ljava/util/Map;)V");
-      jni_helper.callVoidMethod(retained_event_tracker_context, java_track_method_id,
-                                java_events.get());
+      jni_helper.callVoidMethod(event_tracker_global_ref, java_track_method_id, java_events.get());
     };
-    event_tracker->on_exit = [retained_event_tracker_context] {
-      Envoy::JNI::getEnv()->DeleteGlobalRef(retained_event_tracker_context);
+    event_tracker->on_exit_ = [event_tracker_global_ref] {
+      Envoy::JNI::getEnv()->DeleteGlobalRef(event_tracker_global_ref);
     };
   }
 
-  return reinterpret_cast<intptr_t>(
+  return reinterpret_cast<jlong>(
       new Envoy::InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker)));
 }
 
@@ -144,7 +140,9 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 
 extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_terminateEngine(
     JNIEnv* /*env*/, jclass, jlong engine_handle) {
-  reinterpret_cast<Envoy::InternalEngine*>(engine_handle)->terminate();
+  Envoy::InternalEngine* internal_engine = reinterpret_cast<Envoy::InternalEngine*>(engine_handle);
+  internal_engine->terminate();
+  delete internal_engine;
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordCounterInc(
@@ -956,49 +954,42 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
       ->readData(static_cast<envoy_stream_t>(stream_handle), byte_count);
 }
 
-// The Java counterpart guarantees to invoke this method with a non-null direct ByteBuffer where the
-// provided length is between 0 and ByteBuffer.capacity(), inclusively.
+// This function can accept either direct (off the JVM heap) ByteBuffer or non-direct (on the JVM
+// heap) ByteBuffer.
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendData(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject data, jint length,
+    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject byte_buffer, jint length,
     jboolean end_stream) {
   Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::Buffer::InstancePtr cpp_buffer_instance;
+  if (Envoy::JNI::isJavaDirectByteBuffer(jni_helper, byte_buffer)) {
+    cpp_buffer_instance =
+        Envoy::JNI::javaDirectByteBufferToCppBufferInstance(jni_helper, byte_buffer, length);
+  } else {
+    cpp_buffer_instance =
+        Envoy::JNI::javaNonDirectByteBufferToCppBufferInstance(jni_helper, byte_buffer, length);
+  }
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendData(static_cast<envoy_stream_t>(stream_handle),
-                 Envoy::JNI::javaByteBufferToEnvoyData(jni_helper, data, length), end_stream);
-}
-
-// The Java counterpart guarantees to invoke this method with a non-null jbyteArray where the
-// provided length is between 0 and the size of the jbyteArray, inclusively. And given that this
-// jbyteArray comes from a ByteBuffer, it is also guaranteed that its length will not be greater
-// than 2^31 - this is why the length type is jint.
-extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendDataByteArray(JNIEnv* env, jclass,
-                                                                   jlong engine_handle,
-                                                                   jlong stream_handle,
-                                                                   jbyteArray data, jint length,
-                                                                   jboolean end_stream) {
-  Envoy::JNI::JniHelper jni_helper(env);
-  return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendData(static_cast<envoy_stream_t>(stream_handle),
-                 Envoy::JNI::javaByteArrayToEnvoyData(jni_helper, data, length), end_stream);
+      ->sendData(static_cast<envoy_stream_t>(stream_handle), std::move(cpp_buffer_instance),
+                 end_stream);
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendHeaders(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobjectArray headers,
+    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject headers,
     jboolean end_stream) {
   Envoy::JNI::JniHelper jni_helper(env);
+  auto cpp_headers = Envoy::Http::Utility::createRequestHeaderMapPtr();
+  Envoy::JNI::javaHeadersToCppHeaders(jni_helper, headers, *cpp_headers);
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendHeaders(static_cast<envoy_stream_t>(stream_handle),
-                    Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, headers),
-                    end_stream);
+      ->sendHeaders(static_cast<envoy_stream_t>(stream_handle), std::move(cpp_headers), end_stream);
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendTrailers(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobjectArray trailers) {
+    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject trailers) {
   Envoy::JNI::JniHelper jni_helper(env);
+  auto cpp_trailers = Envoy::Http::Utility::createRequestTrailerMapPtr();
+  Envoy::JNI::javaHeadersToCppHeaders(jni_helper, trailers, *cpp_trailers);
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendTrailers(static_cast<envoy_stream_t>(stream_handle),
-                     Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, trailers));
+      ->sendTrailers(static_cast<envoy_stream_t>(stream_handle), std::move(cpp_trailers));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetStream(
@@ -1298,7 +1289,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setPreferredNetwork(JNIEnv* /*e
                                                                      jclass, // class
                                                                      jlong engine, jint network) {
   return reinterpret_cast<Envoy::InternalEngine*>(engine)->setPreferredNetwork(
-      static_cast<envoy_network_t>(network));
+      static_cast<Envoy::NetworkType>(network));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_setProxySettings(

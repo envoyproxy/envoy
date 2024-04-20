@@ -23,7 +23,8 @@ class SetLoggerTest {
     val logEventLatch = CountDownLatch(1)
     val engine =
       EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .addNativeFilter(
           "test_logger",
           "[type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger] {}"
@@ -62,7 +63,7 @@ class SetLoggerTest {
             logEventLatch.countDown()
           }
         }
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .addNativeFilter(
           "test_logger",
           "[type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger] {}"

@@ -9,6 +9,7 @@ import io.envoyproxy.envoymobile.FilterTrailersStatus
 import io.envoyproxy.envoymobile.FinalStreamIntel
 import io.envoyproxy.envoymobile.GRPCClient
 import io.envoyproxy.envoymobile.GRPCRequestHeadersBuilder
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
@@ -71,11 +72,13 @@ class CancelGRPCStreamTest {
   fun `cancel grpc stream calls onCancel callback`() {
     val engine =
       EngineBuilder(Standard())
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .addPlatformFilter(
           name = FILTER_NAME,
           factory = { CancelValidationFilter(filterExpectation) }
         )
-        .addNativeFilter("envoy.filters.http.local_error", "$LOCAL_ERROR_FILTER_CONFIG")
+        .addNativeFilter("envoy.filters.http.local_error", LOCAL_ERROR_FILTER_CONFIG)
         .build()
 
     val client = GRPCClient(engine.streamClient())
