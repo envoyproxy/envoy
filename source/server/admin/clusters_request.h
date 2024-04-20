@@ -24,12 +24,10 @@ public:
   bool nextChunk(Buffer::Instance& response) override;
 
 private:
-  using ClustersRendererPtr = std::unique_ptr<ClustersRenderer>;
-
   uint64_t chunk_limit_{DefaultChunkLimit};
   Server::Instance& server_;
   const ClustersParams& params_;
-  ClustersRendererPtr renderer_ = nullptr;
+  std::unique_ptr<ClustersChunkProcessor> chunk_processor_ = nullptr;
 };
 
 } // namespace Server

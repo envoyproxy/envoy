@@ -10,32 +10,31 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "source/common/json/json_streamer.h"
+
 namespace Envoy {
 namespace Server {
 
-class ClustersRenderer {
+class ClustersChunkProcessor {
 public:
   virtual bool nextChunk(Buffer::Instance& response) PURE;
-  // TODO(demitriswan) make sure this is the best way to handle destruction
-  // in a virtual base class such as this.
-  virtual ~ClustersRenderer() = default;
-
-protected:
-  // render is protected to suggest to implementations that this method should be
-  // implemented to properly implement nextChunk.
-  virtual void render(std::reference_wrapper<const Upstream::Cluster> cluster,
-                      Buffer::Instance& response) PURE;
+  virtual ~ClustersChunkProcessor() = default;
 };
 
-class ClustersTextRenderer : public ClustersRenderer {
+class ClusterRenderer {
 public:
-  ClustersTextRenderer(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
-                       const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map);
-  bool nextChunk(Buffer::Instance& response) override;
+  virtual void render(std::reference_wrapper<const Upstream::Cluster> cluster,
+                      Buffer::Instance& response) PURE;
+  virtual ~ClusterRenderer() = default;
+};
 
-private:
+class TextClusterRenderer : public ClusterRenderer {
+public:
+  TextClusterRenderer() = default;
   void render(std::reference_wrapper<const Upstream::Cluster> cluster,
               Buffer::Instance& response) override;
+
+private:
   static void addOutlierInfo(const std::string& cluster_name,
                              const Upstream::Outlier::Detector* outlier_detector,
                              Buffer::Instance& response);
@@ -43,25 +42,43 @@ private:
                                         const std::string& priority_str,
                                         Upstream::ResourceManager& resource_manager,
                                         Buffer::Instance& response);
-  const uint64_t chunk_limit_;
-  Http::ResponseHeaderMap& response_headers_;
-  std::vector<std::reference_wrapper<const Upstream::Cluster>> clusters_;
-  uint64_t idx_;
 };
 
-class ClustersJsonRenderer : public ClustersRenderer {
+class TextClustersChunkProcessor : public ClustersChunkProcessor {
 public:
-  ClustersJsonRenderer(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
-                       const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map);
+  TextClustersChunkProcessor(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
+                             const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map);
+
   bool nextChunk(Buffer::Instance& response) override;
 
 private:
-  void render(std::reference_wrapper<const Upstream::Cluster> cluster,
-              Buffer::Instance& response) override;
   const uint64_t chunk_limit_;
   Http::ResponseHeaderMap& response_headers_;
-  const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map_;
-  Upstream::ClusterManager::ClusterInfoMap::const_iterator it_;
+  std::vector<std::reference_wrapper<const Upstream::Cluster>> clusters_;
+  std::unique_ptr<TextClusterRenderer> renderer_;
+  uint64_t idx_;
+};
+
+class JsonClusterRenderer : public ClusterRenderer {
+public:
+  JsonClusterRenderer() = default;
+  void render(std::reference_wrapper<const Upstream::Cluster> cluster,
+              Buffer::Instance& response) override;
+};
+
+class JsonClustersChunkProcessor : public ClustersChunkProcessor {
+public:
+  JsonClustersChunkProcessor(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
+                             const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map);
+
+  bool nextChunk(Buffer::Instance& response) override;
+
+private:
+  const uint64_t chunk_limit_;
+  Http::ResponseHeaderMap& response_headers_;
+  std::vector<std::reference_wrapper<const Upstream::Cluster>> clusters_;
+  std::unique_ptr<JsonClusterRenderer> renderer_;
+  uint64_t idx_;
 };
 
 } // namespace Server

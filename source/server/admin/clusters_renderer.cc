@@ -2,63 +2,41 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/resource_manager.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/upstream/host_utility.h"
 
 namespace Envoy {
 namespace Server {
 
-ClustersJsonRenderer::ClustersJsonRenderer(
+TextClustersChunkProcessor::TextClustersChunkProcessor(
     uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
     const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map)
     : chunk_limit_(chunk_limit), response_headers_(response_headers),
-      cluster_info_map_(cluster_info_map), it_(cluster_info_map.cbegin()) {}
-
-// TODO(demitriswan) implement using iterator state.
-bool ClustersJsonRenderer::nextChunk(Buffer::Instance& response) {
-  UNREFERENCED_PARAMETER(response);
-  UNREFERENCED_PARAMETER(response_headers_);
-  UNREFERENCED_PARAMETER(chunk_limit_);
-  UNREFERENCED_PARAMETER(cluster_info_map_);
-  return false;
-}
-
-// TODO(demitriswan) implement. See clusters_handler.cc.
-void ClustersJsonRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster,
-                                  Buffer::Instance& response) {
-  UNREFERENCED_PARAMETER(cluster);
-  UNREFERENCED_PARAMETER(response);
-}
-
-ClustersTextRenderer::ClustersTextRenderer(
-    uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
-    const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map)
-    : chunk_limit_(chunk_limit), response_headers_(response_headers), idx_(0) {
-  std::vector<std::reference_wrapper<const Upstream::Cluster>> v;
+      renderer_(std::make_unique<TextClusterRenderer>()), idx_(0) {
   for (const auto& pair : cluster_info_map) {
     clusters_.push_back(pair.second);
   }
 }
 
-bool ClustersTextRenderer::nextChunk(Buffer::Instance& response) {
+bool TextClustersChunkProcessor::nextChunk(Buffer::Instance& response) {
   const uint64_t original_request_size = response.length();
   for (; idx_ < clusters_.size() && response.length() - original_request_size < chunk_limit_;
        idx_++) {
 
-    render(clusters_[idx_], response);
+    renderer_->render(clusters_[idx_], response);
   }
   // TODO(demitriswan) See if these need to be updated here.
   UNREFERENCED_PARAMETER(response_headers_);
   return idx_ < clusters_.size() ? true : false;
 }
 
-void ClustersTextRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster,
-                                  Buffer::Instance& response) {
+void TextClusterRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster,
+                                 Buffer::Instance& response) {
   const Upstream::Cluster& unwrapped_cluster = cluster.get();
   const std::string& cluster_name = unwrapped_cluster.info()->name();
   response.add(fmt::format("{}::observability_name::{}\n", cluster_name,
@@ -119,9 +97,9 @@ void ClustersTextRenderer::render(std::reference_wrapper<const Upstream::Cluster
   }
 }
 
-void ClustersTextRenderer::addOutlierInfo(const std::string& cluster_name,
-                                          const Upstream::Outlier::Detector* outlier_detector,
-                                          Buffer::Instance& response) {
+void TextClusterRenderer::addOutlierInfo(const std::string& cluster_name,
+                                         const Upstream::Outlier::Detector* outlier_detector,
+                                         Buffer::Instance& response) {
   if (outlier_detector) {
     response.add(fmt::format(
         "{}::outlier::success_rate_average::{:g}\n", cluster_name,
@@ -142,10 +120,10 @@ void ClustersTextRenderer::addOutlierInfo(const std::string& cluster_name,
   }
 }
 
-void ClustersTextRenderer::addCircuitBreakerSettings(const std::string& cluster_name,
-                                                     const std::string& priority_str,
-                                                     Upstream::ResourceManager& resource_manager,
-                                                     Buffer::Instance& response) {
+void TextClusterRenderer::addCircuitBreakerSettings(const std::string& cluster_name,
+                                                    const std::string& priority_str,
+                                                    Upstream::ResourceManager& resource_manager,
+                                                    Buffer::Instance& response) {
   response.add(fmt::format("{}::{}_priority::max_connections::{}\n", cluster_name, priority_str,
                            resource_manager.connections().max()));
   response.add(fmt::format("{}::{}_priority::max_pending_requests::{}\n", cluster_name,
@@ -154,6 +132,39 @@ void ClustersTextRenderer::addCircuitBreakerSettings(const std::string& cluster_
                            resource_manager.requests().max()));
   response.add(fmt::format("{}::{}_priority::max_retries::{}\n", cluster_name, priority_str,
                            resource_manager.retries().max()));
+}
+JsonClustersChunkProcessor::JsonClustersChunkProcessor(
+    uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
+    const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map)
+    : chunk_limit_(chunk_limit), response_headers_(response_headers),
+      renderer_(std::make_unique<JsonClusterRenderer>()), idx_(0) {
+  for (const auto& pair : cluster_info_map) {
+    clusters_.push_back(pair.second);
+  }
+}
+
+void JsonClusterRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster,
+                                 Buffer::Instance& response) {
+  UNREFERENCED_PARAMETER(cluster);
+  UNREFERENCED_PARAMETER(response);
+}
+
+bool JsonClustersChunkProcessor::nextChunk(Buffer::Instance& response) {
+  // TODO(demitriswan) See if these need to be updated here.
+  UNREFERENCED_PARAMETER(response_headers_);
+
+  const uint64_t original_request_size = response.length();
+  response.add("[");
+  for (; idx_ < clusters_.size() && response.length() - original_request_size < chunk_limit_;
+       idx_++) {
+
+    renderer_->render(clusters_[idx_], response);
+  }
+  if (idx_ < clusters_.size()) {
+    return true;
+  }
+  response.add("]");
+  return false;
 }
 
 } // namespace Server

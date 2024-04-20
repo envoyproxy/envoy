@@ -454,6 +454,7 @@ envoy_cc_library(
         "//envoy/common:pure_lib",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:logger_lib",
+        "//source/common/json:json_streamer_lib",
         "//source/common/upstream:host_utility_lib",
     ],
 )

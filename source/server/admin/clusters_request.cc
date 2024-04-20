@@ -21,11 +21,11 @@ ClustersRequest::ClustersRequest(uint64_t chunk_limit, Instance& server,
 Http::Code ClustersRequest::start(Http::ResponseHeaderMap& response_headers) {
   switch (params_.format_) {
   case ClustersParams::Format::Text:
-    renderer_ = std::make_unique<ClustersTextRenderer>(
+    chunk_processor_ = std::make_unique<TextClustersChunkProcessor>(
         chunk_limit_, response_headers, server_.clusterManager().clusters().active_clusters_);
     break;
   case ClustersParams::Format::Json:
-    renderer_ = std::make_unique<ClustersTextRenderer>(
+    chunk_processor_ = std::make_unique<JsonClustersChunkProcessor>(
         chunk_limit_, response_headers, server_.clusterManager().clusters().active_clusters_);
     break;
   default:
@@ -36,7 +36,7 @@ Http::Code ClustersRequest::start(Http::ResponseHeaderMap& response_headers) {
 }
 
 bool ClustersRequest::nextChunk(Buffer::Instance& response) {
-  return renderer_->nextChunk(response);
+  return chunk_processor_->nextChunk(response);
 }
 
 } // namespace Server
