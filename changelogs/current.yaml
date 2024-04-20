@@ -25,7 +25,7 @@ bug_fixes:
 - area: cares
   change: |
     Upgraded c-ares library to 1.20 and added fix to c-ares dns implementation to additionally check for ARES_EREFUSED status.
-    Without this fix, `DestroyChannelOnRefused` and `CustomResolverValidAfterChannelDestruction` unit test will break.
+    Without this fix, DestroyChannelOnRefused and CustomResolverValidAfterChannelDestruction unit test will break.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
