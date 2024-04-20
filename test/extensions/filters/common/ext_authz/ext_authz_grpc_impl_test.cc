@@ -134,8 +134,8 @@ TEST_F(ExtAuthzGrpcClientTest, InvalidMutations) {
   initialize();
 
   const std::string empty_body{};
-  uint8_t raw_invalid_value[]{0x7f};
-  std::string invalid_value = reinterpret_cast<const char*>(raw_invalid_value);
+  const uint8_t raw_invalid_value[]{0x7f, 0};
+  const std::string invalid_value = reinterpret_cast<const char*>(raw_invalid_value);
   HeaderValueOptionVector header_mutations =
       TestCommon::makeHeaderValueOption({{"invalid-key\n\n\n\n\n", "value", false},
                                          {"invalid-value", invalid_value, true},
