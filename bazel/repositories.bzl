@@ -37,8 +37,8 @@ WINDOWS_SKIP_TARGETS = [
 NO_HTTP3_SKIP_TARGETS = [
     "envoy.quic.crypto_stream.server.quiche",
     "envoy.quic.deterministic_connection_id_generator",
-    "envoy.quic.crypto_stream.server.quiche",
     "envoy.quic.proof_source.filter_chain",
+    "envoy.quic.server_preferred_address.fixed",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
@@ -1470,8 +1470,4 @@ def _com_github_maxmind_libmaxminddb():
     external_http_archive(
         name = "com_github_maxmind_libmaxminddb",
         build_file_content = BUILD_ALL_CONTENT,
-    )
-    native.bind(
-        name = "maxmind",
-        actual = "@envoy//bazel/foreign_cc:maxmind_linux_darwin",
     )

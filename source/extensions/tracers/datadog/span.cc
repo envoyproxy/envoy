@@ -85,8 +85,7 @@ void Span::log(SystemTime, const std::string&) {
 
 void Span::finishSpan() { span_.reset(); }
 
-void Span::injectContext(Tracing::TraceContext& trace_context,
-                         const Upstream::HostDescriptionConstSharedPtr&) {
+void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   if (!span_) {
     return;
   }

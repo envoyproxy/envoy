@@ -85,9 +85,6 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
       transport_wants_read_(false) {
 
-  // Keep it as a bool flag to reduce the times calling runtime method..
-  enable_rst_detect_send_ = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.detect_and_raise_rst_tcp_connection");
   if (!socket_->isOpen()) {
     IS_ENVOY_BUG("Client socket failure");
     return;
@@ -147,12 +144,6 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "closing data_to_write={} type={}", *this,
                        data_to_write, enumToInt(type));
-
-  // RST will be sent only if enable_rst_detect_send_ is true, otherwise it is converted to normal
-  // ConnectionCloseType::Abort.
-  if (!enable_rst_detect_send_ && type == ConnectionCloseType::AbortReset) {
-    type = ConnectionCloseType::Abort;
-  }
 
   // The connection is closed by Envoy by sending RST, and the connection is closed immediately.
   if (type == ConnectionCloseType::AbortReset) {
@@ -293,8 +284,8 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   connection_stats_.reset();
 
-  if (enable_rst_detect_send_ && (detected_close_type_ == DetectedCloseType::RemoteReset ||
-                                  detected_close_type_ == DetectedCloseType::LocalReset)) {
+  if (detected_close_type_ == DetectedCloseType::RemoteReset ||
+      detected_close_type_ == DetectedCloseType::LocalReset) {
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
     const bool ok = Network::Socket::applyOptions(
         Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
@@ -687,7 +678,7 @@ void ConnectionImpl::onReadReady() {
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
 
   // The socket is closed immediately when receiving RST.
-  if (enable_rst_detect_send_ && result.err_code_.has_value() &&
+  if (result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     ENVOY_CONN_LOG(trace, "read: rst close from peer", *this);
     if (result.bytes_processed_ != 0) {
@@ -771,7 +762,7 @@ void ConnectionImpl::onWriteReady() {
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
   // The socket is closed immediately when receiving RST.
-  if (enable_rst_detect_send_ && result.err_code_.has_value() &&
+  if (result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     // Discard anything in the buffer.
     ENVOY_CONN_LOG(debug, "write: rst close from peer.", *this);

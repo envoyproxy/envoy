@@ -1638,4 +1638,50 @@ TEST_P(Http2FloodMitigationTest, GoAwayAfterRequestReset) {
 }
 #endif
 
+TEST_P(Http2FloodMitigationTest, HeadersContinuationObservesLimit) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  beginSession();
+
+  const uint32_t request_stream_id = Http2Frame::makeClientStreamId(0);
+  auto request = Http2Frame::makeEmptyHeadersFrame(request_stream_id);
+  request.appendStaticHeader(Http2Frame::StaticHeaderIndex::MethodGet);
+  request.appendStaticHeader(Http2Frame::StaticHeaderIndex::SchemeHttps);
+  request.appendStaticHeader(Http2Frame::StaticHeaderIndex::Path);
+  request.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Authority, "www.example.com");
+  request.appendHeaderWithoutIndexing(Http2Frame::Header("foo", "bar"));
+  request.adjustPayloadSize();
+  sendFrame(request);
+
+  for (int i = 0; i < 20; i++) {
+    request = Http2Frame::makeEmptyContinuationFrame(request_stream_id);
+    for (int h = 0; h < 50; h++) {
+      request.appendHeaderWithoutIndexing(
+          Http2Frame::Header(absl::StrCat("baz", i, "-", h), "bats"));
+    }
+    request.adjustPayloadSize();
+    sendFrame(request);
+  }
+
+  // Expect request to be reset due to violation of the default limit of 100 headers
+  auto response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
+
+  // Continue pumping frames and expect Envoy to close the connection.
+  for (int i = 0; i < 512; i++) {
+    request = Http2Frame::makeEmptyContinuationFrame(request_stream_id);
+    request.appendHeaderWithoutIndexing(Http2Frame::Header(absl::StrCat("baz", i, "-0"), "bats"));
+    request.adjustPayloadSize();
+    sendFrame(request);
+  }
+
+  if (std::get<1>(GetParam()) == Http2Impl::Oghttp2) {
+    // TODO: oghttp2 needs to support this failure.
+    tcp_client_->close();
+  } else {
+    tcp_client_->waitForDisconnect();
+  }
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.too_many_headers"));
+  EXPECT_EQ(1, test_server_->counter("http2.header_overflow")->value());
+}
+
 } // namespace Envoy

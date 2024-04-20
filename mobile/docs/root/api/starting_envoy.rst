@@ -16,7 +16,7 @@ After the stream client is obtained, it should be stored and used to start netwo
 **Kotlin example**::
 
   val streamClient = AndroidEngineBuilder(getApplication())
-    .addLogLevel(LogLevel.WARN)
+    .setLogLevel(LogLevel.WARN)
     ...
     .build()
     .streamClient()
@@ -24,7 +24,7 @@ After the stream client is obtained, it should be stored and used to start netwo
 **Swift example**::
 
   let streamClient = try EngineBuilder()
-    .addLogLevel(.warn)
+    .setLogLevel(.warn)
     ...
     .build()
     .streamClient()
@@ -110,7 +110,7 @@ Add a list of hostnames to preresolve on Engine startup.
   builder.addDNSPreresolveHostnames(["lyft.com", "google.com"])
 
 ~~~~~~~~~~~~~~~
-``addLogLevel``
+``setLogLevel``
 ~~~~~~~~~~~~~~~
 
 Specify the log level to be used when running the underlying Envoy engine.
@@ -118,10 +118,10 @@ Specify the log level to be used when running the underlying Envoy engine.
 **Example**::
 
   // Kotlin
-  builder.addLogLevel(LogLevel.WARN)
+  builder.setLogLevel(LogLevel.WARN)
 
   // Swift
-  builder.addLogLevel(.warn)
+  builder.setLogLevel(.warn)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``addStreamIdleTimeoutSeconds``
@@ -594,7 +594,7 @@ This may be done by initializing a builder with the contents of the YAML file yo
 **Kotlin example**::
 
   val streamClient = AndroidEngineBuilder(baseContext, Yaml(yamlFileString))
-    .addLogLevel(LogLevel.WARN)
+    .setLogLevel(LogLevel.WARN)
     ...
     .build()
     .streamClient()
@@ -602,7 +602,7 @@ This may be done by initializing a builder with the contents of the YAML file yo
 **Swift example**::
 
   let streamClient = try EngineBuilder(yaml: yamlFileString)
-    .addLogLevel(.warn)
+    .setLogLevel(.warn)
     ...
     .build()
     .streamClient()

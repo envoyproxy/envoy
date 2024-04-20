@@ -85,35 +85,14 @@ build:mobile-test-android --define=envoy_mobile_xds=enabled
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
 
-# Locally-runnable ASAN config for MacOS & Linux with standard dev environment
-# See also:
-# https://github.com/bazelbuild/bazel/issues/6932
-build:mobile-asan-dev --strip=never
-build:mobile-asan-dev --copt -Wno-macro-redefined # ASAN sets _FORTIFY_SOURCE=0
-build:mobile-asan-dev --copt -DADDRESS_SANITIZER
-build:mobile-asan-dev --copt -D_LIBCPP_HAS_NO_ASAN
-build:mobile-asan-dev --copt -g
-build:mobile-asan-dev --copt -fno-omit-frame-pointer
-build:mobile-asan-dev --copt -fno-optimize-sibling-calls
-build:mobile-asan-dev --copt -fsanitize=address
-build:mobile-asan-dev --linkopt -fsanitize=address
-build:mobile-asan-dev --platform_suffix=-asan
-
-build:mobile-clang-asan --linkopt --rtlib=compiler-rt
-build:mobile-clang-asan --linkopt --unwindlib=libgcc
+# Clang ASAN.
 build:mobile-clang-asan --config=clang-asan-common
 
-# Locally-runnable TSAN config
-build:mobile-tsan-dev --features=tsan
-build:mobile-tsan-dev --copt -fsanitize=thread
-build:mobile-tsan-dev --linkopt -fsanitize=thread
-build:mobile-tsan-dev --test_env=ENVOY_IP_TEST_VERSIONS=v4only
-build:mobile-tsan-dev --platform_suffix=-tsan
-# Needed due to https://github.com/libevent/libevent/issues/777
-build:mobile-tsan-dev --copt -DEVENT__DISABLE_DEBUG_MODE
-# https://github.com/abseil/abseil-cpp/issues/760
-# https://github.com/google/sanitizers/issues/953
-build:mobile-tsan-dev --test_env="TSAN_OPTIONS=report_atomic_races=0"
+# Clang TSAN.
+build:mobile-clang-tsan --config=clang-tsan
+
+# Clang MSAN.
+build:mobile-clang-msan --config=clang-msan
 
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.

@@ -24,7 +24,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
         self.expectation(description: "Successful response trailers received")
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
       .setLogger { _, msg in
         print(msg, terminator: "")
       }
@@ -81,7 +81,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
         self.expectation(description: "Successful response trailers received")
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
       .setLogger { _, msg in
         print(msg, terminator: "")
       }
@@ -140,7 +140,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
         self.expectation(description: "Successful response trailers received")
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
       .setLogger { _, msg in
         print(msg, terminator: "")
       }
@@ -195,7 +195,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     let engineExpectation = self.expectation(description: "Run started engine")
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
       .setLogger { _, msg in
         print(msg, terminator: "")
       }

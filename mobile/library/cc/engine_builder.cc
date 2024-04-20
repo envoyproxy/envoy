@@ -149,13 +149,6 @@ EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
-  // Envoy::Platform::LogLevel is essentially the same as Logger::Logger::Levels, so we can
-  // safely cast it.
-  log_level_ = static_cast<Logger::Logger::Levels>(log_level);
-  return *this;
-}
-
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
   return *this;
@@ -970,10 +963,7 @@ EngineSharedPtr EngineBuilder::build() {
   if (bootstrap) {
     options->setConfigProto(std::move(bootstrap));
   }
-  ENVOY_BUG(
-      options->setLogLevel(logLevelToString(static_cast<Envoy::Platform::LogLevel>(log_level_)))
-          .ok(),
-      "invalid log level");
+  options->setLogLevel(static_cast<spdlog::level::level_enum>(log_level_));
   options->setConcurrency(1);
   envoy_engine->run(options);
 

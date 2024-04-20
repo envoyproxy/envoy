@@ -18,10 +18,18 @@ import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 
-private const val ASSERTION_FILTER_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
 private const val MATCHER_TRAILER_NAME = "test-trailer"
 private const val MATCHER_TRAILER_VALUE = "test.code"
+private const val ASSERTION_FILTER_TEXT_PROTO =
+  """
+  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
+    match_config: {
+      http_request_trailers_match: {
+        headers: { name: 'test-trailer', exact_match: 'test.code' }
+      }
+    }
+  }
+"""
 
 class SendTrailersTest {
   init {
@@ -45,13 +53,10 @@ class SendTrailersTest {
     val expectation = CountDownLatch(1)
     val engine =
       EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
-        .addNativeFilter(
-          "envoy.filters.http.assertion",
-          "[$ASSERTION_FILTER_TYPE] {match_config: {http_request_trailers_match: {headers: [{name: 'test-trailer', exact_match: 'test.code'}]}}}"
-        )
+        .addNativeFilter("envoy.filters.http.assertion", ASSERTION_FILTER_TEXT_PROTO)
         .addNativeFilter(
           "envoy.filters.http.buffer",
           "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 65000 } }"

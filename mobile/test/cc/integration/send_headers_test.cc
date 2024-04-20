@@ -12,11 +12,26 @@
 
 namespace Envoy {
 
+inline constexpr absl::string_view ASSERTION_FILTER_TEXT_PROTO = R"(
+  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
+    match_config: {
+      http_request_headers_match: {
+        headers: { name: ':method', exact_match: 'GET' }
+        headers: { name: ':scheme', exact_match: 'https' }
+        headers: { name: ':path', exact_match: '/' }
+      }
+    }
+  }
+)";
+
 TEST(SendHeadersTest, Success) {
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
   engine_builder.enforceTrustChainVerification(false)
       .setLogLevel(Logger::Logger::debug)
+#ifdef ENVOY_ENABLE_FULL_PROTOS
+      .addNativeFilter("envoy.filters.http.assertion", std::string(ASSERTION_FILTER_TEXT_PROTO))
+#endif
       .setOnEngineRunning([&]() { engine_running.Notify(); });
   EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
   engine_running.WaitForNotification();
