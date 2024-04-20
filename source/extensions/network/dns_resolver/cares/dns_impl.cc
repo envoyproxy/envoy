@@ -194,7 +194,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     //
     // The channel cannot be destroyed and reinitialized here because that leads to a c-ares
     // segfault.
-    if (status == ARES_ECONNREFUSED) {
+    if (status == ARES_ECONNREFUSED || status == ARES_EREFUSED) {
       parent_.dirty_channel_ = true;
     }
   }
