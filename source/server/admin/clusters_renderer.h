@@ -23,7 +23,8 @@ public:
 protected:
   // render is protected to suggest to implementations that this method should be
   // implemented to properly implement nextChunk.
-  virtual void render(std::reference_wrapper<const Upstream::Cluster> cluster, Buffer::Instance& response) PURE;
+  virtual void render(std::reference_wrapper<const Upstream::Cluster> cluster,
+                      Buffer::Instance& response) PURE;
 };
 
 class ClustersTextRenderer : public ClustersRenderer {
@@ -33,7 +34,8 @@ public:
   bool nextChunk(Buffer::Instance& response) override;
 
 private:
-  void render(std::reference_wrapper<const Upstream::Cluster> cluster, Buffer::Instance& response) override;
+  void render(std::reference_wrapper<const Upstream::Cluster> cluster,
+              Buffer::Instance& response) override;
   static void addOutlierInfo(const std::string& cluster_name,
                              const Upstream::Outlier::Detector* outlier_detector,
                              Buffer::Instance& response);
@@ -54,7 +56,8 @@ public:
   bool nextChunk(Buffer::Instance& response) override;
 
 private:
-  void render(std::reference_wrapper<const Upstream::Cluster> cluster, Buffer::Instance& response) override;
+  void render(std::reference_wrapper<const Upstream::Cluster> cluster,
+              Buffer::Instance& response) override;
   const uint64_t chunk_limit_;
   Http::ResponseHeaderMap& response_headers_;
   const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map_;

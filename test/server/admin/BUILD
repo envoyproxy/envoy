@@ -265,6 +265,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "clusters_params_test",
+    srcs = envoy_select_admin_functionality(["clusters_params_test.cc"]),
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/server/admin:clusters_params_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "clusters_request_test",
     srcs = envoy_select_admin_functionality(["clusters_request_test.cc"]),
     deps = [

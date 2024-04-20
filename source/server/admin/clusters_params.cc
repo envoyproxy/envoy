@@ -16,10 +16,10 @@ Http::Code ClustersParams::parse(absl::string_view url, Buffer::Instance& respon
       Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(url);
   absl::optional<std::string> optional_format = query.getFirstValue("format");
   if (optional_format.has_value()) {
-    if (*optional_format == "text") {
-      format_ = Format::Text;
-    } else {
+    if (*optional_format == "json") {
       format_ = Format::Json;
+    } else {
+      format_ = Format::Text;
     }
   }
   return Http::Code::OK;

@@ -29,7 +29,8 @@ bool ClustersJsonRenderer::nextChunk(Buffer::Instance& response) {
 }
 
 // TODO(demitriswan) implement. See clusters_handler.cc.
-void ClustersJsonRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster, Buffer::Instance& response) {
+void ClustersJsonRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster,
+                                  Buffer::Instance& response) {
   UNREFERENCED_PARAMETER(cluster);
   UNREFERENCED_PARAMETER(response);
 }
@@ -56,22 +57,23 @@ bool ClustersTextRenderer::nextChunk(Buffer::Instance& response) {
   return idx_ < clusters_.size() ? true : false;
 }
 
-void ClustersTextRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster, Buffer::Instance& response) {
+void ClustersTextRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster,
+                                  Buffer::Instance& response) {
   const Upstream::Cluster& unwrapped_cluster = cluster.get();
   const std::string& cluster_name = unwrapped_cluster.info()->name();
   response.add(fmt::format("{}::observability_name::{}\n", cluster_name,
                            unwrapped_cluster.info()->observabilityName()));
   addOutlierInfo(cluster_name, unwrapped_cluster.outlierDetector(), response);
 
-  addCircuitBreakerSettings(cluster_name, "default",
-                            unwrapped_cluster.info()->resourceManager(Upstream::ResourcePriority::Default),
-                            response);
-  addCircuitBreakerSettings(cluster_name, "high",
-                            unwrapped_cluster.info()->resourceManager(Upstream::ResourcePriority::High),
-                            response);
+  addCircuitBreakerSettings(
+      cluster_name, "default",
+      unwrapped_cluster.info()->resourceManager(Upstream::ResourcePriority::Default), response);
+  addCircuitBreakerSettings(
+      cluster_name, "high",
+      unwrapped_cluster.info()->resourceManager(Upstream::ResourcePriority::High), response);
 
-  response.add(
-      fmt::format("{}::added_via_api::{}\n", cluster_name, unwrapped_cluster.info()->addedViaApi()));
+  response.add(fmt::format("{}::added_via_api::{}\n", cluster_name,
+                           unwrapped_cluster.info()->addedViaApi()));
   if (const auto& name = unwrapped_cluster.info()->edsServiceName(); !name.empty()) {
     response.add(fmt::format("{}::eds_service_name::{}\n", cluster_name, name));
   }
@@ -88,24 +90,21 @@ void ClustersTextRenderer::render(std::reference_wrapper<const Upstream::Cluster
       }
 
       for (const auto& [stat_name, stat] : all_stats) {
-        response.add(
-            fmt::format("{}::{}::{}::{}\n", cluster_name, host_address, stat_name, stat));
+        response.add(fmt::format("{}::{}::{}::{}\n", cluster_name, host_address, stat_name, stat));
       }
 
       response.add(
           fmt::format("{}::{}::hostname::{}\n", cluster_name, host_address, host->hostname()));
       response.add(fmt::format("{}::{}::health_flags::{}\n", cluster_name, host_address,
                                Upstream::HostUtility::healthFlagsToString(*host)));
-      response.add(
-          fmt::format("{}::{}::weight::{}\n", cluster_name, host_address, host->weight()));
+      response.add(fmt::format("{}::{}::weight::{}\n", cluster_name, host_address, host->weight()));
       response.add(fmt::format("{}::{}::region::{}\n", cluster_name, host_address,
                                host->locality().region()));
       response.add(
           fmt::format("{}::{}::zone::{}\n", cluster_name, host_address, host->locality().zone()));
       response.add(fmt::format("{}::{}::sub_zone::{}\n", cluster_name, host_address,
                                host->locality().sub_zone()));
-      response.add(
-          fmt::format("{}::{}::canary::{}\n", cluster_name, host_address, host->canary()));
+      response.add(fmt::format("{}::{}::canary::{}\n", cluster_name, host_address, host->canary()));
       response.add(
           fmt::format("{}::{}::priority::{}\n", cluster_name, host_address, host->priority()));
       response.add(fmt::format(
@@ -119,7 +118,6 @@ void ClustersTextRenderer::render(std::reference_wrapper<const Upstream::Cluster
     }
   }
 }
-
 
 void ClustersTextRenderer::addOutlierInfo(const std::string& cluster_name,
                                           const Upstream::Outlier::Detector* outlier_detector,

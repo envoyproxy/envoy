@@ -18,7 +18,7 @@ struct ClustersParams {
 
   Http::Code parse(absl::string_view url, Buffer::Instance& response);
 
-  Format format_;
+  Format format_{Format::Text};
 };
 
 } // namespace Server
