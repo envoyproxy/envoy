@@ -321,15 +321,16 @@ func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bo
 	return uint64(value), true
 }
 
-func (c *httpCApiImpl) HttpGetDynamicMetadata(rr unsafe.Pointer, filterName string) map[string]interface{} {
-	r := (*httpRequest)(rr)
+func (c *httpCApiImpl) HttpGetDynamicMetadata(s unsafe.Pointer, filterName string) map[string]interface{} {
+	state := (*processState)(s)
+	r := state.request
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.markMayWaitingCallback()
 
 	var valueData C.uint64_t
 	var valueLen C.int
-	res := C.envoyGoFilterHttpGetDynamicMetadata(unsafe.Pointer(r.req),
+	res := C.envoyGoFilterHttpGetDynamicMetadata(unsafe.Pointer(state.processState),
 		unsafe.Pointer(unsafe.StringData(filterName)), C.int(len(filterName)), &valueData, &valueLen)
 	if res == C.CAPIYield {
 		r.checkOrWaitCallback()

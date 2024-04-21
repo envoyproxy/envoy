@@ -61,9 +61,11 @@ var protocolsIdToName = map[uint64]string{
 }
 
 type panicInfo struct {
-	paniced bool
-	details string
+	paniced      bool
+	details      string
+	processState *processState
 }
+
 type httpRequest struct {
 	req             *C.httpRequest
 	httpFilter      api.StreamFilter
@@ -86,6 +88,36 @@ type httpRequest struct {
 type processState struct {
 	request      *httpRequest
 	processState *C.processState
+}
+
+const (
+	// Values align with "enum class FilterState" in C++
+	ProcessingHeader  = 1
+	ProcessingData    = 4
+	ProcessingTrailer = 6
+)
+
+func (p *processState) Phase() api.EnvoyRequestPhase {
+	if p.processState.is_encoding == 0 {
+		switch int(p.processState.state) {
+		case ProcessingHeader:
+			return api.DecodeHeaderPhase
+		case ProcessingData:
+			return api.DecodeDataPhase
+		case ProcessingTrailer:
+			return api.DecodeTrailerPhase
+		}
+	}
+	// p.processState.is_encoding == 1
+	switch int(p.processState.state) {
+	case ProcessingHeader:
+		return api.EncodeHeaderPhase
+	case ProcessingData:
+		return api.EncodeDataPhase
+	case ProcessingTrailer:
+		return api.EncodeTrailerPhase
+	}
+	panic(fmt.Errorf("unexpected state, is_encoding: %d, state: %d", p.processState.is_encoding, p.processState.state))
 }
 
 func (p *processState) Continue(status api.StatusType) {
@@ -155,6 +187,42 @@ func (r *httpRequest) pluginName() string {
 func (r *httpRequest) sendPanicReply(details string) {
 	defer r.RecoverPanic()
 	cAPI.HttpSendPanicReply(unsafe.Pointer(r.req), details)
+}
+
+func (s *processState) sendPanicReply(details string) {
+	defer s.RecoverPanic()
+	cAPI.HttpSendPanicReply(unsafe.Pointer(s.processState), details)
+}
+
+func (s *processState) RecoverPanic() {
+	if e := recover(); e != nil {
+		const size = 64 << 10
+		buf := make([]byte, size)
+		buf = buf[:runtime.Stack(buf, false)]
+		api.LogErrorf("http: panic serving: %v\n%s", e, buf)
+
+		switch e {
+		case errRequestFinished, errFilterDestroyed:
+			// do nothing
+
+		case errNotInGo:
+			// We can not send local reply now, since not in go now,
+			// will delay to the next time entering Go.
+			s.request.pInfo = panicInfo{
+				paniced:      true,
+				details:      fmt.Sprint(e),
+				processState: s,
+			}
+
+		default:
+			// The following safeReplyPanic should only may get errRequestFinished,
+			// errFilterDestroyed or errNotInGo, won't hit this branch, so, won't dead loop here.
+
+			// errInvalidPhase, or other panic, not from not-ok C return status.
+			// It's safe to try send a local reply with 500 status.
+			s.sendPanicReply(fmt.Sprint(e))
+		}
+	}
 }
 
 func (r *httpRequest) RecoverPanic() {
