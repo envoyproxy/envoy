@@ -237,6 +237,7 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	}
 	if f.clearRoute {
 		f.callbacks.ClearRouteCache()
+		f.callbacks.DecoderFilterCallbacks().ClearRouteCache()
 	}
 	return api.Continue
 }

@@ -76,6 +76,36 @@ type httpRequest struct {
 	// 1. protect req_->strValue in the C++ side from being used concurrently.
 	// 2. protect waitingCallback from being modified in markMayWaitingCallback concurrently.
 	mutex sync.Mutex
+
+	decodingState processState
+	encodingState processState
+	streamInfo    streamInfo
+}
+
+// processState implements the FilterCallbacks interface.
+type processState struct {
+	request      *httpRequest
+	processState *C.processState
+}
+
+func (p *processState) Continue(status api.StatusType) {
+	cAPI.HttpContinue(unsafe.Pointer(p.processState), uint64(status))
+}
+
+func (p *processState) StreamInfo() api.StreamInfo {
+	return &p.request.streamInfo
+}
+
+func (r *httpRequest) DecoderFilterCallbacks() api.DecoderFilterCallbacks {
+	return &r.decodingState
+}
+
+func (r *httpRequest) EncoderFilterCallbacks() api.EncoderFilterCallbacks {
+	return &r.encodingState
+}
+
+func (r *httpRequest) FilterCallbacks() api.FilterCallbacks {
+	return &r.decodingState
 }
 
 // markWaitingOnEnvoy marks the request may be waiting a callback from envoy.

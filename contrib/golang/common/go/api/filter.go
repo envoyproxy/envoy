@@ -180,7 +180,22 @@ type FilterCallbacks interface {
 	// TODO add more for filter callbacks
 }
 
+type DecoderFilterCallbacks interface {
+	FilterCallbacks
+}
+
 type FilterCallbackHandler interface {
+	// DecoderFilterCallbacks could only be used in DecodeXXX phases.
+	DecoderFilterCallbacks() DecoderFilterCallbacks
+	// EncoderFilterCallbacks could only be used in EncodeXXX phases.
+	EncoderFilterCallbacks() EncoderFilterCallbacks
+	// FilterCallbacks could only be used in Log phases.
+	// TODO: maybe we should update the OnLogXX APIs, and emit this API.
+	// such as: OnLog(HttpFormatterContext log_context, StreamInfo stream_info)
+	FilterCallbacks() FilterCallbacks
+}
+
+type EncoderFilterCallbacks interface {
 	FilterCallbacks
 }
 

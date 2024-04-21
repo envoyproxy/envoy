@@ -131,7 +131,7 @@ func getRequest(r *C.httpRequest) *httpRequest {
 }
 
 //export envoyGoFilterOnHttpHeader
-func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64 {
+func envoyGoFilterOnHttpHeader(s *C.processState, endStream, headerNum, headerBytes uint64) uint64 {
 	var req *httpRequest
 	phase := api.EnvoyRequestPhase(r.phase)
 	// early SendLocalReply or OnLogDownstreamStart may run before the header handling
