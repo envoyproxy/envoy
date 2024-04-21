@@ -24,8 +24,8 @@ bug_fixes:
     if the downstream request ``:authority`` was longer than 255 characters.
 - area: cares
   change: |
-    Upgraded c-ares library to 1.20 and added fix to c-ares dns implementation to additionally check for ARES_EREFUSED status.
-    Without this fix, DestroyChannelOnRefused and CustomResolverValidAfterChannelDestruction unit test will break.
+    Upgraded c-ares library to 1.20 and added fix to c-ares DNS implementation to additionally check for ``ARES_EREFUSED`` status.
+    Without this fix, ``DestroyChannelOnRefused`` and ``CustomResolverValidAfterChannelDestruction`` unit test will break.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
