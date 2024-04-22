@@ -559,15 +559,12 @@ LoaderImpl::create(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tl
   auto loader =
       std::unique_ptr<LoaderImpl>(new LoaderImpl(tls, config, local_info, store, generator, api));
   auto result = loader->initLayers(dispatcher, validation_visitor);
-  if (!result.ok()) {
-    return result;
-  }
+  RETURN_IF_NOT_OK(result);
   return loader;
 }
 
 absl::Status LoaderImpl::initLayers(Event::Dispatcher& dispatcher,
                                     ProtobufMessage::ValidationVisitor& validation_visitor) {
-  absl::Status creation_status;
   absl::node_hash_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());
@@ -589,12 +586,9 @@ absl::Status LoaderImpl::initLayers(Event::Dispatcher& dispatcher,
       if (watcher_ == nullptr) {
         watcher_ = dispatcher.createFilesystemWatcher();
       }
-      creation_status = watcher_->addWatch(layer.disk_layer().symlink_root(),
-                                           Filesystem::Watcher::Events::MovedTo,
-                                           [this](uint32_t) { return loadNewSnapshot(); });
-      if (!creation_status.ok()) {
-        return creation_status;
-      }
+      RETURN_IF_NOT_OK(watcher_->addWatch(layer.disk_layer().symlink_root(),
+                                          Filesystem::Watcher::Events::MovedTo,
+                                          [this](uint32_t) { return loadNewSnapshot(); }));
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kRtdsLayer:
       subscriptions_.emplace_back(std::make_unique<RtdsSubscription>(*this, layer.rtds_layer(),
@@ -606,8 +600,7 @@ absl::Status LoaderImpl::initLayers(Event::Dispatcher& dispatcher,
     }
   }
 
-  creation_status = loadNewSnapshot();
-  return creation_status;
+  return loadNewSnapshot();
 }
 
 void LoaderImpl::initialize(Upstream::ClusterManager& cm) {
