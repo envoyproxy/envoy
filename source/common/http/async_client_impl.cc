@@ -85,9 +85,11 @@ createRetryPolicy(AsyncClientImpl& parent, const AsyncClient::StreamOptions& opt
   if (options.retry_policy.has_value()) {
     Upstream::RetryExtensionFactoryContextImpl factory_context(
         parent.factory_context_.singletonManager());
-    return std::make_unique<Router::RetryPolicyImpl>(options.retry_policy.value(),
-                                                     ProtobufMessage::getNullValidationVisitor(),
-                                                     factory_context, context);
+    return THROW_OR_RETURN_VALUE(
+        Router::RetryPolicyImpl::create(options.retry_policy.value(),
+                                        ProtobufMessage::getNullValidationVisitor(),
+                                        factory_context, context),
+        std::unique_ptr<const Router::RetryPolicy>);
   }
   if (options.parsed_retry_policy == nullptr) {
     return std::make_unique<Router::RetryPolicyImpl>();

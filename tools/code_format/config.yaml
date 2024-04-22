@@ -117,6 +117,7 @@ paths:
     - source/common/formatter/substitution_format_string.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/http/http2/codec_impl.cc
+    - source/common/http/async_client_impl.cc
     - source/common/http/hash_policy.cc
     - source/common/http/conn_manager_utility.cc
     - source/common/protobuf/yaml_utility.cc
