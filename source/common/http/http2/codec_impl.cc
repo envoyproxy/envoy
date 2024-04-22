@@ -368,7 +368,7 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
     // We only buffer the onStreamClose if we had no errors.
     if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
       ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
-                     status.message());
+                     status.message()); // GCOV_EXCL_LINE
     }
   }
 }
@@ -780,7 +780,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
     // its stream close.
     if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
       ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
-                     status.message());
+                     status.message()); // GCOV_EXCL_LINE
     }
     return;
   }
@@ -978,7 +978,7 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
     // protections that Envoy's codec does not have.
     if (rc == NGHTTP2_ERR_FLOODED) {
       return bufferFloodError(
-          "Flooding was detected in this HTTP/2 session, and it must be closed");
+          "Flooding was detected in this HTTP/2 session, and it must be closed"); // GCOV_EXCL_LINE
     }
     if (rc != static_cast<ssize_t>(slice.len_)) {
       return codecProtocolError(nghttp2_strerror(rc));
@@ -1181,7 +1181,7 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
 
   default:
     // We do not currently support push.
-    ENVOY_BUG(false, "push not supported");
+    ENVOY_BUG(false, "push not supported"); // GCOV_EXCL_LINE
   }
 
   stream->advanceHeadersState();
@@ -1199,58 +1199,6 @@ Status ConnectionImpl::onRstStream(int32_t stream_id, uint32_t error_code) {
   stream->bytes_meter_->addWireBytesReceived(/*frame_length=*/4 + H2_FRAME_HEADER_SIZE);
   stream->remote_rst_ = true;
   stats_.rx_reset_.inc();
-  return okStatus();
-}
-
-Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
-  ENVOY_CONN_LOG(trace, "recv frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
-  ASSERT(connection_.state() == Network::Connection::State::Open);
-
-  // onFrameReceived() is called with a complete HEADERS frame assembled from all the HEADERS
-  // and CONTINUATION frames, but we track them separately: HEADERS frames in onBeginHeaders()
-  // and CONTINUATION frames in onBeforeFrameReceived().
-  ASSERT(frame->hd.type != NGHTTP2_CONTINUATION);
-
-  if (frame->hd.type == NGHTTP2_PING) {
-    // The ``opaque_data`` should be exactly what was sent in the ping, which is
-    // was the current time when the ping was sent. This can be useful while debugging
-    // to match the ping and ack.
-    uint64_t data;
-    safeMemcpy(&data, &(frame->ping.opaque_data));
-    return onPing(data, frame->ping.hd.flags & NGHTTP2_FLAG_ACK);
-  }
-  if (frame->hd.type == NGHTTP2_DATA) {
-    return onBeginData(frame->hd.stream_id, frame->hd.length, frame->hd.flags, frame->data.padlen);
-  }
-  if (frame->hd.type == NGHTTP2_GOAWAY) {
-    ASSERT(frame->hd.stream_id == 0);
-    return onGoAway(frame->goaway.error_code);
-  }
-  if (frame->hd.type == NGHTTP2_SETTINGS) {
-    if (frame->hd.flags == NGHTTP2_FLAG_NONE) {
-      std::vector<http2::adapter::Http2Setting> settings;
-      settings.reserve(frame->settings.niv);
-      for (const nghttp2_settings_entry& entry :
-           absl::MakeSpan(frame->settings.iv, frame->settings.niv)) {
-        settings.push_back(
-            {static_cast<http2::adapter::Http2SettingsId>(entry.settings_id), entry.value});
-      }
-      onSettings(settings);
-    }
-    return okStatus();
-  }
-  if (frame->hd.type == NGHTTP2_HEADERS) {
-    return onHeaders(frame->hd.stream_id, frame->hd.length, frame->hd.flags);
-  }
-  if (frame->hd.type == NGHTTP2_RST_STREAM) {
-    return onRstStream(frame->hd.stream_id, frame->rst_stream.error_code);
-  }
-  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
-  if (stream != nullptr && frame->hd.type != METADATA_FRAME_TYPE) {
-    // Track bytes received.
-    stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
-  }
-
   return okStatus();
 }
 
@@ -1357,7 +1305,7 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
 
   default:
     // Unknown error conditions. Trigger ENVOY_BUG and connection close.
-    ENVOY_BUG(false, absl::StrCat("Unexpected error_code: ", error_code));
+    ENVOY_BUG(false, absl::StrCat("Unexpected error_code: ", error_code)); // GCOV_EXCL_LINE
     break;
   }
 
@@ -1656,9 +1604,7 @@ void ConnectionImpl::sendSettingsHelper(
   };
 
   // Universally disable receiving push promise frames as we don't currently
-  // support them. nghttp2 will fail the connection if the other side still
-  // sends them.
-  // TODO(mattklein123): Remove this when we correctly proxy push promise.
+  // support them.
   // NOTE: This is a special case with respect to custom parameter overrides in
   // that server push is not supported and therefore not end user configurable.
   if (disable_push) {
