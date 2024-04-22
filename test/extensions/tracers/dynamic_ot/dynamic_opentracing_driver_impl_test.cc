@@ -91,7 +91,7 @@ TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   const Json::ObjectSharedPtr spans_json =
       TestEnvironment::jsonLoadFromString(TestEnvironment::readFileToStringForTest(spans_file_));
   EXPECT_NE(spans_json, nullptr);
-  EXPECT_EQ(spans_json->asObjectArray().size(), 1);
+  EXPECT_EQ(spans_json->asObjectArray().value().size(), 1);
 }
 #endif
 

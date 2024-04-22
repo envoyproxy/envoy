@@ -70,12 +70,15 @@ public:
   absl::StatusOr<double> getDouble(const std::string& name, double default_value) const override;
   absl::StatusOr<int64_t> getInteger(const std::string& name) const override;
   absl::StatusOr<int64_t> getInteger(const std::string& name, int64_t default_value) const override;
-  absl::StatusOr<ObjectSharedPtr> getObject(const std::string& name, bool allow_empty) const override;
+  absl::StatusOr<ObjectSharedPtr> getObject(const std::string& name,
+                                            bool allow_empty) const override;
   absl::StatusOr<std::vector<ObjectSharedPtr>> getObjectArray(const std::string& name,
-                                              bool allow_empty) const override;
+                                                              bool allow_empty) const override;
   absl::StatusOr<std::string> getString(const std::string& name) const override;
-  absl::StatusOr<std::string> getString(const std::string& name, const std::string& default_value) const override;
-  absl::StatusOr<std::vector<std::string>> getStringArray(const std::string& name, bool allow_empty) const override;
+  absl::StatusOr<std::string> getString(const std::string& name,
+                                        const std::string& default_value) const override;
+  absl::StatusOr<std::vector<std::string>> getStringArray(const std::string& name,
+                                                          bool allow_empty) const override;
   absl::StatusOr<std::vector<ObjectSharedPtr>> asObjectArray() const override;
   absl::StatusOr<std::string> asString() const override { return stringValue(); }
   std::string asJsonString() const override;
@@ -134,10 +137,9 @@ private:
   bool isType(Type type) const { return type == type_; }
   absl::Status checkType(Type type) const {
     if (!isType(type)) {
-      return absl::InvalidArgumentError(
-          fmt::format(
-              "JSON field from line {} accessed with type '{}' does not match actual type '{}'.",
-              line_number_start_, typeAsString(type), typeAsString(type_)));
+      return absl::InvalidArgumentError(fmt::format(
+          "JSON field from line {} accessed with type '{}' does not match actual type '{}'.",
+          line_number_start_, typeAsString(type), typeAsString(type_)));
     }
     return absl::OkStatus();
   }
@@ -147,7 +149,7 @@ private:
     RETURN_IF_NOT_OK(checkType(Type::String));
     return value_.string_value_;
   }
-  absl::StatusOr<std::vector<FieldSharedPtr> >arrayValue() const {
+  absl::StatusOr<std::vector<FieldSharedPtr>> arrayValue() const {
     RETURN_IF_NOT_OK(checkType(Type::Array));
     return value_.array_value_;
   }
@@ -415,8 +417,8 @@ absl::StatusOr<bool> Field::getBoolean(const std::string& name) const {
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Boolean)) {
     return absl::InvalidArgumentError(
-                          fmt::format("key '{}' missing or not a boolean from lines {}-{}", name,
-                                      line_number_start_, line_number_end_));
+        fmt::format("key '{}' missing or not a boolean from lines {}-{}", name, line_number_start_,
+                    line_number_end_));
   }
   return value_itr->second->booleanValue();
 }
@@ -434,8 +436,9 @@ absl::StatusOr<double> Field::getDouble(const std::string& name) const {
   RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Double)) {
-    return absl::InvalidArgumentError(fmt::format("key '{}' missing or not a double from lines {}-{}", name,
-                                      line_number_start_, line_number_end_));
+    return absl::InvalidArgumentError(
+        fmt::format("key '{}' missing or not a double from lines {}-{}", name, line_number_start_,
+                    line_number_end_));
   }
   return value_itr->second->doubleValue();
 }
@@ -454,8 +457,8 @@ absl::StatusOr<int64_t> Field::getInteger(const std::string& name) const {
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Integer)) {
     return absl::InvalidArgumentError(
-                          fmt::format("key '{}' missing or not an integer from lines {}-{}", name,
-                                      line_number_start_, line_number_end_));
+        fmt::format("key '{}' missing or not an integer from lines {}-{}", name, line_number_start_,
+                    line_number_end_));
   }
   return value_itr->second->integerValue();
 }
@@ -469,8 +472,7 @@ absl::StatusOr<int64_t> Field::getInteger(const std::string& name, int64_t defau
   return default_value;
 }
 
-absl::StatusOr<ObjectSharedPtr> Field::getObject(const std::string& name,
-                                                        bool allow_empty) const {
+absl::StatusOr<ObjectSharedPtr> Field::getObject(const std::string& name, bool allow_empty) const {
   RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end()) {
@@ -489,7 +491,7 @@ absl::StatusOr<ObjectSharedPtr> Field::getObject(const std::string& name,
 }
 
 absl::StatusOr<std::vector<ObjectSharedPtr>> Field::getObjectArray(const std::string& name,
-                                                   bool allow_empty) const {
+                                                                   bool allow_empty) const {
   RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
@@ -498,8 +500,8 @@ absl::StatusOr<std::vector<ObjectSharedPtr>> Field::getObjectArray(const std::st
       return ret;
     }
     return absl::InvalidArgumentError(
-                          fmt::format("key '{}' missing or not an array from lines {}-{}", name,
-                                      line_number_start_, line_number_end_));
+        fmt::format("key '{}' missing or not an array from lines {}-{}", name, line_number_start_,
+                    line_number_end_));
   }
 
   auto array_value_or_error = value_itr->second->arrayValue();
@@ -514,13 +516,14 @@ absl::StatusOr<std::string> Field::getString(const std::string& name) const {
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::String)) {
     return absl::InvalidArgumentError(
-                          fmt::format("key '{}' missing or not a string from lines {}-{}", name,
-                                      line_number_start_, line_number_end_));
+        fmt::format("key '{}' missing or not a string from lines {}-{}", name, line_number_start_,
+                    line_number_end_));
   }
   return value_itr->second->stringValue();
 }
 
-absl::StatusOr<std::string> Field::getString(const std::string& name, const std::string& default_value) const {
+absl::StatusOr<std::string> Field::getString(const std::string& name,
+                                             const std::string& default_value) const {
   RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
@@ -529,7 +532,8 @@ absl::StatusOr<std::string> Field::getString(const std::string& name, const std:
   return default_value;
 }
 
-absl::StatusOr<std::vector<std::string>> Field::getStringArray(const std::string& name, bool allow_empty) const {
+absl::StatusOr<std::vector<std::string>> Field::getStringArray(const std::string& name,
+                                                               bool allow_empty) const {
   RETURN_IF_NOT_OK(checkType(Type::Object));
   std::vector<std::string> string_array;
   auto value_itr = value_.object_value_.find(name);
@@ -538,8 +542,8 @@ absl::StatusOr<std::vector<std::string>> Field::getStringArray(const std::string
       return string_array;
     }
     return absl::InvalidArgumentError(
-                          fmt::format("key '{}' missing or not an array from lines {}-{}", name,
-                                      line_number_start_, line_number_end_));
+        fmt::format("key '{}' missing or not an array from lines {}-{}", name, line_number_start_,
+                    line_number_end_));
   }
 
   auto array_value_or_error = value_itr->second->arrayValue();
@@ -548,9 +552,8 @@ absl::StatusOr<std::vector<std::string>> Field::getStringArray(const std::string
   string_array.reserve(array.size());
   for (const auto& element : array) {
     if (!element->isType(Type::String)) {
-      return absl::InvalidArgumentError(
-                            fmt::format("JSON array '{}' from line {} does not contain all strings",
-                                        name, line_number_start_));
+      return absl::InvalidArgumentError(fmt::format(
+          "JSON array '{}' from line {} does not contain all strings", name, line_number_start_));
     }
     RETURN_IF_STATUS_NOT_OK(element->stringValue());
     string_array.push_back(element->stringValue().value());
@@ -575,10 +578,10 @@ bool Field::empty() const {
   } else if (isType(Type::Array)) {
     return value_.array_value_.empty();
   }
-   IS_ENVOY_BUG("Json does not support empty() on types other than array and object");
-   return false;
-  }
+  IS_ENVOY_BUG("Json does not support empty() on types other than array and object");
+  return false;
 }
+} // namespace
 
 bool Field::hasObject(const std::string& name) const {
   if (!checkType(Type::Object).ok()) {

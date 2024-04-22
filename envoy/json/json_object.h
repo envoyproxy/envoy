@@ -81,7 +81,8 @@ public:
    * @param default_value supplies the value to return if name does not exist.
    * @return int64_t the value.
    */
-  virtual  absl::StatusOr<int64_t> getInteger(const std::string& name, int64_t default_value) const PURE;
+  virtual absl::StatusOr<int64_t> getInteger(const std::string& name,
+                                             int64_t default_value) const PURE;
 
   /**
    * Get a sub-object by name.
@@ -90,7 +91,8 @@ public:
    * exist.
    * @return ObjectObjectSharedPtr the sub-object.
    */
-  virtual  absl::StatusOr<ObjectSharedPtr> getObject(const std::string& name, bool allow_empty = false) const PURE;
+  virtual absl::StatusOr<ObjectSharedPtr> getObject(const std::string& name,
+                                                    bool allow_empty = false) const PURE;
 
   /**
    * Determine if an object has type Object.
@@ -110,8 +112,8 @@ public:
    * @param allow_empty specifies whether to return an empty array if the key does not exist.
    * @return std::vector<ObjectSharedPtr> the array of JSON  objects.
    */
-  virtual absl::StatusOr<std::vector<ObjectSharedPtr>> getObjectArray(const std::string& name,
-                                                      bool allow_empty = false) const PURE;
+  virtual absl::StatusOr<std::vector<ObjectSharedPtr>>
+  getObjectArray(const std::string& name, bool allow_empty = false) const PURE;
 
   /**
    * Get a string value by name.
@@ -127,7 +129,7 @@ public:
    * @return std::string the value.
    */
   virtual absl::StatusOr<std::string> getString(const std::string& name,
-                                const std::string& default_value) const PURE;
+                                                const std::string& default_value) const PURE;
 
   /**
    * Get a string array by name.
@@ -135,8 +137,8 @@ public:
    * @param allow_empty specifies whether to return an empty array if the key does not exist.
    * @return std::vector<std::string> the array of strings.
    */
-  virtual absl::StatusOr<std::vector<std::string>> getStringArray(const std::string& name,
-                                                  bool allow_empty = false) const PURE;
+  virtual absl::StatusOr<std::vector<std::string>>
+  getStringArray(const std::string& name, bool allow_empty = false) const PURE;
 
   /**
    * Get a double value by name.
@@ -151,7 +153,8 @@ public:
    * @param default_value supplies the value to return if name does not exist.
    * @return double the value.
    */
-  virtual absl::StatusOr<double> getDouble(const std::string& name, double default_value) const PURE;
+  virtual absl::StatusOr<double> getDouble(const std::string& name,
+                                           double default_value) const PURE;
 
   /**
    * @return a hash of the JSON object.

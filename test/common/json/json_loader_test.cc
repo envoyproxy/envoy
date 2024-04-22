@@ -65,7 +65,7 @@ TEST_F(JsonLoaderTest, Basic) {
   EXPECT_FALSE(Factory::loadFromString("{").status().ok());
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"hello\":123}").value();
+    ObjectSharedPtr json = *Factory::loadFromString("{\"hello\":123}");
     EXPECT_TRUE(json->hasObject("hello"));
     EXPECT_FALSE(json->hasObject("world"));
     EXPECT_FALSE(json->empty());
@@ -79,22 +79,22 @@ TEST_F(JsonLoaderTest, Basic) {
     EXPECT_FALSE(json->getObjectArray("hello").status().ok());
     EXPECT_FALSE(json->getString("hello").status().ok());
     EXPECT_EQ(json->getString("hello", "").status().message(),
-                              "key 'hello' missing or not a string from lines 1-1");
+              "key 'hello' missing or not a string from lines 1-1");
     EXPECT_EQ(json->getString("hello").status().message(),
-                              "key 'hello' missing or not a string from lines 1-1");
+              "key 'hello' missing or not a string from lines 1-1");
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"hello\":\"123\"\n}").value();
+    ObjectSharedPtr json = *Factory::loadFromString("{\"hello\":\"123\"\n}");
     EXPECT_EQ(json->getInteger("hello").status().message(),
-                              "key 'hello' missing or not an integer from lines 1-2");
+              "key 'hello' missing or not an integer from lines 1-2");
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"hello\":true}").value();
-    EXPECT_TRUE(json->getBoolean("hello").value());
-    EXPECT_TRUE(json->getBoolean("hello", false).value());
-    EXPECT_FALSE(json->getBoolean("world", false).value());
+    ObjectSharedPtr json = *Factory::loadFromString("{\"hello\":true}");
+    EXPECT_TRUE(*json->getBoolean("hello"));
+    EXPECT_TRUE(*json->getBoolean("hello", false));
+    EXPECT_FALSE(*json->getBoolean("world", false));
 
     EXPECT_TRUE(absl::get<bool>(getValidValue(*json, "hello")));
     expectErrorValue(*json, "world", absl::StatusCode::kNotFound,
@@ -102,21 +102,21 @@ TEST_F(JsonLoaderTest, Basic) {
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"hello\": [\"a\", \"b\", 3]}").value();
+    ObjectSharedPtr json = *Factory::loadFromString("{\"hello\": [\"a\", \"b\", 3]}");
     EXPECT_FALSE(json->getStringArray("hello").status().ok());
     EXPECT_FALSE(json->getStringArray("world").status().ok());
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"hello\":123}").value();
-    EXPECT_EQ(123, json->getInteger("hello", 456).value());
-    EXPECT_EQ(456, json->getInteger("world", 456).value());
+    ObjectSharedPtr json = *Factory::loadFromString("{\"hello\":123}");
+    EXPECT_EQ(123, *json->getInteger("hello", 456));
+    EXPECT_EQ(456, *json->getInteger("world", 456));
 
     EXPECT_EQ(123, absl::get<int64_t>(getValidValue(*json, "hello")));
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"hello\": \n[123]}").value();
+    ObjectSharedPtr json = *Factory::loadFromString("{\"hello\": \n[123]}");
 
     EXPECT_EQ(
         json->getObjectArray("hello").value().at(0)->getString("hello").status().message(),
@@ -125,9 +125,9 @@ TEST_F(JsonLoaderTest, Basic) {
 
   {
     EXPECT_EQ(Factory::loadFromString("{\"hello\": \n\n\"world\"").status().message(),
-                              "JSON supplied is not valid. Error(line 3, column 8, tmessageen "
-                              "\"world\"): syntax error while "
-                              "parsing object - unexpected end of input; expected '}'\n");
+              "JSON supplied is not valid. Error(line 3, column 8, token "
+              "\"world\"): syntax error while "
+              "parsing object - unexpected end of input; expected '}'\n");
   }
 
   {
@@ -138,53 +138,55 @@ TEST_F(JsonLoaderTest, Basic) {
   }
 
   {
-    ObjectSharedPtr json_object = Factory::loadFromString("[\"foo\",\"bar\"]").value();
+    ObjectSharedPtr json_object = *Factory::loadFromString("[\"foo\",\"bar\"]");
     EXPECT_FALSE(json_object->empty());
   }
 
   {
-    ObjectSharedPtr json_object = Factory::loadFromString("[]").value();
+    ObjectSharedPtr json_object = *Factory::loadFromString("[]");
     EXPECT_TRUE(json_object->empty());
   }
 
   {
     ObjectSharedPtr json =
-        Factory::loadFromString("{\"1\":{\"11\":\"111\"},\"2\":{\"22\":\"222\"}}").value();
+        *Factory::loadFromString("{\"1\":{\"11\":\"111\"},\"2\":{\"22\":\"222\"}}");
     int pos = 0;
     ASSERT_TRUE(json->iterate([this, &pos](const std::string& key, const Json::Object& value) {
-      EXPECT_TRUE(key == "1" || key == "2");
+                      EXPECT_TRUE(key == "1" || key == "2");
 
-      if (key == "1") {
-        EXPECT_EQ("111", value.getString("11").value());
-        EXPECT_EQ("111", absl::get<std::string>(getValidValue(value, "11")));
-      } else {
-        EXPECT_EQ("222", value.getString("22").value());
-        EXPECT_EQ("222", absl::get<std::string>(getValidValue(value, "22")));
-      }
+                      if (key == "1") {
+                        EXPECT_EQ("111", *value.getString("11"));
+                        EXPECT_EQ("111", absl::get<std::string>(getValidValue(value, "11")));
+                      } else {
+                        EXPECT_EQ("222", *value.getString("22"));
+                        EXPECT_EQ("222", absl::get<std::string>(getValidValue(value, "22")));
+                      }
 
-      pos++;
-      return true;
-    }).ok());
+                      pos++;
+                      return true;
+                    })
+                    .ok());
 
     EXPECT_EQ(2, pos);
   }
 
   {
     ObjectSharedPtr json =
-        Factory::loadFromString("{\"1\":{\"11\":\"111\"},\"2\":{\"22\":\"222\"}}").value();
+        *Factory::loadFromString("{\"1\":{\"11\":\"111\"},\"2\":{\"22\":\"222\"}}");
     int pos = 0;
     ASSERT_TRUE(json->iterate([&pos](const std::string& key, const Json::Object& value) {
-      EXPECT_TRUE(key == "1" || key == "2");
+                      EXPECT_TRUE(key == "1" || key == "2");
 
-      if (key == "1") {
-        EXPECT_EQ("111", value.getString("11").value());
-      } else {
-        EXPECT_EQ("222", value.getString("22").value());
-      }
+                      if (key == "1") {
+                        EXPECT_EQ("111", *value.getString("11"));
+                      } else {
+                        EXPECT_EQ("222", *value.getString("22"));
+                      }
 
-      pos++;
-      return false;
-    }).ok());
+                      pos++;
+                      return false;
+                    })
+                    .ok());
 
     EXPECT_EQ(1, pos);
   }
@@ -199,7 +201,7 @@ TEST_F(JsonLoaderTest, Basic) {
     }
     )EOF";
 
-    ObjectSharedPtr config = Factory::loadFromString(json).value();
+    ObjectSharedPtr config = *Factory::loadFromString(json);
     EXPECT_EQ(2U, config->getObjectArray("descriptors").value()[0]->asObjectArray().value().size());
     EXPECT_EQ(1U, config->getObjectArray("descriptors").value()[1]->asObjectArray().value().size());
   }
@@ -211,8 +213,8 @@ TEST_F(JsonLoaderTest, Basic) {
     }
     )EOF";
 
-    ObjectSharedPtr config = Factory::loadFromString(json).value();
-    std::vector<ObjectSharedPtr> array = config->getObjectArray("descriptors").value();
+    ObjectSharedPtr config = *Factory::loadFromString(json);
+    std::vector<ObjectSharedPtr> array = *config->getObjectArray("descriptors");
     EXPECT_FALSE(array[0]->asObjectArray().status().ok());
 
     // Object Array is not supported as an value.
@@ -222,78 +224,78 @@ TEST_F(JsonLoaderTest, Basic) {
 
   {
     std::string json = R"EOF({})EOF";
-    ObjectSharedPtr config = Factory::loadFromString(json).value();
-    ObjectSharedPtr object = config->getObject("foo", true).value();
-    EXPECT_EQ(2, object->getInteger("bar", 2).value());
+    ObjectSharedPtr config = *Factory::loadFromString(json);
+    ObjectSharedPtr object = *config->getObject("foo", true);
+    EXPECT_EQ(2, *object->getInteger("bar", 2));
     EXPECT_TRUE(object->empty());
   }
 
   {
     std::string json = R"EOF({"foo": []})EOF";
-    ObjectSharedPtr config = Factory::loadFromString(json).value();
+    ObjectSharedPtr config = *Factory::loadFromString(json);
     EXPECT_TRUE(config->getStringArray("foo").value().empty());
   }
 
   {
     std::string json = R"EOF({"foo": ["bar", "baz"]})EOF";
-    ObjectSharedPtr config = Factory::loadFromString(json).value();
+    ObjectSharedPtr config = *Factory::loadFromString(json);
     EXPECT_FALSE(config->getStringArray("foo").value().empty());
   }
 
   {
     std::string json = R"EOF({})EOF";
-    ObjectSharedPtr config = Factory::loadFromString(json).value();
+    ObjectSharedPtr config = *Factory::loadFromString(json);
     EXPECT_FALSE(config->getStringArray("foo").status().ok());
   }
 
   {
     std::string json = R"EOF({})EOF";
-    ObjectSharedPtr config = Factory::loadFromString(json).value();
+    ObjectSharedPtr config = *Factory::loadFromString(json);
     EXPECT_TRUE(config->getStringArray("foo", true).value().empty());
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"hello\": \n[2.0]}").value();
+    ObjectSharedPtr json = *Factory::loadFromString("{\"hello\": \n[2.0]}");
     EXPECT_FALSE(json->getObjectArray("hello").value().at(0)->getDouble("foo").status().ok());
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"hello\": \n[null]}").value();
+    ObjectSharedPtr json = *Factory::loadFromString("{\"hello\": \n[null]}");
     EXPECT_FALSE(json->getObjectArray("hello").value().at(0)->getDouble("foo").status().ok());
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{}").value();
+    ObjectSharedPtr json = *Factory::loadFromString("{}");
     EXPECT_FALSE((json->getObjectArray("hello").status().ok()));
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{}").value();
+    ObjectSharedPtr json = *Factory::loadFromString("{}");
     EXPECT_TRUE(json->getObjectArray("hello", true).value().empty());
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("[ null ]").value();
+    ObjectSharedPtr json = *Factory::loadFromString("[ null ]");
     EXPECT_EQ(json->asJsonString(), "[null]");
   }
 
   {
-    ObjectSharedPtr json1 = Factory::loadFromString("[ [ ] , { } ]").value();
+    ObjectSharedPtr json1 = *Factory::loadFromString("[ [ ] , { } ]");
     EXPECT_EQ(json1->asJsonString(), "[null,null]");
   }
 
   {
-    ObjectSharedPtr json1 = Factory::loadFromString("[ true ]").value();
+    ObjectSharedPtr json1 = *Factory::loadFromString("[ true ]");
     EXPECT_EQ(json1->asJsonString(), "[true]");
   }
 
   {
-    ObjectSharedPtr json1 = Factory::loadFromString("{\"foo\": 123, \"bar\": \"cat\"}").value();
+    ObjectSharedPtr json1 = *Factory::loadFromString("{\"foo\": 123, \"bar\": \"cat\"}");
     EXPECT_EQ(json1->asJsonString(), "{\"bar\":\"cat\",\"foo\":123}");
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"hello\": {}}").value();
+    ObjectSharedPtr json = *Factory::loadFromString("{\"hello\": {}}");
     EXPECT_EQ(json->getObject("hello").value()->asJsonString(), "null");
   }
 
@@ -303,7 +305,7 @@ TEST_F(JsonLoaderTest, Basic) {
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"hello\": [] }").value();
+    ObjectSharedPtr json = *Factory::loadFromString("{\"hello\": [] }");
     EXPECT_EQ(json->asJsonString(), "{\"hello\":null}");
   }
 }
@@ -311,13 +313,15 @@ TEST_F(JsonLoaderTest, Basic) {
 TEST_F(JsonLoaderTest, Integer) {
   {
     ObjectSharedPtr json =
-        Factory::loadFromString("{\"max\":9223372036854775807, \"min\":-9223372036854775808}").value();
-    EXPECT_EQ(std::numeric_limits<int64_t>::max(), json->getInteger("max").value());
-    EXPECT_EQ(std::numeric_limits<int64_t>::min(), json->getInteger("min").value());
+        *Factory::loadFromString("{\"max\":9223372036854775807, \"min\":-9223372036854775808}")
+            ;
+    EXPECT_EQ(std::numeric_limits<int64_t>::max(), *json->getInteger("max"));
+    EXPECT_EQ(std::numeric_limits<int64_t>::min(), *json->getInteger("min"));
   }
   {
-    EXPECT_FALSE(Factory::loadFromString("{\"val\":9223372036854775808}").status().ok());
-    ObjectSharedPtr json = Factory::loadFromString("{\"val\":-9223372036854775809}").value();
+    EXPECT_ENVOY_BUG(
+        EXPECT_FALSE(Factory::loadFromString("{\"val\":9223372036854775808}").status().ok()), "");
+    ObjectSharedPtr json = *Factory::loadFromString("{\"val\":-9223372036854775809}");
     EXPECT_FALSE(json->getInteger("val").status().ok());
   }
   // Number overflow exception.
@@ -329,35 +333,37 @@ TEST_F(JsonLoaderTest, Integer) {
                                          "111111111111111111111111111111111111111111111111111111111"
                                          "111111111111111111111111111111111111111111111111111111111"
                                          "111111111111111111111111111111111111111111111111111111111"
-                                         "1111111111111111111111111111111111111111111111111").status().ok());
+                                         "1111111111111111111111111111111111111111111111111")
+                     .status()
+                     .ok());
   }
 }
 
 TEST_F(JsonLoaderTest, Double) {
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"value1\": 10.5, \"value2\": -12.3}").value();
-    EXPECT_EQ(10.5, json->getDouble("value1").value());
-    EXPECT_EQ(-12.3, json->getDouble("value2").value());
+    ObjectSharedPtr json = *Factory::loadFromString("{\"value1\": 10.5, \"value2\": -12.3}");
+    EXPECT_EQ(10.5, *json->getDouble("value1"));
+    EXPECT_EQ(-12.3, *json->getDouble("value2"));
 
     EXPECT_EQ(10.5, absl::get<double>(getValidValue(*json, "value1")));
     EXPECT_EQ(-12.3, absl::get<double>(getValidValue(*json, "value2")));
   }
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"foo\": 13.22}").value();
-    EXPECT_EQ(13.22, json->getDouble("foo", 0));
-    EXPECT_EQ(0, json->getDouble("bar", 0).value());
+    ObjectSharedPtr json = *Factory::loadFromString("{\"foo\": 13.22}");
+    EXPECT_EQ(13.22, *json->getDouble("foo", 0));
+    EXPECT_EQ(0, *json->getDouble("bar", 0));
 
     EXPECT_EQ(13.22, absl::get<double>(getValidValue(*json, "foo")));
   }
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"foo\": \"bar\"}").value();
+    ObjectSharedPtr json = *Factory::loadFromString("{\"foo\": \"bar\"}");
     EXPECT_FALSE(json->getDouble("foo").status().ok());
   }
 }
 
 TEST_F(JsonLoaderTest, LoadArray) {
-  ObjectSharedPtr json1 = Factory::loadFromString("[1.11, 22, \"cat\"]").value();
-  ObjectSharedPtr json2 = Factory::loadFromString("[22, \"cat\", 1.11]").value();
+  ObjectSharedPtr json1 = *Factory::loadFromString("[1.11, 22, \"cat\"]");
+  ObjectSharedPtr json2 = *Factory::loadFromString("[22, \"cat\", 1.11]");
 
   // Array values in different orders will not be the same.
   EXPECT_NE(json1->asJsonString(), json2->asJsonString());
@@ -365,10 +371,11 @@ TEST_F(JsonLoaderTest, LoadArray) {
 }
 
 TEST_F(JsonLoaderTest, Hash) {
-  ObjectSharedPtr json1 = Factory::loadFromString("{\"value1\": 10.5, \"value2\": -12.3}").value();
-  ObjectSharedPtr json2 = Factory::loadFromString("{\"value2\": -12.3, \"value1\": 10.5}").value();
-  ObjectSharedPtr json3 = Factory::loadFromString("  {  \"value2\":  -12.3, \"value1\":  10.5} ").value();
-  ObjectSharedPtr json4 = Factory::loadFromString("{\"value1\": 10.5}").value();
+  ObjectSharedPtr json1 = *Factory::loadFromString("{\"value1\": 10.5, \"value2\": -12.3}");
+  ObjectSharedPtr json2 = *Factory::loadFromString("{\"value2\": -12.3, \"value1\": 10.5}");
+  ObjectSharedPtr json3 =
+      *Factory::loadFromString("  {  \"value2\":  -12.3, \"value1\":  10.5} ");
+  ObjectSharedPtr json4 = *Factory::loadFromString("{\"value1\": 10.5}");
 
   // Objects with keys in different orders should be the same
   EXPECT_EQ(json1->hash(), json2->hash());
@@ -378,8 +385,10 @@ TEST_F(JsonLoaderTest, Hash) {
   EXPECT_NE(json1->hash(), json4->hash());
 
   // Nested objects with keys in different orders should be the same.
-  ObjectSharedPtr json5 = Factory::loadFromString("{\"value1\": {\"a\": true, \"b\": null}}").value();
-  ObjectSharedPtr json6 = Factory::loadFromString("{\"value1\": {\"b\": null, \"a\": true}}").value();
+  ObjectSharedPtr json5 =
+      *Factory::loadFromString("{\"value1\": {\"a\": true, \"b\": null}}");
+  ObjectSharedPtr json6 =
+      *Factory::loadFromString("{\"value1\": {\"b\": null, \"a\": true}}");
   EXPECT_EQ(json5->hash(), json6->hash());
 }
 
@@ -399,7 +408,7 @@ TEST_F(JsonLoaderTest, Schema) {
     }
     )EOF";
 
-  ObjectSharedPtr json = Factory::loadFromString(json_string).value();
+  ObjectSharedPtr json = *Factory::loadFromString(json_string);
   EXPECT_ENVOY_BUG(json->validateSchema(invalid_schema), "not implemented");
 }
 
@@ -420,17 +429,19 @@ TEST_F(JsonLoaderTest, MissingEnclosingDocument) {
 }
 
 TEST_F(JsonLoaderTest, AsString) {
-  ObjectSharedPtr json = Factory::loadFromString("{\"name1\": \"value1\", \"name2\": true}").value();
+  ObjectSharedPtr json =
+      *Factory::loadFromString("{\"name1\": \"value1\", \"name2\": true}");
   ASSERT_TRUE(json->iterate([&](const std::string& key, const Json::Object& value) {
-    EXPECT_TRUE(key == "name1" || key == "name2");
+                    EXPECT_TRUE(key == "name1" || key == "name2");
 
-    if (key == "name1") {
-      EXPECT_EQ("value1", value.asString().value());
-    } else {
-      EXPECT_FALSE(value.asString().status().ok());
-    }
-    return true;
-  }).ok());
+                    if (key == "name1") {
+                      EXPECT_EQ("value1", *value.asString());
+                    } else {
+                      EXPECT_FALSE(value.asString().status().ok());
+                    }
+                    return true;
+                  })
+                  .ok());
 }
 
 TEST_F(JsonLoaderTest, LoadFromStruct) {

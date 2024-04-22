@@ -511,10 +511,11 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigD
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
   EXPECT_EQ("application/json", contentType(response));
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body()).value();
   size_t index = 0;
-  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
-    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
+  for (auto obj_or_error : *json->getObjectArray("configs")) {
+    const Json::ObjectSharedPtr& obj_ptr = obj_or_err.value();
+    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type").value()) == 0);
     index++;
   }
 
@@ -581,10 +582,10 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
   EXPECT_EQ("application/json", contentType(response));
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body()).value();
   size_t index = 0;
-  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
-    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
+  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs").value()) {
+    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type").value()) == 0);
     index++;
   }
 
