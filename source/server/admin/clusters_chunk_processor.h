@@ -66,9 +66,9 @@ public:
 private:
   void render(std::reference_wrapper<const Upstream::Cluster> cluster,
               Buffer::Instance& response);
-
   void drainBufferIntoResponse(Buffer::Instance& response);
   void finalize(Buffer::Instance& response);
+  void addMapEntries(Json::Streamer::Map* raw_map_ptr, Buffer::Instance& response, std::vector<Json::Streamer::Map::NameValue>& entries);
 
   const uint64_t chunk_limit_;
   Http::ResponseHeaderMap& response_headers_;
@@ -77,6 +77,9 @@ private:
   std::vector<std::unique_ptr<ClustersJsonContext>> json_context_holder_; 
   uint64_t idx_;
 };
+
+
+
 
 } // namespace Server
 } // namespace Envoy

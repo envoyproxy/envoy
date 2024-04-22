@@ -155,12 +155,15 @@ JsonClustersChunkProcessor::JsonClustersChunkProcessor(
 
 void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::Cluster> cluster,
                                         Buffer::Instance& response) {
-  UNREFERENCED_PARAMETER(cluster);
-  UNREFERENCED_PARAMETER(response);
   Json::Streamer::MapPtr cluster_map = json_context_holder_.back()->clusters_->addMap();
   const Upstream::Cluster& unwrapped_cluster = cluster.get();
   Upstream::ClusterInfoConstSharedPtr cluster_info = unwrapped_cluster.info();
-  cluster_map->addEntries({{"name", cluster_info->name()}});
+  std::vector<Json::Streamer::Map::NameValue> top_level_entries = {
+    {"name", cluster_info->name()},
+    {"observability_name", cluster_info->observabilityName()},
+  };
+  addMapEntries(cluster_map.get(), response, top_level_entries);
+  drainBufferIntoResponse(response);
 }
 
 bool JsonClustersChunkProcessor::nextChunk(Buffer::Instance& response) {
@@ -188,6 +191,11 @@ void JsonClustersChunkProcessor::drainBufferIntoResponse(Buffer::Instance& respo
   if (&response != &buffer_) {
     response.move(buffer_);
   }
+}
+
+void JsonClustersChunkProcessor::addMapEntries(Json::Streamer::Map* raw_map_ptr, Buffer::Instance& response, std::vector<Json::Streamer::Map::NameValue>& entries) {
+  raw_map_ptr->addEntries(entries);
+  drainBufferIntoResponse(response);
 }
 
 // Start destruction of the ClustersJsonContext to render the closing tokens and push to the
