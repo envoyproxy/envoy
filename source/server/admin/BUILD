@@ -420,12 +420,13 @@ envoy_cc_library(
     hdrs = ["clusters_request.h"],
     deps = [
         ":clusters_params_lib",
-        ":clusters_renderer_lib",
+        ":clusters_chunk_processor_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:header_map_interface",
         "//envoy/server:admin_interface",
         "//envoy/server:instance_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
     ],
 )
@@ -446,9 +447,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "clusters_renderer_lib",
-    srcs = ["clusters_renderer.cc"],
-    hdrs = ["clusters_renderer.h"],
+    name = "clusters_chunk_processor_lib",
+    srcs = ["clusters_chunk_processor.cc"],
+    hdrs = ["clusters_chunk_processor.h"],
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/common:pure_lib",
@@ -456,5 +457,6 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/json:json_streamer_lib",
         "//source/common/upstream:host_utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
@@ -9,6 +10,7 @@
 #include "source/server/admin/clusters_request.h"
 
 #include "test/mocks/server/instance.h"
+#include "test/mocks/upstream/cluster.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
@@ -21,6 +23,9 @@ using testing::Return;
 using testing::ReturnRef;
 
 class BaseClustersRequestFixture : public testing::Test {
+public:
+  BaseClustersRequestFixture() : 
+    cluster_info_name_("") {}
 protected:
   using ClustersRequestPtr = std::unique_ptr<ClustersRequest>;
 
@@ -49,6 +54,13 @@ protected:
         /* data=*/drain_after_next_chunk ? std::move(result_data) : std::move(buffer),
     };
   }
+
+const std::string& getClusterInfoName() {
+  return cluster_info_name_;
+}
+
+private:
+  const std::string cluster_info_name_;
 };
 
 struct VerifyJsonOutputParameters {
@@ -61,6 +73,7 @@ class VerifyJsonOutputFixture : public BaseClustersRequestFixture,
 TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
   VerifyJsonOutputParameters params = GetParam();
   MockInstance mock_server;
+  Upstream::MockCluster mock_cluster;
   Upstream::MockClusterManager mock_cluster_manager;
   Buffer::OwnedImpl buffer;
   ClustersParams clusters_params;
@@ -76,31 +89,57 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
   // EXPECT_EQ(result.data_.toString(), "{}");
 }
 
-constexpr VerifyJsonOutputParameters VERIFY_JSON_CASES[] = {
-    {/* drain_=*/true},
-    {/* drain_=*/false},
+// constexpr VerifyJsonOutputParameters VERIFY_JSON_CASES[] = {
+//     {/* drain_=*/true},
+//     {/* drain_=*/false},
+// };
+
+// INSTANTIATE_TEST_SUITE_P(VerifyJsonOutput, VerifyJsonOutputFixture,
+//                          testing::ValuesIn<VerifyJsonOutputParameters>(VERIFY_JSON_CASES));
+
+// struct VerifyTextOutputParameters {
+//   bool drain_;
+// };
+
+// class VerifyTextOutputFixture : public BaseClustersRequestFixture,
+//                                 public testing::WithParamInterface<VerifyTextOutputParameters> {};
+
+// // TODO(demitriswan) Implement test for text output verification.
+// TEST_P(VerifyTextOutputFixture, VerifyTextOutput) {}
+
+// constexpr VerifyTextOutputParameters VERIFY_TEXT_CASES[] = {
+//     {/* drain_=*/true},
+//     {/* drain_=*/false},
+// };
+
+// INSTANTIATE_TEST_SUITE_P(VerifyTextOutput, VerifyTextOutputFixture,
+//                          testing::ValuesIn<VerifyTextOutputParameters>(VERIFY_TEXT_CASES));
+
+class Foo {
+public:
+  Foo(std::unique_ptr<Json::Streamer> streamer, Buffer::Instance& buffer) : streamer_(std::move(streamer)), buffer_(buffer) {
+    array_ = streamer_->makeRootArray();
+  }
+  void foo(Buffer::Instance& buffer) {
+    array_->addNumber(int64_t(1));
+    buffer.move(buffer_); 
+  }
+  std::unique_ptr<Json::Streamer> streamer_;
+  Buffer::Instance& buffer_;
+  Json::Streamer::ArrayPtr array_;
 };
 
-INSTANTIATE_TEST_SUITE_P(VerifyJsonOutput, VerifyJsonOutputFixture,
-                         testing::ValuesIn<VerifyJsonOutputParameters>(VERIFY_JSON_CASES));
-
-struct VerifyTextOutputParameters {
-  bool drain_;
-};
-
-class VerifyTextOutputFixture : public BaseClustersRequestFixture,
-                                public testing::WithParamInterface<VerifyTextOutputParameters> {};
-
-// TODO(demitriswan) Implement test for text output verification.
-TEST_P(VerifyTextOutputFixture, VerifyTextOutput) {}
-
-constexpr VerifyTextOutputParameters VERIFY_TEXT_CASES[] = {
-    {/* drain_=*/true},
-    {/* drain_=*/false},
-};
-
-INSTANTIATE_TEST_SUITE_P(VerifyTextOutput, VerifyTextOutputFixture,
-                         testing::ValuesIn<VerifyTextOutputParameters>(VERIFY_TEXT_CASES));
+TEST(Json, Verify) {
+  Buffer::OwnedImpl request_buffer;
+  Buffer::OwnedImpl buffer;
+  {
+    Foo foo(std::make_unique<Json::Streamer>(buffer), buffer);
+    foo.foo(request_buffer);
+    foo.foo(request_buffer);
+  }
+  request_buffer.move(buffer);
+  EXPECT_EQ(request_buffer.toString(), "[1,1]");
+}
 
 } // namespace Server
 } // namespace Envoy

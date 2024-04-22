@@ -8,7 +8,7 @@
 #include "envoy/server/instance.h"
 
 #include "source/server/admin/clusters_params.h"
-#include "source/server/admin/clusters_renderer.h"
+#include "source/server/admin/clusters_chunk_processor.h"
 
 namespace Envoy {
 namespace Server {

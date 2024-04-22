@@ -280,8 +280,11 @@ envoy_cc_test(
         "//envoy/http:codes_interface",
         "//envoy/server:instance_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/server/admin:clusters_chunk_processor_lib",
+        "//source/server/admin:clusters_params_lib",
         "//source/server/admin:clusters_request_lib",
         "//test/mocks/server:instance_mocks",
+        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
 )

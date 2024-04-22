@@ -7,7 +7,7 @@
 #include "envoy/server/instance.h"
 
 #include "source/common/common/logger.h"
-#include "source/server/admin/clusters_renderer.h"
+#include "source/server/admin/clusters_chunk_processor.h"
 
 #include "clusters_params.h"
 

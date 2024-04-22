@@ -9,11 +9,25 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
-
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/json/json_streamer.h"
 
 namespace Envoy {
 namespace Server {
+
+struct ClustersJsonContext {
+  ClustersJsonContext(
+    std::unique_ptr<Json::Streamer> streamer,
+    std::reference_wrapper<Buffer::Instance> buffer,
+    Json::Streamer::MapPtr root_map,
+    Json::Streamer::ArrayPtr clusters) :
+    streamer_(std::move(streamer)), buffer_(buffer.get()),
+    root_map_(std::move(root_map)), clusters_(std::move(clusters)) {}
+  std::unique_ptr<Json::Streamer> streamer_;
+  Buffer::Instance& buffer_;
+  Json::Streamer::MapPtr root_map_;
+  Json::Streamer::ArrayPtr clusters_;
+};
 
 class ClustersChunkProcessor {
 public:
@@ -21,20 +35,15 @@ public:
   virtual ~ClustersChunkProcessor() = default;
 };
 
-class ClusterRenderer {
+class TextClustersChunkProcessor : public ClustersChunkProcessor {
 public:
-  virtual void render(std::reference_wrapper<const Upstream::Cluster> cluster,
-                      Buffer::Instance& response) PURE;
-  virtual ~ClusterRenderer() = default;
-};
-
-class TextClusterRenderer : public ClusterRenderer {
-public:
-  TextClusterRenderer() = default;
-  void render(std::reference_wrapper<const Upstream::Cluster> cluster,
-              Buffer::Instance& response) override;
-
+  TextClustersChunkProcessor(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
+                             const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map);
+  bool nextChunk(Buffer::Instance& response) override;
 private:
+  void render(std::reference_wrapper<const Upstream::Cluster> cluster,
+              Buffer::Instance& response);
+
   static void addOutlierInfo(const std::string& cluster_name,
                              const Upstream::Outlier::Detector* outlier_detector,
                              Buffer::Instance& response);
@@ -42,42 +51,30 @@ private:
                                         const std::string& priority_str,
                                         Upstream::ResourceManager& resource_manager,
                                         Buffer::Instance& response);
-};
-
-class TextClustersChunkProcessor : public ClustersChunkProcessor {
-public:
-  TextClustersChunkProcessor(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
-                             const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map);
-
-  bool nextChunk(Buffer::Instance& response) override;
-
-private:
   const uint64_t chunk_limit_;
   Http::ResponseHeaderMap& response_headers_;
   std::vector<std::reference_wrapper<const Upstream::Cluster>> clusters_;
-  std::unique_ptr<TextClusterRenderer> renderer_;
   uint64_t idx_;
 };
 
-class JsonClusterRenderer : public ClusterRenderer {
-public:
-  JsonClusterRenderer() = default;
-  void render(std::reference_wrapper<const Upstream::Cluster> cluster,
-              Buffer::Instance& response) override;
-};
 
 class JsonClustersChunkProcessor : public ClustersChunkProcessor {
 public:
   JsonClustersChunkProcessor(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
                              const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map);
-
   bool nextChunk(Buffer::Instance& response) override;
-
 private:
+  void render(std::reference_wrapper<const Upstream::Cluster> cluster,
+              Buffer::Instance& response);
+
+  void drainBufferIntoResponse(Buffer::Instance& response);
+  void finalize(Buffer::Instance& response);
+
   const uint64_t chunk_limit_;
   Http::ResponseHeaderMap& response_headers_;
   std::vector<std::reference_wrapper<const Upstream::Cluster>> clusters_;
-  std::unique_ptr<JsonClusterRenderer> renderer_;
+  Buffer::OwnedImpl buffer_;
+  std::vector<std::unique_ptr<ClustersJsonContext>> json_context_holder_; 
   uint64_t idx_;
 };
 

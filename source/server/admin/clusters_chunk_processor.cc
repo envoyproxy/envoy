@@ -1,14 +1,16 @@
-#include "source/server/admin/clusters_renderer.h"
+#include "source/server/admin/clusters_chunk_processor.h"
 
 #include <cstdint>
 #include <functional>
 #include <memory>
 
+#include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/resource_manager.h"
 
 #include "source/common/upstream/host_utility.h"
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -17,7 +19,7 @@ TextClustersChunkProcessor::TextClustersChunkProcessor(
     uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
     const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map)
     : chunk_limit_(chunk_limit), response_headers_(response_headers),
-      renderer_(std::make_unique<TextClusterRenderer>()), idx_(0) {
+    idx_(0) {
   for (const auto& pair : cluster_info_map) {
     clusters_.push_back(pair.second);
   }
@@ -28,15 +30,15 @@ bool TextClustersChunkProcessor::nextChunk(Buffer::Instance& response) {
   for (; idx_ < clusters_.size() && response.length() - original_request_size < chunk_limit_;
        idx_++) {
 
-    renderer_->render(clusters_[idx_], response);
+    render(clusters_[idx_], response);
   }
   // TODO(demitriswan) See if these need to be updated here.
   UNREFERENCED_PARAMETER(response_headers_);
   return idx_ < clusters_.size() ? true : false;
 }
 
-void TextClusterRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster,
-                                 Buffer::Instance& response) {
+void TextClustersChunkProcessor::render(std::reference_wrapper<const Upstream::Cluster> cluster,
+                                        Buffer::Instance& response) {
   const Upstream::Cluster& unwrapped_cluster = cluster.get();
   const std::string& cluster_name = unwrapped_cluster.info()->name();
   response.add(fmt::format("{}::observability_name::{}\n", cluster_name,
@@ -97,7 +99,7 @@ void TextClusterRenderer::render(std::reference_wrapper<const Upstream::Cluster>
   }
 }
 
-void TextClusterRenderer::addOutlierInfo(const std::string& cluster_name,
+void TextClustersChunkProcessor::addOutlierInfo(const std::string& cluster_name,
                                          const Upstream::Outlier::Detector* outlier_detector,
                                          Buffer::Instance& response) {
   if (outlier_detector) {
@@ -120,7 +122,7 @@ void TextClusterRenderer::addOutlierInfo(const std::string& cluster_name,
   }
 }
 
-void TextClusterRenderer::addCircuitBreakerSettings(const std::string& cluster_name,
+void TextClustersChunkProcessor::addCircuitBreakerSettings(const std::string& cluster_name,
                                                     const std::string& priority_str,
                                                     Upstream::ResourceManager& resource_manager,
                                                     Buffer::Instance& response) {
@@ -133,20 +135,32 @@ void TextClusterRenderer::addCircuitBreakerSettings(const std::string& cluster_n
   response.add(fmt::format("{}::{}_priority::max_retries::{}\n", cluster_name, priority_str,
                            resource_manager.retries().max()));
 }
+
 JsonClustersChunkProcessor::JsonClustersChunkProcessor(
     uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
     const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map)
     : chunk_limit_(chunk_limit), response_headers_(response_headers),
-      renderer_(std::make_unique<JsonClusterRenderer>()), idx_(0) {
+      idx_(0) {
   for (const auto& pair : cluster_info_map) {
     clusters_.push_back(pair.second);
   }
+  std::unique_ptr<Json::Streamer> streamer = std::make_unique<Json::Streamer>(buffer_);
+  Json::Streamer::MapPtr root_map = streamer->makeRootMap();
+  root_map->addKey("cluster_statuses");
+  Json::Streamer::ArrayPtr clusters = root_map->addArray();
+  json_context_holder_.push_back(std::make_unique<ClustersJsonContext>(
+      std::move(streamer), buffer_,
+      std::move(root_map), std::move(clusters)));
 }
 
-void JsonClusterRenderer::render(std::reference_wrapper<const Upstream::Cluster> cluster,
-                                 Buffer::Instance& response) {
+void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::Cluster> cluster,
+                                        Buffer::Instance& response) {
   UNREFERENCED_PARAMETER(cluster);
   UNREFERENCED_PARAMETER(response);
+  Json::Streamer::MapPtr cluster_map = json_context_holder_.back()->clusters_->addMap();
+  const Upstream::Cluster& unwrapped_cluster = cluster.get();
+  Upstream::ClusterInfoConstSharedPtr cluster_info = unwrapped_cluster.info();
+  cluster_map->addEntries({{"name", cluster_info->name()}});
 }
 
 bool JsonClustersChunkProcessor::nextChunk(Buffer::Instance& response) {
@@ -154,17 +168,34 @@ bool JsonClustersChunkProcessor::nextChunk(Buffer::Instance& response) {
   UNREFERENCED_PARAMETER(response_headers_);
 
   const uint64_t original_request_size = response.length();
-  response.add("[");
   for (; idx_ < clusters_.size() && response.length() - original_request_size < chunk_limit_;
        idx_++) {
 
-    renderer_->render(clusters_[idx_], response);
+    render(clusters_[idx_], response);
   }
   if (idx_ < clusters_.size()) {
     return true;
   }
-  response.add("]");
+  finalize(response);
   return false;
+}
+
+// Json::Streamer holds a reference to a Buffer::Instance reference but the API for Request
+// takes a Buffer::Instance reference on each call to nextChunk. So, at the end of each
+// Json::Streamer function invocation, call drainBufferIntoResponse to ensure that the
+// contents written to its buffer gets moved and appended to the response.
+void JsonClustersChunkProcessor::drainBufferIntoResponse(Buffer::Instance& response) {
+  if (&response != &buffer_) {
+    response.move(buffer_);
+  }
+}
+
+// Start destruction of the ClustersJsonContext to render the closing tokens and push to the
+// buffer. Since we've pushed data into the buffer in the Json::Streamer, we'll need to drain
+// the contents into the response.
+void JsonClustersChunkProcessor::finalize(Buffer::Instance& response) {
+  json_context_holder_.pop_back();
+  drainBufferIntoResponse(response);
 }
 
 } // namespace Server
