@@ -382,7 +382,8 @@ const absl::string_view ClusterImplBase::DoNotValidateAlpnRuntimeKey =
     "config.do_not_validate_alpn_support";
 
 // Overriding drop_overload ratio settings from EDS.
-const absl::string_view ClusterImplBase::DropOverloadRuntimeKey = "config.drop_overload_support";
+const absl::string_view ClusterImplBase::DropOverloadRuntimeKey =
+    "load_balancing_policy.drop_overload_limit";
 
 // TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the
 // stat name into every host that receives a copy of that metric. This can be improved by putting
@@ -1702,14 +1703,12 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
         drop_percentage.denominator()));
   }
 
-  // If DropOverloadRuntimeKey is not enabled, take the EDS drop_overload config.
-  // If DropOverloadRuntimeKey is enabled, take it.
+  // If DropOverloadRuntimeKey is not enabled, honor the EDS drop_overload config.
+  // If it is enabled, choose the smaller one between it and the EDS config.
   float drop_ratio = float(drop_percentage.numerator()) / (denominator);
-  uint64_t drop_percent_runtime =
+  uint64_t drop_ratio_runtime =
       runtime_.snapshot().getInteger(ClusterImplBase::DropOverloadRuntimeKey, UINT32_MAX);
-  if (drop_percent_runtime != UINT32_MAX) {
-    drop_ratio = float(drop_percent_runtime) / float(100);
-  }
+  drop_ratio = std::min(drop_ratio, float(drop_ratio_runtime) / float(100));
   drop_overload_ = UnitFloat(drop_ratio);
   return absl::OkStatus();
 }
