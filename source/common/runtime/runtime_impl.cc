@@ -558,8 +558,7 @@ LoaderImpl::create(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tl
                    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   auto loader =
       std::unique_ptr<LoaderImpl>(new LoaderImpl(tls, config, local_info, store, generator, api));
-  auto result = loader->initLayers(dispatcher, validation_visitor);
-  RETURN_IF_NOT_OK(result);
+  RETURN_IF_NOT_OK(loader->initLayers(dispatcher, validation_visitor));
   return loader;
 }
 
