@@ -6,7 +6,9 @@
 #include "source/common/http/matching/inputs.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/matching/network/common/inputs.h"
 
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -171,6 +173,43 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
     EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  }
+}
+
+TEST(MatchingData, FilterStateInput) {
+  StreamInfo::StreamInfoImpl stream_info(createStreamInfo());
+  HttpMatchingDataImpl data(stream_info);
+
+  {
+    Network::Matching::FilterStateInput<HttpMatchingData> input("filter_state_key");
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  }
+
+  stream_info.filterState()->setData(
+      "unknown_key", std::make_shared<Router::StringAccessorImpl>("some_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  {
+    Network::Matching::FilterStateInput<HttpMatchingData> input("filter_state_key");
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  }
+
+  stream_info.filterState()->setData(
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  {
+    Network::Matching::FilterStateInput<HttpMatchingData> input("filter_state_key");
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(absl::get<std::string>(result.data_), "filter_state_value");
   }
 }
 

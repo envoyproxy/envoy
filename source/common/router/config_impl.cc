@@ -49,6 +49,7 @@
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
+#include "source/extensions/matching/network/common/inputs.h"
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
 #include "source/extensions/path/rewrite/uri_template/uri_template_rewrite.h"
 
@@ -144,7 +145,12 @@ public:
             envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance())
             ->GetDescriptor()
             ->full_name());
-    if (type_url == request_header_input_name) {
+    static std::string filter_state_input_name = TypeUtil::descriptorFullNameToTypeUrl(
+        createReflectableMessage(envoy::extensions::matching::common_inputs::network::v3::
+                                     FilterStateInput::default_instance())
+            ->GetDescriptor()
+            ->full_name());
+    if (type_url == request_header_input_name || type_url == filter_state_input_name) {
       return absl::OkStatus();
     }
 
