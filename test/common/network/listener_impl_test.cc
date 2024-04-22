@@ -630,7 +630,7 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
   client_connection2->connect();
 
   listener.enable();
-  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_)).Times(1);
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Now that we've seen that the connection hasn't been closed by the listener, make sure to
