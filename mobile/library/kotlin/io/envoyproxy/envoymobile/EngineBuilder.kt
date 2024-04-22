@@ -146,7 +146,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10
-  private var dnsQueryTimeoutSeconds = 25
+  private var dnsQueryTimeoutSeconds = 5
   private var dnsMinRefreshSeconds = 60
   private var dnsPreresolveHostnames = listOf<String>()
   private var enableDNSCache = false
@@ -183,12 +183,12 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var xdsBuilder: XdsBuilder? = null
 
   /**
-   * Add a log level to use with Envoy.
+   * Sets a log level to use with Envoy.
    *
    * @param logLevel the log level to use with Envoy.
    * @return this builder.
    */
-  fun addLogLevel(logLevel: LogLevel): EngineBuilder {
+  fun setLogLevel(logLevel: LogLevel): EngineBuilder {
     this.logLevel = logLevel
     return this
   }

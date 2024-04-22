@@ -72,6 +72,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
                            static_cast<uint64_t>(Http::Code::OK)),
       codec_client_type_(codecClientType(config.http_health_check().codec_client_type())),
       random_generator_(context.api().randomGenerator()) {
+  // TODO(boteng): introduce additional validation for the authority and path headers
+  // based on the default UHV when it is available.
   auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.http_health_check().receive());
   THROW_IF_STATUS_NOT_OK(bytes_or_error, throw);
   receive_bytes_ = bytes_or_error.value();

@@ -125,6 +125,8 @@ public:
   const std::string RBAC_PREFIX = "envoy.rbac_prefix";
   // Stats prefix for the RBAC http filter
   const std::string RBAC_HTTP_PREFIX = "envoy.rbac_http_prefix";
+  // Policy name for the RBAC http filter
+  const std::string RBAC_POLICY_NAME = "envoy.rbac_policy_name";
   // Stats prefix for the TCP Proxy network filter
   const std::string TCP_PREFIX = "envoy.tcp_prefix";
   // Stats prefix for the UDP Proxy network filter
@@ -161,6 +163,8 @@ public:
   const std::string THRIFT_PREFIX = "envoy.thrift_prefix";
   // Stats prefix for the Redis Proxy network filter
   const std::string REDIS_PREFIX = "envoy.redis_prefix";
+  // Proxy Protocol version for a connection (Proxy Protocol listener filter).
+  const std::string PROXY_PROTOCOL_VERSION = "envoy.proxy_protocol_version";
 
   // Mapping from the names above to their respective regex strings.
   const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;

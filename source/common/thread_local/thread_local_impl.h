@@ -19,6 +19,7 @@ namespace ThreadLocal {
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
+  InstanceImpl();
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
@@ -35,7 +36,7 @@ private:
   // slot as callbacks drain from workers.
   struct SlotImpl : public Slot {
     SlotImpl(InstanceImpl& parent, uint32_t index);
-    ~SlotImpl() override { parent_.removeSlot(index_); }
+    ~SlotImpl() override;
     std::function<void()> wrapCallback(const std::function<void()>& cb);
     std::function<void()> dataCallback(const UpdateCb& cb);
     static bool currentThreadRegisteredWorker(uint32_t index);
@@ -85,6 +86,8 @@ private:
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
   Event::Dispatcher* main_thread_dispatcher_{};
   std::atomic<bool> shutdown_{};
+
+  bool allow_slot_destroy_on_worker_threads_{};
 
   // Test only.
   friend class ThreadLocalInstanceImplTest;
