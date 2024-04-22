@@ -100,7 +100,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // [#next-free-field: 19]
 message ExternalProcessor {
-  // [#not-implemented-hide:]
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
   enum RouteCacheAction {
@@ -246,9 +245,8 @@ message ExternalProcessor {
   // Prevents clearing the route-cache when the
   // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
   // field is set in an external processor response.
-  // Only one of ``disable_clear_route_cache`` or
-  // :ref:`route_cache_action <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.route_cache_action>`
-  // can be set. It is recommended to set ``route_cache_action`` which supersedes ``disable_clear_route_cache``.
+  // Only one of ``disable_clear_route_cache`` or ``route_cache_action`` can be set.
+  // It is recommended to set ``route_cache_action`` which supersedes ``disable_clear_route_cache``.
   bool disable_clear_route_cache = 11
       [(udpa.annotations.field_migrate).oneof_promotion = "clear_route_cache_type"];
 
