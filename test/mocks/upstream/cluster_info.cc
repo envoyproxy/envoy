@@ -128,26 +128,6 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke(
           [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
-  ON_CALL(*this, lbType()).WillByDefault(ReturnPointee(&lb_type_));
-  ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
-  ON_CALL(*this, lbRoundRobinConfig())
-      .WillByDefault(
-          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> {
-            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
-                lb_round_robin_config_.get());
-          }));
-  ON_CALL(*this, lbRingHashConfig())
-      .WillByDefault(
-          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> {
-            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-                lb_ring_hash_config_.get());
-          }));
-  ON_CALL(*this, lbMaglevConfig())
-      .WillByDefault(
-          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> {
-            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
-                lb_maglev_config_.get());
-          }));
   ON_CALL(*this, lbOriginalDstConfig())
       .WillByDefault(Invoke(
           [this]() -> OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> {

@@ -40,6 +40,8 @@ public:
 };
 using ChildLoadBalancerCreatorPtr = std::unique_ptr<ChildLoadBalancerCreator>;
 
+// TODO(wbpcode): to remove the LegacyChildLoadBalancerCreatorImpl because it is not used anymore
+// except for tests.
 class LegacyChildLoadBalancerCreatorImpl : public Upstream::ChildLoadBalancerCreator {
 public:
   LegacyChildLoadBalancerCreatorImpl(
