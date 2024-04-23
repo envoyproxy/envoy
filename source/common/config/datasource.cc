@@ -101,9 +101,9 @@ absl::string_view DataSourceProvider::data() const {
 }
 
 absl::StatusOr<DataSourceProvider>
-DataSourceProvider::create(const envoy::config::core::v3::DataSource& source,
+DataSourceProvider::create(const ProtoDataSource& source, OptRef<const ProtoWatchedDirectory> watch,
                            Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls,
-                           Api::Api& api, bool allow_empty, uint64_t max_size, bool watch) {
+                           Api::Api& api, bool allow_empty, uint64_t max_size) {
   auto initial_data_or_error = read(source, allow_empty, api, max_size);
   RETURN_IF_STATUS_NOT_OK(initial_data_or_error);
 
@@ -120,17 +120,18 @@ DataSourceProvider::create(const envoy::config::core::v3::DataSource& source,
   const auto& filename = source.filename();
   auto watcher = main_dispatcher.createFilesystemWatcher();
   // DynamicData will ensure that the watcher is destroyed before the slot is destroyed.
+  // TODO(wbpcode): use Config::WatchedDirectory instead of directly creating a watcher
+  // if the Config::WatchedDirectory is exception-free in the future.
   auto watcher_status = watcher->addWatch(
-      filename, Filesystem::Watcher::Events::Modified | Filesystem::Watcher::Events::MovedTo,
+      absl::StrCat(watch->path(), "/"), Filesystem::Watcher::Events::MovedTo,
       [slot_ptr = slot.get(), &api, filename, allow_empty, max_size](uint32_t) -> absl::Status {
         auto new_data_or_error = readFile(filename, api, allow_empty, max_size);
         if (!new_data_or_error.ok()) {
-          // Log an error but don't fail the watch to avoid throwing EnvoyException.
+          // Log an error but don't fail the watch to avoid throwing EnvoyException at runtime.
           ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), error,
                               "Failed to read file: {}", new_data_or_error.status().message());
           return absl::OkStatus();
         }
-        RETURN_IF_STATUS_NOT_OK(new_data_or_error);
         slot_ptr->runOnAllThreads(
             [new_data = std::make_shared<std::string>(std::move(new_data_or_error.value()))](
                 OptRef<DynamicData::ThreadLocalData> obj) {
@@ -138,7 +139,6 @@ DataSourceProvider::create(const envoy::config::core::v3::DataSource& source,
                 obj->data_ = new_data;
               }
             });
-
         return absl::OkStatus();
       });
   RETURN_IF_NOT_OK(watcher_status);

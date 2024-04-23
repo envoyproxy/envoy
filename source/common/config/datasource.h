@@ -20,6 +20,9 @@ namespace Envoy {
 namespace Config {
 namespace DataSource {
 
+using ProtoDataSource = envoy::config::core::v3::DataSource;
+using ProtoWatchedDirectory = envoy::config::core::v3::WatchedDirectory;
+
 /**
  * Read contents of the DataSource.
  * @param source data source.
@@ -56,7 +59,6 @@ class DynamicData {
 public:
   struct ThreadLocalData : public ThreadLocal::ThreadLocalObject {
     ThreadLocalData(std::shared_ptr<std::string> data) : data_(std::move(data)) {}
-
     std::shared_ptr<std::string> data_;
   };
 
@@ -73,28 +75,35 @@ private:
   Filesystem::WatcherPtr watcher_;
 };
 
+/**
+ * DataSourceProvider provides a way to get the DataSource contents and watch the possible
+ * content changes. The watch only works for filename-based DataSource and watched directory
+ * is provided explicitly.
+ *
+ * NOTE: This should only be used when the envoy.config.core.v3.DataSource is necessary and
+ * file watch is required.
+ */
 class DataSourceProvider {
 public:
   /**
    * Create a DataSourceProvider from a DataSource.
    * @param source data source.
+   * @param watch optional watched directory.
    * @param main_dispatcher reference to the main dispatcher.
    * @param tls reference to the thread local slot allocator.
    * @param api reference to the Api.
    * @param allow_empty return an empty string if no DataSource case is specified.
    * @param max_size max size limit of file to read, default 0 means no limit.
-   * @param watch whether to watch the file for changes. If true and the source is
-   * a file name, the file will be watched for changes and the data will be updated
-   * in the provider when the file changes.
    * @return absl::StatusOr<DataSourceProvider> with DataSource contents. or an error
    * status if any error occurs.
    * NOTE: If file watch is enabled and the new file content does not meet the
    * requirements (allow_empty, max_size), the provider will keep the old content.
    */
-  static absl::StatusOr<DataSourceProvider>
-  create(const envoy::config::core::v3::DataSource& source, Event::Dispatcher& main_dispatcher,
-         ThreadLocal::SlotAllocator& tls, Api::Api& api, bool allow_empty, uint64_t max_size = 0,
-         bool watch = false);
+  static absl::StatusOr<DataSourceProvider> create(const ProtoDataSource& source,
+                                                   OptRef<const ProtoWatchedDirectory> watch,
+                                                   Event::Dispatcher& main_dispatcher,
+                                                   ThreadLocal::SlotAllocator& tls, Api::Api& api,
+                                                   bool allow_empty, uint64_t max_size = 0);
 
   absl::string_view data() const;
 
