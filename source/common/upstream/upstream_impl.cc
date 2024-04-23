@@ -1706,9 +1706,23 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
   // If DropOverloadRuntimeKey is not enabled, honor the EDS drop_overload config.
   // If it is enabled, choose the smaller one between it and the EDS config.
   float drop_ratio = float(drop_percentage.numerator()) / (denominator);
-  uint64_t drop_ratio_runtime =
-      runtime_.snapshot().getInteger(ClusterImplBase::DropOverloadRuntimeKey, UINT32_MAX);
-  drop_ratio = std::min(drop_ratio, float(drop_ratio_runtime) / float(100));
+  if (drop_ratio > 1) {
+    return absl::InvalidArgumentError(
+        fmt::format("Cluster drop_overloads config is invalid. drop_ratio={}(Numerator {} / "
+                    "Denominator {}). The valid range is 0~1.",
+                    drop_ratio, drop_percentage.numerator(), denominator));
+  }
+  const uint32_t MAX_DROP_OVERLOAD_RUNTIME = 100;
+  uint64_t drop_ratio_runtime = runtime_.snapshot().getInteger(
+      ClusterImplBase::DropOverloadRuntimeKey, MAX_DROP_OVERLOAD_RUNTIME);
+  if (drop_ratio_runtime > MAX_DROP_OVERLOAD_RUNTIME) {
+    return absl::InvalidArgumentError(
+        fmt::format("load_balancing_policy.drop_overload_limit runtime key config {} is invalid. "
+                    "The valid range is 0~100",
+                    drop_ratio_runtime));
+  }
+
+  drop_ratio = std::min(drop_ratio, float(drop_ratio_runtime) / float(MAX_DROP_OVERLOAD_RUNTIME));
   drop_overload_ = UnitFloat(drop_ratio);
   return absl::OkStatus();
 }
