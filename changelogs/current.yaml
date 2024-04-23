@@ -29,10 +29,10 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.proxy_status_upstream_request_timeout`` runtime flag and lagacy code paths.
-- area: tcp
+- area: http
   change: |
     Removed ``envoy.reloadable_features.handle_uppercase_scheme`` runtime flag and legacy code paths.
-- area: http
+- area: tcp
   change: |
     Removed ``envoy.reloadable_features.detect_and_raise_rst_tcp_connection`` runtime flag and legacy code paths.
 
