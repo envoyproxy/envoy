@@ -6,11 +6,12 @@
 
 #include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/resource_manager.h"
 
-#include "source/common/upstream/host_utility.h"
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/upstream/host_utility.h"
 
 namespace Envoy {
 namespace Server {
@@ -18,8 +19,7 @@ namespace Server {
 TextClustersChunkProcessor::TextClustersChunkProcessor(
     uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
     const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map)
-    : chunk_limit_(chunk_limit), response_headers_(response_headers),
-    idx_(0) {
+    : chunk_limit_(chunk_limit), response_headers_(response_headers), idx_(0) {
   for (const auto& pair : cluster_info_map) {
     clusters_.push_back(pair.second);
   }
@@ -100,8 +100,8 @@ void TextClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
 }
 
 void TextClustersChunkProcessor::addOutlierInfo(const std::string& cluster_name,
-                                         const Upstream::Outlier::Detector* outlier_detector,
-                                         Buffer::Instance& response) {
+                                                const Upstream::Outlier::Detector* outlier_detector,
+                                                Buffer::Instance& response) {
   if (outlier_detector) {
     response.add(fmt::format(
         "{}::outlier::success_rate_average::{:g}\n", cluster_name,
@@ -122,10 +122,9 @@ void TextClustersChunkProcessor::addOutlierInfo(const std::string& cluster_name,
   }
 }
 
-void TextClustersChunkProcessor::addCircuitBreakerSettings(const std::string& cluster_name,
-                                                    const std::string& priority_str,
-                                                    Upstream::ResourceManager& resource_manager,
-                                                    Buffer::Instance& response) {
+void TextClustersChunkProcessor::addCircuitBreakerSettings(
+    const std::string& cluster_name, const std::string& priority_str,
+    Upstream::ResourceManager& resource_manager, Buffer::Instance& response) {
   response.add(fmt::format("{}::{}_priority::max_connections::{}\n", cluster_name, priority_str,
                            resource_manager.connections().max()));
   response.add(fmt::format("{}::{}_priority::max_pending_requests::{}\n", cluster_name,
@@ -139,8 +138,7 @@ void TextClustersChunkProcessor::addCircuitBreakerSettings(const std::string& cl
 JsonClustersChunkProcessor::JsonClustersChunkProcessor(
     uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
     const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map)
-    : chunk_limit_(chunk_limit), response_headers_(response_headers),
-      idx_(0) {
+    : chunk_limit_(chunk_limit), response_headers_(response_headers), idx_(0) {
   for (const auto& pair : cluster_info_map) {
     clusters_.push_back(pair.second);
   }
@@ -149,21 +147,7 @@ JsonClustersChunkProcessor::JsonClustersChunkProcessor(
   root_map->addKey("cluster_statuses");
   Json::Streamer::ArrayPtr clusters = root_map->addArray();
   json_context_holder_.push_back(std::make_unique<ClustersJsonContext>(
-      std::move(streamer), buffer_,
-      std::move(root_map), std::move(clusters)));
-}
-
-void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::Cluster> cluster,
-                                        Buffer::Instance& response) {
-  Json::Streamer::MapPtr cluster_map = json_context_holder_.back()->clusters_->addMap();
-  const Upstream::Cluster& unwrapped_cluster = cluster.get();
-  Upstream::ClusterInfoConstSharedPtr cluster_info = unwrapped_cluster.info();
-  std::vector<Json::Streamer::Map::NameValue> top_level_entries = {
-    {"name", cluster_info->name()},
-    {"observability_name", cluster_info->observabilityName()},
-  };
-  addMapEntries(cluster_map.get(), response, top_level_entries);
-  drainBufferIntoResponse(response);
+      std::move(streamer), buffer_, std::move(root_map), std::move(clusters)));
 }
 
 bool JsonClustersChunkProcessor::nextChunk(Buffer::Instance& response) {
@@ -183,6 +167,54 @@ bool JsonClustersChunkProcessor::nextChunk(Buffer::Instance& response) {
   return false;
 }
 
+void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::Cluster> cluster,
+                                        Buffer::Instance& response) {
+  Json::Streamer::MapPtr cluster_map = json_context_holder_.back()->clusters_->addMap();
+  const Upstream::Cluster& unwrapped_cluster = cluster.get();
+  Upstream::ClusterInfoConstSharedPtr cluster_info = unwrapped_cluster.info();
+
+  Json::Streamer::Map::Entries top_level_entries =
+      std::vector<const Json::Streamer::Map::NameValue>{
+          {"name", cluster_info->name()},
+          {"observability_name", cluster_info->observabilityName()},
+      };
+  addMapEntries(cluster_map.get(), response, top_level_entries);
+
+  if (const std::string& name = cluster_info->edsServiceName(); !name.empty()) {
+    Json::Streamer::Map::Entries eds_service_name_entry =
+        std::vector<const Json::Streamer::Map::NameValue>{
+            {"eds_service_name", name},
+        };
+    addMapEntries(cluster_map.get(), response, eds_service_name_entry);
+  }
+
+  {
+    Json::Streamer::MapPtr circuit_breaker_settings =
+        json_context_holder_.back()->clusters_->addMap();
+    addCircuitBreakerSettingsAsJson(
+        circuit_breaker_settings.get(), response, envoy::config::core::v3::RoutingPriority::DEFAULT,
+        cluster_info->resourceManager(Upstream::ResourcePriority::Default));
+    addCircuitBreakerSettingsAsJson(
+        circuit_breaker_settings.get(), response, envoy::config::core::v3::RoutingPriority::HIGH,
+        cluster_info->resourceManager(Upstream::ResourcePriority::High));
+  } // Terminate the map.
+}
+
+void JsonClustersChunkProcessor::addCircuitBreakerSettingsAsJson(
+    Json::Streamer::Map* raw_map_ptr, Buffer::Instance& response,
+    const envoy::config::core::v3::RoutingPriority& priority,
+    Upstream::ResourceManager& resource_manager) {
+  Json::Streamer::Map::Entries config = std::vector<const Json::Streamer::Map::NameValue>{
+      {"priority",
+       priority == envoy::config::core::v3::RoutingPriority::DEFAULT ? "DEFAULT" : "HIGH"},
+      {"max_connections", resource_manager.connections().max()},
+      {"max_pending_requests", resource_manager.pendingRequests().max()},
+      {"max_requests", resource_manager.requests().max()},
+      {"max_retries", resource_manager.retries().max()},
+  };
+  addMapEntries(raw_map_ptr, response, config);
+}
+
 // Json::Streamer holds a reference to a Buffer::Instance reference but the API for Request
 // takes a Buffer::Instance reference on each call to nextChunk. So, at the end of each
 // Json::Streamer function invocation, call drainBufferIntoResponse to ensure that the
@@ -193,7 +225,9 @@ void JsonClustersChunkProcessor::drainBufferIntoResponse(Buffer::Instance& respo
   }
 }
 
-void JsonClustersChunkProcessor::addMapEntries(Json::Streamer::Map* raw_map_ptr, Buffer::Instance& response, std::vector<Json::Streamer::Map::NameValue>& entries) {
+void JsonClustersChunkProcessor::addMapEntries(Json::Streamer::Map* raw_map_ptr,
+                                               Buffer::Instance& response,
+                                               Json::Streamer::Map::Entries& entries) {
   raw_map_ptr->addEntries(entries);
   drainBufferIntoResponse(response);
 }

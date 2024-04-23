@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <functional>
-#include <memory>
 #include <iostream>
+#include <memory>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codes.h"
@@ -9,6 +9,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/upstream/resource_manager_impl.h"
 #include "source/server/admin/clusters_params.h"
 #include "source/server/admin/clusters_request.h"
 
@@ -23,6 +24,7 @@ namespace Envoy {
 namespace Server {
 
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -31,6 +33,12 @@ protected:
   BaseClustersRequestFixture() {
     ON_CALL(mock_server_, clusterManager()).WillByDefault(ReturnRef(mock_cluster_manager_));
     ON_CALL(mock_cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_info_maps_));
+    resource_manager_default_ = std::make_unique<Upstream::ResourceManagerImpl>(
+        runtime_, resource_manager_key_, 1024, 1024, 1024, 16, 4, 512, circuit_breaker_stats_,
+        std::nullopt, std::nullopt);
+    resource_manager_high_ = std::make_unique<Upstream::ResourceManagerImpl>(
+        runtime_, resource_manager_key_, 4096, 4096, 4096, 16, 4, 1024, circuit_breaker_stats_,
+        std::nullopt, std::nullopt);
   }
 
   using ClustersRequestPtr = std::unique_ptr<ClustersRequest>;
@@ -63,14 +71,25 @@ protected:
     };
   }
 
-  void loadNewMockClusterByName(NiceMock<Upstream::MockClusterMockPrioritySet>& mock_cluster, std::string_view name) {
+  void loadNewMockClusterByName(NiceMock<Upstream::MockClusterMockPrioritySet>& mock_cluster,
+                                absl::string_view name) {
     mock_cluster.info_->name_ = name;
+    ON_CALL(*mock_cluster.info_, edsServiceName()).WillByDefault(ReturnRef("potato_launcher"));
+    ON_CALL(*mock_cluster.info_, resourceManager(Upstream::ResourcePriority::Default))
+        .WillByDefault(ReturnRef(std::ref(*resource_manager_default_).get()));
+    ON_CALL(*mock_cluster.info_, resourceManager(Upstream::ResourcePriority::High))
+        .WillByDefault(ReturnRef(std::ref(*resource_manager_default_).get()));
     cluster_info_maps_.active_clusters_.emplace(name, std::ref(mock_cluster));
   }
 
   NiceMock<MockInstance> mock_server_;
   NiceMock<Upstream::MockClusterManager> mock_cluster_manager_;
   Upstream::ClusterManager::ClusterInfoMaps cluster_info_maps_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  const std::string resource_manager_key_{"test_resource_manager_key"};
+  Upstream::ClusterCircuitBreakersStats circuit_breaker_stats_;
+  std::unique_ptr<Upstream::ResourceManager> resource_manager_default_;
+  std::unique_ptr<Upstream::ResourceManager> resource_manager_high_;
 };
 
 struct VerifyJsonOutputParameters {
@@ -81,10 +100,11 @@ class VerifyJsonOutputFixture : public BaseClustersRequestFixture,
                                 public testing::WithParamInterface<VerifyJsonOutputParameters> {};
 
 TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
-  constexpr int chunk_limit = 1;  // Small chunk limit will force next chunk to be called for each Cluster.
+  // Small chunk limit will force next chunk to be called for each Cluster.
+  constexpr int chunk_limit = 1;
   VerifyJsonOutputParameters params = GetParam();
   Buffer::OwnedImpl buffer;
-  ClustersParams clusters_params; 
+  ClustersParams clusters_params;
   clusters_params.format_ = ClustersParams::Format::Json;
 
   NiceMock<Upstream::MockClusterMockPrioritySet> test_cluster;
@@ -92,12 +112,14 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
 
   NiceMock<Upstream::MockClusterMockPrioritySet> test_cluster2;
   loadNewMockClusterByName(test_cluster2, "test_cluster2");
-  
 
   ResponseResult result = response(*makeRequest(chunk_limit, clusters_params), params.drain_);
 
   EXPECT_EQ(result.code_, Http::Code::OK);
-  EXPECT_EQ(result.data_.toString(), R"EOF({"cluster_statuses":[{"name":"test_cluster","observability_name":"observability_name"},{"name":"test_cluster2","observability_name":"observability_name"}]})EOF");
+  EXPECT_EQ(
+      result.data_.toString(),
+      R"EOF({"cluster_statuses":[{"name":"test_cluster","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":"1024","max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":"4096","max_retries":16}]}},"
+                                "{"name":"test_cluster2","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":"1024","max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":"4096","max_retries":16}]}]})EOF");
 }
 
 constexpr VerifyJsonOutputParameters VERIFY_JSON_CASES[] = {
@@ -126,11 +148,11 @@ constexpr VerifyTextOutputParameters VERIFY_TEXT_CASES[] = {
 INSTANTIATE_TEST_SUITE_P(VerifyTextOutput, VerifyTextOutputFixture,
                          testing::ValuesIn<VerifyTextOutputParameters>(VERIFY_TEXT_CASES));
 
-
 TEST(Json, VerifyArrayPtrDestructionTerminatesJsonArray) {
   class Foo {
   public:
-    Foo(std::unique_ptr<Json::Streamer> streamer, Buffer::Instance& buffer) : streamer_(std::move(streamer)), buffer_(buffer) {
+    Foo(std::unique_ptr<Json::Streamer> streamer, Buffer::Instance& buffer)
+        : streamer_(std::move(streamer)), buffer_(buffer) {
       array_ = streamer_->makeRootArray();
     }
     void foo(Buffer::Instance& buffer, int64_t number) {

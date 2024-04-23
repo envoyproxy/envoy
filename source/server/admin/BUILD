@@ -419,8 +419,8 @@ envoy_cc_library(
     srcs = ["clusters_request.cc"],
     hdrs = ["clusters_request.h"],
     deps = [
-        ":clusters_params_lib",
         ":clusters_chunk_processor_lib",
+        ":clusters_params_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:header_map_interface",
@@ -458,5 +458,6 @@ envoy_cc_library(
         "//source/common/json:json_streamer_lib",
         "//source/common/upstream:host_utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
