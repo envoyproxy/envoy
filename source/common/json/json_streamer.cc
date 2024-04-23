@@ -82,6 +82,12 @@ void Streamer::Level::addNumber(int64_t number) {
   streamer_.addNumber(number);
 }
 
+void Streamer::Level::addBool(bool b) {
+  ASSERT_THIS_IS_TOP_LEVEL;
+  nextField();
+  streamer_.addBool(b);
+}
+
 void Streamer::Level::addString(absl::string_view str) {
   ASSERT_THIS_IS_TOP_LEVEL;
   nextField();
@@ -142,6 +148,9 @@ void Streamer::Level::addValue(const Value& value) {
   case 3:
     addNumber(absl::get<int64_t>(value));
     break;
+  case 4:
+    addBool(absl::get<bool>(value));
+    break;
   default:
     IS_ENVOY_BUG(absl::StrCat("addValue invalid index: ", value.index()));
     break;
@@ -165,6 +174,8 @@ void Streamer::addNumber(double number) {
 void Streamer::addNumber(uint64_t number) { response_.addFragments({absl::StrCat(number)}); }
 
 void Streamer::addNumber(int64_t number) { response_.addFragments({absl::StrCat(number)}); }
+
+void Streamer::addBool(bool b) { response_.addFragments({b ? "true" : "false"}); }
 
 void Streamer::addSanitized(absl::string_view prefix, absl::string_view str,
                             absl::string_view suffix) {
