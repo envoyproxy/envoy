@@ -323,11 +323,7 @@ TEST(MatchingData, ApplicationProtocolInput) {
 
 TEST(MatchingData, FilterStateInput) {
   std::string key = "filter_state_key";
-
-  envoy::extensions::matching::common_inputs::network::v3::FilterStateInput input_config;
-  input_config.set_key(key);
-
-  FilterStateInput input(input_config);
+  FilterStateInput<MatchingData> input(key);
 
   MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);

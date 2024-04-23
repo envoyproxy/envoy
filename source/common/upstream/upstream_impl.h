@@ -184,15 +184,15 @@ private:
 
 /**
  * Base implementation of most of Upstream::HostDescription, shared between
- * HostDescriptionImpl and LogicalHostDescriptionImpl, which is in
+ * HostDescriptionImpl and LogicalHost, which is in
  * source/extensions/clusters/common/logical_host.h. These differ in threading.
  *
  * HostDescriptionImpl and HostImpl are intended to be initialized in the main
  * thread, and are thereafter read-only, and thus do not require locking.
  *
- * LogicalDescriptionHostImpl and LogicalHostImpl are intended to be dynamically
- * changed due to DNS resolution and Happy Eyeballs from multiple threads, and
- * thus require an address_lock and lock annotations to enforce this.
+ * LogicalHostImpl is intended to be dynamically changed due to DNS resolution
+ * and Happy Eyeballs from multiple threads, and thus requires an address_lock
+ * and lock annotations to enforce this.
  *
  * The two level implementation inheritance allows most of the implementation
  * to be shared, but sinks the ones requiring different lock semantics into
