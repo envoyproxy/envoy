@@ -5,6 +5,8 @@
 
 #include "source/common/common/assert.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 
 // This is a workaround to allow an exceptionless Envoy Mobile build while we
@@ -57,15 +59,21 @@ public:
 // the macros above.
 #define THROW_IF_STATUS_NOT_OK(variable, throw_action) THROW_IF_NOT_OK_REF(variable.status());
 
-#define RETURN_IF_STATUS_NOT_OK(variable)                                                          \
-  if (!variable.status().ok()) {                                                                   \
-    return variable.status();                                                                      \
-  }
+#define RETURN_IF_STATUS_NOT_OK(expr)                                                              \
+  do {                                                                                             \
+    if (::Envoy::Details::StatusAdapter adapter{(expr.status())}) {                                \
+    } else {                                                                                       \
+      return std::move(adapter.status_);                                                           \
+    }                                                                                              \
+  } while (false)
 
-#define RETURN_IF_NOT_OK(variable)                                                                 \
-  if (!variable.ok()) {                                                                            \
-    return variable;                                                                               \
-  }
+#define RETURN_IF_NOT_OK(expr)                                                                     \
+  do {                                                                                             \
+    if (::Envoy::Details::StatusAdapter adapter{(expr)}) {                                         \
+    } else {                                                                                       \
+      return std::move(adapter.status_);                                                           \
+    }                                                                                              \
+  } while (false)
 
 template <class Type> Type returnOrThrow(absl::StatusOr<Type> type_or_error) {
   THROW_IF_STATUS_NOT_OK(type_or_error, throw);
@@ -73,5 +81,20 @@ template <class Type> Type returnOrThrow(absl::StatusOr<Type> type_or_error) {
 }
 
 #define THROW_OR_RETURN_VALUE(expression, type) returnOrThrow<type>(expression)
+
+namespace Details {
+// Helper class to convert `Status` to `bool` so it can be used inside `if` statements.
+struct StatusAdapter {
+  StatusAdapter(const absl::Status& status) : status_(status) {}
+  StatusAdapter(absl::Status&& status) : status_(std::move(status)) {}
+
+  StatusAdapter(const StatusAdapter&) = delete;
+  StatusAdapter& operator=(const StatusAdapter&) = delete;
+
+  explicit operator bool() const { return status_.ok(); }
+
+  absl::Status status_;
+};
+} // namespace Details
 
 } // namespace Envoy

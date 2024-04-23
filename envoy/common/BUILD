@@ -31,6 +31,7 @@ envoy_basic_cc_library(
     ],
     deps = [
         "//source/common/common:assert_lib",
+        "@com_google_absl//absl/status",
     ],
 )
 
