@@ -22,10 +22,10 @@ template <typename T> T unwrap(ParsingResult<T> res) {
   throwEnvoyExceptionOrPanic(std::string(absl::get<1>(res)));
 }
 
-unsigned parseTag(CBS& cbs) {
+int attemptParseTagForErrorMessage(CBS& cbs) {
   unsigned tag = 0;
   if (!CBS_get_any_asn1_element(&cbs, nullptr, &tag, nullptr)) {
-    IS_ENVOY_BUG("Failed to parse ASN.1 element tag");
+    return -1;
   }
   return tag;
 }
@@ -58,7 +58,7 @@ absl::Status skipResponderId(CBS& cbs) {
   }
 
   return absl::InvalidArgumentError(
-      absl::StrCat("Unknown choice for Responder ID: ", parseTag(cbs)));
+      absl::StrCat("Unknown choice for Responder ID: ", attemptParseTagForErrorMessage(cbs)));
 }
 
 absl::Status skipCertStatus(CBS& cbs) {
@@ -71,7 +71,7 @@ absl::Status skipCertStatus(CBS& cbs) {
         unwrap(
             Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
         unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 2)))) {
-    return absl::InvalidArgumentError(absl::StrCat("Unknown OcspCertStatus tag: ", parseTag(cbs)));
+    return absl::InvalidArgumentError(absl::StrCat("Unknown OcspCertStatus tag: ", attemptParseTagForErrorMessage(cbs)));
   }
   return absl::OkStatus();
 }
@@ -344,7 +344,6 @@ absl::StatusOr<CertId> Asn1OcspUtility::parseCertId(CBS& cbs) {
   // }
   CBS elem;
   if (!CBS_get_asn1(&cbs, &elem, CBS_ASN1_SEQUENCE)) {
-    std::cerr << "BAd";
     return absl::InvalidArgumentError("OCSP CertID is not a well-formed ASN.1 SEQUENCE");
   }
 
