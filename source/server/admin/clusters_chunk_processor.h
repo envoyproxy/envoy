@@ -69,7 +69,8 @@ private:
   void finalize(Buffer::Instance& response);
   void addMapEntries(Json::Streamer::Map* raw_map_ptr, Buffer::Instance& response,
                      std::vector<const Json::Streamer::Map::NameValue>& entries);
-  void addCircuitBreakerSettingsAsJson(Json::Streamer::Array* raw_map_ptr, Buffer::Instance& response,
+  void addCircuitBreakerSettingsAsJson(Json::Streamer::Array* raw_map_ptr,
+                                       Buffer::Instance& response,
                                        const envoy::config::core::v3::RoutingPriority& priority,
                                        Upstream::ResourceManager& resource_manager);
 

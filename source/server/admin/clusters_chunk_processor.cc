@@ -174,8 +174,8 @@ void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
   Upstream::ClusterInfoConstSharedPtr cluster_info = unwrapped_cluster.info();
 
   std::vector<const Json::Streamer::Map::NameValue> top_level_entries{
-     {"name", cluster_info->name()},
-     {"observability_name", cluster_info->observabilityName()},
+      {"name", cluster_info->name()},
+      {"observability_name", cluster_info->observabilityName()},
   };
   addMapEntries(cluster_map.get(), response, top_level_entries);
 
@@ -186,7 +186,7 @@ void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
     addMapEntries(cluster_map.get(), response, eds_service_name_entry);
   }
 
-  {  
+  {
     cluster_map->addKey("circuit_breakers");
     Json::Streamer::MapPtr circuit_breakers = cluster_map->addMap();
     circuit_breakers->addKey("thresholds");
@@ -226,9 +226,9 @@ void JsonClustersChunkProcessor::drainBufferIntoResponse(Buffer::Instance& respo
   }
 }
 
-void JsonClustersChunkProcessor::addMapEntries(Json::Streamer::Map* raw_map_ptr,
-                                               Buffer::Instance& response,
-                                               std::vector<const Json::Streamer::Map::NameValue>& entries) {
+void JsonClustersChunkProcessor::addMapEntries(
+    Json::Streamer::Map* raw_map_ptr, Buffer::Instance& response,
+    std::vector<const Json::Streamer::Map::NameValue>& entries) {
   raw_map_ptr->addEntries(entries);
   drainBufferIntoResponse(response);
 }

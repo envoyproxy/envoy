@@ -34,11 +34,11 @@ protected:
     ON_CALL(mock_server_, clusterManager()).WillByDefault(ReturnRef(mock_cluster_manager_));
     ON_CALL(mock_cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_info_maps_));
     resource_manager_default_ = std::make_unique<Upstream::ResourceManagerImpl>(
-        runtime_, resource_manager_key_, 1024, 1024, 1024, 16, 4, 512, mock_cluster_info_.circuit_breakers_stats_,
-        std::nullopt, std::nullopt);
+        runtime_, resource_manager_key_, 1024, 1024, 1024, 16, 4, 512,
+        mock_cluster_info_.circuit_breakers_stats_, std::nullopt, std::nullopt);
     resource_manager_high_ = std::make_unique<Upstream::ResourceManagerImpl>(
-        runtime_, resource_manager_key_, 4096, 4096, 4096, 16, 4, 1024, mock_cluster_info_.circuit_breakers_stats_,
-        std::nullopt, std::nullopt);
+        runtime_, resource_manager_key_, 4096, 4096, 4096, 16, 4, 1024,
+        mock_cluster_info_.circuit_breakers_stats_, std::nullopt, std::nullopt);
   }
 
   using ClustersRequestPtr = std::unique_ptr<ClustersRequest>;
@@ -119,7 +119,7 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
   // The order of clusters is non-deterministic so strip the 2 from test_cluster2 and expect both
   // clusters to be identical.
   EXPECT_EQ(
-      std::regex_replace(result.data_.toString(), std::regex("test_cluster2"), "test_cluster"), 
+      std::regex_replace(result.data_.toString(), std::regex("test_cluster2"), "test_cluster"),
       R"EOF({"cluster_statuses":[{"name":"test_cluster","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":1024,"max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":4096,"max_retries":16}]}},{"name":"test_cluster","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":1024,"max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":4096,"max_retries":16}]}}]})EOF");
 }
 
