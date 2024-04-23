@@ -591,6 +591,7 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
   EXPECT_CALL(overload_manager, getLoadShedPoint(testing::_))
       .WillRepeatedly(Return(&accept_connection_point));
   listener.configureLoadShedPoints(overload_manager);
+  listener.disable();
 
   // When accepting we'll reject the first connection, get queried again and accept the
   // second connection.
@@ -628,6 +629,7 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
   client_connection2->addConnectionCallbacks(connection_callbacks2);
   client_connection2->connect();
 
+  listener.enable();
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 

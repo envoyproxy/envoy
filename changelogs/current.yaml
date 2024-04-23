@@ -10,6 +10,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: tracers
+  change: |
+    Set status code for OpenTelemetry tracers (previously unset).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -33,10 +36,20 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.proxy_status_upstream_request_timeout`` runtime flag and lagacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.handle_uppercase_scheme`` runtime flag and legacy code paths.
 - area: tcp
   change: |
     Removed ``envoy.reloadable_features.detect_and_raise_rst_tcp_connection`` runtime flag and legacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and lagacy code paths.
 
 new_features:
+- area: matching
+  change: |
+    Added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`
+    for matching http input based on filter state objects.
 
 deprecated:

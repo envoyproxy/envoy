@@ -47,7 +47,8 @@ RouteSpecificFilterConfigConstSharedPtr RouteEntryImpl::createRouteSpecificFilte
 RouteEntryImpl::RouteEntryImpl(const ProtoRouteAction& route_action,
                                Envoy::Server::Configuration::ServerFactoryContext& context)
     : name_(route_action.name()), cluster_name_(route_action.cluster()),
-      metadata_(route_action.metadata()), typed_metadata_(metadata_) {
+      metadata_(route_action.metadata()), typed_metadata_(metadata_),
+      timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route_action, timeout, DEFAULT_ROUTE_TIMEOUT_MS)) {
 
   for (const auto& proto_filter_config : route_action.per_filter_config()) {
     auto route_config =
