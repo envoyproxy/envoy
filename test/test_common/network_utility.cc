@@ -232,7 +232,7 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
   }
   return Network::Utility::readFromSocket(handle, local_address, processor,
                                           MonotonicTime(std::chrono::seconds(0)), recv_msg_method,
-                                          nullptr);
+                                          nullptr, nullptr);
 }
 
 UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_rx_datagram_size)
@@ -245,7 +245,7 @@ UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_rx_da
 void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Instance& peer) {
   const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
                                                   nullptr, peer);
-  ASSERT_EQ(rc.return_value_, buffer.length());
+  ASSERT_EQ(rc.return_value_, buffer.length()) << static_cast<int>(rc.err_->getErrorCode());
 }
 
 void UdpSyncPeer::recv(Network::UdpRecvData& datagram) {
