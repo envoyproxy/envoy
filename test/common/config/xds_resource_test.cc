@@ -48,7 +48,7 @@ TEST(XdsResourceIdentifierTest, DecodeEncode) {
       "xdstp://foo/envoy.config.listener.v3.Listener/bar/baz?ab=",
       "xdstp://foo/envoy.config.listener.v3.Listener/bar/baz?=cd",
       "xdstp://foo/envoy.config.listener.v3.Listener/bar/baz?ab=cde&ba=edc&z=f",
-      // Sets the EsacpedUrn/EscapedUrnWithManyQueryParams depending on whether
+      // Sets the escaped string contents depending on whether
       // envoy.reloadable_features.xdstp_path_avoid_colon_encoding is set.
       // This should be replaced by using the plain EscapedUrn and EscapedUrnWithManyQueryParams
       // once envoy.reloadable_features.xdstp_path_avoid_colon_encoding is removed.
