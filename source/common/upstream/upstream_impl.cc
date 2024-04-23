@@ -1712,7 +1712,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
                     "Denominator {}). The valid range is 0~1.",
                     drop_ratio, drop_percentage.numerator(), denominator));
   }
-  const uint32_t MAX_DROP_OVERLOAD_RUNTIME = 100;
+  const uint64_t MAX_DROP_OVERLOAD_RUNTIME = 100;
   uint64_t drop_ratio_runtime = runtime_.snapshot().getInteger(
       ClusterImplBase::DropOverloadRuntimeKey, MAX_DROP_OVERLOAD_RUNTIME);
   if (drop_ratio_runtime > MAX_DROP_OVERLOAD_RUNTIME) {
