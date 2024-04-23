@@ -187,9 +187,7 @@ void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
 
   addCircuitBreakers(cluster_map.get(), cluster_info, response);
   addEjectionThresholds(cluster_map.get(), cluster.get(), response);
-
 }
-
 
 void JsonClustersChunkProcessor::addEjectionThresholds(Json::Streamer::Map* raw_clusters_map_ptr,
                                                        const Upstream::Cluster& unwrapped_cluster,
@@ -199,8 +197,9 @@ void JsonClustersChunkProcessor::addEjectionThresholds(Json::Streamer::Map* raw_
       outlier_detector->successRateEjectionThreshold(
           Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin) > 0.0) {
     std::vector<const Json::Streamer::Map::NameValue> success_rate_ejection_threshold{
-      {"success_rate_ejection_threshold", double(outlier_detector->successRateEjectionThreshold(
-            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))},
+        {"success_rate_ejection_threshold",
+         double(outlier_detector->successRateEjectionThreshold(
+             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))},
     };
     addMapEntries(raw_clusters_map_ptr, response, success_rate_ejection_threshold);
   }
@@ -208,8 +207,9 @@ void JsonClustersChunkProcessor::addEjectionThresholds(Json::Streamer::Map* raw_
       outlier_detector->successRateEjectionThreshold(
           Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin) > 0.0) {
     std::vector<const Json::Streamer::Map::NameValue> local_success_rate_ejection_threshold{
-      {"local_success_rate_ejection_threshold", double(outlier_detector->successRateEjectionThreshold(
-            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))},
+        {"local_success_rate_ejection_threshold",
+         double(outlier_detector->successRateEjectionThreshold(
+             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))},
     };
     addMapEntries(raw_clusters_map_ptr, response, local_success_rate_ejection_threshold);
   }

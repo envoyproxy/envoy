@@ -1,5 +1,5 @@
-#include <cstdint>
 #include <cctype>
+#include <cstdint>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -32,7 +32,6 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
-
 
 class BaseClustersRequestFixture : public testing::Test {
 protected:
@@ -86,9 +85,13 @@ protected:
     ON_CALL(*mock_cluster.info_, resourceManager(Upstream::ResourcePriority::High))
         .WillByDefault(ReturnRef(std::ref(*resource_manager_high_).get()));
     ON_CALL(Const(mock_cluster), outlierDetector()).WillByDefault(Return(&detector_));
-    ON_CALL(Const(detector_), successRateEjectionThreshold(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
+    ON_CALL(Const(detector_),
+            successRateEjectionThreshold(
+                Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
         .WillByDefault(Return(double(1.1)));
-    ON_CALL(Const(detector_), successRateEjectionThreshold(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))
+    ON_CALL(Const(detector_),
+            successRateEjectionThreshold(
+                Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))
         .WillByDefault(Return(double(1.1)));
     cluster_info_maps_.active_clusters_.emplace(name, std::ref(mock_cluster));
   }
