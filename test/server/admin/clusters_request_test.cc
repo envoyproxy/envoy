@@ -2,6 +2,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <regex>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codes.h"
@@ -24,7 +25,6 @@ namespace Envoy {
 namespace Server {
 
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -34,10 +34,10 @@ protected:
     ON_CALL(mock_server_, clusterManager()).WillByDefault(ReturnRef(mock_cluster_manager_));
     ON_CALL(mock_cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_info_maps_));
     resource_manager_default_ = std::make_unique<Upstream::ResourceManagerImpl>(
-        runtime_, resource_manager_key_, 1024, 1024, 1024, 16, 4, 512, circuit_breaker_stats_,
+        runtime_, resource_manager_key_, 1024, 1024, 1024, 16, 4, 512, mock_cluster_info_.circuit_breakers_stats_,
         std::nullopt, std::nullopt);
     resource_manager_high_ = std::make_unique<Upstream::ResourceManagerImpl>(
-        runtime_, resource_manager_key_, 4096, 4096, 4096, 16, 4, 1024, circuit_breaker_stats_,
+        runtime_, resource_manager_key_, 4096, 4096, 4096, 16, 4, 1024, mock_cluster_info_.circuit_breakers_stats_,
         std::nullopt, std::nullopt);
   }
 
@@ -78,16 +78,16 @@ protected:
     ON_CALL(*mock_cluster.info_, resourceManager(Upstream::ResourcePriority::Default))
         .WillByDefault(ReturnRef(std::ref(*resource_manager_default_).get()));
     ON_CALL(*mock_cluster.info_, resourceManager(Upstream::ResourcePriority::High))
-        .WillByDefault(ReturnRef(std::ref(*resource_manager_default_).get()));
+        .WillByDefault(ReturnRef(std::ref(*resource_manager_high_).get()));
     cluster_info_maps_.active_clusters_.emplace(name, std::ref(mock_cluster));
   }
 
+  NiceMock<Upstream::MockClusterInfo> mock_cluster_info_;
   NiceMock<MockInstance> mock_server_;
   NiceMock<Upstream::MockClusterManager> mock_cluster_manager_;
   Upstream::ClusterManager::ClusterInfoMaps cluster_info_maps_;
   NiceMock<Runtime::MockLoader> runtime_;
   const std::string resource_manager_key_{"test_resource_manager_key"};
-  Upstream::ClusterCircuitBreakersStats circuit_breaker_stats_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_default_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_high_;
 };
@@ -100,7 +100,7 @@ class VerifyJsonOutputFixture : public BaseClustersRequestFixture,
                                 public testing::WithParamInterface<VerifyJsonOutputParameters> {};
 
 TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
-  // Small chunk limit will force next chunk to be called for each Cluster.
+  // Small chunk limit will force Request::nextChunk to be called for each Cluster.
   constexpr int chunk_limit = 1;
   VerifyJsonOutputParameters params = GetParam();
   Buffer::OwnedImpl buffer;
@@ -116,10 +116,11 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
   ResponseResult result = response(*makeRequest(chunk_limit, clusters_params), params.drain_);
 
   EXPECT_EQ(result.code_, Http::Code::OK);
+  // The order of clusters is non-deterministic so strip the 2 from test_cluster2 and expect both
+  // clusters to be identical.
   EXPECT_EQ(
-      result.data_.toString(),
-      R"EOF({"cluster_statuses":[{"name":"test_cluster","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":"1024","max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":"4096","max_retries":16}]}},"
-                                "{"name":"test_cluster2","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":"1024","max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":"4096","max_retries":16}]}]})EOF");
+      std::regex_replace(result.data_.toString(), std::regex("test_cluster2"), "test_cluster"), 
+      R"EOF({"cluster_statuses":[{"name":"test_cluster","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":1024,"max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":4096,"max_retries":16}]}},{"name":"test_cluster","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":1024,"max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":4096,"max_retries":16}]}}]})EOF");
 }
 
 constexpr VerifyJsonOutputParameters VERIFY_JSON_CASES[] = {

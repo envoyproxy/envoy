@@ -173,38 +173,39 @@ void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
   const Upstream::Cluster& unwrapped_cluster = cluster.get();
   Upstream::ClusterInfoConstSharedPtr cluster_info = unwrapped_cluster.info();
 
-  Json::Streamer::Map::Entries top_level_entries =
-      std::vector<const Json::Streamer::Map::NameValue>{
-          {"name", cluster_info->name()},
-          {"observability_name", cluster_info->observabilityName()},
-      };
+  std::vector<const Json::Streamer::Map::NameValue> top_level_entries{
+     {"name", cluster_info->name()},
+     {"observability_name", cluster_info->observabilityName()},
+  };
   addMapEntries(cluster_map.get(), response, top_level_entries);
 
   if (const std::string& name = cluster_info->edsServiceName(); !name.empty()) {
-    Json::Streamer::Map::Entries eds_service_name_entry =
-        std::vector<const Json::Streamer::Map::NameValue>{
-            {"eds_service_name", name},
-        };
+    std::vector<const Json::Streamer::Map::NameValue> eds_service_name_entry{
+        {"eds_service_name", name},
+    };
     addMapEntries(cluster_map.get(), response, eds_service_name_entry);
   }
 
-  {
-    Json::Streamer::MapPtr circuit_breaker_settings =
-        json_context_holder_.back()->clusters_->addMap();
+  {  
+    cluster_map->addKey("circuit_breakers");
+    Json::Streamer::MapPtr circuit_breakers = cluster_map->addMap();
+    circuit_breakers->addKey("thresholds");
+    Json::Streamer::ArrayPtr thresholds = circuit_breakers->addArray();
     addCircuitBreakerSettingsAsJson(
-        circuit_breaker_settings.get(), response, envoy::config::core::v3::RoutingPriority::DEFAULT,
+        thresholds.get(), response, envoy::config::core::v3::RoutingPriority::DEFAULT,
         cluster_info->resourceManager(Upstream::ResourcePriority::Default));
     addCircuitBreakerSettingsAsJson(
-        circuit_breaker_settings.get(), response, envoy::config::core::v3::RoutingPriority::HIGH,
+        thresholds.get(), response, envoy::config::core::v3::RoutingPriority::HIGH,
         cluster_info->resourceManager(Upstream::ResourcePriority::High));
   } // Terminate the map.
 }
 
 void JsonClustersChunkProcessor::addCircuitBreakerSettingsAsJson(
-    Json::Streamer::Map* raw_map_ptr, Buffer::Instance& response,
+    Json::Streamer::Array* raw_thresholds_ptr, Buffer::Instance& response,
     const envoy::config::core::v3::RoutingPriority& priority,
     Upstream::ResourceManager& resource_manager) {
-  Json::Streamer::Map::Entries config = std::vector<const Json::Streamer::Map::NameValue>{
+  Json::Streamer::MapPtr threshold = raw_thresholds_ptr->addMap();
+  std::vector<const Json::Streamer::Map::NameValue> entries{
       {"priority",
        priority == envoy::config::core::v3::RoutingPriority::DEFAULT ? "DEFAULT" : "HIGH"},
       {"max_connections", resource_manager.connections().max()},
@@ -212,7 +213,7 @@ void JsonClustersChunkProcessor::addCircuitBreakerSettingsAsJson(
       {"max_requests", resource_manager.requests().max()},
       {"max_retries", resource_manager.retries().max()},
   };
-  addMapEntries(raw_map_ptr, response, config);
+  addMapEntries(threshold.get(), response, entries);
 }
 
 // Json::Streamer holds a reference to a Buffer::Instance reference but the API for Request
@@ -227,7 +228,7 @@ void JsonClustersChunkProcessor::drainBufferIntoResponse(Buffer::Instance& respo
 
 void JsonClustersChunkProcessor::addMapEntries(Json::Streamer::Map* raw_map_ptr,
                                                Buffer::Instance& response,
-                                               Json::Streamer::Map::Entries& entries) {
+                                               std::vector<const Json::Streamer::Map::NameValue>& entries) {
   raw_map_ptr->addEntries(entries);
   drainBufferIntoResponse(response);
 }
