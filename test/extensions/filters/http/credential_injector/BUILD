@@ -54,3 +54,17 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "credential_injector_oauth_integration_test",
+    size = "large",
+    srcs = ["credential_injector_oauth_integration_test.cc"],
+    extension_names = ["envoy.filters.http.credential_injector"],
+    deps = [
+        "//source/extensions/filters/http/credential_injector:config",
+        "//source/extensions/http/injected_credentials/oauth2:config",
+        "//source/extensions/http/injected_credentials/oauth2:oauth_response_cc_proto",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

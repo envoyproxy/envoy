@@ -10,9 +10,11 @@ namespace OAuth2 {
 // TokenProvider Contructor
 TokenProvider::TokenProvider(Common::SecretReaderConstSharedPtr secret_reader,
                              ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
-                             const OAuth2& proto_config, Event::Dispatcher& dispatcher)
+                             const OAuth2& proto_config, Event::Dispatcher& dispatcher,
+                             const std::string& stats_prefix, Stats::Scope& scope)
     : secret_reader_(secret_reader), tls_(tls.allocateSlot()),
-      client_id_(proto_config.client_credentials().client_id()), dispatcher_(&dispatcher) {
+      client_id_(proto_config.client_credentials().client_id()), dispatcher_(&dispatcher),
+      stats_(generateStats(stats_prefix + "oauth2.", scope)) {
   ThreadLocalOauth2ClientCredentialsTokenSharedPtr empty(
       new ThreadLocalOauth2ClientCredentialsToken(""));
   tls_->set(
@@ -26,21 +28,28 @@ TokenProvider::TokenProvider(Common::SecretReaderConstSharedPtr secret_reader,
 
 // TokenProvider asyncGetAccessToken
 void TokenProvider::asyncGetAccessToken() {
-  ENVOY_LOG(debug, "tp: Getting access token.");
   // get the access token from the oauth2 client
   if (timer_) {
     timer_->disableTimer();
     timer_.reset();
   }
-  auto result = oauth2_client_->asyncGetAccessToken(client_id_, secret_reader_->credential());
-  if (result == OAuth2Client::GetTokenResult::NotDispatchedClusterNotFound) {
-    ENVOY_LOG(error, "tp: OAuth cluster not found., retrying in 2 seconds.");
+  if (secret_reader_->credential().empty()) {
+    ENVOY_LOG(error, "asyncGetAccessToken: client secret is empty, retrying in 2 seconds.");
     timer_ = dispatcher_->createTimer([this]() -> void { asyncGetAccessToken(); });
     timer_->enableTimer(std::chrono::seconds(2));
+    stats_.token_fetch_failed_on_client_secret_.inc();
     return;
   }
-
-  ENVOY_LOG(debug, "tp: Dispatched OAuth request for access token.");
+  auto result = oauth2_client_->asyncGetAccessToken(client_id_, secret_reader_->credential());
+  if (result == OAuth2Client::GetTokenResult::NotDispatchedClusterNotFound) {
+    ENVOY_LOG(error, "asyncGetAccessToken: OAuth cluster not found., retrying in 2 seconds.");
+    timer_ = dispatcher_->createTimer([this]() -> void { asyncGetAccessToken(); });
+    timer_->enableTimer(std::chrono::seconds(2));
+    stats_.token_fetch_failed_on_cluster_not_found_.inc();
+    return;
+  }
+  stats_.token_requested_.inc();
+  ENVOY_LOG(debug, "asyncGetAccessToken: Dispatched OAuth request for access token.");
 }
 
 // FilterCallbacks
@@ -56,6 +65,13 @@ void TokenProvider::onGetAccessTokenSuccess(const std::string& access_token,
     timer_ = dispatcher_->createTimer([this]() -> void { asyncGetAccessToken(); });
   }
   timer_->enableTimer(expires_in / 2);
+  stats_.token_fetched_.inc();
+}
+
+void TokenProvider::onGetAccessTokenFailure() {
+  ENVOY_LOG(error, "onGetAccessTokenFailure: Failed to get access token");
+  stats_.token_fetch_failed_on_oauth_server_response_.inc();
+  asyncGetAccessToken();
 }
 
 const std::string& TokenProvider::token() const { return threadLocal().token(); }

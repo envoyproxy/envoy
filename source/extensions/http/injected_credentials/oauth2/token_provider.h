@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/stats/stats_macros.h"
+
 #include "envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.pb.h"
 #include "envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.pb.validate.h"
 
@@ -13,6 +15,23 @@ namespace Extensions {
 namespace Http {
 namespace InjectedCredentials {
 namespace OAuth2 {
+
+/**
+ * All Oauth2 access token provider stats. @see stats_macros.h
+ */
+#define ALL_OAUTH2_CLIENT_CREDENTIAL_TOKEN_PROVIDER_STATS(COUNTER)                                 \
+  COUNTER(token_fetch_failed_on_client_secret)                                                     \
+  COUNTER(token_fetch_failed_on_cluster_not_found)                                                 \
+  COUNTER(token_fetch_failed_on_oauth_server_response)                                             \
+  COUNTER(token_requested)                                                                         \
+  COUNTER(token_fetched)
+
+/**
+ * Struct definition for Oauth2 access token provider stats. @see stats_macros.h
+ */
+struct TokenProviderStats {
+  ALL_OAUTH2_CLIENT_CREDENTIAL_TOKEN_PROVIDER_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 using envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2;
 
@@ -42,7 +61,8 @@ class TokenProvider : public TokenReader,
 public:
   TokenProvider(Common::SecretReaderConstSharedPtr secret_reader, ThreadLocal::SlotAllocator& tls,
                 Upstream::ClusterManager& cm, const OAuth2& proto_config,
-                Event::Dispatcher& dispatcher);
+                Event::Dispatcher& dispatcher, const std::string& stats_prefix,
+                Stats::Scope& scope);
   void asyncGetAccessToken();
 
   const ThreadLocalOauth2ClientCredentialsToken& threadLocal() const {
@@ -54,8 +74,14 @@ public:
 
   // FilterCallbacks
   void onGetAccessTokenSuccess(const std::string& access_code, std::chrono::seconds) override;
+  void onGetAccessTokenFailure() override;
 
 private:
+  static TokenProviderStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return TokenProviderStats{
+        ALL_OAUTH2_CLIENT_CREDENTIAL_TOKEN_PROVIDER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+  }
+
   std::string token_;
   const Common::SecretReaderConstSharedPtr secret_reader_;
   ThreadLocal::SlotPtr tls_;
@@ -63,6 +89,7 @@ private:
   std::string client_id_;
   Event::Dispatcher* dispatcher_;
   Event::TimerPtr timer_;
+  TokenProviderStats stats_;
 };
 
 } // namespace OAuth2

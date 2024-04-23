@@ -66,6 +66,7 @@ void OAuth2ClientImpl::onSuccess(const Envoy::Http::AsyncClient::Request&,
   if (response_code != "200") {
     ENVOY_LOG(error, "Oauth response code: {}", response_code);
     ENVOY_LOG(error, "Oauth response body: {}", message->bodyAsString());
+    parent_->onGetAccessTokenFailure();
     return;
   }
 
@@ -77,11 +78,13 @@ void OAuth2ClientImpl::onSuccess(const Envoy::Http::AsyncClient::Request&,
   } catch (EnvoyException& e) {
     ENVOY_LOG(error, "Error parsing response body, received exception: {}", e.what());
     ENVOY_LOG(error, "Response body: {}", response_body);
+    // This is unlikely to get better if we retry, so just fail.
     return;
   }
 
   if (!response.has_access_token() || !response.has_expires_in()) {
     ENVOY_LOG(error, "No access token or expiration after asyncGetAccessToken");
+    // This is unlikely to get better if we retry, so just fail.
     return;
   }
 
@@ -95,6 +98,7 @@ void OAuth2ClientImpl::onFailure(const Envoy::Http::AsyncClient::Request&,
                                  Envoy::Http::AsyncClient::FailureReason) {
   ENVOY_LOG(error, "OAuth request failed");
   in_flight_request_ = nullptr;
+  parent_->onGetAccessTokenFailure();
 }
 
 } // namespace OAuth2

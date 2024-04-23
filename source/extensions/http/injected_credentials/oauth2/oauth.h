@@ -21,6 +21,7 @@ public:
 
   virtual void onGetAccessTokenSuccess(const std::string& access_token,
                                        std::chrono::seconds expires_in) PURE;
+  virtual void onGetAccessTokenFailure() PURE;
 };
 
 } // namespace OAuth2
