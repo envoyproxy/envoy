@@ -186,23 +186,29 @@ void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
     addMapEntries(cluster_map.get(), response, eds_service_name_entry);
   }
 
-  {
-    cluster_map->addKey("circuit_breakers");
-    Json::Streamer::MapPtr circuit_breakers = cluster_map->addMap();
-    circuit_breakers->addKey("thresholds");
-    Json::Streamer::ArrayPtr thresholds = circuit_breakers->addArray();
-    addCircuitBreakerSettingsAsJson(
-        thresholds.get(), response, envoy::config::core::v3::RoutingPriority::DEFAULT,
-        cluster_info->resourceManager(Upstream::ResourcePriority::Default));
-    addCircuitBreakerSettingsAsJson(
-        thresholds.get(), response, envoy::config::core::v3::RoutingPriority::HIGH,
-        cluster_info->resourceManager(Upstream::ResourcePriority::High));
-  } // Terminate the map.
+  addCircuitBreakers(cluster_map.get(), cluster_info, response);
+
+  // const Upstream::Outlier::Detector* outlier_detector = unwrapped_cluster.outlierDetector();
 }
 
-void JsonClustersChunkProcessor::addCircuitBreakerSettingsAsJson(
-    Json::Streamer::Array* raw_thresholds_ptr, Buffer::Instance& response,
+void JsonClustersChunkProcessor::addCircuitBreakers(
+    Json::Streamer::Map* raw_clusters_map_ptr, Upstream::ClusterInfoConstSharedPtr cluster_info,
+    Buffer::Instance& response) {
+  raw_clusters_map_ptr->addKey("circuit_breakers");
+  Json::Streamer::MapPtr circuit_breakers = raw_clusters_map_ptr->addMap();
+  circuit_breakers->addKey("thresholds");
+  Json::Streamer::ArrayPtr thresholds = circuit_breakers->addArray();
+  addCircuitBreakerForPriority(envoy::config::core::v3::RoutingPriority::DEFAULT, thresholds.get(),
+                               response,
+                               cluster_info->resourceManager(Upstream::ResourcePriority::Default));
+  addCircuitBreakerForPriority(envoy::config::core::v3::RoutingPriority::HIGH, thresholds.get(),
+                               response,
+                               cluster_info->resourceManager(Upstream::ResourcePriority::High));
+}
+
+void JsonClustersChunkProcessor::addCircuitBreakerForPriority(
     const envoy::config::core::v3::RoutingPriority& priority,
+    Json::Streamer::Array* raw_thresholds_ptr, Buffer::Instance& response,
     Upstream::ResourceManager& resource_manager) {
   Json::Streamer::MapPtr threshold = raw_thresholds_ptr->addMap();
   std::vector<const Json::Streamer::Map::NameValue> entries{
