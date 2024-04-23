@@ -434,10 +434,6 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
   } else if (stream_info.hasResponseFlag(CoreResponseFlag::NoHealthyUpstream)) {
     return ProxyStatusError::DestinationUnavailable;
   } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamRequestTimeout)) {
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.proxy_status_upstream_request_timeout")) {
-      return ProxyStatusError::ConnectionTimeout;
-    }
     return ProxyStatusError::HttpResponseTimeout;
   }
 

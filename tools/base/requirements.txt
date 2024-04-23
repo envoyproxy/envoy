@@ -473,9 +473,9 @@ docutils==0.20.1 \
     #   envoy-docs-sphinx-runner
     #   sphinx
     #   sphinx-rtd-theme
-envoy-base-utils==0.5.0 \
-    --hash=sha256:a185279fc2f6c49ba2b2a1d02ab2a361733ee4a5c3f41a225cbd2dd349369458 \
-    --hash=sha256:f71e4bdcea86539f273388f1cb6210b40ec5d05f49aaacb7ef776a60fb60f107
+envoy-base-utils==0.5.1 \
+    --hash=sha256:477ab036d4e523a962f7f37382ed55d8b04c78efbcc3db276b5e1711f4838d29 \
+    --hash=sha256:fa4a3f2ea55e558979b99ab7d0baeb4cd30a9eb50c3f7cf63e6b2129625e4d58
     # via
     #   -r requirements.in
     #   envoy-code-check
@@ -1230,9 +1230,9 @@ snowballstemmer==2.2.0 \
     --hash=sha256:09b16deb8547d3412ad7b590689584cd0fe25ec8db3be37788be3810cbf19cb1 \
     --hash=sha256:c8e1716e83cc398ae16824e5572ae04e0d9fc2c6b985fb0f900f5f0c96ecba1a
     # via sphinx
-sphinx==7.3.6 \
-    --hash=sha256:d6c09acd42094fcd96a9299c1b32b2dafe82d667fdd6e532e5978443ad074c2a \
-    --hash=sha256:fc9f3d13fed5c9a0e677d368090e209899ce5d0081eb552b657e2923e57517f0
+sphinx==7.3.7 \
+    --hash=sha256:413f75440be4cacf328f580b4274ada4565fb2187d696a84970c23f77b64d8c3 \
+    --hash=sha256:a4a7db75ed37531c05002d56ed6948d4c42f473a36f46e1382b0bd76ca9627bc
     # via
     #   -r requirements.in
     #   envoy-docs-sphinx-runner
