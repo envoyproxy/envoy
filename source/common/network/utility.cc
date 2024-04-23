@@ -614,7 +614,10 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
   IoHandle::RecvMsgOutput output(1, packets_dropped);
 
   // TODO(yugant): Avoid allocating 64k for each read by getting memory from UdpPacketProcessor
-  const uint64_t max_rx_datagram_size_with_gro = 64 * 1024;
+  const uint64_t max_rx_datagram_size_with_gro =
+      num_packets_read != nullptr
+          ? 64 * 1024
+          : NUM_DATAGRAMS_PER_RECEIVE * udp_packet_processor.maxDatagramSize();
   ENVOY_LOG_MISC(trace, "starting gro recvmsg with max={}", max_rx_datagram_size_with_gro);
 
   Api::IoCallUint64Result result =
@@ -774,16 +777,32 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
 
   // Read at least one time, and attempt to read numPacketsExpectedPerEventLoop() packets unless
   // this goes over MAX_NUM_PACKETS_PER_EVENT_LOOP.
-  size_t remaining_packets_to_read = std::min<size_t>(
+  size_t num_packets_to_read = std::min<size_t>(
       MAX_NUM_PACKETS_PER_EVENT_LOOP, udp_packet_processor.numPacketsExpectedPerEventLoop());
+  size_t num_reads;
+  switch (recv_msg_method) {
+  case UdpRecvMsgMethod::RecvMsgWithGro:
+    num_reads = (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE);
+    break;
+  case UdpRecvMsgMethod::RecvMmsg:
+    num_reads = (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE);
+    break;
+  case UdpRecvMsgMethod::RecvMsg:
+    num_reads = num_packets_to_read;
+    break;
+  }
+  // Make sure to read at least once.
+  num_reads = std::max<size_t>(1, num_reads);
 
+  const bool apply_read_limit_differently = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.udp_socket_apply_read_limit_differently");
   do {
     const uint32_t old_packets_dropped = packets_dropped;
-    uint32_t num_packets_read = 0;
+    uint32_t num_packets_processed = 0;
     const MonotonicTime receive_time = time_source.monotonicTime();
-    Api::IoCallUint64Result result =
-        Utility::readFromSocket(handle, local_address, udp_packet_processor, receive_time,
-                                recv_msg_method, &packets_dropped, &num_packets_read);
+    Api::IoCallUint64Result result = Utility::readFromSocket(
+        handle, local_address, udp_packet_processor, receive_time, recv_msg_method,
+        &packets_dropped, apply_read_limit_differently ? &num_packets_processed : nullptr);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.
@@ -806,10 +825,17 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
           delta);
       udp_packet_processor.onDatagramsDropped(delta);
     }
-    if (remaining_packets_to_read <= num_packets_read) {
-      return std::move(result.err_);
+    if (apply_read_limit_differently) {
+      if (num_packets_to_read <= num_packets_processed) {
+        return std::move(result.err_);
+      }
+      num_packets_to_read -= num_packets_processed;
+    } else {
+      --num_reads;
+      if (num_reads == 0) {
+        return std::move(result.err_);
+      }
     }
-    remaining_packets_to_read -= num_packets_read;
   } while (true);
 }
 

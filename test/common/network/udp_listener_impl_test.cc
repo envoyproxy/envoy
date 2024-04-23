@@ -236,30 +236,29 @@ TEST_P(UdpListenerImplTest, LimitNumberOfReadsPerLoop) {
 }
 
 #ifdef UDP_GRO
-TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsgNoDrop) {
+TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsg) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.udp_socket_apply_read_limit_differently")) {
+    return;
+  }
   setup(true);
 
   ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(true));
-  const std::string first = std::string(32 * 1024, 'a');
-  client_.write(first, *send_to_addr_);
+  client_.write(std::string(32768, 'a'), *send_to_addr_);
   const std::string second("second");
   client_.write(second, *send_to_addr_);
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
-  EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(0);
-  EXPECT_CALL(listener_callbacks_, onData(_))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, 1);
-        EXPECT_EQ(data.buffer_->toString(), first);
-      }))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, 1);
-        EXPECT_EQ(data.buffer_->toString(), second);
-        dispatcher_->exit();
-      }));
+  EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(AtLeast(1));
+  EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+    validateRecvCallbackParams(data, 1);
+    EXPECT_EQ(data.buffer_->toString(), second);
+
+    dispatcher_->exit();
+  }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(0, listener_->packetsDropped());
+  EXPECT_EQ(1, listener_->packetsDropped());
 }
 #endif
 
@@ -665,7 +664,10 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
         // Set msg_iovec
         EXPECT_EQ(msg->msg_iovlen, 1);
         memcpy(msg->msg_iov[0].iov_base, stacked_message.data(), stacked_message.length());
-        EXPECT_EQ(msg->msg_iov[0].iov_len, 64 * 1024);
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.udp_socket_apply_read_limit_differently")) {
+          EXPECT_EQ(msg->msg_iov[0].iov_len, 64 * 1024);
+        }
         msg->msg_iov[0].iov_len = stacked_message.length();
 
         // Set control headers
@@ -732,10 +734,44 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsgNoDrop) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.udp_socket_apply_read_limit_differently")) {
+    return;
+  }
+  setup(true);
+
+  ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(true));
+  const std::string first = std::string(32 * 1024, 'a');
+  client_.write(first, *send_to_addr_);
+  const std::string second("second");
+  client_.write(second, *send_to_addr_);
+
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(0);
+  EXPECT_CALL(listener_callbacks_, onData(_))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        validateRecvCallbackParams(data, 1);
+        EXPECT_EQ(data.buffer_->toString(), first);
+      }))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        validateRecvCallbackParams(data, 1);
+        EXPECT_EQ(data.buffer_->toString(), second);
+        dispatcher_->exit();
+      }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(0, listener_->packetsDropped());
+}
+
 // Tests that with GRO, listener are able to read 64kB worth of data if they are carried in packets
 // of same size, regardless of MAX_NUM_PACKETS_PER_EVENT_LOOP or listener_callbacks_ provided limit.
 // But once MAX_NUM_PACKETS_PER_EVENT_LOOP of packets are processed, read will stop.
 TEST_P(UdpListenerImplTest, UdpGroReadLimit) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.udp_socket_apply_read_limit_differently")) {
+    return;
+  }
   setup(true);
 
   EXPECT_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop()).WillRepeatedly(Return(32));

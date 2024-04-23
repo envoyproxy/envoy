@@ -245,7 +245,7 @@ UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_rx_da
 void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Instance& peer) {
   const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
                                                   nullptr, peer);
-  ASSERT_EQ(rc.return_value_, buffer.length()) << static_cast<int>(rc.err_->getErrorCode());
+  ASSERT_EQ(rc.return_value_, buffer.length());
 }
 
 void UdpSyncPeer::recv(Network::UdpRecvData& datagram) {
