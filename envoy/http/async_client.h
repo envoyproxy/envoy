@@ -304,6 +304,19 @@ public:
       return *this;
     }
 
+    StreamOptions& setParentSpan(Tracing::Span& parent_span) {
+      parent_span_ = &parent_span;
+      return *this;
+    }
+    StreamOptions& setChildSpanName(const std::string& child_span_name) {
+      child_span_name_ = child_span_name;
+      return *this;
+    }
+    StreamOptions& setSampled(absl::optional<bool> sampled) {
+      sampled_ = sampled;
+      return *this;
+    }
+
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
@@ -342,6 +355,16 @@ public:
     OptRef<Router::FilterConfig> filter_config_;
 
     bool is_shadow{false};
+
+    // The parent span that child spans are created under to trace egress requests/responses.
+    // If not set, requests will not be traced.
+    Tracing::Span* parent_span_{nullptr};
+    // The name to give to the child span that represents the async http request.
+    // If left empty and parent_span_ is set, then the default name will have the cluster name.
+    // Only used if parent_span_ is set.
+    std::string child_span_name_{""};
+    // Sampling decision for the tracing span. The span is sampled by default.
+    absl::optional<bool> sampled_{true};
   };
 
   /**
@@ -390,15 +413,15 @@ public:
       return *this;
     }
     RequestOptions& setParentSpan(Tracing::Span& parent_span) {
-      parent_span_ = &parent_span;
+      StreamOptions::setParentSpan(parent_span);
       return *this;
     }
     RequestOptions& setChildSpanName(const std::string& child_span_name) {
-      child_span_name_ = child_span_name;
+      StreamOptions::setChildSpanName(child_span_name);
       return *this;
     }
     RequestOptions& setSampled(absl::optional<bool> sampled) {
-      sampled_ = sampled;
+      StreamOptions::setSampled(sampled);
       return *this;
     }
     RequestOptions& setBufferAccount(const Buffer::BufferMemoryAccountSharedPtr& account) {
@@ -415,16 +438,6 @@ public:
       return StreamOptions::operator==(src) && parent_span_ == src.parent_span_ &&
              child_span_name_ == src.child_span_name_ && sampled_ == src.sampled_;
     }
-
-    // The parent span that child spans are created under to trace egress requests/responses.
-    // If not set, requests will not be traced.
-    Tracing::Span* parent_span_{nullptr};
-    // The name to give to the child span that represents the async http request.
-    // If left empty and parent_span_ is set, then the default name will have the cluster name.
-    // Only used if parent_span_ is set.
-    std::string child_span_name_{""};
-    // Sampling decision for the tracing span. The span is sampled by default.
-    absl::optional<bool> sampled_{true};
   };
 
   /**
