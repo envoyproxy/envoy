@@ -75,6 +75,9 @@ private:
   void addCircuitBreakerForPriority(const envoy::config::core::v3::RoutingPriority& priority,
                                     Json::Streamer::Array* raw_map_ptr, Buffer::Instance& response,
                                     Upstream::ResourceManager& resource_manager);
+  void addEjectionThresholds(Json::Streamer::Map* raw_clusters_map_ptr,
+                             const Upstream::Cluster& unwrapped_cluster,
+                             Buffer::Instance& response);
 
   const uint64_t chunk_limit_;
   Http::ResponseHeaderMap& response_headers_;

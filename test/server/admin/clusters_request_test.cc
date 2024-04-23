@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <cctype>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -17,6 +18,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -24,9 +26,13 @@
 namespace Envoy {
 namespace Server {
 
+using testing::AtLeast;
+using testing::Const;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+
 
 class BaseClustersRequestFixture : public testing::Test {
 protected:
@@ -71,7 +77,7 @@ protected:
     };
   }
 
-  void loadNewMockClusterByName(NiceMock<Upstream::MockClusterMockPrioritySet>& mock_cluster,
+  void loadNewMockClusterByName(NiceMock<Upstream::MockCluster>& mock_cluster,
                                 absl::string_view name) {
     mock_cluster.info_->name_ = name;
     ON_CALL(*mock_cluster.info_, edsServiceName()).WillByDefault(ReturnRef("potato_launcher"));
@@ -79,6 +85,11 @@ protected:
         .WillByDefault(ReturnRef(std::ref(*resource_manager_default_).get()));
     ON_CALL(*mock_cluster.info_, resourceManager(Upstream::ResourcePriority::High))
         .WillByDefault(ReturnRef(std::ref(*resource_manager_high_).get()));
+    ON_CALL(Const(mock_cluster), outlierDetector()).WillByDefault(Return(&detector_));
+    ON_CALL(Const(detector_), successRateEjectionThreshold(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
+        .WillByDefault(Return(double(1.1)));
+    ON_CALL(Const(detector_), successRateEjectionThreshold(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))
+        .WillByDefault(Return(double(1.1)));
     cluster_info_maps_.active_clusters_.emplace(name, std::ref(mock_cluster));
   }
 
@@ -87,6 +98,7 @@ protected:
   NiceMock<Upstream::MockClusterManager> mock_cluster_manager_;
   Upstream::ClusterManager::ClusterInfoMaps cluster_info_maps_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Upstream::Outlier::MockDetector> detector_;
   const std::string resource_manager_key_{"test_resource_manager_key"};
   std::unique_ptr<Upstream::ResourceManager> resource_manager_default_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_high_;
@@ -107,10 +119,10 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
   ClustersParams clusters_params;
   clusters_params.format_ = ClustersParams::Format::Json;
 
-  NiceMock<Upstream::MockClusterMockPrioritySet> test_cluster;
+  NiceMock<Upstream::MockCluster> test_cluster;
   loadNewMockClusterByName(test_cluster, "test_cluster");
 
-  NiceMock<Upstream::MockClusterMockPrioritySet> test_cluster2;
+  NiceMock<Upstream::MockCluster> test_cluster2;
   loadNewMockClusterByName(test_cluster2, "test_cluster2");
 
   ResponseResult result = response(*makeRequest(chunk_limit, clusters_params), params.drain_);
@@ -120,7 +132,7 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
   // clusters to be identical.
   EXPECT_EQ(
       std::regex_replace(result.data_.toString(), std::regex("test_cluster2"), "test_cluster"),
-      R"EOF({"cluster_statuses":[{"name":"test_cluster","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":1024,"max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":4096,"max_retries":16}]}},{"name":"test_cluster","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":1024,"max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":4096,"max_retries":16}]}}]})EOF");
+      R"EOF({"cluster_statuses":[{"name":"test_cluster","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":1024,"max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":4096,"max_retries":16}]},"success_rate_ejection_threshold":1.1,"local_success_rate_ejection_threshold":1.1},{"name":"test_cluster","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":1024,"max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":4096,"max_retries":16}]},"success_rate_ejection_threshold":1.1,"local_success_rate_ejection_threshold":1.1}]})EOF");
 }
 
 constexpr VerifyJsonOutputParameters VERIFY_JSON_CASES[] = {

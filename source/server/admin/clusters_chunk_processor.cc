@@ -170,8 +170,7 @@ bool JsonClustersChunkProcessor::nextChunk(Buffer::Instance& response) {
 void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::Cluster> cluster,
                                         Buffer::Instance& response) {
   Json::Streamer::MapPtr cluster_map = json_context_holder_.back()->clusters_->addMap();
-  const Upstream::Cluster& unwrapped_cluster = cluster.get();
-  Upstream::ClusterInfoConstSharedPtr cluster_info = unwrapped_cluster.info();
+  Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.get().info();
 
   std::vector<const Json::Streamer::Map::NameValue> top_level_entries{
       {"name", cluster_info->name()},
@@ -187,8 +186,33 @@ void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
   }
 
   addCircuitBreakers(cluster_map.get(), cluster_info, response);
+  addEjectionThresholds(cluster_map.get(), cluster.get(), response);
 
-  // const Upstream::Outlier::Detector* outlier_detector = unwrapped_cluster.outlierDetector();
+}
+
+
+void JsonClustersChunkProcessor::addEjectionThresholds(Json::Streamer::Map* raw_clusters_map_ptr,
+                                                       const Upstream::Cluster& unwrapped_cluster,
+                                                       Buffer::Instance& response) {
+  const Upstream::Outlier::Detector* outlier_detector = unwrapped_cluster.outlierDetector();
+  if (outlier_detector != nullptr &&
+      outlier_detector->successRateEjectionThreshold(
+          Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin) > 0.0) {
+    std::vector<const Json::Streamer::Map::NameValue> success_rate_ejection_threshold{
+      {"success_rate_ejection_threshold", double(outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))},
+    };
+    addMapEntries(raw_clusters_map_ptr, response, success_rate_ejection_threshold);
+  }
+  if (outlier_detector != nullptr &&
+      outlier_detector->successRateEjectionThreshold(
+          Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin) > 0.0) {
+    std::vector<const Json::Streamer::Map::NameValue> local_success_rate_ejection_threshold{
+      {"local_success_rate_ejection_threshold", double(outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))},
+    };
+    addMapEntries(raw_clusters_map_ptr, response, local_success_rate_ejection_threshold);
+  }
 }
 
 void JsonClustersChunkProcessor::addCircuitBreakers(

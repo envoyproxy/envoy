@@ -286,6 +286,7 @@ envoy_cc_test(
         "//source/server/admin:clusters_request_lib",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/test_common:utility_lib",
     ],
 )
