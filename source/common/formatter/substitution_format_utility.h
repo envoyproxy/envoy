@@ -23,9 +23,9 @@ public:
   static constexpr CommandSyntaxFlags PARAMS_OPTIONAL = 1 << 1;
   static constexpr CommandSyntaxFlags LENGTH_ALLOWED = 1 << 2;
 
-  static void verifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags,
-                           const std::string& command, const std::string& subcommand,
-                           const absl::optional<size_t>& length);
+  static absl::Status verifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags,
+                                   const std::string& command, const std::string& subcommand,
+                                   const absl::optional<size_t>& length);
 };
 
 /**
@@ -52,6 +52,14 @@ public:
    * max_length is greater than the length of the string.
    */
   static void truncate(std::string& str, absl::optional<size_t> max_length);
+
+  /**
+   * Truncate an input string view to a maximum length, and return the resulting string view. Do not
+   * truncate if max_length is not set or max_length is greater than the length of the input string
+   * view.
+   */
+  static absl::string_view truncateStringView(absl::string_view str,
+                                              absl::optional<size_t> max_length);
 
   /**
    * Parse a header subcommand of the form: X?Y .

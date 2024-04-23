@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -46,6 +47,8 @@ public:
 
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; };
 
+  const std::chrono::milliseconds timeout() const override { return timeout_; };
+
   RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                                   Server::Configuration::ServerFactoryContext& factory_context,
@@ -59,6 +62,8 @@ private:
 
   const envoy::config::core::v3::Metadata metadata_;
   const Envoy::Config::TypedMetadataImpl<RouteTypedMetadataFactory> typed_metadata_;
+
+  const std::chrono::milliseconds timeout_;
 
   absl::flat_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> per_filter_configs_;
 };

@@ -186,7 +186,7 @@ void CredentialsFileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the credentials file");
 
   auto credentials_file = Utility::getCredentialFilePath();
-  auto profile = Utility::getCredentialProfileName();
+  auto profile = profile_.empty() ? Utility::getCredentialProfileName() : profile_;
 
   ENVOY_LOG(debug, "Credentials file path = {}, profile name = {}", credentials_file, profile);
 

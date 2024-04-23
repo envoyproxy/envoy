@@ -99,9 +99,9 @@ absl::optional<std::string> HeaderFormatter::format(const Http::HeaderMap& heade
     return absl::nullopt;
   }
 
-  std::string val = std::string(header->value().getStringView());
-  SubstitutionFormatUtils::truncate(val, max_length_);
-  return val;
+  absl::string_view val = header->value().getStringView();
+  val = SubstitutionFormatUtils::truncateStringView(val, max_length_);
+  return std::string(val);
 }
 
 ProtobufWkt::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) const {
@@ -110,9 +110,9 @@ ProtobufWkt::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) 
     return SubstitutionFormatUtils::unspecifiedValue();
   }
 
-  std::string val = std::string(header->value().getStringView());
-  SubstitutionFormatUtils::truncate(val, max_length_);
-  return ValueUtil::stringValue(val);
+  absl::string_view val = header->value().getStringView();
+  val = SubstitutionFormatUtils::truncateStringView(val, max_length_);
+  return ValueUtil::stringValue(std::string(val));
 }
 
 ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
@@ -405,7 +405,8 @@ FormatterProviderPtr HttpBuiltInCommandParser::parse(const std::string& command,
   }
 
   // Check flags for the command.
-  CommandSyntaxChecker::verifySyntax((*it).second.first, command, subcommand, max_length);
+  THROW_IF_NOT_OK(
+      CommandSyntaxChecker::verifySyntax((*it).second.first, command, subcommand, max_length));
 
   // Create a pointer to the formatter by calling a function
   // associated with formatter's name.

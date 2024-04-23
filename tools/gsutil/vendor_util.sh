@@ -1,5 +1,6 @@
-#!/bin/bash -eu
+#!/usr/bin/env bash
 
+set -eu
 set -o pipefail
 
 # REQUIRES DOCKER!

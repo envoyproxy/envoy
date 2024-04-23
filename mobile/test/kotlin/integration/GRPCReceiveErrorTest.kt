@@ -83,7 +83,7 @@ class GRPCReceiveErrorTest {
 
     val engine =
       EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .addPlatformFilter(
           name = FILTER_NAME,

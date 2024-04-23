@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 
 ENVOY_BUILD_CONTAINER="$(grep envoyproxy/envoy-build-ubuntu "$(dirname "$0")"/../.bazelrc | sed -e 's#.*envoyproxy/envoy-build-ubuntu:\(.*\)#\1#' | uniq)"
