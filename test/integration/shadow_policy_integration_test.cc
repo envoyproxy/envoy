@@ -929,7 +929,7 @@ TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithAddBody) {
 
 TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderAppendsSuffix) {
   initialConfigSetup("cluster_1", "");
-  // disable_shadow_host_suffix_append defaults to "false"
+  // By default `disable_shadow_host_suffix_append` is "false".
   config_helper_.addConfigModifier(
       [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -943,7 +943,7 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderAppendsSuffix) {
 
   initialize();
   sendRequestAndValidateResponse();
-  // ensure shadowed host header has suffix "-shadow"
+  // Ensure shadowed host header has suffix "-shadow".
   EXPECT_EQ(upstream_headers_->Host()->value().getStringView(), "sni.lyft.com");
   EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "sni.lyft.com-shadow");
 }
@@ -964,7 +964,7 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderDisabledAppendSuffi
 
   initialize();
   sendRequestAndValidateResponse();
-  // ensure shadowed host header does not have suffix "-shadow"
+  // Ensure shadowed host header does not have suffix "-shadow".
   EXPECT_EQ(upstream_headers_->Host()->value().getStringView(), "sni.lyft.com");
   EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "sni.lyft.com");
 }
