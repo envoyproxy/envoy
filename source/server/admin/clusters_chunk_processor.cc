@@ -196,26 +196,25 @@ void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
       {"added_via_api", cluster_info->addedViaApi()},
   };
   addMapEntries(cluster_map.get(), response, added_via_api);
+  addHostStatuses(cluster_map.get(), cluster, response);
 }
 
 void JsonClustersChunkProcessor::addHostStatuses(Json::Streamer::Map* raw_clusters_map_ptr,
                                                  const Upstream::Cluster& unwrapped_cluster,
                                                  Buffer::Instance& response) {
-
-  Json::Streamer::ArrayPtr host_sets = raw_clusters_map_ptr->addArray();
+  raw_clusters_map_ptr->addKey("host_statuses");
+  Json::Streamer::ArrayPtr host_statuses_ptr = raw_clusters_map_ptr->addArray();
   for (const Upstream::HostSetPtr& host_set :
        unwrapped_cluster.prioritySet().hostSetsPerPriority()) {
-    Json::Streamer::ArrayPtr hosts = raw_clusters_map_ptr->addArray();
-    processHostSet(host_sets.get(), host_set, response);
+    processHostSet(host_statuses_ptr.get(), host_set, response);
   }
 }
 
-void JsonClustersChunkProcessor::processHostSet(Json::Streamer::Array* raw_hosts_statuses_ptr,
+void JsonClustersChunkProcessor::processHostSet(Json::Streamer::Array* raw_host_statuses_ptr,
                                                 const Upstream::HostSetPtr& host_set,
                                                 Buffer::Instance& response) {
-  Json::Streamer::ArrayPtr host_statuses_ptr = raw_hosts_statuses_ptr->addArray();
   for (const Upstream::HostSharedPtr& host : host_set->hosts()) {
-    processHost(host_statuses_ptr.get(), host, response);
+    processHost(raw_host_statuses_ptr, host, response);
   }
 }
 
@@ -227,41 +226,41 @@ void JsonClustersChunkProcessor::processHost(Json::Streamer::Array* raw_host_sta
       {"hostname", host->hostname()},
   };
   addMapEntries(host_ptr.get(), response, hostname);
-  {
-    host_ptr->addKey("locality");
-    Json::Streamer::MapPtr locality_ptr = host_ptr->addMap();
-    std::vector<const Json::Streamer::Map::NameValue> locality{
-        {"region", host->locality().region()},
-        {"zone", host->locality().zone()},
-        {"sub_zone", host->locality().sub_zone()},
-    };
-    addMapEntries(locality_ptr.get(), response, locality);
-  }
+  // {
+  //   host_ptr->addKey("locality");
+  //   Json::Streamer::MapPtr locality_ptr = host_ptr->addMap();
+  //   std::vector<const Json::Streamer::Map::NameValue> locality{
+  //       {"region", host->locality().region()},
+  //       {"zone", host->locality().zone()},
+  //       {"sub_zone", host->locality().sub_zone()},
+  //   };
+  //   addMapEntries(locality_ptr.get(), response, locality);
+  // }
+  // buildHostStats(host_ptr.get(), host, response);
+  // setHealthFlags(host_ptr.get(), host, response);
 
-  setHealthFlags(host_ptr.get(), host, response);
+  // double success_rate = host->outlierDetector().successRate(
+  //     Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
+  // if (success_rate >= 0.0) {
+  //   std::vector<const Json::Streamer::Map::NameValue> success_rate_property{
+  //       {"suceess_rate", success_rate},
+  //   };
+  //   addMapEntries(host_ptr.get(), response, success_rate_property);
+  // }
 
-  double success_rate = host->outlierDetector().successRate(
-      Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
-  if (success_rate >= 0.0) {
-    std::vector<const Json::Streamer::Map::NameValue> success_rate_property{
-        {"suceess_rate", success_rate},
-    };
-    addMapEntries(host_ptr.get(), response, success_rate_property);
-  }
-
-  std::vector<const Json::Streamer::Map::NameValue> weight_and_priority{
-      {"weight", uint64_t(host->weight())},
-      {"priority", uint64_t(host->priority())},
-  };
-  addMapEntries(host_ptr.get(), response, weight_and_priority);
-  success_rate = host->outlierDetector().successRate(
-      Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
-  if (success_rate >= 0.0) {
-    std::vector<const Json::Streamer::Map::NameValue> success_rate_property{
-        {"local_origin_success_rate", success_rate},
-    };
-    addMapEntries(host_ptr.get(), response, success_rate_property);
-  }
+  // std::vector<const Json::Streamer::Map::NameValue> weight_and_priority{
+  //     {"weight", uint64_t(host->weight())},
+  //     {"priority", uint64_t(host->priority())},
+  // };
+  // addMapEntries(host_ptr.get(), response, weight_and_priority);
+  // success_rate = host->outlierDetector().successRate(
+  //     Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
+  // if (success_rate >= 0.0) {
+  //   std::vector<const Json::Streamer::Map::NameValue> success_rate_property{
+  //       {"local_origin_success_rate", success_rate},
+  //   };
+  //   addMapEntries(host_ptr.get(), response, success_rate_property);
+  // }
 }
 
 void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_ptr,
