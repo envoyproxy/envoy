@@ -38,6 +38,7 @@ OAuth2CredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
       FLOW_TYPE_NOT_SET:
     throw EnvoyException("OAuth2 flow type not set");
   }
+  return nullptr;
 }
 
 Common::CredentialInjectorSharedPtr
