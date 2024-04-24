@@ -308,6 +308,7 @@ Filter::StreamOpenState Filter::openStream() {
 
 void Filter::closeStream() {
   if (stream_) {
+    ENVOY_LOG(error, "tyxia_close_stream");
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
@@ -353,7 +354,12 @@ Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 
-  return FilterHeadersStatus::Continue;
+  if (end_stream) {
+    state.setPaused(true);
+    return FilterHeadersStatus::StopIteration;
+  } else {
+    return FilterHeadersStatus::Continue;
+  }
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
@@ -424,7 +430,11 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
   if (config_->observabilityMode()) {
+    // For the body processing mode in observability mode, only STREAMED body processing mode is
+    // supported and any other body processing modes will be ignored. NONE mode(i.e., skip body
+    // processing) will still work as expected.
     if (state.bodyMode() == ProcessingMode::STREAMED) {
+      // Try to open the stream if the connection has not been established.
       switch (openStream()) {
       case StreamOpenState::Error:
         return FilterDataStatus::StopIterationNoBuffer;
@@ -434,14 +444,27 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
         // Fall through
         break;
       }
+      // Set up the the body chunk and send.
       auto req = setupBodyChunk(state, data, end_stream);
       // LOG(INFO) << "tyxia_body_size: " << data.length() << "\n";
-
-      sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
+      stream_->send(std::move(req), false);
+      stats_.stream_msgs_sent_.inc();
     } else if (state.bodyMode() != ProcessingMode::NONE) {
       ENVOY_LOG(error, "Wrong body mode for observability mode, no data is sent.");
     }
-    return FilterDataStatus::Continue;
+
+    if (end_stream) {
+      // But we need to stop iteration and buffer for the last chunk.
+      state.setPaused(true);
+      // TODO(tyxia) if we pause, then timeout is needed.
+      state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
+                                 config_->messageTimeout(),
+                                 ProcessorState::CallbackState::StreamedBodyCallback);
+      return FilterDataStatus::StopIterationAndBuffer;
+      // If it is end of stream, timeout needs to be implemented
+    } else {
+      return FilterDataStatus::Continue;
+    }
   }
 
   if (end_stream) {
@@ -625,6 +648,35 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   if (processing_complete_) {
     ENVOY_LOG(trace, "trailers: Continue");
     return FilterTrailersStatus::Continue;
+  }
+
+  if (state.sendTrailers() && config_->observabilityMode()) {
+    switch (openStream()) {
+    case StreamOpenState::Error:
+      return FilterTrailersStatus::StopIteration;
+    case StreamOpenState::IgnoreError:
+      return FilterTrailersStatus::Continue;
+    case StreamOpenState::Ok:
+      // Fall through
+      break;
+    }
+
+    ENVOY_LOG(error, "tyxia send trailers");
+    ProcessingRequest req;
+    addAttributes(state, req);
+    addDynamicMetadata(state, req);
+    auto* trailers_req = state.mutableTrailers(req);
+    MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
+                                  *trailers_req->mutable_trailers());
+
+    ENVOY_LOG(debug, "Sending trailers message in observability mode");
+    stream_->send(std::move(req), false);
+    stats_.stream_msgs_sent_.inc();
+    // TODO(tyxia) Here returns StopIteration!!
+    state.setPaused(true);
+    return FilterTrailersStatus::StopIteration;
+
+    // return FilterTrailersStatus::Continue;
   }
 
   bool body_delivered = state.completeBodyAvailable();
@@ -926,7 +978,11 @@ void Filter::setDecoderDynamicMetadata(const ProcessingResponse& response) {
 
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   if (config_->observabilityMode()) {
-    ENVOY_LOG(error, "Ignoring stream message received when observability mode is enabled");
+    // TODO(tyxia) Last bit of message need to be paused!!!
+    // Or last message needs to be complied with timeout
+    decoding_state_.continueIfNecessary();
+    encoding_state_.continueIfNecessary();
+    ENVOY_LOG(error, "Ignoring received message  when observability mode is enabled");
     // Ignore additional messages in the observability mode.
     return;
   }
