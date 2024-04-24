@@ -4,17 +4,21 @@
 #include <functional>
 #include <memory>
 
+#include "clusters_chunk_processor.h"
 #include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/resource_manager.h"
+#include "envoy/upstream/upstream.h"
+#include "source/common/network/utility.h"
 
-#include "source/common/buffer/buffer_impl.h"
 #include "source/common/upstream/host_utility.h"
 
 namespace Envoy {
 namespace Server {
+
+void setHealthFlag(Json::Streamer::Map* raw_host_ptr, Upstream::Host::HealthFlag flag, const Upstream::Host& host);
 
 TextClustersChunkProcessor::TextClustersChunkProcessor(
     uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
@@ -191,6 +195,167 @@ void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
       {"added_via_api", cluster_info->addedViaApi()},
   };
   addMapEntries(cluster_map.get(), response, added_via_api);
+}
+
+
+void JsonClustersChunkProcessor::addHostStatuses(Json::Streamer::Map* raw_clusters_map_ptr,
+                                                 const Upstream::Cluster& unwrapped_cluster,
+                                                 Buffer::Instance& response) {
+                                                  
+  Json::Streamer::ArrayPtr host_sets = raw_clusters_map_ptr->addArray();
+  for (const Upstream::HostSetPtr& host_set : unwrapped_cluster.prioritySet().hostSetsPerPriority()) {
+    Json::Streamer::ArrayPtr hosts = raw_clusters_map_ptr->addArray(); 
+    processHostSet(host_sets.get(), host_set, response);
+  }
+}
+
+void JsonClustersChunkProcessor::processHostSet(Json::Streamer::Array* raw_hosts_statuses_ptr, const Upstream::HostSetPtr& host_set, Buffer::Instance& response) {
+  Json::Streamer::ArrayPtr host_statuses_ptr = raw_hosts_statuses_ptr->addArray();
+  for (const Upstream::HostSharedPtr& host : host_set->hosts()) {
+    processHost(host_statuses_ptr.get(), host, response);
+  }
+}
+
+
+void JsonClustersChunkProcessor::processHost(Json::Streamer::Array* raw_host_statuses_ptr, const Upstream::HostSharedPtr& host, Buffer::Instance& response) {
+  Json::Streamer::MapPtr host_ptr = raw_host_statuses_ptr->addMap();
+  std::vector<const Json::Streamer::Map::NameValue> hostname{
+    {"hostname", host->hostname()},
+  };
+  addMapEntries(host_ptr.get(), response, hostname);
+  {
+    host_ptr->addKey("locality");
+    Json::Streamer::MapPtr locality_ptr = host_ptr->addMap();
+    std::vector<const Json::Streamer::Map::NameValue> locality{
+      {"region", host->locality().region()},
+      {"zone", host->locality().zone()},
+      {"sub_zone", host->locality().sub_zone()},
+    };
+    addMapEntries(locality_ptr.get(), response, locality);
+  }
+
+  setHealthFlags(host_ptr.get(), host, response);
+
+  double success_rate = host->outlierDetector().successRate(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
+  if (success_rate >= 0.0) {
+    std::vector<const Json::Streamer::Map::NameValue> success_rate_property{
+      {"suceess_rate", success_rate},
+    };
+    addMapEntries(host_ptr.get(), response, success_rate_property);
+  }
+
+  std::vector<const Json::Streamer::Map::NameValue> weight_and_priority{
+    {"weight", uint64_t(host->weight())},
+    {"priority", uint64_t(host->priority())},
+  };
+  addMapEntries(host_ptr.get(), response, weight_and_priority);
+  success_rate = host->outlierDetector().successRate(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
+  if (success_rate >= 0.0) {
+    std::vector<const Json::Streamer::Map::NameValue> success_rate_property{
+      {"local_origin_success_rate", success_rate},
+    };
+    addMapEntries(host_ptr.get(), response, success_rate_property);
+  } 
+}
+
+
+void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host, Buffer::Instance& response) {
+  Json::Streamer::ArrayPtr stats = raw_host_ptr->addArray();
+  for (const auto& [counter_name, counter] : host->counters()) {
+    Json::Streamer::MapPtr stat_obj = stats->addMap();
+    // TODO(demitriswan) Make sure this name conversion works as expected
+    std::vector<const Json::Streamer::Map::NameValue> stats_properties{
+      {"type", envoy::admin::v3::SimpleMetric_Type_Name(envoy::admin::v3::SimpleMetric::COUNTER)},
+      {"name", counter_name},
+      {"value", counter.get().value()},
+    };
+    addMapEntries(raw_host_ptr, response, stats_properties);
+  }
+  for (const auto& [gauge_name, gauge] : host->gauges()) {
+    Json::Streamer::MapPtr stat_obj = stats->addMap();
+    // TODO(demitriswan) Make sure this name conversion works as expected
+    std::vector<const Json::Streamer::Map::NameValue> stats_properties{
+      {"type", envoy::admin::v3::SimpleMetric_Type_Name(envoy::admin::v3::SimpleMetric::GAUGE)},
+      {"name", gauge_name},
+      {"value", gauge.get().value()},
+    };
+    addMapEntries(raw_host_ptr, response, stats_properties);
+  }
+}
+
+void JsonClusterChunkProcessor::setHealthFlags(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host, Buffer::Instance& response) {
+  raw_host_ptr->addKey("health_stats");
+  Json::Streamer::MapPtr heath_status_ptr = raw_host_ptr->addMap();
+  // Invokes setHealthFlag for each health flag.
+  #define SET_HEALTH_FLAG(name, notused)                                                             \
+    setHealthFlag(map_status_ptr.get(), Upstream::Host::HealthFlag::name, host, response);
+          HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
+  #undef SET_HEALTH_FLAG
+}
+
+void JsonClustersChunkProcessor::setHealthFlag(Json::Streamer::Map* health_status_ptr, Upstream::Host::HealthFlag flag, const Upstream::HostSharedPtr& host, Buffer::Instance& response) {
+  switch (flag) {
+  case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC: {
+    std::vector<const Json::Streamer::Map::NameValue> status{
+      {"failed_active_health_check", host.get()->healthFlagGet(flag)},
+    };
+    addMapEntries(health_status_ptr, response, status);
+    break;
+  }
+  case Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK: {
+    std::vector<const Json::Streamer::Map::NameValue> status{
+      {"failed_outlier_check", host.get()->healthFlagGet(flag)},
+    };
+    addMapEntries(health_status_ptr, response, status);
+    break;
+  }
+  case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
+  case Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH:
+  case Upstream::Host::HealthFlag::EDS_STATUS_DRAINING: {
+    // TODO(demitriswan) make sure this name conversion works as expected.
+    std::vector<const Json::Streamer::Map::NameValue> status{
+      {"eds_health_status", envoy::config::core::v3::HealthStatus_Name(host.get()->healthFlagGet(flag))},
+    };
+    addMapEntries(health_status_ptr, response, status);
+    break;
+  }
+  case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC: {
+    std::vector<const Json::Streamer::Map::NameValue> status{
+      {"failed_active_degraded_check", host.get()->healthFlagGet(flag)},
+    };
+    addMapEntries(health_status_ptr, response, status);
+    break;
+  }
+  case Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL: {
+    std::vector<const Json::Streamer::Map::NameValue> status{
+      {"pending_dynamic_removal", host.get()->healthFlagGet(flag)},
+    };
+    addMapEntries(health_status_ptr, response, status);
+    break;
+  }
+  case Upstream::Host::HealthFlag::PENDING_ACTIVE_HC: {
+    std::vector<const Json::Streamer::Map::NameValue> status{
+      {"pending_active_hc", host.get()->healthFlagGet(flag)},
+    };
+    addMapEntries(health_status_ptr, response, status);
+    break;
+  }
+  case Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL: {
+    std::vector<const Json::Streamer::Map::NameValue> status{
+      {"excluded_via_immediate_hc_fail", host.get()->healthFlagGet(flag)},
+    };
+    addMapEntries(health_status_ptr, response, status);
+    break;
+  }
+  case Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT: {
+    std::vector<const Json::Streamer::Map::NameValue> status{
+      {"active_hc_timeout", host.get()->healthFlagGet(flag)},
+    };
+    addMapEntries(health_status_ptr, response, status);
+    break;
+  }
 }
 
 void JsonClustersChunkProcessor::addEjectionThresholds(Json::Streamer::Map* raw_clusters_map_ptr,
