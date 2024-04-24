@@ -63,7 +63,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final String mNodeRegion = "";
   private final String mNodeZone = "";
   private final String mNodeSubZone = "";
-  private Map<String, Boolean> mRuntimeGuards = new HashMap<>();
+  private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
   /**
    * Builder for Native Cronet Engine. Default config enables SPDY, disables QUIC and HTTP cache.
@@ -108,6 +108,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setRuntimeGuard(String feature, boolean value) {
     mRuntimeGuards.put(feature, value);
+    return this;
   }
 
   /**
