@@ -28,6 +28,7 @@ Currently the filter supports following extensions
 
 * :ref:`generic <envoy_v3_api_msg_extensions.http.injected_credentials.generic.v3.Generic>`
 * :ref:`oauth2 client credentials grant <envoy_v3_api_msg_extensions.http.injected_credentials.oauth2.v3.OAuth2>`
+
 Other credential types can be supported as extensions.
 
 Here is an example configuration with Generic credential, which injects an HTTP Basic Auth credential into the proxied requests.
