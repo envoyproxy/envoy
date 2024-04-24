@@ -60,8 +60,9 @@ struct SuccessResponse {
     headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
       // UpstreamHeaderMatcher
       if (matchers_->matches(header.key().getStringView())) {
-        response_->headers_to_set.emplace_back(Http::LowerCaseString{header.key().getStringView()},
-                                               std::string(header.value().getStringView()));
+        response_->headers_to_set.emplace_back(
+            Http::LowerCaseString{std::string(header.key().getStringView())},
+            std::string(header.value().getStringView()));
       }
       if (append_matchers_->matches(header.key().getStringView())) {
         // If there is an existing matching key in the current headers, the new entry will be
@@ -69,14 +70,15 @@ struct SuccessResponse {
         // a matching "key" from the authorization response headers {"key": "value2"}, the
         // request to upstream server will have two entries for "key": {"key": "value1", "key":
         // "value2"}.
-        response_->headers_to_add.emplace_back(Http::LowerCaseString{header.key().getStringView()},
-                                               std::string(header.value().getStringView()));
+        response_->headers_to_add.emplace_back(
+            Http::LowerCaseString{std::string(header.key().getStringView())},
+            std::string(header.value().getStringView()));
       }
       if (response_matchers_->matches(header.key().getStringView())) {
         // For HTTP implementation, the response headers from the auth server will, by default, be
         // appended (using addCopy) to the encoded response headers.
         response_->response_headers_to_add.emplace_back(
-            Http::LowerCaseString{header.key().getStringView()},
+            Http::LowerCaseString{std::string(header.key().getStringView())},
             std::string(header.value().getStringView()));
       }
       if (to_dynamic_metadata_matchers_->matches(header.key().getStringView())) {
@@ -230,17 +232,18 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
       }
     }
   } else {
-    for (const auto& [key_str, value] : http_request.headers()) {
-      const Http::LowerCaseString key{key_str};
+    for (const auto& header : http_request.headers()) {
+      const Http::LowerCaseString key{header.first};
 
+      // Skip setting content-length header since it is already configured at initialization.
       if (key == Http::Headers::get().ContentLength) {
         continue;
       }
 
       if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), value));
+        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
       } else {
-        headers->addCopy(key, value);
+        headers->addCopy(key, header.second);
       }
     }
   }
@@ -315,7 +318,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
     return std::make_unique<Response>(errorResponse());
   }
 
-  // Extract headers-to-remove from the storage header coming from the authorization server.
+  // Extract headers-to-remove from the storage header coming from the
+  // authorization server.
   const auto& storage_header_name = Headers::get().EnvoyAuthHeadersToRemove;
   // If we are going to construct an Ok response we need to save the
   // headers_to_remove in a variable first.
@@ -330,11 +334,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
             storage_header_value, ",", /*keep_empty_string=*/false, /*trim_whitespace=*/true);
         headers_to_remove.reserve(headers_to_remove.size() + header_names.size());
         for (const auto& header_name : header_names) {
-          // The header name was expressed over a header value, which is more permissive. Make sure
-          // it's a valid header name.
-          if (Http::HeaderUtility::headerNameIsValid(header_name)) {
-            headers_to_remove.emplace_back(header_name);
-          }
+          headers_to_remove.push_back(Http::LowerCaseString(std::string(header_name)));
         }
       }
     }
