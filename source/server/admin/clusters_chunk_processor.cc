@@ -290,14 +290,14 @@ void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_pt
   }
 }
 
-void JsonClusterChunkProcessor::setHealthFlags(Json::Streamer::Map* raw_host_ptr,
+void JsonClustersChunkProcessor::setHealthFlags(Json::Streamer::Map* raw_host_ptr,
                                                const Upstream::HostSharedPtr& host,
                                                Buffer::Instance& response) {
   raw_host_ptr->addKey("health_stats");
-  Json::Streamer::MapPtr heath_status_ptr = raw_host_ptr->addMap();
+  Json::Streamer::MapPtr health_status_ptr = raw_host_ptr->addMap();
 // Invokes setHealthFlag for each health flag.
 #define SET_HEALTH_FLAG(name, notused)                                                             \
-  setHealthFlag(map_status_ptr.get(), Upstream::Host::HealthFlag::name, host, response);
+  setHealthFlag(health_status_ptr.get(), Upstream::Host::HealthFlag::name, host, response);
   HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
 #undef SET_HEALTH_FLAG
 }
@@ -368,6 +368,7 @@ void JsonClustersChunkProcessor::setHealthFlag(Json::Streamer::Map* health_statu
     break;
   }
   }
+}
 
   void JsonClustersChunkProcessor::addEjectionThresholds(Json::Streamer::Map * raw_clusters_map_ptr,
                                                          const Upstream::Cluster& unwrapped_cluster,
