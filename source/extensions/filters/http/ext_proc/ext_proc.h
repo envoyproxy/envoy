@@ -393,9 +393,6 @@ private:
   void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 
-  Http::FilterHeadersStatus
-  sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers, ProcessorState& state,
-                                 bool end_stream);
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream);
 
@@ -411,6 +408,11 @@ private:
                           envoy::service::ext_proc::v3::ProcessingRequest& req);
   void addAttributes(ProcessorState& state, envoy::service::ext_proc::v3::ProcessingRequest& req);
 
+  Http::FilterHeadersStatus
+  sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers, ProcessorState& state,
+                                 bool end_stream);
+  Http::FilterDataStatus sendDataInObservabilityMode(Buffer::Instance& data, ProcessorState& state,
+                                                     bool end_stream);
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;

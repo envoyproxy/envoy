@@ -332,7 +332,6 @@ void Filter::onDestroy() {
 FilterHeadersStatus
 Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers,
                                        ProcessorState& state, bool end_stream) {
-
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterHeadersStatus::StopIteration;
@@ -356,9 +355,50 @@ Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers
 
   if (end_stream) {
     state.setPaused(true);
+    // Timeout is needed when filter is waiting for the response from external processor.
+    state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                             ProcessorState::CallbackState::HeadersCallback);
     return FilterHeadersStatus::StopIteration;
   } else {
     return FilterHeadersStatus::Continue;
+  }
+}
+
+Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& data, ProcessorState& state,
+                                                   bool end_stream) {
+  // For the body processing mode in observability mode, only STREAMED body processing mode is
+  // supported and any other body processing modes will be ignored. NONE mode(i.e., skip body
+  // processing) will still work as expected.
+  if (state.bodyMode() == ProcessingMode::STREAMED) {
+    // Try to open the stream if the connection has not been established.
+    switch (openStream()) {
+    case StreamOpenState::Error:
+      return FilterDataStatus::StopIterationNoBuffer;
+    case StreamOpenState::IgnoreError:
+      return FilterDataStatus::Continue;
+    case StreamOpenState::Ok:
+      // Fall through
+      break;
+    }
+    // Set up the the body chunk and send.
+    auto req = setupBodyChunk(state, data, end_stream);
+    stream_->send(std::move(req), false);
+    stats_.stream_msgs_sent_.inc();
+  } else if (state.bodyMode() != ProcessingMode::NONE) {
+    ENVOY_LOG(error, "Wrong body mode for observability mode, no data is sent.");
+  }
+
+  if (end_stream) {
+    // But we need to stop iteration and buffer for the last chunk.
+    state.setPaused(true);
+    // TODO(tyxia) if we pause, then timeout is needed.
+    state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
+                               config_->messageTimeout(),
+                               ProcessorState::CallbackState::StreamedBodyCallback);
+    return FilterDataStatus::StopIterationAndBuffer;
+    // If it is end of stream, timeout needs to be implemented
+  } else {
+    return FilterDataStatus::Continue;
   }
 }
 
@@ -376,7 +416,6 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
 
   state.setHeaders(&headers);
   state.setHasNoBody(end_stream);
-
   ProcessingRequest req;
   addAttributes(state, req);
   addDynamicMetadata(state, req);
@@ -401,6 +440,8 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   // External processor may still close the stream to indicate that no more messages are needed.
   // In this case, `processing_complete_` will be true and sending message is skipped at openStream
   // above.
+  // Send headers in observaibility mode if external processor wants headers to be sent, i.e.,
+  // sendHeaders() is true.
   if (decoding_state_.sendHeaders() && config_->observabilityMode()) {
     return sendHeadersInObservabilityMode(headers, decoding_state_, end_stream);
   }
@@ -430,41 +471,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
   if (config_->observabilityMode()) {
-    // For the body processing mode in observability mode, only STREAMED body processing mode is
-    // supported and any other body processing modes will be ignored. NONE mode(i.e., skip body
-    // processing) will still work as expected.
-    if (state.bodyMode() == ProcessingMode::STREAMED) {
-      // Try to open the stream if the connection has not been established.
-      switch (openStream()) {
-      case StreamOpenState::Error:
-        return FilterDataStatus::StopIterationNoBuffer;
-      case StreamOpenState::IgnoreError:
-        return FilterDataStatus::Continue;
-      case StreamOpenState::Ok:
-        // Fall through
-        break;
-      }
-      // Set up the the body chunk and send.
-      auto req = setupBodyChunk(state, data, end_stream);
-      // LOG(INFO) << "tyxia_body_size: " << data.length() << "\n";
-      stream_->send(std::move(req), false);
-      stats_.stream_msgs_sent_.inc();
-    } else if (state.bodyMode() != ProcessingMode::NONE) {
-      ENVOY_LOG(error, "Wrong body mode for observability mode, no data is sent.");
-    }
-
-    if (end_stream) {
-      // But we need to stop iteration and buffer for the last chunk.
-      state.setPaused(true);
-      // TODO(tyxia) if we pause, then timeout is needed.
-      state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
-                                 config_->messageTimeout(),
-                                 ProcessorState::CallbackState::StreamedBodyCallback);
-      return FilterDataStatus::StopIterationAndBuffer;
-      // If it is end of stream, timeout needs to be implemented
-    } else {
-      return FilterDataStatus::Continue;
-    }
+    return sendDataInObservabilityMode(data, state, end_stream);
   }
 
   if (end_stream) {
@@ -661,22 +668,10 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
       break;
     }
 
-    ENVOY_LOG(error, "tyxia send trailers");
-    ProcessingRequest req;
-    addAttributes(state, req);
-    addDynamicMetadata(state, req);
-    auto* trailers_req = state.mutableTrailers(req);
-    MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
-                                  *trailers_req->mutable_trailers());
-
-    ENVOY_LOG(debug, "Sending trailers message in observability mode");
-    stream_->send(std::move(req), false);
-    stats_.stream_msgs_sent_.inc();
-    // TODO(tyxia) Here returns StopIteration!!
+    sendTrailers(state, trailers);
     state.setPaused(true);
-    return FilterTrailersStatus::StopIteration;
 
-    // return FilterTrailersStatus::Continue;
+    return FilterTrailersStatus::StopIteration;
   }
 
   bool body_delivered = state.completeBodyAvailable();
