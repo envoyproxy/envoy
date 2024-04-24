@@ -665,7 +665,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
         EXPECT_EQ(msg->msg_iovlen, 1);
         memcpy(msg->msg_iov[0].iov_base, stacked_message.data(), stacked_message.length());
         if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.udp_socket_apply_read_limit_differently")) {
+                "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
           EXPECT_EQ(msg->msg_iov[0].iov_len, 64 * 1024);
         }
         msg->msg_iov[0].iov_len = stacked_message.length();
@@ -736,7 +736,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
 
 TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsgNoDrop) {
   if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.udp_socket_apply_read_limit_differently")) {
+          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
     return;
   }
   setup(true);
@@ -769,7 +769,7 @@ TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsgNoDrop) {
 // But once MAX_NUM_PACKETS_PER_EVENT_LOOP of packets are processed, read will stop.
 TEST_P(UdpListenerImplTest, UdpGroReadLimit) {
   if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.udp_socket_apply_read_limit_differently")) {
+          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
     return;
   }
   setup(true);

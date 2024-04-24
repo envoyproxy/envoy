@@ -780,7 +780,7 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
   size_t num_packets_to_read = std::min<size_t>(
       MAX_NUM_PACKETS_PER_EVENT_LOOP, udp_packet_processor.numPacketsExpectedPerEventLoop());
   const bool apply_read_limit_differently = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.udp_socket_apply_read_limit_differently");
+      "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit");
   size_t num_reads;
   if (apply_read_limit_differently) {
     // Call socket read at least once and at most num_packets_read to avoid infinite loop.
