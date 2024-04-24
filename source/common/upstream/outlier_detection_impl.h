@@ -22,6 +22,7 @@
 #include "envoy/upstream/outlier_detection.h"
 
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/outlier_detection_monitors/common/monitor_base_impl.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -37,7 +38,8 @@ public:
   static absl::StatusOr<DetectorSharedPtr>
   createForCluster(Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
                    Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                   EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
+                   EventLoggerSharedPtr event_logger, Random::RandomGenerator& random,
+                   ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 /**
@@ -137,6 +139,7 @@ public:
   uint32_t numEjections() override { return num_ejections_; }
   void putHttpResponseCode(uint64_t response_code) override;
   void putResult(Result result, absl::optional<uint64_t> code) override;
+  void putResult(const Error&) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return last_ejection_time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override {
@@ -283,7 +286,9 @@ constexpr absl::string_view MaxEjectionTimeJitterMsRuntime =
  */
 class DetectorConfig {
 public:
-  DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config);
+  // DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config);
+  DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config,
+                 ProtobufMessage::ValidationVisitor& validation_visitor);
 
   uint64_t intervalMs() const { return interval_ms_; }
   uint64_t baseEjectionTimeMs() const { return base_ejection_time_ms_; }
@@ -363,6 +368,14 @@ private:
   static constexpr uint64_t DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE = 100;
   static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_MS = 10 * DEFAULT_BASE_EJECTION_TIME_MS;
   static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_JITTER_MS = 0;
+
+  // explicitly call constructor to increment ownership count of the shared pointer.
+  std::shared_ptr<Extensions::Outlier::MonitorsSet> monitorsSet() {
+    return std::shared_ptr<Extensions::Outlier::MonitorsSet>(monitors_set_);
+  }
+
+private:
+  std::shared_ptr<Extensions::Outlier::MonitorsSet> monitors_set_;
 };
 
 /**
@@ -375,7 +388,8 @@ public:
   static absl::StatusOr<std::shared_ptr<DetectorImpl>>
   create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-         EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
+         EventLoggerSharedPtr event_logger, Random::RandomGenerator& random,
+         ProtobufMessage::ValidationVisitor& validation_visitor);
   ~DetectorImpl() override;
 
   void onConsecutive5xx(HostSharedPtr host);
@@ -421,7 +435,8 @@ public:
 private:
   DetectorImpl(const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-               EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
+               EventLoggerSharedPtr event_logger, Random::RandomGenerator& randomi,
+               ProtobufMessage::ValidationVisitor& validation_visitor);
 
   void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();

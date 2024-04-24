@@ -47,6 +47,14 @@ enum class Result {
   ExtOriginRequestSuccess // Request was completed successfully.
 };
 
+/*
+ * Forward declaration of a class carrying a result of a transaction with upstream entity
+ * or generated internally by Envoy.
+ * Different categories of errors will be derived from that base class.
+ * Those categories of results are fed only into Outlier Detection extensions.
+ */
+class Error;
+
 /**
  * Monitor for per host data. Proxy filters should send pertinent data when available.
  */
@@ -79,6 +87,8 @@ public:
    * required.
    */
   void putResult(Result result) { putResult(result, absl::nullopt); }
+
+  virtual void putResult(const Error&) PURE;
 
   /**
    * Add a response time for a host (in this case response time is generic and might be used for

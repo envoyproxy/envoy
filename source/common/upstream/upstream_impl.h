@@ -173,6 +173,7 @@ public:
   uint32_t numEjections() override { return 0; }
   void putHttpResponseCode(uint64_t) override {}
   void putResult(Outlier::Result, absl::optional<uint64_t>) override {}
+  void putResult(const Outlier::Error&) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }

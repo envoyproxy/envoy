@@ -26,11 +26,12 @@ namespace Outlier {
 absl::StatusOr<DetectorSharedPtr> DetectorImplFactory::createForCluster(
     Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, EventLoggerSharedPtr event_logger,
-    Random::RandomGenerator& random) {
+    Random::RandomGenerator& random, ProtobufMessage::ValidationVisitor& validation_visitor) {
   if (cluster_config.has_outlier_detection()) {
 
     return DetectorImpl::create(cluster, cluster_config.outlier_detection(), dispatcher, runtime,
-                                dispatcher.timeSource(), std::move(event_logger), random);
+                                dispatcher.timeSource(), std::move(event_logger), random,
+                                validation_visitor);
   } else {
     return nullptr;
   }
@@ -207,7 +208,8 @@ void DetectorHostMonitorImpl::localOriginNoFailure() {
   resetConsecutiveLocalOriginFailure();
 }
 
-DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config)
+DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config,
+                               ProtobufMessage::ValidationVisitor& validation_visitor)
     : interval_ms_(
           static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(config, interval, DEFAULT_INTERVAL_MS))),
       base_ejection_time_ms_(static_cast<uint64_t>(
@@ -259,15 +261,30 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
       max_ejection_time_jitter_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(
           config, max_ejection_time_jitter, DEFAULT_MAX_EJECTION_TIME_JITTER_MS))),
       successful_active_health_check_uneject_host_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, successful_active_health_check_uneject_host, true)) {}
+          config, successful_active_health_check_uneject_host, true)) {
+
+  // Create outlier detection extensions.
+  Extensions::Outlier::MonitorFactoryContext context(validation_visitor);
+  for (const auto& monitor : config.monitors()) {
+    const auto& name = monitor.name();
+    printf("Evaluating monitor %s\n", name.c_str());
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Extensions::Outlier::MonitorFactory>(monitor);
+    printf("Found factory: %s\n", factory.category().c_str());
+    auto config = Config::Utility::translateToFactoryConfig(
+        monitor, validation_visitor /*.staticValidationVisitor()*/, factory);
+    auto m = factory.createMonitor(*config, context);
+  }
+}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::config::cluster::v3::OutlierDetection& config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                            TimeSource& time_source, EventLoggerSharedPtr event_logger,
-                           Random::RandomGenerator& random)
-    : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
-      stats_(generateStats(cluster.info()->statsScope())),
+                           Random::RandomGenerator& random,
+                           ProtobufMessage::ValidationVisitor& validation_visitor)
+    : config_(config, validation_visitor), dispatcher_(dispatcher), runtime_(runtime),
+      time_source_(time_source), stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
       event_logger_(event_logger), random_generator_(random) {
   // Insert success rate initial numbers for each type of SR detector
@@ -288,9 +305,10 @@ absl::StatusOr<std::shared_ptr<DetectorImpl>>
 DetectorImpl::create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                      TimeSource& time_source, EventLoggerSharedPtr event_logger,
-                     Random::RandomGenerator& random) {
-  std::shared_ptr<DetectorImpl> detector(
-      new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger, random));
+                     Random::RandomGenerator& random,
+                     ProtobufMessage::ValidationVisitor& validation_visitor) {
+  std::shared_ptr<DetectorImpl> detector(new DetectorImpl(
+      cluster, config, dispatcher, runtime, time_source, event_logger, random, validation_visitor));
 
   if (detector->config().maxEjectionTimeMs() < detector->config().baseEjectionTimeMs()) {
     return absl::InvalidArgumentError(
