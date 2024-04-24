@@ -902,7 +902,7 @@ envoy.http.injected_credentials.generic:
   status: alpha
   type_urls:
   - envoy.extensions.http.injected_credentials.generic.v3.Generic
-envoy.http.injected_credentials.generic:
+envoy.http.injected_credentials.oauth2:
   categories:
   - envoy.http.injected_credentials
   security_posture: unknown

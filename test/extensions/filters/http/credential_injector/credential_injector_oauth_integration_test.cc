@@ -1,5 +1,6 @@
-#include "test/integration/http_protocol_integration.h"
 #include "source/extensions/http/injected_credentials/oauth2/oauth_response.pb.h"
+
+#include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

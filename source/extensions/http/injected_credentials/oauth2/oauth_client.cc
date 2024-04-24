@@ -1,3 +1,5 @@
+#include "source/extensions/http/injected_credentials/oauth2/oauth_client.h"
+
 #include <chrono>
 
 #include "envoy/http/async_client.h"
@@ -12,8 +14,6 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/http/injected_credentials/oauth2/oauth_response.pb.h"
-
-#include "source/extensions/http/injected_credentials/oauth2/oauth_client.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -73,9 +73,10 @@ void OAuth2ClientImpl::onSuccess(const Envoy::Http::AsyncClient::Request&,
   const std::string response_body = message->bodyAsString();
 
   envoy::extensions::http::injected_credentials::oauth2::OAuthResponse response;
-  try {
+  TRY_NEEDS_AUDIT {
     MessageUtil::loadFromJson(response_body, response, ProtobufMessage::getNullValidationVisitor());
-  } catch (EnvoyException& e) {
+  }
+  END_TRY catch (EnvoyException& e) {
     ENVOY_LOG(error, "Error parsing response body, received exception: {}", e.what());
     ENVOY_LOG(error, "Response body: {}", response_body);
     // This is unlikely to get better if we retry, so just fail.

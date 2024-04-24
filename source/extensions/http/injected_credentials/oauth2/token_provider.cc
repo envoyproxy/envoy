@@ -7,7 +7,7 @@ namespace Http {
 namespace InjectedCredentials {
 namespace OAuth2 {
 
-// TokenProvider Contructor
+// TokenProvider Constructor
 TokenProvider::TokenProvider(Common::SecretReaderConstSharedPtr secret_reader,
                              ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
                              const OAuth2& proto_config, Event::Dispatcher& dispatcher,
