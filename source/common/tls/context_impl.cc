@@ -900,12 +900,13 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
         throwEnvoyExceptionOrPanic("Required OCSP response is missing from TLS context");
       }
     } else {
-      auto response = std::make_unique<Ocsp::OcspResponseWrapper>(ocsp_resp_bytes,
-                                                                  factory_context_.timeSource());
-      if (!response->matchesCertificate(*ctx.cert_chain_)) {
+      auto response_or_error =
+          Ocsp::OcspResponseWrapper::create(ocsp_resp_bytes, factory_context_.timeSource());
+      THROW_IF_STATUS_NOT_OK(response_or_error, throw);
+      if (!response_or_error.value()->matchesCertificate(*ctx.cert_chain_)) {
         throwEnvoyExceptionOrPanic("OCSP response does not match its TLS certificate");
       }
-      ctx.ocsp_response_ = std::move(response);
+      ctx.ocsp_response_ = std::move(response_or_error.value());
     }
   }
 }
