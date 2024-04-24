@@ -71,7 +71,8 @@ absl::Status skipCertStatus(CBS& cbs) {
         unwrap(
             Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
         unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 2)))) {
-    return absl::InvalidArgumentError(absl::StrCat("Unknown OcspCertStatus tag: ", attemptParseTagForErrorMessage(cbs)));
+    return absl::InvalidArgumentError(
+        absl::StrCat("Unknown OcspCertStatus tag: ", attemptParseTagForErrorMessage(cbs)));
   }
   return absl::OkStatus();
 }
