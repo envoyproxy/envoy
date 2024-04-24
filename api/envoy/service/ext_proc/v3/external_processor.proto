@@ -339,7 +339,7 @@ message ImmediateResponse {
 
   // The message body to return with the response which is sent using the
   // text/plain content type, or encoded in the grpc-message header.
-  string body = 3;
+  bytes body = 3;
 
   // If set, then include a gRPC status trailer.
   GrpcStatus grpc_status = 4;

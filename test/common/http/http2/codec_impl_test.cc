@@ -4561,8 +4561,6 @@ TEST_P(Http2CodecImplTest, BadResponseHeader) {
   EXPECT_TRUE(server_wrapper_->status_.ok());
 }
 
-class TestNghttp2SessionFactory;
-
 // Test client for H/2 METADATA frame edge cases.
 class MetadataTestClientConnectionImpl : public TestClientConnectionImpl {
 public:
@@ -4587,68 +4585,7 @@ public:
   }
 
 protected:
-  friend class TestNghttp2SessionFactory;
-
   NewMetadataEncoder encoder_;
-};
-
-class TestNghttp2SessionFactory : public Http2SessionFactory {
-public:
-  ~TestNghttp2SessionFactory() override {
-    nghttp2_session_callbacks_del(callbacks_);
-    nghttp2_option_del(options_);
-  }
-
-  std::unique_ptr<http2::adapter::Http2Adapter>
-  create(const nghttp2_session_callbacks*, ConnectionImpl* connection,
-         const http2::adapter::OgHttp2Adapter::Options& options) override {
-    // Only need to provide callbacks required to send METADATA frames. The new codec wrapper
-    // requires the send callback, but not the pack_extension callback.
-    nghttp2_session_callbacks_new(&callbacks_);
-    nghttp2_session_callbacks_set_send_callback(
-        callbacks_,
-        [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
-          // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
-          return static_cast<MetadataTestClientConnectionImpl*>(
-                     static_cast<ConnectionImpl*>(user_data))
-              ->onSend(data, length);
-        });
-    auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
-        http2::adapter::Perspective::kClient, *callbacks_, connection);
-    http2::adapter::Http2VisitorInterface& v = *visitor;
-    connection->setVisitor(std::move(visitor));
-    return http2::adapter::OgHttp2Adapter::Create(v, options);
-  }
-
-  std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks*,
-                                                       ConnectionImpl* connection,
-                                                       const nghttp2_option*) override {
-    // Only need to provide callbacks required to send METADATA frames. The new codec wrapper
-    // requires the send callback, but not the pack_extension callback.
-    nghttp2_session_callbacks_new(&callbacks_);
-    nghttp2_session_callbacks_set_send_callback(
-        callbacks_,
-        [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
-          // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
-          return static_cast<MetadataTestClientConnectionImpl*>(
-                     static_cast<ConnectionImpl*>(user_data))
-              ->onSend(data, length);
-        });
-    nghttp2_option_new(&options_);
-    nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
-
-    auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
-        http2::adapter::Perspective::kClient, *callbacks_, connection);
-    http2::adapter::Http2VisitorInterface& v = *visitor;
-    connection->setVisitor(std::move(visitor));
-    return http2::adapter::NgHttp2Adapter::CreateClientAdapter(v, options_);
-  }
-
-  void init(ConnectionImpl*, const envoy::config::core::v3::Http2ProtocolOptions&) override {}
-
-private:
-  nghttp2_session_callbacks* callbacks_;
-  nghttp2_option* options_;
 };
 
 class Http2CodecMetadataTest : public Http2CodecImplTestFixture, public ::testing::Test {
@@ -4680,7 +4617,7 @@ protected:
   }
 
 private:
-  TestNghttp2SessionFactory http2_session_factory_;
+  ProdNghttp2SessionFactory http2_session_factory_;
 };
 
 // Validates noop handling of METADATA frames without a known stream ID.
