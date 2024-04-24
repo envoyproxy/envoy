@@ -59,6 +59,11 @@ public:
    * for this route.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * @return route timeout for this route.
+   */
+  virtual const std::chrono::milliseconds timeout() const PURE;
 };
 using RouteEntryConstSharedPtr = std::shared_ptr<const RouteEntry>;
 

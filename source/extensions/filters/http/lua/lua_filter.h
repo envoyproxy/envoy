@@ -7,6 +7,7 @@
 
 #include "source/common/crypto/utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/lua/wrappers.h"
@@ -435,6 +436,11 @@ public:
                        Server::Configuration::ServerFactoryContext& context);
 
   ~FilterConfigPerRoute() override {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.restart_features.allow_slot_destroy_on_worker_threads")) {
+      return;
+    }
+
     // The design of the TLS system does not allow TLS state to be modified in worker threads.
     // However, when the route configuration is dynamically updated via RDS, the old
     // FilterConfigPerRoute object may be destructed in a random worker thread. Therefore, to
