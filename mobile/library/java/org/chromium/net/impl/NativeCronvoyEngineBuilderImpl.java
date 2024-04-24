@@ -44,7 +44,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mDnsCacheSaveIntervalSeconds = 1;
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
-  private final boolean mDnsUseSystemResolver = true;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
