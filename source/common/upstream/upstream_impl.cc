@@ -1187,7 +1187,6 @@ ClusterInfoImpl::ClusterInfoImpl(
 
     load_balancer_config_ = std::move(lb_pair->config);
     load_balancer_factory_ = lb_pair->factory;
-    lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
 
     RELEASE_ASSERT(
         load_balancer_factory_,
@@ -1366,8 +1365,6 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
                     "implementation for cluster: '{}' with names from [{}]",
                     name_, absl::StrJoin(missing_policies, ", ")));
   }
-
-  lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
 }
 
 ProtocolOptionsConfigConstSharedPtr

@@ -21,7 +21,7 @@ Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
   if (!active_or_legacy.hasActive()) {
     return std::make_unique<Upstream::RingHashLoadBalancer>(
         priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
-        !active_or_legacy.hasLegacy() ? active_or_legacy.legacy()->lbConfig() : absl::nullopt,
+        active_or_legacy.hasLegacy() ? active_or_legacy.legacy()->lbConfig() : absl::nullopt,
         cluster_info.lbConfig());
   }
 
