@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.quic.server_preferred_address.v3;
 
+import "envoy/config/core/v3/address.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -23,13 +25,44 @@ message FixedServerPreferredAddressConfig {
 
   oneof ipv4_type {
     // String representation of IPv4 address, i.e. "127.0.0.2".
+    // The listener's port will be used.
     // If not specified, none will be configured.
     string ipv4_address = 1;
+
+
+    // The IPv4 address to advertise to clients for Server Preferred Address.
+    envoy.config.core.v3.SocketAddress ipv4_address_and_port = 3;
+  }
+
+  oneof ipv4_dnat_type {
+    // If there is a DNAT between the client and Envoy, the address that Envoy will observe
+    // server preferred address IPv4 packets being sent to. If this is not specified, it is assumed
+    // there is no DNAT and the server preferred address packets will be sent to the address advertised
+    // to clients for server preferred address.
+    //
+    // String representation of IPv4 address, i.e. "127.0.0.2"
+    // The listener's port will be used.
+    string ipv4_dnat_address = 5;
   }
 
   oneof ipv6_type {
     // String representation of IPv6 address, i.e. "::1".
+    // The listener's port will be used.
     // If not specified, none will be configured.
     string ipv6_address = 2;
+
+
+    // The IPv6 address to advertise to clients for Server Preferred Address.
+    envoy.config.core.v3.SocketAddress ipv6_address_and_port = 4;
+  }
+  oneof ipv6_dnat_type {
+    // If there is a DNAT between the client and Envoy, the address that Envoy will observe
+    // server preferred address IPv6 packets being sent to. If this is not specified, it is assumed
+    // there is no DNAT and the server preferred address packets will be sent to the address advertised
+    // to clients for server preferred address.
+    //
+    // String representation of IPv6 address, i.e. "::1"
+    // The listener's port will be used.
+    string ipv6_dnat_address = 6;
   }
 }
