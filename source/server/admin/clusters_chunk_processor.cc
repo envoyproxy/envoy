@@ -187,6 +187,10 @@ void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
 
   addCircuitBreakers(cluster_map.get(), cluster_info, response);
   addEjectionThresholds(cluster_map.get(), cluster.get(), response);
+  std::vector<const Json::Streamer::Map::NameValue> added_via_api{
+      {"added_via_api", cluster_info->addedViaApi()},
+  };
+  addMapEntries(cluster_map.get(), response, added_via_api);
 }
 
 void JsonClustersChunkProcessor::addEjectionThresholds(Json::Streamer::Map* raw_clusters_map_ptr,
