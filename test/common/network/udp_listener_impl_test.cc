@@ -238,7 +238,7 @@ TEST_P(UdpListenerImplTest, LimitNumberOfReadsPerLoop) {
 #ifdef UDP_GRO
 TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsg) {
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.udp_socket_apply_read_limit_differently")) {
+          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
     return;
   }
   setup(true);
