@@ -2013,8 +2013,8 @@ envoy_quic_cc_library(
 
 envoy_quic_cc_library(
     name = "quic_core_blocked_writer_list_lib",
-    hdrs = ["quiche/quic/core/quic_blocked_writer_list.h"],
     srcs = ["quiche/quic/core/quic_blocked_writer_list.cc"],
+    hdrs = ["quiche/quic/core/quic_blocked_writer_list.h"],
     deps = [
         ":quic_core_blocked_writer_interface_lib",
         ":quic_platform_base",
