@@ -467,7 +467,7 @@ case $CI_TARGET in
             --define wasm=wasmtime \
             --define enable_logging=disabled \
             -c fastbuild \
-            @envoy//source/exe:envoy-static \
+            @envoy//contrib/exe:envoy-static \
             --build_tag_filters=-nofips
         collect_build_profile build
         ;;
