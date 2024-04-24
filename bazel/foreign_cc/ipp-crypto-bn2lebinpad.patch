@@ -1,0 +1,19 @@
+diff --git a/sources/ippcp/crypto_mb/src/common/ifma_cvt52.c b/sources/ippcp/crypto_mb/src/common/ifma_cvt52.c
+index e6db178c..0a1ecc49 100644
+--- a/sources/ippcp/crypto_mb/src/common/ifma_cvt52.c
++++ b/sources/ippcp/crypto_mb/src/common/ifma_cvt52.c
+@@ -16,9 +16,14 @@
+ 
+ #include <internal/common/ifma_defs.h>
+ #include <internal/common/ifma_math.h>
++#include <openssl/bn.h>
+ 
+ #include <assert.h>
+ 
++static int BN_bn2lebinpad(const BIGNUM *a, unsigned char *to, int tolen) {
++    return BN_bn2le_padded(to, tolen, a);
++}
++
+ #if defined(_MSC_VER) && (_MSC_VER < 1920)
+   // Disable optimization for VS2017 due to AVX512 masking bug
+   #define DISABLE_OPTIMIZATION __pragma(optimize( "", off ))
