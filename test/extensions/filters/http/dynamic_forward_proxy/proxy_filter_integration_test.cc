@@ -9,6 +9,7 @@
 #include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/registry.h"
 
 using testing::HasSubstr;
 
@@ -387,6 +388,10 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 

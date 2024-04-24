@@ -10,7 +10,9 @@
 #include "test/common/http/common.h"
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/common/mocks/common/mocks.h"
+#include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/autonomous_upstream.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_random_generator.h"
 
 #include "extension_registry.h"
@@ -553,6 +555,31 @@ TEST_P(ClientIntegrationTest, InvalidDomain) {
 
   ASSERT_EQ(cc_.on_error_calls, 1);
   ASSERT_EQ(cc_.on_headers_calls, 0);
+}
+
+TEST_P(ClientIntegrationTest, InvalidDomainFakeResolver) {
+  upstream_tls_ = false; // Avoid cert verify errors.
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+
+  initialize();
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  default_request_headers_.setHost(
+      absl::StrCat("www.doesnotexist.com:", fake_upstreams_[0]->localAddress()->ip()->port()));
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  // Force the lookup to resolve to localhost.
+  Network::TestResolver::unblockResolve("localhost");
+  terminal_callback_.waitReady();
+
+  // Instead of an error we should get a 200 ok from the fake upstream.
+  ASSERT_EQ(cc_.on_error_calls, 0);
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
 }
 
 TEST_P(ClientIntegrationTest, BasicBeforeResponseHeaders) {
