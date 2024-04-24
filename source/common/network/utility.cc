@@ -779,23 +779,28 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
   // this goes over MAX_NUM_PACKETS_PER_EVENT_LOOP.
   size_t num_packets_to_read = std::min<size_t>(
       MAX_NUM_PACKETS_PER_EVENT_LOOP, udp_packet_processor.numPacketsExpectedPerEventLoop());
-  size_t num_reads;
-  switch (recv_msg_method) {
-  case UdpRecvMsgMethod::RecvMsgWithGro:
-    num_reads = (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE);
-    break;
-  case UdpRecvMsgMethod::RecvMmsg:
-    num_reads = (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE);
-    break;
-  case UdpRecvMsgMethod::RecvMsg:
-    num_reads = num_packets_to_read;
-    break;
-  }
-  // Make sure to read at least once.
-  num_reads = std::max<size_t>(1, num_reads);
-
   const bool apply_read_limit_differently = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.udp_socket_apply_read_limit_differently");
+  size_t num_reads;
+  if (apply_read_limit_differently) {
+    // Call socket read at least once and at most num_packets_read to avoid infinite loop.
+    num_reads = std::max<size_t>(1, num_packets_to_read);
+  } else {
+    switch (recv_msg_method) {
+    case UdpRecvMsgMethod::RecvMsgWithGro:
+      num_reads = (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE);
+      break;
+    case UdpRecvMsgMethod::RecvMmsg:
+      num_reads = (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE);
+      break;
+    case UdpRecvMsgMethod::RecvMsg:
+      num_reads = num_packets_to_read;
+      break;
+    }
+    // Make sure to read at least once.
+    num_reads = std::max<size_t>(1, num_reads);
+  }
+
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     uint32_t num_packets_processed = 0;
@@ -830,11 +835,10 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
         return std::move(result.err_);
       }
       num_packets_to_read -= num_packets_processed;
-    } else {
-      --num_reads;
-      if (num_reads == 0) {
-        return std::move(result.err_);
-      }
+    }
+    --num_reads;
+    if (num_reads == 0) {
+      return std::move(result.err_);
     }
   } while (true);
 }
