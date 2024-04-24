@@ -79,13 +79,17 @@ private:
                              const Upstream::Cluster& unwrapped_cluster,
                              Buffer::Instance& response);
   void addHostStatuses(Json::Streamer::Map* raw_clusters_map_ptr,
-                       const Upstream::Cluster& unwrapped_cluster,
-                       Buffer::Instance& response);
-  void processHostSet(Json::Streamer::Array* raw_hosts_statuses_ptr, const Upstream::HostSetPtr& host_set, Buffer::Instance& response);
-  void processHost(Json::Streamer::Array* raw_host_statuses_ptr, const Upstream::HostSharedPtr& host, Buffer::Instance& response);
-  void buildHostStats(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host, Buffer::Instance& response);
-  void setHealthFlags(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host, Buffer::Instance& response);
-  void setHealthFlag(Json::Streamer::Map* raw_host_ptr, Upstream::Host::HealthFlag flag, const Upstream::HostSharedPtr& host, Buffer::Instance& response);
+                       const Upstream::Cluster& unwrapped_cluster, Buffer::Instance& response);
+  void processHostSet(Json::Streamer::Array* raw_hosts_statuses_ptr,
+                      const Upstream::HostSetPtr& host_set, Buffer::Instance& response);
+  void processHost(Json::Streamer::Array* raw_host_statuses_ptr,
+                   const Upstream::HostSharedPtr& host, Buffer::Instance& response);
+  void buildHostStats(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host,
+                      Buffer::Instance& response);
+  void setHealthFlags(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host,
+                      Buffer::Instance& response);
+  void setHealthFlag(Json::Streamer::Map* raw_host_ptr, Upstream::Host::HealthFlag flag,
+                     const Upstream::HostSharedPtr& host, Buffer::Instance& response);
 
   const uint64_t chunk_limit_;
   Http::ResponseHeaderMap& response_headers_;
