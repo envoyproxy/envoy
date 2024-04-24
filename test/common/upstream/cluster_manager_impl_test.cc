@@ -1345,8 +1345,6 @@ public:
     cluster1->info_->lb_factory_ =
         Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(factory_name);
 
-    std::cout << cluster1->info_->lb_factory_->name() << std::endl;
-
     InSequence s;
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
         .WillOnce(Return(std::make_pair(cluster1, nullptr)));
