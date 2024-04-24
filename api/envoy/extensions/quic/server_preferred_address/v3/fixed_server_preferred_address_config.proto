@@ -18,6 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.quic.server_preferred_address.fixed]
 
 // Configuration for FixedServerPreferredAddressConfig.
+// [#next-free-field: 7]
 message FixedServerPreferredAddressConfig {
   // [#comment:TODO(danzh2010): discuss with API shepherds before removing WiP status.]
 
@@ -29,9 +30,8 @@ message FixedServerPreferredAddressConfig {
     // If not specified, none will be configured.
     string ipv4_address = 1;
 
-
     // The IPv4 address to advertise to clients for Server Preferred Address.
-    envoy.config.core.v3.SocketAddress ipv4_address_and_port = 3;
+    config.core.v3.SocketAddress ipv4_address_and_port = 3;
   }
 
   oneof ipv4_dnat_type {
@@ -51,10 +51,10 @@ message FixedServerPreferredAddressConfig {
     // If not specified, none will be configured.
     string ipv6_address = 2;
 
-
     // The IPv6 address to advertise to clients for Server Preferred Address.
-    envoy.config.core.v3.SocketAddress ipv6_address_and_port = 4;
+    config.core.v3.SocketAddress ipv6_address_and_port = 4;
   }
+
   oneof ipv6_dnat_type {
     // If there is a DNAT between the client and Envoy, the address that Envoy will observe
     // server preferred address IPv6 packets being sent to. If this is not specified, it is assumed

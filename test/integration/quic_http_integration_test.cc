@@ -1957,7 +1957,10 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDNAT) {
             server_preferred_address;
         server_preferred_address.mutable_ipv4_address_and_port()->set_address("1.2.3.4");
         server_preferred_address.mutable_ipv4_address_and_port()->set_port_value(12345);
+        server_preferred_address.mutable_ipv6_address_and_port()->set_address("::1");
+        server_preferred_address.mutable_ipv6_address_and_port()->set_port_value(12345);
         server_preferred_address.set_ipv4_dnat_address("127.0.0.2");
+        server_preferred_address.set_ipv6_dnat_address("::2");
         preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
 
         // Configure a test listener filter which is incompatible with any server preferred
