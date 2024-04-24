@@ -2023,6 +2023,19 @@ envoy_quic_cc_library(
     ],
 )
 
+envoy_cc_test(
+    name = "quic_core_blocked_writer_list_test",
+    srcs = ["quiche/quic/core/quic_blocked_writer_list_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_blocked_writer_interface_lib",
+        ":quic_core_blocked_writer_list_lib",
+        ":quic_platform_test",
+    ],
+)
+
 envoy_quic_cc_library(
     name = "quic_core_arena_scoped_ptr_lib",
     hdrs = ["quiche/quic/core/quic_arena_scoped_ptr.h"],
