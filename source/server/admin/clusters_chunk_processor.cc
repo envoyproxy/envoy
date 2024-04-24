@@ -226,16 +226,16 @@ void JsonClustersChunkProcessor::processHost(Json::Streamer::Array* raw_host_sta
       {"hostname", host->hostname()},
   };
   addMapEntries(host_ptr.get(), response, hostname);
-  // {
-  //   host_ptr->addKey("locality");
-  //   Json::Streamer::MapPtr locality_ptr = host_ptr->addMap();
-  //   std::vector<const Json::Streamer::Map::NameValue> locality{
-  //       {"region", host->locality().region()},
-  //       {"zone", host->locality().zone()},
-  //       {"sub_zone", host->locality().sub_zone()},
-  //   };
-  //   addMapEntries(locality_ptr.get(), response, locality);
-  // }
+  {
+    host_ptr->addKey("locality");
+    Json::Streamer::MapPtr locality_ptr = host_ptr->addMap();
+    std::vector<const Json::Streamer::Map::NameValue> locality{
+        {"region", host->locality().region()},
+        {"zone", host->locality().zone()},
+        {"sub_zone", host->locality().sub_zone()},
+    };
+    addMapEntries(locality_ptr.get(), response, locality);
+  }
   // buildHostStats(host_ptr.get(), host, response);
   // setHealthFlags(host_ptr.get(), host, response);
 
