@@ -10,6 +10,7 @@
 #include "source/common/http/null_route_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
 
@@ -98,7 +99,10 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       router_(options.filter_config_ ? *options.filter_config_ : parent.config_,
               parent.config_.async_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr,
-                   StreamInfo::FilterState::LifeSpan::FilterChain),
+                   options.filter_state != nullptr
+                       ? options.filter_state
+                       : std::make_shared<StreamInfo::FilterStateImpl>(
+                             StreamInfo::FilterState::LifeSpan::FilterChain)),
       tracing_config_(Tracing::EgressConfig::get()),
       retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_)),
       route_(std::make_shared<NullRouteImpl>(
