@@ -137,7 +137,7 @@ void Streamer::Map::addEntries(const Entries& entries) {
 }
 
 void Streamer::Level::addValue(const Value& value) {
-  switch (value.index()) {
+  switch (int idx = value.index()) {
   case 0:
     static_assert(std::is_same<decltype(absl::get<0>(value)), const absl::string_view&>::value,
                   "value at index 0 must be an absl::string_vlew");
