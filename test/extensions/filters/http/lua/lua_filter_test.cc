@@ -2192,7 +2192,8 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Event::SimulatedTimeSystem test_time;
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time.timeSystem(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
