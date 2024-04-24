@@ -87,16 +87,16 @@ envoy_cc_library(
     ],
 )
 
-# envoy_cc_test(
-#     name = "http2_adapter_chunked_buffer_test",
-#     srcs = ["quiche/http2/adapter/chunked_buffer_test.cc"],
-#     copts = quiche_copts,
-#     repository = "@envoy",
-#     deps = [
-#         ":quiche_common_platform_test",
-#         "@com_google_absl//absl/strings",
-#     ],
-# )
+envoy_cc_test(
+    name = "http2_adapter_chunked_buffer_test",
+    srcs = ["quiche/http2/adapter/chunked_buffer_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":quiche_common_platform_test",
+        "@com_google_absl//absl/strings",
+    ],
+)
 
 envoy_cc_library(
     name = "http2_adapter_data_source",
