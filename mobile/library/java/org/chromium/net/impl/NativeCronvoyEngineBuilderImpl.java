@@ -97,6 +97,21 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
+   * Set the DNS minimum refresh time, in seconds, which ensures that we wait to refresh a DNS
+   * entry for at least the minimum refresh time. For example, if the DNS record TTL is 60 seconds
+   * and setMinDnsRefreshSeconds(120) is invoked, then at least 120 seconds will transpire before
+   * the DNS entry for a host is refreshed.
+   *
+   * The default is 60s.
+   *
+   * @param minRefreshSeconds The DNS minimum refresh time, in seconds.
+   */
+  public NativeCronvoyEngineBuilderImpl setMinDnsRefreshSeconds(int minRefreshSeconds) {
+    mDnsMinRefreshSeconds = minRefreshSeconds;
+    return this;
+  }
+
+  /**
    * Sets the boolean value for the reloadable runtime feature flag value. For example, to set the
    * Envoy runtime flag `envoy.reloadable_features.http_allow_partial_urls_in_referer` to true,
    * call `setRuntimeGuard("http_allow_partial_urls_in_referer", true)`.
