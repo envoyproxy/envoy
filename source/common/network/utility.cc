@@ -731,7 +731,7 @@ Api::IoCallUint64Result readFromSocketRecvMsg(IoHandle& handle,
                                               MonotonicTime receive_time, uint32_t* packets_dropped,
                                               uint32_t* num_packets_read) {
   if (num_packets_read != nullptr) {
-    *num_packets_read = 0
+    *num_packets_read = 0;
   }
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   IoHandle::RecvMsgOutput output(1, packets_dropped);
