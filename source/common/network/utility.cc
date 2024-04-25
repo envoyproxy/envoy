@@ -1,5 +1,6 @@
 #include "source/common/network/utility.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -610,7 +611,9 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
                                               uint32_t* num_packets_read) {
   ASSERT(Api::OsSysCallsSingleton::get().supportsUdpGro(),
          "cannot use GRO when the platform doesn't support it.");
-  *num_packets_read = 0;
+  if (num_packets_read != nullptr) {
+    *num_packets_read = 0;
+  }
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   IoHandle::RecvMsgOutput output(1, packets_dropped);
 
@@ -666,7 +669,9 @@ readFromSocketRecvMmsg(IoHandle& handle, const Address::Instance& local_address,
   ASSERT(Api::OsSysCallsSingleton::get().supportsMmsg(),
          "cannot use recvmmsg when the platform doesn't support it.");
   const auto max_rx_datagram_size = udp_packet_processor.maxDatagramSize();
-  *num_packets_read = 0;
+  if (num_packets_read != nullptr) {
+    *num_packets_read = 0;
+  }
 
   // Buffer::ReservationSingleSlice is always passed by value, and can only be constructed
   // by Buffer::Instance::reserve(), so this is needed to keep a fixed array
@@ -725,7 +730,9 @@ Api::IoCallUint64Result readFromSocketRecvMsg(IoHandle& handle,
                                               UdpPacketProcessor& udp_packet_processor,
                                               MonotonicTime receive_time, uint32_t* packets_dropped,
                                               uint32_t* num_packets_read) {
-  *num_packets_read = 0
+  if (num_packets_read != nullptr) {
+    *num_packets_read = 0
+  }
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   IoHandle::RecvMsgOutput output(1, packets_dropped);
 
