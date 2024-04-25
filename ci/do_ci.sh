@@ -463,11 +463,12 @@ case $CI_TARGET in
             --define log_debug_assert_in_release=disabled
         echo "Building binary with wasm=wasmtime... and logging disabled"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+            --action_env=TEST=TEST \
             --config=compile-time-options \
             --define wasm=wasmtime \
             --define enable_logging=disabled \
             -c fastbuild \
-            @envoy//source/exe:envoy-static \
+            @envoy//contrib/exe:envoy-static \
             --build_tag_filters=-nofips
         collect_build_profile build
         ;;
