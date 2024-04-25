@@ -15,6 +15,7 @@ class EnvoyQuicServerPreferredAddressConfig {
 public:
   virtual ~EnvoyQuicServerPreferredAddressConfig() = default;
 
+  // The set of addresses used to configure the server preferred addresses.
   struct Addresses {
     // Addresses that client is requested to use.
     quic::QuicSocketAddress ipv4_;

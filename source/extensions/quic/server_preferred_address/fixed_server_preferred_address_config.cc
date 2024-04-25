@@ -14,24 +14,27 @@ ipOrAddressToAddress(const FixedServerPreferredAddressConfig::QuicSocketOrIpAddr
   return absl::visit(
       [&](const auto& arg) -> quic::QuicSocketAddress {
         using T = std::decay_t<decltype(arg)>;
+
         if constexpr (std::is_same_v<T, quic::QuicSocketAddress>) {
           return arg;
-        } else if constexpr (std::is_same_v<T, quic::QuicIpAddress>) {
-          return quic::QuicSocketAddress(arg, port);
-        } else {
-          IS_ENVOY_BUG(fmt::format("Unhandled type in variant visitor: {}", typeof(arg)));
-          return {};
         }
+
+        if constexpr (std::is_same_v<T, quic::QuicIpAddress>) {
+          return quic::QuicSocketAddress(arg, port);
+        }
+
+        IS_ENVOY_BUG(fmt::format("Unhandled type in variant visitor: {}", address.index()));
+        return {};
       },
       address);
 }
 
-quic::QuicIpAddress parseIp(const std::string& addr, absl::string_view version,
+quic::QuicIpAddress parseIp(const std::string& addr, absl::string_view address_family,
                             const Protobuf::Message& message) {
   quic::QuicIpAddress ip;
   if (!ip.FromString(addr)) {
     ProtoExceptionUtil::throwProtoValidationException(
-        absl::StrCat("bad ", version, " server preferred address: ", addr), message);
+        absl::StrCat("bad ", address_family, " server preferred address: ", addr), message);
   }
   return ip;
 }
