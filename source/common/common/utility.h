@@ -734,7 +734,7 @@ template <class Value> struct TrieLookupTable {
     for (uint8_t c : key) {
       current = (*current)[c];
       if (current == nullptr) {
-        return nullptr;
+        return {};
       }
     }
     return current->value_;
