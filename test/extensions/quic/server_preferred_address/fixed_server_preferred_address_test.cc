@@ -1,8 +1,8 @@
+#include "source/common/network/utility.h"
 #include "source/extensions/quic/server_preferred_address/fixed_server_preferred_address_config.h"
 
-#include "source/common/network/utility.h"
-#include "test/test_common/utility.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
