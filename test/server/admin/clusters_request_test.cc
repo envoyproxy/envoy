@@ -112,25 +112,21 @@ protected:
     ON_CALL(*mock_host_, hostname()).WillByDefault(ReturnRef("test_hostname"));
     ON_CALL(*mock_host_, locality()).WillByDefault(ReturnRef(locality_));
     ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC))
-        .WillByDefault(Return(false));
+        .WillByDefault(Return(true));
     ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK))
-        .WillByDefault(Return(false));
-    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
-        .WillByDefault(Return("HEALTHY"));
-    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH))
-        .WillByDefault(Return("HEALTHY"));
+        .WillByDefault(Return(true));
     ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::EDS_STATUS_DRAINING))
-        .WillByDefault(Return("HEALTHY"));
+        .WillByDefault(Return(true));
     ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC))
-        .WillByDefault(Return(false));
+        .WillByDefault(Return(true));
     ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL))
-        .WillByDefault(Return(false));
+        .WillByDefault(Return(true));
     ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC))
-        .WillByDefault(Return(false));
+        .WillByDefault(Return(true));
     ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL))
-        .WillByDefault(Return(false));
+        .WillByDefault(Return(true));
     ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT))
-        .WillByDefault(Return(false));
+        .WillByDefault(Return(true));
     ON_CALL(*mock_host_, outlierDetector()).WillByDefault(ReturnRef(detector_host_monitor_));
     ON_CALL(
         Const(detector_host_monitor_),
@@ -193,7 +189,8 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
 
   EXPECT_EQ(result.code_, Http::Code::OK);
   // The order of clusters is non-deterministic so strip the 2 from test_cluster2 and expect both
-  // clusters to be identical.
+  // clusters to be identical. We also strip all whitespace when making the expectation since the
+  // output will not actually have any.
   std::string expected_readable_output = R"EOF(
       { 
         "cluster_statuses": [
@@ -248,8 +245,19 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
                     "value": 11
                   }
                 ]
+                "health_status": {
+                  "failed_active_health_check": false,
+                  "failed_outlier_check": false,
+                  "eds_health_status": "HEALTHY",
+                  "failed_active_degraded_check": false,
+                  "pending_dynamic_removal": false,
+                  "pending_active_hc": false,
+                  "excluded_via_immediate_hc_fail": false,
+                  "active_hc_timeout": false
+                }
+
               }
-            ]
+            ],
           },
           {
             "name": "test_cluster",

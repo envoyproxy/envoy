@@ -7,11 +7,13 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/upstream/host_utility.h"
 
 namespace Envoy {
@@ -176,25 +178,26 @@ void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
   Json::Streamer::MapPtr cluster_map = json_context_holder_.back()->clusters_->addMap();
   Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.get().info();
 
-  std::vector<const Json::Streamer::Map::NameValue> top_level_entries{
-      {"name", cluster_info->name()},
-      {"observability_name", cluster_info->observabilityName()},
-  };
-  addMapEntries(cluster_map.get(), response, top_level_entries);
+  std::vector<const Json::Streamer::Map::NameValue> top_level_entries;
+  if (const std::string& name = cluster_info->name(); !name.empty()) {
+    top_level_entries.emplace_back("name", name);
+  }
+  if (const std::string& observability_name = cluster_info->observabilityName();
+      !observability_name.empty()) {
+    top_level_entries.emplace_back("observability_name", observability_name);
+  }
 
-  if (const std::string& name = cluster_info->edsServiceName(); !name.empty()) {
-    std::vector<const Json::Streamer::Map::NameValue> eds_service_name_entry{
-        {"eds_service_name", name},
-    };
-    addMapEntries(cluster_map.get(), response, eds_service_name_entry);
+  if (const std::string& eds_service_name = cluster_info->edsServiceName();
+      !eds_service_name.empty()) {
+    top_level_entries.push_back({"eds_service_name", eds_service_name});
   }
 
   addCircuitBreakers(cluster_map.get(), cluster_info, response);
   addEjectionThresholds(cluster_map.get(), cluster.get(), response);
-  std::vector<const Json::Streamer::Map::NameValue> added_via_api{
-      {"added_via_api", cluster_info->addedViaApi()},
-  };
-  addMapEntries(cluster_map.get(), response, added_via_api);
+  if (bool added_via_api = cluster_info->addedViaApi(); added_via_api) {
+    top_level_entries.emplace_back("added_via_api", added_via_api);
+  }
+  addMapEntries(cluster_map.get(), response, top_level_entries);
   addHostStatuses(cluster_map.get(), cluster, response);
 }
 
@@ -220,87 +223,134 @@ void JsonClustersChunkProcessor::processHostSet(Json::Streamer::Array* raw_host_
 void JsonClustersChunkProcessor::processHost(Json::Streamer::Array* raw_host_statuses_ptr,
                                              const Upstream::HostSharedPtr& host,
                                              Buffer::Instance& response) {
+  Buffer::OwnedImpl buffer;
   Json::Streamer::MapPtr host_ptr = raw_host_statuses_ptr->addMap();
+  std::vector<const Json::Streamer::Map::NameValue> host_config;
+  setHostname(host, host_config);
   addAddress(host_ptr.get(), host, response);
-  std::vector<const Json::Streamer::Map::NameValue> hostname{
-      {"hostname", host->hostname()},
-  };
-  addMapEntries(host_ptr.get(), response, hostname);
-  {
-    host_ptr->addKey("locality");
-    Json::Streamer::MapPtr locality_ptr = host_ptr->addMap();
-    std::vector<const Json::Streamer::Map::NameValue> locality{
-        {"region", host->locality().region()},
-        {"zone", host->locality().zone()},
-        {"sub_zone", host->locality().sub_zone()},
-    };
-    addMapEntries(locality_ptr.get(), response, locality);
-  }
+  setLocality(host_ptr.get(), host, response);
   buildHostStats(host_ptr.get(), host, response);
-  // setHealthFlags(host_ptr.get(), host, response);
+  setHealthFlags(host_ptr.get(), host, response);
+  setSuccessRate(host, host_config);
 
-  // double success_rate = host->outlierDetector().successRate(
-  //     Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
-  // if (success_rate >= 0.0) {
-  //   std::vector<const Json::Streamer::Map::NameValue> success_rate_property{
-  //       {"suceess_rate", success_rate},
-  //   };
-  //   addMapEntries(host_ptr.get(), response, success_rate_property);
+  // TODO(demitriswan) add test to ensure empty object doesn't get written.
+  // if (buffer.length()) {
+  //   response.move(buffer);
   // }
+  if (!host_config.empty()) {
+    addMapEntries(host_ptr.get(), response, host_config);
+  }
+}
+void JsonClustersChunkProcessor::setHostname(
+    const Upstream::HostSharedPtr& host,
+    std::vector<const Json::Streamer::Map::NameValue>& host_config) {
+  // if (const std::string& hostname = host->hostname(); !hostname.empty()) {
+  host_config.emplace_back("hostname", host->hostname());
+  // }
+}
 
-  // std::vector<const Json::Streamer::Map::NameValue> weight_and_priority{
-  //     {"weight", uint64_t(host->weight())},
-  //     {"priority", uint64_t(host->priority())},
-  // };
-  // addMapEntries(host_ptr.get(), response, weight_and_priority);
-  // success_rate = host->outlierDetector().successRate(
-  //     Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
-  // if (success_rate >= 0.0) {
-  //   std::vector<const Json::Streamer::Map::NameValue> success_rate_property{
-  //       {"local_origin_success_rate", success_rate},
-  //   };
-  //   addMapEntries(host_ptr.get(), response, success_rate_property);
-  // }
+void JsonClustersChunkProcessor::setSuccessRate(
+    const Upstream::HostSharedPtr& host,
+    std::vector<const Json::Streamer::Map::NameValue>& host_config) {
+
+  double external_success_rate = host->outlierDetector().successRate(
+      Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
+  double local_success_rate = host->outlierDetector().successRate(
+      Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
+  if (!external_success_rate && !local_success_rate) {
+    return;
+  }
+
+  if (external_success_rate >= 0.0) {
+    host_config.emplace_back("success_rate", external_success_rate);
+  }
+  if (uint64_t weight = host->weight(); weight) {
+    host_config.emplace_back("weight", weight);
+  }
+  if (uint64_t priority = host->priority(); priority) {
+    host_config.emplace_back("priority", priority);
+  }
+  if (local_success_rate >= 0.0) {
+    host_config.emplace_back("local_origin_success_rate", local_success_rate);
+  }
+}
+
+void JsonClustersChunkProcessor::setLocality(Json::Streamer::Map* raw_host_ptr,
+                                             const Upstream::HostSharedPtr& host,
+                                             Buffer::Instance& response) {
+
+  if (host->locality().region().empty() && host->locality().zone().empty() &&
+      host->locality().sub_zone().empty()) {
+    return;
+  }
+  raw_host_ptr->addKey("locality");
+  Json::Streamer::MapPtr locality_ptr = raw_host_ptr->addMap();
+  std::vector<const Json::Streamer::Map::NameValue> locality;
+  if (const std::string& region = host->locality().region(); !region.empty()) {
+    locality.emplace_back("region", region);
+  }
+  if (const std::string& zone = host->locality().zone(); !zone.empty()) {
+    locality.emplace_back("zone", zone);
+  }
+  if (const std::string& sub_zone = host->locality().sub_zone(); !sub_zone.empty()) {
+    locality.emplace_back("sub_zone", sub_zone);
+  }
+  addMapEntries(locality_ptr.get(), response, locality);
 }
 
 void JsonClustersChunkProcessor::addAddress(Json::Streamer::Map* raw_host_ptr,
                                             const Upstream::HostSharedPtr& host,
                                             Buffer::Instance& response) {
-  // Referenced Network::Utility::addressToProtobufAddress as used in the
-  // original admin clusters handler for json responses; however, the
-  // config.core.v3.Address has a slightly different structure according to the
-  // documentation.
-  //
-  // TODO(demitriswan) find out why this is the case.
-  raw_host_ptr->addKey("address");
-  Json::Streamer::MapPtr address_ptr = raw_host_ptr->addMap();
   switch (host->address()->type()) {
   case Network::Address::Type::Pipe: {
-    Json::Streamer::MapPtr pipe_ptr = address_ptr->addMap();
-    std::vector<const Json::Streamer::Map::NameValue> pipe{
-        {"pipe", host->address()->asString()},
-    };
-    addMapEntries(pipe_ptr.get(), response, pipe);
+    if (const std::string& path = host->address()->asString(); !path.empty()) {
+      raw_host_ptr->addKey("address");
+      Json::Streamer::MapPtr address_ptr = raw_host_ptr->addMap();
+      address_ptr->addKey("pipe");
+      Json::Streamer::MapPtr pipe_ptr = address_ptr->addMap();
+      std::vector<const Json::Streamer::Map::NameValue> pipe{
+          {"pipe", host->address()->asString()},
+      };
+      addMapEntries(pipe_ptr.get(), response, pipe);
+    }
     break;
   }
   case Network::Address::Type::Ip: {
-    address_ptr->addKey("socket_address");
-    Json::Streamer::MapPtr socket_address_ptr = address_ptr->addMap();
-    std::vector<const Json::Streamer::Map::NameValue> socket_address{
-        {"address", host->address()->ip()->addressAsString()},
-        {"port", uint64_t(host->address()->ip()->port())},
-    };
-    addMapEntries(socket_address_ptr.get(), response, socket_address);
+    if (!host->address()->ip()->addressAsString().empty() || host->address()->ip()->port()) {
+      raw_host_ptr->addKey("address");
+      Json::Streamer::MapPtr address_ptr = raw_host_ptr->addMap();
+      address_ptr->addKey("socket_address");
+      Json::Streamer::MapPtr socket_address_ptr = address_ptr->addMap();
+      std::vector<const Json::Streamer::Map::NameValue> socket_address;
+      if (const std::string& address = host->address()->ip()->addressAsString(); !address.empty()) {
+        socket_address.emplace_back("address", address);
+      }
+      if (uint64_t port = uint64_t(host->address()->ip()->port()); port) {
+        socket_address.emplace_back("port", port);
+      }
+      addMapEntries(socket_address_ptr.get(), response, socket_address);
+    }
     break;
   }
   case Network::Address::Type::EnvoyInternal: {
-    raw_host_ptr->addKey("envoy_internal_address");
-    Json::Streamer::MapPtr envoy_internal_address_ptr = raw_host_ptr->addMap();
-    std::vector<const Json::Streamer::Map::NameValue> envoy_internal_address{
-        {"server_listerner_name", host->address()->envoyInternalAddress()->addressId()},
-        {"endpoint_id", host->address()->envoyInternalAddress()->endpointId()},
-    };
-    addMapEntries(envoy_internal_address_ptr.get(), response, envoy_internal_address);
+    if (!host->address()->envoyInternalAddress()->addressId().empty() ||
+        !host->address()->envoyInternalAddress()->endpointId().empty()) {
+      raw_host_ptr->addKey("address");
+      Json::Streamer::MapPtr address_ptr = raw_host_ptr->addMap();
+      raw_host_ptr->addKey("envoy_internal_address");
+      Json::Streamer::MapPtr envoy_internal_address_ptr = raw_host_ptr->addMap();
+      std::vector<const Json::Streamer::Map::NameValue> envoy_internal_address;
+      if (const std::string& server_listener_name =
+              host->address()->envoyInternalAddress()->addressId();
+          !server_listener_name.empty()) {
+        envoy_internal_address.emplace_back("server_listener_name", server_listener_name);
+      }
+      if (const std::string& endpoint_id = host->address()->envoyInternalAddress()->endpointId();
+          !endpoint_id.empty()) {
+        envoy_internal_address.emplace_back("endpoint_id", endpoint_id);
+      }
+      addMapEntries(envoy_internal_address_ptr.get(), response, envoy_internal_address);
+    }
     break;
   }
   }
@@ -309,24 +359,34 @@ void JsonClustersChunkProcessor::addAddress(Json::Streamer::Map* raw_host_ptr,
 void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_ptr,
                                                 const Upstream::HostSharedPtr& host,
                                                 Buffer::Instance& response) {
+  if (host->counters().empty() && host->gauges().empty()) {
+    return;
+  }
   raw_host_ptr->addKey("stats");
   Json::Streamer::ArrayPtr stats_ptr = raw_host_ptr->addArray();
   for (const auto& [counter_name, counter] : host->counters()) {
     Json::Streamer::MapPtr stats_obj_ptr = stats_ptr->addMap();
     std::vector<const Json::Streamer::Map::NameValue> counter_object{
-        {"type", envoy::admin::v3::SimpleMetric_Type_Name(envoy::admin::v3::SimpleMetric::COUNTER)},
-        {"name", counter_name},
-        {"value", counter.get().value()},
-    };
+        {"type",
+         envoy::admin::v3::SimpleMetric_Type_Name(envoy::admin::v3::SimpleMetric::COUNTER)}};
+    if (!counter_name.empty()) {
+      counter_object.emplace_back("name", counter_name);
+    }
+    if (uint64_t value = counter.get().value(); value) {
+      counter_object.emplace_back("value", value);
+    }
     addMapEntries(stats_obj_ptr.get(), response, counter_object);
   }
   for (const auto& [gauge_name, gauge] : host->gauges()) {
     Json::Streamer::MapPtr stats_obj_ptr = stats_ptr->addMap();
     std::vector<const Json::Streamer::Map::NameValue> gauge_object{
-        {"type", envoy::admin::v3::SimpleMetric_Type_Name(envoy::admin::v3::SimpleMetric::GAUGE)},
-        {"name", gauge_name},
-        {"value", gauge.get().value()},
-    };
+        {"type", envoy::admin::v3::SimpleMetric_Type_Name(envoy::admin::v3::SimpleMetric::GAUGE)}};
+    if (!gauge_name.empty()) {
+      gauge_object.emplace_back("name", gauge_name);
+    }
+    if (uint64_t value = gauge.get().value(); value) {
+      gauge_object.emplace_back("value", value);
+    }
     addMapEntries(stats_obj_ptr.get(), response, gauge_object);
   }
 }
@@ -334,80 +394,88 @@ void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_pt
 void JsonClustersChunkProcessor::setHealthFlags(Json::Streamer::Map* raw_host_ptr,
                                                 const Upstream::HostSharedPtr& host,
                                                 Buffer::Instance& response) {
-  raw_host_ptr->addKey("health_status");
-  Json::Streamer::MapPtr health_status_ptr = raw_host_ptr->addMap();
+  absl::flat_hash_map<, absl::variant<bool, absl::string_view>> flag_map;
+  // Json::Streamer::MapPtr health_status_ptr = raw_host_ptr->addMap();
 // Invokes setHealthFlag for each health flag.
 #define SET_HEALTH_FLAG(name, notused)                                                             \
-  setHealthFlag(health_status_ptr.get(), Upstream::Host::HealthFlag::name, host, response);
+  loadHealthFlagMap(flag_map, Upstream::Host::HealthFlag::name, host);
   HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
 #undef SET_HEALTH_FLAG
+  if (!flag_map.empty()) {
+    return;
+  }
+  raw_host_ptr->addKey("health_status");
+  Json::Streamer::MapPtr health_flags_ptr = raw_host_ptr->addMap();
+  std::vector<const Json::Streamer::Map::NameValue> flags;
+  for (const auto& [name, flag_value] : flag_map) {
+    if (name == "eds_health_status") {
+      flags.emplace_back(name, std::get<>(flag_value));
+    } else {
+      flags.emplace_back(name, std::get<bool>(flag_value));
+    }
+  }
+  addMapEntries(health_flags_ptr.get(), response, flags);
 }
 
-void JsonClustersChunkProcessor::setHealthFlag(Json::Streamer::Map* health_status_ptr,
-                                               Upstream::Host::HealthFlag flag,
-                                               const Upstream::HostSharedPtr& host,
-                                               Buffer::Instance& response) {
+void JsonClustersChunkProcessor::loadHealthFlagMap(
+    absl::flat_hash_map<absl::string_view, absl::variant<bool, >>& flag_map,
+    Upstream::Host::HealthFlag flag, const Upstream::HostSharedPtr& host) {
   switch (flag) {
-  case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC: {
-    std::vector<const Json::Streamer::Map::NameValue> status{
-        {"failed_active_health_check", host.get()->healthFlagGet(flag)},
-    };
-    addMapEntries(health_status_ptr, response, status);
+  case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC:
+    if (bool value = host.get()->healthFlagGet(flag); value) {
+      flag_map.emplace("failed_active_health_check", value);
+    }
     break;
-  }
-  case Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK: {
-    std::vector<const Json::Streamer::Map::NameValue> status{
-        {"failed_outlier_check", host.get()->healthFlagGet(flag)},
-    };
-    addMapEntries(health_status_ptr, response, status);
+  case Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK:
+    if (bool value = host.get()->healthFlagGet(flag); value) {
+      flag_map.emplace("failed_outlier_check", value);
+    }
     break;
-  }
-  case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
   case Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH:
-  case Upstream::Host::HealthFlag::EDS_STATUS_DRAINING: {
-    // TODO(demitriswan) make sure this name conversion works as expected.
-    std::vector<const Json::Streamer::Map::NameValue> status{
-        {"eds_health_status",
-         envoy::config::core::v3::HealthStatus_Name(host.get()->healthFlagGet(flag))},
-    };
-    addMapEntries(health_status_ptr, response, status);
+  case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
+    if (host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH) ||
+        host->healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH)) {
+      if (host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)) {
+        flag_map.emplace("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
+                                                  envoy::config::core::v3::UNHEALTHY));
+      } else {
+        flag_map.emplace("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
+                                                  envoy::config::core::v3::DEGRADED));
+      }
+    } else {
+      flag_map.emplace("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
+                                                envoy::config::core::v3::HEALTHY));
+    }
+  case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
+    if (bool value = host.get()->healthFlagGet(flag); value) {
+      flag_map.emplace("failed_active_degraded_check", value);
+    }
     break;
-  }
-  case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC: {
-    std::vector<const Json::Streamer::Map::NameValue> status{
-        {"failed_active_degraded_check", host.get()->healthFlagGet(flag)},
-    };
-    addMapEntries(health_status_ptr, response, status);
+  case Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL:
+    if (bool value = host.get()->healthFlagGet(flag); value) {
+      flag_map.emplace("pending_dynamic_removal", value);
+    }
     break;
-  }
-  case Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL: {
-    std::vector<const Json::Streamer::Map::NameValue> status{
-        {"pending_dynamic_removal", host.get()->healthFlagGet(flag)},
-    };
-    addMapEntries(health_status_ptr, response, status);
+  case Upstream::Host::HealthFlag::PENDING_ACTIVE_HC:
+    if (bool value = host.get()->healthFlagGet(flag); value) {
+      flag_map.emplace("pending_active_hc", value);
+    }
     break;
-  }
-  case Upstream::Host::HealthFlag::PENDING_ACTIVE_HC: {
-    std::vector<const Json::Streamer::Map::NameValue> status{
-        {"pending_active_hc", host.get()->healthFlagGet(flag)},
-    };
-    addMapEntries(health_status_ptr, response, status);
+  case Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL:
+    if (bool value = host.get()->healthFlagGet(flag); value) {
+      flag_map.emplace("excluded_via_immediate_hc_fail", value);
+    }
     break;
-  }
-  case Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL: {
-    std::vector<const Json::Streamer::Map::NameValue> status{
-        {"excluded_via_immediate_hc_fail", host.get()->healthFlagGet(flag)},
-    };
-    addMapEntries(health_status_ptr, response, status);
+  case Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT:
+    if (bool value = host.get()->healthFlagGet(flag); value) {
+      flag_map.emplace("active_hc_timeout", value);
+    }
     break;
-  }
-  case Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT: {
-    std::vector<const Json::Streamer::Map::NameValue> status{
-        {"active_hc_timeout", host.get()->healthFlagGet(flag)},
-    };
-    addMapEntries(health_status_ptr, response, status);
+  case Upstream::Host::HealthFlag::EDS_STATUS_DRAINING:
+    if (bool value = host.get()->healthFlagGet(flag); value) {
+      flag_map.emplace("eds_health_status", value);
+    }
     break;
-  }
   }
 }
 
@@ -459,12 +527,20 @@ void JsonClustersChunkProcessor::addCircuitBreakerForPriority(
   Json::Streamer::MapPtr threshold = raw_thresholds_ptr->addMap();
   std::vector<const Json::Streamer::Map::NameValue> entries{
       {"priority",
-       priority == envoy::config::core::v3::RoutingPriority::DEFAULT ? "DEFAULT" : "HIGH"},
-      {"max_connections", resource_manager.connections().max()},
-      {"max_pending_requests", resource_manager.pendingRequests().max()},
-      {"max_requests", resource_manager.requests().max()},
-      {"max_retries", resource_manager.retries().max()},
-  };
+       priority == envoy::config::core::v3::RoutingPriority::DEFAULT ? "DEFAULT" : "HIGH"}};
+  if (uint64_t max_connections = resource_manager.connections().max(); max_connections) {
+    entries.emplace_back("max_connections", max_connections);
+  }
+  if (uint64_t max_pending_requests = resource_manager.pendingRequests().max();
+      max_pending_requests) {
+    entries.emplace_back("max_pending_requests", max_pending_requests);
+  }
+  if (uint64_t max_requests = resource_manager.requests().max(); max_requests) {
+    entries.emplace_back("max_requests", max_requests);
+  }
+  if (uint64_t max_retries = resource_manager.requests().max(); max_retries) {
+    entries.emplace_back("max_retries", max_retries);
+  }
   addMapEntries(threshold.get(), response, entries);
 }
 
