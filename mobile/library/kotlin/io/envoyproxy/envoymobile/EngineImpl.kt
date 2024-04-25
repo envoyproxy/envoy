@@ -14,12 +14,6 @@ class EngineImpl(
   private val streamClient: StreamClient
   private val pulseClient: PulseClient
 
-  constructor(
-    envoyEngine: EnvoyEngine,
-    envoyConfiguration: EnvoyConfiguration,
-    logLevel: LogLevel = LogLevel.INFO
-  ) : this(envoyEngine, envoyConfiguration, null, logLevel)
-
   init {
     streamClient = StreamClientImpl(envoyEngine)
     pulseClient = PulseClientImpl(envoyEngine)
