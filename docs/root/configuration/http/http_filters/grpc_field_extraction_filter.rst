@@ -1,4 +1,4 @@
-.._config_http_filters_grpc_field_extraction:
+.. _config_http_filters_grpc_field_extraction:
 
 gRPC Field Extraction
 =====================

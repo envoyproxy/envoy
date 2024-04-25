@@ -220,11 +220,6 @@ EngineBuilder& EngineBuilder::addMaxConnectionsPerHost(int max_connections_per_h
   return *this;
 }
 
-EngineBuilder& EngineBuilder::useDnsSystemResolver(bool use_system_resolver) {
-  use_system_resolver_ = use_system_resolver;
-  return *this;
-}
-
 EngineBuilder& EngineBuilder::addH2ConnectionKeepaliveIdleIntervalMilliseconds(
     int h2_connection_keepalive_idle_interval_milliseconds) {
   h2_connection_keepalive_idle_interval_milliseconds_ =

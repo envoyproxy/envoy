@@ -21,7 +21,8 @@ public:
             connection, connection_id, dispatcher, send_buffer_limit, std::move(ssl_info),
             std::make_unique<StreamInfo::StreamInfoImpl>(
                 dispatcher.timeSource(),
-                connection.connectionSocket()->connectionInfoProviderSharedPtr())) {}
+                connection.connectionSocket()->connectionInfoProviderSharedPtr(),
+                StreamInfo::FilterState::LifeSpan::Connection)) {}
 
   void dumpState(std::ostream& /*os*/, int /*indent_level = 0*/) const override {}
   absl::string_view requestedServerName() const override { return {}; }

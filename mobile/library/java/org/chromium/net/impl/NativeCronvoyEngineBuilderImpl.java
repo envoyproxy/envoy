@@ -20,6 +20,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.chromium.net.ExperimentalCronetEngine;
@@ -44,7 +45,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mDnsCacheSaveIntervalSeconds = 1;
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
-  private final boolean mDnsUseSystemResolver = true;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
@@ -63,6 +63,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final String mNodeRegion = "";
   private final String mNodeZone = "";
   private final String mNodeSubZone = "";
+  private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
   /**
    * Builder for Native Cronet Engine. Default config enables SPDY, disables QUIC and HTTP cache.
@@ -92,6 +93,21 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setDnsQueryTimeoutSeconds(int timeout) {
     mDnsQueryTimeoutSeconds = timeout;
+    return this;
+  }
+
+  /**
+   * Sets the boolean value for the reloadable runtime feature flag value. For example, to set the
+   * Envoy runtime flag `envoy.reloadable_features.http_allow_partial_urls_in_referer` to true,
+   * call `setRuntimeGuard("http_allow_partial_urls_in_referer", true)`.
+   *
+   * TODO(abeyad): Change the name to setRuntimeFeature here and in the C++ APIs.
+   *
+   * @param feature The reloadable runtime feature flag name.
+   * @param value The Boolean value to set the runtime feature flag to.
+   */
+  public NativeCronvoyEngineBuilderImpl setRuntimeGuard(String feature, boolean value) {
+    mRuntimeGuards.put(feature, value);
     return this;
   }
 
@@ -141,7 +157,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     List<EnvoyHTTPFilterFactory> platformFilterChain = Collections.emptyList();
     Map<String, EnvoyStringAccessor> stringAccessors = Collections.emptyMap();
     Map<String, EnvoyKeyValueStore> keyValueStores = Collections.emptyMap();
-    Map<String, Boolean> runtimeGuards = Collections.emptyMap();
 
     return new EnvoyConfiguration(
         mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
@@ -153,7 +168,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
-        platformFilterChain, stringAccessors, keyValueStores, runtimeGuards,
+        platformFilterChain, stringAccessors, keyValueStores, mRuntimeGuards,
         mEnablePlatformCertificatesValidation,
         /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
         /*xdsPort=*/0, /*xdsGrpcInitialMetadata=*/Collections.emptyMap(),

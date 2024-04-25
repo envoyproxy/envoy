@@ -26,7 +26,8 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
   }
 
   if (!config_->proxyAccessLogs().empty()) {
-    udp_proxy_stats_.emplace(StreamInfo::StreamInfoImpl(config_->timeSource(), nullptr));
+    udp_proxy_stats_.emplace(StreamInfo::StreamInfoImpl(
+        config_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::Connection));
   }
 }
 
@@ -284,7 +285,8 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
       idle_timer_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
           [this] { onIdleTimer(); })),
       udp_session_info_(StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(),
-                                                   createDownstreamConnectionInfoProvider())) {
+                                                   createDownstreamConnectionInfoProvider(),
+                                                   StreamInfo::FilterState::LifeSpan::Connection)) {
   udp_session_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   cluster_.filter_.config_->stats().downstream_sess_total_.inc();
   cluster_.filter_.config_->stats().downstream_sess_active_.inc();
