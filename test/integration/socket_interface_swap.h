@@ -31,7 +31,7 @@ public:
                    : Envoy::Network::IoSocketError::create(error_->getSystemErrorCode());
       }
 
-      if (orig_dnat_address_ && *orig_dnat_address_ == *io_handle->peerAddress()) {
+      if (orig_dnat_address_ != nullptr && *orig_dnat_address_ == *io_handle->peerAddress()) {
         peer_address_override_out = translated_dnat_address_;
       }
 
@@ -50,10 +50,12 @@ public:
 
     void readOverride(Network::IoHandle::RecvMsgOutput& output) {
       absl::MutexLock lock(&mutex_);
-      for (auto& pkt : output.msg_) {
-        // Reverse DNAT when receiving packets.
-        if (pkt.peer_address_ && *pkt.peer_address_ == *translated_dnat_address_) {
-          pkt.peer_address_ = orig_dnat_address_;
+      if (translated_dnat_address_ != nullptr) {
+        for (auto& pkt : output.msg_) {
+          // Reverse DNAT when receiving packets.
+          if (pkt.peer_address_ != nullptr && *pkt.peer_address_ == *translated_dnat_address_) {
+            pkt.peer_address_ = orig_dnat_address_;
+          }
         }
       }
     }
