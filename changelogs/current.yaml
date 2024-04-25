@@ -25,6 +25,9 @@ bug_fixes:
   change: |
     Fix a RELEASE_ASSERT when using :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>`
     if the downstream request ``:authority`` was longer than 255 characters.
+- area: http
+  change: |
+    Fix a crash when reloading the HTTP Connection Manager via ECDS.
 
 
 removed_config_or_runtime:
