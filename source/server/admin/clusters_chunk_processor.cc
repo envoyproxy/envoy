@@ -8,6 +8,7 @@
 #include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/address.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -222,6 +223,7 @@ void JsonClustersChunkProcessor::processHost(Json::Streamer::Array* raw_host_sta
                                              const Upstream::HostSharedPtr& host,
                                              Buffer::Instance& response) {
   Json::Streamer::MapPtr host_ptr = raw_host_statuses_ptr->addMap();
+  addAddress(host_ptr.get(), host, response);
   std::vector<const Json::Streamer::Map::NameValue> hostname{
       {"hostname", host->hostname()},
   };
@@ -261,6 +263,49 @@ void JsonClustersChunkProcessor::processHost(Json::Streamer::Array* raw_host_sta
   //   };
   //   addMapEntries(host_ptr.get(), response, success_rate_property);
   // }
+}
+
+void JsonClustersChunkProcessor::addAddress(Json::Streamer::Map* raw_host_ptr,
+                                            const Upstream::HostSharedPtr& host,
+                                            Buffer::Instance& response) {
+  // Referenced Network::Utility::addressToProtobufAddress as used in the
+  // original admin clusters handler for json responses; however, the
+  // config.core.v3.Address has a slightly different structure according to the
+  // documentation.
+  //
+  // TODO(demitriswan) find out why this is the case.
+  raw_host_ptr->addKey("address");
+  Json::Streamer::MapPtr address_ptr = raw_host_ptr->addMap();
+  switch (host->address()->type()) {
+    case Network::Address::Type::Pipe: {
+      Json::Streamer::MapPtr pipe_ptr = address_ptr->addMap();
+      std::vector<const Json::Streamer::Map::NameValue> pipe{
+        {"pipe", host->address()->asString()},
+      };
+      addMapEntries(pipe_ptr.get(), response, pipe);
+      break;
+    }
+    case Network::Address::Type::Ip: {
+      address_ptr->addKey("socket_address");
+      Json::Streamer::MapPtr socket_address_ptr = address_ptr->addMap();
+      std::vector<const Json::Streamer::Map::NameValue> socket_address{
+        {"address", host->address()->ip()->addressAsString()},
+        {"port", uint64_t(host->address()->ip()->port())},
+      };
+      addMapEntries(socket_address_ptr.get(), response, socket_address);
+      break;
+    }
+    case Network::Address::Type::EnvoyInternal: {
+      raw_host_ptr->addKey("envoy_internal_address");
+      Json::Streamer::MapPtr envoy_internal_address_ptr = raw_host_ptr->addMap();
+      std::vector<const Json::Streamer::Map::NameValue> envoy_internal_address{
+        {"server_listerner_name", host->address()->envoyInternalAddress()->addressId()},
+        {"endpoint_id", host->address()->envoyInternalAddress()->endpointId()},
+      };
+      addMapEntries(envoy_internal_address_ptr.get(), response, envoy_internal_address);
+      break;
+    }
+  }
 }
 
 void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_ptr,
