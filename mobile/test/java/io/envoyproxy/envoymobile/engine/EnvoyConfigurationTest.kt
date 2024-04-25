@@ -175,7 +175,7 @@ class EnvoyConfigurationTest {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate).contains("connect_timeout { seconds: 123 }")
 
     // DNS
@@ -229,13 +229,13 @@ class EnvoyConfigurationTest {
 
     // Validate ordering between filters and platform filters
     assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
-    // Validate that createYaml doesn't change filter order.
-    val resolvedTemplate2 = TestJni.createYaml(envoyConfiguration)
+    // Validate that createProtoString doesn't change filter order.
+    val resolvedTemplate2 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
     // Validate that createBootstrap also doesn't change filter order.
     // This may leak memory as the boostrap isn't used.
     envoyConfiguration.createBootstrap()
-    val resolvedTemplate3 = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate3 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate3).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
   }
 
@@ -258,7 +258,7 @@ class EnvoyConfigurationTest {
       trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED
     )
 
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
 
     // TlS Verification
     assertThat(resolvedTemplate).contains("trust_chain_verification: ACCEPT_UNTRUSTED")
@@ -299,7 +299,7 @@ class EnvoyConfigurationTest {
       runtimeGuards = mapOf("test_feature_false" to true, "test_feature_true" to false),
     )
 
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
 
     assertThat(resolvedTemplate).contains("test_feature_false")
     assertThat(resolvedTemplate).contains("test_feature_true")
@@ -316,7 +316,7 @@ class EnvoyConfigurationTest {
       rtdsResourceName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate).contains("fake_rtds_layer");
     assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
     assertThat(resolvedTemplate).contains("initial_fetch_timeout { seconds: 5432 }")
@@ -333,7 +333,7 @@ class EnvoyConfigurationTest {
       cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, xdsAddress = "FAKE_ADDRESS", xdsPort = 0, enableCds = true
     )
 
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
 
     assertThat(resolvedTemplate).contains("FAKE_CDS_LOCATOR");
     assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
@@ -347,7 +347,7 @@ class EnvoyConfigurationTest {
       cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 123456, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
 
     assertThat(resolvedTemplate).doesNotContain("FAKE_CDS_LOCATOR");
     assertThat(resolvedTemplate).doesNotContain("1234356");
@@ -364,7 +364,7 @@ class EnvoyConfigurationTest {
       enableCds = true, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
 
     assertThat(resolvedTemplate).contains("cds_config");
     assertThat(resolvedTemplate).contains("initial_fetch_timeout { seconds: 5 }")
@@ -381,7 +381,7 @@ class EnvoyConfigurationTest {
       rtdsResourceName = "fake_rtds_layer", xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
 
     assertThat(resolvedTemplate).contains("initial_fetch_timeout { seconds: 5 }")
   }
@@ -395,7 +395,7 @@ class EnvoyConfigurationTest {
         .build()
     )
 
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
 
     assertThat(resolvedTemplate).contains("metadata_field")
     assertThat(resolvedTemplate).contains("metadata_value")

@@ -407,9 +407,6 @@ EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
 #endif
 
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
-  // The yaml utilities have non-relevant thread asserts.
-  Thread::SkipAsserts skip;
-
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
       std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 

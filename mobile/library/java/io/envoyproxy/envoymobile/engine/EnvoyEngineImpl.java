@@ -89,21 +89,6 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   /**
-   * Run the Envoy engine with the provided yaml string and log level.
-   *
-   * This does not perform registration, and performRegistration may need to be called first.
-   *
-   * @param configurationYAML The configuration yaml with which to start Envoy.
-   * @param logLevel          The log level to use when starting Envoy.
-   * @return A status indicating if the action was successful.
-   */
-  @Override
-  public EnvoyStatus runWithYaml(String configurationYAML, String logLevel) {
-    checkIsTerminated();
-    return runWithResolvedYAML(configurationYAML, logLevel);
-  }
-
-  /**
    * Run the Envoy engine with the provided envoyConfiguration and log level.
    *
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
@@ -118,18 +103,6 @@ public class EnvoyEngineImpl implements EnvoyEngine {
         JniLibrary.runEngine(this.engineHandle, "", envoyConfiguration.createBootstrap(), logLevel);
     if (status == 0) {
       return EnvoyStatus.ENVOY_SUCCESS;
-    }
-    return EnvoyStatus.ENVOY_FAILURE;
-  }
-
-  private EnvoyStatus runWithResolvedYAML(String configurationYAML, String logLevel) {
-    try {
-      int status = JniLibrary.runEngine(this.engineHandle, configurationYAML, 0, logLevel);
-      if (status == 0) {
-        return EnvoyStatus.ENVOY_SUCCESS;
-      }
-    } catch (Throwable throwable) {
-      // TODO: Need to have a way to log the exception somewhere.
     }
     return EnvoyStatus.ENVOY_FAILURE;
   }

@@ -11,19 +11,6 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
 import java.util.UUID
 
-/** Envoy engine configuration. */
-sealed class BaseConfiguration
-
-/** The standard configuration. */
-class Standard : BaseConfiguration()
-
-/**
- * The configuration based off a custom yaml.
- *
- * @param yaml the custom config.
- */
-class Custom(val yaml: String) : BaseConfiguration()
-
 /**
  * Builder for generating the xDS configuration for the Envoy Mobile engine. xDS is a protocol for
  * dynamic configuration of Envoy instances, more information can be found in
@@ -128,7 +115,7 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
 }
 
 /** Builder used for creating and running a new `Engine` instance. */
-open class EngineBuilder(private val configuration: BaseConfiguration = Standard()) {
+open class EngineBuilder() {
   protected var onEngineRunning: (() -> Unit) = {}
   protected var logger: ((LogLevel, String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
@@ -700,14 +687,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         xdsBuilder?.enableCds ?: false,
       )
 
-    return when (configuration) {
-      is Custom -> {
-        EngineImpl(engineType(), engineConfiguration, configuration.yaml, logLevel)
-      }
-      is Standard -> {
-        EngineImpl(engineType(), engineConfiguration, logLevel)
-      }
-    }
+    return EngineImpl(engineType(), engineConfiguration, logLevel)
   }
 
   /**

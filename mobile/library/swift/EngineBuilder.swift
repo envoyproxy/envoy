@@ -121,15 +121,8 @@ open class XdsBuilder: NSObject {
 @objcMembers
 open class EngineBuilder: NSObject {
   // swiftlint:disable:previous type_body_length
-  private let base: BaseConfiguration
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
   private var logLevel: LogLevel = .info
-
-  private enum BaseConfiguration {
-    case standard
-    case custom(String)
-  }
-
   private var connectTimeoutSeconds: UInt32 = 30
   private var dnsFailureRefreshSecondsBase: UInt32 = 2
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
@@ -180,18 +173,8 @@ open class EngineBuilder: NSObject {
 
   // MARK: - Public
 
-  /// Initialize a new builder with standard HTTP library configuration.
-  public override init() {
-    self.base = .standard
-  }
-
-  /// Initialize a new builder with a custom full YAML configuration.
-  /// Setting other attributes in this builder will have no effect.
-  ///
-  /// - parameter yaml: Contents of a YAML file to use for configuration.
-  public init(yaml: String) {
-    self.base = .custom(yaml)
-  }
+  /// Initialize a new builder.
+  public override init() {}
 
   /// Set a log level to use with Envoy.
   ///
@@ -699,12 +682,7 @@ open class EngineBuilder: NSObject {
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue))
     let config = self.makeConfig()
 
-    switch self.base {
-    case .custom(let yaml):
-      return EngineImpl(yaml: yaml, config: config, logLevel: self.logLevel, engine: engine)
-    case .standard:
-      return EngineImpl(config: config, logLevel: self.logLevel, engine: engine)
-    }
+    return EngineImpl(config: config, logLevel: self.logLevel, engine: engine)
   }
 
   // MARK: - Internal

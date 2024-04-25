@@ -277,7 +277,7 @@ public class JniLibrary {
   public static native void callClearTestRootCertificateFromNative();
 
   /*
-   * Given a filter name, create the proto or YAML config for adding the native filter
+   * Given a filter name, create the proto config for adding the native filter
    *
    * @param filterName the name of the native filter
    * @return a filter config which can be passed back to createBootstrap
