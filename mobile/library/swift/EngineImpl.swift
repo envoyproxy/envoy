@@ -13,7 +13,7 @@ final class EngineImpl: NSObject {
   /// - parameter config:   Configuration to use for starting Envoy.
   /// - parameter logLevel: Log level to use for this instance.
   /// - parameter engine:   The underlying engine to use for starting Envoy.
-  convenience init(config: EnvoyConfiguration, logLevel: LogLevel = .info, engine: EnvoyEngine) {
+  init(config: EnvoyConfiguration, logLevel: LogLevel = .info, engine: EnvoyEngine) {
     self.engine = engine
     self.pulseClientImpl = PulseClientImpl(engine: engine)
     self.streamClientImpl = StreamClientImpl(engine: engine)
