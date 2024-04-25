@@ -48,10 +48,8 @@ quic::QuicSocketAddress parseSocketAddress(const envoy::config::core::v3::Socket
   envoy::config::core::v3::Address outer;
   *outer.mutable_socket_address() = addr;
   auto envoy_addr = Network::Utility::protobufAddressToAddress(outer);
-  if (envoy_addr == nullptr) {
-    ProtoExceptionUtil::throwProtoValidationException(
-        absl::StrCat("bad ", version_str, " server preferred address: ", addr), message);
-  }
+  ASSERT(envoy_addr != nullptr,
+         "Network::Utility::protobufAddressToAddress throws on failure so this can't be nullptr");
   if (envoy_addr->ip() == nullptr || envoy_addr->ip()->version() != version) {
     ProtoExceptionUtil::throwProtoValidationException(
         absl::StrCat("wrong address type for ", version_str, " server preferred address: ", addr),
