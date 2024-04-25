@@ -32,6 +32,7 @@ public:
       }
 
       if (orig_dnat_address_ != nullptr && *orig_dnat_address_ == *io_handle->peerAddress()) {
+        ASSERT(translated_dnat_address_ != nullptr);
         peer_address_override_out = translated_dnat_address_;
       }
 
@@ -54,6 +55,7 @@ public:
         for (auto& pkt : output.msg_) {
           // Reverse DNAT when receiving packets.
           if (pkt.peer_address_ != nullptr && *pkt.peer_address_ == *translated_dnat_address_) {
+            ASSERT(orig_dnat_address_ != nullptr);
             pkt.peer_address_ = orig_dnat_address_;
           }
         }
