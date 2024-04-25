@@ -56,8 +56,9 @@ class Filter : public Http::StreamFilter,
                public AccessLog::Instance,
                Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(FilterStats& stats, Event::Dispatcher& dispatcher)
-      : dispatcher_(dispatcher), decoded_headers_(false), stats_(stats) {}
+  Filter(FilterStats& stats, Event::Dispatcher& dispatcher, bool is_upstream)
+      : dispatcher_(dispatcher), decoded_headers_(false), stats_(stats), is_upstream_(is_upstream) {
+  }
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -108,6 +109,8 @@ public:
       log->log(log_context, info);
     }
   }
+
+  bool isUpstream() const { return is_upstream_; }
 
 private:
   friend FactoryCallbacksWrapper;
@@ -165,6 +168,8 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   FilterStats& stats_;
+  // Filter in the upstream filter chain.
+  bool is_upstream_;
 };
 
 } // namespace Composite

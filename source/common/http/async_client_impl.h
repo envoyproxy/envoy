@@ -254,6 +254,7 @@ private:
   upstreamOverrideHost() const override {
     return absl::nullopt;
   }
+  bool shouldLoadShed() const override { return false; }
   absl::string_view filterConfigName() const override { return ""; }
   RequestHeaderMapOptRef requestHeaders() override { return makeOptRefFromPtr(request_headers_); }
   RequestTrailerMapOptRef requestTrailers() override {

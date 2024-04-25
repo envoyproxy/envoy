@@ -12,6 +12,7 @@ namespace GenericProxy {
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
+  ON_CALL(*this, timeout()).WillByDefault(Return(timeout_));
 }
 
 MockRouteMatcher::MockRouteMatcher() {

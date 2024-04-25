@@ -111,8 +111,7 @@ struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(
       TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain,
-      FilterStateSharedPtr ancestor_filter_state = nullptr)
+      FilterState::LifeSpan life_span, FilterStateSharedPtr ancestor_filter_state = nullptr)
       : StreamInfoImpl(
             absl::nullopt, time_source, downstream_connection_info_provider,
             std::make_shared<FilterStateImpl>(std::move(ancestor_filter_state), life_span)) {}
@@ -120,8 +119,7 @@ struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(
       Http::Protocol protocol, TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain,
-      FilterStateSharedPtr ancestor_filter_state = nullptr)
+      FilterState::LifeSpan life_span, FilterStateSharedPtr ancestor_filter_state = nullptr)
       : StreamInfoImpl(
             protocol, time_source, downstream_connection_info_provider,
             std::make_shared<FilterStateImpl>(std::move(ancestor_filter_state), life_span)) {}

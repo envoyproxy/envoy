@@ -762,6 +762,16 @@ TEST_F(RouterTest, NoHost) {
   EXPECT_EQ(callbacks_.details(), "no_healthy_upstream");
 }
 
+TEST_F(RouterTest, RouterLoadShedTest) {
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  ON_CALL(callbacks_, shouldLoadShed()).WillByDefault(Return(true));
+  router_->decodeHeaders(headers, true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(callbacks_.details(), "overload");
+  EXPECT_EQ(1UL, router_->stats().rq_overload_local_reply_.value());
+}
+
 TEST_F(RouterTest, MaintenanceMode) {
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, maintenanceMode()).WillOnce(Return(true));
 
@@ -5182,7 +5192,8 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
-  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_EQ(nullptr, stream_info.upstreamInfo());
 
@@ -5236,7 +5247,8 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
 
   expectResponseTimerCreate();
 
-  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   // Check that upstream timing is updated after the first request.
@@ -5305,7 +5317,8 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
 
-  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   expectResponseTimerCreate();

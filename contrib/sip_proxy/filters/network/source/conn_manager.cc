@@ -337,7 +337,8 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
   read_callbacks_->connection().enableHalfClose(true);
 
   auto stream_info = StreamInfo::StreamInfoImpl(
-      time_source_, read_callbacks_->connection().connectionInfoProviderSharedPtr());
+      time_source_, read_callbacks_->connection().connectionInfoProviderSharedPtr(),
+      StreamInfo::FilterState::LifeSpan::Connection);
   tra_handler_ = std::make_shared<TrafficRoutingAssistantHandler>(
       *this, read_callbacks_->connection().dispatcher(), config_.settings()->traServiceConfig(),
       context_, stream_info);
