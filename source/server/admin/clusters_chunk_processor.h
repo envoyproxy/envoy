@@ -67,7 +67,8 @@ private:
   void render(std::reference_wrapper<const Upstream::Cluster> cluster, Buffer::Instance& response);
   void drainBufferIntoResponse(Buffer::Instance& response);
   void finalize(Buffer::Instance& response);
-  void addAddress(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host, Buffer::Instance& response);
+  void addAddress(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host,
+                  Buffer::Instance& response);
   void addMapEntries(Json::Streamer::Map* raw_map_ptr, Buffer::Instance& response,
                      std::vector<const Json::Streamer::Map::NameValue>& entries);
   void addCircuitBreakers(Json::Streamer::Map* raw_clusters_map_ptr,

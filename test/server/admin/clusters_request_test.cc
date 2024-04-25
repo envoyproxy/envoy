@@ -12,8 +12,8 @@
 #include "source/server/admin/clusters_request.h"
 
 #include "test/mocks/server/instance.h"
-#include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/utility.h"
@@ -40,9 +40,15 @@ protected:
     resource_manager_high_ = std::make_unique<Upstream::ResourceManagerImpl>(
         runtime_, resource_manager_key_, 4096, 4096, 4096, 16, 4, 1024,
         mock_cluster_info_.circuit_breakers_stats_, std::nullopt, std::nullopt);
+
     locality_.set_region("test_region");
     locality_.set_zone("test_zone");
     locality_.set_sub_zone("test_sub_zone");
+
+    counter_.add(10);
+    counters_.emplace_back("test_counter", counter_);
+    gauge_.add(11);
+    gauges_.emplace_back("test_gauge", gauge_);
   }
 
   using ClustersRequestPtr = std::unique_ptr<ClustersRequest>;
@@ -96,42 +102,46 @@ protected:
     cluster_info_maps_.active_clusters_.emplace(name, std::ref(mock_cluster));
 
     Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://1.2.3.4:80");
+        Network::Utility::resolveUrl("tcp://1.2.3.4:80");
     ON_CALL(*mock_host_, address()).WillByDefault(Return(address));
     Upstream::MockHostSet* host_set = mock_cluster.priority_set_.getMockHostSet(0);
 
-    Stats::PrimitiveCounter test_counter;
-    test_counter.add(10);
-    std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters{ 
-        {"test_counter", test_counter},
-    };
-    Stats::PrimitiveGauge test_gauge;
-    test_gauge.set(11);
-    std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges{
-        {"test_gauge", test_gauge},
-    };
-    ON_CALL(*mock_host_, counters()).WillByDefault(Invoke([&counters]() { return counters; }));
-    ON_CALL(*mock_host_, gauges()).WillByDefault(Invoke([&gauges]() { return gauges; }));
+    ON_CALL(*mock_host_, counters()).WillByDefault(Return(counters_));
+    ON_CALL(*mock_host_, gauges()).WillByDefault(Return(gauges_));
 
     ON_CALL(*mock_host_, hostname()).WillByDefault(ReturnRef("test_hostname"));
     ON_CALL(*mock_host_, locality()).WillByDefault(ReturnRef(locality_));
-    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC)).WillByDefault(Return(false));
-    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK)).WillByDefault(Return(false));
-    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)).WillByDefault(Return("HEALTHY"));
-    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH)).WillByDefault(Return("HEALTHY"));
-    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::EDS_STATUS_DRAINING)).WillByDefault(Return("HEALTHY"));
-    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC)).WillByDefault(Return(false));
-    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL)).WillByDefault(Return(false));
-    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC)).WillByDefault(Return(false));
-    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL)).WillByDefault(Return(false));
-    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT)).WillByDefault(Return(false));
+    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC))
+        .WillByDefault(Return(false));
+    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK))
+        .WillByDefault(Return(false));
+    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
+        .WillByDefault(Return("HEALTHY"));
+    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH))
+        .WillByDefault(Return("HEALTHY"));
+    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::EDS_STATUS_DRAINING))
+        .WillByDefault(Return("HEALTHY"));
+    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC))
+        .WillByDefault(Return(false));
+    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL))
+        .WillByDefault(Return(false));
+    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC))
+        .WillByDefault(Return(false));
+    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL))
+        .WillByDefault(Return(false));
+    ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT))
+        .WillByDefault(Return(false));
     ON_CALL(*mock_host_, outlierDetector()).WillByDefault(ReturnRef(detector_host_monitor_));
-    ON_CALL(Const(detector_host_monitor_), successRate(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
-      .WillByDefault(Return(double(1.0)));
+    ON_CALL(
+        Const(detector_host_monitor_),
+        successRate(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
+        .WillByDefault(Return(double(1.0)));
     ON_CALL(*mock_host_, weight()).WillByDefault(Return(uint64_t(1)));
     ON_CALL(*mock_host_, priority()).WillByDefault(Return(uint64_t(1)));
-    ON_CALL(Const(detector_host_monitor_), successRate(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))
-      .WillByDefault(Return(double(1.0)));
+    ON_CALL(
+        Const(detector_host_monitor_),
+        successRate(Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))
+        .WillByDefault(Return(double(1.0)));
 
     host_set->hosts_.emplace_back(mock_host_);
   }
@@ -152,6 +162,10 @@ protected:
   std::vector<std::shared_ptr<Upstream::Host>> mock_hosts_;
   envoy::config::core::v3::Locality locality_;
   NiceMock<Upstream::Outlier::MockDetectorHostMonitor> detector_host_monitor_;
+  Stats::PrimitiveCounter counter_;
+  Stats::PrimitiveGauge gauge_;
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters_;
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges_;
 };
 
 struct VerifyJsonOutputParameters {
@@ -180,9 +194,122 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
   EXPECT_EQ(result.code_, Http::Code::OK);
   // The order of clusters is non-deterministic so strip the 2 from test_cluster2 and expect both
   // clusters to be identical.
+  std::string expected_readable_output = R"EOF(
+      { 
+        "cluster_statuses": [
+          {
+            "name": "test_cluster",
+            "observability_name": "observability_name",
+            "eds_service_name": "potato_launcher",
+            "circuit_breakers": {
+              "thresholds": [
+                {
+                  "priority": "DEFAULT",
+                  "max_connections": 1024,
+                  "max_pending_requests": 1024,
+                  "max_requests": 1024,
+                  "max_retries": 16
+                },
+                {
+                  "priority": "HIGH",
+                  "max_connections": 4096,
+                  "max_pending_requests": 4096,
+                  "max_requests": 4096,
+                  "max_retries": 16
+                }
+              ]
+            },
+            "success_rate_ejection_threshold": 1.1,
+            "local_success_rate_ejection_threshold": 1.1,
+            "added_via_api": true,
+            "host_statuses": [
+              {
+                "address": {
+                  "socket_address": {
+                    "address": "1.2.3.4",
+                    "port": 80
+                  }
+                },
+                "hostname": "test_hostname",
+                "locality": {
+                  "region": "test_region",
+                  "zone": "test_zone",
+                  "sub_zone": "test_sub_zone"
+                },
+                "stats": [
+                  {
+                    "type": "COUNTER",
+                    "name": "test_counter",
+                    "value": 10
+                  },
+                  {
+                    "type": "GAUGE",
+                    "name": "test_gauge",
+                    "value": 11
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "test_cluster",
+            "observability_name": "observability_name",
+            "eds_service_name": "potato_launcher",
+            "circuit_breakers": {
+              "thresholds": [
+                {
+                  "priority": "DEFAULT",
+                  "max_connections": 1024,
+                  "max_pending_requests": 1024,
+                  "max_requests": 1024,
+                  "max_retries": 16
+                },
+                {
+                  "priority": "HIGH",
+                  "max_connections": 4096,
+                  "max_pending_requests": 4096,
+                  "max_requests": 4096,
+                  "max_retries": 16
+                }
+              ]
+            },
+            "success_rate_ejection_threshold": 1.1,
+            "local_success_rate_ejection_threshold": 1.1,
+            "added_via_api": true,
+            "host_statuses": [
+              {
+                "address": {
+                  "socket_address": {
+                    "address": "1.2.3.4",
+                    "port": 80
+                  }
+                },
+                "hostname": "test_hostname",
+                "locality": {
+                  "region": "test_region",
+                  "zone": "test_zone",
+                  "sub_zone": "test_sub_zone"
+                },
+                "stats": [
+                  {
+                    "type": "COUNTER",
+                    "name": "test_counter",
+                    "value": 10
+                  },
+                  {
+                    "type": "GAUGE",
+                    "name": "test_gauge",
+                    "value": 11
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      })EOF";
   EXPECT_EQ(
       std::regex_replace(result.data_.toString(), std::regex("test_cluster2"), "test_cluster"),
-      R"EOF({"cluster_statuses":[{"name":"test_cluster","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":1024,"max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":4096,"max_retries":16}]},"success_rate_ejection_threshold":1.1,"local_success_rate_ejection_threshold":1.1,"added_via_api":true,"host_statuses":[{"address":{"socket_address":{"address":"1.2.3.4","port":80}},"hostname":"test_hostname","locality":{"region":"test_region","zone":"test_zone","sub_zone":"test_sub_zone"}}]},{"name":"test_cluster","observability_name":"observability_name","eds_service_name":"potato_launcher","circuit_breakers":{"thresholds":[{"priority":"DEFAULT","max_connections":1024,"max_pending_requests":1024,"max_requests":1024,"max_retries":16},{"priority":"HIGH","max_connections":4096,"max_pending_requests":4096,"max_requests":4096,"max_retries":16}]},"success_rate_ejection_threshold":1.1,"local_success_rate_ejection_threshold":1.1,"added_via_api":true,"host_statuses":[{"address":{"socket_address":{"address":"1.2.3.4","port":80}},"hostname":"test_hostname","locality":{"region":"test_region","zone":"test_zone","sub_zone":"test_sub_zone"}}]}]})EOF");
+      std::regex_replace(expected_readable_output, std::regex(R"(\s)"), ""));
 }
 
 constexpr VerifyJsonOutputParameters VERIFY_JSON_CASES[] = {
