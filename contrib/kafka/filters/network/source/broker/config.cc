@@ -20,7 +20,7 @@ Network::FilterFactoryCb KafkaConfigFactory::createFilterFactoryFromProtoTyped(
       std::make_shared<BrokerFilterConfig>(proto_config);
   return [&context, filter_config](Network::FilterManager& filter_manager) -> void {
     Network::FilterSharedPtr filter = std::make_shared<KafkaBrokerFilter>(
-        context.scope(), context.serverFactoryContext().timeSource(), *filter_config);
+        context.scope(), context.serverFactoryContext().timeSource(), filter_config);
     filter_manager.addFilter(filter);
   };
 }
