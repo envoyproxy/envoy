@@ -17,15 +17,15 @@ using KeyLengthRange = std::pair<size_t, size_t>;
 
 // Args are:
 // 0 - size_t num_keys
-// 1 - std::pair<size_t, size_t> keylength_range
+// 1 - std::pair<size_t, size_t> key_length_range
 template <typename... Args> static void bmTrieLookups(benchmark::State& state, Args&&... args) {
   auto args_t = std::make_tuple(std::move(args)...);
   const size_t num_keys = std::get<0>(args_t);
-  KeyLengthRange keylength_range = std::get<1>(args_t);
+  KeyLengthRange key_length_range = std::get<1>(args_t);
   std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
   std::uniform_int_distribution<char> char_distribution('a', 'z');
-  std::uniform_int_distribution<size_t> keylength_distribution(keylength_range.first,
-                                                               keylength_range.second);
+  std::uniform_int_distribution<size_t> key_length_distribution(key_length_range.first,
+                                                                key_length_range.second);
   std::uniform_int_distribution<size_t> keyindex_distribution(0, num_keys - 1);
   auto make_key = [&](size_t len) {
     std::string ret;
@@ -37,7 +37,7 @@ template <typename... Args> static void bmTrieLookups(benchmark::State& state, A
   TrieLookupTable<const void*> trie;
   std::vector<std::string> keys;
   for (size_t i = 0; i < num_keys; i++) {
-    std::string key = make_key(keylength_distribution(prng));
+    std::string key = make_key(key_length_distribution(prng));
     trie.add(key, reinterpret_cast<const void*>(&num_keys));
     keys.push_back(std::move(key));
   }
@@ -57,6 +57,8 @@ template <typename... Args> static void bmTrieLookups(benchmark::State& state, A
 BENCHMARK_CAPTURE(bmTrieLookups, 100_short_keys, 100, KeyLengthRange(8, 8));
 BENCHMARK_CAPTURE(bmTrieLookups, 100_long_keys, 100, KeyLengthRange(128, 128));
 BENCHMARK_CAPTURE(bmTrieLookups, 100_mixed_keys, 100, KeyLengthRange(8, 128));
+BENCHMARK_CAPTURE(bmTrieLookups, 10000_short_keys, 10000, KeyLengthRange(8, 8));
+BENCHMARK_CAPTURE(bmTrieLookups, 10000_long_keys, 10000, KeyLengthRange(128, 128));
 BENCHMARK_CAPTURE(bmTrieLookups, 10000_mixed_keys, 10000, KeyLengthRange(8, 128));
 
 } // namespace Envoy
