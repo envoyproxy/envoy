@@ -130,7 +130,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
 }
 
 class RejectedTest : public ExtAuthzGrpcClientTest {
- public:
+public:
   RejectedTest()
       : invalid_header_value_(reinterpret_cast<const char*>(invalid_header_value_raw_bytes_)),
         invalid_header_name_("invalid-\nkey"),
@@ -170,16 +170,16 @@ class RejectedTest : public ExtAuthzGrpcClientTest {
 };
 
 TEST_F(RejectedTest, OkHeaderInvalidName) {
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body_,
-      headers_invalid_name_, {}, {});
+  auto check_response =
+      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
+                                    empty_body_, headers_invalid_name_, {}, {});
   testResponse(std::move(check_response));
 }
 
 TEST_F(RejectedTest, OkHeaderInvalidValue) {
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body_,
-      headers_invalid_value_, {}, {});
+  auto check_response =
+      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
+                                    empty_body_, headers_invalid_value_, {}, {});
   testResponse(std::move(check_response));
 }
 
@@ -198,29 +198,29 @@ TEST_F(RejectedTest, DeniedHeaderInvalidValue) {
 }
 
 TEST_F(RejectedTest, OkDownstreamHeaderInvalidName) {
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body_, {},
-      headers_invalid_name_, {});
+  auto check_response =
+      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
+                                    empty_body_, {}, headers_invalid_name_, {});
   testResponse(std::move(check_response));
 }
 
 TEST_F(RejectedTest, OkDownstreamHeaderInvalidValue) {
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body_, {},
-      headers_invalid_value_, {});
+  auto check_response =
+      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
+                                    empty_body_, {}, headers_invalid_value_, {});
   testResponse(std::move(check_response));
 }
 
 TEST_F(RejectedTest, OkRemoveHeaderInvalidName) {
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body_, {}, {},
-      {invalid_header_name_});
+  auto check_response =
+      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
+                                    empty_body_, {}, {}, {invalid_header_name_});
   testResponse(std::move(check_response));
 }
 
 TEST_F(RejectedTest, OkSetQueryParamInvalidKey) {
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body_, {}, {}, {});
+  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok,
+                                                      envoy::type::v3::OK, empty_body_, {}, {}, {});
 
   auto* query_parameter = check_response->mutable_ok_response()->add_query_parameters_to_set();
   query_parameter->set_key("\n\n\n");
@@ -230,8 +230,8 @@ TEST_F(RejectedTest, OkSetQueryParamInvalidKey) {
 }
 
 TEST_F(RejectedTest, OkSetQueryParamInvalidValue) {
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body_, {}, {}, {});
+  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok,
+                                                      envoy::type::v3::OK, empty_body_, {}, {}, {});
 
   auto* query_parameter = check_response->mutable_ok_response()->add_query_parameters_to_set();
   query_parameter->set_key("key");

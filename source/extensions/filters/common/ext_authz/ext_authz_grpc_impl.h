@@ -59,7 +59,6 @@ public:
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
 
-
 private:
   void rejectResponse(const absl::Status& status);
 

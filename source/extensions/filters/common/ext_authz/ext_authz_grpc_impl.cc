@@ -74,8 +74,7 @@ absl::Status copyOkResponseMutations(ResponsePtr& response,
          !Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(query_parameter.value()))) {
       return absl::InternalError("Field 'query_parameters_to_set' contained invalid header.");
     }
-    response->query_parameters_to_set.emplace_back(query_parameter.key(),
-                                                         query_parameter.value());
+    response->query_parameters_to_set.emplace_back(query_parameter.key(), query_parameter.value());
   }
 
   for (const auto& query_parameter_name : ok_response.query_parameters_to_remove()) {
