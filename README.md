@@ -80,7 +80,7 @@ Google calendar is here: https://goo.gl/PkDijT
 
 ### Security Audit
 
-There has been several third party engagements focused on Envoy security:
+There have been several third-party engagements focused on Envoy security:
 * In 2018 Cure53 performed a security audit, [full report](docs/security/audit_cure53_2018.pdf).
 * In 2021 Ada Logics performed an audit on our fuzzing infrastructure with recommendations for improvements, [full report](docs/security/audit_fuzzer_adalogics_2021.pdf).
 
