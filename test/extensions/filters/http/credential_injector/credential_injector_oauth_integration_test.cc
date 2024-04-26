@@ -332,7 +332,7 @@ typed_config:
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Retry token request on oauth2 IDP server bad response
+// Retry token request on oauth2 server bad response
 TEST_P(CredentialInjectorIntegrationTest, RetryTokenRequestOnBadResponseFromIDPServer) {
   const std::string filter_config =
       R"EOF(

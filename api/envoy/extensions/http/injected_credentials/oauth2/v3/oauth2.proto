@@ -68,7 +68,7 @@ message OAuth2 {
     ClientCredentials client_credentials = 3;
   }
 
-  // The interval between two successive retries to fetch token from IDP. Default is 2 secs.
+  // The interval between two successive retries to fetch token from Identity Provider. Default is 2 secs.
   // The interval must be at least 1 second.
   google.protobuf.Duration token_fetch_retry_interval = 4
       [(validate.rules).duration = {gte {seconds: 1}}];
