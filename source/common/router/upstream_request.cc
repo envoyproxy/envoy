@@ -129,9 +129,9 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context);
   }
 
-  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  stream_info_.setUpstreamInfo(upstream_info_);
   stream_info_.route_ = parent_.callbacks()->route();
-  parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
+  parent_.callbacks()->streamInfo().setUpstreamInfo(upstream_info_);
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
   stream_info_.setIsShadow(parent_.callbacks()->streamInfo().isShadow());
