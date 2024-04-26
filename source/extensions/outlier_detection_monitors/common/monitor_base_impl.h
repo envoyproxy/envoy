@@ -2,19 +2,34 @@
 
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/upstream/outlier_detection.h"
 
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
+
+// Types of errors reported to outlier detectors.
+// Each type may have a different syntax and content.
+enum class Upstream::Outlier::ErrorType {
+  HTTP_CODE,
+  LOCAL_ORIGIN,
+};
+
 namespace Extensions {
 namespace Outlier {
 
+using namespace Envoy::Upstream::Outlier;
+
+// Base class for monitors. It defines interface to:
+// - components reporting errors
+// - cluster manager which checks for health of the endpoints
 class ODMonitor {
   // Define PURE functions as API between Envoy and outlier detection mechanism.
 };
 
 using ODMonitorPtr = std::unique_ptr<ODMonitor>;
 
+// (todo): maybe move it to config file
 class MonitorFactoryContext {
 public:
   MonitorFactoryContext(ProtobufMessage::ValidationVisitor& validation_visitor)
@@ -27,6 +42,7 @@ private:
 };
 
 // This should go to something like source/extensions/outlier_detection/common
+// (todo): maybe move it to config file
 class MonitorFactory : public Config::TypedFactory {
 public:
   ~MonitorFactory() override = default;
@@ -37,6 +53,7 @@ public:
   std::string category() const override { return "envoy.outlier_detection_monitors"; }
 };
 
+// (todo): maybe move it to config file
 template <class ConfigProto> class MonitorFactoryBase : public MonitorFactory {
 public:
   ODMonitorPtr createMonitor(const Protobuf::Message& config,
@@ -46,6 +63,7 @@ public:
                                        context);
   }
 
+  // (todo): maybe move it to config file
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ConfigProto>();
   }
@@ -61,20 +79,7 @@ private:
   const std::string name_;
 };
 
-// Types of results which can be reported.
-enum class ErrorType {
-  HTTP_CODE,
-  LOCAL_ORIGIN,
-  DATABASE,
-};
-
-class Error {
-public:
-  virtual ErrorType type() const PURE;
-  virtual ~Error() = default;
-};
-
-class HttpCode : public Error {
+class HttpCode : public Upstream::Outlier::Error {
 public:
   HttpCode(uint64_t code) : code_(code) {}
   HttpCode() = delete;
@@ -114,6 +119,8 @@ private:
 };
 
 // Class groups error buckets. Buckets may be of different types.
+// Base class for various types of monitors.
+// Each monitor may implement different health detection algorithm.
 class Monitor {
 public:
   virtual ~Monitor() {}

@@ -10,6 +10,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/stats/symbol_table.h"
+#include "source/extensions/outlier_detection_monitors/common/monitor_base_impl.h"
 
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -29,6 +30,7 @@ public:
   MOCK_METHOD(uint32_t, numEjections, ());
   MOCK_METHOD(void, putHttpResponseCode, (uint64_t code));
   MOCK_METHOD(void, putResult, (Result result, absl::optional<uint64_t> code));
+  MOCK_METHOD(void, putResult, (ErrorPtr));
   MOCK_METHOD(void, putResponseTime, (std::chrono::milliseconds time));
   MOCK_METHOD(const absl::optional<MonotonicTime>&, lastEjectionTime, ());
   MOCK_METHOD(const absl::optional<MonotonicTime>&, lastUnejectionTime, ());

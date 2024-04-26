@@ -54,6 +54,21 @@ enum class Result {
  * Those categories of results are fed only into Outlier Detection extensions.
  */
 class Error;
+// void PrintTo(const Error&, std::ostream *);
+
+// Types of results which can be reported.
+enum class ErrorType; // {
+                      // HTTP_CODE,
+                      // LOCAL_ORIGIN,
+                      // DATABASE,
+//};
+
+class Error {
+public:
+  virtual ErrorType type() const PURE;
+  virtual ~Error() = default;
+};
+using ErrorPtr = std::unique_ptr<Error>;
 
 /**
  * Monitor for per host data. Proxy filters should send pertinent data when available.
@@ -88,7 +103,7 @@ public:
    */
   void putResult(Result result) { putResult(result, absl::nullopt); }
 
-  virtual void putResult(const Error&) PURE;
+  virtual void putResult(ErrorPtr) PURE;
 
   /**
    * Add a response time for a host (in this case response time is generic and might be used for
