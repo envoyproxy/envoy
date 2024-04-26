@@ -32,7 +32,8 @@ public:
     DispatchedRequest,
   };
   virtual GetTokenResult asyncGetAccessToken(const std::string& client_id,
-                                             const std::string& secret) PURE;
+                                             const std::string& secret,
+                                             const std::string& scopes) PURE;
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
 
   // Http::AsyncClient::Callbacks
@@ -57,8 +58,8 @@ public:
   /**
    * Request the access token from the OAuth server. Calls the `onSuccess` on `onFailure` callbacks.
    */
-  GetTokenResult asyncGetAccessToken(const std::string& client_id,
-                                     const std::string& secret) override;
+  GetTokenResult asyncGetAccessToken(const std::string& client_id, const std::string& secret,
+                                     const std::string& scopes) override;
 
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
 

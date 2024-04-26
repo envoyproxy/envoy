@@ -87,9 +87,12 @@ private:
   ThreadLocal::SlotPtr tls_;
   std::unique_ptr<OAuth2Client> oauth2_client_;
   std::string client_id_;
+  const std::string oauth_scopes_;
   Event::Dispatcher* dispatcher_;
   Event::TimerPtr timer_;
   TokenProviderStats stats_;
+  // retry interval for fetching the token
+  const std::chrono::seconds retry_interval_{2};
 };
 
 } // namespace OAuth2

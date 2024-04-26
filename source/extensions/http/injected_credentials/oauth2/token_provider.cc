@@ -1,5 +1,6 @@
 #include "source/extensions/http/injected_credentials/oauth2/token_provider.h"
 #include "token_provider.h"
+#include <chrono>
 
 namespace Envoy {
 namespace Extensions {
@@ -7,14 +8,43 @@ namespace Http {
 namespace InjectedCredentials {
 namespace OAuth2 {
 
+namespace {
+
+constexpr absl::string_view DEFAULT_AUTH_SCOPE = "";
+// Transforms the proto list of 'auth_scopes' into a vector of std::string, also
+// handling the default value logic.
+std::string oauthScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos) {
+  std::vector<std::string> scopes;
+
+  // If 'auth_scopes' is empty it must return a list with the default value.
+  if (auth_scopes_protos.empty()) {
+    scopes.emplace_back(DEFAULT_AUTH_SCOPE);
+  } else {
+    scopes.reserve(auth_scopes_protos.size());
+
+    for (const auto& scope : auth_scopes_protos) {
+      scopes.emplace_back(scope);
+    }
+  }
+  return absl::StrJoin(scopes, " ");
+  ;
+}
+
+} // namespace
+
 // TokenProvider Constructor
 TokenProvider::TokenProvider(Common::SecretReaderConstSharedPtr secret_reader,
                              ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
                              const OAuth2& proto_config, Event::Dispatcher& dispatcher,
                              const std::string& stats_prefix, Stats::Scope& scope)
     : secret_reader_(secret_reader), tls_(tls.allocateSlot()),
-      client_id_(proto_config.client_credentials().client_id()), dispatcher_(&dispatcher),
-      stats_(generateStats(stats_prefix + "oauth2.", scope)) {
+      client_id_(proto_config.client_credentials().client_id()),
+      oauth_scopes_(oauthScopesList(proto_config.scopes())), dispatcher_(&dispatcher),
+      stats_(generateStats(stats_prefix + "oauth2.", scope)),
+      retry_interval_(
+          proto_config.token_fetch_retry_interval().seconds() > 0
+              ? std::chrono::seconds(proto_config.token_fetch_retry_interval().seconds())
+              : std::chrono::seconds(2)) {
   ThreadLocalOauth2ClientCredentialsTokenSharedPtr empty(
       new ThreadLocalOauth2ClientCredentialsToken(""));
   tls_->set(
@@ -34,17 +64,20 @@ void TokenProvider::asyncGetAccessToken() {
     timer_.reset();
   }
   if (secret_reader_->credential().empty()) {
-    ENVOY_LOG(error, "asyncGetAccessToken: client secret is empty, retrying in 2 seconds.");
+    ENVOY_LOG(error, "asyncGetAccessToken: client secret is empty, retrying in {} seconds.",
+              retry_interval_.count());
     timer_ = dispatcher_->createTimer([this]() -> void { asyncGetAccessToken(); });
-    timer_->enableTimer(std::chrono::seconds(2));
+    timer_->enableTimer(std::chrono::seconds(retry_interval_));
     stats_.token_fetch_failed_on_client_secret_.inc();
     return;
   }
-  auto result = oauth2_client_->asyncGetAccessToken(client_id_, secret_reader_->credential());
+  auto result =
+      oauth2_client_->asyncGetAccessToken(client_id_, secret_reader_->credential(), oauth_scopes_);
   if (result == OAuth2Client::GetTokenResult::NotDispatchedClusterNotFound) {
-    ENVOY_LOG(error, "asyncGetAccessToken: OAuth cluster not found., retrying in 2 seconds.");
+    ENVOY_LOG(error, "asyncGetAccessToken: OAuth cluster not found. Retrying in {} seconds.",
+              retry_interval_.count());
     timer_ = dispatcher_->createTimer([this]() -> void { asyncGetAccessToken(); });
-    timer_->enableTimer(std::chrono::seconds(2));
+    timer_->enableTimer(std::chrono::seconds(retry_interval_));
     stats_.token_fetch_failed_on_cluster_not_found_.inc();
     return;
   }
@@ -59,19 +92,27 @@ void TokenProvider::onGetAccessTokenSuccess(const std::string& access_token,
   auto token = absl::StrCat("Bearer ", access_token);
   ThreadLocalOauth2ClientCredentialsTokenSharedPtr value(
       new ThreadLocalOauth2ClientCredentialsToken(token));
+  stats_.token_fetched_.inc();
+
   tls_->set(
       [value](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return value; });
-  if (!timer_) {
-    timer_ = dispatcher_->createTimer([this]() -> void { asyncGetAccessToken(); });
+  if (timer_) {
+    return;
   }
+  timer_ = dispatcher_->createTimer([this]() -> void { asyncGetAccessToken(); });
+  ENVOY_LOG(debug, "onGetAccessTokenSuccess: Token fetched successfully, expires in {} seconds.",
+            expires_in.count());
   timer_->enableTimer(expires_in / 2);
-  stats_.token_fetched_.inc();
 }
 
 void TokenProvider::onGetAccessTokenFailure() {
   ENVOY_LOG(error, "onGetAccessTokenFailure: Failed to get access token");
   stats_.token_fetch_failed_on_oauth_server_response_.inc();
-  asyncGetAccessToken();
+  if (timer_) {
+    return;
+  }
+  timer_ = dispatcher_->createTimer([this]() -> void { asyncGetAccessToken(); });
+  timer_->enableTimer(retry_interval_);
 }
 
 const std::string& TokenProvider::token() const { return threadLocal().token(); }
