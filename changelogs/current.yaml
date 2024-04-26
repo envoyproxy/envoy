@@ -13,6 +13,11 @@ minor_behavior_changes:
 - area: tracers
   change: |
     Set status code for OpenTelemetry tracers (previously unset).
+- area: udp
+  change: |
+    Change GRO read buffer to 64kB to avoid MSG_TRUNC. And change the way to limit the number of packets processed per event
+    loop to work with GRO. This behavior can be reverted by setting runtime guard
+    ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
