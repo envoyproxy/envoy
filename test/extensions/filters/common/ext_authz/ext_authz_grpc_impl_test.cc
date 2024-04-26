@@ -427,8 +427,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
-// Test the client when an OK response is received with additional query string parameters. Also
-// test that query parameters are percent-encoded when necessary.
+// Test the client when an OK response is received with additional query string parameters.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
   initialize();
 
