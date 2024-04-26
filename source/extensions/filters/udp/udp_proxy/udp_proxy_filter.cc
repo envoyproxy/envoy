@@ -49,11 +49,11 @@ void UdpProxyFilter::onClusterAddOrUpdate(absl::string_view cluster_name,
          &cluster_infos_[cluster_name]->cluster_ != &cluster);
 
   if (config_->usingPerPacketLoadBalancing()) {
-    cluster_infos_.emplace(cluster_name,
-                           std::make_unique<PerPacketLoadBalancingClusterInfo>(*this, cluster));
+    cluster_infos_.insert_or_assign(
+        cluster_name, std::make_unique<PerPacketLoadBalancingClusterInfo>(*this, cluster));
   } else {
-    cluster_infos_.emplace(cluster_name,
-                           std::make_unique<StickySessionClusterInfo>(*this, cluster));
+    cluster_infos_.insert_or_assign(cluster_name,
+                                    std::make_unique<StickySessionClusterInfo>(*this, cluster));
   }
 }
 
