@@ -39,7 +39,8 @@ namespace ExtAuthz {
   COUNTER(denied)                                                                                  \
   COUNTER(error)                                                                                   \
   COUNTER(disabled)                                                                                \
-  COUNTER(failure_mode_allowed)
+  COUNTER(failure_mode_allowed)                                                                    \
+  COUNTER(rejected)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
@@ -71,7 +72,8 @@ public:
 
         encode_raw_headers_(config.encode_raw_headers()),
 
-        status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
+        status_on_error_(toErrorCode(config.status_on_error().code())),
+        status_on_rejected_(toRejectedCode(config.status_on_rejected().code())), scope_(scope),
         runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
         filter_enabled_(config.has_filter_enabled()
                             ? absl::optional<Runtime::FractionalPercent>(
@@ -104,6 +106,7 @@ public:
         ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
         ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
         ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
+        ext_authz_rejected_(pool_.add(createPoolStatName(config.stat_prefix(), "rejected"))),
         ext_authz_failure_mode_allowed_(
             pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {
     auto bootstrap = factory_context.bootstrap();
@@ -156,6 +159,8 @@ public:
   bool headersAsBytes() const { return encode_raw_headers_; }
 
   Http::Code statusOnError() const { return status_on_error_; }
+
+  Http::Code statusOnRejected() const { return status_on_rejected_; }
 
   bool filterEnabled(const envoy::config::core::v3::Metadata& metadata) {
     const bool enabled = filter_enabled_.has_value() ? filter_enabled_->enabled() : true;
@@ -213,6 +218,14 @@ private:
     return Http::Code::Forbidden;
   }
 
+  static Http::Code toRejectedCode(uint64_t status) {
+    const auto code = static_cast<Http::Code>(status);
+    if (code >= Http::Code::Continue && code <= Http::Code::NetworkAuthenticationRequired) {
+      return code;
+    }
+    return Http::Code::InternalServerError;
+  }
+
   ExtAuthzFilterStats generateStats(const std::string& prefix,
                                     const std::string& filter_stats_prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat(prefix, "ext_authz.", filter_stats_prefix);
@@ -237,6 +250,7 @@ private:
   const bool pack_as_bytes_;
   const bool encode_raw_headers_;
   const Http::Code status_on_error_;
+  const Http::Code status_on_rejected_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
@@ -269,6 +283,7 @@ public:
   const Stats::StatName ext_authz_ok_;
   const Stats::StatName ext_authz_denied_;
   const Stats::StatName ext_authz_error_;
+  const Stats::StatName ext_authz_rejected_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
 };
 

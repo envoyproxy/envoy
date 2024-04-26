@@ -59,13 +59,9 @@ public:
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
 
+
 private:
-  using RepeatedHeaderValueOption =
-      Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>;
-  void copyHeaderMutationsIntoResponse(
-      ResponsePtr& response, const RepeatedHeaderValueOption& headers,
-      const RepeatedHeaderValueOption& response_headers_to_add = {},
-      const Protobuf::RepeatedPtrField<std::string>& headers_to_remove = {});
+  void rejectResponse(const absl::Status& status);
 
   Grpc::AsyncClient<envoy::service::auth::v3::CheckRequest, envoy::service::auth::v3::CheckResponse>
       async_client_;

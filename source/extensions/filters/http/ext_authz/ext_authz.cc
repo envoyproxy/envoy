@@ -474,6 +474,21 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     }
     break;
   }
+  case CheckStatus::Rejected: {
+    ENVOY_STREAM_LOG(
+        trace, "ext_authz filter rejected the request with an error. Response status code: {}",
+        *decoder_callbacks_, enumToInt(config_->statusOnRejected()));
+    if (cluster_) {
+      config_->incCounter(cluster_->statsScope(), config_->ext_authz_rejected_);
+    }
+    stats_.rejected_.inc();
+    decoder_callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
+    decoder_callbacks_->sendLocalReply(
+        config_->statusOnRejected(), EMPTY_STRING, nullptr, absl::nullopt,
+        Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzRejected);
+    break;
+  }
   }
 }
 

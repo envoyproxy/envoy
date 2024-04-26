@@ -41,6 +41,8 @@ struct ResponseCodeDetailsValues {
   const std::string AuthzDenied = "ext_authz_denied";
   // The ext_authz filter encountered a failure, and was configured to fail-closed.
   const std::string AuthzError = "ext_authz_error";
+  // The ext_authz filter rejected the CheckResponse and dropped the client request.
+  const std::string AuthzRejected = "ext_authz_rejected";
 };
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailsValues>;
 
@@ -70,7 +72,9 @@ enum class CheckStatus {
   // The authz service could not be queried.
   Error,
   // The request is denied.
-  Denied
+  Denied,
+  // The response was rejected.
+  Rejected
 };
 
 /**

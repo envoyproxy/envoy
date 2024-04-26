@@ -311,6 +311,46 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   EXPECT_EQ(1U, config_->stats().error_.value());
 }
 
+TEST_F(HttpFilterTest, RejectRequest) {
+  InSequence s;
+
+  initialize(R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  )EOF");
+
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(),
+                  std::to_string(enumToInt(Http::Code::InternalServerError)));
+      }));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Rejected;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  // TODO: ADD THESE STATS
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.rejected")
+                    .value());
+  EXPECT_EQ(1U, config_->stats().rejected_.value());
+}
+
 // Verifies that the filter responds with a configurable HTTP status when an network error occurs.
 TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
   InSequence s;
