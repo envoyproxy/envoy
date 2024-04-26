@@ -155,6 +155,14 @@ func (h *requestOrResponseHeaderMapImpl) RangeWithCopy(f func(key, value string)
 	}
 }
 
+func (h *requestOrResponseHeaderMapImpl) GetAllHeaders() map[string][]string {
+	h.mutex.Lock()
+	h.initHeaders()
+	copied_headers := h.headers
+	h.mutex.Unlock()
+	return copied_headers
+}
+
 // api.RequestHeaderMap
 type requestHeaderMapImpl struct {
 	requestOrResponseHeaderMapImpl
