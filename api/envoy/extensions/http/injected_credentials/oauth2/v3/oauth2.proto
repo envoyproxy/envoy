@@ -5,12 +5,12 @@ package envoy.extensions.http.injected_credentials.oauth2.v3;
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
+import "google/protobuf/duration.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
-
-import "google/protobuf/duration.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.injected_credentials.oauth2.v3";
 option java_outer_classname = "Oauth2Proto";
