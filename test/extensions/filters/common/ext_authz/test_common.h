@@ -90,67 +90,48 @@ MATCHER_P(AuthzResponseNoAttributes, response, "") {
 }
 
 MATCHER(AuthzResponseRejected, "") {
-  ENVOY_LOG_MISC(trace, "try match");
   if (arg->status != CheckStatus::Rejected) {
-    ENVOY_LOG_MISC(trace, "if (arg->status != CheckStatus::Rejected) {");
     return false;
   }
 
   // Everything else should be empty.
   if (arg->body.compare("")) {
-    ENVOY_LOG_MISC(trace, "if (arg->body.compare()) {");
     return false;
   }
 
   if (!TestCommon::compareHeaderVector(arg->headers_to_append, {})) {
-    ENVOY_LOG_MISC(trace, "if (!TestCommon::compareHeaderVector(arg->headers_to_append, {})) {");
     return false;
   }
 
   if (!TestCommon::compareHeaderVector(arg->headers_to_set, {})) {
-    ENVOY_LOG_MISC(trace, "if (!TestCommon::compareHeaderVector(arg->headers_to_set, {})) {");
     return false;
   }
 
   if (!TestCommon::compareHeaderVector(arg->headers_to_add, {})) {
-    ENVOY_LOG_MISC(trace, "if (!TestCommon::compareHeaderVector(arg->headers_to_add, {})) {");
     return false;
   }
 
   if (!TestCommon::compareHeaderVector(arg->response_headers_to_add, {})) {
-    ENVOY_LOG_MISC(trace,
-                   "if (!TestCommon::compareHeaderVector(arg->response_headers_to_add, {})) {");
     return false;
   }
 
   if (!TestCommon::compareHeaderVector(arg->response_headers_to_set, {})) {
-    ENVOY_LOG_MISC(trace,
-                   "if (!TestCommon::compareHeaderVector(arg->response_headers_to_set, {})) {");
     return false;
   }
 
   if (!TestCommon::compareHeaderVector(arg->response_headers_to_set, {})) {
-    ENVOY_LOG_MISC(trace,
-                   "if (!TestCommon::compareHeaderVector(arg->response_headers_to_set, {})) {");
     return false;
   }
 
   if (!TestCommon::compareQueryParamsVector(arg->query_parameters_to_set, {})) {
-    ENVOY_LOG_MISC(
-        trace, "if (!TestCommon::compareQueryParamsVector(arg->query_parameters_to_set, {})) {");
     return false;
   }
 
   if (!TestCommon::compareVectorOfHeaderName(arg->headers_to_remove, {})) {
-    ENVOY_LOG_MISC(trace,
-                   "if (!TestCommon::compareVectorOfHeaderName(arg->headers_to_remove, {})) {");
     return false;
   }
 
   if (!TestCommon::compareVectorOfUnorderedStrings(arg->query_parameters_to_remove, {})) {
-    ENVOY_LOG_MISC(
-        trace,
-        "if (!TestCommon::compareVectorOfUnorderedStrings(arg->query_parameters_to_remove, {})) {");
     return false;
   }
 
