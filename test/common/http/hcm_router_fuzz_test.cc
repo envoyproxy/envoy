@@ -498,7 +498,7 @@ private:
 
 class Harness {
 public:
-  Harness() : hcm_config_(Protobuf::RepeatedPtrField<std::string>{}) {
+  Harness() : hcm_config_(std::make_shared<FuzzConfig>(Protobuf::RepeatedPtrField<std::string>{})) {
     ON_CALL(filter_callbacks_.connection_, close(_, _)).WillByDefault(InvokeWithoutArgs([this]() {
       closed_ = true;
     }));
@@ -506,12 +506,12 @@ public:
 
   void fuzz(const FuzzCase& input) {
     hcm_ = std::make_unique<ConnectionManagerImpl>(
-        hcm_config_, drain_close_, random_, hcm_config_.http_context_, runtime_, local_info_,
-        hcm_config_.cm_, overload_manager_, hcm_config_.time_system_);
+        hcm_config_, drain_close_, random_, hcm_config_->http_context_, runtime_, local_info_,
+        hcm_config_->cm_, overload_manager_, hcm_config_->time_system_);
     hcm_->initializeReadFilterCallbacks(filter_callbacks_);
     Buffer::OwnedImpl data;
     hcm_->onData(data, false);
-    FuzzClusterManager& cluster_manager = hcm_config_.getFuzzClusterManager();
+    FuzzClusterManager& cluster_manager = hcm_config_->getFuzzClusterManager();
 
     for (const auto& action : input.actions()) {
       if (closed_) {
@@ -520,7 +520,7 @@ public:
       switch (action.action_case()) {
       case ActionCase::kAdvanceTime: {
         const auto& a = action.advance_time();
-        hcm_config_.time_system_.timeSystem().advanceTimeWait(
+        hcm_config_->time_system_.timeSystem().advanceTimeWait(
             std::chrono::milliseconds(a.milliseconds()));
         break;
       }
@@ -582,7 +582,7 @@ public:
   }
 
 private:
-  FuzzConfig hcm_config_;
+  std::shared_ptr<FuzzConfig> hcm_config_;
   NiceMock<Network::MockDrainDecision> drain_close_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
