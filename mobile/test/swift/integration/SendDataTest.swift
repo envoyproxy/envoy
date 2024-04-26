@@ -21,7 +21,7 @@ final class SendDataTests: XCTestCase {
 
     let expectation = self.expectation(description: "Run called with expected http status")
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
       .setLogger { _, msg in
         print(msg, terminator: "")
       }

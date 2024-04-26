@@ -74,9 +74,11 @@ envoy_status_t InternalEngine::readData(envoy_stream_t stream, size_t bytes_to_r
       [&, stream, bytes_to_read]() { http_client_->readData(stream, bytes_to_read); });
 }
 
-envoy_status_t InternalEngine::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
-  return dispatcher_->post(
-      [&, stream, data, end_stream]() { http_client_->sendData(stream, data, end_stream); });
+envoy_status_t InternalEngine::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer,
+                                        bool end_stream) {
+  return dispatcher_->post([&, stream, buffer = std::move(buffer), end_stream]() mutable {
+    http_client_->sendData(stream, std::move(buffer), end_stream);
+  });
 }
 
 envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream,
@@ -268,10 +270,10 @@ envoy_status_t InternalEngine::resetConnectivityState() {
   return dispatcher_->post([&]() -> void { connectivity_manager_->resetConnectivityState(); });
 }
 
-envoy_status_t InternalEngine::setPreferredNetwork(envoy_network_t network) {
+envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
   return dispatcher_->post([&, network]() -> void {
     envoy_netconf_t configuration_key =
-        Envoy::Network::ConnectivityManagerImpl::setPreferredNetwork(network);
+        Network::ConnectivityManagerImpl::setPreferredNetwork(network);
     connectivity_manager_->refreshDns(configuration_key, true);
   });
 }

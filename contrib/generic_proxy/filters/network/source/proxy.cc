@@ -50,7 +50,8 @@ ActiveStream::ActiveStream(Filter& parent, StreamRequestPtr request)
     : parent_(parent), request_stream_(std::move(request)),
       request_stream_end_(request_stream_->frameFlags().endStream()),
       stream_info_(parent_.time_source_,
-                   parent_.callbacks_->connection().connectionInfoProviderSharedPtr()) {
+                   parent_.callbacks_->connection().connectionInfoProviderSharedPtr(),
+                   StreamInfo::FilterState::LifeSpan::FilterChain) {
   if (!request_stream_end_) {
     // If the request is not fully received, register the stream to the frame handler map.
     parent_.registerFrameHandler(requestStreamId(), this);

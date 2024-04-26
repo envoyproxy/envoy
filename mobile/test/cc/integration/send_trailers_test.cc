@@ -1,7 +1,6 @@
 #include "test/common/integration/engine_with_test_server.h"
 #include "test/common/integration/test_server.h"
 
-#include "absl/strings/str_format.h"
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
@@ -10,11 +9,24 @@
 
 namespace Envoy {
 
+inline constexpr absl::string_view ASSERTION_FILTER_TEXT_PROTO = R"(
+  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
+    match_config: {
+      http_request_trailers_match: {
+        headers: { name: 'trailer-key', exact_match: 'trailer-value' }
+      }
+    }
+  }
+)";
+
 TEST(SendTrailersTest, Success) {
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
   engine_builder.enforceTrustChainVerification(false)
       .setLogLevel(Logger::Logger::debug)
+#ifdef ENVOY_ENABLE_FULL_PROTOS
+      .addNativeFilter("envoy.filters.http.assertion", std::string(ASSERTION_FILTER_TEXT_PROTO))
+#endif
       .setOnEngineRunning([&]() { engine_running.Notify(); });
   EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
   engine_running.WaitForNotification();
@@ -46,7 +58,7 @@ TEST(SendTrailersTest, Success) {
   headers->addCopy(Http::LowerCaseString(":method"), "GET");
   headers->addCopy(Http::LowerCaseString(":scheme"), "https");
   headers->addCopy(Http::LowerCaseString(":authority"),
-                   absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()));
+                   engine_with_test_server.testServer().getAddress());
   headers->addCopy(Http::LowerCaseString(":path"), "/");
   stream->sendHeaders(std::move(headers), false);
 

@@ -19,10 +19,13 @@ public:
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(const std::chrono::milliseconds, timeout, (), (const));
 
   std::string cluster_name_{"fake_cluster_name"};
 
   envoy::config::core::v3::Metadata metadata_;
+
+  std::chrono::milliseconds timeout_;
 };
 
 class MockRouteMatcher : public RouteMatcher {

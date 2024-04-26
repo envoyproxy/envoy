@@ -87,6 +87,9 @@ public:
   bool hasResetStream() const { return http_reset_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_->streamInfo(); }
 
+protected:
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+
 private:
   void streamError(Status::GrpcStatus grpc_status, const std::string& message);
   void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, EMPTY_STRING); }

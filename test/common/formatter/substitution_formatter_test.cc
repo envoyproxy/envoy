@@ -259,7 +259,8 @@ TEST(SubstitutionFormatterTest, plainNumberFormatter) {
 TEST(SubstitutionFormatterTest, inFlightDuration) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
-  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr};
+  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
 
   {
     time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(100)));

@@ -345,7 +345,7 @@ void OwnedGenericUpstream::onDecodingFailure() {
 
 UpstreamRequest::UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr generic_upstream)
     : parent_(parent), generic_upstream_(std::move(generic_upstream)),
-      stream_info_(parent.time_source_, nullptr),
+      stream_info_(parent.time_source_, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain),
       upstream_info_(std::make_shared<StreamInfo::UpstreamInfoImpl>()) {
 
   // Set the upstream info for the stream info.
@@ -502,7 +502,13 @@ void UpstreamRequest::onUpstreamSuccess(Upstream::HostDescriptionConstSharedPtr 
 
   if (span_ != nullptr) {
     TraceContextBridge trace_context{*parent_.request_stream_};
-    span_->injectContext(trace_context, upstream_info_->upstream_host_);
+    Tracing::UpstreamContext upstream_context(
+        upstream_info_->upstream_host_.get(),       // host_
+        &upstream_info_->upstream_host_->cluster(), // cluster_
+        Tracing::ServiceType::Unknown,              // service_type_
+        false                                       // async_client_span_
+    );
+    span_->injectContext(trace_context, upstream_context);
   }
 
   sendRequestStartToUpstream();

@@ -367,11 +367,15 @@ public:
    * receiving packets from the kernel.
    * @param packets_dropped is the output parameter for number of packets dropped in kernel. If the
    * caller is not interested in it, nullptr can be passed in.
+   * @param num_packets_read is the output parameter for the number of packets passed to the
+   * udp_packet_processor in this call. If the caller is not interested in it, nullptr can be passed
+   * in.
    */
   static Api::IoCallUint64Result
   readFromSocket(IoHandle& handle, const Address::Instance& local_address,
                  UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time,
-                 UdpRecvMsgMethod recv_msg_method, uint32_t* packets_dropped);
+                 UdpRecvMsgMethod recv_msg_method, uint32_t* packets_dropped,
+                 uint32_t* num_packets_read);
 
   /**
    * Read some packets from a given UDP socket and pass the packet to a given

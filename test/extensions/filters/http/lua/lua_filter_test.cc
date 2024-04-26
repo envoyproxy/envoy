@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -2191,7 +2192,8 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Event::SimulatedTimeSystem test_time;
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time.timeSystem(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
@@ -2884,6 +2886,25 @@ TEST_F(LuaHttpFilterTest, LogTableInsteadOfString) {
 }
 
 TEST_F(LuaHttpFilterTest, DestructFilterConfigPerRoute) {
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  per_route_proto_config.mutable_source_code()->set_inline_string(HEADER_ONLY_SCRIPT);
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  InSequence s;
+  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).Times(0);
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(0);
+
+  per_route_config_ =
+      std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
+  per_route_config_.reset();
+}
+
+TEST_F(LuaHttpFilterTest, DestructFilterConfigPerRouteAndDisableRuntime) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.restart_features.allow_slot_destroy_on_worker_threads", "false"}});
+
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
   per_route_proto_config.mutable_source_code()->set_inline_string(HEADER_ONLY_SCRIPT);

@@ -12,11 +12,26 @@
 
 namespace Envoy {
 
+inline constexpr absl::string_view ASSERTION_FILTER_TEXT_PROTO = R"(
+  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
+    match_config: {
+      http_request_headers_match: {
+        headers: { name: ':method', exact_match: 'GET' }
+        headers: { name: ':scheme', exact_match: 'https' }
+        headers: { name: ':path', exact_match: '/' }
+      }
+    }
+  }
+)";
+
 TEST(SendHeadersTest, Success) {
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
   engine_builder.enforceTrustChainVerification(false)
       .setLogLevel(Logger::Logger::debug)
+#ifdef ENVOY_ENABLE_FULL_PROTOS
+      .addNativeFilter("envoy.filters.http.assertion", std::string(ASSERTION_FILTER_TEXT_PROTO))
+#endif
       .setOnEngineRunning([&]() { engine_running.Notify(); });
   EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
   engine_running.WaitForNotification();
@@ -48,7 +63,7 @@ TEST(SendHeadersTest, Success) {
   headers->addCopy(Http::LowerCaseString(":method"), "GET");
   headers->addCopy(Http::LowerCaseString(":scheme"), "https");
   headers->addCopy(Http::LowerCaseString(":authority"),
-                   absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()));
+                   engine_with_test_server.testServer().getAddress());
   headers->addCopy(Http::LowerCaseString(":path"), "/");
   stream->sendHeaders(std::move(headers), true);
   stream_complete.WaitForNotification();
@@ -90,8 +105,8 @@ TEST(SendHeadersTest, SuccessWithDeprecatedFunction) {
           .start();
 
   Platform::RequestHeadersBuilder request_headers_builder(
-      Platform::RequestMethod::GET, "https",
-      absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()), "/");
+      Platform::RequestMethod::GET, "https", engine_with_test_server.testServer().getAddress(),
+      "/");
   auto request_headers = request_headers_builder.build();
   auto request_headers_ptr =
       Platform::RequestHeadersSharedPtr(new Platform::RequestHeaders(request_headers));
