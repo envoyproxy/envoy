@@ -41,6 +41,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and lagacy code paths.
+- area: router
+  change: |
+    Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
 
 new_features:
 - area: matching
