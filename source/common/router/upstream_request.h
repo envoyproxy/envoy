@@ -195,6 +195,7 @@ private:
   std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
+  std::shared_ptr<StreamInfo::UpstreamInfoImpl> upstream_info_;
   DownstreamWatermarkManager downstream_watermark_manager_{*this};
   Tracing::SpanPtr span_;
   StreamInfo::StreamInfoImpl stream_info_;

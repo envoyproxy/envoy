@@ -82,7 +82,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool,
                                  bool can_send_early_data, bool can_use_http3,
                                  bool enable_half_close)
-    : parent_(parent), conn_pool_(std::move(conn_pool)),
+    : parent_(parent), conn_pool_(std::move(conn_pool)), upstream_host_(conn_pool_->host()),
+      upstream_info_(std::make_shared<StreamInfo::UpstreamInfoImpl>()),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr,
                    StreamInfo::FilterState::LifeSpan::FilterChain),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
@@ -110,14 +111,14 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     }
   }
 
-  // The router checks that the connection pool is non-null before creating the upstream request.
-  auto upstream_host = conn_pool_->host();
+  // The router checks that the connection pool is non-null and valid before creating an
+  // UpstreamRequest.
+  ASSERT(conn_pool_->valid() && upstream_host_ != nullptr, "Invalid connection pool");
+  upstream_info_->upstream_host_ = upstream_host_;
+
   Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
-  Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
-                                            &upstream_host->cluster(),     // cluster_
-                                            Tracing::ServiceType::Unknown, // service_type_
-                                            false                          // async_client_span_
-  );
+  Tracing::UpstreamContext upstream_context(upstream_host_.get(), &upstream_host_->cluster(),
+                                            Tracing::ServiceType::Unknown, false);
 
   if (span_ != nullptr) {
     span_->injectContext(trace_context, upstream_context);
@@ -372,10 +373,24 @@ void UpstreamRequest::maybeEndDecode(bool end_stream) {
 
 void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host,
                                              bool pool_success) {
-  StreamInfo::UpstreamInfo& upstream_info = *streamInfo().upstreamInfo();
-  upstream_info.setUpstreamHost(host);
-  upstream_host_ = host;
-  parent_.onUpstreamHostSelected(host, pool_success);
+
+  // Quick return if the host is nullptr. In this case the connection pool calling must be
+  // failed.
+  if (host == nullptr) {
+    ASSERT(!pool_success);
+    return;
+  }
+
+  // In most cases, the host description from host() of connection pool should be the same as
+  // the host description from the connection pool callback. Exception is the logical host
+  // which's addresses may be changed at runtime and the host description from the connection
+  // pool callback will be different from the host description from host() of connection pool.
+  if (host != upstream_host_) {
+    upstream_host_ = std::move(host);
+    upstream_info_->upstream_host_ = upstream_host_;
+  }
+
+  parent_.onUpstreamHostSelected(upstream_host_, pool_success);
 }
 
 void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
@@ -574,7 +589,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
 
   // Mimic an upstream reset.
-  onUpstreamHostSelected(host, false);
+  onUpstreamHostSelected(std::move(host), false); // Move host to the upstream_host_ if necessary.
   onResetStream(reset_reason, transport_failure_reason);
 }
 
@@ -595,9 +610,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
     upstream_->enableHalfClose();
   }
 
-  host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
-
-  onUpstreamHostSelected(host, true);
+  onUpstreamHostSelected(std::move(host), true); // Move host to the upstream_host_ if necessary.
+  upstream_host_->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
   if (protocol) {
     stream_info_.protocol(protocol.value());
@@ -668,8 +682,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   }
 
   const auto* route_entry = route().routeEntry();
-  if (route_entry->autoHostRewrite() && !host->hostname().empty()) {
-    Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
+  if (route_entry->autoHostRewrite() && !upstream_host_->hostname().empty()) {
+    Http::Utility::updateAuthority(*parent_.downstreamHeaders(), upstream_host_->hostname(),
                                    route_entry->appendXfh());
   }
 

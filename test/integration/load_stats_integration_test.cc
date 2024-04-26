@@ -669,7 +669,7 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   EXPECT_EQ("503", response_->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
 
-  ASSERT_TRUE(waitForLoadStatsRequest({}, 1));
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 1, 0, 0)}, 1));
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());

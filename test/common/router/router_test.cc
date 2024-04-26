@@ -3530,7 +3530,8 @@ TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, true);
 
-  EXPECT_CALL(*router_->retry_state_, onHostAttempted(_)).Times(0);
+  EXPECT_CALL(*router_->retry_state_,
+              onHostAttempted(testing::Eq(cm_.thread_local_cluster_.conn_pool_.host_)));
 
   router_->retry_state_->expectResetRetry();
 
@@ -3567,7 +3568,7 @@ TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers), true);
-  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
 TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
@@ -3900,7 +3901,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   response_timeout_->invokeCallback();
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
   // Timeout fired so no retry was done.
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -3951,7 +3952,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltRespo
   Http::TestResponseHeaderMapImpl response_headers{{":status", "204"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   response_timeout_->invokeCallback();
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
   // no retry was done.
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
