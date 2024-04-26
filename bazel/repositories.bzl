@@ -1372,12 +1372,12 @@ def _intel_dlb():
         build_file_content = """
 filegroup(
     name = "libdlb",
-    srcs = glob([
-        "dlb/libdlb/**",
-    ]),
+    srcs = glob(["dlb/libdlb/*"]),
     visibility = ["@envoy//contrib/dlb/source:__pkg__"],
 )
 """,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
     )
 
 def _rules_fuzzing():
