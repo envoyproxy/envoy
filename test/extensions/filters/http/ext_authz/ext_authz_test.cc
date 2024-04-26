@@ -343,7 +343,6 @@ TEST_F(HttpFilterTest, RejectRequest) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Rejected;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  // TODO: ADD THESE STATS
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.rejected")
