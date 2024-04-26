@@ -114,7 +114,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(
-    JNIEnv* env, jclass, jlong engine, jstring config, jlong bootstrap_ptr, jstring log_level) {
+    JNIEnv* env, jclass, jlong engine, jlong bootstrap_ptr, jstring log_level) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::JNI::StringUtfUniquePtr java_string_config = jni_helper.getStringUtfChars(config, nullptr);
   Envoy::JNI::StringUtfUniquePtr java_log_level = jni_helper.getStringUtfChars(log_level, nullptr);
@@ -123,17 +123,11 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap(
       reinterpret_cast<envoy::config::bootstrap::v3::Bootstrap*>(bootstrap_ptr));
 
-  jint result;
-  if (!bootstrap) {
-    result = reinterpret_cast<Envoy::InternalEngine*>(engine)->run(java_string_config.get(),
-                                                                   java_log_level.get());
-  } else {
-    auto options = std::make_unique<Envoy::OptionsImplBase>();
-    options->setConfigProto(std::move(bootstrap));
-    ENVOY_BUG(options->setLogLevel(java_log_level.get()).ok(), "invalid log level");
-    options->setConcurrency(1);
-    result = reinterpret_cast<Envoy::InternalEngine*>(engine)->run(std::move(options));
-  }
+  auto options = std::make_unique<Envoy::OptionsImplBase>();
+  options->setConfigProto(std::move(bootstrap));
+  ENVOY_BUG(options->setLogLevel(java_log_level.get()).ok(), "invalid log level");
+  options->setConcurrency(1);
+  jint result = reinterpret_cast<Envoy::InternalEngine*>(engine)->run(std::move(options));
 
   return result;
 }

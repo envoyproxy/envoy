@@ -100,7 +100,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
     checkIsTerminated();
     performRegistration(envoyConfiguration);
     int status =
-        JniLibrary.runEngine(this.engineHandle, "", envoyConfiguration.createBootstrap(), logLevel);
+        JniLibrary.runEngine(this.engineHandle, envoyConfiguration.createBootstrap(), logLevel);
     if (status == 0) {
       return EnvoyStatus.ENVOY_SUCCESS;
     }
