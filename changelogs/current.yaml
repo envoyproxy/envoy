@@ -9,7 +9,8 @@ behavior_changes:
     to false.
 - area: ext_proc
   change: |
-    Adding support for :ref:`route_cache_action <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.route_cache_action>`.
+    Adding support for
+    :ref:`route_cache_action <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.route_cache_action>`.
     It specifies the route action to be taken when an external processor response is received in response to request headers.
 
 minor_behavior_changes:
