@@ -763,8 +763,8 @@ message RouteAction {
   // collected for the shadow cluster making this feature useful for testing.
   //
   // During shadowing, the host/authority header is altered such that ``-shadow`` is appended. This is
-  // useful for logging. For example, ``cluster1`` becomes ``cluster1-shadow``. 
-  // This behavior can be disabled by setting ``disable_shadow_host_suffix_append`` to ``true``.
+  // useful for logging. For example, ``cluster1`` becomes ``cluster1-shadow``. This behavior can be
+  // disabled by setting ``disable_shadow_host_suffix_append`` to ``true``.
   //
   // .. note::
   //

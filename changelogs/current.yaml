@@ -64,8 +64,9 @@ new_features:
     for matching http input based on filter state objects.
 - area: http
   change: |
-    Added :ref:`disable_shadow_host_suffix_append <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
-    in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` 
+    Added :ref:`disable_shadow_host_suffix_append
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
+    in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>`
     for disabling appending of the ``-shadow`` suffix to the shadowed host/authority header.
 
 deprecated:
