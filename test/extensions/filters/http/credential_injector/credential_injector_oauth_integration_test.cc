@@ -354,6 +354,7 @@ typed_config:
         client_secret:
           name: client-secret
           sds_config:
+            resource_api_version: V3
             path_config_source:
               path: "{{ test_tmpdir }}/client_secret.yaml"
 )EOF";
