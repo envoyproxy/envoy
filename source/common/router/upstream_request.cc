@@ -371,26 +371,21 @@ void UpstreamRequest::maybeEndDecode(bool end_stream) {
   }
 }
 
-void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host,
-                                             bool pool_success) {
-
-  // Quick return if the host is nullptr. In this case the connection pool calling must be
-  // failed.
-  if (host == nullptr) {
-    ASSERT(!pool_success);
-    return;
-  }
-
+void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr real_host,
+                                             bool success) {
   // In most cases, the host description from host() of connection pool should be the same as
   // the host description from the connection pool callback. Exception is the logical host
   // which's addresses may be changed at runtime and the host description from the connection
   // pool callback will be different from the host description from host() of connection pool.
-  if (host != upstream_host_) {
-    upstream_host_ = std::move(host);
+  if (real_host != nullptr && real_host != upstream_host_) {
+    upstream_host_ = std::move(real_host);
     upstream_info_->upstream_host_ = upstream_host_;
   }
 
-  parent_.onUpstreamHostSelected(upstream_host_, pool_success);
+  // Upstream host never be nullptr. The value may from the host() of connection pool or the
+  // valid host description from the connection pool callback.
+  ASSERT(upstream_host_ != nullptr);
+  parent_.onUpstreamHostSelected(upstream_host_, success);
 }
 
 void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
