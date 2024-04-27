@@ -155,7 +155,8 @@ public:
                Server::Configuration::CommonFactoryContext& context)
       : failure_mode_allow_(config.failure_mode_allow()),
         disable_clear_route_cache_(config.disable_clear_route_cache()),
-        message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
+        route_cache_action_(config.route_cache_action()), message_timeout_(message_timeout),
+        max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()),
         mutation_checker_(config.mutation_rules(), context.regexEngine()),
@@ -177,7 +178,14 @@ public:
             config.metadata_options().receiving_namespaces().untyped().end()),
         expression_manager_(builder, context.localInfo(), config.request_attributes(),
                             config.response_attributes()),
-        immediate_mutation_checker_(context.regexEngine()) {}
+        immediate_mutation_checker_(context.regexEngine()) {
+    if (disable_clear_route_cache_ &&
+        (route_cache_action_ !=
+         envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
+      ExceptionUtil::throwEnvoyException("disable_clear_route_cache and route_cache_action can not "
+                                         "be set to none-default at the same time.");
+    }
+  }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -199,6 +207,11 @@ public:
   }
 
   bool disableClearRouteCache() const { return disable_clear_route_cache_; }
+
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
+  routeCacheAction() const {
+    return route_cache_action_;
+  }
 
   const std::vector<Matchers::StringMatcherPtr>& allowedHeaders() const { return allowed_headers_; }
   const std::vector<Matchers::StringMatcherPtr>& disallowedHeaders() const {
@@ -235,6 +248,8 @@ private:
   }
   const bool failure_mode_allow_;
   const bool disable_clear_route_cache_;
+  const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
+      route_cache_action_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
 
