@@ -13,6 +13,11 @@ minor_behavior_changes:
 - area: tracers
   change: |
     Set status code for OpenTelemetry tracers (previously unset).
+- area: udp
+  change: |
+    Change GRO read buffer to 64kB to avoid MSG_TRUNC. And change the way to limit the number of packets processed per event
+    loop to work with GRO. This behavior can be reverted by setting runtime guard
+    ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -25,7 +30,14 @@ bug_fixes:
   change: |
     Fix a RELEASE_ASSERT when using :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>`
     if the downstream request ``:authority`` was longer than 255 characters.
-
+- area: http
+  change: |
+    Fix a crash when reloading the HTTP Connection Manager via ECDS.
+- area: cares
+  change: |
+    Upgraded c-ares library to 1.20.1 and added fix to c-ares DNS implementation to additionally check for ``ARES_EREFUSED``,
+    ``ARES_ESERVFAIL``and ``ARES_ENOTIMP`` status. Without this fix, ``DestroyChannelOnRefused`` and
+    ``CustomResolverValidAfterChannelDestruction`` unit test will break.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

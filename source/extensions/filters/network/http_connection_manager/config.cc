@@ -295,7 +295,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
     auto& server_context = context.serverFactoryContext();
 
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
-        *filter_config, context.drainDecision(), server_context.api().randomGenerator(),
+        filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), server_context.overloadManager(),
         server_context.mainThreadDispatcher().timeSource());
@@ -852,7 +852,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     auto& server_context = context.serverFactoryContext();
 
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
-        *filter_config, context.drainDecision(), server_context.api().randomGenerator(),
+        filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), server_context.overloadManager(),
         server_context.mainThreadDispatcher().timeSource());

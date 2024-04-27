@@ -17,15 +17,25 @@ public final class HttpTestServerFactory {
   /** The instance of {@link HttpTestServer}. */
   public static class HttpTestServer {
     private final long handle; // Used by the native code.
+    private final String ipAddress;
     private final int port;
+    private final String address;
 
-    private HttpTestServer(long handle, int port) {
+    private HttpTestServer(long handle, String ipAddress, int port, String address) {
       this.handle = handle;
+      this.ipAddress = ipAddress;
       this.port = port;
+      this.address = address;
     }
+
+    /** Returns the server IP address. */
+    public String getIpAddress() { return ipAddress; }
 
     /** Returns the server port. */
     public int getPort() { return port; }
+
+    /** Returns the combination of IP address and port number. */
+    public String getAddress() { return address; }
 
     /** Shuts down the server. */
     public native void shutdown();
