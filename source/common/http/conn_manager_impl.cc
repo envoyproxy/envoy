@@ -1799,10 +1799,10 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
       // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the
       // payload is no longer HTTP/1.1)
       headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
-    } else if (connection_manager_.config_.keepaliveHeaderTimeout().count() != 0) {
+    } else if (connection_manager_.config_->keepaliveHeaderTimeout().count() != 0) {
       headers.setKeepAlive(absl::StrCat(
           "timeout=",
-          std::to_string(connection_manager_.config_.keepaliveHeaderTimeout().count())));
+          std::to_string(connection_manager_.config_->keepaliveHeaderTimeout().count())));
       headers.setReferenceConnection(Headers::get().ConnectionValues.KeepAlive);
     }
   }
