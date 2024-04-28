@@ -337,6 +337,7 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
           EXPECT_TRUE(user_data != nullptr);
           EXPECT_EQ(res, 2);
           completions_nr++;
+          ENVOY_LOG_MISC(info, "get uring request completion {}", completions_nr);
           // Note: generally events are not guaranteed to complete in the same order
           // we submit them, but for this case of reading from a single file it's ok
           // to expect the same order.
@@ -361,6 +362,9 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   res = io_uring_->submit();
   EXPECT_EQ(res, IoUringResult::Ok);
 
+  while (completions_nr < 2) {
+    dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  } 
   // Even though we haven't been notified about ops completion the buffers
   // are filled already.
   EXPECT_EQ(static_cast<char*>(iov1.iov_base)[0], 'a');
