@@ -134,7 +134,7 @@ public:
     }
   }
 
-  void notifyPoolReady() {
+  void notifyPoolReady(bool encoding_success = true) {
     if (creating_connection_) {
       creating_connection_ = false;
 
@@ -143,7 +143,12 @@ public:
         EXPECT_TRUE(boundUpstreamConnection()->waitingResponseRequestsForTest().empty());
       }
 
-      EXPECT_CALL(mock_upstream_connection_, write(_, _)).Times(testing::AtLeast(1));
+      if (!encoding_success) {
+        EXPECT_CALL(mock_upstream_connection_, write(_, _)).Times(0);
+      } else {
+        EXPECT_CALL(mock_upstream_connection_, write(_, _)).Times(testing::AtLeast(1));
+      }
+
       factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
           .poolReady(mock_upstream_connection_);
 
@@ -202,7 +207,7 @@ public:
     upstream_request->generic_upstream_->onUpstreamData(test_buffer, false);
   }
 
-  void notifyDecodingFailure() {
+  void notifyDecodingFailure(absl::string_view reason) {
     ASSERT(!filter_->upstreamRequestsForTest().empty());
 
     auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
@@ -222,7 +227,7 @@ public:
     EXPECT_CALL(*mock_client_codec_, decode(BufferStringEqual("test_1"), _))
         .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) {
           buffer.drain(buffer.length());
-          client_cb_->onDecodingFailure();
+          client_cb_->onDecodingFailure(reason);
         }));
 
     Buffer::OwnedImpl test_buffer;
@@ -461,6 +466,8 @@ TEST_P(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
   kickOffNewUpstreamRequest();
 
   if (with_tracing_) {
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamAddress, _));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().PeerAddress, _));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Error, "true"));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "local_reset"));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
@@ -480,7 +487,7 @@ TEST_P(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
         EXPECT_EQ(status.message(), "local_reset");
       }));
 
-  filter_->upstreamRequestsForTest().begin()->get()->resetStream(StreamResetReason::LocalReset);
+  filter_->upstreamRequestsForTest().begin()->get()->resetStream(StreamResetReason::LocalReset, {});
   EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
 
   // Mock downstream closing.
@@ -887,14 +894,35 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
   EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
-      .WillOnce(Invoke([this](Status status, absl::string_view, ResponseUpdateFunction) {
+      .WillOnce(Invoke([this](Status status, absl::string_view data, ResponseUpdateFunction) {
         EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
-        // Decoding error of bound upstream connection will not be notified to every requests
-        // and will be treated as local reset.
-        EXPECT_TRUE(status.message() == "protocol_error" || status.message() == "local_reset");
+        EXPECT_TRUE(status.message() == "protocol_error");
+        EXPECT_EQ(data, "decoding-failure");
       }));
 
-  notifyDecodingFailure();
+  notifyDecodingFailure("decoding-failure");
+
+  // Mock downstream closing.
+  mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndRequestEncodingFailure) {
+  setup();
+  kickOffNewUpstreamRequest();
+
+  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+      .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
+        callback.onEncodingFailure("encoding-failure");
+      }));
+
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([this](Status status, absl::string_view data, ResponseUpdateFunction) {
+        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+        EXPECT_TRUE(status.message() == "protocol_error");
+        EXPECT_EQ(data, "encoding-failure");
+      }));
+
+  notifyPoolReady(false);
 
   // Mock downstream closing.
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
