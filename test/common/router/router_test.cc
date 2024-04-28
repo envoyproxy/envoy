@@ -5192,7 +5192,8 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
-  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_EQ(nullptr, stream_info.upstreamInfo());
 
@@ -5246,7 +5247,8 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
 
   expectResponseTimerCreate();
 
-  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   // Check that upstream timing is updated after the first request.
@@ -5315,7 +5317,8 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
 
-  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   expectResponseTimerCreate();

@@ -111,25 +111,27 @@ struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(
       TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
+      FilterState::LifeSpan life_span)
       : StreamInfoImpl(absl::nullopt, time_source, downstream_connection_info_provider,
                        std::make_shared<FilterStateImpl>(life_span)) {}
 
   StreamInfoImpl(
       Http::Protocol protocol, TimeSource& time_source,
-      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider)
+      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
+      FilterState::LifeSpan life_span)
       : StreamInfoImpl(protocol, time_source, downstream_connection_info_provider,
-                       std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
+                       std::make_shared<FilterStateImpl>(life_span)) {}
 
   StreamInfoImpl(
       Http::Protocol protocol, TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan life_span)
+      FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan parent_life_span,
+      FilterState::LifeSpan life_span)
       : StreamInfoImpl(
             protocol, time_source, downstream_connection_info_provider,
-            std::make_shared<FilterStateImpl>(
-                FilterStateImpl::LazyCreateAncestor(std::move(parent_filter_state), life_span),
-                FilterState::LifeSpan::FilterChain)) {}
+            std::make_shared<FilterStateImpl>(FilterStateImpl::LazyCreateAncestor(
+                                                  std::move(parent_filter_state), parent_life_span),
+                                              life_span)) {}
 
   SystemTime startTime() const override { return start_time_; }
 

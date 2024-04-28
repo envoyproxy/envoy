@@ -1,7 +1,6 @@
 #include "test/common/integration/engine_with_test_server.h"
 #include "test/common/integration/test_server.h"
 
-#include "absl/strings/str_format.h"
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
@@ -43,9 +42,8 @@ void sendRequest() {
                     .start();
 
   auto request_headers =
-      Platform::RequestHeadersBuilder(
-          Platform::RequestMethod::GET, "https",
-          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()), "/")
+      Platform::RequestHeadersBuilder(Platform::RequestMethod::GET, "https",
+                                      engine_with_test_server.testServer().getAddress(), "/")
           .build();
   stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
   stream_complete.WaitForNotification();

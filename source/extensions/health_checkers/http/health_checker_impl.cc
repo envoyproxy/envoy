@@ -269,7 +269,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       // upstream crypto
       host_->transportSocketFactory().implementsSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource(),
-                                         local_connection_info_provider_);
+                                         local_connection_info_provider_,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info.upstreamInfo()->setUpstreamHost(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);

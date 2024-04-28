@@ -70,7 +70,7 @@ class SendDataTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "localhost:${httpTestServer.port}",
+          authority = httpTestServer.address,
           path = "/simple.txt"
         )
         .build()

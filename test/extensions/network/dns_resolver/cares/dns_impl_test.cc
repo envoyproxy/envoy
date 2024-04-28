@@ -341,7 +341,8 @@ class TestDnsServer : public TcpListenerCallbacks {
 public:
   TestDnsServer(Event::Dispatcher& dispatcher)
       : dispatcher_(dispatcher), record_ttl_(0), cname_ttl_(0),
-        stream_info_(dispatcher.timeSource(), nullptr) {}
+        stream_info_(dispatcher.timeSource(), nullptr,
+                     StreamInfo::FilterState::LifeSpan::Connection) {}
 
   void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
