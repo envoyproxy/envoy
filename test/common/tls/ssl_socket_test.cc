@@ -978,7 +978,8 @@ class SslSocketTest : public SslCertsTest,
 protected:
   SslSocketTest()
       : dispatcher_(api_->allocateDispatcher("test_thread")),
-        stream_info_(api_->timeSource(), nullptr), version_(GetParam()) {}
+        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::Connection),
+        version_(GetParam()) {}
 
   void testClientSessionResumption(const std::string& server_ctx_yaml,
                                    const std::string& client_ctx_yaml, bool expect_reuse,
@@ -3564,7 +3565,8 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   SSL_SESSION* ssl_session = nullptr;
   Network::ConnectionPtr server_connection;
-  StreamInfo::StreamInfoImpl stream_info(time_system, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(time_system, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         Network::DownstreamTransportSocketFactory& tsf =
@@ -3610,7 +3612,8 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   client_connection->connect();
 
   Network::MockConnectionCallbacks server_connection_callbacks;
-  StreamInfo::StreamInfoImpl stream_info2(time_system, nullptr);
+  StreamInfo::StreamInfoImpl stream_info2(time_system, nullptr,
+                                          StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         Network::DownstreamTransportSocketFactory& tsf =
@@ -3711,7 +3714,8 @@ void testSupportForSessionResumption(const std::string& server_ctx_yaml,
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
 
-  StreamInfo::StreamInfoImpl stream_info(time_system, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(time_system, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
   Network::ConnectionPtr server_connection;
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
