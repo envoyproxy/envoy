@@ -113,7 +113,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   // The router checks that the connection pool is non-null and valid before creating an
   // UpstreamRequest.
-  ASSERT(conn_pool_->valid() && upstream_host_ != nullptr, "Invalid connection pool");
+  ASSERT(upstream_host_ != nullptr, "Invalid connection pool");
   upstream_info_->upstream_host_ = upstream_host_;
 
   Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
