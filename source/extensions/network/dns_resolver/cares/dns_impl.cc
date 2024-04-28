@@ -35,7 +35,8 @@ DnsResolverImpl::DnsResolverImpl(
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
       dns_resolver_options_(config.dns_resolver_options()),
       use_resolvers_as_fallback_(config.use_resolvers_as_fallback()),
-      udp_max_queries_(config.udp_max_queries),
+      udp_max_queries_(
+          static_cast<uint32_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, udp_max_queries, 0))),
       resolvers_csv_(maybeBuildResolversCsv(resolvers)),
       filter_unroutable_families_(config.filter_unroutable_families()),
       scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {

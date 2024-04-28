@@ -714,6 +714,7 @@ public:
     }
 
     cares.set_filter_unroutable_families(filterUnroutableFamilies());
+    cares.set_allocated_udp_max_queries(udpMaxQueries());
 
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
@@ -947,6 +948,7 @@ protected:
   virtual void updateDnsResolverOptions(){};
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
+  virtual ProtobufWkt::UInt32Value* udpMaxQueries() const { return 0; }
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<TestDnsServer> server_;
@@ -2093,11 +2095,10 @@ TEST_P(DnsImplCustomResolverTest, CustomResolverValidAfterChannelDestruction) {
 class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {
 protected:
   bool tcpOnly() const override { return false; }
-  void updateDnsResolverOptions() override {
+  ProtobufWkt::UInt32Value* udpMaxQueries() const override {
     auto udp_max_queries = std::make_unique<ProtobufWkt::UInt32Value>();
     udp_max_queries->set_value(100);
-    dns_resolver_options_.set_allocated_udp_max_queries(
-        dynamic_cast<ProtobufWkt::UInt32Value*>(udp_max_queries.release()));
+    return dynamic_cast<ProtobufWkt::UInt32Value*>(udp_max_queries.release());
   }
 };
 
