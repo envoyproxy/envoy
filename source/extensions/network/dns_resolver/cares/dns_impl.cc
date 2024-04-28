@@ -35,6 +35,7 @@ DnsResolverImpl::DnsResolverImpl(
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
       dns_resolver_options_(config.dns_resolver_options()),
       use_resolvers_as_fallback_(config.use_resolvers_as_fallback()),
+      udp_max_queries_(config.udp_max_queries),
       resolvers_csv_(maybeBuildResolversCsv(resolvers)),
       filter_unroutable_families_(config.filter_unroutable_families()),
       scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
@@ -94,9 +95,9 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
     options.options_.flags |= ARES_FLAG_NOSEARCH;
   }
 
-  if (dns_resolver_options_.has_udp_max_queries()) {
+  if (udp_max_queries_ > 0) {
     options.optmask_ |= ARES_OPT_UDP_MAX_QUERIES;
-    options.options_.udp_max_queries = dns_resolver_options_.udp_max_queries().value();
+    options.options_.udp_max_queries = udp_max_queries_;
   }
 
   return options;

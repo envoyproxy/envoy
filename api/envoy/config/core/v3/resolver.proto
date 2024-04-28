@@ -4,8 +4,6 @@ package envoy.config.core.v3;
 
 import "envoy/config/core/v3/address.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -24,10 +22,6 @@ message DnsResolverOptions {
 
   // Do not use the default search domains; only query hostnames as-is or as aliases.
   bool no_default_search_domain = 2;
-
-  // This option allows for number of UDP based DNS queries to be capped. Note, this
-  // is only applicable to c-ares DNS resolver currently.
-  google.protobuf.UInt32Value udp_max_queries = 3;
 }
 
 // DNS resolution configuration which includes the underlying dns resolver addresses and options.
