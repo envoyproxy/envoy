@@ -105,8 +105,9 @@ TEST_P(IoUringImplParamTest, InvalidParams) {
   res = io_uring_->submit();
   EXPECT_EQ(res, IoUringResult::Ok);
 
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_EQ(completions_nr, 2);
+  while (completions_nr < 2) {
+    dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  }
 }
 
 TEST_F(IoUringImplTest, InjectCompletion) {
@@ -383,6 +384,10 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   EXPECT_EQ(res, IoUringResult::Ok);
   res = io_uring_->submit();
   EXPECT_EQ(res, IoUringResult::Ok);
+
+  while (completions_nr < 3) {
+    dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
   EXPECT_EQ(static_cast<char*>(iov3.iov_base)[0], 'e');
   EXPECT_EQ(static_cast<char*>(iov3.iov_base)[1], 'f');
