@@ -463,7 +463,7 @@ case $CI_TARGET in
             --define log_debug_assert_in_release=disabled
         echo "Building binary and DISABLE cache with wasm=wasmtime... and logging disabled"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-            --action_env=ARBITRARY_TEST=TEST3 \
+            --action_env=ARBITRARY_TEST=TEST5 \
             --config=compile-time-options \
             --define wasm=wasmtime \
             --define enable_logging=disabled \
@@ -472,7 +472,7 @@ case $CI_TARGET in
             --build_tag_filters=-nofips
         echo "Building contrib binary and DIABLE cache with wasm=wasmtime... and logging disabled"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-            --action_env=ARBITRARY_TEST=TEST4 \
+            --action_env=ARBITRARY_TEST=TEST6 \
             --config=compile-time-options \
             --define wasm=wasmtime \
             --define enable_logging=disabled \
