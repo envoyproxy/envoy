@@ -236,6 +236,7 @@ public:
   bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
+  std::chrono::seconds keepaliveHeaderTimeout() const override { return {}; }
 
 private:
   friend class AdminTestingPeer;

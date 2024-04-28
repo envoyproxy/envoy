@@ -37,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 58]
+// [#next-free-field: 59]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -895,6 +895,14 @@ message HttpConnectionManager {
   // This should be set to ``false`` in cases where Envoy's view of the downstream address may not correspond to the
   // actual client address, for example, if there's another proxy in front of the Envoy.
   google.protobuf.BoolValue add_proxy_protocol_connection_state = 53;
+
+  // The timeout seconds configured here will be set in the "Keep-Alive" response header.
+  // For example, configuring 10s will return the response header "Connection: keep-alive" and "Keep-Alive: timeout=10".
+  // If not specified, the default is 0, which means this behavior is disabled.
+  // The "Keep-Alive" header field is recognized by Mozilla, Konqueror and Apache HTTPClient.
+  // Note that the "Connection" and "Keep-Alive" response headers will only be added when the downstream protocol is HTTP1.0 or HTTP1.1
+  // and it is not an upgrade connection scenario.
+  google.protobuf.Duration keepalive_header_timeout = 58;
 }
 
 // The configuration to customize local reply returned by Envoy.

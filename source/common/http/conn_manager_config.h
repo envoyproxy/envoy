@@ -544,6 +544,12 @@ public:
    *         Connection Lifetime.
    */
   virtual bool addProxyProtocolConnectionState() const PURE;
+
+  /**
+   * @return the timeout seconds will be set in the "Keep-Alive" response header.
+   * Zero indicates this behavior is disabled.
+   */
+  virtual std::chrono::seconds keepaliveHeaderTimeout() const PURE;
 };
 
 using ConnectionManagerConfigSharedPtr = std::shared_ptr<ConnectionManagerConfig>;

@@ -177,6 +177,7 @@ public:
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;
   }
+  std::chrono::seconds keepaliveHeaderTimeout() const override { return keepalive_header_timeout_; }
 
   // Simple helper to wrapper filter to the factory function.
   FilterFactoryCb createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr filter) {
@@ -282,6 +283,7 @@ public:
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_{};
   bool add_proxy_protocol_connection_state_ = true;
+  std::chrono::seconds keepalive_header_timeout_{};
 
   const LocalReply::LocalReplyPtr local_reply_;
 

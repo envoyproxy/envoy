@@ -1793,13 +1793,17 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // point, the cached route should never be updated or refreshed.
   blockRouteCache();
 
-  if (connection_manager_.drain_state_ != DrainState::NotDraining &&
-      connection_manager_.codec_->protocol() < Protocol::Http2) {
-    // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
-    // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the
-    // payload is no longer HTTP/1.1)
-    if (!state_.is_tunneling_) {
+  if (!state_.is_tunneling_ && connection_manager_.codec_->protocol() < Protocol::Http2) {
+    if (connection_manager_.drain_state_ != DrainState::NotDraining) {
+      // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
+      // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the
+      // payload is no longer HTTP/1.1)
       headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
+    } else if (connection_manager_.config_.keepaliveHeaderTimeout().count() != 0) {
+      headers.setKeepAlive(absl::StrCat(
+          "timeout=",
+          std::to_string(connection_manager_.config_.keepaliveHeaderTimeout().count())));
+      headers.setReferenceConnection(Headers::get().ConnectionValues.KeepAlive);
     }
   }
 

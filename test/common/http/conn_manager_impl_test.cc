@@ -1475,6 +1475,32 @@ TEST_F(HttpConnectionManagerImplTest, DateHeaderPresent) {
   doRemoteClose();
 }
 
+TEST_F(HttpConnectionManagerImplTest, KeepaliveHeaderNotAppend) {
+  setup(false, "");
+  setUpEncoderAndDecoder(false, false);
+  sendRequestHeadersAndData();
+  const auto* modified_headers = sendResponseHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}, {"server", "foo"}}});
+  ASSERT_TRUE(modified_headers);
+  EXPECT_FALSE(modified_headers->KeepAlive());
+  doRemoteClose();
+}
+
+TEST_F(HttpConnectionManagerImplTest, KeepaliveHeaderAppend) {
+  setup(false, "");
+  setUpEncoderAndDecoder(false, false);
+  keepalive_header_timeout_ = std::chrono::seconds(60);
+  sendRequestHeadersAndData();
+  const auto* modified_headers = sendResponseHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}, {"server", "foo"}}});
+  ASSERT_TRUE(modified_headers);
+  EXPECT_TRUE(modified_headers->Connection());
+  EXPECT_EQ("keep-alive", modified_headers->getConnectionValue());
+  EXPECT_TRUE(modified_headers->KeepAlive());
+  EXPECT_EQ("timeout=60", modified_headers->getKeepAliveValue());
+  doRemoteClose();
+}
+
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   setup(false, "");
 
