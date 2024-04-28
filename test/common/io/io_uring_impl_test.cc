@@ -364,7 +364,7 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
 
   while (completions_nr < 2) {
     dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-  } 
+  }
   // Even though we haven't been notified about ops completion the buffers
   // are filled already.
   EXPECT_EQ(static_cast<char*>(iov1.iov_base)[0], 'a');
