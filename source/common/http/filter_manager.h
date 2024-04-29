@@ -1106,7 +1106,8 @@ public:
       : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
                       proxy_100_continue, buffer_limit, filter_chain_factory),
         stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
-                     parent_filter_state, filter_state_life_span),
+                     parent_filter_state, filter_state_life_span,
+                     StreamInfo::FilterState::LifeSpan::FilterChain),
         local_reply_(local_reply),
         downstream_filter_load_shed_point_(overload_manager.getLoadShedPoint(
             Server::LoadShedPointName::get().HttpDownstreamFilterCheck)) {

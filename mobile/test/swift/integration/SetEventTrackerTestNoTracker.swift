@@ -17,7 +17,7 @@ final class SetEventTrackerTestNoTracker: XCTestCase {
     let expectation = self.expectation(description: "Response headers received")
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
       .setLogger { _, msg in
         print(msg, terminator: "")
       }

@@ -652,12 +652,40 @@ TEST_F(StatNameTest, StatNameSet) {
 }
 
 TEST_F(StatNameTest, StorageCopy) {
-  StatName a = pool_.add("stat.name");
+  const StatName a = pool_.add("stat.name");
   StatNameStorage b_storage(a, table_);
-  StatName b = b_storage.statName();
+  const StatName b = b_storage.statName();
   EXPECT_EQ(a, b);
   EXPECT_NE(a.data(), b.data());
   b_storage.free(table_);
+
+  const StatName c = pool_.add(a);
+  EXPECT_EQ(a, c);
+  EXPECT_NE(a.data(), c.data());
+}
+
+TEST_F(StatNameTest, AddingToPoolViaStatNamePreservesDynamicSegments) {
+  const StatNameDynamicStorage tag_name("tag", table_);
+  const StatNameDynamicStorage tag_value("value", table_);
+  const StatNameTagVector tag_vector{{tag_name.statName(), tag_value.statName()}};
+
+  const StatName empty_prefix = pool_.add("");
+  const StatName basename = pool_.add("stat.name");
+
+  TagUtility::TagStatNameJoiner joiner(empty_prefix, basename, tag_vector, table_);
+  const StatName tagged_name = joiner.nameWithTags();
+
+  const StatName copy_via_statname = pool_.add(tagged_name);
+  EXPECT_EQ(tagged_name, copy_via_statname);
+  EXPECT_NE(tagged_name.data(), copy_via_statname.data());
+
+  // When adding the statname via strings it will be encoded in the symbol
+  // table. It will not be comparable to the statname that is a mix of
+  // encoded symbols from the symbol table and dynamic strings.
+  const std::string tagged_name_str = table_.toString(tagged_name);
+  const StatName copy_via_string = pool_.add(tagged_name_str);
+  EXPECT_NE(tagged_name, copy_via_string);
+  EXPECT_EQ(table_.toString(tagged_name), table_.toString(copy_via_string));
 }
 
 TEST_F(StatNameTest, RecentLookups) {

@@ -18,7 +18,7 @@ class EngineBuilderTest {
   fun `adding log level builder uses log level for running Envoy`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addLogLevel(LogLevel.DEBUG)
+    engineBuilder.setLogLevel(LogLevel.DEBUG)
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.logLevel).isEqualTo(LogLevel.DEBUG)

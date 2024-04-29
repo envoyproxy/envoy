@@ -3,7 +3,6 @@
 #include "test/common/integration/engine_with_test_server.h"
 #include "test/common/integration/test_server.h"
 
-#include "absl/strings/str_format.h"
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
@@ -51,9 +50,8 @@ TEST(EngineTest, SetLogger) {
                     .start();
 
   auto request_headers =
-      Platform::RequestHeadersBuilder(
-          Platform::RequestMethod::GET, "https",
-          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()), "/")
+      Platform::RequestHeadersBuilder(Platform::RequestMethod::GET, "https",
+                                      engine_with_test_server.testServer().getAddress(), "/")
           .build();
   stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
   stream_complete.WaitForNotification();
@@ -64,9 +62,6 @@ TEST(EngineTest, SetLogger) {
 }
 
 TEST(EngineTest, SetEngineCallbacks) {
-  TestServer test_server;
-  test_server.start(TestServerType::HTTP2_WITH_TLS);
-
   absl::Notification engine_running;
   auto engine_callbacks = std::make_unique<EngineCallbacks>();
   engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
@@ -102,9 +97,8 @@ TEST(EngineTest, SetEngineCallbacks) {
                     .start();
 
   auto request_headers =
-      Platform::RequestHeadersBuilder(
-          Platform::RequestMethod::GET, "https",
-          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()), "/")
+      Platform::RequestHeadersBuilder(Platform::RequestMethod::GET, "https",
+                                      engine_with_test_server.testServer().getAddress(), "/")
           .build();
   stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
   stream_complete.WaitForNotification();

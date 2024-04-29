@@ -199,7 +199,7 @@ class StartTlsIntegrationTest : public testing::TestWithParam<StartTlsTestParams
 public:
   StartTlsIntegrationTest()
       : BaseIntegrationTest(GetParam().first, ConfigHelper::baseConfig()),
-        stream_info_(timeSystem(), nullptr) {}
+        stream_info_(timeSystem(), nullptr, StreamInfo::FilterState::LifeSpan::Connection) {}
   void initialize() override;
 
   NiceMock<Network::MockConnectionCallbacks> upstream_callbacks_;
