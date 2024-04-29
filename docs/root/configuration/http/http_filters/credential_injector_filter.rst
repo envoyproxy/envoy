@@ -5,10 +5,6 @@ Credential Injector
 
 The credential injector HTTP filter serves the purpose of injecting credentials into outgoing HTTP requests.
 
-The filter configuration is used to retrieve the credentials, or they can be fetched from a remote source
-such as an OAuth2 authorization server. The credentials obtained are then injected into the ``Authorization``
-header of the proxied HTTP requests, utilizing either the ``Basic`` or ``Bearer`` scheme.
-
 Notice: This filter is intended to be used for workload authentication, which means that the identity associated
 with the inserted credential is considered as the identity of the workload behind the Envoy proxy (in this case,
 Envoy is typically deployed as a sidecar alongside that workload).
@@ -24,19 +20,21 @@ Configuration
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
 
-Currently the filter supports following extensions
+The filter is configured with one of the following supported *credential_injector* extensions. Extensions are responsible for fetching the credentials
+from the source. The credentials obtained are then injected into the ``Authorization`` header of the proxied HTTP requests, utilizing either the ``Basic``
+or ``Bearer`` scheme.
 
+Generic Credential Injector
+===========================
+* This extension should be configured with the type URL ``type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic``.
 * :ref:`generic <envoy_v3_api_msg_extensions.http.injected_credentials.generic.v3.Generic>`
-* :ref:`oauth2 client credentials grant <envoy_v3_api_msg_extensions.http.injected_credentials.oauth2.v3.OAuth2>`
-
-Other credential types can be supported as extensions.
 
 Here is an example configuration with Generic credential, which injects an HTTP Basic Auth credential into the proxied requests.
 
-.. literalinclude:: _include/credential-injector-filter.yaml
+.. literalinclude:: _include/credential-injector-generic-filter.yaml
     :language: yaml
-    :lines: 28-41
-    :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-filter.yaml>`
+    :lines: 28-42
+    :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-generic-filter.yaml>`
 
 
 credential.yaml for Basic Auth:
@@ -63,6 +61,18 @@ credential.yaml for Bearer Token:
       secret:
         inline_string: "Bearer myToken"
 
+OAuth2 (Client Credential Grant) Credential Injector
+====================================================
+* This extension should be configured with the type URL ``type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2``.
+* :ref:`oauth2 client credentials grant <envoy_v3_api_msg_extensions.http.injected_credentials.oauth2.v3.OAuth2>`
+
+Here is an example configuration with OAuth2 client credential injector, which injects an OAuth2 token into the proxied requests.
+
+.. literalinclude:: _include/credential-injector-oauth2-filter.yaml
+    :language: yaml
+    :lines: 31-49
+    :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-oauth2-filter.yaml>`
+
 Statistics
 ----------
 
@@ -75,3 +85,15 @@ The HTTP credential injector filter outputs statistics in the ``http.<stat_prefi
   ``injected``, Counter, Total number of requests with injected credentials
   ``failed``, Counter, Total number of requests that failed to inject credentials
   ``already_exists``, Counter, Total number of requests that already had credentials and overwrite is false
+
+Oauth2 Client Credential Injector extension specific statistics are also emitted in the ``http.<stat_prefix>.credential_injector.oauth2.`` namespace.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  ``token_requested``, Counter, Total number of token requests sent to the oauth2 server
+  ``token_fetched``, Counter, Total number of successful token fetches from the oauth2 server
+  ``token_fetch_failed_on_client_secret``, Counter, Total number of times token request not sent due to missing client secret
+  ``token_fetch_failed_on_cluster_not_found``, Counter, Total number of times token request not sent due to missing outh2 server cluster
+  ``token_fetch_failed_on_oauth_server_response``, Counter, Total number of times oauth server response was not successful
