@@ -64,7 +64,7 @@ new_features:
     for matching http input based on filter state objects.
 - area: cares
   change: |
-    Added :ref:`udp_max_queries<envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.udp_max_queries>`
+    Added :ref:`udp_max_queries<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.udp_max_queries>`
     option to limit the number of UDP queries.
 
 deprecated:
