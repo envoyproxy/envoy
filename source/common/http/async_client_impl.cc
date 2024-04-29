@@ -25,7 +25,8 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
       config_(factory_context, http_context.asyncClientStatPrefix(), factory_context.localInfo(),
               *stats_store.rootScope(), cm, factory_context.runtime(),
               factory_context.api().randomGenerator(), std::move(shadow_writer), true, false, false,
-              false, false, false, {}, dispatcher.timeSource(), http_context, router_context),
+              false, false, false, false, {}, dispatcher.timeSource(), http_context,
+              router_context),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {

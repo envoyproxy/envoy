@@ -119,11 +119,13 @@ public:
 
   /**
    * Set the :scheme header using the best information available. In order this is
+   * - security of upstream connection if provided
    * - existing scheme header if valid
    * - x-forwarded-proto header if valid
    * - security of downstream connection
    */
-  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure);
+  static void setUpstreamScheme(Http::RequestHeaderMap& headers,
+                                absl::optional<bool> upstream_secure, bool downstream_secure);
 
   /**
    * Determine whether a request should be shadowed.
@@ -204,7 +206,7 @@ public:
                Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
                bool respect_expected_rq_timeout, bool suppress_grpc_request_failure_code_stats,
-               bool flush_upstream_log_on_upstream_stream,
+               bool use_upstream_scheme, bool flush_upstream_log_on_upstream_stream,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
@@ -216,6 +218,7 @@ public:
         start_child_span_(start_child_span), suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
         suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
+        use_upstream_scheme_(use_upstream_scheme),
         flush_upstream_log_on_upstream_stream_(flush_upstream_log_on_upstream_stream),
         http_context_(http_context), zone_name_(local_info_.zoneStatName()),
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
@@ -271,6 +274,7 @@ public:
   const bool suppress_envoy_headers_;
   const bool respect_expected_rq_timeout_;
   const bool suppress_grpc_request_failure_code_stats_;
+  const bool use_upstream_scheme_;
   // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
   HeaderVectorPtr strict_check_headers_;
   const bool flush_upstream_log_on_upstream_stream_;

@@ -82,7 +82,8 @@ private:
 class RouterTest : public RouterTestBase {
 public:
   RouterTest()
-      : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
+      : RouterTestBase(false, false, false, false, false,
+                       Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
   };
 
@@ -5806,15 +5807,27 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
 TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   TestScopedRuntime scoped_runtime;
 
-  // With no scheme and x-forwarded-proto, set scheme based on encryption level
+  // With provided upstream scheme, use upstream scheme
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false);
+    FilterUtility::setUpstreamScheme(headers, absl::optional<bool>(false), false);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, absl::optional<bool>(true), false);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // With no scheme and x-forwarded-proto, set scheme based on downstream encryption level
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, absl::nullopt, false);
+    EXPECT_EQ("http", headers.get_(":scheme"));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, absl::nullopt, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
@@ -5822,7 +5835,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto("foo");
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, absl::nullopt, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
@@ -5830,7 +5843,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, absl::nullopt, true);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
 
@@ -5839,7 +5852,17 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
     Http::TestRequestHeaderMapImpl headers;
     headers.setScheme(Http::Headers::get().SchemeValues.Https);
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
-    FilterUtility::setUpstreamScheme(headers, false);
+    FilterUtility::setUpstreamScheme(headers, absl::nullopt, false);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // Trust upstream scheme over preexisting scheme, x-forwarded-proto, and downstream encryption
+  // level
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setScheme("http");
+    headers.setForwardedProto("http");
+    FilterUtility::setUpstreamScheme(headers, absl::optional<bool>(true), false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 }

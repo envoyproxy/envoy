@@ -444,7 +444,7 @@ public:
             runtime_, random_, Router::ShadowWriterPtr{shadow_writer_}, true /*emit_dynamic_stats*/,
             false /*start_child_span*/, true /*suppress_envoy_headers*/,
             false /*respect_expected_rq_timeout*/,
-            true /*suppress_grpc_request_failure_code_stats*/,
+            true /*suppress_grpc_request_failure_code_stats*/, false /*use_upstream_scheme*/,
             false /*flush_upstream_log_on_upstream_stream*/, std::move(strict_headers_to_check),
             time_system_.timeSystem(), http_context_, router_context_) {
     cluster_manager_.createDefaultClusters(*this);

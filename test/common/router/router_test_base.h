@@ -61,7 +61,7 @@ public:
 class RouterTestBase : public testing::Test {
 public:
   RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
-                 bool suppress_grpc_request_failure_code_stats,
+                 bool suppress_grpc_request_failure_code_stats, bool use_upstream_scheme,
                  bool flush_upstream_log_on_upstream_stream,
                  Protobuf::RepeatedPtrField<std::string> strict_headers_to_check);
 
