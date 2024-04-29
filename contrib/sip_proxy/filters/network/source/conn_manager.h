@@ -247,7 +247,8 @@ private:
           stream_id_(parent_.random_generator_.random()),
           transaction_id_(metadata->transactionId().value()),
           stream_info_(parent_.time_source_,
-                       parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
+                       parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr(),
+                       StreamInfo::FilterState::LifeSpan::FilterChain),
           metadata_(metadata) {
       parent.stats_.request_active_.inc();
     }

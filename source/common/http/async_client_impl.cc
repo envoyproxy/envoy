@@ -97,7 +97,8 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
       router_(options.filter_config_ ? *options.filter_config_ : parent.config_,
               parent.config_.async_stats_),
-      stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
+      stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr,
+                   StreamInfo::FilterState::LifeSpan::FilterChain),
       tracing_config_(Tracing::EgressConfig::get()),
       retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_)),
       route_(std::make_shared<NullRouteImpl>(

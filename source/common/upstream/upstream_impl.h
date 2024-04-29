@@ -1323,6 +1323,7 @@ protected:
 
 private:
   static const absl::string_view DoNotValidateAlpnRuntimeKey;
+  static const absl::string_view DropOverloadRuntimeKey;
 
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);

@@ -31,7 +31,8 @@ namespace SipProxy {
 
 class SipTraTest : public testing::Test {
 public:
-  SipTraTest() : stream_info_(time_source_, nullptr) {}
+  SipTraTest()
+      : stream_info_(time_source_, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain) {}
   std::shared_ptr<SipProxy::MockTrafficRoutingAssistantHandlerDeep> initTraHandler() {
     std::string tra_yaml = R"EOF(
                grpc_service:

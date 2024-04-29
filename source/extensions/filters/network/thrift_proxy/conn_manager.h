@@ -215,7 +215,8 @@ private:
                                parent_.stats_.request_time_ms_, parent_.time_source_)),
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_,
-                       parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
+                       parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr(),
+                       StreamInfo::FilterState::LifeSpan::FilterChain),
           local_response_sent_{false}, pending_transport_end_{false}, passthrough_{false},
           under_on_local_reply_{false} {
       parent_.stats_.request_active_.inc();
