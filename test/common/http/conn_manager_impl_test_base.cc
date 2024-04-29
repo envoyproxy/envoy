@@ -138,6 +138,9 @@ public:
   bool addProxyProtocolConnectionState() const override {
     return parent_.addProxyProtocolConnectionState();
   }
+  std::chrono::seconds keepaliveHeaderTimeout() const override {
+    return parent_.keepaliveHeaderTimeout();
+  }
 
 private:
   ConnectionManagerConfig& parent_;

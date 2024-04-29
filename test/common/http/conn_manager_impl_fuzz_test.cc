@@ -242,6 +242,7 @@ public:
   bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
+  std::chrono::seconds keepaliveHeaderTimeout() const override { return keepalive_header_timeout_; }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
@@ -295,6 +296,7 @@ public:
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
+  std::chrono::seconds keepalive_header_timeout_;
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks
