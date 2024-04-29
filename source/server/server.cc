@@ -606,7 +606,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   OptRef<Server::ConfigTracker> config_tracker;
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-  admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this,
+  admin_ = std::make_shared<AdminImpl>(initial_config.admin().profilePath(), *this,
                                        initial_config.admin().ignoreGlobalConnLimit());
 
   config_tracker = admin_->getConfigTracker();

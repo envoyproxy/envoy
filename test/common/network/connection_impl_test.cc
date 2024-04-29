@@ -135,7 +135,8 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>();
-  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_ENVOY_BUG(
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -152,7 +153,8 @@ public:
 class ConnectionImplTestBase {
 protected:
   ConnectionImplTestBase()
-      : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_, nullptr) {}
+      : api_(Api::createApiForTest(time_system_)),
+        stream_info_(time_system_, nullptr, StreamInfo::FilterState::LifeSpan::Connection) {}
 
   virtual ~ConnectionImplTestBase() {
     EXPECT_TRUE(timer_destroyed_ || timer_ == nullptr);
@@ -2527,7 +2529,9 @@ private:
 
 class MockTransportConnectionImplTest : public testing::Test {
 public:
-  MockTransportConnectionImplTest() : stream_info_(dispatcher_.timeSource(), nullptr) {
+  MockTransportConnectionImplTest()
+      : stream_info_(dispatcher_.timeSource(), nullptr,
+                     StreamInfo::FilterState::LifeSpan::Connection) {
     EXPECT_CALL(dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
     EXPECT_CALL(dispatcher_.buffer_factory_, createBuffer_(_, _, _))
         .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,

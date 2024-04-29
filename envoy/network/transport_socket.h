@@ -16,9 +16,11 @@
 
 #include "absl/types/optional.h"
 
+#ifdef ENVOY_ENABLE_QUIC
 namespace quic {
 class QuicCryptoClientConfig;
 }
+#endif
 
 namespace Envoy {
 
@@ -344,10 +346,12 @@ public:
    */
   virtual OptRef<const Ssl::ClientContextConfig> clientContextConfig() const { return {}; }
 
+#ifdef ENVOY_ENABLE_QUIC
   /*
    * @return the QuicCryptoClientConfig or nullptr for non-QUIC factories.
    */
   virtual std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig() { return nullptr; }
+#endif
 };
 
 /**

@@ -113,7 +113,8 @@ public:
     context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {cluster_name_});
 
-    StreamInfo::StreamInfoImpl stream_info{time_source_, nullptr};
+    StreamInfo::StreamInfoImpl stream_info{time_source_, nullptr,
+                                           StreamInfo::FilterState::LifeSpan::Connection};
     SipFilterStats stat = SipFilterStats::generateStats("test.", *store_.rootScope());
     EXPECT_CALL(config_, stats()).WillRepeatedly(ReturnRef(stat));
 

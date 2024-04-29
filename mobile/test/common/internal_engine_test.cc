@@ -111,11 +111,11 @@ public:
     return engine->run(std::move(options));
   }
 
-  Http::RequestHeaderMapPtr createLocalhostRequestHeaders(const int port) {
+  Http::RequestHeaderMapPtr createLocalhostRequestHeaders(absl::string_view address) {
     auto headers = Http::Utility::createRequestHeaderMapPtr();
     headers->setScheme("http");
     headers->setMethod("GET");
-    headers->setHost(absl::StrFormat("localhost:%d", port));
+    headers->setHost(address);
     headers->setPath("/");
     return headers;
   }
@@ -345,7 +345,7 @@ TEST_F(InternalEngineTest, BasicStream) {
 
   engine->startStream(stream, stream_cbs, false);
 
-  engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getPort()), false);
+  engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getAddress()), false);
   engine->sendData(stream, std::make_unique<Buffer::OwnedImpl>("request body"), false);
   engine->sendTrailers(stream, Http::Utility::createRequestTrailerMapPtr());
 
@@ -487,7 +487,7 @@ protected:
 
     envoy_stream_t stream = engine->initStream();
     engine->startStream(stream, stream_cbs, false);
-    engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getPort()), false);
+    engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getAddress()), false);
     engine->sendData(stream, std::make_unique<Buffer::OwnedImpl>("request body"), true);
 
     EXPECT_TRUE(context.on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));

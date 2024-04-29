@@ -39,7 +39,7 @@ public:
   ~SPIFFEValidator() override = default;
 
   // Tls::CertValidator
-  void addClientValidationContext(SSL_CTX* context, bool require_client_cert) override;
+  absl::Status addClientValidationContext(SSL_CTX* context, bool require_client_cert) override;
 
   ValidationResults
   doVerifyCertChain(STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
@@ -48,7 +48,8 @@ public:
                     const CertValidator::ExtraValidationContext& validation_context, bool is_server,
                     absl::string_view host_name) override;
 
-  int initializeSslContexts(std::vector<SSL_CTX*> contexts, bool provides_certificates) override;
+  absl::StatusOr<int> initializeSslContexts(std::vector<SSL_CTX*> contexts,
+                                            bool provides_certificates) override;
 
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;

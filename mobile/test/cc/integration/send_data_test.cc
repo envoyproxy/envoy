@@ -61,7 +61,7 @@ TEST(SendDataTest, Success) {
   headers->addCopy(Http::LowerCaseString(":method"), "GET");
   headers->addCopy(Http::LowerCaseString(":scheme"), "https");
   headers->addCopy(Http::LowerCaseString(":authority"),
-                   absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()));
+                   engine_with_test_server.testServer().getAddress());
   headers->addCopy(Http::LowerCaseString(":path"), "/");
   stream->sendHeaders(std::move(headers), false);
   stream->sendData(std::make_unique<Buffer::OwnedImpl>("request body"));

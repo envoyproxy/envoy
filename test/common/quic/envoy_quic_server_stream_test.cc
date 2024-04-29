@@ -844,7 +844,8 @@ TEST_F(EnvoyQuicServerStreamTest, StatsGathererLogsOnStreamDestruction) {
   std::list<AccessLog::InstanceSharedPtr> loggers = {mock_logger};
   Event::GlobalTimeSystem test_time_;
   Envoy::StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, test_time_.timeSystem(),
-                                                nullptr};
+                                                nullptr,
+                                                StreamInfo::FilterState::LifeSpan::FilterChain};
   quic_stream_->statsGatherer()->setAccessLogHandlers(loggers);
   quic_stream_->setDeferredLoggingHeadersAndTrailers(nullptr, nullptr, nullptr, stream_info);
 
