@@ -38,6 +38,9 @@ bug_fixes:
     Upgraded c-ares library to 1.20.1 and added fix to c-ares DNS implementation to additionally check for ``ARES_EREFUSED``,
     ``ARES_ESERVFAIL``and ``ARES_ENOTIMP`` status. Without this fix, ``DestroyChannelOnRefused`` and
     ``CustomResolverValidAfterChannelDestruction`` unit test will break.
+- area: udp
+  change: |
+    Fixed a bug that would cause Envoy to crash when updates to a pre-existing cluster were made (e.g. HostSet changes).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
