@@ -20,7 +20,7 @@ Configuration
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
 
-The filter is configured with one of the following supported *credential_injector* extensions. Extensions are responsible for fetching the credentials
+The filter is configured with one of the following supported ``credential_injector`` extensions. Extensions are responsible for fetching the credentials
 from the source. The credentials obtained are then injected into the ``Authorization`` header of the proxied HTTP requests, utilizing either the ``Basic``
 or ``Bearer`` scheme.
 
