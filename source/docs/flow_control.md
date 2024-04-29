@@ -58,6 +58,9 @@ will buffer for each stream. When `readDisable(false)` is called, any outstandin
 is immediately consumed, which results in resuming window updates to the peer and the resumption of
 data.
 
+![Figure: Downstream connection backs-up and backpressure overview](flow_control_downstream_backs_up_overview.drawio.svg)
+*Figure: Downstream connection backs-up and backpressure overview*
+
 Note that `readDisable(true)` on a stream may be called by multiple entities. It is called when any
 filter buffers too much, when the stream backs up and has too much data buffered, or the
 connection has too much data buffered. Because of this, `readDisable()` maintains a count of
@@ -280,7 +283,7 @@ The high watermark path is as follows:
    `Network::ConnectionCallbacks::onAboveWriteBufferHighWatermark()`.
  * When `Envoy::Http::CodecClient` receives `onAboveWriteBufferHighWatermark()` it
    calls `onUnderlyingConnectionAboveWriteBufferHighWatermark()` on `codec_`.
- * When `Envoy::Http::ConnectionManagerImpl` receives `onAboveWriteBufferHighWatermark()` it calls
+ * When `Envoy::Http::Http2::ConnectionImpl` receives `onAboveWriteBufferHighWatermark()` it calls
    `runHighWatermarkCallbacks()` for each stream of the connection.
  * `runHighWatermarkCallbacks()` results in all subscribers of `Envoy::Http::StreamCallback`
  receiving an `onAboveWriteBufferHighWatermark()` callback.
@@ -296,7 +299,7 @@ The low watermark path is as follows:
    `Network::ConnectionCallbacks::onBelowWriteBufferLowWatermark()`.
  * When `Envoy::Http::CodecClient` receives `onBelowWriteBufferLowWatermark()` it
    calls `onUnderlyingConnectionBelowWriteBufferLowWatermark()` on `codec_`.
- * When `Envoy::Http::ConnectionManagerImpl` receives `onBelowWriteBufferLowWatermark()` it calls
+ * When `Envoy::Http::Http2::ConnectionImpl` receives `onBelowWriteBufferLowWatermark()` it calls
    `runLowWatermarkCallbacks()` for each stream of the connection.
  * `runLowWatermarkCallbacks()` results in all subscribers of `Envoy::Http::StreamCallback`
  receiving a `onBelowWriteBufferLowWatermark()` callback.
