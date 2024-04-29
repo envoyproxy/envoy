@@ -9,6 +9,7 @@
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
+#include "substitution_format_utility.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -1204,6 +1205,14 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
               return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
                   [](const Ssl::ConnectionInfo& connection_info) {
                     return connection_info.subjectPeerCertificate();
+                  });
+            }}},
+          {"UPSTREAM_PEER_URI_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
                   });
             }}},
           {"DOWNSTREAM_LOCAL_ADDRESS",

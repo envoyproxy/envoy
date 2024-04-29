@@ -1090,7 +1090,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     StreamInfoFormatter upstream_format("VIRTUAL_CLUSTER_NAME");
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
   }
-
   {
     // Use a local stream info for these tests as as setSslConnection can only be called once.
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -1103,7 +1102,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("san")));
   }
-
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_URI_SAN");
@@ -1856,7 +1854,46 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue(expected_cert)));
   }
-
+  {
+    // Use a local stream info for these tests as as setSslConnection can only be called once.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_URI_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san"};
+    EXPECT_CALL(*connection_info, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san")));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_URI_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san1", "san2"};
+    EXPECT_CALL(*connection_info, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("san1,san2", upstream_format.formatWithContext({}, stream_info));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_URI_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, uriSanPeerCertificate())
+        .WillRepeatedly(Return(std::vector<std::string>()));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_URI_SAN");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("UPSTREAM_PEER_SUBJECT");
