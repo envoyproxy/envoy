@@ -12,7 +12,7 @@ namespace Hyperscan {
 class HyperscanEngine : public Envoy::Regex::Engine {
 public:
   explicit HyperscanEngine(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls);
-  Envoy::Regex::CompiledMatcherPtr matcher(const std::string& regex) const override;
+  absl::StatusOr<Envoy::Regex::CompiledMatcherPtr> matcher(const std::string& regex) const override;
 
 private:
   Event::Dispatcher& dispatcher_;
