@@ -1691,8 +1691,14 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
       if (local_reply_sent_) {
         return;
       }
+      // In case -1 is send from sdk, as an invalid value, nullopt is sent to allows envoy to
+      // set the grpc status code
+      absl::optional<Grpc::Status::GrpcStatus> grpc_status_code =
+          grpc_status == static_cast<uint32_t>(Grpc::Status::WellKnownGrpcStatus::InvalidCode)
+              ? absl::nullopt
+              : absl::optional<Grpc::Status::GrpcStatus>(grpc_status);
       decoder_callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(response_code), body_text,
-                                         modify_headers, grpc_status, details);
+                                         modify_headers, grpc_status_code, details);
       local_reply_sent_ = true;
     });
   }
