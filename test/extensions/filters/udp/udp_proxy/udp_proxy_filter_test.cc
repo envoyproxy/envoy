@@ -826,7 +826,7 @@ matcher:
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 }
 
-// Test updates to existing cluster (e.g. priority set changes, etc)
+// Test updates to existing cluster (e.g. priority set changes, etc).
 TEST_F(UdpProxyFilterTest, ClusterDynamicInfoMapUpdate) {
   InSequence s;
 
@@ -843,7 +843,7 @@ matcher:
         false);
 
   // Initial ThreadLocalCluster, scoped lifetime
-  // mimics replacement of old ThreadLocalCluster via postThreadLocalClusterUpdate
+  // mimics replacement of old ThreadLocalCluster via postThreadLocalClusterUpdate.
   {
     NiceMock<Upstream::MockThreadLocalCluster> other_thread_local_cluster;
     other_thread_local_cluster.cluster_.info_->name_ = "fake_cluster";
@@ -855,7 +855,7 @@ matcher:
                                                     command);
   }
 
-  // Push new cluster (getter), we expect this to result in new ClusterInfos object in map
+  // Push new cluster (getter), we expect this to result in new ClusterInfos object in map.
   {
     Upstream::ThreadLocalClusterCommand command = [this]() -> Upstream::ThreadLocalCluster& {
       return factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_;
