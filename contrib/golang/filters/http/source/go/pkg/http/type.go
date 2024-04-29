@@ -329,9 +329,9 @@ func (h *requestOrResponseTrailerMapImpl) RangeWithCopy(f func(key, value string
 func (h *requestOrResponseTrailerMapImpl) GetAllHeaders() map[string][]string {
 	h.mutex.Lock()
 	h.initTrailers()
-	copiedHeaders := h.headers
+	copied_headers := h.headers
 	h.mutex.Unlock()
-	return copiedHeaders
+	return copied_headers
 }
 
 // api.RequestTrailerMap
