@@ -146,8 +146,6 @@ void ExtensionRegistry::registerFactories() {
   // These are required to support specific route configs, if they are on.
   // It's likely no current users of E-M require them so we could optionally compile out by default.
   Router::forceRegisterDefaultEarlyDataPolicyFactory();
-  Router::forceRegisterRouteListMatchActionFactory();
-  Router::forceRegisterRouteMatchActionFactory();
   Extensions::UriTemplate::Match::forceRegisterUriTemplateMatcherFactory();
   Extensions::UriTemplate::Rewrite::forceRegisterUriTemplateRewriterFactory();
   Http::Matching::forceRegisterHttpRequestHeadersDataInputFactory();

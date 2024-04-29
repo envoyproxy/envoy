@@ -8,3 +8,4 @@ source/server/guarddog_impl.h
 source/server/watchdog_impl.h
 source/server/options_impl.cc
 source/extensions/access_loggers/common/file_access_log_impl.h
+source/common/router/scoped_rds.h

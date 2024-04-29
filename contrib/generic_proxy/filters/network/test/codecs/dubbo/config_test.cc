@@ -195,7 +195,7 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
     buffer.writeBEInt<int64_t>(0);
     buffer.writeBEInt<int64_t>(0);
 
-    EXPECT_CALL(callbacks, onDecodingFailure());
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
     server_codec.decode(buffer, false);
   }
 
@@ -318,7 +318,7 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
     buffer.writeBEInt<int64_t>(0);
     buffer.writeBEInt<int64_t>(0);
 
-    EXPECT_CALL(callbacks, onDecodingFailure());
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
     client_codec.decode(buffer, false);
   }
 
