@@ -314,6 +314,11 @@ void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) 
   parent_.deferredStream(*this);
 }
 
+void ActiveStream::onEncodingFailure(absl::string_view reason) {
+  ENVOY_LOG(error, "Generic proxy: response encoding failure: {}", reason);
+  resetStream(DownstreamStreamResetReason::ProtocolError);
+}
+
 void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
   factory.createFilterChain(*this);
   // Reverse the encoder filter chain so that the first encoder filter is the last filter in the
@@ -390,9 +395,9 @@ void Filter::onDecodingSuccess(StreamFramePtr request) {
   onDecodingFailure();
 }
 
-void Filter::onDecodingFailure() {
+void Filter::onDecodingFailure(absl::string_view reason) {
+  ENVOY_LOG(error, "generic proxy: request decoding failure: {}", reason);
   stats_helper_.onRequestDecodingError();
-
   resetDownstreamAllStreams(DownstreamStreamResetReason::ProtocolError);
   closeDownstreamConnection();
 }
