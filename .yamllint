@@ -21,5 +21,11 @@ rules:
 
 yaml-files:
 - .clang-format
+- .yamllint
 - "*.yml"
 - "*.yaml"
+
+ignore:
+- .project
+- "**/*template.yaml"
+- "**/node_modules/*"
