@@ -93,6 +93,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   case Filters::Common::ExtAuthz::CheckStatus::Denied:
     config_->stats().denied_.inc();
     break;
+  case Filters::Common::ExtAuthz::CheckStatus::Rejected:
+    PANIC("Not implemented!");
+    break;
   }
 
   if (!response->dynamic_metadata.fields().empty()) {
