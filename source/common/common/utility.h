@@ -636,8 +636,38 @@ private:
   double m2_{0};
 };
 
-// A TrieEntry aims to be a good balance of performant and space-efficient,
-// by allocating a vector the size of the range of entries it contains.
+// FastTrieEntry is used for very simple very fast lookups.
+//
+// Each node contains 256 pointers to potential child nodes, making an
+// 8KB allocation for every node. Since the vast majority of nodes are
+// very sparse, this is extremely space-inefficient, but it makes for
+// the fastest possible lookups if the total table size is small.
+// At larger table sizes, memory cache misses come into play and a more
+// compact trie actually runs faster.
+//
+// Benchmarks suggest that for the important use case of
+// the static header lookup table, FastTrieEntry lookups run in about
+// 2/3 the time that SmallTrieEntry lookups do, but for cases like
+// large route tables, or with long keys, FastTrieEntry runs in around
+// 2x the time and 100x the memory.
+//
+// FastTrieEntry should therefore should not be used in contexts where
+// performance is not critical, or where the contents may be large.
+template <class Value> class FastTrieEntry {
+public:
+  FastTrieEntry* operator[](uint8_t i) const { return entries_[i].get(); }
+  void set(uint8_t branch, std::unique_ptr<FastTrieEntry<Value>> entry) {
+    entries_[branch] = std::move(entry);
+  }
+  Value value_{};
+
+private:
+  std::array<std::unique_ptr<FastTrieEntry>, 256> entries_;
+};
+
+// A SmallTrieEntry aims to be a good balance of performant and
+// space-efficient, by allocating a vector the size of the range of children
+// the node contains. This should be good for most use-cases.
 //
 // For example, a node with children 'a' and 'z' will contain a vector of
 // size 26, containing two values and 24 nulls. A node with only one
@@ -654,17 +684,17 @@ private:
 // prefix "foobar" consumes 56KB.
 // Using ranged vectors like this makes a single prefix "foobar" consume
 // less than 20 bytes per node, for a total of 0.14KB.
-template <class Value> class TrieEntry {
+template <class Value> class SmallTrieEntry {
 public:
   Value value_{};
-  TrieEntry* operator[](uint8_t i) const {
+  SmallTrieEntry* operator[](uint8_t i) const {
     if (i >= min_child_ && i < min_child_ + children_.size()) {
       return children_[i - min_child_].get();
     }
     return nullptr;
   }
 
-  void set(uint8_t branch, std::unique_ptr<TrieEntry<Value>> entry) {
+  void set(uint8_t branch, std::unique_ptr<SmallTrieEntry<Value>> entry) {
     if (children_.empty()) {
       children_.reserve(1);
       children_.emplace_back(std::move(entry));
@@ -674,7 +704,7 @@ public:
     if (branch < min_child_) {
       // expand the vector backwards, by moving the existing vector onto
       // the end of a newly allocated one.
-      std::vector<std::unique_ptr<TrieEntry>> new_children;
+      std::vector<std::unique_ptr<SmallTrieEntry>> new_children;
       new_children.reserve(min_child_ - branch + children_.size());
       new_children.resize(min_child_ - branch);
       std::move(children_.begin(), children_.end(), std::back_inserter(new_children));
@@ -693,13 +723,13 @@ public:
 
 private:
   uint8_t min_child_{0};
-  std::vector<std::unique_ptr<TrieEntry>> children_;
+  std::vector<std::unique_ptr<SmallTrieEntry>> children_;
 };
 
 /**
  * A trie used for faster lookup with lookup time at most equal to the size of the key.
  */
-template <class Value> struct TrieLookupTable {
+template <template <class> class EntryType, class Value> struct TrieLookupTable {
 
   /**
    * Adds an entry to the Trie at the given Key.
@@ -710,10 +740,10 @@ template <class Value> struct TrieLookupTable {
    * @return false when a value already exists for the given key.
    */
   bool add(absl::string_view key, Value value, bool overwrite_existing = true) {
-    TrieEntry<Value>* current = &root_;
+    EntryType<Value>* current = &root_;
     for (uint8_t c : key) {
       if (!(*current)[c]) {
-        current->set(c, std::make_unique<TrieEntry<Value>>());
+        current->set(c, std::make_unique<EntryType<Value>>());
       }
       current = (*current)[c];
     }
@@ -730,7 +760,7 @@ template <class Value> struct TrieLookupTable {
    * @return the value associated with the key.
    */
   Value find(absl::string_view key) const {
-    const TrieEntry<Value>* current = &root_;
+    const EntryType<Value>* current = &root_;
     for (uint8_t c : key) {
       current = (*current)[c];
       if (current == nullptr) {
@@ -747,8 +777,8 @@ template <class Value> struct TrieLookupTable {
    * @return the value matching the longest prefix based on the key.
    */
   Value findLongestPrefix(absl::string_view key) const {
-    const TrieEntry<Value>* current = &root_;
-    const TrieEntry<Value>* result = current;
+    const EntryType<Value>* current = &root_;
+    const EntryType<Value>* result = current;
 
     for (uint8_t c : key) {
       current = (*current)[c];
@@ -762,7 +792,7 @@ template <class Value> struct TrieLookupTable {
     return result ? result->value_ : nullptr;
   }
 
-  TrieEntry<Value> root_;
+  EntryType<Value> root_;
 };
 
 /**

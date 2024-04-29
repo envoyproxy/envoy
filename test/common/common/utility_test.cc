@@ -1057,8 +1057,13 @@ TEST(DateFormatter, FromTimeSameWildcard) {
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%1f%2f").fromTime(time1));
 }
 
-TEST(TrieLookupTable, AddItems) {
-  TrieLookupTable<const char*> trie;
+using TrieTypeList = testing::Types<TrieLookupTable<FastTrieEntry, const char*>,
+                                    TrieLookupTable<SmallTrieEntry, const char*>>;
+template <class> struct TrieLookupTableSuite : testing::Test {};
+TYPED_TEST_SUITE(TrieLookupTableSuite, TrieTypeList);
+
+TYPED_TEST(TrieLookupTableSuite, AddItems) {
+  TypeParam trie;
   const char* cstr_a = "a";
   const char* cstr_b = "b";
   const char* cstr_c = "c";
@@ -1077,8 +1082,8 @@ TEST(TrieLookupTable, AddItems) {
   EXPECT_EQ(cstr_c, trie.find("foo"));
 }
 
-TEST(TrieLookupTable, LongestPrefix) {
-  TrieLookupTable<const char*> trie;
+TYPED_TEST(TrieLookupTableSuite, LongestPrefix) {
+  TypeParam trie;
   const char* cstr_a = "a";
   const char* cstr_b = "b";
   const char* cstr_c = "c";
