@@ -77,7 +77,7 @@ public:
 
 private:
   template <typename T> T* internalStartRequest(T* async_request);
-  Router::FilterConfig config_;
+  const Router::FilterConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
 

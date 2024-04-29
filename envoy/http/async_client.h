@@ -19,7 +19,8 @@
 namespace Envoy {
 namespace Router {
 class FilterConfig;
-}
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+} // namespace Router
 namespace Http {
 
 /**
@@ -294,7 +295,7 @@ public:
       retry_policy = absl::nullopt;
       return *this;
     }
-    StreamOptions& setFilterConfig(Router::FilterConfig& config) {
+    StreamOptions& setFilterConfig(const Router::FilterConfigSharedPtr& config) {
       filter_config_ = config;
       return *this;
     }
@@ -339,7 +340,7 @@ public:
     absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
     const Router::RetryPolicy* parsed_retry_policy{nullptr};
 
-    OptRef<Router::FilterConfig> filter_config_;
+    Router::FilterConfigSharedPtr filter_config_;
 
     bool is_shadow{false};
   };

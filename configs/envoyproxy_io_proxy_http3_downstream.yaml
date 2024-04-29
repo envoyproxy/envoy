@@ -56,8 +56,14 @@ static_resources:
     address:
       socket_address:
         protocol: UDP
-        address: 0.0.0.0
+        address: 127.0.0.1
         port_value: 10000
+    additional_addresses:
+      - address:
+          socket_address:
+            protocol: UDP
+            address: 127.0.0.1
+            port_value: 10001
     udp_listener_config:
       quic_options: {}
       downstream_socket_config:

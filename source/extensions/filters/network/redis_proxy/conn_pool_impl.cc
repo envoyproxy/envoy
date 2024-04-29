@@ -277,7 +277,7 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
       client = std::make_unique<ThreadLocalActiveClient>(*this);
       client->host_ = host;
       client->redis_client_ =
-          client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
+          client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
                                  auth_username_, auth_password_, false);
       client->redis_client_->addConnectionCallbacks(*client);
     }
@@ -309,7 +309,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
   // If there is an active transaction, establish a new connection if necessary.
   if (transaction.active_ && !transaction.connection_established_) {
     transaction.clients_[client_idx] =
-        client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
+        client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
                                auth_username_, auth_password_, true);
     if (transaction.connection_cb_) {
       transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);
