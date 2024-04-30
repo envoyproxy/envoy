@@ -2,7 +2,8 @@ package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
 
-class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
+// `public` for testing only.
+public class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
   private final long streamStartMs;
   private final long dnsStartMs;
   private final long dnsEndMs;
@@ -37,6 +38,11 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
     receivedByteCount = values[13];
     responseFlags = values[14];
     upstreamProtocol = values[15];
+  }
+
+  // Used for testing only.
+  public static EnvoyFinalStreamIntelImpl createForTesting(long[] values) {
+    return new EnvoyFinalStreamIntelImpl(values);
   }
 
   @Override
