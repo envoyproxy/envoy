@@ -14,11 +14,11 @@ namespace Envoy {
 
 // NOLINT(namespace-envoy)
 
-template <template <class> class EntryType>
+template <class TableType>
 static void typedBmTrieLookups(benchmark::State& state, std::vector<std::string>& keys) {
   std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
   std::uniform_int_distribution<size_t> keyindex_distribution(0, keys.size() - 1);
-  TrieLookupTable<EntryType, const void*> trie;
+  TableType trie;
   for (const std::string& key : keys) {
     trie.add(key, nullptr);
   }
@@ -44,8 +44,7 @@ static void typedBmTrieLookups(benchmark::State& state, std::vector<std::string>
 // Range args are:
 // 0 - num_keys
 // 1 - key_length (0 is a special case that generates mixed-length keys)
-template <template <class> class EntryType>
-static void typedBmTrieLookups(benchmark::State& state) {
+template <class TableType> static void typedBmTrieLookups(benchmark::State& state) {
   std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
   int num_keys = state.range(0);
   int key_length = state.range(1);
@@ -64,32 +63,36 @@ static void typedBmTrieLookups(benchmark::State& state) {
     std::string key = make_key(key_length_distribution(prng));
     keys.push_back(std::move(key));
   }
-  typedBmTrieLookups<EntryType>(state, keys);
+  typedBmTrieLookups<TableType>(state, keys);
 }
 
-static void bmBigTrieLookups(benchmark::State& s) { typedBmTrieLookups<BigTrieEntry>(s); }
-static void bmSmallTrieLookups(benchmark::State& s) { typedBmTrieLookups<SmallTrieEntry>(s); }
+static void bmBigTrieLookups(benchmark::State& s) {
+  typedBmTrieLookups<TrieLookupTable<BigTrieEntry, const void*>>(s);
+}
+static void bmSmallTrieLookups(benchmark::State& s) {
+  typedBmTrieLookups<TrieLookupTable<SmallTrieEntry, const void*>>(s);
+}
 
 #define ADD_HEADER_TO_KEYS(name) keys.emplace_back(Http::Headers::get().name);
 static void bmBigTrieLookupsRequestHeaders(benchmark::State& s) {
   std::vector<std::string> keys;
   INLINE_REQ_HEADERS(ADD_HEADER_TO_KEYS);
-  typedBmTrieLookups<BigTrieEntry>(s, keys);
+  typedBmTrieLookups<TrieLookupTable<BigTrieEntry, const void*>>(s, keys);
 }
 static void bmSmallTrieLookupsRequestHeaders(benchmark::State& s) {
   std::vector<std::string> keys;
   INLINE_REQ_HEADERS(ADD_HEADER_TO_KEYS);
-  typedBmTrieLookups<SmallTrieEntry>(s, keys);
+  typedBmTrieLookups<TrieLookupTable<SmallTrieEntry, const void*>>(s, keys);
 }
 static void bmBigTrieLookupsResponseHeaders(benchmark::State& s) {
   std::vector<std::string> keys;
   INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
-  typedBmTrieLookups<BigTrieEntry>(s, keys);
+  typedBmTrieLookups<TrieLookupTable<BigTrieEntry, const void*>>(s, keys);
 }
 static void bmSmallTrieLookupsResponseHeaders(benchmark::State& s) {
   std::vector<std::string> keys;
   INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
-  typedBmTrieLookups<SmallTrieEntry>(s, keys);
+  typedBmTrieLookups<TrieLookupTable<SmallTrieEntry, const void*>>(s, keys);
 }
 
 BENCHMARK(bmBigTrieLookupsRequestHeaders);
