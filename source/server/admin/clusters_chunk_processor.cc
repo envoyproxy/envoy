@@ -189,7 +189,7 @@ void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
 
   if (const std::string& eds_service_name = cluster_info->edsServiceName();
       !eds_service_name.empty()) {
-    top_level_entries.push_back({"eds_service_name", eds_service_name});
+    top_level_entries.emplace_back("eds_service_name", eds_service_name);
   }
 
   addCircuitBreakers(cluster_map.get(), cluster_info, response);
@@ -244,9 +244,9 @@ void JsonClustersChunkProcessor::processHost(Json::Streamer::Array* raw_host_sta
 void JsonClustersChunkProcessor::setHostname(
     const Upstream::HostSharedPtr& host,
     std::vector<const Json::Streamer::Map::NameValue>& host_config) {
-  // if (const std::string& hostname = host->hostname(); !hostname.empty()) {
-  host_config.emplace_back("hostname", host->hostname());
-  // }
+  if (const std::string& hostname = host->hostname(); !hostname.empty()) {
+    host_config.emplace_back("hostname", hostname);
+  }
 }
 
 void JsonClustersChunkProcessor::setSuccessRate(
@@ -365,7 +365,9 @@ void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_pt
   raw_host_ptr->addKey("stats");
   Json::Streamer::ArrayPtr stats_ptr = raw_host_ptr->addArray();
   for (const auto& [counter_name, counter] : host->counters()) {
-    Json::Streamer::MapPtr stats_obj_ptr = stats_ptr->addMap();
+    if (counter_name.empty() || counter.get().value() == 0) {
+      continue;
+    }
     std::vector<const Json::Streamer::Map::NameValue> counter_object{
         {"type",
          envoy::admin::v3::SimpleMetric_Type_Name(envoy::admin::v3::SimpleMetric::COUNTER)}};
@@ -375,10 +377,13 @@ void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_pt
     if (uint64_t value = counter.get().value(); value) {
       counter_object.emplace_back("value", value);
     }
+    Json::Streamer::MapPtr stats_obj_ptr = stats_ptr->addMap();
     addMapEntries(stats_obj_ptr.get(), response, counter_object);
   }
   for (const auto& [gauge_name, gauge] : host->gauges()) {
-    Json::Streamer::MapPtr stats_obj_ptr = stats_ptr->addMap();
+    if (gauge_name.empty() || gauge.get().value() == 0 ) {
+      continue;
+    }
     std::vector<const Json::Streamer::Map::NameValue> gauge_object{
         {"type", envoy::admin::v3::SimpleMetric_Type_Name(envoy::admin::v3::SimpleMetric::GAUGE)}};
     if (!gauge_name.empty()) {
@@ -387,6 +392,7 @@ void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_pt
     if (uint64_t value = gauge.get().value(); value) {
       gauge_object.emplace_back("value", value);
     }
+    Json::Streamer::MapPtr stats_obj_ptr = stats_ptr->addMap();
     addMapEntries(stats_obj_ptr.get(), response, gauge_object);
   }
 }
@@ -394,9 +400,8 @@ void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_pt
 void JsonClustersChunkProcessor::setHealthFlags(Json::Streamer::Map* raw_host_ptr,
                                                 const Upstream::HostSharedPtr& host,
                                                 Buffer::Instance& response) {
-  absl::flat_hash_map<, absl::variant<bool, absl::string_view>> flag_map;
-  // Json::Streamer::MapPtr health_status_ptr = raw_host_ptr->addMap();
-// Invokes setHealthFlag for each health flag.
+  absl::flat_hash_map<absl::string_view, absl::variant<bool, absl::string_view>> flag_map;
+  // Invokes setHealthFlag for each health flag.
 #define SET_HEALTH_FLAG(name, notused)                                                             \
   loadHealthFlagMap(flag_map, Upstream::Host::HealthFlag::name, host);
   HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
@@ -409,7 +414,7 @@ void JsonClustersChunkProcessor::setHealthFlags(Json::Streamer::Map* raw_host_pt
   std::vector<const Json::Streamer::Map::NameValue> flags;
   for (const auto& [name, flag_value] : flag_map) {
     if (name == "eds_health_status") {
-      flags.emplace_back(name, std::get<>(flag_value));
+      flags.emplace_back(name, std::get<std::string_view>(flag_value));
     } else {
       flags.emplace_back(name, std::get<bool>(flag_value));
     }
@@ -418,17 +423,17 @@ void JsonClustersChunkProcessor::setHealthFlags(Json::Streamer::Map* raw_host_pt
 }
 
 void JsonClustersChunkProcessor::loadHealthFlagMap(
-    absl::flat_hash_map<absl::string_view, absl::variant<bool, >>& flag_map,
+    absl::flat_hash_map<absl::string_view, absl::variant<bool, std::string_view>>& flag_map,
     Upstream::Host::HealthFlag flag, const Upstream::HostSharedPtr& host) {
   switch (flag) {
   case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC:
     if (bool value = host.get()->healthFlagGet(flag); value) {
-      flag_map.emplace("failed_active_health_check", value);
+      flag_map.insert_or_assign("failed_active_health_check", value);
     }
     break;
   case Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK:
     if (bool value = host.get()->healthFlagGet(flag); value) {
-      flag_map.emplace("failed_outlier_check", value);
+      flag_map.insert_or_assign("failed_outlier_check", value);
     }
     break;
   case Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH:
@@ -436,44 +441,44 @@ void JsonClustersChunkProcessor::loadHealthFlagMap(
     if (host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH) ||
         host->healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH)) {
       if (host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)) {
-        flag_map.emplace("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
+        flag_map.insert_or_assign("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
                                                   envoy::config::core::v3::UNHEALTHY));
       } else {
-        flag_map.emplace("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
+        flag_map.insert_or_assign("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
                                                   envoy::config::core::v3::DEGRADED));
       }
     } else {
-      flag_map.emplace("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
+      flag_map.insert_or_assign("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
                                                 envoy::config::core::v3::HEALTHY));
     }
   case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
     if (bool value = host.get()->healthFlagGet(flag); value) {
-      flag_map.emplace("failed_active_degraded_check", value);
+      flag_map.insert_or_assign("failed_active_degraded_check", value);
     }
     break;
   case Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL:
     if (bool value = host.get()->healthFlagGet(flag); value) {
-      flag_map.emplace("pending_dynamic_removal", value);
+      flag_map.insert_or_assign("pending_dynamic_removal", value);
     }
     break;
   case Upstream::Host::HealthFlag::PENDING_ACTIVE_HC:
     if (bool value = host.get()->healthFlagGet(flag); value) {
-      flag_map.emplace("pending_active_hc", value);
+      flag_map.insert_or_assign("pending_active_hc", value);
     }
     break;
   case Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL:
     if (bool value = host.get()->healthFlagGet(flag); value) {
-      flag_map.emplace("excluded_via_immediate_hc_fail", value);
+      flag_map.insert_or_assign("excluded_via_immediate_hc_fail", value);
     }
     break;
   case Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT:
     if (bool value = host.get()->healthFlagGet(flag); value) {
-      flag_map.emplace("active_hc_timeout", value);
+      flag_map.insert_or_assign("active_hc_timeout", value);
     }
     break;
   case Upstream::Host::HealthFlag::EDS_STATUS_DRAINING:
     if (bool value = host.get()->healthFlagGet(flag); value) {
-      flag_map.emplace("eds_health_status", value);
+      flag_map.insert_or_assign("eds_health_status", value);
     }
     break;
   }

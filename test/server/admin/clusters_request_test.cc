@@ -84,7 +84,7 @@ protected:
   void loadNewMockClusterByName(NiceMock<Upstream::MockClusterMockPrioritySet>& mock_cluster,
                                 absl::string_view name) {
     mock_cluster.info_->name_ = name;
-    ON_CALL(*mock_cluster.info_, edsServiceName()).WillByDefault(ReturnRef("potato_launcher"));
+    ON_CALL(*mock_cluster.info_, edsServiceName()).WillByDefault(ReturnRef(eds_service_name_));
     ON_CALL(*mock_cluster.info_, resourceManager(Upstream::ResourcePriority::Default))
         .WillByDefault(ReturnRef(std::ref(*resource_manager_default_).get()));
     ON_CALL(*mock_cluster.info_, resourceManager(Upstream::ResourcePriority::High))
@@ -109,7 +109,7 @@ protected:
     ON_CALL(*mock_host_, counters()).WillByDefault(Return(counters_));
     ON_CALL(*mock_host_, gauges()).WillByDefault(Return(gauges_));
 
-    ON_CALL(*mock_host_, hostname()).WillByDefault(ReturnRef("test_hostname"));
+    ON_CALL(*mock_host_, hostname()).WillByDefault(ReturnRef(hostname_));
     ON_CALL(*mock_host_, locality()).WillByDefault(ReturnRef(locality_));
     ON_CALL(*mock_host_, healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC))
         .WillByDefault(Return(true));
@@ -142,6 +142,8 @@ protected:
     host_set->hosts_.emplace_back(mock_host_);
   }
 
+  const std::string hostname_{"test_hostname"};
+  const std::string eds_service_name_{"potato_launcher"};
   NiceMock<Upstream::MockClusterInfo> mock_cluster_info_;
   NiceMock<MockInstance> mock_server_;
   NiceMock<Upstream::MockClusterManager> mock_cluster_manager_;
@@ -192,129 +194,126 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
   // clusters to be identical. We also strip all whitespace when making the expectation since the
   // output will not actually have any.
   std::string expected_readable_output = R"EOF(
-      { 
-        "cluster_statuses": [
-          {
-            "name": "test_cluster",
-            "observability_name": "observability_name",
-            "eds_service_name": "potato_launcher",
-            "circuit_breakers": {
-              "thresholds": [
-                {
-                  "priority": "DEFAULT",
-                  "max_connections": 1024,
-                  "max_pending_requests": 1024,
-                  "max_requests": 1024,
-                  "max_retries": 16
-                },
-                {
-                  "priority": "HIGH",
-                  "max_connections": 4096,
-                  "max_pending_requests": 4096,
-                  "max_requests": 4096,
-                  "max_retries": 16
-                }
-              ]
-            },
-            "success_rate_ejection_threshold": 1.1,
-            "local_success_rate_ejection_threshold": 1.1,
-            "added_via_api": true,
-            "host_statuses": [
+    {
+      "cluster_statuses": [
+        {
+          "circuit_breakers": {
+            "thresholds": [
               {
-                "address": {
-                  "socket_address": {
-                    "address": "1.2.3.4",
-                    "port": 80
-                  }
-                },
-                "hostname": "test_hostname",
-                "locality": {
-                  "region": "test_region",
-                  "zone": "test_zone",
-                  "sub_zone": "test_sub_zone"
-                },
-                "stats": [
-                  {
-                    "type": "COUNTER",
-                    "name": "test_counter",
-                    "value": 10
-                  },
-                  {
-                    "type": "GAUGE",
-                    "name": "test_gauge",
-                    "value": 11
-                  }
-                ]
-                "health_status": {
-                  "failed_active_health_check": false,
-                  "failed_outlier_check": false,
-                  "eds_health_status": "HEALTHY",
-                  "failed_active_degraded_check": false,
-                  "pending_dynamic_removal": false,
-                  "pending_active_hc": false,
-                  "excluded_via_immediate_hc_fail": false,
-                  "active_hc_timeout": false
-                }
-
-              }
-            ],
-          },
-          {
-            "name": "test_cluster",
-            "observability_name": "observability_name",
-            "eds_service_name": "potato_launcher",
-            "circuit_breakers": {
-              "thresholds": [
-                {
-                  "priority": "DEFAULT",
-                  "max_connections": 1024,
-                  "max_pending_requests": 1024,
-                  "max_requests": 1024,
-                  "max_retries": 16
-                },
-                {
-                  "priority": "HIGH",
-                  "max_connections": 4096,
-                  "max_pending_requests": 4096,
-                  "max_requests": 4096,
-                  "max_retries": 16
-                }
-              ]
-            },
-            "success_rate_ejection_threshold": 1.1,
-            "local_success_rate_ejection_threshold": 1.1,
-            "added_via_api": true,
-            "host_statuses": [
+                "priority": "DEFAULT",
+                "max_connections": 1024,
+                "max_pending_requests": 1024,
+                "max_requests": 1024,
+                "max_retries": 1024
+              },
               {
-                "address": {
-                  "socket_address": {
-                    "address": "1.2.3.4",
-                    "port": 80
-                  }
-                },
-                "hostname": "test_hostname",
-                "locality": {
-                  "region": "test_region",
-                  "zone": "test_zone",
-                  "sub_zone": "test_sub_zone"
-                },
-                "stats": [
-                  {
-                    "type": "COUNTER",
-                    "name": "test_counter",
-                    "value": 10
-                  },
-                  {
-                    "type": "GAUGE",
-                    "name": "test_gauge",
-                    "value": 11
-                  }
-                ]
+                "priority": "HIGH",
+                "max_connections": 4096,
+                "max_pending_requests": 4096,
+                "max_requests": 4096,
+                "max_retries": 4096
               }
             ]
-          }
-        ]
-      })EOF";
+          },
+          "success_rate_ejection_threshold": 1.1,
+          "local_success_rate_ejection_threshold": 1.1,
+          "name": "test_cluster",
+          "observability_name": "observability_name",
+          "eds_service_name": "potato_launcher",
+          "added_via_api": true,
+          "host_statuses": [
+            {
+              "address": {
+                "socket_address": {
+                  "address": "1.2.3.4",
+                  "port": 80
+                }
+              },
+              "locality": {
+                "region": "test_region",
+                "zone": "test_zone",
+                "sub_zone": "test_sub_zone"
+              },
+              "stats": [
+                {
+                  "type": "COUNTER",
+                  "name": "test_counter",
+                  "value": 10
+                },
+                {
+                  "type": "GAUGE",
+                  "name": "test_gauge",
+                  "value": 11
+                }
+              ],
+              "hostname": "test_hostname",
+              "success_rate": 1,
+              "weight": 1,
+              "priority": 1,
+              "local_origin_success_rate": 1
+            }
+          ]
+        },
+        {
+          "circuit_breakers": {
+            "thresholds": [
+              {
+                "priority": "DEFAULT",
+                "max_connections": 1024,
+                "max_pending_requests": 1024,
+                "max_requests": 1024,
+                "max_retries": 1024
+              },
+              {
+                "priority": "HIGH",
+                "max_connections": 4096,
+                "max_pending_requests": 4096,
+                "max_requests": 4096,
+                "max_retries": 4096
+              }
+            ]
+          },
+          "success_rate_ejection_threshold": 1.1,
+          "local_success_rate_ejection_threshold": 1.1,
+          "name": "test_cluster",
+          "observability_name": "observability_name",
+          "eds_service_name": "potato_launcher",
+          "added_via_api": true,
+          "host_statuses": [
+            {
+              "address": {
+                "socket_address": {
+                  "address": "1.2.3.4",
+                  "port": 80
+                }
+              },
+              "locality": {
+                "region": "test_region",
+                "zone": "test_zone",
+                "sub_zone": "test_sub_zone"
+              },
+              "stats": [
+                {
+                  "type": "COUNTER",
+                  "name": "test_counter",
+                  "value": 10
+                },
+                {
+                  "type": "GAUGE",
+                  "name": "test_gauge",
+                  "value": 11
+                }
+              ],
+              "hostname": "test_hostname",
+              "success_rate": 1,
+              "weight": 1,
+              "priority": 1,
+              "local_origin_success_rate": 1
+            }
+          ]
+        }
+      ]
+    })EOF";
   EXPECT_EQ(
       std::regex_replace(result.data_.toString(), std::regex("test_cluster2"), "test_cluster"),
       std::regex_replace(expected_readable_output, std::regex(R"(\s)"), ""));
