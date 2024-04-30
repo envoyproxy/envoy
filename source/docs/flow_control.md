@@ -283,8 +283,8 @@ The high watermark path is as follows:
    `Network::ConnectionCallbacks::onAboveWriteBufferHighWatermark()`.
  * When `Envoy::Http::CodecClient` receives `onAboveWriteBufferHighWatermark()` it
    calls `onUnderlyingConnectionAboveWriteBufferHighWatermark()` on `codec_`.
- * When `Envoy::Http::Http2::ConnectionImpl` receives `onAboveWriteBufferHighWatermark()` it calls
-   `runHighWatermarkCallbacks()` for each stream of the connection.
+ * When `Envoy::Http::Http2::ConnectionImpl` or `Envoy::Http::Http1::ConnectionImpl` receives `onAboveWriteBufferHighWatermark()` it calls
+   `runHighWatermarkCallbacks()` for each stream of the connection eventually.
  * `runHighWatermarkCallbacks()` results in all subscribers of `Envoy::Http::StreamCallback`
  receiving an `onAboveWriteBufferHighWatermark()` callback.
  * When `Envoy::Router::Filter` receives `onAboveWriteBufferHighWatermark()` it
@@ -299,8 +299,8 @@ The low watermark path is as follows:
    `Network::ConnectionCallbacks::onBelowWriteBufferLowWatermark()`.
  * When `Envoy::Http::CodecClient` receives `onBelowWriteBufferLowWatermark()` it
    calls `onUnderlyingConnectionBelowWriteBufferLowWatermark()` on `codec_`.
- * When `Envoy::Http::Http2::ConnectionImpl` receives `onBelowWriteBufferLowWatermark()` it calls
-   `runLowWatermarkCallbacks()` for each stream of the connection.
+ * When `Envoy::Http::Http2::ConnectionImpl` or `Envoy::Http::Http1::ConnectionImpl` receives `onBelowWriteBufferLowWatermark()` it calls
+   `runLowWatermarkCallbacks()` for each stream of the connection eventually.
  * `runLowWatermarkCallbacks()` results in all subscribers of `Envoy::Http::StreamCallback`
  receiving a `onBelowWriteBufferLowWatermark()` callback.
  * When `Envoy::Router::Filter` receives `onBelowWriteBufferLowWatermark()` it
