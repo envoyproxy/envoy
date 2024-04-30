@@ -32,7 +32,7 @@ public:
   MOCK_METHOD(Stats::Scope&, statsScope, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
 
-  testing::NiceMock<StatelessMockServerFactoryContext> server_context_;
+  testing::NiceMock<MockServerFactoryContext> server_context_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<MockConfigTracker> config_tracker_;
