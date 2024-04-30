@@ -15,7 +15,6 @@
 #if defined(__APPLE__)
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
 #endif
-#include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.h"
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
@@ -149,10 +148,12 @@ EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
   return *this;
 }
 
+#if !defined(__APPLE__)
 EngineBuilder& EngineBuilder::setUseCares(bool use_cares) {
   use_cares_ = use_cares;
   return *this;
 }
+#endif
 
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;

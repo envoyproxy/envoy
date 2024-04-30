@@ -22,7 +22,6 @@
 #include "source/extensions/http/header_validators/envoy_default/config.h"
 #include "source/extensions/http/original_ip_detection/xff/config.h"
 #include "source/extensions/load_balancing_policies/cluster_provided/config.h"
-#include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 #include "source/extensions/path/match/uri_template/config.h"
 #include "source/extensions/path/rewrite/uri_template/config.h"
@@ -64,6 +63,10 @@
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
 #include "source/common/tls/cert_validator/default_validator.h"
+#endif
+
+#if !defined(__APPLE__)
+#include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 #endif
 
 namespace Envoy {
@@ -157,7 +160,9 @@ void ExtensionRegistry::registerFactories() {
   // Envoy Mobile uses the GetAddrInfo resolver for DNS lookups on android by default.
   // This could be compiled out for iOS.
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
+#if !defined(__APPLE__)
   Network::forceRegisterCaresDnsResolverFactory();
+#endif
 
   Network::Address::forceRegisterIpResolver();
 
