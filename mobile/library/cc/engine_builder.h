@@ -124,6 +124,7 @@ public:
   virtual ~EngineBuilder() = default;
   static std::string nativeNameToConfig(absl::string_view name);
 
+  EngineBuilder& setUseCares(bool use_cares);
   EngineBuilder& setLogLevel(Logger::Logger::Levels log_level);
   EngineBuilder& setLogger(std::unique_ptr<EnvoyLogger> logger);
   EngineBuilder& setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks);
@@ -253,6 +254,7 @@ private:
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
   bool enable_http3_ = true;
+  bool use_cares_ = false;
   std::string http3_connection_options_ = "";
   std::string http3_client_connection_options_ = "";
   std::vector<std::pair<std::string, int>> quic_hints_;
