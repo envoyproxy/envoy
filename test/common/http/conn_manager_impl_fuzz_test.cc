@@ -296,7 +296,7 @@ public:
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
-  std::chrono::seconds keepalive_header_timeout_;
+  std::chrono::seconds keepalive_header_timeout_{};
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks
