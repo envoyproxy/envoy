@@ -1187,9 +1187,9 @@ ClusterInfoImpl::ClusterInfoImpl(
     if (!lb_pair.ok()) {
       throwEnvoyExceptionOrPanic(std::string(lb_pair.status().message()));
     }
-    load_balancer_factory_ = lb_pair->factory_;
+    load_balancer_factory_ = lb_pair->factory;
     ASSERT(load_balancer_factory_ != nullptr, "null load balancer factory");
-    load_balancer_config_ = std::move(lb_pair->config_);
+    load_balancer_config_ = std::move(lb_pair->config);
   }
 
   if (config.lb_subset_config().locality_weight_aware() &&
