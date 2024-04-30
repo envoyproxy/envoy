@@ -122,8 +122,7 @@ protected:
                                   std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
                                   ssl_context_manager_, {}),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
-        quic_stat_names_(listener_config_.listenerScope().symbolTable()) {
-  }
+        quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
   template <typename A, typename B>
   std::unique_ptr<A> staticUniquePointerCast(std::unique_ptr<B>&& source) {
