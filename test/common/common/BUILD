@@ -395,13 +395,13 @@ envoy_cc_benchmark_binary(
         "benchmark",
     ],
     deps = [
-        "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
     ],
 )
 
 envoy_benchmark_test(
     name = "utility_trie_speed_test_benchmark_test",
+    size = "large",
     benchmark_binary = "utility_trie_speed_test",
 )
 

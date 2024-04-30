@@ -3,26 +3,55 @@
 
 #include <random>
 
-#include "source/common/common/assert.h"
-#include "source/common/common/utility.h"
+#include "envoy/http/header_map.h"
 
-#include "absl/strings/string_view.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
 
 // NOLINT(namespace-envoy)
 
-using KeyLengthRange = std::pair<size_t, size_t>;
-
 template <template <class> class EntryType>
-static void typedBmTrieLookups(benchmark::State& state, const size_t num_keys,
-                               const KeyLengthRange key_length_range) {
+static void typedBmTrieLookups(benchmark::State& state, std::vector<std::string>& keys) {
   std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
+  std::uniform_int_distribution<size_t> keyindex_distribution(0, keys.size() - 1);
+  TrieLookupTable<EntryType, const void*> trie;
+  for (const std::string& key : keys) {
+    trie.add(key, nullptr);
+  }
+  std::vector<size_t> key_selections;
+  for (size_t i = 0; i < 1024; i++) {
+    key_selections.push_back(keyindex_distribution(prng));
+  }
+
+  // key_index indexes into key_selections which is a preselected
+  // random ordering of 1024 indexes into the existing keys. This
+  // way we read from all over the trie, without spending time during
+  // the performance test generating these random choices.
+  size_t key_index = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    auto v = trie.find(keys[key_selections[key_index++]]);
+    // Reset key_index to 0 whenever it reaches 1024.
+    key_index &= 1023;
+    benchmark::DoNotOptimize(v);
+  }
+}
+
+// Range args are:
+// 0 - num_keys
+// 1 - key_length (0 is a special case that generates mixed-length keys)
+template <template <class> class EntryType>
+static void typedBmTrieLookups(benchmark::State& state) {
+  std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
+  int num_keys = state.range(0);
+  int key_length = state.range(1);
   std::uniform_int_distribution<char> char_distribution('a', 'z');
-  std::uniform_int_distribution<size_t> key_length_distribution(key_length_range.first,
-                                                                key_length_range.second);
-  std::uniform_int_distribution<size_t> keyindex_distribution(0, num_keys - 1);
+  std::uniform_int_distribution<size_t> key_length_distribution(key_length == 0 ? 8 : key_length,
+                                                                key_length == 0 ? 128 : key_length);
   auto make_key = [&](size_t len) {
     std::string ret;
     for (size_t i = 0; i < len; i++) {
@@ -30,57 +59,44 @@ static void typedBmTrieLookups(benchmark::State& state, const size_t num_keys,
     }
     return ret;
   };
-  TrieLookupTable<EntryType, const void*> trie;
   std::vector<std::string> keys;
-  for (size_t i = 0; i < num_keys; i++) {
+  for (int i = 0; i < num_keys; i++) {
     std::string key = make_key(key_length_distribution(prng));
-    trie.add(key, reinterpret_cast<const void*>(&num_keys));
     keys.push_back(std::move(key));
   }
-
-  std::vector<size_t> key_selections;
-  for (size_t i = 0; i < 1024; i++) {
-    key_selections.push_back(keyindex_distribution(prng));
-  }
-  size_t key_index = 0;
-  for (auto _ : state) {
-    UNREFERENCED_PARAMETER(_);
-    auto v = trie.find(keys[key_selections[key_index++]]);
-    key_index &= 1023;
-    benchmark::DoNotOptimize(v);
-  }
+  typedBmTrieLookups<EntryType>(state, keys);
 }
 
-// Args are:
-// 0 - size_t num_keys
-// 1 - std::pair<size_t, size_t> key_length_range
-template <typename... Args> static void bmFastTrieLookups(benchmark::State& state, Args&&... args) {
-  auto args_t = std::make_tuple(std::move(args)...);
-  typedBmTrieLookups<FastTrieEntry>(state, std::get<0>(args_t), std::get<1>(args_t));
+static void bmBigTrieLookups(benchmark::State& s) { typedBmTrieLookups<BigTrieEntry>(s); }
+static void bmSmallTrieLookups(benchmark::State& s) { typedBmTrieLookups<SmallTrieEntry>(s); }
+
+#define ADD_HEADER_TO_KEYS(name) keys.emplace_back(Http::Headers::get().name);
+static void bmBigTrieLookupsRequestHeaders(benchmark::State& s) {
+  std::vector<std::string> keys;
+  INLINE_REQ_HEADERS(ADD_HEADER_TO_KEYS);
+  typedBmTrieLookups<BigTrieEntry>(s, keys);
 }
-template <typename... Args>
-static void bmSmallTrieLookups(benchmark::State& state, Args&&... args) {
-  auto args_t = std::make_tuple(std::move(args)...);
-  typedBmTrieLookups<SmallTrieEntry>(state, std::get<0>(args_t), std::get<1>(args_t));
+static void bmSmallTrieLookupsRequestHeaders(benchmark::State& s) {
+  std::vector<std::string> keys;
+  INLINE_REQ_HEADERS(ADD_HEADER_TO_KEYS);
+  typedBmTrieLookups<SmallTrieEntry>(s, keys);
+}
+static void bmBigTrieLookupsResponseHeaders(benchmark::State& s) {
+  std::vector<std::string> keys;
+  INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
+  typedBmTrieLookups<BigTrieEntry>(s, keys);
+}
+static void bmSmallTrieLookupsResponseHeaders(benchmark::State& s) {
+  std::vector<std::string> keys;
+  INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
+  typedBmTrieLookups<SmallTrieEntry>(s, keys);
 }
 
-BENCHMARK_CAPTURE(bmFastTrieLookups, 10_short_keys, 10, KeyLengthRange(8, 8));
-BENCHMARK_CAPTURE(bmSmallTrieLookups, 10_short_keys, 10, KeyLengthRange(8, 8));
-BENCHMARK_CAPTURE(bmFastTrieLookups, 10_mixed_keys, 10, KeyLengthRange(8, 128));
-BENCHMARK_CAPTURE(bmSmallTrieLookups, 10_mixed_keys, 10, KeyLengthRange(8, 128));
-BENCHMARK_CAPTURE(bmFastTrieLookups, 10_long_keys, 10, KeyLengthRange(128, 128));
-BENCHMARK_CAPTURE(bmSmallTrieLookups, 10_long_keys, 10, KeyLengthRange(128, 128));
-BENCHMARK_CAPTURE(bmFastTrieLookups, 100_short_keys, 100, KeyLengthRange(8, 8));
-BENCHMARK_CAPTURE(bmSmallTrieLookups, 100_short_keys, 100, KeyLengthRange(8, 8));
-BENCHMARK_CAPTURE(bmFastTrieLookups, 100_mixed_keys, 100, KeyLengthRange(8, 128));
-BENCHMARK_CAPTURE(bmSmallTrieLookups, 100_mixed_keys, 100, KeyLengthRange(8, 128));
-BENCHMARK_CAPTURE(bmFastTrieLookups, 100_long_keys, 100, KeyLengthRange(128, 128));
-BENCHMARK_CAPTURE(bmSmallTrieLookups, 100_long_keys, 100, KeyLengthRange(128, 128));
-BENCHMARK_CAPTURE(bmFastTrieLookups, 10000_short_keys, 10000, KeyLengthRange(8, 8));
-BENCHMARK_CAPTURE(bmSmallTrieLookups, 10000_short_keys, 10000, KeyLengthRange(8, 8));
-BENCHMARK_CAPTURE(bmFastTrieLookups, 10000_mixed_keys, 10000, KeyLengthRange(8, 128));
-BENCHMARK_CAPTURE(bmSmallTrieLookups, 10000_mixed_keys, 10000, KeyLengthRange(8, 128));
-BENCHMARK_CAPTURE(bmFastTrieLookups, 10000_long_keys, 10000, KeyLengthRange(128, 128));
-BENCHMARK_CAPTURE(bmSmallTrieLookups, 10000_long_keys, 10000, KeyLengthRange(128, 128));
+BENCHMARK(bmBigTrieLookupsRequestHeaders);
+BENCHMARK(bmBigTrieLookupsResponseHeaders);
+BENCHMARK(bmBigTrieLookups)->ArgsProduct({{10, 100, 1000, 10000}, {0, 8, 128}});
+BENCHMARK(bmSmallTrieLookupsRequestHeaders);
+BENCHMARK(bmSmallTrieLookupsResponseHeaders);
+BENCHMARK(bmSmallTrieLookups)->ArgsProduct({{10, 100, 1000, 10000}, {0, 8, 128}});
 
 } // namespace Envoy

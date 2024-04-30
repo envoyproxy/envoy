@@ -1057,7 +1057,7 @@ TEST(DateFormatter, FromTimeSameWildcard) {
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%1f%2f").fromTime(time1));
 }
 
-using TrieTypeList = testing::Types<TrieLookupTable<FastTrieEntry, const char*>,
+using TrieTypeList = testing::Types<TrieLookupTable<BigTrieEntry, const char*>,
                                     TrieLookupTable<SmallTrieEntry, const char*>>;
 template <class> struct TrieLookupTableSuite : testing::Test {};
 TYPED_TEST_SUITE(TrieLookupTableSuite, TrieTypeList);

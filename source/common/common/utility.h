@@ -636,7 +636,7 @@ private:
   double m2_{0};
 };
 
-// FastTrieEntry is used for very simple very fast lookups.
+// BigTrieEntry is used for very simple very fast lookups.
 //
 // Each node contains 256 pointers to potential child nodes, making an
 // 8KB allocation for every node. Since the vast majority of nodes are
@@ -646,23 +646,23 @@ private:
 // compact trie actually runs faster.
 //
 // Benchmarks suggest that for the important use case of
-// the static header lookup table, FastTrieEntry lookups run in about
+// the static header lookup table, BigTrieEntry lookups run in about
 // 2/3 the time that SmallTrieEntry lookups do, but for cases like
-// large route tables, or with long keys, FastTrieEntry runs in around
+// large route tables, or with long keys, BigTrieEntry runs in around
 // 2x the time and 100x the memory.
 //
-// FastTrieEntry should therefore should not be used in contexts where
+// BigTrieEntry should therefore should not be used in contexts where
 // performance is not critical, or where the contents may be large.
-template <class Value> class FastTrieEntry {
+template <class Value> class BigTrieEntry {
 public:
-  FastTrieEntry* operator[](uint8_t i) const { return entries_[i].get(); }
-  void set(uint8_t branch, std::unique_ptr<FastTrieEntry<Value>> entry) {
+  BigTrieEntry* operator[](uint8_t i) const { return entries_[i].get(); }
+  void set(uint8_t branch, std::unique_ptr<BigTrieEntry<Value>> entry) {
     entries_[branch] = std::move(entry);
   }
   Value value_{};
 
 private:
-  std::array<std::unique_ptr<FastTrieEntry>, 256> entries_;
+  std::array<std::unique_ptr<BigTrieEntry>, 256> entries_;
 };
 
 // A SmallTrieEntry aims to be a good balance of performant and

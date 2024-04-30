@@ -146,7 +146,7 @@ protected:
    */
   template <class Interface>
   struct StaticLookupTable
-      : public TrieLookupTable<FastTrieEntry, std::function<StaticLookupResponse(HeaderMapImpl&)>> {
+      : public TrieLookupTable<BigTrieEntry, std::function<StaticLookupResponse(HeaderMapImpl&)>> {
     StaticLookupTable();
 
     void finalizeTable() {
