@@ -923,10 +923,9 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
 
   // Check if the cluster provided load balancing policy is used. We need handle it as special
   // case.
-  TypedLoadBalancerFactory* typed_lb_factory = cluster_info->loadBalancerFactory();
-  RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
+  TypedLoadBalancerFactory& typed_lb_factory = cluster_info->loadBalancerFactory();
   const bool cluster_provided_lb =
-      typed_lb_factory->name() == "envoy.load_balancing_policies.cluster_provided";
+      typed_lb_factory.name() == "envoy.load_balancing_policies.cluster_provided";
 
   if (cluster_provided_lb && lb == nullptr) {
     return absl::InvalidArgumentError(
@@ -981,8 +980,8 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
     cluster_entry_it->second->thread_aware_lb_ = std::move(lb);
   } else {
     cluster_entry_it->second->thread_aware_lb_ =
-        typed_lb_factory->create(cluster_info->loadBalancerConfig(), *cluster_info,
-                                 cluster_reference.prioritySet(), runtime_, random_, time_source_);
+        typed_lb_factory.create(cluster_info->loadBalancerConfig(), *cluster_info,
+                                cluster_reference.prioritySet(), runtime_, random_, time_source_);
   }
 
   updateClusterCounts();

@@ -79,18 +79,12 @@ using UpstreamNetworkFilterConfigProviderManager =
 
 class LegacyLbPolicyConfigHelper {
 public:
-  struct Result {
-    TypedLoadBalancerFactory* factory;
-    LoadBalancerConfigPtr config;
-  };
+  // This result never be nullptr.
+  using Result = TypedLoadBalancerFactory*;
 
   static absl::StatusOr<Result>
-  getTypedLbConfigFromLegacyProtoWithoutSubset(const ClusterProto& cluster,
-                                               ProtobufMessage::ValidationVisitor& visitor);
-
-  static absl::StatusOr<Result>
-  getTypedLbConfigFromLegacyProto(const ClusterProto& cluster,
-                                  ProtobufMessage::ValidationVisitor& visitor);
+  getTypedLbConfigFromLegacyProtoWithoutSubset(const ClusterProto& cluster);
+  static absl::StatusOr<Result> getTypedLbConfigFromLegacyProto(const ClusterProto& cluster);
 };
 
 /**
@@ -815,7 +809,10 @@ public:
   OptRef<const LoadBalancerConfig> loadBalancerConfig() const override {
     return makeOptRefFromPtr<const LoadBalancerConfig>(load_balancer_config_.get());
   }
-  TypedLoadBalancerFactory* loadBalancerFactory() const override { return load_balancer_factory_; }
+  TypedLoadBalancerFactory& loadBalancerFactory() const override {
+    ASSERT(load_balancer_factory_ != nullptr, "null load balancer factory");
+    return *load_balancer_factory_;
+  }
   const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const override {
     return *common_lb_config_;
   }

@@ -1154,14 +1154,13 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToRedisCluster) {
   envoy::config::cluster::v3::Cluster::CustomClusterType cluster_type;
   cluster_type.set_name("envoy.clusters.redis");
 
-  auto lb_factory = Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
-      "envoy.load_balancing_policies.cluster_provided");
-
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
       .WillOnce(Return(
           makeOptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>(cluster_type)));
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, loadBalancerFactory())
-      .WillOnce(Return(lb_factory));
+      .WillOnce(
+          ReturnRef(Config::Utility::getAndCheckFactoryByName<Upstream::TypedLoadBalancerFactory>(
+              "envoy.load_balancing_policies.cluster_provided")));
 
   setup();
 
@@ -1182,8 +1181,9 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToRedisClusterHashtag) {
       .WillOnce(Return(
           makeOptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>(cluster_type)));
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, loadBalancerFactory())
-      .WillOnce(Return(Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
-          "envoy.load_balancing_policies.cluster_provided")));
+      .WillOnce(
+          ReturnRef(Config::Utility::getAndCheckFactoryByName<Upstream::TypedLoadBalancerFactory>(
+              "envoy.load_balancing_policies.cluster_provided")));
 
   setup();
 
