@@ -1021,7 +1021,6 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
                     ClusterProto::LbPolicy_Name(cluster.lb_policy())));
   }
 
-  ASSERT(lb_factory != nullptr);
   return Result{lb_factory, lb_factory->loadConfig(cluster, visitor)};
 }
 
@@ -1188,16 +1187,9 @@ ClusterInfoImpl::ClusterInfoImpl(
     if (!lb_pair.ok()) {
       throwEnvoyExceptionOrPanic(std::string(lb_pair.status().message()));
     }
-
-    load_balancer_config_ = std::move(lb_pair->config);
-    load_balancer_factory_ = lb_pair->factory;
-
-    RELEASE_ASSERT(
-        load_balancer_factory_,
-        fmt::format(
-            "No load balancer factory found from legacy LB configuration (type: {}, subset: {}).",
-            envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy()),
-            config.has_lb_subset_config()));
+    load_balancer_factory_ = lb_pair->factory_;
+    ASSERT(load_balancer_factory_ != nullptr, "null load balancer factory");
+    load_balancer_config_ = std::move(lb_pair->config_);
   }
 
   if (config.lb_subset_config().locality_weight_aware() &&
@@ -1354,10 +1346,10 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
       Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
                                              context.messageValidationVisitor(), *proto_message);
 
+      load_balancer_factory_ = factory;
       load_balancer_config_ =
           factory->loadConfig(*proto_message, context.messageValidationVisitor());
 
-      load_balancer_factory_ = factory;
       break;
     }
     missing_policies.push_back(policy.typed_extension_config().name());
