@@ -23,6 +23,10 @@
 namespace Envoy {
 namespace Quic {
 
+namespace {
+  constexpr uint8_t kEcnMask = 0x03;
+}  // namespace
+
 bool ActiveQuicListenerFactory::disable_kernel_bpf_packet_routing_for_test_ = false;
 
 ActiveQuicListener::ActiveQuicListener(
@@ -135,7 +139,8 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
   quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
                                   /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
-                                  /*owns_header_buffer*/ false);
+                                  /*owns_header_buffer*/ false,
+                                  static_cast<quic::QuicEcnCodepoint>(data.tos_ & kEcnMask));
   if (!quic_dispatcher_->processPacket(self_address, peer_address, packet)) {
     if (non_dispatched_udp_packet_handler_.has_value()) {
       non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));

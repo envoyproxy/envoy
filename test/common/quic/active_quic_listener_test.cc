@@ -46,6 +46,10 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Quic {
 
+namespace {
+constexpr int kECT1 = 0x01;
+}  // namespace
+
 // A test quic listener that exits after processing one round of packets.
 class TestActiveQuicListener : public ActiveQuicListener {
   using ActiveQuicListener::ActiveQuicListener;
@@ -118,7 +122,8 @@ protected:
                                   std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
                                   ssl_context_manager_, {}),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
-        quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
+        quic_stat_names_(listener_config_.listenerScope().symbolTable()) {
+  }
 
   template <typename A, typename B>
   std::unique_ptr<A> staticUniquePointerCast(std::unique_ptr<B>&& source) {
@@ -126,6 +131,7 @@ protected:
   }
 
   void SetUp() override {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
     envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
     listen_socket_ =
@@ -247,6 +253,17 @@ protected:
     client_sockets_.push_back(
         std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_address_,
                                               nullptr, Network::SocketCreationOptions{}));
+    // Set outgoing ECN marks on client packets.
+    int level, optname;
+    if (local_address_->ip()->version() == Network::Address::IpVersion::v6) {
+      level = IPPROTO_IPV6;
+      optname = IPV6_TCLASS;
+    } else {
+      level = IPPROTO_IP;
+      optname = IP_TOS;
+    }
+    int value = kECT1;
+    client_sockets_.back()->setSocketOption(level, optname, &value, sizeof(value));
     Buffer::OwnedImpl payload =
         generateChloPacketToSend(quic_version_, quic_config_, connection_id);
     Buffer::RawSliceVector slice = payload.getRawSlices();
@@ -580,6 +597,21 @@ TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
   }
   EXPECT_EQ(rv.return_value_, 0);
   EXPECT_EQ(optval, 1);
+}
+
+TEST_P(ActiveQuicListenerTest, EcnReporting) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
+  initialize();
+  maybeConfigureMocks(/* connection_count = */ 1);
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  sendCHLO(connection_id);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  quic::QuicConnection* connection =
+      quic::test::QuicDispatcherPeer::GetFirstSessionIfAny(quic_dispatcher_)->connection();
+  EXPECT_EQ(connection->connection_id(), quic::test::TestConnectionId(1));
+  ASSERT(connection != nullptr);
+  const quic::QuicConnectionStats& stats = connection->GetStats();
+  EXPECT_EQ(stats.num_ecn_marks_received.ect1, 1);
 }
 
 class ActiveQuicListenerEmptyFlagConfigTest : public ActiveQuicListenerTest {

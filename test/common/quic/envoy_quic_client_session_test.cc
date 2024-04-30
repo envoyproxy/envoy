@@ -450,14 +450,14 @@ TEST_P(EnvoyQuicClientSessionTest, HandlePacketsWithoutDestinationAddress) {
     auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
                                                       stateless_reset_packet->length());
     quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
-                                    time_system_.monotonicTime());
+                                    time_system_.monotonicTime(), /*tos=*/0);
   }
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
       .Times(0);
   auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
                                                     stateless_reset_packet->length());
   quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
-                                  time_system_.monotonicTime());
+                                  time_system_.monotonicTime(), /*tos=*/0);
 }
 
 // Tests that receiving a STATELESS_RESET packet on the probing socket doesn't cause crash.
