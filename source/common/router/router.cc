@@ -757,7 +757,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     retry_connection_failure_buffer_limit_ = std::max(
         retry_shadow_buffer_limit_, std::min(cluster_->perConnectionBufferLimitBytes() + 1048576,
                                              std::numeric_limits<uint32_t>::max()));
-    callbacks_->setDecoderBufferLimit(retry_connection_failure_buffer_limit_);
   }
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
@@ -866,8 +865,11 @@ void Filter::onUpstreamConnectionEstablished() {
               "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
               "up on the retry/shadow.",
               getLength(callbacks_->decodingBuffer()), retry_shadow_buffer_limit_);
-    // Disabling retry and shadow: the requests is to big.
+    // Disabling retry and shadow: the request is to big.
     giveUpRetryAndShadow();
+    if (getLength(callbacks_->decodingBuffer()) > callbacks_->decoderBufferLimit()) {
+      callbacks_->setDecoderBufferLimit(getLength(callbacks_->decodingBuffer()));
+    }
   }
 }
 
