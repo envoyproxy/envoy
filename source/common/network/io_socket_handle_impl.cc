@@ -342,7 +342,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
           ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_RECVTOS) ||
 #else
           ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_TOS) ||
-#endif  // __APPLE__
+#endif // __APPLE__
            (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_TCLASS))) {
         output.msg_[0].tos_ = *(reinterpret_cast<uint8_t*>(CMSG_DATA(cmsg)));
       }
@@ -428,7 +428,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
             ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_RECVTOS) ||
 #else
             ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_TOS) ||
-#endif  // __APPLE__
+#endif // __APPLE__
              (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_TCLASS))) {
           output.msg_[i].tos_ = *(reinterpret_cast<uint8_t*>(CMSG_DATA(cmsg)));
           continue;

@@ -48,7 +48,7 @@ namespace Quic {
 
 namespace {
 constexpr int kECT1 = 0x01;
-}  // namespace
+} // namespace
 
 // A test quic listener that exits after processing one round of packets.
 class TestActiveQuicListener : public ActiveQuicListener {
