@@ -59,9 +59,7 @@ public:
     return enforcement_type_;
   }
 
-  std::chrono::milliseconds delayDenyMs() const {
-    return delay_deny_ms_;
-  }
+  std::chrono::milliseconds delayDenyMs() const { return delay_deny_ms_; }
 
 private:
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;

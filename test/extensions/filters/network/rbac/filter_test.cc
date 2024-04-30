@@ -61,7 +61,8 @@ public:
     }
 
     if (delay_deny_duration_ms > 0) {
-      (*config.mutable_delay_deny()) = ProtobufUtil::TimeUtil::MillisecondsToDuration(delay_deny_duration_ms);
+      (*config.mutable_delay_deny()) =
+          ProtobufUtil::TimeUtil::MillisecondsToDuration(delay_deny_duration_ms);
     }
 
     config_ = std::make_shared<RoleBasedAccessControlFilterConfig>(
@@ -355,10 +356,11 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, DelayDenied) {
   setDestinationPort(789);
 
   // Only call close() once since the connection is delay denied.
-  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _)).Times(1);
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
-  Event::MockTimer* delay_timer = new NiceMock<Event::MockTimer>(&callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(delay_deny_duration_ms), _)).Times(1);
+  Event::MockTimer* delay_timer =
+      new NiceMock<Event::MockTimer>(&callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(delay_deny_duration_ms), _));
 
   // Call onData() twice, should only increase stats once.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
