@@ -60,10 +60,11 @@ genrule(
         "//docs:configs",
         "//docs:proto_examples",
         "//test/config/integration/certs",
+        "//examples/secrets",
     ],
     outs = ["example_configs.tar"],
     cmd = (
-        "$(location configgen.sh) $(location configgen) example_configs.tar $(@D) " +
+        "$(location configgen.sh) $(location configgen) $(locations //examples/secrets) example_configs.tar $(@D) " +
         "$(locations :configs) " +
         "$(locations //examples:configs) " +
         "$(locations //examples:certs) " +

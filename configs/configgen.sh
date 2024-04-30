@@ -4,10 +4,20 @@ set -e
 
 CONFIGGEN="$1"
 shift
+SECRETS_DIR="$1"
+shift
 TARGETFILE="$1"
 shift
 OUT_DIR="$1"
 shift
+
+mkdir -p "$OUT_DIR/secrets"
+# Take out dir path from SECRETS_DIR which is a .yaml file
+# and copy all secrets to OUT_DIR/secrets
+SECRETS_DIR=${SECRETS_DIR%/*}
+for FILE in "$SECRETS_DIR"/*.yaml; do
+  cp "$FILE" "$OUT_DIR/secrets"
+done
 
 mkdir -p "$OUT_DIR/certs"
 mkdir -p "$OUT_DIR/lib"
@@ -43,4 +53,4 @@ done
 # shellcheck disable=SC2035
 # TODO(mattklein123): I can't make this work when using the shellcheck suggestions. Try
 # to fix this.
-(cd "$OUT_DIR"; tar -hcf "$TARGETFILE" -- $(ls *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.so lib/*.wasm lib/*.lua 2>/dev/null))
+(cd "$OUT_DIR"; tar -hcf "$TARGETFILE" -- $(ls *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.so lib/*.wasm lib/*.lua secrets/*.yaml 2>/dev/null))
