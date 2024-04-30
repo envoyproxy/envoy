@@ -542,23 +542,35 @@ absl::Status ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::
   return absl::OkStatus();
 }
 
-LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+LoaderImpl::LoaderImpl(ThreadLocal::SlotAllocator& tls,
                        const envoy::config::bootstrap::v3::LayeredRuntime& config,
                        const LocalInfo::LocalInfo& local_info, Stats::Store& store,
-                       Random::RandomGenerator& generator,
-                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                       absl::Status& creation_status)
+                       Random::RandomGenerator& generator, Api::Api& api)
     : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()),
       config_(config), service_cluster_(local_info.clusterName()), api_(api),
-      init_watcher_("RTDS", [this]() { onRtdsReady(); }), store_(store) {
-  creation_status = absl::OkStatus();
+      init_watcher_("RTDS", [this]() { onRtdsReady(); }), store_(store) {}
+
+absl::StatusOr<std::unique_ptr<LoaderImpl>>
+LoaderImpl::create(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+                   const envoy::config::bootstrap::v3::LayeredRuntime& config,
+                   const LocalInfo::LocalInfo& local_info, Stats::Store& store,
+                   Random::RandomGenerator& generator,
+                   ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
+  auto loader =
+      std::unique_ptr<LoaderImpl>(new LoaderImpl(tls, config, local_info, store, generator, api));
+  auto result = loader->initLayers(dispatcher, validation_visitor);
+  RETURN_IF_NOT_OK(result);
+  return loader;
+}
+
+absl::Status LoaderImpl::initLayers(Event::Dispatcher& dispatcher,
+                                    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  absl::Status creation_status;
   absl::node_hash_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());
     if (!ret.second) {
-      creation_status =
-          absl::InvalidArgumentError(absl::StrCat("Duplicate layer name: ", layer.name()));
-      return;
+      return absl::InvalidArgumentError(absl::StrCat("Duplicate layer name: ", layer.name()));
     }
     switch (layer.layer_specifier_case()) {
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kStaticLayer:
@@ -566,9 +578,8 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kAdminLayer:
       if (admin_layer_ != nullptr) {
-        creation_status = absl::InvalidArgumentError(
+        return absl::InvalidArgumentError(
             "Too many admin layers specified in LayeredRuntime, at most one may be specified");
-        return;
       }
       admin_layer_ = std::make_unique<AdminLayer>(layer.name(), stats_);
       break;
@@ -579,22 +590,19 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       creation_status = watcher_->addWatch(layer.disk_layer().symlink_root(),
                                            Filesystem::Watcher::Events::MovedTo,
                                            [this](uint32_t) { return loadNewSnapshot(); });
-      if (!creation_status.ok()) {
-        return;
-      }
+      RETURN_IF_NOT_OK(creation_status);
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kRtdsLayer:
-      subscriptions_.emplace_back(
-          std::make_unique<RtdsSubscription>(*this, layer.rtds_layer(), store, validation_visitor));
+      subscriptions_.emplace_back(std::make_unique<RtdsSubscription>(*this, layer.rtds_layer(),
+                                                                     store_, validation_visitor));
       init_manager_.add(subscriptions_.back()->init_target_);
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::LAYER_SPECIFIER_NOT_SET:
-      creation_status = absl::InvalidArgumentError("layer specifier not set");
-      return;
+      return absl::InvalidArgumentError("layer specifier not set");
     }
   }
 
-  creation_status = loadNewSnapshot();
+  return loadNewSnapshot();
 }
 
 void LoaderImpl::initialize(Upstream::ClusterManager& cm) {
