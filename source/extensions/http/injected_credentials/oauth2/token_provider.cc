@@ -46,6 +46,7 @@ TokenProvider::TokenProvider(Common::SecretReaderConstSharedPtr secret_reader,
           proto_config.token_fetch_retry_interval().seconds() > 0
               ? std::chrono::seconds(proto_config.token_fetch_retry_interval().seconds())
               : std::chrono::seconds(2)) {
+  timer_ = dispatcher_->createTimer([this]() -> void { asyncGetAccessToken(); });
   ThreadLocalOauth2ClientCredentialsTokenSharedPtr empty(
       new ThreadLocalOauth2ClientCredentialsToken(""));
   tls_->set(
@@ -60,15 +61,12 @@ TokenProvider::TokenProvider(Common::SecretReaderConstSharedPtr secret_reader,
 // TokenProvider asyncGetAccessToken
 void TokenProvider::asyncGetAccessToken() {
   // get the access token from the oauth2 client
-  if (timer_ && timer_->enabled()) {
+  if (timer_->enabled()) {
     timer_->disableTimer();
   }
   if (secret_reader_->credential().empty()) {
     ENVOY_LOG(error, "asyncGetAccessToken: client secret is empty, retrying in {} seconds.",
               retry_interval_.count());
-    if (!timer_) {
-      timer_ = dispatcher_->createTimer([this]() -> void { asyncGetAccessToken(); });
-    }
     timer_->enableTimer(std::chrono::seconds(retry_interval_));
     stats_.token_fetch_failed_on_client_secret_.inc();
     return;
@@ -78,9 +76,6 @@ void TokenProvider::asyncGetAccessToken() {
   if (result == OAuth2Client::GetTokenResult::NotDispatchedClusterNotFound) {
     ENVOY_LOG(error, "asyncGetAccessToken: OAuth cluster not found. Retrying in {} seconds.",
               retry_interval_.count());
-    if (!timer_) {
-      timer_ = dispatcher_->createTimer([this]() -> void { asyncGetAccessToken(); });
-    }
     timer_->enableTimer(std::chrono::seconds(retry_interval_));
     stats_.token_fetch_failed_on_cluster_not_found_.inc();
     return;
@@ -100,7 +95,6 @@ void TokenProvider::onGetAccessTokenSuccess(const std::string& access_token,
 
   tls_->set(
       [value](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return value; });
-  ASSERT(timer_ != nullptr);
   if (timer_->enabled()) {
     return;
   }
@@ -112,7 +106,6 @@ void TokenProvider::onGetAccessTokenSuccess(const std::string& access_token,
 void TokenProvider::onGetAccessTokenFailure() {
   ENVOY_LOG(error, "onGetAccessTokenFailure: Failed to get access token");
   stats_.token_fetch_failed_on_oauth_server_response_.inc();
-  ASSERT(timer_ != nullptr);
   if (timer_->enabled()) {
     return;
   }
