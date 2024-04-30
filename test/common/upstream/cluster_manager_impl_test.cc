@@ -1266,10 +1266,9 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNoLb) {
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "cluster_0";
 
-  ON_CALL(*cluster1->info_, loadBalancerFactory())
-      .WillByDefault(
-          ReturnRef(Config::Utility::getAndCheckFactoryByName<Upstream::TypedLoadBalancerFactory>(
-              "envoy.load_balancing_policies.cluster_provided")));
+  auto lb_factory = Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
+      "envoy.load_balancing_policies.cluster_provided");
+  ON_CALL(*cluster1->info_, loadBalancerFactory()).WillByDefault(Return(lb_factory));
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));

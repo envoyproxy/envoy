@@ -1001,10 +1001,9 @@ public:
   virtual OptRef<const LoadBalancerConfig> loadBalancerConfig() const PURE;
 
   /**
-   * @return the load balancer factory for this cluster. Cluster will always has a valid load
-   * balancer factory if it is created successfully.
+   * @return the load balancer factory for this cluster.
    */
-  virtual TypedLoadBalancerFactory& loadBalancerFactory() const PURE;
+  virtual TypedLoadBalancerFactory* loadBalancerFactory() const PURE;
 
   /**
    * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for

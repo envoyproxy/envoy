@@ -977,7 +977,9 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
-    const ClusterProto& cluster) {
+    const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
+
+  LoadBalancerConfigPtr lb_config;
   TypedLoadBalancerFactory* lb_factory = nullptr;
 
   switch (cluster.lb_policy()) {
@@ -1019,11 +1021,13 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
                     ClusterProto::LbPolicy_Name(cluster.lb_policy())));
   }
 
-  return lb_factory;
+  ASSERT(lb_factory != nullptr);
+  return Result{lb_factory, lb_factory->loadConfig(cluster, visitor)};
 }
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
-LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(const ClusterProto& cluster) {
+LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
+    const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
 
   // Handle the lb subset config case first.
   // Note it is possible to have a lb_subset_config without actually having any subset selectors.
@@ -1032,11 +1036,12 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(const ClusterProto& 
     auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.subset");
     if (lb_factory != nullptr) {
-      return lb_factory;
+      return Result{lb_factory, lb_factory->loadConfig(cluster, visitor)};
     }
     return absl::InvalidArgumentError("No subset load balancer factory found");
   }
-  return getTypedLbConfigFromLegacyProtoWithoutSubset(cluster);
+
+  return getTypedLbConfigFromLegacyProtoWithoutSubset(cluster, visitor);
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
@@ -1177,16 +1182,22 @@ ClusterInfoImpl::ClusterInfoImpl(
     // If load_balancing_policy is not set, we will try to convert legacy lb_policy
     // to load_balancing_policy and use it.
 
-    auto lb_factory_or = LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(config);
+    auto lb_pair = LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
+        config, server_context.messageValidationVisitor());
 
-    if (!lb_factory_or.ok()) {
-      throwEnvoyExceptionOrPanic(
-          fmt::format("Cluster creation failure: {}", lb_factory_or.status().message()));
+    if (!lb_pair.ok()) {
+      throwEnvoyExceptionOrPanic(std::string(lb_pair.status().message()));
     }
-    load_balancer_factory_ = lb_factory_or.value();
-    ASSERT(load_balancer_factory_ != nullptr, "null load balancer factory");
-    load_balancer_config_ =
-        load_balancer_factory_->loadConfig(config, server_context.messageValidationVisitor());
+
+    load_balancer_config_ = std::move(lb_pair->config);
+    load_balancer_factory_ = lb_pair->factory;
+
+    RELEASE_ASSERT(
+        load_balancer_factory_,
+        fmt::format(
+            "No load balancer factory found from legacy LB configuration (type: {}, subset: {}).",
+            envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy()),
+            config.has_lb_subset_config()));
   }
 
   if (config.lb_subset_config().locality_weight_aware() &&
@@ -1343,10 +1354,10 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
       Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
                                              context.messageValidationVisitor(), *proto_message);
 
-      load_balancer_factory_ = factory;
       load_balancer_config_ =
           factory->loadConfig(*proto_message, context.messageValidationVisitor());
 
+      load_balancer_factory_ = factory;
       break;
     }
     missing_policies.push_back(policy.typed_extension_config().name());
