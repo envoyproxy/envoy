@@ -17,6 +17,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/upstream/host_utility.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -382,7 +384,7 @@ void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_pt
     addMapEntries(stats_obj_ptr.get(), response, counter_object);
   }
   for (const auto& [gauge_name, gauge] : host->gauges()) {
-    if (gauge_name.empty() || gauge.get().value() == 0 ) {
+    if (gauge_name.empty() || gauge.get().value() == 0) {
       continue;
     }
     std::vector<const Json::Streamer::Map::NameValue> gauge_object{
@@ -415,11 +417,11 @@ void JsonClustersChunkProcessor::setHealthFlags(Json::Streamer::Map* raw_host_pt
   std::vector<const Json::Streamer::Map::NameValue> flags;
   for (const auto& [name, flag_value] : flag_map) {
     if (name == "eds_health_status") {
-      if (std::holds_alternative<std::string_view>(flag_value)) {
-        flags.emplace_back(name, std::get<std::string_view>(flag_value));
+      if (absl::holds_alternative<absl::string_view>(flag_value)) {
+        flags.emplace_back(name, std::get<absl::string_view>(flag_value));
       }
     } else {
-      if (std::holds_alternative<bool>(flag_value)) {
+      if (absl::holds_alternative<bool>(flag_value)) {
         flags.emplace_back(name, std::get<bool>(flag_value));
       }
     }
@@ -428,7 +430,7 @@ void JsonClustersChunkProcessor::setHealthFlags(Json::Streamer::Map* raw_host_pt
 }
 
 void JsonClustersChunkProcessor::loadHealthFlagMap(
-    absl::btree_map<absl::string_view, absl::variant<bool, std::string_view>>& flag_map,
+    absl::btree_map<absl::string_view, absl::variant<bool, absl::string_view>>& flag_map,
     Upstream::Host::HealthFlag flag, const Upstream::HostSharedPtr& host) {
   switch (flag) {
   case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC:
@@ -447,14 +449,14 @@ void JsonClustersChunkProcessor::loadHealthFlagMap(
         host->healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH)) {
       if (host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)) {
         flag_map.insert_or_assign("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
-                                                  envoy::config::core::v3::UNHEALTHY));
+                                                           envoy::config::core::v3::UNHEALTHY));
       } else {
         flag_map.insert_or_assign("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
-                                                  envoy::config::core::v3::DEGRADED));
+                                                           envoy::config::core::v3::DEGRADED));
       }
     } else {
       flag_map.insert_or_assign("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
-                                                envoy::config::core::v3::HEALTHY));
+                                                         envoy::config::core::v3::HEALTHY));
     }
   case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
     if (bool value = host.get()->healthFlagGet(flag); value) {
@@ -483,7 +485,8 @@ void JsonClustersChunkProcessor::loadHealthFlagMap(
     break;
   case Upstream::Host::HealthFlag::EDS_STATUS_DRAINING:
     if (bool value = host.get()->healthFlagGet(flag); value) {
-      flag_map.insert_or_assign("eds_health_status", envoy::config::core::v3::HealthStatus_Name(envoy::config::core::v3::DRAINING));
+      flag_map.insert_or_assign("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
+                                                         envoy::config::core::v3::DRAINING));
     }
     break;
   }

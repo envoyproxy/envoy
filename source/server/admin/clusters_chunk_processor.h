@@ -14,6 +14,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/json/json_streamer.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Server {
 

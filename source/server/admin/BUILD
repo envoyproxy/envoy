@@ -459,6 +459,7 @@ envoy_cc_library(
         "//source/common/json:json_streamer_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:host_utility_lib",
+        "@com_google_absl//absl/strings:string_view",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
