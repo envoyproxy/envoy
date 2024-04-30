@@ -61,12 +61,7 @@ InstanceConstSharedPtr addressFromSockAddrOrDie(const sockaddr_storage& ss, sock
 class InstanceBase : public Instance {
 public:
   // Network::Address::Instance
-  const std::string& asString() const override {
-    if (address_port_string_.empty()) {
-      populateAddressPortString();
-    }
-    return address_port_string_;
-  }
+  const std::string& asString() const override { return friendly_name_; }
   absl::string_view asStringView() const override { return asString(); }
   // Default logical name is the human-readable name.
   const std::string& logicalName() const override { return asString(); }
@@ -78,10 +73,8 @@ protected:
   InstanceBase(Type type, const SocketInterface* sock_interface)
       : socket_interface_(*sock_interface), type_(type) {}
 
-  virtual void populateAddressPortString() PURE;
-
-  std::string address_port_string_;
   const SocketInterface& socket_interface_;
+  std::string friendly_name_;
 
 private:
   const Type type_;
@@ -103,10 +96,28 @@ public:
   }
 };
 
+class IpInstance : public InstanceBase {
+public:
+  // InstanceBase
+  const std::string& asString() const override {
+    if (address_port_string_.empty()) {
+      const_cast<IpInstance*>(this)->populateAddressPortString();
+    }
+    return address_port_string_;
+  }
+
+protected:
+  IpInstance(Type type, const SocketInterface* sock_interface)
+      : InstanceBase(type, sock_interface) {}
+
+  virtual void populateAddressPortString() PURE;
+  std::string address_port_string_;
+};
+
 /**
  * Implementation of an IPv4 address.
  */
-class Ipv4Instance : public InstanceBase {
+class Ipv4Instance : public IpInstance {
 public:
   /**
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
@@ -114,6 +125,8 @@ public:
   explicit Ipv4Instance(const sockaddr_in* address,
                         const SocketInterface* sock_interface = nullptr);
 
+  Ipv4Instance(const sockaddr_in* address, bool generate_address_string,
+               const SocketInterface* socket_interface = nullptr);
   /**
    * Construct from a string IPv4 address such as "1.2.3.4". Port will be unset/0.
    */
@@ -172,6 +185,7 @@ private:
    * upon error.
    */
   explicit Ipv4Instance(absl::Status& error, const sockaddr_in* address,
+                        bool generate_address_string,
                         const SocketInterface* sock_interface = nullptr);
 
   struct Ipv4Helper : public Ipv4 {
@@ -199,10 +213,10 @@ private:
     IpVersion version() const override { return IpVersion::v4; }
 
     Ipv4Helper ipv4_;
-    std::string address_string_;
+    mutable std::string address_string_;
   };
 
-  void initHelper(const sockaddr_in* address);
+  void initHelper(const sockaddr_in* address, bool generate_address_string);
 
   IpHelper ip_;
   friend class InstanceFactory;
@@ -211,7 +225,7 @@ private:
 /**
  * Implementation of an IPv6 address.
  */
-class Ipv6Instance : public InstanceBase {
+class Ipv6Instance : public IpInstance {
 public:
   /**
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
@@ -308,7 +322,7 @@ private:
     IpVersion version() const override { return IpVersion::v6; }
 
     Ipv6Helper ipv6_;
-    std::string address_string_;
+    mutable std::string address_string_;
   };
 
   void initHelper(const sockaddr_in6& address, bool v6only);
