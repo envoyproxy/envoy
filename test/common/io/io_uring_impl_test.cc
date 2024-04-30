@@ -1,3 +1,5 @@
+#include <functional>
+
 #include "source/common/io/io_uring_impl.h"
 #include "source/common/network/address_impl.h"
 
@@ -22,6 +24,8 @@ public:
   MockIoUringSocket mock_io_uring_socket_;
 };
 
+using WaitConditionFunc = std::function<bool()>;
+
 class IoUringImplTest : public ::testing::Test {
 public:
   IoUringImplTest() : api_(Api::createApiForTest()), should_skip_(!isIoUringSupported()) {
@@ -45,6 +49,18 @@ public:
 
     if (io_uring_->isEventfdRegistered()) {
       io_uring_->unregisterEventfd();
+    }
+  }
+
+  void waitForCondition(Event::Dispatcher& dispatcher, WaitConditionFunc condition_func,
+                        std::chrono::milliseconds wait_timeout = TestUtility::DefaultTimeout) {
+    Event::TestTimeSystem::RealTimeBound bound(wait_timeout);
+    while (!condition_func()) {
+      if (!bound.withinBound()) {
+        RELEASE_ASSERT(0, "Timed out waiting for the condition.");
+        break;
+      }
+      dispatcher.run(Event::Dispatcher::RunType::NonBlock);
     }
   }
 
@@ -110,8 +126,7 @@ TEST_P(IoUringImplParamTest, InvalidParams) {
   res = io_uring_->submit();
   EXPECT_EQ(res, IoUringResult::Ok);
 
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_EQ(completions_nr, 2);
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 2; });
 }
 
 TEST_F(IoUringImplTest, InjectCompletion) {
@@ -141,8 +156,7 @@ TEST_F(IoUringImplTest, InjectCompletion) {
 
   file_event->activate(Event::FileReadyType::Read);
 
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_EQ(completions_nr, 1);
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 1; });
 }
 
 TEST_F(IoUringImplTest, NestInjectCompletion) {
@@ -182,8 +196,7 @@ TEST_F(IoUringImplTest, NestInjectCompletion) {
 
   file_event->activate(Event::FileReadyType::Read);
 
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_EQ(completions_nr, 2);
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 2; });
 }
 
 TEST_F(IoUringImplTest, RemoveInjectCompletion) {
@@ -218,8 +231,7 @@ TEST_F(IoUringImplTest, RemoveInjectCompletion) {
   EXPECT_EQ(-1, data2);
   file_event->activate(Event::FileReadyType::Read);
 
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_EQ(completions_nr, 1);
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 1; });
 }
 
 TEST_F(IoUringImplTest, NestRemoveInjectCompletion) {
@@ -258,8 +270,7 @@ TEST_F(IoUringImplTest, NestRemoveInjectCompletion) {
 
   file_event->activate(Event::FileReadyType::Read);
 
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_EQ(completions_nr, 2);
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 2; });
 }
 
 TEST_F(IoUringImplTest, RegisterEventfd) {
@@ -303,10 +314,8 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   EXPECT_STREQ(static_cast<char*>(iov.iov_base), "");
   io_uring_->submit();
 
-  dispatcher->run(Event::Dispatcher::RunType::Block);
-
   // Check that the completion callback has been actually called.
-  EXPECT_EQ(completions_nr, 1);
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 1; });
   // The file's content is in the read buffer now.
   EXPECT_STREQ(static_cast<char*>(iov.iov_base), "test text");
 }
@@ -366,6 +375,7 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   res = io_uring_->submit();
   EXPECT_EQ(res, IoUringResult::Ok);
 
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 2; });
   // Even though we haven't been notified about ops completion the buffers
   // are filled already.
   EXPECT_EQ(static_cast<char*>(iov1.iov_base)[0], 'a');
@@ -373,11 +383,9 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   EXPECT_EQ(static_cast<char*>(iov2.iov_base)[0], 'c');
   EXPECT_EQ(static_cast<char*>(iov2.iov_base)[1], 'd');
 
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-
   // Only 2 completions are expected because the completion queue can contain
   // no more than 2 entries.
-  EXPECT_EQ(completions_nr, 2);
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 2; });
 
   // Check a new event gets handled in the next dispatcher run.
   res = io_uring_->prepareReadv(fd, &iov3, 1, 4, &request3);
@@ -385,12 +393,10 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   res = io_uring_->submit();
   EXPECT_EQ(res, IoUringResult::Ok);
 
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 3; });
+
   EXPECT_EQ(static_cast<char*>(iov3.iov_base)[0], 'e');
   EXPECT_EQ(static_cast<char*>(iov3.iov_base)[1], 'f');
-
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-  // Check the completion callback was called actually.
-  EXPECT_EQ(completions_nr, 3);
 }
 
 } // namespace
