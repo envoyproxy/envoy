@@ -265,6 +265,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
                                                     RecvMsgOutput& output) {
   ASSERT(!output.msg_.empty());
+
   absl::FixedArray<char> cbuf(cmsg_space_);
   memset(cbuf.begin(), 0, cmsg_space_);
 
