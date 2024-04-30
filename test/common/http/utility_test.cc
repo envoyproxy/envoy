@@ -1034,6 +1034,26 @@ TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusAlreadyExists) {
                               Grpc::Status::WellKnownGrpcStatus::InvalidArgument, false});
 }
 
+TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusInvalidCode) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+
+  EXPECT_CALL(callbacks, streamInfo());
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(), "200");
+        EXPECT_NE(headers.GrpcStatus(), nullptr);
+        EXPECT_EQ(headers.getGrpcStatusValue(),
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unauthenticated)));
+        EXPECT_NE(headers.GrpcMessage(), nullptr);
+        EXPECT_EQ(headers.getGrpcMessageValue(), "unauthorized");
+      }));
+  sendLocalReplyTestHelper(is_reset, callbacks,
+                           Utility::LocalReplyData{true, Http::Code::Unauthorized, "unauthorized",
+                                                   Grpc::Status::WellKnownGrpcStatus::InvalidCode,
+                                                   false});
+}
+
 TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusPreserved) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;

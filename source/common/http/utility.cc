@@ -693,10 +693,11 @@ Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions&
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
 
     if (response_headers->getGrpcStatusValue().empty()) {
-      response_headers->setGrpcStatus(std::to_string(
-          enumToInt(local_reply_data.grpc_status_
-                        ? local_reply_data.grpc_status_.value()
-                        : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
+      response_headers->setGrpcStatus(std::to_string(enumToInt(
+          local_reply_data.grpc_status_ && local_reply_data.grpc_status_.value() !=
+                                               Grpc::Status::WellKnownGrpcStatus::InvalidCode
+              ? local_reply_data.grpc_status_.value()
+              : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
     }
 
     if (!body_text.empty() && !local_reply_data.is_head_request_) {
