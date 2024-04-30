@@ -1691,8 +1691,9 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
       if (local_reply_sent_) {
         return;
       }
-      // In case -1 is send from sdk, as an invalid value, nullopt is sent to allows envoy to
-      // set the grpc status code
+      // C++, Rust and other SDKs use -1 (InvalidCode) as the default value if gRPC code is not set,
+      // which should be mapped to nullopt in Envoy to prevent it from sending a grpc-status trailer
+      // at all.
       absl::optional<Grpc::Status::GrpcStatus> grpc_status_code =
           grpc_status == static_cast<uint32_t>(Grpc::Status::WellKnownGrpcStatus::InvalidCode)
               ? absl::nullopt
