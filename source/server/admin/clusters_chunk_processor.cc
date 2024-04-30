@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <variant>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -400,13 +401,13 @@ void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_pt
 void JsonClustersChunkProcessor::setHealthFlags(Json::Streamer::Map* raw_host_ptr,
                                                 const Upstream::HostSharedPtr& host,
                                                 Buffer::Instance& response) {
-  absl::flat_hash_map<absl::string_view, absl::variant<bool, absl::string_view>> flag_map;
+  absl::btree_map<absl::string_view, absl::variant<bool, absl::string_view>> flag_map;
   // Invokes setHealthFlag for each health flag.
 #define SET_HEALTH_FLAG(name, notused)                                                             \
   loadHealthFlagMap(flag_map, Upstream::Host::HealthFlag::name, host);
   HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
 #undef SET_HEALTH_FLAG
-  if (!flag_map.empty()) {
+  if (flag_map.empty()) {
     return;
   }
   raw_host_ptr->addKey("health_status");
@@ -414,16 +415,20 @@ void JsonClustersChunkProcessor::setHealthFlags(Json::Streamer::Map* raw_host_pt
   std::vector<const Json::Streamer::Map::NameValue> flags;
   for (const auto& [name, flag_value] : flag_map) {
     if (name == "eds_health_status") {
-      flags.emplace_back(name, std::get<std::string_view>(flag_value));
+      if (std::holds_alternative<std::string_view>(flag_value)) {
+        flags.emplace_back(name, std::get<std::string_view>(flag_value));
+      }
     } else {
-      flags.emplace_back(name, std::get<bool>(flag_value));
+      if (std::holds_alternative<bool>(flag_value)) {
+        flags.emplace_back(name, std::get<bool>(flag_value));
+      }
     }
   }
   addMapEntries(health_flags_ptr.get(), response, flags);
 }
 
 void JsonClustersChunkProcessor::loadHealthFlagMap(
-    absl::flat_hash_map<absl::string_view, absl::variant<bool, std::string_view>>& flag_map,
+    absl::btree_map<absl::string_view, absl::variant<bool, std::string_view>>& flag_map,
     Upstream::Host::HealthFlag flag, const Upstream::HostSharedPtr& host) {
   switch (flag) {
   case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC:
@@ -478,7 +483,7 @@ void JsonClustersChunkProcessor::loadHealthFlagMap(
     break;
   case Upstream::Host::HealthFlag::EDS_STATUS_DRAINING:
     if (bool value = host.get()->healthFlagGet(flag); value) {
-      flag_map.insert_or_assign("eds_health_status", value);
+      flag_map.insert_or_assign("eds_health_status", envoy::config::core::v3::HealthStatus_Name(envoy::config::core::v3::DRAINING));
     }
     break;
   }

@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
 
-file_1="$(<$1)"
-file_2="$(<$2)"
+file="$(<$1)"
 
-declare -i word_count_1=$(echo "$file_1" | wc -c)
-declare -i word_count_2=$(echo "$file_2" | wc -c)
+actual="$(echo "$file" | grep -m 1 Which | tail -n 1)"
+expected="$(echo "$file" | grep -m 2 Which | tail -n 1)"
+
+echo "$actual"
+echo "$expected"
+
+declare -i actual_char_count=$(echo "$actual" | wc -c)
+declare -i expected_char_count=$(echo "$expected" | wc -c)
 declare -i exit_code
 
-if (( word_count_1 != word_count_2 )); then
-  echo "word_count_1: $word_count_1 word_count_2: $word_count_2" >&2
+if (( actual_char_count != expected_char_count )); then
+  echo "actual word count: $actual_word_count expected_word_count: $expected_word_count"
   exit_code=1
 fi
 
-for ((i=0; i < word_count_1; i++)) {
-  if [[ ${file_1:$i:1} != ${file_2:$i:1} ]]; then
-    echo "mismatch at index $i: first ${file_1:$i:30} |  second ${file_2:$i:30}" >&2
+for ((i=0; i < actual_char_count; i++)) {
+  #echo "${actual:$i:1} ${expected:$i:1}"
+  if [[ ${actual:$i:1} != ${expected:$i:1} ]]; then
+    echo "mismatch at index $i: actual ${actual:$i:30} | expected ${expected:$i:30}"
     exit_code=1
-		exit 11
   fi
 }
 

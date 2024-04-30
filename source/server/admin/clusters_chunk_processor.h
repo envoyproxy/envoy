@@ -97,7 +97,7 @@ private:
   void setHostname(const Upstream::HostSharedPtr& host,
                    std::vector<const Json::Streamer::Map::NameValue>& top_level_entries);
   void loadHealthFlagMap(
-      absl::flat_hash_map<absl::string_view, absl::variant<bool, absl::string_view>>& flag_map,
+      absl::btree_map<absl::string_view, absl::variant<bool, absl::string_view>>& flag_map,
       Upstream::Host::HealthFlag flag, const Upstream::HostSharedPtr& host);
 
   const uint64_t chunk_limit_;
