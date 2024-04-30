@@ -1695,9 +1695,11 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
       // which should be mapped to nullopt in Envoy to prevent it from sending a grpc-status trailer
       // at all.
       absl::optional<Grpc::Status::GrpcStatus> grpc_status_code =
-          grpc_status == static_cast<uint32_t>(Grpc::Status::WellKnownGrpcStatus::InvalidCode)
+          Grpc::Status::WellKnownGrpcStatus(grpc_status) ==
+                  Grpc::Status::WellKnownGrpcStatus::InvalidCode
               ? absl::nullopt
-              : absl::optional<Grpc::Status::GrpcStatus>(grpc_status);
+              : absl::optional<Grpc::Status::GrpcStatus>(
+                    Grpc::Status::WellKnownGrpcStatus(grpc_status));
       decoder_callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(response_code), body_text,
                                          modify_headers, grpc_status_code, details);
       local_reply_sent_ = true;
