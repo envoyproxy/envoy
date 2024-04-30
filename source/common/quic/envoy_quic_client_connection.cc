@@ -13,9 +13,7 @@ namespace Envoy {
 namespace Quic {
 
 namespace {
-
 constexpr uint8_t kEcnMask = 0x03;
-
 }  // namespace
 
 // Used to defer deleting connection socket to avoid deleting IoHandle in a read loop.

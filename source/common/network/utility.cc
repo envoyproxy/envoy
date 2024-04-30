@@ -634,7 +634,7 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
     passPayloadToProcessor(
         result.return_value_, std::move(buffer), std::move(output.msg_[0].peer_address_),
         std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time,
-                  output.msg_[0].tos_);
+        output.msg_[0].tos_);
     return result;
   }
 
