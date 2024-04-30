@@ -287,8 +287,12 @@ public:
 
   void onUpstreamRequestReset(UpstreamRequest& upstream_request, StreamResetReason reason,
                               absl::string_view reason_detail);
+  void onTimeout();
 
-  void setRouteEntry(const RouteEntry* route_entry) { route_entry_ = route_entry; }
+  void setRouteEntry(const RouteEntry* route_entry) {
+    route_entry_ = route_entry;
+    max_retries_ = route_entry_ ? route_entry->retryPolicy().numRetries() : 1;
+  }
 
   std::list<UpstreamRequestPtr>& upstreamRequestsForTest() { return upstream_requests_; }
 
@@ -305,17 +309,34 @@ private:
 
   void kickOffNewUpstreamRequest();
   void resetStream(StreamResetReason reason, absl::string_view reason_detail);
+  void completeAndSendLocalReply(absl::Status status, absl::string_view details,
+                                 absl::optional<StreamInfo::CoreResponseFlag> flag = {});
 
-  // Clean up all the upstream requests.
-  void cleanUpstreamRequests();
+  // Clean up all the upstream requests, statuses and timers. All further events will be
+  // ignored.
+  void onFilterComplete();
 
-  // Set filter_complete_ to true before any local or upstream response. Because the
-  // response processing may complete and destroy the L7 filter chain directly and cause the
-  // onDestory() of RouterFilter to be called. The filter_complete_ will be used to block
-  // unnecessary clearUpstreamRequests() in the onDestory() of RouterFilter.
+  // Check if all request frames are ready and fire the timeout timer if necessary.
+  void mayRequestStreamEnd(bool stream_end_stream);
+
+  // Check if retry is allowed.
+  bool couldRetry(absl::optional<StreamResetReason> reason) {
+    // If the upstream connection is bound to the downstream connection and resetting happens,
+    // we should not retry the request because the downstream connection will be closed.
+    if (reason.has_value() && config_->bindUpstreamConnection()) {
+      return false;
+    }
+    return num_retries_ < max_retries_;
+  }
+
+  // Set this flag if the downstream request is cancelled, reset or completed, or the upstream
+  // response is completely received to tell the filter to ignore all further events.
   bool filter_complete_{};
 
   const RouteEntry* route_entry_{};
+  uint32_t num_retries_{0};
+  uint32_t max_retries_{1};
+
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Request* request_stream_{};
   std::list<StreamFramePtr> request_stream_frames_;
@@ -324,6 +345,7 @@ private:
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_;
 
   std::list<UpstreamRequestPtr> upstream_requests_;
+  Envoy::Event::TimerPtr timeout_timer_;
 
   DecoderFilterCallback* callbacks_{};
 
