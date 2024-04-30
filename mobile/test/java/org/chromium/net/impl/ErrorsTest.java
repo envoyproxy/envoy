@@ -4,22 +4,16 @@ import static org.chromium.net.impl.Errors.mapEnvoyMobileErrorToNetError;
 import static org.junit.Assert.assertEquals;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.filters.SmallTest;
 import io.envoyproxy.envoymobile.engine.EnvoyFinalStreamIntelImpl;
 import io.envoyproxy.envoymobile.engine.UpstreamHttpProtocol;
-import org.junit.rules.ExpectedException;
 import org.chromium.net.impl.Errors.NetError;
 import org.junit.runner.RunWith;
-import org.junit.Rule;
 import org.junit.Test;
 
 @RunWith(AndroidJUnit4.class)
 public class ErrorsTest {
 
-  @Rule public final ExpectedException thrown = ExpectedException.none();
-
   @Test
-  @SmallTest
   public void testMapEnvoyMobileErrorToNetErrorHttp3() throws Exception {
     // 8 corresponds to NoRouteFound in StreamInfo::CoreResponseFlag:
     // https://github.com/envoyproxy/envoy/blob/410e9a77bd6b74abb3e1545b4fd077e734d0fce3/envoy/stream_info/stream_info.h#L39
@@ -32,7 +26,6 @@ public class ErrorsTest {
   }
 
   @Test
-  @SmallTest
   public void testMapEnvoyMobileErrorToNetErrorFoundInMap() throws Exception {
     // 4 corresponds to UpstreamRemoteReset in StreamInfo::CoreResponseFlag:
     // https://github.com/envoyproxy/envoy/blob/410e9a77bd6b74abb3e1545b4fd077e734d0fce3/envoy/stream_info/stream_info.h#L39
@@ -44,7 +37,6 @@ public class ErrorsTest {
   }
 
   @Test
-  @SmallTest
   public void testMapEnvoyMobileErrorToNetErrorMultipleResponseFlags() throws Exception {
     // 4 corresponds to UpstreamRemoteReset and 16 corresponds to StreamIdleTimeout in
     // StreamInfo::CoreResponseFlag:
@@ -60,7 +52,6 @@ public class ErrorsTest {
   }
 
   @Test
-  @SmallTest
   public void testMapEnvoyMobileErrorToNetErrorNotFoundInMap() throws Exception {
     // 1 corresponds to NoHealthyUpstream in StreamInfo::CoreResponseFlag:
     // https://github.com/envoyproxy/envoy/blob/410e9a77bd6b74abb3e1545b4fd077e734d0fce3/envoy/stream_info/stream_info.h#L39
@@ -73,7 +64,6 @@ public class ErrorsTest {
   }
 
   @Test
-  @SmallTest
   public void testMapEnvoyMobileErrorToNetErrorEmptyResponseFlags() throws Exception {
     // 0 means no response flags are set on the bitmap.
     long responseFlags = 0;
