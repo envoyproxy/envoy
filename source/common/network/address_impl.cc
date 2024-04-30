@@ -233,14 +233,15 @@ absl::Status Ipv4Instance::validateProtocolSupported() {
 void Ipv4Instance::initHelper(const sockaddr_in* address) {
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_ = *address;
-  ip_.friendly_address_ = sockaddrToString(*address);
+}
 
+void Ipv4Instance::populateAddressPortString() {
   // Based on benchmark testing, this reserve+append implementation runs faster than absl::StrCat.
-  fmt::format_int port(ntohs(address->sin_port));
-  friendly_name_.reserve(ip_.friendly_address_.size() + 1 + port.size());
-  friendly_name_.append(ip_.friendly_address_);
-  friendly_name_.push_back(':');
-  friendly_name_.append(port.data(), port.size());
+  fmt::format_int port(ntohs(ip_.ipv4_.sin_port));
+  address_port_string_.reserve(ip_.addressAsString().size() + 1 + port.size());
+  address_port_string_.append(ip_.addressAsString());
+  address_port_string_.push_back(':');
+  address_port_string_.append(port.data(), port.size());
 }
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
@@ -354,9 +355,11 @@ absl::Status Ipv6Instance::validateProtocolSupported() {
 
 void Ipv6Instance::initHelper(const sockaddr_in6& address, bool v6only) {
   ip_.ipv6_.address_ = address;
-  ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
   ip_.ipv6_.v6only_ = v6only;
-  friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
+}
+
+void Ipv6Instance::populateAddressPortString() {
+  address_port_string_ = fmt::format("[{}]:{}", ip_.addressAsString(), ip_.port());
 }
 
 PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode,

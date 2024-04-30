@@ -61,8 +61,13 @@ InstanceConstSharedPtr addressFromSockAddrOrDie(const sockaddr_storage& ss, sock
 class InstanceBase : public Instance {
 public:
   // Network::Address::Instance
-  const std::string& asString() const override { return friendly_name_; }
-  absl::string_view asStringView() const override { return friendly_name_; }
+  const std::string& asString() const override {
+    if (address_port_string_.empty()) {
+      populateAddressPortString();
+    }
+    return address_port_string_;
+  }
+  absl::string_view asStringView() const override { return asString(); }
   // Default logical name is the human-readable name.
   const std::string& logicalName() const override { return asString(); }
   Type type() const override { return type_; }
@@ -73,7 +78,9 @@ protected:
   InstanceBase(Type type, const SocketInterface* sock_interface)
       : socket_interface_(*sock_interface), type_(type) {}
 
-  std::string friendly_name_;
+  virtual void populateAddressPortString() PURE;
+
+  std::string address_port_string_;
   const SocketInterface& socket_interface_;
 
 private:
@@ -154,6 +161,9 @@ public:
    */
   static Envoy::Cleanup forceProtocolUnsupportedForTest(bool new_val);
 
+protected:
+  void populateAddressPortString() override;
+
 private:
   /**
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
@@ -171,7 +181,12 @@ private:
   };
 
   struct IpHelper : public Ip {
-    const std::string& addressAsString() const override { return friendly_address_; }
+    const std::string& addressAsString() const override {
+      if (address_string_.empty()) {
+        address_string_ = sockaddrToString(ipv4_.address_);
+      }
+      return address_string_;
+    }
     bool isAnyAddress() const override { return ipv4_.address_.sin_addr.s_addr == INADDR_ANY; }
     bool isUnicastAddress() const override {
       return !isAnyAddress() && (ipv4_.address_.sin_addr.s_addr != INADDR_BROADCAST) &&
@@ -184,7 +199,7 @@ private:
     IpVersion version() const override { return IpVersion::v4; }
 
     Ipv4Helper ipv4_;
-    std::string friendly_address_;
+    std::string address_string_;
   };
 
   void initHelper(const sockaddr_in* address);
@@ -242,6 +257,9 @@ public:
    */
   static Envoy::Cleanup forceProtocolUnsupportedForTest(bool new_val);
 
+protected:
+  void populateAddressPortString() override;
+
 private:
   /**
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
@@ -271,7 +289,13 @@ private:
   };
 
   struct IpHelper : public Ip {
-    const std::string& addressAsString() const override { return friendly_address_; }
+    const std::string& addressAsString() const override {
+      if (address_string_.empty()) {
+        address_string_ = ipv6_.makeFriendlyAddress();
+      }
+      return address_string_;
+    }
+
     bool isAnyAddress() const override {
       return 0 == memcmp(&ipv6_.address_.sin6_addr, &in6addr_any, sizeof(struct in6_addr));
     }
@@ -284,7 +308,7 @@ private:
     IpVersion version() const override { return IpVersion::v6; }
 
     Ipv6Helper ipv6_;
-    std::string friendly_address_;
+    std::string address_string_;
   };
 
   void initHelper(const sockaddr_in6& address, bool v6only);
