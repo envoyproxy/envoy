@@ -356,7 +356,89 @@ class VerifyTextOutputFixture : public BaseClustersRequestFixture,
                                 public testing::WithParamInterface<VerifyTextOutputParameters> {};
 
 // TODO(demitriswan) Implement test for text output verification.
-TEST_P(VerifyTextOutputFixture, VerifyTextOutput) {}
+TEST_P(VerifyTextOutputFixture, VerifyTextOutput) {
+  // Small chunk limit will force Request::nextChunk to be called for each Cluster.
+  constexpr int chunk_limit = 1;
+  VerifyTextOutputParameters params = GetParam();
+  Buffer::OwnedImpl buffer;
+  ClustersParams clusters_params;
+  clusters_params.format_ = ClustersParams::Format::Text;
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> test_cluster;
+  loadNewMockClusterByName(test_cluster, "test_cluster");
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> test_cluster2;
+  loadNewMockClusterByName(test_cluster2, "test_cluster2");
+
+  ResponseResult result = response(*makeRequest(chunk_limit, clusters_params), params.drain_);
+
+  EXPECT_EQ(result.code_, Http::Code::OK);
+  // The order of clusters is non-deterministic so strip the 2 from test_cluster2 and expect both
+  // clusters to be identical. We also strip all whitespace when making the expectation since the
+  // output will not actually have any.
+  std::string expected_readable_output =
+R"EOF(test_cluster::observability_name::observability_name
+test_cluster::outlier::success_rate_average::0
+test_cluster::outlier::success_rate_ejection_threshold::1.1
+test_cluster::outlier::local_origin_success_rate_average::0
+test_cluster::outlier::local_origin_success_rate_ejection_threshold::1.1
+test_cluster::default_priority::max_connections::1024
+test_cluster::default_priority::max_pending_requests::1024
+test_cluster::default_priority::max_requests::1024
+test_cluster::default_priority::max_retries::16
+test_cluster::high_priority::max_connections::4096
+test_cluster::high_priority::max_pending_requests::4096
+test_cluster::high_priority::max_requests::4096
+test_cluster::high_priority::max_retries::16
+test_cluster::added_via_api::true
+test_cluster::eds_service_name::potato_launcher
+test_cluster::1.2.3.4:80::test_counter::10
+test_cluster::1.2.3.4:80::test_gauge::11
+test_cluster::1.2.3.4:80::hostname::test_hostname
+test_cluster::1.2.3.4:80::health_flags::/failed_active_hc/failed_outlier_check/degraded_active_hc/pending_dynamic_removal/pending_active_hc/excluded_via_immediate_hc_fail/active_hc_timeout/eds_status_draining
+test_cluster::1.2.3.4:80::weight::1
+test_cluster::1.2.3.4:80::region::test_region
+test_cluster::1.2.3.4:80::zone::test_zone
+test_cluster::1.2.3.4:80::sub_zone::test_sub_zone
+test_cluster::1.2.3.4:80::canary::false
+test_cluster::1.2.3.4:80::priority::1
+test_cluster::1.2.3.4:80::success_rate::1
+test_cluster::1.2.3.4:80::local_origin_success_rate::1
+test_cluster::observability_name::observability_name
+test_cluster::outlier::success_rate_average::0
+test_cluster::outlier::success_rate_ejection_threshold::1.1
+test_cluster::outlier::local_origin_success_rate_average::0
+test_cluster::outlier::local_origin_success_rate_ejection_threshold::1.1
+test_cluster::default_priority::max_connections::1024
+test_cluster::default_priority::max_pending_requests::1024
+test_cluster::default_priority::max_requests::1024
+test_cluster::default_priority::max_retries::16
+test_cluster::high_priority::max_connections::4096
+test_cluster::high_priority::max_pending_requests::4096
+test_cluster::high_priority::max_requests::4096
+test_cluster::high_priority::max_retries::16
+test_cluster::added_via_api::true
+test_cluster::eds_service_name::potato_launcher
+test_cluster::1.2.3.4:80::test_counter::10
+test_cluster::1.2.3.4:80::test_gauge::11
+test_cluster::1.2.3.4:80::hostname::test_hostname
+test_cluster::1.2.3.4:80::health_flags::/failed_active_hc/failed_outlier_check/degraded_active_hc/pending_dynamic_removal/pending_active_hc/excluded_via_immediate_hc_fail/active_hc_timeout/eds_status_draining
+test_cluster::1.2.3.4:80::weight::1
+test_cluster::1.2.3.4:80::region::test_region
+test_cluster::1.2.3.4:80::zone::test_zone
+test_cluster::1.2.3.4:80::sub_zone::test_sub_zone
+test_cluster::1.2.3.4:80::canary::false
+test_cluster::1.2.3.4:80::priority::1
+test_cluster::1.2.3.4:80::success_rate::1
+test_cluster::1.2.3.4:80::local_origin_success_rate::1
+)EOF";
+  EXPECT_EQ(
+      std::regex_replace(result.data_.toString(), std::regex("test_cluster2"), "test_cluster"),
+      expected_readable_output);
+
+
+
+}
 
 constexpr VerifyTextOutputParameters VERIFY_TEXT_CASES[] = {
     {/* drain_=*/true},
