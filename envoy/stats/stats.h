@@ -233,6 +233,7 @@ template <typename StatsStructType> class DeferredCreationCompatibleInterface {
 public:
   // Helper function to get-or-create and return the StatsStructType object.
   virtual StatsStructType& getOrCreate() PURE;
+  virtual bool isPresent() const PURE;
 
   virtual ~DeferredCreationCompatibleInterface() = default;
 };
@@ -249,6 +250,9 @@ public:
 
   inline StatsStructType* operator->() { return &data_->getOrCreate(); };
   inline StatsStructType& operator*() { return data_->getOrCreate(); };
+
+  // Returns whether the underlying stats have been initialized yet.
+  bool isPresent() const { return data_->isPresent(); }
 
 private:
   std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> data_;
