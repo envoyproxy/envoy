@@ -666,6 +666,7 @@ TEST_P(EnvoyQuicClientSessionAllowMmsgTest, UsesRecvMmsgWhenNoGroAndMmsgAllowed)
       .WillRepeatedly(Invoke([&](os_fd_t, struct mmsghdr*, unsigned int, int,
                                  struct timespec*) -> Api::SysCallIntResult {
         dispatcher_->exit();
+        // EAGAIN should be returned with -1 but returning 0 here shouldn't cause busy looping.
         return {0, SOCKET_ERROR_AGAIN};
       }));
 

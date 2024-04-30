@@ -422,7 +422,7 @@ TEST_F(Http1ServerCodecTest, UnexpectedRequestTest) {
                "custom: value\r\n"
                "\r\n");
 
-    EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+    EXPECT_CALL(codec_callbacks_, onDecodingFailure(_));
     codec_->decode(buffer, false);
   }
 
@@ -444,7 +444,7 @@ TEST_F(Http1ServerCodecTest, UnexpectedRequestTest) {
                "0\r\n"  // Last chunk header.
                "\r\n"); // Last chunk footer.
 
-    EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+    EXPECT_CALL(codec_callbacks_, onDecodingFailure(_));
     codec_->decode(buffer, false);
   }
 
@@ -465,7 +465,7 @@ TEST_F(Http1ServerCodecTest, UnexpectedRequestTest) {
                "0\r\n"  // Last chunk header.
                "\r\n"); // Last chunk footer.
 
-    EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+    EXPECT_CALL(codec_callbacks_, onDecodingFailure(_));
     codec_->decode(buffer, false);
   }
 
@@ -479,7 +479,7 @@ TEST_F(Http1ServerCodecTest, UnexpectedRequestTest) {
                "custom: value\r\n"
                "\r\n");
 
-    EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+    EXPECT_CALL(codec_callbacks_, onDecodingFailure(_));
     codec_->decode(buffer, false);
   }
 
@@ -494,7 +494,7 @@ TEST_F(Http1ServerCodecTest, UnexpectedRequestTest) {
                "custom: value\r\n"
                "\r\n");
 
-    EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+    EXPECT_CALL(codec_callbacks_, onDecodingFailure(_));
     codec_->decode(buffer, false);
   }
 }
@@ -731,7 +731,7 @@ TEST_F(Http1ServerCodecTest, NewRequestBeforeFirstRequestCompleteTest) {
   codec_->decode(buffer, false);
 
   // First request is not complete, so the codec should close the connection.
-  EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+  EXPECT_CALL(codec_callbacks_, onDecodingFailure(_));
   codec_->decode(buffer2, false);
 }
 
@@ -786,7 +786,7 @@ TEST_F(Http1ServerCodecTest, SingleFrameModeRequestTooLargeTest) {
              "\r\n"
              "body~");
 
-  EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+  EXPECT_CALL(codec_callbacks_, onDecodingFailure(_));
   codec_->decode(buffer, false);
 }
 
@@ -1130,7 +1130,7 @@ TEST_F(Http1ClientCodecTest, UnexpectedResponseTest) {
                "0\r\n"  // Last chunk header.
                "\r\n"); // Last chunk footer.
 
-    EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+    EXPECT_CALL(codec_callbacks_, onDecodingFailure(_));
     codec_->decode(buffer, false);
   }
 
@@ -1152,7 +1152,7 @@ TEST_F(Http1ClientCodecTest, UnexpectedResponseTest) {
                "0\r\n"  // Last chunk header.
                "\r\n"); // Last chunk footer.
 
-    EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+    EXPECT_CALL(codec_callbacks_, onDecodingFailure(_));
     codec_->decode(buffer, false);
   }
 }
@@ -1309,9 +1309,9 @@ TEST_F(Http1ClientCodecTest, ResponseCompleteBeforeRequestCompleteTest) {
 
   // Decode the response.
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(3);
-  // Finally, the onDecodingFailure() is called because the request is not complete and the
+  // Finally, the onDecodingFailure(_) is called because the request is not complete and the
   // response is complete.
-  EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+  EXPECT_CALL(codec_callbacks_, onDecodingFailure(_));
   codec_->decode(buffer, false);
 }
 
@@ -1394,7 +1394,7 @@ TEST_F(Http1ClientCodecTest, SingleFrameModeResponseTooLargeTest) {
              "\r\n"
              "body~");
 
-  EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+  EXPECT_CALL(codec_callbacks_, onDecodingFailure(_));
   codec_->decode(buffer, false);
 }
 
