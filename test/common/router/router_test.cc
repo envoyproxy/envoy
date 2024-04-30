@@ -4583,7 +4583,7 @@ public:
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.streaming_shadow", streaming_shadow_ ? "true" : "false"}});
     // Recreate router filter so it latches the correct value of streaming shadow.
-    router_ = std::make_unique<RouterTestFilter>(config_, config_.default_stats_);
+    router_ = std::make_unique<RouterTestFilter>(config_, config_->default_stats_);
     router_->setDecoderFilterCallbacks(callbacks_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);

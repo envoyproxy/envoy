@@ -234,7 +234,7 @@ public:
 
   // Common::Redis::Client::ClientFactory
   Common::Redis::Client::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
-                                          const Common::Redis::Client::Config&,
+                                          const Common::Redis::Client::ConfigSharedPtr&,
                                           const Common::Redis::RedisCommandStatsSharedPtr&,
                                           Stats::Scope&, const std::string& username,
                                           const std::string& password, bool) override {

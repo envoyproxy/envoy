@@ -23,7 +23,7 @@ class ActiveMessageTest : public testing::Test {
 public:
   ActiveMessageTest()
       : stats_(RocketmqFilterStats::generateStats("test.", *store_.rootScope())),
-        config_(rocketmq_proxy_config_, factory_context_),
+        config_(std::make_shared<ConfigImpl>(rocketmq_proxy_config_, factory_context_)),
         connection_manager_(
             config_, factory_context_.serverFactoryContext().mainThreadDispatcher().timeSource()) {
     connection_manager_.initializeReadFilterCallbacks(filter_callbacks_);
@@ -39,7 +39,7 @@ protected:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Stats::IsolatedStoreImpl store_;
   RocketmqFilterStats stats_;
-  ConfigImpl config_;
+  std::shared_ptr<ConfigImpl> config_;
   ConnectionManager connection_manager_;
 };
 

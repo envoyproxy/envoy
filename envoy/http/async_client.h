@@ -9,6 +9,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/tracer.h"
 
@@ -19,7 +20,8 @@
 namespace Envoy {
 namespace Router {
 class FilterConfig;
-}
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+} // namespace Router
 namespace Http {
 
 /**
@@ -266,6 +268,12 @@ public:
       return *this;
     }
 
+    // Set FilterState on async stream allowing upstream filters to access it.
+    StreamOptions& setFilterState(Envoy::StreamInfo::FilterStateSharedPtr fs) {
+      filter_state = fs;
+      return *this;
+    }
+
     // Set buffer restriction and accounting for the stream.
     StreamOptions& setBufferAccount(const Buffer::BufferMemoryAccountSharedPtr& account) {
       account_ = account;
@@ -294,7 +302,7 @@ public:
       retry_policy = absl::nullopt;
       return *this;
     }
-    StreamOptions& setFilterConfig(Router::FilterConfig& config) {
+    StreamOptions& setFilterConfig(const Router::FilterConfigSharedPtr& config) {
       filter_config_ = config;
       return *this;
     }
@@ -330,6 +338,7 @@ public:
     ParentContext parent_context;
 
     envoy::config::core::v3::Metadata metadata;
+    Envoy::StreamInfo::FilterStateSharedPtr filter_state;
 
     // Buffer memory account for tracking bytes.
     Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
@@ -339,7 +348,7 @@ public:
     absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
     const Router::RetryPolicy* parsed_retry_policy{nullptr};
 
-    OptRef<Router::FilterConfig> filter_config_;
+    Router::FilterConfigSharedPtr filter_config_;
 
     bool is_shadow{false};
   };
@@ -375,6 +384,10 @@ public:
     }
     RequestOptions& setMetadata(const envoy::config::core::v3::Metadata& m) {
       StreamOptions::setMetadata(m);
+      return *this;
+    }
+    RequestOptions& setFilterState(Envoy::StreamInfo::FilterStateSharedPtr fs) {
+      StreamOptions::setFilterState(fs);
       return *this;
     }
     RequestOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
