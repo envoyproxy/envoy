@@ -377,7 +377,7 @@ TEST_P(VerifyTextOutputFixture, VerifyTextOutput) {
   // clusters to be identical. We also strip all whitespace when making the expectation since the
   // output will not actually have any.
   std::string expected_readable_output =
-R"EOF(test_cluster::observability_name::observability_name
+      R"EOF(test_cluster::observability_name::observability_name
 test_cluster::outlier::success_rate_average::0
 test_cluster::outlier::success_rate_ejection_threshold::1.1
 test_cluster::outlier::local_origin_success_rate_average::0
@@ -435,9 +435,6 @@ test_cluster::1.2.3.4:80::local_origin_success_rate::1
   EXPECT_EQ(
       std::regex_replace(result.data_.toString(), std::regex("test_cluster2"), "test_cluster"),
       expected_readable_output);
-
-
-
 }
 
 constexpr VerifyTextOutputParameters VERIFY_TEXT_CASES[] = {
