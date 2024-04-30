@@ -24,7 +24,7 @@ namespace Envoy {
 namespace Quic {
 
 namespace {
-  constexpr uint8_t kEcnMask = 0x03;
+constexpr uint8_t kEcnMask = 0x03;
 } // namespace
 
 bool ActiveQuicListenerFactory::disable_kernel_bpf_packet_routing_for_test_ = false;
