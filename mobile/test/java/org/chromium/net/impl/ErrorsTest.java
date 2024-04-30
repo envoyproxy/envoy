@@ -9,7 +9,6 @@ import io.envoyproxy.envoymobile.engine.EnvoyFinalStreamIntelImpl;
 import io.envoyproxy.envoymobile.engine.UpstreamHttpProtocol;
 import org.junit.rules.ExpectedException;
 import org.chromium.net.impl.Errors.NetError;
-import org.chromium.net.testing.Feature;
 import org.junit.runner.RunWith;
 import org.junit.Rule;
 import org.junit.Test;
