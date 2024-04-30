@@ -50,9 +50,11 @@ message FixedServerPreferredAddressConfig {
     // If not specified, none will be configured.
     string ipv4_address = 1;
 
-    // The IPv4 address to advertise to clients for Server Preferred Address.
-    Addresses ipv4_config = 3;
   }
+
+  // The IPv4 address to advertise to clients for Server Preferred Address.
+  // This field takes precedence over `ipv4_address`.
+  Addresses ipv4_config = 3;
 
   oneof ipv6_type {
     // String representation of IPv6 address, i.e. "::1".
@@ -60,7 +62,9 @@ message FixedServerPreferredAddressConfig {
     // If not specified, none will be configured.
     string ipv6_address = 2;
 
-    // The IPv6 address to advertise to clients for Server Preferred Address.
-    Addresses ipv6_config = 4;
   }
+
+  // The IPv6 address to advertise to clients for Server Preferred Address.
+  // This field takes precedence over `ipv6_address`.
+  Addresses ipv6_config = 4;
 }
