@@ -10,6 +10,7 @@
 #include "source/common/http/null_route_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
 
@@ -22,10 +23,12 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context, Router::Context& router_context)
     : factory_context_(factory_context), cluster_(cluster),
-      config_(factory_context, http_context.asyncClientStatPrefix(), factory_context.localInfo(),
-              *stats_store.rootScope(), cm, factory_context.runtime(),
-              factory_context.api().randomGenerator(), std::move(shadow_writer), true, false, false,
-              false, false, false, {}, dispatcher.timeSource(), http_context, router_context),
+      config_(std::make_shared<Router::FilterConfig>(
+          factory_context, http_context.asyncClientStatPrefix(), factory_context.localInfo(),
+          *stats_store.rootScope(), cm, factory_context.runtime(),
+          factory_context.api().randomGenerator(), std::move(shadow_writer), true, false, false,
+          false, false, false, Protobuf::RepeatedPtrField<std::string>{}, dispatcher.timeSource(),
+          http_context, router_context)),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -94,11 +97,14 @@ createRetryPolicy(AsyncClientImpl& parent, const AsyncClient::StreamOptions& opt
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options)
-    : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(options.filter_config_ ? *options.filter_config_ : parent.config_,
-              parent.config_.async_stats_),
+    : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_->random_.random()),
+      router_(options.filter_config_ ? options.filter_config_ : parent.config_,
+              parent.config_->async_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr,
-                   StreamInfo::FilterState::LifeSpan::FilterChain),
+                   options.filter_state != nullptr
+                       ? options.filter_state
+                       : std::make_shared<StreamInfo::FilterStateImpl>(
+                             StreamInfo::FilterState::LifeSpan::FilterChain)),
       tracing_config_(Tracing::EgressConfig::get()),
       retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_)),
       route_(std::make_shared<NullRouteImpl>(
@@ -169,7 +175,7 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
   is_grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
   headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {
-    Utility::appendXff(headers, *parent_.config_.local_info_.address());
+    Utility::appendXff(headers, *parent_.config_->local_info_.address());
   }
 
   router_.decodeHeaders(headers, end_stream);

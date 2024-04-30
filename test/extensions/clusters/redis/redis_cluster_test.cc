@@ -94,7 +94,7 @@ public:
   // ClientFactory
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
-         const Extensions::NetworkFilters::Common::Redis::Client::Config&,
+         const Extensions::NetworkFilters::Common::Redis::Client::ConfigSharedPtr&,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
          Stats::Scope&, const std::string&, const std::string&, bool) override {
     EXPECT_EQ(22120, host->address()->ip()->port());
@@ -139,7 +139,7 @@ protected:
         cluster_factory_context, *this, dns_resolver_, cluster_callback_);
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
-    pool_callbacks_ = &cluster_->redis_discovery_session_;
+    pool_callbacks_ = cluster_->redis_discovery_session_.get();
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) -> void {
           membership_updated_.ready();

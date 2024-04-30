@@ -72,6 +72,7 @@ public:
   struct TestRequestEncoderCallback : public EncodingCallbacks {
     OptRef<const RouteEntry> routeEntry() const override { return {}; }
     void onEncodingSuccess(Buffer::Instance& buffer, bool) override { buffer_.move(buffer); }
+    void onEncodingFailure(absl::string_view) override {}
     Buffer::OwnedImpl buffer_;
   };
   using TestRequestEncoderCallbackSharedPtr = std::shared_ptr<TestRequestEncoderCallback>;
@@ -79,6 +80,7 @@ public:
   struct TestResponseEncoderCallback : public EncodingCallbacks {
     OptRef<const RouteEntry> routeEntry() const override { return {}; }
     void onEncodingSuccess(Buffer::Instance& buffer, bool) override { buffer_.move(buffer); }
+    void onEncodingFailure(absl::string_view) override {}
     Buffer::OwnedImpl buffer_;
   };
   using TestResponseEncoderCallbackSharedPtr = std::shared_ptr<TestResponseEncoderCallback>;
@@ -112,7 +114,7 @@ public:
         parent_.integration_->dispatcher_->exit();
       }
     }
-    void onDecodingFailure() override {}
+    void onDecodingFailure(absl::string_view) override {}
     void writeToConnection(Buffer::Instance&) override {}
     OptRef<Network::Connection> connection() override {
       if (parent_.upstream_connection_ != nullptr) {

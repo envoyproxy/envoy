@@ -16,12 +16,12 @@
     "@emotion/styled": "^11.11.5",
     "framer-motion": "^11.1.7",
     "mdi-react": "^9.3.0",
-    "react": "^18.2.0",
+    "react": "^18.3.1",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.23.0"
   },
   "devDependencies": {
-    "@types/react": "^18.2.79",
+    "@types/react": "^18.3.1",
     "@types/react-dom": "^18.2.25",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
@@ -32,7 +32,7 @@
     "eslint-plugin-n": "^15.0.0 || ^16.0.0 ",
     "eslint-plugin-promise": "^6.0.0",
     "eslint-plugin-react": "^7.34.1",
-    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-refresh": "^0.4.6",
     "typescript": "*",
     "vite": "^5.2.10"

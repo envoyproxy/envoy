@@ -31,8 +31,9 @@ public:
 
   /**
    * If request decoding failure then this method will be called.
+   * @param reason the reason of decoding failure.
    */
-  virtual void onDecodingFailure() PURE;
+  virtual void onDecodingFailure(absl::string_view reason = {}) PURE;
 
   /**
    * Write specified data to the downstream connection. This is could be used to write
@@ -71,8 +72,9 @@ public:
 
   /**
    * If response decoding failure then this method will be called.
+   * @param reason the reason of decoding failure.
    */
-  virtual void onDecodingFailure() PURE;
+  virtual void onDecodingFailure(absl::string_view reason = {}) PURE;
 
   /**
    * Write specified data to the upstream connection. This is could be used to write
@@ -113,6 +115,12 @@ public:
    * @param end_stream if last frame is encoded.
    */
   virtual void onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) PURE;
+
+  /**
+   * If encoding failure then this method will be called.
+   * @param reason the reason of encoding failure.
+   */
+  virtual void onEncodingFailure(absl::string_view reason = {}) PURE;
 
   /**
    * The route that the request is matched to. This is optional when encoding the response

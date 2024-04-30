@@ -195,6 +195,7 @@ private:
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
   const bool use_resolvers_as_fallback_;
+  const uint32_t udp_max_queries_;
   const absl::optional<std::string> resolvers_csv_;
   const bool filter_unroutable_families_;
   Stats::ScopeSharedPtr scope_;
