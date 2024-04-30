@@ -13,7 +13,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-MockStreamFrameHandler::MockStreamFrameHandler() = default;
+MockRequestFramesHandler::MockRequestFramesHandler() = default;
 
 MockStreamFilterConfig::MockStreamFilterConfig() {
   ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Invoke([]() {

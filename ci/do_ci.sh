@@ -866,30 +866,30 @@ case $CI_TARGET in
                 "${TEST_TARGETS[@]}"
         fi
         # Build release binaries
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-              "${BAZEL_RELEASE_OPTIONS[@]}" \
-              --remote_download_outputs=toplevel \
-              //distribution/binary:release
-        # Copy release binaries to binary export directory
-        cp -a \
-           "bazel-bin/distribution/binary/release.tar.zst" \
-           "${ENVOY_BINARY_DIR}/release.tar.zst"
-        # Grab the schema_validator_tool
-        # TODO(phlax): bundle this with the release when #26390 is resolved
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
-              --remote_download_toplevel \
-              //test/tools/schema_validator:schema_validator_tool.stripped
-        # Copy schema_validator_tool to binary export directory
-        cp -a \
-           bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped \
-           "${ENVOY_BINARY_DIR}/schema_validator_tool"
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
-              --remote_download_toplevel \
-              //test/tools/router_check:router_check_tool.stripped
-        cp -a \
-           bazel-bin/test/tools/router_check/router_check_tool.stripped \
-           "${ENVOY_BINARY_DIR}/router_check_tool"
-        echo "Release files created in ${ENVOY_BINARY_DIR}"
+        # bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+        #       "${BAZEL_RELEASE_OPTIONS[@]}" \
+        #       --remote_download_outputs=toplevel \
+        #       //distribution/binary:release
+        # # Copy release binaries to binary export directory
+        # cp -a \
+        #    "bazel-bin/distribution/binary/release.tar.zst" \
+        #    "${ENVOY_BINARY_DIR}/release.tar.zst"
+        # # Grab the schema_validator_tool
+        # # TODO(phlax): bundle this with the release when #26390 is resolved
+        # bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+        #       --remote_download_toplevel \
+        #       //test/tools/schema_validator:schema_validator_tool.stripped
+        # # Copy schema_validator_tool to binary export directory
+        # cp -a \
+        #    bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped \
+        #    "${ENVOY_BINARY_DIR}/schema_validator_tool"
+        # bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+        #       --remote_download_toplevel \
+        #       //test/tools/router_check:router_check_tool.stripped
+        # cp -a \
+        #    bazel-bin/test/tools/router_check/router_check_tool.stripped \
+        #    "${ENVOY_BINARY_DIR}/router_check_tool"
+        # echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;
 
     release.server_only.binary)

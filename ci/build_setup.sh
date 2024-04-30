@@ -61,7 +61,7 @@ function cleanup() {
 }
 
 cleanup
-trap cleanup EXIT
+# trap cleanup EXIT
 
 # NB: do not use bazel before here to ensure correct directories.
 _bazel="$(which bazel)"

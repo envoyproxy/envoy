@@ -13,7 +13,7 @@ namespace GenericProxy {
 
 template <typename InterfaceType> class FakeStreamBase : public InterfaceType {
 public:
-  void forEach(StreamBase::IterateCallback callback) const override {
+  void forEach(HeaderFrame::IterateCallback callback) const override {
     for (const auto& pair : data_) {
       callback(pair.first, pair.second);
     }
@@ -41,13 +41,15 @@ public:
  * factory. The message format of this protocol is shown below.
  *
  * Fake request message format:
- *   <INT Message Size><Protocol>|<host>|<PATH>|<METHOD>|<key>:<value>;*
+ *   <INT Message Size>REQ<Protocol>|<host>|<PATH>|<METHOD>|<key>:<value>;*
  * Fake response message format:
-     <INT Message Size><INT Status><Protocol>|<Status Detail>|<key>:<value>;*
+     <INT Message Size>RSP<INT Status><Protocol>|<Status Detail>|<key>:<value>;*
+ * Fake common frame message format:
+ *   <INT Message Size>COM<key>:<value>;*
  */
 class FakeStreamCodecFactory : public CodecFactory {
 public:
-  class FakeRequest : public FakeStreamBase<Request> {
+  class FakeRequest : public FakeStreamBase<RequestHeaderFrame> {
   public:
     absl::string_view protocol() const override { return protocol_; }
     absl::string_view host() const override { return host_; }
@@ -60,7 +62,7 @@ public:
     std::string method_;
   };
 
-  class FakeResponse : public FakeStreamBase<Response> {
+  class FakeResponse : public FakeStreamBase<ResponseHeaderFrame> {
   public:
     absl::string_view protocol() const override { return protocol_; }
     StreamStatus status() const override { return status_; }
@@ -68,6 +70,14 @@ public:
     std::string protocol_;
     StreamStatus status_;
     std::string message_;
+  };
+
+  class FakeCommonFrame : public CommonFrame {
+  public:
+    // StreamFrame
+    FrameFlags frameFlags() const override { return stream_frame_flags_; }
+    FrameFlags stream_frame_flags_;
+    absl::flat_hash_map<std::string, std::string> data_;
   };
 
   class FakeServerCodec : public ServerCodec {
@@ -142,20 +152,23 @@ public:
 
     void encode(const StreamFrame& response, EncodingCallbacks& callback) override {
       const FakeResponse* typed_response = dynamic_cast<const FakeResponse*>(&response);
-      ASSERT(typed_response != nullptr);
+      if (typed_response != nullptr) {
+        std::string body;
+        body.reserve(512);
+        body = typed_response->protocol_ + "|" + typed_response->message_ + "|";
+        for (const auto& pair : typed_response->data_) {
+          body += pair.first + ":" + pair.second + ";";
+        }
+        // Additional 4 bytes for status.
+        encoding_buffer_.writeBEInt<uint32_t>(body.size() + 4);
+        encoding_buffer_.writeBEInt<int>(typed_response->status_.code());
+        encoding_buffer_.add(body);
 
-      std::string body;
-      body.reserve(512);
-      body = typed_response->protocol_ + "|" + typed_response->message_ + "|";
-      for (const auto& pair : typed_response->data_) {
-        body += pair.first + ":" + pair.second + ";";
+        callback.onEncodingSuccess(encoding_buffer_, response.frameFlags().endStream());
+        return;
       }
-      // Additional 4 bytes for status.
-      encoding_buffer_.writeBEInt<uint32_t>(body.size() + 4);
-      encoding_buffer_.writeBEInt<int>(typed_response->status_.code());
-      encoding_buffer_.add(body);
-
-      callback.onEncodingSuccess(encoding_buffer_, response.frameFlags().endStream());
+      const FakeCommonFrame* typed_common_response =
+          dynamic_cast<const FakeCommonFrame*>(&response);
     }
 
     ResponsePtr respond(Status status, absl::string_view, const Request&) override {

@@ -90,30 +90,34 @@ public:
 
     struct SingleResponse {
       bool end_stream_{};
-      ResponsePtr response_;
-      std::list<StreamFramePtr> response_frames_;
+      ResponseHeaderFramePtr response_;
+      std::list<ResponseCommonFramePtr> response_frames_;
     };
 
-    void onDecodingSuccess(StreamFramePtr response_frame) override {
+    void onDecodingSuccess(ResponseHeaderFramePtr response_frame,
+                           absl::optional<StartTime>) override {
       auto& response = responses_[response_frame->frameFlags().streamFlags().streamId()];
-
       ASSERT(!response.end_stream_);
       response.end_stream_ = response_frame->frameFlags().endStream();
-
-      if (response.response_ != nullptr) {
-        response.response_frames_.push_back(std::move(response_frame));
-      } else {
-        ASSERT(response.response_frames_.empty());
-        StreamFramePtrHelper<Response> helper(std::move(response_frame));
-        ASSERT(helper.typed_frame_ != nullptr);
-        response.response_ = std::move(helper.typed_frame_);
-      }
+      response.response_ = std::move(response_frame);
 
       // Exit dispatcher if we have received all the expected response frames.
       if (responses_[waiting_for_stream_id_].end_stream_) {
         parent_.integration_->dispatcher_->exit();
       }
     }
+    void onDecodingSuccess(ResponseCommonFramePtr frame) override {
+      auto& response = responses_[frame->frameFlags().streamFlags().streamId()];
+      ASSERT(!response.end_stream_);
+      response.end_stream_ = frame->frameFlags().endStream();
+      response.response_frames_.push_back(std::move(frame));
+
+      // Exit dispatcher if we have received all the expected response frames.
+      if (responses_[waiting_for_stream_id_].end_stream_) {
+        parent_.integration_->dispatcher_->exit();
+      }
+    }
+
     void onDecodingFailure(absl::string_view) override {}
     void writeToConnection(Buffer::Instance&) override {}
     OptRef<Network::Connection> connection() override {

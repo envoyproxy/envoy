@@ -823,7 +823,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
   auto mock_decoder_filter_0 = std::make_shared<NiceMock<MockDecoderFilter>>();
   mock_decoder_filters_ = {{"mock_0", mock_decoder_filter_0}};
 
-  NiceMock<MockStreamFrameHandler> mock_stream_frame_handler;
+  NiceMock<MockRequestFramesHandler> mock_stream_frame_handler;
 
   EXPECT_CALL(*mock_decoder_filter_0, setDecoderFilterCallbacks(_))
       .WillOnce(Invoke([&mock_stream_frame_handler](DecoderFilterCallback& callbacks) {
@@ -852,7 +852,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
 
   // stream_frame_handler will be called twice to handle the two frames (except the first
   // StreamRequest frame).
-  EXPECT_CALL(mock_stream_frame_handler, onStreamFrame(_)).Times(2);
+  EXPECT_CALL(mock_stream_frame_handler, onRequestCommonFrame(_)).Times(2);
 
   auto request_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
   request_frame_1->stream_frame_flags_ = FrameFlags(StreamFlags(), false);
@@ -892,7 +892,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
 
   active_stream->onResponseStart(std::move(response));
 
-  auto response_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  auto response_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   response_frame_1->stream_frame_flags_ = FrameFlags(StreamFlags(), true);
 
   active_stream->onResponseFrame(std::move(response_frame_1));
