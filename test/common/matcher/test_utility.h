@@ -255,9 +255,10 @@ createSingleMatcher(absl::optional<absl::string_view> input,
   MatchingDataType data =
       input.has_value() ? MatchingDataType(std::string(*input)) : absl::monostate();
 
-  return std::make_unique<SingleFieldMatcher<TestData>>(
-      std::make_unique<TestInput>(DataInputGetResult{availability, std::move(data)}),
-      std::make_unique<TestMatcher>(predicate));
+  return SingleFieldMatcher<TestData>::create(
+             std::make_unique<TestInput>(DataInputGetResult{availability, std::move(data)}),
+             std::make_unique<TestMatcher>(predicate))
+      .value();
 }
 
 // Creates a StringAction from a provided string.

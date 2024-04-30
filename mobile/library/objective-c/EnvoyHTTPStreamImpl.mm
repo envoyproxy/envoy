@@ -1,6 +1,8 @@
 #import "library/objective-c/EnvoyEngine.h"
 #import "library/objective-c/EnvoyBridgeUtility.h"
 
+#include "source/common/buffer/buffer_impl.h"
+
 #import "library/common/types/c_types.h"
 #import "library/common/internal_engine.h"
 #include "library/common/http/header_utility.h"
@@ -196,7 +198,9 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
 }
 
 - (void)sendData:(NSData *)data close:(BOOL)close {
-  _engine->sendData(_streamHandle, toNativeData(data), close);
+  Envoy::Buffer::InstancePtr buffer = std::make_unique<Envoy::Buffer::OwnedImpl>();
+  buffer->add([data bytes], data.length);
+  _engine->sendData(_streamHandle, std::move(buffer), close);
 }
 
 - (void)readData:(size_t)byteCount {
@@ -204,7 +208,17 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
 }
 
 - (void)sendTrailers:(EnvoyHeaders *)trailers {
-  _engine->sendTrailers(_streamHandle, toNativeHeaders(trailers));
+  Envoy::Http::RequestTrailerMapPtr cppTrailers =
+      Envoy::Http::Utility::createRequestTrailerMapPtr();
+  for (id trailerKey in trailers) {
+    std::string cppTrailerKey = std::string([trailerKey UTF8String]);
+    NSArray *trailerList = trailers[trailerKey];
+    for (NSString *trailerValue in trailerList) {
+      std::string cppTrailerValue = std::string([trailerValue UTF8String]);
+      cppTrailers->addCopy(Envoy::Http::LowerCaseString(cppTrailerKey), cppTrailerValue);
+    }
+  }
+  _engine->sendTrailers(_streamHandle, std::move((cppTrailers)));
 }
 
 - (int)cancel {

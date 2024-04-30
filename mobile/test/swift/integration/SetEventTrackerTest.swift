@@ -11,16 +11,21 @@ final class SetEventTrackerTest: XCTestCase {
     register_test_extensions()
   }
 
-  func testEmitEventWithoutSettingEventTracker() throws {
+  func testSetEventTracker() throws {
     EnvoyTestServer.startHttp1PlaintextServer()
 
     let eventExpectation =
       self.expectation(description: "Passed event tracker receives an event")
 
     let engine = EngineBuilder()
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+          print(msg, terminator: "")
+      }
       .setEventTracker { event in
-        XCTAssertEqual("bar", event["foo"])
-        eventExpectation.fulfill()
+        if event["foo"] == "bar" {
+          eventExpectation.fulfill()
+        }
       }
       .addNativeFilter(
         name: "envoy.filters.http.test_event_tracker",

@@ -49,9 +49,11 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
 // If restart_epoch is 0 there is no parent, so it's effectively already
 // drained and terminated.
 HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
-                                       const std::string& socket_path, mode_t socket_mode)
+                                       const std::string& socket_path, mode_t socket_mode,
+                                       bool skip_hot_restart_on_no_parent)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch),
-      parent_terminated_(restart_epoch == 0), parent_drained_(restart_epoch == 0) {
+      parent_terminated_(restart_epoch == 0), parent_drained_(restart_epoch == 0),
+      skip_hot_restart_on_no_parent_(skip_hot_restart_on_no_parent) {
   main_rpc_stream_.initDomainSocketAddress(&parent_address_);
   std::string socket_path_udp = socket_path + "_udp";
   udp_forwarding_rpc_stream_.initDomainSocketAddress(&parent_address_udp_forwarding_);
@@ -66,7 +68,25 @@ HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
                                               socket_mode);
 }
 
+bool HotRestartingChild::abortDueToFailedParentConnection() {
+  if (!skip_hot_restart_on_no_parent_) {
+    return false;
+  }
+  HotRestartMessage wrapped_request;
+  wrapped_request.mutable_request()->mutable_test_connection();
+  if (!main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request, true)) {
+    return true;
+  }
+  return false;
+}
+
 void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
+  if (abortDueToFailedParentConnection()) {
+    ENVOY_LOG(warn, "hot restart sendmsg() connection refused, falling back to regular restart");
+    absl::MutexLock lock(&registry_mu_);
+    parent_terminated_ = parent_drained_ = true;
+    return;
+  }
   socket_event_udp_forwarding_ = dispatcher.createFileEvent(
       udp_forwarding_rpc_stream_.domain_socket_,
       [this](uint32_t events) -> void {

@@ -393,15 +393,16 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          "http.fault.aborts_injected",
                          {fault_connection_manager, fault_downstream_cluster});
 
+  // HTTP Connection Manager and Route
   Tag rds_hcm;
   rds_hcm.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
   rds_hcm.value_ = "rds_connection_manager";
 
   Tag rds_route_config;
   rds_route_config.name_ = tag_names.RDS_ROUTE_CONFIG;
-  rds_route_config.value_ = "route_config.123";
+  rds_route_config.value_ = "agg/route_config.1-23";
 
-  regex_tester.testRegex("http.rds_connection_manager.rds.route_config.123.update_success",
+  regex_tester.testRegex("http.rds_connection_manager.rds.agg/route_config.1-23.update_success",
                          "http.rds.update_success", {rds_hcm, rds_route_config});
 
   // Listener manager worker id
@@ -467,6 +468,22 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   rbac_http_prefix.value_ = "prefix";
   regex_tester.testRegex("http.hcm_prefix.rbac.prefix.allowed", "http.rbac.allowed",
                          {rbac_http_hcm_prefix, rbac_http_prefix});
+
+  // RBAC HTTP Filter Per-Policy Prefix
+  Tag rbac_policy_name;
+  rbac_policy_name.name_ = tag_names.RBAC_POLICY_NAME;
+  rbac_policy_name.value_ = "my_rbac_policy";
+  regex_tester.testRegex("http.hcm_prefix.rbac.policy.my_rbac_policy.allowed",
+                         "http.rbac.policy.allowed", {rbac_http_hcm_prefix, rbac_policy_name});
+  regex_tester.testRegex("http.hcm_prefix.rbac.policy.my_rbac_policy.denied",
+                         "http.rbac.policy.denied", {rbac_http_hcm_prefix, rbac_policy_name});
+  regex_tester.testRegex("http.hcm_prefix.rbac.prefix.policy.my_rbac_"
+                         "policy.shadow_allowed",
+                         "http.rbac.policy.shadow_allowed",
+                         {rbac_http_hcm_prefix, rbac_http_prefix, rbac_policy_name});
+  regex_tester.testRegex("http.hcm_prefix.rbac.prefix.policy.my_rbac_policy.shadow_denied",
+                         "http.rbac.policy.shadow_denied",
+                         {rbac_http_hcm_prefix, rbac_http_prefix, rbac_policy_name});
 
   // Proxy Protocol version prefix
   Tag proxy_protocol_version;

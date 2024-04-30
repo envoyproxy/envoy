@@ -14,6 +14,8 @@ namespace Common {
 namespace Expr {
 namespace {
 
+using ::testing::MatchesRegex;
+
 TEST(Evaluator, Print) {
   EXPECT_EQ(print(CelValue::CreateBool(false)), "false");
   EXPECT_EQ(print(CelValue::CreateInt64(123)), "123");
@@ -29,8 +31,8 @@ TEST(Evaluator, Print) {
   std::string node_yaml = "id: test";
   TestUtility::loadFromYaml(node_yaml, node);
   EXPECT_EQ(print(CelValue::CreateNull()), "NULL");
-  EXPECT_EQ(print(google::api::expr::runtime::CelProtoWrapper::CreateMessage(&node, &arena)),
-            "id: \"test\"");
+  EXPECT_THAT(print(google::api::expr::runtime::CelProtoWrapper::CreateMessage(&node, &arena)),
+              MatchesRegex("id:\\s+\"test\""));
 
   EXPECT_EQ(print(CelValue::CreateDuration(absl::Minutes(1))), "1m");
   absl::Time time = TestUtility::parseTime("Dec 22 01:50:34 2020 GMT", "%b %e %H:%M:%S %Y GMT");

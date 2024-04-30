@@ -67,7 +67,7 @@ public:
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(4);
 
     // Test we match the correct stat with empty-slots before, after, or both.
-    hot_restart_ = std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0);
+    hot_restart_ = std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0, false);
     hot_restart_->drainParentListeners();
 
     // We close both sockets, both ends, totaling 4.
@@ -133,7 +133,7 @@ TEST_P(DomainSocketErrorTest, DomainSocketAlreadyInUse) {
   });
   EXPECT_CALL(os_sys_calls_, close(_)).Times(GetParam());
 
-  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0),
+  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0, false),
                Server::HotRestartDomainSocketInUseException);
 }
 
@@ -149,7 +149,7 @@ TEST_P(DomainSocketErrorTest, DomainSocketError) {
   });
   EXPECT_CALL(os_sys_calls_, close(_)).Times(GetParam());
 
-  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0), EnvoyException);
+  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0, false), EnvoyException);
 }
 
 class HotRestartUdpForwardingContextTest : public HotRestartImplTest {

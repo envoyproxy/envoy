@@ -14,7 +14,6 @@
 #include "absl/types/optional.h"
 #include "library/cc/engine.h"
 #include "library/cc/key_value_store.h"
-#include "library/cc/log_level.h"
 #include "library/cc/string_accessor.h"
 #include "library/common/engine_types.h"
 
@@ -125,13 +124,11 @@ public:
   virtual ~EngineBuilder() = default;
   static std::string nativeNameToConfig(absl::string_view name);
 
-  [[deprecated("Use EngineBuilder::setLogLevel instead")]] EngineBuilder&
-  addLogLevel(LogLevel log_level);
   EngineBuilder& setLogLevel(Logger::Logger::Levels log_level);
   EngineBuilder& setLogger(std::unique_ptr<EnvoyLogger> logger);
   EngineBuilder& setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks);
-  [[deprecated("Use EngineBuilder::setEngineCallbacks instead")]] EngineBuilder&
-  setOnEngineRunning(std::function<void()> closure);
+  EngineBuilder& setOnEngineRunning(absl::AnyInvocable<void()> closure);
+  EngineBuilder& setOnEngineExit(absl::AnyInvocable<void()> closure);
   EngineBuilder& setEventTracker(std::unique_ptr<EnvoyEventTracker> event_tracker);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
@@ -139,7 +136,6 @@ public:
   EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
   EngineBuilder& addDnsMinRefreshSeconds(int dns_min_refresh_seconds);
   EngineBuilder& addMaxConnectionsPerHost(int max_connections_per_host);
-  EngineBuilder& useDnsSystemResolver(bool use_system_resolver);
   EngineBuilder& addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       int h2_connection_keepalive_idle_interval_milliseconds);
   EngineBuilder&
@@ -233,7 +229,6 @@ private:
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
   int dns_query_timeout_seconds_ = 5;
-  bool use_system_resolver_ = true;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;
   std::string app_version_ = "unspecified";

@@ -87,26 +87,12 @@ public class JniLibrary {
    * Send data over an open HTTP stream. This method can be invoked multiple
    * times.
    *
-   * @param engine,    the stream's associated engine.
-   * @param stream,    the stream to send data over.
-   * @param data,      the data to send.
-   * @param length,    the size in bytes of the data to send. 0 <= length <= data.length
-   * @param endStream, supplies whether this is the last data in the stream.
-   * @return int,      the resulting status of the operation.
-   */
-  protected static native int sendDataByteArray(long engine, long stream, byte[] data, int length,
-                                                boolean endStream);
-
-  /**
-   * Send data over an open HTTP stream. This method can be invoked multiple
-   * times.
-   *
-   * @param engine,    the stream's associated engine.
-   * @param stream,    the stream to send data over.
-   * @param data,      the data to send; must be a <b>direct</b> ByteBuffer.
-   * @param length,    the size in bytes of the data to send. 0 <= length <= data.capacity()
-   * @param endStream, supplies whether this is the last data in the stream.
-   * @return int,      the resulting status of the operation.
+   * @param engine    the stream's associated engine.
+   * @param stream    the stream to send data over.
+   * @param data      the data to send. It can be direct or non-direct byteBuffer.
+   * @param length    the size in bytes of the data to send. 0 <= length <= data.capacity()
+   * @param endStream supplies whether this is the last data in the stream.
+   * @return int      the resulting status of the operation.
    */
   protected static native int sendData(long engine, long stream, ByteBuffer data, int length,
                                        boolean endStream);
@@ -126,12 +112,13 @@ public class JniLibrary {
    * Send trailers over an open HTTP stream. This method can only be invoked once
    * per stream. Note that this method implicitly ends the stream.
    *
-   * @param engine,   the stream's associated engine.
-   * @param stream,   the stream to send trailers over.
-   * @param trailers, the trailers to send.
+   * @param engine   the stream's associated engine.
+   * @param stream   the stream to send trailers over.
+   * @param trailers the trailers to send.
    * @return int, the resulting status of the operation.
    */
-  protected static native int sendTrailers(long engine, long stream, byte[][] trailers);
+  protected static native int sendTrailers(long engine, long stream,
+                                           Map<String, List<String>> trailers);
 
   /**
    * Detach all callbacks from a stream and send an interrupt upstream if
@@ -139,7 +126,7 @@ public class JniLibrary {
    *
    * @param engine, the stream's associated engine.
    * @param stream, the stream to evict.
-   * @return int, the resulting status of the operation.
+   * @return the resulting status of the operation.
    */
   protected static native int resetStream(long engine, long stream);
 

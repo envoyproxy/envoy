@@ -16,6 +16,8 @@ envoy_cc_test(
         "//source/common/http/matching:inputs_lib",
         "//source/common/network:address_lib",
         "//source/common/network:socket_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/matching/network/common:inputs_lib",
         "//test/test_common:test_time_lib",
     ],
 )

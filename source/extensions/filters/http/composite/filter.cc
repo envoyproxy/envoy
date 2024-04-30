@@ -142,6 +142,9 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
 
 void Filter::updateFilterState(Http::StreamFilterCallbacks* callback,
                                const std::string& filter_name, const std::string& action_name) {
+  if (isUpstream()) {
+    return;
+  }
   auto* info = callback->streamInfo().filterState()->getDataMutable<MatchedActionInfo>(
       MatchedActionsFilterStateKey);
   if (info != nullptr) {

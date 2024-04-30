@@ -54,7 +54,7 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
         }
       })) {
   ASSERT(codec_client_);
-  if (dynamic_cast<CodecClientProd*>(codec_client_.get()) == nullptr) {
+  if (!codec_client_->connectCalled()) {
     // Hasn't called connect() yet, schedule one for the next event loop.
     async_connect_callback_->scheduleCallbackNextIteration();
   }
@@ -178,9 +178,11 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         // Because HTTP/3 codec client connect() can close connection inline and can raise 0-RTT
         // event inline, and both cases need to have network callbacks and http callbacks wired up
         // to propagate the event, so do not call connect() during codec client construction.
-        CodecClientPtr codec = std::make_unique<NoConnectCodecClientProd>(
+        bool auto_connect = false;
+        CodecClientPtr codec = std::make_unique<CodecClientProd>(
             CodecType::HTTP3, std::move(data.connection_), data.host_description_,
-            pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions());
+            pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions(),
+            auto_connect);
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info);

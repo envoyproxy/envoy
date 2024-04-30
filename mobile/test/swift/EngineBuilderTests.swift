@@ -62,7 +62,7 @@ final class EngineBuilderTests: XCTestCase {
 
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addLogLevel(.trace)
+      .setLogLevel(.trace)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }

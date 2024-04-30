@@ -44,7 +44,6 @@ src_files = glob([
 test_suite(
     name = "ci_tests",
     tests = [
-        "http2_adapter_callback_visitor_test",
         "http2_adapter_event_forwarder_test",
         "http2_adapter_header_validator_test",
         "http2_adapter_impl_comparison_test",
@@ -77,35 +76,25 @@ envoy_cc_test_library(
 )
 
 envoy_cc_library(
-    name = "http2_adapter_callback_visitor",
-    srcs = ["quiche/http2/adapter/callback_visitor.cc"],
-    hdrs = ["quiche/http2/adapter/callback_visitor.h"],
+    name = "http2_adapter_chunked_buffer",
+    srcs = ["quiche/http2/adapter/chunked_buffer.cc"],
+    hdrs = ["quiche/http2/adapter/chunked_buffer.h"],
     copts = quiche_copts,
-    local_defines = ["NGHTTP2_16"],
     repository = "@envoy",
     deps = [
-        ":http2_adapter_http2_util",
-        ":http2_adapter_http2_visitor_interface",
-        ":http2_adapter_nghttp2_include",
-        ":http2_adapter_nghttp2_util",
-        ":quiche_common_callbacks",
+        ":quiche_common_circular_deque_lib",
         ":quiche_common_platform_export",
     ],
 )
 
 envoy_cc_test(
-    name = "http2_adapter_callback_visitor_test",
-    srcs = ["quiche/http2/adapter/callback_visitor_test.cc"],
+    name = "http2_adapter_chunked_buffer_test",
+    srcs = ["quiche/http2/adapter/chunked_buffer_test.cc"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
-        ":http2_adapter_callback_visitor",
-        ":http2_adapter_mock_nghttp2_callbacks",
-        ":http2_adapter_nghttp2_adapter",
-        ":http2_adapter_nghttp2_test_utils",
-        ":http2_adapter_test_frame_sequence",
-        ":http2_adapter_test_utils",
         ":quiche_common_platform_test",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -285,7 +274,6 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
-        ":http2_adapter_callback_visitor",
         ":http2_adapter_data_source",
         ":http2_adapter_http2_protocol",
         ":http2_adapter_http2_util",
@@ -450,7 +438,7 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
-        ":http2_adapter_callback_visitor",
+        ":http2_adapter_chunked_buffer",
         ":http2_adapter_data_source",
         ":http2_adapter_event_forwarder",
         ":http2_adapter_header_validator",
@@ -2021,6 +2009,31 @@ envoy_quic_cc_library(
     hdrs = ["quiche/quic/core/quic_blocked_writer_interface.h"],
     tags = ["nofips"],
     deps = [":quic_platform_export"],
+)
+
+envoy_quic_cc_library(
+    name = "quic_core_blocked_writer_list_lib",
+    srcs = ["quiche/quic/core/quic_blocked_writer_list.cc"],
+    hdrs = ["quiche/quic/core/quic_blocked_writer_list.h"],
+    deps = [
+        ":quic_core_blocked_writer_interface_lib",
+        ":quic_platform_base",
+        ":quic_platform_bug_tracker",
+        ":quiche_common_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "quic_core_blocked_writer_list_test",
+    srcs = ["quiche/quic/core/quic_blocked_writer_list_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_blocked_writer_interface_lib",
+        ":quic_core_blocked_writer_list_lib",
+        ":quic_platform_test",
+    ],
 )
 
 envoy_quic_cc_library(
@@ -3904,6 +3917,7 @@ envoy_quic_cc_library(
         ":quic_core_alarm_factory_lib",
         ":quic_core_alarm_lib",
         ":quic_core_blocked_writer_interface_lib",
+        ":quic_core_blocked_writer_list_lib",
         ":quic_core_connection_id_generator_interface_lib",
         ":quic_core_connection_lib",
         ":quic_core_crypto_crypto_handshake_lib",

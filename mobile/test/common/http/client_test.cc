@@ -211,8 +211,7 @@ TEST_P(ClientTest, BasicStreamData) {
   };
 
   // Build body data
-  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  envoy_data c_data = Data::Utility::toBridgeData(request_data);
+  auto request_data = std::make_unique<Buffer::OwnedImpl>("request body");
 
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
@@ -222,7 +221,7 @@ TEST_P(ClientTest, BasicStreamData) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body"), true));
-  http_client_.sendData(stream_, c_data, true);
+  http_client_.sendData(stream_, std::move(request_data), true);
   resumeDataIfExplicitFlowControl(20);
 
   // Encode response data.
@@ -246,10 +245,6 @@ TEST_P(ClientTest, BasicStreamTrailers) {
     cc->on_trailers_calls++;
   };
 
-  // Build a set of request trailers.
-  TestRequestTrailerMapImpl trailers;
-  envoy_headers c_trailers = Utility::toBridgeHeaders(trailers);
-
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
 
@@ -258,7 +253,7 @@ TEST_P(ClientTest, BasicStreamTrailers) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeTrailers_(_));
-  http_client_.sendTrailers(stream_, c_trailers);
+  http_client_.sendTrailers(stream_, Utility::createRequestTrailerMapPtr());
   resumeDataIfExplicitFlowControl(20);
 
   // Encode response trailers.
@@ -290,12 +285,9 @@ TEST_P(ClientTest, MultipleDataStream) {
   cc_.end_stream_with_headers_ = false;
 
   // Build first body data
-  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  envoy_data c_data = Data::Utility::toBridgeData(request_data);
-
+  auto request_data1 = std::make_unique<Buffer::OwnedImpl>("request body1");
   // Build second body data
-  Buffer::OwnedImpl request_data2 = Buffer::OwnedImpl("request body2");
-  envoy_data c_data2 = Data::Utility::toBridgeData(request_data2);
+  auto request_data2 = std::make_unique<Buffer::OwnedImpl>("request body2");
 
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
@@ -309,8 +301,8 @@ TEST_P(ClientTest, MultipleDataStream) {
   // Send request data.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body"), false));
-  http_client_.sendData(stream_, c_data, false);
+  EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body1"), false));
+  http_client_.sendData(stream_, std::move(request_data1), false);
   EXPECT_EQ(cc_.on_send_window_available_calls, 0);
   if (explicit_flow_control_) {
     EXPECT_TRUE(process_buffered_data_callback->enabled_);
@@ -323,7 +315,7 @@ TEST_P(ClientTest, MultipleDataStream) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body2"), true));
-  http_client_.sendData(stream_, c_data2, true);
+  http_client_.sendData(stream_, std::move(request_data2), true);
   // The stream is done: no further on_send_window_available calls should happen.
   EXPECT_EQ(cc_.on_send_window_available_calls, explicit_flow_control_ ? 1 : 0);
 
