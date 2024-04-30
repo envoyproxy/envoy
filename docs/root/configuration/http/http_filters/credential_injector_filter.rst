@@ -29,10 +29,49 @@ Generic Credential Injector
 * This extension should be configured with the type URL ``type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic``.
 * :ref:`generic <envoy_v3_api_msg_extensions.http.injected_credentials.generic.v3.Generic>`
 
+Here is an example configuration with Generic credential, which injects an HTTP Basic Auth credential into the proxied requests.
+
+.. literalinclude:: _include/credential-injector-generic-filter.yaml
+    :language: yaml
+    :lines: 28-42
+    :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-generic-filter.yaml>`
+
+
+credential.yaml for Basic Auth:
+
+.. code-block:: yaml
+
+  resources:
+  - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+    name: credential
+    generic_secret:
+      secret:
+        inline_string: "Basic base64EncodedUsernamePassword"
+
+It can also be configured to inject a Bearer token into the proxied requests.
+
+credential.yaml for Bearer Token:
+
+.. code-block:: yaml
+
+  resources:
+  - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+    name: credential
+    generic_secret:
+      secret:
+        inline_string: "Bearer myToken"
+
 OAuth2 (Client Credential Grant) Credential Injector
 ====================================================
 * This extension should be configured with the type URL ``type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2``.
 * :ref:`oauth2 client credentials grant <envoy_v3_api_msg_extensions.http.injected_credentials.oauth2.v3.OAuth2>`
+
+Here is an example configuration with OAuth2 client credential injector, which injects an OAuth2 token into the proxied requests.
+
+.. literalinclude:: _include/credential-injector-oauth2-filter.yaml
+    :language: yaml
+    :lines: 31-49
+    :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-oauth2-filter.yaml>`
 
 Statistics
 ----------
