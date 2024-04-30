@@ -174,11 +174,12 @@ void TrafficRoutingAssistantHandler::doSubscribe(
   }
 }
 
-ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
+ConnectionManager::ConnectionManager(const ConfigSharedPtr& config,
+                                     Random::RandomGenerator& random_generator,
                                      TimeSource& time_source,
                                      Server::Configuration::FactoryContext& context,
                                      std::shared_ptr<Router::TransactionInfos> transaction_infos)
-    : config_(config), stats_(config_.stats()), decoder_(std::make_unique<Decoder>(*this)),
+    : config_(config), stats_(config_->stats()), decoder_(std::make_unique<Decoder>(*this)),
       random_generator_(random_generator), time_source_(time_source), context_(context),
       transaction_infos_(transaction_infos) {}
 
@@ -340,7 +341,7 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
       time_source_, read_callbacks_->connection().connectionInfoProviderSharedPtr(),
       StreamInfo::FilterState::LifeSpan::Connection);
   tra_handler_ = std::make_shared<TrafficRoutingAssistantHandler>(
-      *this, read_callbacks_->connection().dispatcher(), config_.settings()->traServiceConfig(),
+      *this, read_callbacks_->connection().dispatcher(), config_->settings()->traServiceConfig(),
       context_, stream_info);
 }
 
@@ -504,7 +505,7 @@ FilterStatus ConnectionManager::ActiveTrans::messageEnd() {
 }
 
 void ConnectionManager::ActiveTrans::createFilterChain() {
-  parent_.config_.filterFactory().createFilterChain(*this);
+  parent_.config_->filterFactory().createFilterChain(*this);
 }
 
 void ConnectionManager::ActiveTrans::onReset() { parent_.doDeferredTransDestroy(*this); }
@@ -526,7 +527,7 @@ const Network::Connection* ConnectionManager::ActiveTrans::connection() const {
 Router::RouteConstSharedPtr ConnectionManager::ActiveTrans::route() {
   if (!cached_route_) {
     if (metadata_ != nullptr) {
-      Router::RouteConstSharedPtr route = parent_.config_.routerConfig().route(*metadata_);
+      Router::RouteConstSharedPtr route = parent_.config_->routerConfig().route(*metadata_);
       cached_route_ = std::move(route);
     } else {
       cached_route_ = nullptr;

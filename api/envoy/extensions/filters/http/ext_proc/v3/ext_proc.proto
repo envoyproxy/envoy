@@ -11,6 +11,7 @@ import "envoy/type/matcher/v3/string.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -97,8 +98,27 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 18]
+// [#next-free-field: 19]
 message ExternalProcessor {
+  // Describes the route cache action to be taken when an external processor response
+  // is received in response to request headers.
+  enum RouteCacheAction {
+    // The default behavior is to clear the route cache only when the
+    // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
+    // field is set in an external processor response.
+    DEFAULT = 0;
+
+    // Always clear the route cache irrespective of the clear_route_cache bit in
+    // the external processor response.
+    CLEAR = 1;
+
+    // Do not clear the route cache irrespective of the clear_route_cache bit in
+    // the external processor response. Setting to RETAIN is equivalent to set the
+    // :ref:`disable_clear_route_cache <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`
+    // to true.
+    RETAIN = 2;
+  }
+
   reserved 4;
 
   reserved "async_mode";
@@ -172,11 +192,6 @@ message ExternalProcessor {
     gte {}
   }];
 
-  // Prevents clearing the route-cache when the
-  // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
-  // field is set in an external processor response.
-  bool disable_clear_route_cache = 11;
-
   // Allow headers matching the ``forward_rules`` to be forwarded to the external processing server.
   // If not set, all headers are forwarded to the external processing server.
   HeaderForwardingRules forward_rules = 12;
@@ -226,6 +241,22 @@ message ExternalProcessor {
   //    This work is currently tracked under https://github.com/envoyproxy/envoy/issues/33319.
   //
   bool observability_mode = 17;
+
+  // Prevents clearing the route-cache when the
+  // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
+  // field is set in an external processor response.
+  // Only one of ``disable_clear_route_cache`` or ``route_cache_action`` can be set.
+  // It is recommended to set ``route_cache_action`` which supersedes ``disable_clear_route_cache``.
+  bool disable_clear_route_cache = 11
+      [(udpa.annotations.field_migrate).oneof_promotion = "clear_route_cache_type"];
+
+  // [#not-implemented-hide:]
+  // Specifies the action to be taken when an external processor response is
+  // received in response to request headers. It is recommended to set this field than set
+  // :ref:`disable_clear_route_cache <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`.
+  // Only one of ``disable_clear_route_cache`` or ``route_cache_action`` can be set.
+  RouteCacheAction route_cache_action = 18
+      [(udpa.annotations.field_migrate).oneof_promotion = "clear_route_cache_type"];
 }
 
 // The MetadataOptions structure defines options for the sending and receiving of

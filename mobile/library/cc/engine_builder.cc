@@ -383,18 +383,10 @@ EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string type
 }
 
 std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
-#ifndef ENVOY_ENABLE_YAML
   return absl::StrCat("[type.googleapis.com/"
                       "envoymobile.extensions.filters.http.platform_bridge.PlatformBridge] {"
                       "platform_filter_name: \"",
                       name, "\" }");
-#else
-  return absl::StrCat(
-      "{'@type': "
-      "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, "
-      "platform_filter_name: ",
-      name, "}");
-#endif
 }
 
 EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
@@ -464,10 +456,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
        ++filter) {
     auto* native_filter = hcm->add_http_filters();
     native_filter->set_name(filter->name_);
-#ifdef ENVOY_ENABLE_YAML
-    MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
-                              ProtobufMessage::getStrictValidationVisitor());
-#else
 #ifdef ENVOY_ENABLE_FULL_PROTOS
     Protobuf::TextFormat::ParseFromString((*filter).typed_config_,
                                           native_filter->mutable_typed_config());
@@ -476,7 +464,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 #else
     IS_ENVOY_BUG("Native filter support not implemented for this build");
 #endif // !ENVOY_ENABLE_FULL_PROTOS
-#endif // !ENVOY_ENABLE_YAML
   }
 
   // Set up the optional filters
