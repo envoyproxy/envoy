@@ -88,6 +88,7 @@ public class Errors {
       return NetError.ERR_QUIC_PROTOCOL_ERROR;
     }
 
+    // This will only map the first matched error to a NetError code.
     for (Map.Entry<Long, NetError> entry : ENVOYMOBILE_ERROR_TO_NET_ERROR.entrySet()) {
       if ((responseFlag & entry.getKey()) != 0) {
         return entry.getValue();
