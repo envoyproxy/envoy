@@ -154,7 +154,6 @@ public:
                Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
                Server::Configuration::CommonFactoryContext& context)
       : failure_mode_allow_(config.failure_mode_allow()),
-        disable_clear_route_cache_(config.disable_clear_route_cache()),
         route_cache_action_(config.route_cache_action()), message_timeout_(message_timeout),
         max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
@@ -179,11 +178,15 @@ public:
         expression_manager_(builder, context.localInfo(), config.request_attributes(),
                             config.response_attributes()),
         immediate_mutation_checker_(context.regexEngine()) {
-    if (disable_clear_route_cache_ &&
+    if (config.disable_clear_route_cache() &&
         (route_cache_action_ !=
          envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
       ExceptionUtil::throwEnvoyException("disable_clear_route_cache and route_cache_action can not "
                                          "be set to none-default at the same time.");
+    }
+    if (config.disable_clear_route_cache()) {
+      route_cache_action_ =
+          envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RETAIN;
     }
   }
 
@@ -205,8 +208,6 @@ public:
   const Filters::Common::MutationRules::Checker& mutationChecker() const {
     return mutation_checker_;
   }
-
-  bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
   routeCacheAction() const {
@@ -247,8 +248,7 @@ private:
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
   const bool failure_mode_allow_;
-  const bool disable_clear_route_cache_;
-  const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
       route_cache_action_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;

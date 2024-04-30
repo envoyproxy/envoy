@@ -2714,6 +2714,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
 
   EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
   EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 0);
   EXPECT_EQ(config_->stats().streams_started_.value(), 1);
   EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 3);
   EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 3);
@@ -2803,10 +2804,45 @@ TEST_F(HttpFilterTest, ClearRouteCacheUnchanged) {
 
   EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 1);
   EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 0);
   EXPECT_EQ(config_->stats().streams_started_.value(), 1);
   EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 3);
   EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 3);
   EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
+}
+
+// Using the default configuration, "clear_route_cache" flag not set. No header mutation.
+TEST_F(HttpFilterTest, ClearRouteCacheUnchangedNoClearFlag) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_body_mode: "BUFFERED"
+  )EOF");
+
+  // Do not call ClearRouteCache() for inbound traffic without header mutation.
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, absl::nullopt);
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data("foo");
+  Buffer::OwnedImpl buffered_response_data;
+  setUpEncodingBuffering(buffered_response_data);
+
+  // There is no ClearRouteCache() call for outbound traffic regardless.
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
+  processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 0);
 }
 
 // Verify that the "disable_route_cache_clearing" and "route_cache_action"  setting
@@ -2863,6 +2899,7 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToClearHeaderMutation) {
 
   EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
   EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 0);
   EXPECT_EQ(config_->stats().streams_started_.value(), 1);
   EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 2);
   EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 2);
@@ -2870,7 +2907,7 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToClearHeaderMutation) {
 }
 
 // Verify that without header mutation in response, setting route_cache_action to CLEAR
-// will not clear route cache.
+// and set the clear_route_cache flag to true in the response will not clear route cache.
 TEST_F(HttpFilterTest, FilterRouteCacheActionSetToClearNoHeaderMutation) {
   initialize(R"EOF(
   grpc_service:
@@ -2880,7 +2917,9 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToClearNoHeaderMutation) {
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(true, absl::nullopt);
@@ -2889,6 +2928,30 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToClearNoHeaderMutation) {
 
   EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
   EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 1);
+}
+
+// Verify that without header mutation in response, setting route_cache_action to CLEAR and not
+// set the clear_route_cache flag to true in the response will not clear route cache.
+TEST_F(HttpFilterTest, FilterRouteCacheActionSetToClearResponseNotSetNoHeaderMutation) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  route_cache_action: CLEAR
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  // There is no clear_route_cache set in the response. clear_route_cache_ignored_ is zero in this
+  // case.
+  processRequestHeaders(false, absl::nullopt);
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
 }
 
 // Verify that setting route_cache_action to RETAIN will not clear route cache.
@@ -2915,6 +2978,34 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToRetainWithHeaderMutation) {
   filter_->onDestroy();
 
   EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 1);
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+}
+
+// Verify that setting route_cache_action to RETAIN, response clear_route_cache flag not set,
+// will not clear route cache.
+TEST_F(HttpFilterTest, FilterRouteCacheActionSetToRetainResponseNotWithHeaderMutation) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  route_cache_action: RETAIN
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+    auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
+    auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_header()->set_key("x-new-header");
+    resp_add->mutable_header()->set_value("new");
+  });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+
+  filter_->onDestroy();
+
+  // This counter will not increase as clear_route_cache flag in the response is not set.
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
   EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
 }
 
