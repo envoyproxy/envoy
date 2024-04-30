@@ -58,7 +58,7 @@ COPY --chown=0:0 --chmod=755 \
 
 
 # STAGE: envoy-distroless
-FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:0cf184cfdb9ac2878822b15b8917fae5d42fba26da654cd75ab3ed34add0737f AS envoy-distroless
+FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:312c829b02cb4270e64e72973dfc15164e3fbbd6c1d685da55b6f0de2a99a2b2 AS envoy-distroless
 EXPOSE 10000
 ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]
