@@ -66,5 +66,11 @@ new_features:
   change: |
     Added :ref:`udp_max_queries<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.udp_max_queries>`
     option to limit the number of UDP queries.
+- area: http
+  change: |
+    Added :ref:`disable_shadow_host_suffix_append
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
+    in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>`
+    for disabling appending of the ``-shadow`` suffix to the shadowed host/authority header.
 
 deprecated:
