@@ -72,5 +72,9 @@ new_features:
     <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
     in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>`
     for disabling appending of the ``-shadow`` suffix to the shadowed host/authority header.
+- area: rbac
+  change: |
+    Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
+    the configured duration.
 
 deprecated:
