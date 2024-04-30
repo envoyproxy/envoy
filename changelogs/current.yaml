@@ -40,7 +40,7 @@ bug_fixes:
     ``CustomResolverValidAfterChannelDestruction`` unit test will break.
 - area: udp
   change: |
-    Fixed a bug that would cause Envoy to crash when updates to a pre-existing cluster were made (e.g. HostSet changes).
+    Fixed a bug that would cause Envoy to crash when updates to a pre-existing cluster were made (e.g. ``HostSet`` changes).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
