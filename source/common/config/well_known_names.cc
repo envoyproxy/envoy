@@ -23,9 +23,9 @@ std::string expandRegex(const std::string& regex) {
               {"<TLS_VERSION>", R"(TLSv\d\.\d)"},
               // A generic name can contain any character except dots.
               {"<TAG_VALUE>", TAG_VALUE_REGEX},
-              // Route names may contain dots in addition to alphanumerics and
-              // dashes with underscores.
-              {"<ROUTE_CONFIG_NAME>", R"([\w-\.]+)"},
+              // Route names may contain dots and slashes in addition to
+              // alphanumerics, underscores, and dashes.
+              {"<ROUTE_CONFIG_NAME>", R"([\w-\./]+)"},
               // Match a prefix that is either a listener plus name or cluster plus name
               {"<LISTENER_OR_CLUSTER_WITH_NAME>", R"((?:listener|cluster)\..*?)"}});
 }

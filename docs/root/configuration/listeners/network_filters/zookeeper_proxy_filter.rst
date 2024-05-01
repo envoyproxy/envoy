@@ -26,7 +26,9 @@ The ZooKeeper proxy filter should be chained with the TCP proxy filter as shown
 in the configuration snippet below:
 
 .. literalinclude:: _include/zookeeper-filter-proxy.yaml
-    :language: yaml
+   :language: yaml
+   :linenos:
+   :caption: :download:`zookeeper-filter-proxy.yaml <_include/zookeeper-filter-proxy.yaml>`
 
 .. _config_network_filters_zookeeper_proxy_stats:
 
@@ -35,13 +37,13 @@ Statistics
 
 Every configured ZooKeeper proxy filter has statistics rooted at *<stat_prefix>.zookeeper.*.
 
-*_resp_fast* and *_resp_slow* are per-opcode metrics and will only be emitted when :ref:`enable_latency_threshold_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_latency_threshold_metrics>` is set to ``true``.
+``_resp_fast`` and ``_resp_slow`` are per-opcode metrics and will only be emitted when :ref:`enable_latency_threshold_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_latency_threshold_metrics>` is set to ``true``.
 
-*_rq_bytes* are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_request_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_request_bytes_metrics>` is set to ``true``.
+``_rq_bytes`` are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_request_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_request_bytes_metrics>` is set to ``true``.
 
-*_resp_bytes* are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_response_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_response_bytes_metrics>` is set to ``true``.
+``_resp_bytes`` are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_response_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_response_bytes_metrics>` is set to ``true``.
 
-*_decoder_error* are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_decoder_error_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>` is set to ``true``.
+``_decoder_error`` are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_decoder_error_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>` is set to ``true``.
 
 The following counters are available:
 
