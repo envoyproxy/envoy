@@ -23,8 +23,6 @@ public:
   Common::CredentialInjectorSharedPtr
   createOauth2ClientCredentialInjector(const OAuth2& proto_config, const std::string& stats_prefix,
                                        Server::Configuration::FactoryContext& context);
-
-private:
   Common::CredentialInjectorSharedPtr
   createCredentialInjectorFromProtoTyped(const OAuth2& config, const std::string& stats_prefix,
                                          Server::Configuration::FactoryContext& context) override;

@@ -33,30 +33,25 @@ Here is an example configuration with Generic credential, which injects an HTTP 
 
 .. literalinclude:: _include/credential-injector-generic-filter.yaml
     :language: yaml
-    :lines: 28-42
+    :lines: 22-35
     :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-generic-filter.yaml>`
 
 
-credential.yaml for Basic Auth:
+credential which is being used to inject a Basic Auth credential into the proxied requests:
 
-.. code-block:: yaml
-
-  resources:
-  - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
-    name: credential
-    generic_secret:
-      secret:
-        inline_string: "Basic base64EncodedUsernamePassword"
+.. literalinclude:: _include/credential-injector-generic-filter.yaml
+    :language: yaml
+    :lines: 52-55
+    :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-generic-filter.yaml>`
 
 It can also be configured to inject a Bearer token into the proxied requests.
 
-credential.yaml for Bearer Token:
+credential for Bearer Token:
 
 .. code-block:: yaml
 
-  resources:
-  - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
-    name: credential
+  secrets:
+  - name: credential
     generic_secret:
       secret:
         inline_string: "Bearer myToken"
@@ -70,7 +65,7 @@ Here is an example configuration with OAuth2 client credential injector, which i
 
 .. literalinclude:: _include/credential-injector-oauth2-filter.yaml
     :language: yaml
-    :lines: 31-49
+    :lines: 26-40
     :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-oauth2-filter.yaml>`
 
 Statistics
@@ -86,14 +81,17 @@ The HTTP credential injector filter outputs statistics in the ``http.<stat_prefi
   ``failed``, Counter, Total number of requests that failed to inject credentials
   ``already_exists``, Counter, Total number of requests that already had credentials and overwrite is false
 
-Oauth2 Client Credential Injector extension specific statistics are also emitted in the ``http.<stat_prefix>.credential_injector.oauth2.`` namespace.
+OAuth2 Client Credential Injector extension specific statistics are also emitted in the ``http.<stat_prefix>.credential_injector.oauth2.`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  ``token_requested``, Counter, Total number of token requests sent to the oauth2 server
-  ``token_fetched``, Counter, Total number of successful token fetches from the oauth2 server
+  ``token_requested``, Counter, Total number of token requests sent to the OAuth2 server
+  ``token_fetched``, Counter, Total number of successful token fetches from the OAuth2 server
   ``token_fetch_failed_on_client_secret``, Counter, Total number of times token request not sent due to missing client secret
-  ``token_fetch_failed_on_cluster_not_found``, Counter, Total number of times token request not sent due to missing outh2 server cluster
-  ``token_fetch_failed_on_oauth_server_response``, Counter, Total number of times oauth server response was not successful
+  ``token_fetch_failed_on_cluster_not_found``, Counter, Total number of times token request not sent due to missing OAuth2 server cluster
+  ``token_fetch_failed_on_bad_response_code``, Counter, Total number of times OAuth2 server responded with non-200 response code
+  ``token_fetch_failed_on_bad_token``, Counter, Total number of times OAuth2 server responded with bad token
+  ``token_fetch_failed_on_stream_reset``, Counter, Total number of times http stream with OAuth2 server got reset
+

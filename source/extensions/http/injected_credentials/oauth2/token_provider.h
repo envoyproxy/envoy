@@ -6,6 +6,7 @@
 #include "envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.pb.validate.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "oauth.h"
 #include "source/extensions/http/injected_credentials/common/credential.h"
 #include "source/extensions/http/injected_credentials/common/secret_reader.h"
 #include "source/extensions/http/injected_credentials/oauth2/oauth_client.h"
@@ -22,7 +23,9 @@ namespace OAuth2 {
 #define ALL_OAUTH2_CLIENT_CREDENTIAL_TOKEN_PROVIDER_STATS(COUNTER)                                 \
   COUNTER(token_fetch_failed_on_client_secret)                                                     \
   COUNTER(token_fetch_failed_on_cluster_not_found)                                                 \
-  COUNTER(token_fetch_failed_on_oauth_server_response)                                             \
+  COUNTER(token_fetch_failed_on_stream_reset)                                                      \
+  COUNTER(token_fetch_failed_on_bad_token)                                                         \
+  COUNTER(token_fetch_failed_on_bad_response_code)                                                 \
   COUNTER(token_requested)                                                                         \
   COUNTER(token_fetched)
 
@@ -74,7 +77,7 @@ public:
 
   // FilterCallbacks
   void onGetAccessTokenSuccess(const std::string& access_code, std::chrono::seconds) override;
-  void onGetAccessTokenFailure() override;
+  void onGetAccessTokenFailure(FilterCallbacks::FailureReason) override;
 
 private:
   static TokenProviderStats generateStats(const std::string& prefix, Stats::Scope& scope) {

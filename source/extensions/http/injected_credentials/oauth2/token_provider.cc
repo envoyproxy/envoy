@@ -103,9 +103,25 @@ void TokenProvider::onGetAccessTokenSuccess(const std::string& access_token,
   timer_->enableTimer(expires_in / 2);
 }
 
-void TokenProvider::onGetAccessTokenFailure() {
+void TokenProvider::onGetAccessTokenFailure(FailureReason failure_reason) {
   ENVOY_LOG(error, "onGetAccessTokenFailure: Failed to get access token");
-  stats_.token_fetch_failed_on_oauth_server_response_.inc();
+  bool retry = true;
+  switch (failure_reason) {
+  case FailureReason::StreamReset:
+    stats_.token_fetch_failed_on_stream_reset_.inc();
+    break;
+  case FailureReason::BadToken:
+    stats_.token_fetch_failed_on_bad_token_.inc();
+    retry = false;
+    break;
+  case FailureReason::BadResponseCode:
+    stats_.token_fetch_failed_on_bad_response_code_.inc();
+    break;
+  }
+  if (!retry) {
+    return;
+  }
+
   if (timer_->enabled()) {
     return;
   }

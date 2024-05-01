@@ -65,15 +65,26 @@ resources:
         fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_oauth2_connection_);
     RELEASE_ASSERT(result, result.message());
   }
-  void handleOauth2TokenRequest(absl::string_view client_secret, bool success = true) {
+
+  void acceptNewStream() {
     AssertionResult result =
         fake_oauth2_connection_->waitForNewStream(*dispatcher_, oauth2_request_);
     RELEASE_ASSERT(result, result.message());
     result = oauth2_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
-
     ASSERT_TRUE(oauth2_request_->waitForHeadersComplete());
+  }
 
+  void waitForTokenRequestAndDontRespondWithToken() {
+    getFakeOuth2Connection();
+    acceptNewStream();
+    checkClientSecretInRequest("test_client_secret");
+    oauth2_request_->encodeHeaders(Http::TestRequestHeaderMapImpl{{":status", "503"}}, false);
+  }
+
+  void handleOauth2TokenRequest(absl::string_view client_secret, bool success = true,
+                                bool good_token = true, bool good_json = true) {
+    acceptNewStream();
     checkClientSecretInRequest(client_secret);
     if (success) {
       oauth2_request_->encodeHeaders(
@@ -85,9 +96,16 @@ resources:
 
     envoy::extensions::http::injected_credentials::oauth2::OAuthResponse oauth_response;
     oauth_response.mutable_access_token()->set_value("test-access-token");
-    oauth_response.mutable_expires_in()->set_value(2); // 2 seconds
+    if (good_token) {
+      oauth_response.mutable_expires_in()->set_value(2); // 2 seconds
+    }
 
     Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
+    if (!good_json) {
+      Buffer::OwnedImpl buffer("bad json");
+      oauth2_request_->encodeData(buffer, true);
+      return;
+    }
     oauth2_request_->encodeData(buffer, true);
   }
 
@@ -107,6 +125,59 @@ resources:
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, CredentialInjectorIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Inject credential to a request without credential
+TEST_P(CredentialInjectorIntegrationTest, InjectCredentialStaticSecret) {
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: envoy.http.injected_credentials.oauth2
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2
+      token_endpoint:
+        cluster: oauth
+        timeout: 3s
+        uri: "oauth.com/token"
+      client_credentials:
+        client_id: test_client_id
+        client_secret:
+          name: test-client-secret
+)EOF";
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("test-client-secret");
+    auto* generic = secret->mutable_generic_secret();
+    generic->mutable_secret()->set_inline_string("test_client_secret");
+  });
+  initializeFilter(filter_config);
+  waitForOAuth2Response("test_client_secret");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
+                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->value()
+                                            .getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_EQ(1UL,
+            test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
+                ->value());
+  EXPECT_EQ(
+      1UL,
+      test_server_->counter("http.config_test.credential_injector.oauth2.token_fetched")->value());
+}
 
 // Inject credential to a request without credential
 TEST_P(CredentialInjectorIntegrationTest, InjectCredential) {
@@ -349,6 +420,8 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2
       token_fetch_retry_interval: 2s
+      scopes:
+        - "scope1"
       token_endpoint:
         cluster: oauth
         timeout: 0.5s
@@ -370,10 +443,12 @@ typed_config:
   // wait for retried token request and respond with good response
   handleOauth2TokenRequest("test_client_secret");
 
-  EXPECT_EQ(1UL, test_server_
-                     ->counter("http.config_test.credential_injector.oauth2.token_fetch_failed_on_"
-                               "oauth_server_response")
-                     ->value());
+  EXPECT_EQ(
+      1UL,
+      test_server_
+          ->counter(
+              "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_response_code")
+          ->value());
   test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
                                  std::chrono::milliseconds(500));
 
@@ -455,6 +530,143 @@ typed_config:
   handleOauth2TokenRequest("test_client_secret");
 
   test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 2,
+                                 std::chrono::milliseconds(1200));
+}
+
+TEST_P(CredentialInjectorIntegrationTest, BadTokenNoExpiry) {
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: envoy.http.injected_credentials.oauth2
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2
+      token_fetch_retry_interval: 1s
+      token_endpoint:
+        cluster: oauth
+        timeout: 4s
+        uri: "oauth.com/token"
+      client_credentials:
+        client_id: test_client_id
+        client_secret:
+          name: client-secret
+          sds_config:
+            resource_api_version: V3
+            path_config_source:
+              path: "{{ test_tmpdir }}/client_secret.yaml"
+)EOF";
+  initializeFilter(filter_config);
+  getFakeOuth2Connection();
+  handleOauth2TokenRequest("test_client_secret", true, false);
+  test_server_->waitForCounterEq(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", 1,
+      std::chrono::milliseconds(1000));
+}
+
+TEST_P(CredentialInjectorIntegrationTest, BadTokenMalformedJson) {
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: envoy.http.injected_credentials.oauth2
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2
+      token_fetch_retry_interval: 1s
+      token_endpoint:
+        cluster: oauth
+        timeout: 4s
+        uri: "oauth.com/token"
+      client_credentials:
+        client_id: test_client_id
+        client_secret:
+          name: client-secret
+          sds_config:
+            resource_api_version: V3
+            path_config_source:
+              path: "{{ test_tmpdir }}/client_secret.yaml"
+)EOF";
+  initializeFilter(filter_config);
+  getFakeOuth2Connection();
+  handleOauth2TokenRequest("test_client_secret", true, true, false);
+  test_server_->waitForCounterEq(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", 1,
+      std::chrono::milliseconds(1000));
+}
+
+TEST_P(CredentialInjectorIntegrationTest, RetryOnClusterNotFound) {
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: envoy.http.injected_credentials.oauth2
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2
+      token_fetch_retry_interval: 1s
+      token_endpoint:
+        cluster: non-existing-cluster
+        timeout: 0.5s
+        uri: "oauth.com/token"
+      client_credentials:
+        client_id: test_client_id
+        client_secret:
+          name: client-secret
+          sds_config:
+            resource_api_version: V3
+            path_config_source:
+              path: "{{ test_tmpdir }}/client_secret.yaml"
+)EOF";
+  initializeFilter(filter_config);
+  test_server_->waitForCounterEq(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", 1,
+      std::chrono::milliseconds(1000));
+  test_server_->waitForCounterEq(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", 2,
+      std::chrono::milliseconds(1200));
+}
+
+TEST_P(CredentialInjectorIntegrationTest, RetryOnStreamReset) {
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: envoy.http.injected_credentials.oauth2
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2
+      token_fetch_retry_interval: 1s
+      token_endpoint:
+        cluster: oauth
+        timeout: 0.5s
+        uri: "oauth.com/token"
+      client_credentials:
+        client_id: test_client_id
+        client_secret:
+          name: client-secret
+          sds_config:
+            resource_api_version: V3
+            path_config_source:
+              path: "{{ test_tmpdir }}/client_secret.yaml"
+)EOF";
+  initializeFilter(filter_config);
+  waitForTokenRequestAndDontRespondWithToken();
+  test_server_->waitForCounterEq(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_stream_reset", 1,
+      std::chrono::milliseconds(1000));
+  EXPECT_EQ(1UL,
+            test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
+                ->value());
+  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_requested", 2,
                                  std::chrono::milliseconds(1200));
 }
 

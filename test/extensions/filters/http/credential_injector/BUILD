@@ -56,8 +56,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "credential_injector_oauth_integration_test",
+    name = "oauth2_config_test",
     size = "large",
+    srcs = ["oauth2_config_test.cc"],
+    extension_names = ["envoy.filters.http.credential_injector"],
+    deps = [
+        "//test/mocks/server:factory_context_mocks",
+        "//source/extensions/http/injected_credentials/oauth2:config",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "credential_injector_oauth_integration_test",
     srcs = ["credential_injector_oauth_integration_test.cc"],
     extension_names = ["envoy.filters.http.credential_injector"],
     deps = [

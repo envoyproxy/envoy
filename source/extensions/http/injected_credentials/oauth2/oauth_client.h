@@ -28,7 +28,6 @@ class OAuth2Client : public Envoy::Http::AsyncClient::Callbacks {
 public:
   enum class GetTokenResult {
     NotDispatchedClusterNotFound,
-    NotDispatchedAlreadyInFlight,
     DispatchedRequest,
   };
   virtual GetTokenResult asyncGetAccessToken(const std::string& client_id,
@@ -47,12 +46,6 @@ class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::crede
 public:
   OAuth2ClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri)
       : cm_(cm), uri_(uri) {}
-
-  ~OAuth2ClientImpl() override {
-    if (in_flight_request_ != nullptr) {
-      in_flight_request_->cancel();
-    }
-  }
 
   // OAuth2Client
   /**
@@ -73,21 +66,14 @@ public:
 
 private:
   FilterCallbacks* parent_{nullptr};
-
   Upstream::ClusterManager& cm_;
   const envoy::config::core::v3::HttpUri uri_;
-
-  // Tracks any outstanding in-flight requests, allowing us to cancel the request
-  // if the filter ends before the request completes.
-  Envoy::Http::AsyncClient::Request* in_flight_request_{nullptr};
-
   /**
    * Begins execution of an asynchronous request.
    *
    * @param request the HTTP request to be executed.
    */
   GetTokenResult dispatchRequest(Envoy::Http::RequestMessagePtr&& request);
-
   Envoy::Http::RequestMessagePtr createPostRequest() {
     auto request = Envoy::Http::Utility::prepareHeaders(uri_);
     request->headers().setReferenceMethod(Envoy::Http::Headers::get().MethodValues.Post);
