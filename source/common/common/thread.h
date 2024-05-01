@@ -139,6 +139,12 @@ public:
     return atomic_ref.load();
   }
 
+  /**
+   * Returns whether the underlying pointer at the index is null.
+   * 
+   * @param index the Index to look up.
+   * @return true if the underlying pointer at the index is null.
+   */
   bool isNull(uint32_t index) const { return data_[index].load() == nullptr; }
 
 private:
@@ -169,8 +175,8 @@ public:
    */
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
 
-  /*
-   * Returns true if the underlying pointer is null.
+  /**
+   * @return true if the underlying pointer is null.
    */
   bool isNull() const { return BaseClass::isNull(0); }
 };
