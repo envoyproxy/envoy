@@ -584,7 +584,9 @@ TEST_P(IntegrationTest, MultipleRequests) {
   EXPECT_NE(response_decoder_callback_->responses_[2].response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->responses_[2].response_->status().code(), 0);
   EXPECT_EQ(response_decoder_callback_->responses_[2].response_->get("zzzz"), "xxxx");
-  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->get("stream_id"), "2");
+  EXPECT_EQ(
+      response_decoder_callback_->responses_[2].response_->frameFlags().streamFlags().streamId(),
+      2);
 
   FakeStreamCodecFactory::FakeResponse response_1;
   response_1.protocol_ = "fake_fake_fake";
@@ -600,7 +602,9 @@ TEST_P(IntegrationTest, MultipleRequests) {
   EXPECT_NE(response_decoder_callback_->responses_[1].response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->responses_[1].response_->status().code(), 0);
   EXPECT_EQ(response_decoder_callback_->responses_[1].response_->get("zzzz"), "yyyy");
-  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->get("stream_id"), "1");
+  EXPECT_EQ(
+      response_decoder_callback_->responses_[1].response_->frameFlags().streamFlags().streamId(),
+      1);
 
   cleanup();
 }
@@ -623,10 +627,10 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   request_1.data_ = {
       {"version", "v1"}, {"stream_id", "1"}, {"end_stream", "false"}, {"frame", "1_header"}};
 
-  FakeStreamCodecFactory::FakeRequest request_1_frame_1;
+  FakeStreamCodecFactory::FakeCommonFrame request_1_frame_1;
   request_1_frame_1.data_ = {{"stream_id", "1"}, {"end_stream", "false"}, {"frame", "1_frame_1"}};
 
-  FakeStreamCodecFactory::FakeRequest request_1_frame_2;
+  FakeStreamCodecFactory::FakeCommonFrame request_1_frame_2;
   request_1_frame_2.data_ = {{"stream_id", "1"}, {"end_stream", "true"}, {"frame", "1_frame_2"}};
 
   FakeStreamCodecFactory::FakeRequest request_2;
@@ -637,10 +641,10 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   request_2.data_ = {
       {"version", "v1"}, {"stream_id", "2"}, {"end_stream", "false"}, {"frame", "2_header"}};
 
-  FakeStreamCodecFactory::FakeRequest request_2_frame_1;
+  FakeStreamCodecFactory::FakeCommonFrame request_2_frame_1;
   request_2_frame_1.data_ = {{"stream_id", "2"}, {"end_stream", "false"}, {"frame", "2_frame_1"}};
 
-  FakeStreamCodecFactory::FakeRequest request_2_frame_2;
+  FakeStreamCodecFactory::FakeCommonFrame request_2_frame_2;
   request_2_frame_2.data_ = {{"stream_id", "2"}, {"end_stream", "true"}, {"frame", "2_frame_2"}};
 
   // We handle frame one by one to make sure the order is correct.
@@ -702,7 +706,7 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   response_2.data_["stream_id"] = "2";
   response_2.data_["end_stream"] = "false";
 
-  FakeStreamCodecFactory::FakeResponse response_2_frame_1;
+  FakeStreamCodecFactory::FakeCommonFrame response_2_frame_1;
   response_2_frame_1.data_["stream_id"] = "2";
   response_2_frame_1.data_["end_stream"] = "true";
 
@@ -715,7 +719,9 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   EXPECT_NE(response_decoder_callback_->responses_[2].response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->responses_[2].response_->status().code(), 0);
   EXPECT_EQ(response_decoder_callback_->responses_[2].response_->get("zzzz"), "xxxx");
-  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->get("stream_id"), "2");
+  EXPECT_EQ(
+      response_decoder_callback_->responses_[2].response_->frameFlags().streamFlags().streamId(),
+      2);
 
   FakeStreamCodecFactory::FakeResponse response_1;
   response_1.protocol_ = "fake_fake_fake";
@@ -724,7 +730,7 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   response_1.data_["stream_id"] = "1";
   response_1.data_["end_stream"] = "false";
 
-  FakeStreamCodecFactory::FakeResponse response_1_frame_1;
+  FakeStreamCodecFactory::FakeCommonFrame response_1_frame_1;
   response_1_frame_1.data_["stream_id"] = "1";
   response_1_frame_1.data_["end_stream"] = "true";
 
@@ -737,7 +743,9 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   EXPECT_NE(response_decoder_callback_->responses_[1].response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->responses_[1].response_->status().code(), 0);
   EXPECT_EQ(response_decoder_callback_->responses_[1].response_->get("zzzz"), "yyyy");
-  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->get("stream_id"), "1");
+  EXPECT_EQ(
+      response_decoder_callback_->responses_[1].response_->frameFlags().streamFlags().streamId(),
+      1);
 
   cleanup();
 }

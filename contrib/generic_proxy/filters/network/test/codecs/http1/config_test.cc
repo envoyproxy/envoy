@@ -638,7 +638,8 @@ TEST_F(Http1ServerCodecTest, RequestAndResponseTest) {
                "0\r\n"  // Last chunk header.
                "\r\n"); // Last chunk footer.
 
-    EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(3);
+    EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _));
+    EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(2);
 
     codec_->decode(buffer, false);
 
@@ -677,7 +678,8 @@ TEST_F(Http1ServerCodecTest, ResponseCompleteBeforeRequestCompleteTest) {
              "\r\n"); // Chunk footer. No last chunk header and footer, this is an incomplete
                       // request.
 
-  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(2);
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _));
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_));
 
   codec_->decode(buffer, false);
 
@@ -724,7 +726,8 @@ TEST_F(Http1ServerCodecTest, NewRequestBeforeFirstRequestCompleteTest) {
   Buffer::OwnedImpl buffer2;
   buffer2.add(buffer);
 
-  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(3);
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _));
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(2);
 
   codec_->decode(buffer, false);
 
@@ -1038,7 +1041,6 @@ TEST_F(Http1ClientCodecTest, ChunkedResponseDecodingTest) {
         auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
         EXPECT_EQ(frame->frameFlags().endStream(), false);
         EXPECT_EQ(response->response_->getStatusValue(), "200");
-        EXPECT_EQ(response->response_->getContentLengthValue(), "4");
         EXPECT_EQ(response->get("custom").value(), "value");
       }));
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_))
@@ -1077,7 +1079,6 @@ TEST_F(Http1ClientCodecTest, MultipleBufferChunkedResponseDecodingTest) {
         auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
         EXPECT_EQ(frame->frameFlags().endStream(), false);
         EXPECT_EQ(response->response_->getStatusValue(), "200");
-        EXPECT_EQ(response->response_->getContentLengthValue(), "4");
         EXPECT_EQ(response->get("custom").value(), "value");
       }));
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_))
@@ -1271,7 +1272,9 @@ TEST_F(Http1ClientCodecTest, RequestAndResponseTest) {
                "\r\n"); // Last chunk footer.
 
     // Decode the response.
-    EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(3);
+    EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _));
+    EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(2);
+
     codec_->decode(buffer, false);
   }
 }
@@ -1308,7 +1311,9 @@ TEST_F(Http1ClientCodecTest, ResponseCompleteBeforeRequestCompleteTest) {
              "\r\n"); // Last chunk footer.
 
   // Decode the response.
-  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(3);
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _));
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(2);
+
   // Finally, the onDecodingFailure(_) is called because the request is not complete and the
   // response is complete.
   EXPECT_CALL(codec_callbacks_, onDecodingFailure(_));

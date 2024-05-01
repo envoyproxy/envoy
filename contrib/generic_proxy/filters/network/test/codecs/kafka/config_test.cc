@@ -56,7 +56,7 @@ TEST(KafkaCodecTest, KafkaRequestCallbacksTest) {
   KafkaRequestCallbacks request_callbacks(callbacks);
 
   {
-    EXPECT_CALL(callbacks, onDecodingSuccess(_));
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
 
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
@@ -79,7 +79,7 @@ TEST(KafkaCodecTest, KafkaResponseCallbacksTest) {
   KafkaResponseCallbacks response_callbacks(callbacks);
 
   {
-    EXPECT_CALL(callbacks, onDecodingSuccess(_));
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
 
     auto response =
         std::make_shared<NetworkFilters::Kafka::Response<NetworkFilters::Kafka::FetchResponse>>(

@@ -854,14 +854,14 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
   // StreamRequest frame).
   EXPECT_CALL(mock_stream_frame_handler, onRequestCommonFrame(_)).Times(2);
 
-  auto request_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  auto request_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   request_frame_1->stream_frame_flags_ = FrameFlags(StreamFlags(), false);
   filter_->onDecodingSuccess(std::move(request_frame_1));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
   EXPECT_EQ(1, filter_->frameHandlersForTest().size());
 
   // When the last frame is the end stream, we will delete the frame handler.
-  auto request_frame_2 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  auto request_frame_2 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   request_frame_2->stream_frame_flags_ = FrameFlags(StreamFlags(), true);
   filter_->onDecodingSuccess(std::move(request_frame_2));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
