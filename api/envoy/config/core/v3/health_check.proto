@@ -183,6 +183,8 @@ message HealthCheck {
     // When setting this value, it tries to attempt health check request with ProxyProtocol.
     // When ``send`` is presented, they are sent after preceding ProxyProtocol header.
     // Only ProxyProtocol header is sent when ``send`` is not presented.
+    // It allows to use both ProxyProtocol V1 and V2. In V1, it presents L3/L4. In V2, it includes
+    // LOCAL command and doesn't include L3/L4.
     ProxyProtocolConfig proxy_protocol_config = 3;
   }
 

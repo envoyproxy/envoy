@@ -150,8 +150,15 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
   bool should_write_data = false;
 
   if (parent_.proxy_protocol_config_ != nullptr) {
-    Extensions::Common::ProxyProtocol::generateProxyProtoHeader(*parent_.proxy_protocol_config_,
-                                                                *client_, data);
+    if (parent_.proxy_protocol_config_->version() ==
+        envoy::config::core::v3::ProxyProtocolConfig::V1) {
+      auto src_addr = client_->connectionInfoProvider().localAddress()->ip();
+      auto dst_addr = client_->connectionInfoProvider().remoteAddress()->ip();
+      Extensions::Common::ProxyProtocol::generateV1Header(*src_addr, *dst_addr, data);
+    } else if (parent_.proxy_protocol_config_->version() ==
+               envoy::config::core::v3::ProxyProtocolConfig::V2) {
+      Extensions::Common::ProxyProtocol::generateV2LocalHeader(data);
+    }
     should_write_data = true;
   }
   if (!parent_.send_bytes_.empty()) {
