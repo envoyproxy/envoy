@@ -697,9 +697,15 @@ google-apitools==0.5.32 \
     --hash=sha256:b78f74116558e0476e19501b5b4b2ac7c93261a69c5449c861ea95cbc853c688 \
     --hash=sha256:c3763e52289f61e21c41d5531e20fbda9cc8484a088b8686fd460770db8bad13
     # via gsutil
-google-auth[aiohttp]==2.27.0 \
-    --hash=sha256:8e4bad367015430ff253fe49d500fdc3396c1a434db5740828c728e45bcce245 \
-    --hash=sha256:e863a56ccc2d8efa83df7a80272601e43487fa9a728a376205c86c26aaefa821
+google-auth[aiohttp]==2.17.0 \
+    --hash=sha256:45ba9b4b3e49406de3c5451697820694b2f6ce8a6b75bb187852fdae231dab94 \
+    --hash=sha256:f51d26ebb3e5d723b9a7dbd310b6c88654ef1ad1fc35750d1fdba48ca4d82f52
+    # via
+    #   google-auth-httplib2
+    #   gsutil
+google-auth-httplib2==0.2.0 \
+    --hash=sha256:38aa7badf48f974f1eb9861794e9c0cb2a0511a4ec0679b1f886d108f5640e05 \
+    --hash=sha256:b65a0a2123300dd71281a7bf6e64d65a0759287df52729bdd1ae2e47dc311a3d
     # via gsutil
 google-reauth==0.1.1 \
     --hash=sha256:cb39074488d74c8853074dde47368bbf8f739d4a4338b89aab696c895b6d8368 \
@@ -707,8 +713,8 @@ google-reauth==0.1.1 \
     # via
     #   gcs-oauth2-boto-plugin
     #   gsutil
-gsutil==5.27 \
-    --hash=sha256:681a2d844acdf05fac989da6dd406944ae11cb27a4cf3c9edef74d2585ab5f05
+gsutil==5.28 \
+    --hash=sha256:71370a111e1ad6f8da5e89f99f20dad7147eeeb88222ed9ac0bb6d8fe6a2135f
     # via -r requirements.in
 httplib2==0.20.4 \
     --hash=sha256:58a98e45b4b1a48273073f905d2961666ecf0fbac4250ea5b47aef259eb5c585 \
@@ -716,6 +722,7 @@ httplib2==0.20.4 \
     # via
     #   gcs-oauth2-boto-plugin
     #   google-apitools
+    #   google-auth-httplib2
     #   gsutil
     #   oauth2client
 humanfriendly==10.0 \
@@ -1212,6 +1219,7 @@ six==1.16.0 \
     # via
     #   gcs-oauth2-boto-plugin
     #   google-apitools
+    #   google-auth
     #   gsutil
     #   oauth2client
     #   python-dateutil
