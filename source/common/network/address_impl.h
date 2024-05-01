@@ -74,8 +74,8 @@ protected:
   InstanceBase(Type type, const SocketInterface* sock_interface)
       : socket_interface_(*sock_interface), type_(type) {}
 
-  const SocketInterface& socket_interface_;
   std::string friendly_name_;
+  const SocketInterface& socket_interface_;
 
 private:
   const Type type_;
@@ -111,6 +111,8 @@ public:
   }
 
 protected:
+  friend class IpInstancePeer;
+
   IpInstance(Type type, const SocketInterface* sock_interface)
       : InstanceBase(type, sock_interface) {}
 
@@ -300,12 +302,7 @@ private:
   };
 
   struct IpHelper : public Ip {
-    const std::string& addressAsString() const override {
-      if (address_string_.empty()) {
-        address_string_ = ipv6_.makeFriendlyAddress();
-      }
-      return address_string_;
-    }
+    const std::string& addressAsString() const override;
 
     bool isAnyAddress() const override {
       return 0 == memcmp(&ipv6_.address_.sin6_addr, &in6addr_any, sizeof(struct in6_addr));

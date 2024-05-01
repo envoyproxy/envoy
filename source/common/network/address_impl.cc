@@ -1,4 +1,3 @@
-#include "address_impl.h"
 #include "source/common/network/address_impl.h"
 
 #include <array>
@@ -374,6 +373,13 @@ void Ipv6Instance::initHelper(const sockaddr_in6& address, bool v6only,
     ip_.address_string_ = ip_.ipv6_.makeFriendlyAddress();
     populateAddressPortString();
   }
+}
+
+const std::string& Ipv6Instance::IpHelper::addressAsString() const {
+  if (address_string_.empty()) {
+    address_string_ = ipv6_.makeFriendlyAddress();
+  }
+  return address_string_;
 }
 
 void Ipv6Instance::populateAddressPortString() {

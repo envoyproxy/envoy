@@ -107,7 +107,15 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     client_connect(v4_addr_port);
   }
 }
+
 } // namespace
+
+class IpInstancePeer {
+public:
+  static std::string getAddressString(const IpInstance* address) {
+    return address->address_port_string_;
+  }
+};
 
 class AddressImplSocketTest : public testing::TestWithParam<IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, AddressImplSocketTest,
@@ -162,6 +170,34 @@ TEST(Ipv4InstanceTest, SocketAddress) {
   EXPECT_TRUE(address.ip()->isUnicastAddress());
   EXPECT_EQ(nullptr, address.pipe());
   EXPECT_EQ(nullptr, address.envoyInternalAddress());
+}
+
+TEST(Ipv4InstanceTest, SocketAddressWithInstanceFactory) {
+  sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
+  addr4.sin_family = AF_INET;
+  EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
+  addr4.sin_port = htons(6502);
+
+  StatusOr<InstanceConstSharedPtr> result =
+      InstanceFactory::createInstancePtr<Ipv4Instance>(&addr4);
+  ASSERT_TRUE(result.ok());
+  InstanceConstSharedPtr address = *result;
+  EXPECT_EQ(IpVersion::v4, address->ip()->version());
+  EXPECT_EQ(
+      Runtime::runtimeFeatureEnabled(
+          "envoy.restart_features.address_factory_lazy_create_address_string"),
+      IpInstancePeer::getAddressString(static_cast<const IpInstance*>(address.get())).empty());
+  EXPECT_EQ("1.2.3.4:6502", address->asStringView());
+  EXPECT_EQ("1.2.3.4:6502", address->logicalName());
+  EXPECT_EQ(Type::Ip, address->type());
+  EXPECT_EQ("1.2.3.4", address->ip()->addressAsString());
+  EXPECT_EQ(6502U, address->ip()->port());
+  EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("1.2.3.4"), *address));
+  EXPECT_EQ(nullptr, address->ip()->ipv6());
+  EXPECT_TRUE(address->ip()->isUnicastAddress());
+  EXPECT_EQ(nullptr, address->pipe());
+  EXPECT_EQ(nullptr, address->envoyInternalAddress());
 }
 
 TEST(Ipv4InstanceTest, AddressOnly) {
@@ -252,6 +288,33 @@ TEST(Ipv6InstanceTest, SocketAddress) {
   EXPECT_TRUE(address.ip()->isUnicastAddress());
   EXPECT_EQ(nullptr, address.pipe());
   EXPECT_EQ(nullptr, address.envoyInternalAddress());
+}
+
+TEST(Ipv6InstanceTest, SocketAddressWithInstanceFactory) {
+  sockaddr_in6 addr6;
+  memset(&addr6, 0, sizeof(addr6));
+  addr6.sin6_family = AF_INET6;
+  EXPECT_EQ(1, inet_pton(AF_INET6, "01:023::00Ef", &addr6.sin6_addr));
+  addr6.sin6_port = htons(32000);
+
+  StatusOr<InstanceConstSharedPtr> result = InstanceFactory::createInstancePtr<Ipv6Instance>(addr6);
+  ASSERT_TRUE(result.ok());
+  InstanceConstSharedPtr address = *result;
+  EXPECT_EQ(IpVersion::v6, address->ip()->version());
+  EXPECT_EQ(
+      Runtime::runtimeFeatureEnabled(
+          "envoy.restart_features.address_factory_lazy_create_address_string"),
+      IpInstancePeer::getAddressString(static_cast<const IpInstance*>(address.get())).empty());
+  EXPECT_EQ("[1:23::ef]:32000", address->asStringView());
+  EXPECT_EQ(Type::Ip, address->type());
+  EXPECT_EQ("1:23::ef", address->ip()->addressAsString());
+  EXPECT_FALSE(address->ip()->isAnyAddress());
+  EXPECT_EQ(32000U, address->ip()->port());
+  EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("1:0023::0Ef"), *address));
+  EXPECT_EQ(nullptr, address->ip()->ipv4());
+  EXPECT_TRUE(address->ip()->isUnicastAddress());
+  EXPECT_EQ(nullptr, address->pipe());
+  EXPECT_EQ(nullptr, address->envoyInternalAddress());
 }
 
 TEST(Ipv6InstanceTest, AddressOnly) {
