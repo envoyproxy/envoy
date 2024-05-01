@@ -222,6 +222,7 @@ envoy_cc_test(
     deps = [
         ":xds_test_utility_lib",
         "//source/common/config:xds_resource_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

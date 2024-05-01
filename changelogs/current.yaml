@@ -13,6 +13,11 @@ minor_behavior_changes:
 - area: tracers
   change: |
     Set status code for OpenTelemetry tracers (previously unset).
+- area: xds
+  change: |
+    Updated xDS-TP path naming to better comply with RFC-3986. Encoded resource paths can now include an a colon ``:``,
+    instead of ``%3A``. This behavior can be reverted by setting the runtime flag
+    ``envoy.reloadable_features.xdstp_path_avoid_colon_encoding`` to ``false``.
 - area: udp
   change: |
     Change GRO read buffer to 64kB to avoid MSG_TRUNC. And change the way to limit the number of packets processed per event
