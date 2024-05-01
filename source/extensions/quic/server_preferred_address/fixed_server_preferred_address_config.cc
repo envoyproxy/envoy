@@ -8,25 +8,12 @@ namespace Quic {
 
 namespace {
 
-quic::QuicSocketAddress
-ipOrAddressToAddress(const FixedServerPreferredAddressConfig::QuicSocketOrIpAddress& address,
-                     int32_t port) {
-  return absl::visit(
-      [&](const auto& arg) -> quic::QuicSocketAddress {
-        using T = std::decay_t<decltype(arg)>;
+quic::QuicSocketAddress ipOrAddressToAddress(const quic::QuicSocketAddress& address, int32_t port) {
+  if (address.port() == 0) {
+    return quic::QuicSocketAddress(address.host(), port);
+  }
 
-        if constexpr (std::is_same_v<T, quic::QuicSocketAddress>) {
-          return arg;
-        }
-
-        if constexpr (std::is_same_v<T, quic::QuicIpAddress>) {
-          return quic::QuicSocketAddress(arg, port);
-        }
-
-        IS_ENVOY_BUG(fmt::format("Unhandled type in variant visitor: {}", address.index()));
-        return {};
-      },
-      address);
+  return address;
 }
 
 quic::QuicIpAddress parseIp(const std::string& addr, absl::string_view address_family,
@@ -59,6 +46,51 @@ quic::QuicSocketAddress parseSocketAddress(const envoy::config::core::v3::Socket
   return envoyIpAddressToQuicSocketAddress(envoy_addr->ip());
 }
 
+quic::QuicIpAddress
+parseIpAddressFromSocketAddress(const envoy::config::core::v3::SocketAddress& addr,
+                                Network::Address::IpVersion version, absl::string_view version_str,
+                                const Protobuf::Message& message) {
+  auto socket_addr = parseSocketAddress(addr, version, version_str, message);
+  if (socket_addr.port() != 0) {
+    ProtoExceptionUtil::throwProtoValidationException(
+        fmt::format("port must be 0 in this version of Envoy in address '{}'",
+                    socket_addr.ToString()),
+        message);
+  }
+
+  return socket_addr.host();
+}
+
+FixedServerPreferredAddressConfig::FamilyAddresses
+parseFamily(const std::string& addr_string,
+            const envoy::extensions::quic::server_preferred_address::v3::
+                FixedServerPreferredAddressConfig::Addresses* addresses,
+            Network::Address::IpVersion version, absl::string_view address_family,
+            const Protobuf::Message& message) {
+  FixedServerPreferredAddressConfig::FamilyAddresses ret;
+  if (addresses != nullptr) {
+    if (addresses->has_dnat_address() && !addresses->has_address()) {
+      ProtoExceptionUtil::throwProtoValidationException(
+          absl::StrCat("'dnat_address' but not 'address' is set in server preferred address for ",
+                       address_family),
+          message);
+    }
+    if (addresses->has_address()) {
+      ret.spa_ = parseSocketAddress(addresses->address(), version, address_family, message);
+    }
+    if (addresses->has_dnat_address()) {
+      ret.dnat_ = parseIpAddressFromSocketAddress(addresses->dnat_address(), version,
+                                                  address_family, message);
+    }
+  } else {
+    if (!addr_string.empty()) {
+      ret.spa_ = quic::QuicSocketAddress(parseIp(addr_string, address_family, message), 0);
+    }
+  }
+
+  return ret;
+}
+
 } // namespace
 
 EnvoyQuicServerPreferredAddressConfig::Addresses
@@ -66,10 +98,10 @@ FixedServerPreferredAddressConfig::getServerPreferredAddresses(
     const Network::Address::InstanceConstSharedPtr& local_address) {
   int32_t port = local_address->ip()->port();
   Addresses addresses;
-  addresses.ipv4_ = ipOrAddressToAddress(ip_v4_, port);
-  addresses.ipv6_ = ipOrAddressToAddress(ip_v6_, port);
-  addresses.dnat_ipv4_ = quic::QuicSocketAddress(dnat_ip_v4_, port);
-  addresses.dnat_ipv6_ = quic::QuicSocketAddress(dnat_ip_v6_, port);
+  addresses.ipv4_ = ipOrAddressToAddress(v4_.spa_, port);
+  addresses.ipv6_ = ipOrAddressToAddress(v6_.spa_, port);
+  addresses.dnat_ipv4_ = quic::QuicSocketAddress(v4_.dnat_, port);
+  addresses.dnat_ipv6_ = quic::QuicSocketAddress(v6_.dnat_, port);
   return addresses;
 }
 
@@ -81,47 +113,15 @@ FixedServerPreferredAddressConfigFactory::createServerPreferredAddressConfig(
       MessageUtil::downcastAndValidate<const envoy::extensions::quic::server_preferred_address::v3::
                                            FixedServerPreferredAddressConfig&>(message,
                                                                                validation_visitor);
-  FixedServerPreferredAddressConfig::QuicSocketOrIpAddress ip_v4, ip_v6;
-  switch (config.ipv4_type_case()) {
-  case envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig::
-      kIpv4Address:
-    ip_v4 = parseIp(config.ipv4_address(), "v4", message);
-    break;
-  case envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig::
-      kIpv4AddressAndPort:
-    ip_v4 = parseSocketAddress(config.ipv4_address_and_port(), Network::Address::IpVersion::v4,
-                               "v4", message);
-    break;
-  case envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig::
-      IPV4_TYPE_NOT_SET:
-    break;
-  }
 
-  switch (config.ipv6_type_case()) {
-  case envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig::
-      kIpv6Address:
-    ip_v6 = parseIp(config.ipv6_address(), "v6", message);
-    break;
-  case envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig::
-      kIpv6AddressAndPort:
-    ip_v6 = parseSocketAddress(config.ipv6_address_and_port(), Network::Address::IpVersion::v6,
-                               "v6", message);
-    break;
-  case envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig::
-      IPV6_TYPE_NOT_SET:
-    break;
-  }
+  auto v4 =
+      parseFamily(config.ipv4_address(), config.has_ipv4_config() ? &config.ipv4_config() : nullptr,
+                  Network::Address::IpVersion::v4, "v4", message);
+  auto v6 =
+      parseFamily(config.ipv6_address(), config.has_ipv6_config() ? &config.ipv6_config() : nullptr,
+                  Network::Address::IpVersion::v6, "v6", message);
 
-  quic::QuicIpAddress dnat_v4, dnat_v6;
-  if (config.has_ipv4_dnat_address()) {
-    dnat_v4 = parseIp(config.ipv4_dnat_address(), "dnat v4", message);
-  }
-
-  if (config.has_ipv6_dnat_address()) {
-    dnat_v6 = parseIp(config.ipv6_dnat_address(), "dnat v6", message);
-  }
-
-  return std::make_unique<FixedServerPreferredAddressConfig>(ip_v4, ip_v6, dnat_v4, dnat_v6);
+  return std::make_unique<FixedServerPreferredAddressConfig>(v4, v6);
 }
 
 REGISTER_FACTORY(FixedServerPreferredAddressConfigFactory,

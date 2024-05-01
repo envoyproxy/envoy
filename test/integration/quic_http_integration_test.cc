@@ -1955,12 +1955,16 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDNAT) {
         preferred_address_config->set_name("quic.server_preferred_address.fixed");
         envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig
             server_preferred_address;
-        server_preferred_address.mutable_ipv4_address_and_port()->set_address("1.2.3.4");
-        server_preferred_address.mutable_ipv4_address_and_port()->set_port_value(12345);
-        server_preferred_address.mutable_ipv6_address_and_port()->set_address("::1");
-        server_preferred_address.mutable_ipv6_address_and_port()->set_port_value(12345);
-        server_preferred_address.set_ipv4_dnat_address("127.0.0.2");
-        server_preferred_address.set_ipv6_dnat_address("::2");
+        server_preferred_address.mutable_ipv4_config()->mutable_address()->set_address("1.2.3.4");
+        server_preferred_address.mutable_ipv4_config()->mutable_address()->set_port_value(12345);
+        server_preferred_address.mutable_ipv4_config()->mutable_dnat_address()->set_address(
+            "127.0.0.2");
+        server_preferred_address.mutable_ipv4_config()->mutable_dnat_address()->set_port_value(0);
+
+        server_preferred_address.mutable_ipv6_config()->mutable_address()->set_address("::1");
+        server_preferred_address.mutable_ipv6_config()->mutable_address()->set_port_value(12345);
+        server_preferred_address.mutable_ipv6_config()->mutable_dnat_address()->set_address("::2");
+        server_preferred_address.mutable_ipv6_config()->mutable_dnat_address()->set_port_value(0);
         preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
 
         // Configure a test listener filter which is incompatible with any server preferred

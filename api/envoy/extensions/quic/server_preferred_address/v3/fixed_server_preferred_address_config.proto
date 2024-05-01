@@ -40,29 +40,22 @@ message FixedServerPreferredAddressConfig {
     //
     // Note: Envoy currently must receive all packets for a QUIC connection on the same port, so the
     // port for this address must be zero, and the listener's port will be used instead.
-
-    config.core.v3.SocketAddress dnat_address = 1;
+    config.core.v3.SocketAddress dnat_address = 2;
   }
 
-  oneof ipv4_type {
-    // String representation of IPv4 address, i.e. "127.0.0.2".
-    // The listener's port will be used.
-    // If not specified, none will be configured.
-    string ipv4_address = 1;
-
-  }
+  // String representation of IPv4 address, i.e. "127.0.0.2".
+  // The listener's port will be used.
+  // If not specified, none will be configured.
+  string ipv4_address = 1;
 
   // The IPv4 address to advertise to clients for Server Preferred Address.
   // This field takes precedence over `ipv4_address`.
   Addresses ipv4_config = 3;
 
-  oneof ipv6_type {
-    // String representation of IPv6 address, i.e. "::1".
-    // The listener's port will be used.
-    // If not specified, none will be configured.
-    string ipv6_address = 2;
-
-  }
+  // String representation of IPv6 address, i.e. "::1".
+  // The listener's port will be used.
+  // If not specified, none will be configured.
+  string ipv6_address = 2;
 
   // The IPv6 address to advertise to clients for Server Preferred Address.
   // This field takes precedence over `ipv6_address`.

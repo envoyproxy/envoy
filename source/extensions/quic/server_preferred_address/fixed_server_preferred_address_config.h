@@ -11,22 +11,20 @@ namespace Quic {
 
 class FixedServerPreferredAddressConfig : public Quic::EnvoyQuicServerPreferredAddressConfig {
 public:
-  using QuicSocketOrIpAddress = absl::variant<quic::QuicSocketAddress, quic::QuicIpAddress>;
+  struct FamilyAddresses {
+    quic::QuicSocketAddress spa_;
+    quic::QuicIpAddress dnat_;
+  };
 
-  FixedServerPreferredAddressConfig(const QuicSocketOrIpAddress& ipv4,
-                                    const QuicSocketOrIpAddress& ipv6,
-                                    const quic::QuicIpAddress ipv4_dnat,
-                                    const quic::QuicIpAddress ipv6_dnat)
-      : ip_v4_(ipv4), ip_v6_(ipv6), dnat_ip_v4_(ipv4_dnat), dnat_ip_v6_(ipv6_dnat) {}
+  FixedServerPreferredAddressConfig(const FamilyAddresses& v4, const FamilyAddresses& v6)
+      : v4_(v4), v6_(v6) {}
 
   Addresses getServerPreferredAddresses(
       const Network::Address::InstanceConstSharedPtr& local_address) override;
 
 private:
-  const QuicSocketOrIpAddress ip_v4_;
-  const QuicSocketOrIpAddress ip_v6_;
-  const quic::QuicIpAddress dnat_ip_v4_;
-  const quic::QuicIpAddress dnat_ip_v6_;
+  const FamilyAddresses v4_;
+  const FamilyAddresses v6_;
 };
 
 class FixedServerPreferredAddressConfigFactory
