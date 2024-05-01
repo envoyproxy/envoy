@@ -6,11 +6,11 @@
 #include "envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.pb.validate.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "oauth.h"
-
 #include "source/extensions/http/injected_credentials/common/credential.h"
 #include "source/extensions/http/injected_credentials/common/secret_reader.h"
 #include "source/extensions/http/injected_credentials/oauth2/oauth_client.h"
+
+#include "oauth.h"
 
 namespace Envoy {
 namespace Extensions {
