@@ -230,7 +230,7 @@ jobs:
   # This condition ensures that this (required) job passes if all of
   # the preceeding jobs either pass or are skipped
   # adapted from:
-  #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+  #  https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
   condition: |
     and(
       in(dependencies.prechecks.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),

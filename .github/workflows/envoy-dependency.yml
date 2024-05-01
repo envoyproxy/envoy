@@ -43,9 +43,12 @@ jobs:
            github.event_name == 'workflow_dispatch'
            && startsWith(inputs.task, 'bazel')
       }}
-    name: >-
+    name: >
       Update dep
-      (${{ inputs.pr && 'PR/' || '' }}${{ inputs.task == 'bazel' && 'bazel' || 'bazel/api' }}/${{ inputs.dependency }}/${{ inputs.version }})
+       (${{ inputs.pr && 'PR/' || '' }}
+      ${{ inputs.task == 'bazel' && 'bazel' || 'bazel/api' }}
+      /${{ inputs.dependency }}
+      /${{ inputs.version }})
     runs-on: ubuntu-22.04
     steps:
     - id: appauth

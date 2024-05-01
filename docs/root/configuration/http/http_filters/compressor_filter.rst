@@ -29,7 +29,8 @@ An example configuration of the filter may look like the following:
 .. literalinclude:: _include/compressor-filter.yaml
     :language: yaml
     :linenos:
-    :lines: 33-56
+    :lineno-start: 37
+    :lines: 37-60
     :caption: :download:`compressor-filter.yaml <_include/compressor-filter.yaml>`
 
 By *default* request compression is disabled, but when enabled it will be *skipped* if:
@@ -114,7 +115,8 @@ For example, to disable response compression for a particular virtual host, but 
 .. literalinclude:: _include/compressor-filter.yaml
     :language: yaml
     :linenos:
-    :lines: 14-32
+    :lineno-start: 14
+    :lines: 14-36
     :caption: :download:`compressor-filter.yaml <_include/compressor-filter.yaml>`
 
 Using different compressors for requests and responses
