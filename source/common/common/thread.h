@@ -141,7 +141,7 @@ public:
 
   /**
    * Returns whether the underlying pointer at the index is null.
-   * 
+   *
    * @param index the Index to look up.
    * @return true if the underlying pointer at the index is null.
    */
