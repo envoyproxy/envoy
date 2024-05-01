@@ -5,7 +5,7 @@ FROM otel/opentelemetry-collector:latest@sha256:bba8474ea69d11f0450e38c50040efea
 
 COPY --from=otelc_curl / /
 
-COPY ./otel-collector-config.yaml /etc/otel-collector-config.yaml
+COPY ./otel-collector-config.yml /etc/otel-collector-config.yaml
 USER 0
 RUN chmod o+r /etc/otel-collector-config.yaml
 USER nobody
