@@ -310,6 +310,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
+    _com_github_intel_ipp_crypto_crypto_mb_fips()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
@@ -348,7 +349,6 @@ def envoy_dependencies(skip_targets = []):
     _org_brotli()
     _com_github_facebook_zstd()
     _re2()
-    _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emsdk()
@@ -547,6 +547,19 @@ def _com_github_intel_ipp_crypto_crypto_mb():
     external_http_archive(
         name = "com_github_intel_ipp_crypto_crypto_mb",
         build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_intel_ipp_crypto_crypto_mb_fips():
+    # Temporary fix for building ipp-crypto when boringssl-fips is used.
+    # Build will fail if bn2lebinpad patch is applied. Remove this archive
+    # when upstream dependency fixes this issue.
+    external_http_archive(
+        name = "com_github_intel_ipp_crypto_crypto_mb_fips",
+        patches = ["@envoy//bazel/foreign_cc:ipp-crypto-bn2lebinpad.patch"],
+        patch_args = ["-p1"],
+        build_file_content = BUILD_ALL_CONTENT,
+        # Use existing ipp-crypto repository location name to avoid redefinition.
+        location_name = "com_github_intel_ipp_crypto_crypto_mb",
     )
 
 def _com_github_intel_qatlib():
@@ -1011,6 +1024,30 @@ def _com_google_protobuf():
         name = "python_headers",
         actual = "//bazel:python_headers",
     )
+    native.bind(
+        name = "upb_base_lib",
+        actual = "@com_google_protobuf//upb:base",
+    )
+    native.bind(
+        name = "upb_mem_lib",
+        actual = "@com_google_protobuf//upb:mem",
+    )
+    native.bind(
+        name = "upb_message_lib",
+        actual = "@com_google_protobuf//upb:message",
+    )
+    native.bind(
+        name = "upb_json_lib",
+        actual = "@com_google_protobuf//upb:json",
+    )
+    native.bind(
+        name = "upb_textformat_lib",
+        actual = "@com_google_protobuf//upb:text",
+    )
+    native.bind(
+        name = "upb_reflection",
+        actual = "@com_google_protobuf//upb:reflection",
+    )
 
 def _io_opencensus_cpp():
     external_http_archive(
@@ -1205,41 +1242,6 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
     )
 
-    native.bind(
-        name = "upb_collections_lib",
-        actual = "@upb//:collections",
-    )
-
-    native.bind(
-        name = "upb_lib_descriptor",
-        actual = "@upb//:descriptor_upb_proto",
-    )
-
-    native.bind(
-        name = "upb_lib_descriptor_reflection",
-        actual = "@upb//:descriptor_upb_proto_reflection",
-    )
-
-    native.bind(
-        name = "upb_textformat_lib",
-        actual = "@upb//:textformat",
-    )
-
-    native.bind(
-        name = "upb_json_lib",
-        actual = "@upb//:json",
-    )
-
-    native.bind(
-        name = "upb_reflection",
-        actual = "@upb//:reflection",
-    )
-
-    native.bind(
-        name = "upb_generated_code_support__only_for_generated_code_do_not_use__i_give_permission_to_break_me",
-        actual = "@upb//:generated_code_support__only_for_generated_code_do_not_use__i_give_permission_to_break_me",
-    )
-
 def _com_github_rules_proto_grpc():
     external_http_archive("com_github_rules_proto_grpc")
 
@@ -1249,18 +1251,6 @@ def _re2():
     native.bind(
         name = "re2",
         actual = "@com_googlesource_code_re2//:re2",
-    )
-
-def _upb():
-    external_http_archive(
-        name = "upb",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:upb.patch"],
-    )
-
-    native.bind(
-        name = "upb_lib",
-        actual = "@upb//:upb",
     )
 
 def _proxy_wasm_cpp_sdk():

@@ -312,6 +312,11 @@ public:
       return *this;
     }
 
+    StreamOptions& setIsShadowSuffixDisabled(bool d) {
+      is_shadow_suffixed_disabled = d;
+      return *this;
+    }
+
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
@@ -351,6 +356,8 @@ public:
     Router::FilterConfigSharedPtr filter_config_;
 
     bool is_shadow{false};
+
+    bool is_shadow_suffixed_disabled{false};
   };
 
   /**
@@ -400,6 +407,10 @@ public:
     }
     RequestOptions& setIsShadow(bool s) {
       StreamOptions::setIsShadow(s);
+      return *this;
+    }
+    RequestOptions& setIsShadowSuffixDisabled(bool d) {
+      StreamOptions::setIsShadowSuffixDisabled(d);
       return *this;
     }
     RequestOptions& setParentSpan(Tracing::Span& parent_span) {

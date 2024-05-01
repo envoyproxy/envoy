@@ -773,6 +773,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               .setChildSpanName("mirror")
               .setSampled(shadow_policy.traceSampled())
               .setIsShadow(true)
+              .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
               .setBufferAccount(callbacks_->account())
               // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
               // because a buffer limit of zero on async clients is interpreted as no buffer limit.
@@ -1037,7 +1038,8 @@ void Filter::maybeDoShadowing() {
                        .setParentSpan(callbacks_->activeSpan())
                        .setChildSpanName("mirror")
                        .setSampled(shadow_policy.traceSampled())
-                       .setIsShadow(true);
+                       .setIsShadow(true)
+                       .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend());
     options.setFilterConfig(config_);
     config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
                                    options);
