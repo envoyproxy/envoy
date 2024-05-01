@@ -17,10 +17,10 @@ static_resources:
           enable_latency_threshold_metrics: true
           default_latency_threshold: "0.1s"
           latency_threshold_overrides:
-            - opcode: Create
-              threshold: "0.15s"
-            - opcode: Multi
-              threshold: "0.2s"
+          - opcode: Create
+            threshold: "0.15s"
+          - opcode: Multi
+            threshold: "0.2s"
       - name: envoy.filters.network.tcp_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy

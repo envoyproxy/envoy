@@ -10,26 +10,26 @@ project-lifecycle:
   status: active
   bug-fixes-only: false
   core-maintainers:  # from https://github.com/envoyproxy/envoy/blob/main/OWNERS.md
-# Senior maintainers
-    - github:mattklein123
-    - github:htuch
-    - github:alyssawilk
-    - github:zuercher
-    - github:lizan
-    - github:ggreenway
-    - github:yanavlasov
-    - github:phlax
-    - github:RyanTheOptimist
-    - github:wbpcode
-# Maintainers
-    - github:jmarantz
-    - github:adisuissa
-    - github:KBaichoo
-    - github:keith
-    - github:kyessenov
-    - github:ravenblackx
-    - github:soulxu
-    - github:nezdolik
+  # Senior maintainers
+  - github:mattklein123
+  - github:htuch
+  - github:alyssawilk
+  - github:zuercher
+  - github:lizan
+  - github:ggreenway
+  - github:yanavlasov
+  - github:phlax
+  - github:RyanTheOptimist
+  - github:wbpcode
+  # Maintainers
+  - github:jmarantz
+  - github:adisuissa
+  - github:KBaichoo
+  - github:keith
+  - github:kyessenov
+  - github:ravenblackx
+  - github:soulxu
+  - github:nezdolik
 contribution-policy:
   accepts-pull-requests: true
   accepts-automated-pull-requests: true
@@ -37,16 +37,16 @@ contribution-policy:
 dependencies:
   third-party-packages: true
   dependencies-lists:
-    - https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/external_deps
+  - https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/external_deps
   env-dependencies-policy:
     policy-url: https://github.com/envoyproxy/envoy/blob/main/DEPENDENCY_POLICY.md
 distribution-points:
-  - https://github.com/envoyproxy/envoy
+- https://github.com/envoyproxy/envoy
 documentation:
-  - https://www.envoyproxy.io/docs
+- https://www.envoyproxy.io/docs
 security-contacts:
-  - type: email
-    value: envoy-security@googlegroups.com
+- type: email
+  value: envoy-security@googlegroups.com
 security-testing:
 - tool-type: sca
   tool-name: Dependabot

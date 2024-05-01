@@ -46,7 +46,9 @@ jobs:
       shell: bash
       run: |
        sudo apt-get update --error-on=any
-       sudo apt-get install --yes libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
+       sudo apt-get install --yes \
+           libtool cmake automake autoconf make ninja-build curl unzip \
+           virtualenv openjdk-11-jdk build-essential libc++1
        # Note: the llvm/clang version should match the version specifed in:
        #  - bazel/repository_locations.bzl
        #  - .github/workflows/codeql-push.yml
@@ -61,7 +63,8 @@ jobs:
       run: |
        bazel/setup_clang.sh bin/clang14
        bazelisk shutdown
-       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ //source/common/http/...
+       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ \
+           //source/common/http/...
 
     - name: Clean Artifacts
       run: |

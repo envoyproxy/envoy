@@ -1,12 +1,16 @@
 admin:
   address:
-    socket_address: {address: 0.0.0.0, port_value: 9901}
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
 
 static_resources:
   listeners:
   - name: listener1
     address:
-      socket_address: {address: 0.0.0.0, port_value: 51051}
+      socket_address:
+        address: 0.0.0.0
+        port_value: 51051
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
@@ -20,16 +24,18 @@ static_resources:
             - name: local_service
               domains: ["*"]
               routes:
-              # NOTE: by default, matching happens based on the gRPC route, and not on the incoming request path.
-              # Reference: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_json_transcoder_filter#route-configs-for-transcoded-requests
-              - match: {prefix: "/helloworld.Greeter"}
-                route: {cluster: grpc, timeout: 60s}
+              - match:
+                  prefix: /helloworld.Greeter
+                route:
+                  cluster: grpc
+                  timeout: 60s
           http_filters:
           - name: envoy.filters.http.grpc_json_transcoder
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
-              proto_descriptor: "protos/helloworld.pb"
-              services: ["helloworld.Greeter"]
+              proto_descriptor: protos/helloworld.pb
+              services:
+              - helloworld.Greeter
               print_options:
                 add_whitespace: true
                 always_print_primitive_fields: true
