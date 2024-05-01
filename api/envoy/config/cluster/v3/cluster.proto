@@ -635,15 +635,6 @@ message Cluster {
     //   The specified percent will be truncated to the nearest 1%.
     type.v3.Percent healthy_panic_threshold = 1;
 
-    // Zone aware load balancing configuration.
-    //
-    // .. note::
-    //
-    //   This field may be deprecated in the future in favor of the :ref:`load_balancing_policy
-    //   <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
-    //   Please prefer the :ref:`load_balancing_policy
-    //   <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` to configure
-    //   load balancing policy.
     oneof locality_config_specifier {
       ZoneAwareLbConfig zone_aware_lb_config = 2;
 
@@ -676,14 +667,6 @@ message Cluster {
     bool close_connections_on_host_set_change = 6;
 
     // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
-    //
-    // .. note::
-    //
-    //   This field may be deprecated in the future in favor of the :ref:`load_balancing_policy
-    //   <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
-    //   Please prefer the :ref:`load_balancing_policy
-    //   <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` to configure
-    //   load balancing policy.
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
 
     // This controls what hosts are considered valid when using
@@ -861,14 +844,6 @@ message Cluster {
 
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
-  //
-  // .. note::
-  //
-  //   This field may be deprecated in the future in favor of the :ref:`load_balancing_policy
-  //   <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
-  //   Please prefer the :ref:`load_balancing_policy
-  //   <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` to configure
-  //   load balancing policy.
   LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true}];
 
   // Setting this is required for specifying members of
@@ -1072,14 +1047,6 @@ message Cluster {
   core.v3.BindConfig upstream_bind_config = 21;
 
   // Configuration for load balancing subsetting.
-  //
-  // .. note::
-  //
-  //   This field may be deprecated in the future in favor of the :ref:`load_balancing_policy
-  //   <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
-  //   Please prefer the :ref:`load_balancing_policy
-  //   <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` to configure
-  //   load balancing policy.
   LbSubsetConfig lb_subset_config = 22;
 
   // Optional configuration for the load balancing algorithm selected by
@@ -1090,14 +1057,6 @@ message Cluster {
   // has additional configuration options.
   // Specifying ring_hash_lb_config or maglev_lb_config or least_request_lb_config without setting the corresponding
   // LbPolicy will generate an error at runtime.
-  //
-  // .. note::
-  //
-  //   This field may be deprecated in the future in favor of the :ref:`load_balancing_policy
-  //   <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
-  //   Please prefer the :ref:`load_balancing_policy
-  //   <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` to configure
-  //   load balancing policy.
   oneof lb_config {
     // Optional configuration for the Ring Hash load balancing policy.
     RingHashLbConfig ring_hash_lb_config = 23;
