@@ -75,9 +75,19 @@ parseFamily(const std::string& addr_string,
                        address_family),
           message);
     }
+
     if (addresses->has_address()) {
       ret.spa_ = parseSocketAddress(addresses->address(), version, address_family, message);
+
+      if (!addresses->has_dnat_address() && ret.spa_.port() != 0) {
+        ProtoExceptionUtil::throwProtoValidationException(
+            fmt::format("'address' port must be zero unless 'dnat_address' is set in address {} "
+                        "for address family {}",
+                        ret.spa_.ToString(), address_family),
+            message);
+      }
     }
+
     if (addresses->has_dnat_address()) {
       ret.dnat_ = parseIpAddressFromSocketAddress(addresses->dnat_address(), version,
                                                   address_family, message);
