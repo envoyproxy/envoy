@@ -61,8 +61,8 @@ envoy_extension_cc_test(
     srcs = ["oauth2_config_test.cc"],
     extension_names = ["envoy.filters.http.credential_injector"],
     deps = [
-        "//test/mocks/server:factory_context_mocks",
         "//source/extensions/http/injected_credentials/oauth2:config",
+        "//test/mocks/server:factory_context_mocks",
     ],
 )
 
