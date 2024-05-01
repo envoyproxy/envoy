@@ -23,7 +23,7 @@ message FixedServerPreferredAddressConfig {
 
   option (xds.annotations.v3.message_status).work_in_progress = true;
 
-  // Addreses for server preferred address for a single address family (IPv4 or IPv6).
+  // Addresses for server preferred address for a single address family (IPv4 or IPv6).
   message Addresses {
     // The server preferred address sent to clients.
     //
