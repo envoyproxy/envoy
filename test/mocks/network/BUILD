@@ -43,6 +43,12 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "mock_parent_drained_callback_registrar",
+    hdrs = ["mock_parent_drained_callback_registrar.h"],
+    deps = ["//envoy/network:parent_drained_callback_registrar_interface"],
+)
+
+envoy_cc_mock(
     name = "network_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
@@ -82,5 +88,7 @@ envoy_cc_mock(
         "//envoy/network:transport_socket_interface",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
-    ],
+    ] + envoy_select_enable_http3([
+        "@com_github_google_quiche//:quic_client_crypto_crypto_handshake_lib",
+    ]),
 )

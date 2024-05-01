@@ -119,7 +119,7 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:uhv_enabled": ["-DENVOY_ENABLE_UHV"],
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
-           envoy_select_disable_exceptions(["-fno-unwind-tables", "-fno-exceptions"], repository) + \
+           envoy_select_disable_exceptions(["-fno-exceptions"], repository) + \
            envoy_select_admin_html(["-DENVOY_ADMIN_HTML"], repository) + \
            envoy_select_static_extension_registration(["-DENVOY_STATIC_EXTENSION_REGISTRATION"], repository) + \
            envoy_select_disable_logging(["-DENVOY_DISABLE_LOGGING"], repository) + \

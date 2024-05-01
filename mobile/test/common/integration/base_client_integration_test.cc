@@ -8,9 +8,8 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/bridge_utility.h"
-#include "library/cc/log_level.h"
-#include "library/common/engine.h"
 #include "library/common/http/header_utility.h"
+#include "library/common/internal_engine.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -48,31 +47,6 @@ void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expec
   ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
 }
 
-// Gets the spdlog level from the test options and converts it to the Platform::LogLevel used by
-// the Envoy Mobile engine.
-Platform::LogLevel getPlatformLogLevelFromOptions() {
-  switch (TestEnvironment::getOptions().logLevel()) {
-  case spdlog::level::level_enum::trace:
-    return Platform::LogLevel::trace;
-  case spdlog::level::level_enum::debug:
-    return Platform::LogLevel::debug;
-  case spdlog::level::level_enum::info:
-    return Platform::LogLevel::info;
-  case spdlog::level::level_enum::warn:
-    return Platform::LogLevel::warn;
-  case spdlog::level::level_enum::err:
-    return Platform::LogLevel::error;
-  case spdlog::level::level_enum::critical:
-    return Platform::LogLevel::critical;
-  case spdlog::level::level_enum::off:
-    return Platform::LogLevel::off;
-  default:
-    ENVOY_LOG_MISC(warn, "Couldn't map spdlog level {}. Using `info` level.",
-                   TestEnvironment::getOptions().logLevel());
-    return Platform::LogLevel::info;
-  }
-}
-
 } // namespace
 
 // Use the Envoy mobile default config as much as possible in this test.
@@ -95,7 +69,8 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
   defer_listener_finalization_ = true;
   memset(&last_stream_final_intel_, 0, sizeof(envoy_final_stream_intel));
 
-  builder_.addLogLevel(getPlatformLogLevelFromOptions());
+  builder_.setLogLevel(
+      static_cast<Logger::Logger::Levels>(TestEnvironment::getOptions().logLevel()));
   // The admin interface gets added by default in the ConfigHelper's constructor. Since the admin
   // interface gets compiled out by default in Envoy Mobile, remove it from the ConfigHelper's
   // bootstrap config.
@@ -221,7 +196,7 @@ uint64_t BaseClientIntegrationTest::getCounterValue(const std::string& name) {
   uint64_t counter_value = 0UL;
   uint64_t* counter_value_ptr = &counter_value;
   absl::Notification counter_value_set;
-  auto engine = reinterpret_cast<Envoy::Engine*>(rawEngine());
+  auto engine = reinterpret_cast<Envoy::InternalEngine*>(rawEngine());
   engine->dispatcher().post([&] {
     Stats::CounterSharedPtr counter = TestUtility::findCounter(engine->getStatsStore(), name);
     if (counter != nullptr) {
@@ -252,7 +227,7 @@ uint64_t BaseClientIntegrationTest::getGaugeValue(const std::string& name) {
   uint64_t gauge_value = 0UL;
   uint64_t* gauge_value_ptr = &gauge_value;
   absl::Notification gauge_value_set;
-  auto engine = reinterpret_cast<Envoy::Engine*>(rawEngine());
+  auto engine = reinterpret_cast<Envoy::InternalEngine*>(rawEngine());
   engine->dispatcher().post([&] {
     Stats::GaugeSharedPtr gauge = TestUtility::findGauge(engine->getStatsStore(), name);
     if (gauge != nullptr) {

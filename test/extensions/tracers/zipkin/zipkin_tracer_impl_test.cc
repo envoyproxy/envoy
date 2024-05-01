@@ -566,7 +566,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
 
-  span->injectContext(request_headers_, nullptr);
+  span->injectContext(request_headers_, Tracing::UpstreamContext());
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
 
@@ -589,7 +589,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
 
-  span->injectContext(request_headers_, nullptr);
+  span->injectContext(request_headers_, Tracing::UpstreamContext());
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
   // Check B3 sampled flag is set to not sample
@@ -611,7 +611,7 @@ TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
 
-  span->injectContext(request_headers_, nullptr);
+  span->injectContext(request_headers_, Tracing::UpstreamContext());
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
   // Check B3 sampled flag is set to sample
@@ -725,7 +725,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   // ====
   Tracing::SpanPtr span6 = driver_->startSpan(config_, request_headers_, stream_info_,
                                               operation_name_, {Tracing::Reason::Sampling, true});
-  EXPECT_EQ(span6->getTraceIdAsHex(), "");
+  EXPECT_EQ(span6->getTraceIdAsHex(), "0000000000000000");
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
@@ -798,6 +798,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
   EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
   EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());
   EXPECT_TRUE(zipkin_span->span().sampled());
+  EXPECT_EQ(trace_id, zipkin_span->getTraceIdAsHex());
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
@@ -852,7 +853,7 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledFalse) {
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
 
-  span->injectContext(request_headers_, nullptr);
+  span->injectContext(request_headers_, Tracing::UpstreamContext());
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
   // Check B3 sampled flag is set to not sample
@@ -869,7 +870,7 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
 
-  span->injectContext(request_headers_, nullptr);
+  span->injectContext(request_headers_, Tracing::UpstreamContext());
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
   // Check B3 sampled flag is set to sample
@@ -898,7 +899,7 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   };
 
   span->setSampled(true);
-  span->injectContext(request_headers_, nullptr);
+  span->injectContext(request_headers_, Tracing::UpstreamContext());
   request_headers_.forEach([&dup_callback](absl::string_view key, absl::string_view) -> bool {
     dup_callback(key);
     return true;

@@ -6,6 +6,7 @@ ABI
 ACK
 ACL
 AES
+AJAX
 AllMuxes
 ALPN
 ALS
@@ -26,6 +27,9 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+ECN
+ECS
+EKS
 NID
 NIST
 bm
@@ -176,6 +180,7 @@ FIRSTHDR
 FQDN
 FREEBIND
 curr
+doo
 eslint
 freeifaddrs
 FUZZER
@@ -258,6 +263,7 @@ LEV
 LF
 LHS
 hls
+hoo
 iframe
 ilp
 ingressed
@@ -312,6 +318,7 @@ ODCDS
 middlewildcard
 monostate
 mpd
+mutators
 na
 oghttp
 OID
@@ -353,6 +360,7 @@ QUIC
 QoS
 qat
 qatzip
+qatzstd
 RAII
 RANLUX
 RBAC
@@ -469,7 +477,6 @@ VM
 VPN
 WAITFORONE
 WASM
-WAVM
 WIP
 WKT
 WRONGPASS
@@ -747,6 +754,7 @@ exe
 execlp
 exprfor
 expectable
+extensibility
 extrahelp
 faceplant
 facto
@@ -768,6 +776,8 @@ fixdate
 fixup
 flatbuffer
 flatc
+fluentd
+Fluentd
 fmt
 fmtlib
 fn
@@ -878,6 +888,7 @@ iteratively
 javascript
 jitter
 jittered
+joinable
 js
 kafka
 keepalive
@@ -964,6 +975,7 @@ moveable
 msec
 msg
 msghdr
+msgpack
 multi
 multicast
 multikill
@@ -992,6 +1004,7 @@ netblocks
 netfilter
 netlink
 netmask
+NLB
 NLMSG
 nonblocking
 noncopyable
@@ -1172,6 +1185,7 @@ reparse
 repeatability
 reperform
 repicked
+replayable
 repo
 reproducibility
 requirepass
@@ -1319,6 +1333,7 @@ suf
 superclass
 superroot
 superset
+supportability
 svc
 symlink
 symlinked
@@ -1461,6 +1476,7 @@ xxhash
 xxs
 xyz
 xyzwebservices
+yml
 zag
 zig
 zipkin

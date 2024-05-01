@@ -13,7 +13,6 @@ import org.chromium.net.BidirectionalStream;
 import org.chromium.net.CallbackException;
 import org.chromium.net.CronetException;
 import org.chromium.net.ExperimentalBidirectionalStream;
-import org.chromium.net.NetworkException;
 import org.chromium.net.RequestFinishedInfo;
 import org.chromium.net.UrlResponseInfo;
 import org.chromium.net.impl.Annotations.RequestPriority;
@@ -27,8 +26,8 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -255,7 +254,6 @@ public final class CronvoyBidirectionalStream
           case NextAction.TAKE_NO_MORE_ACTIONS:
             // Very unlikely: just before this switch statement and after the previous one, an EM
             // onError callback occurred, or there was a USER_CANCEL event.
-            return;
           }
         }
       } catch (Exception e) {
@@ -765,8 +763,8 @@ public final class CronvoyBidirectionalStream
     }
     // proxy and caching are not supported.
     CronvoyUrlResponseInfoImpl responseInfo =
-        new CronvoyUrlResponseInfoImpl(Arrays.asList(mInitialUrl), httpStatusCode, "", headers,
-                                       false, negotiatedProtocol, null, receivedByteCount);
+        new CronvoyUrlResponseInfoImpl(Collections.singletonList(mInitialUrl), httpStatusCode, "",
+                                       headers, false, negotiatedProtocol, null, receivedByteCount);
     return responseInfo;
   }
 

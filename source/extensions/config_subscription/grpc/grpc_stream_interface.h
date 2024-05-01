@@ -11,7 +11,7 @@ namespace Config {
 template <class RequestProto, class ResponseProto>
 class GrpcStreamInterface : public Grpc::AsyncStreamCallbacks<ResponseProto> {
 public:
-  virtual ~GrpcStreamInterface() = default;
+  ~GrpcStreamInterface() override = default;
 
   // Attempt to establish a new gRPC stream to the xDS server.
   virtual void establishNewStream() PURE;

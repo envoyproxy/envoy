@@ -15,6 +15,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
@@ -64,6 +65,16 @@ namespace {
 class MockInternalListenerManager : public InternalListenerManager {
 public:
   MOCK_METHOD(InternalListenerOptRef, findByAddress, (const Address::InstanceConstSharedPtr&), ());
+};
+
+class NoopConnectionExecutionContext : public ExecutionContext {
+public:
+  NoopConnectionExecutionContext() = default;
+  ~NoopConnectionExecutionContext() override = default;
+
+protected:
+  void activate() override {}
+  void deactivate() override {}
 };
 
 TEST(RawBufferSocket, TestBasics) {
@@ -124,12 +135,13 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>();
-  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr);
-  EXPECT_DEATH(
+  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+  EXPECT_ENVOY_BUG(
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
                      Network::Test::createRawBufferSocket(), stream_info, false),
-      ".*assert failure: SOCKET_VALID\\(fd\\)");
+      "Client socket failure");
 }
 
 class TestClientConnectionImpl : public Network::ClientConnectionImpl {
@@ -141,7 +153,8 @@ public:
 class ConnectionImplTestBase {
 protected:
   ConnectionImplTestBase()
-      : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_, nullptr) {}
+      : api_(Api::createApiForTest(time_system_)),
+        stream_info_(time_system_, nullptr, StreamInfo::FilterState::LifeSpan::Connection) {}
 
   virtual ~ConnectionImplTestBase() {
     EXPECT_TRUE(timer_destroyed_ || timer_ == nullptr);
@@ -331,6 +344,27 @@ TEST_P(ConnectionImplTest, SetSslConnection) {
   EXPECT_EQ(ssl_info, client_connection_->ssl());
   EXPECT_EQ(ssl_info, client_connection_->connectionInfoProvider().sslConnection());
   disconnect(false);
+}
+
+TEST_P(ConnectionImplTest, SetGetExecutionContextFilterState) {
+  setUpBasicConnection();
+  connect();
+
+  EXPECT_EQ(getConnectionExecutionContext(*client_connection_), nullptr);
+
+  const StreamInfo::FilterStateSharedPtr& filter_state =
+      client_connection_->streamInfo().filterState();
+  auto connection_execution_context = std::make_unique<NoopConnectionExecutionContext>();
+  const NoopConnectionExecutionContext* context_pointer =
+      connection_execution_context.get(); // Not owned.
+  auto filter_state_object = std::make_shared<ConnectionExecutionContextFilterState>(
+      std::move(connection_execution_context));
+  filter_state->setData(kConnectionExecutionContextFilterStateName, filter_state_object,
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::Connection);
+
+  EXPECT_EQ(getConnectionExecutionContext(*client_connection_), context_pointer);
+  disconnect(true);
 }
 
 TEST_P(ConnectionImplTest, GetCongestionWindow) {
@@ -761,29 +795,6 @@ TEST_P(ConnectionImplTest, ServerResetClose) {
         EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::LocalReset);
       }));
 
-  server_connection_->close(ConnectionCloseType::AbortReset);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-}
-
-// Test the RST close and detection feature is disabled by runtime_guard.
-TEST_P(ConnectionImplTest, ServerResetCloseRuntimeDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.detect_and_raise_rst_tcp_connection", "false"}});
-  setUpBasicConnection();
-  connect();
-
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(InvokeWithoutArgs([&]() -> void {
-        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::Normal);
-        dispatcher_->exit();
-      }));
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
-      .WillOnce(InvokeWithoutArgs([&]() -> void {
-        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::Normal);
-      }));
-
-  // Originally it should close the connection by RST.
   server_connection_->close(ConnectionCloseType::AbortReset);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -2518,7 +2529,9 @@ private:
 
 class MockTransportConnectionImplTest : public testing::Test {
 public:
-  MockTransportConnectionImplTest() : stream_info_(dispatcher_.timeSource(), nullptr) {
+  MockTransportConnectionImplTest()
+      : stream_info_(dispatcher_.timeSource(), nullptr,
+                     StreamInfo::FilterState::LifeSpan::Connection) {
     EXPECT_CALL(dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
     EXPECT_CALL(dispatcher_.buffer_factory_, createBuffer_(_, _, _))
         .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,

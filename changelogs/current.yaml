@@ -2,42 +2,76 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: thread_local
+  change: |
+    Changes the behavior of the ``SlotImpl`` class destructor. With this change the destructor can be called on any thread.
+    This behavior can be reverted by setting the runtime flag ``envoy.reloadable_features.allow_slot_destroy_on_worker_threads``
+    to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: adaptive concurrency filter stats
+- area: tracers
   change: |
-    Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
+    Set status code for OpenTelemetry tracers (previously unset).
+- area: udp
+  change: |
+    Change GRO read buffer to 64kB to avoid MSG_TRUNC. And change the way to limit the number of packets processed per event
+    loop to work with GRO. This behavior can be reverted by setting runtime guard
+    ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: tracers
+- area: outlier detection
   change: |
-    use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
+    Fixed :ref:`successful_active_health_check_uneject_host
+    <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`.
+    Before, a failed health check could uneject the host if the ``FAILED_ACTIVE_HC`` health flag had not been set.
+- area: tls
+  change: |
+    Fix a RELEASE_ASSERT when using :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>`
+    if the downstream request ``:authority`` was longer than 255 characters.
+- area: http
+  change: |
+    Fix a crash when reloading the HTTP Connection Manager via ECDS.
+- area: cares
+  change: |
+    Upgraded c-ares library to 1.20.1 and added fix to c-ares DNS implementation to additionally check for ``ARES_EREFUSED``,
+    ``ARES_ESERVFAIL``and ``ARES_ENOTIMP`` status. Without this fix, ``DestroyChannelOnRefused`` and
+    ``CustomResolverValidAfterChannelDestruction`` unit test will break.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: http
   change: |
-    Removed ``envoy.reloadable_features.allow_absolute_url_with_mixed_scheme`` runtime flag and legacy code paths.
+    Removed ``envoy.reloadable_features.proxy_status_upstream_request_timeout`` runtime flag and lagacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.handle_uppercase_scheme`` runtime flag and legacy code paths.
+- area: tcp
+  change: |
+    Removed ``envoy.reloadable_features.detect_and_raise_rst_tcp_connection`` runtime flag and legacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and lagacy code paths.
+- area: router
+  change: |
+    Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
 
 new_features:
-- area: grpc reverse bridge
+- area: matching
   change: |
-    Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter
-    to preserve HTTP 1.1 responses.  This behavioral change can be temporarily reverted by setting runtime guard
-    ``envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status`` to false.
-- area: ext_proc
+    Added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`
+    for matching http input based on filter state objects.
+- area: cares
   change: |
-    implemented
-    :ref:`request_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.request_attributes>`
-    and
-    :ref:`response_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.response_attributes>`
-    config APIs to enable sending and receiving attributes to/from the external processing server.
-- area: access log
+    Added :ref:`udp_max_queries<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.udp_max_queries>`
+    option to limit the number of UDP queries.
+- area: http
   change: |
-    added support for :ref:`%UPSTREAM_CONNECTION_ID% <config_access_log_format_upstream_connection_id>` for the upstream connection
-    identifier.
+    Added :ref:`disable_shadow_host_suffix_append
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
+    in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>`
+    for disabling appending of the ``-shadow`` suffix to the shadowed host/authority header.
 - area: healthcheck
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting

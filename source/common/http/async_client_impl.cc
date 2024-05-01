@@ -1,30 +1,34 @@
 #include "source/common/http/async_client_impl.h"
 
-#include <chrono>
-#include <map>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/router/router.h"
 
 #include "source/common/grpc/common.h"
+#include "source/common/http/null_route_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/common/upstream/retry_factory.h"
 
 namespace Envoy {
 namespace Http {
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Stats::Store& stats_store, Event::Dispatcher& dispatcher,
-                                 const LocalInfo::LocalInfo& local_info,
-                                 Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                                 Random::RandomGenerator& random,
+                                 Upstream::ClusterManager& cm,
+                                 Server::Configuration::CommonFactoryContext& factory_context,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context, Router::Context& router_context)
-    : singleton_manager_(cm.clusterManagerFactory().singletonManager()), cluster_(cluster),
-      config_(http_context.asyncClientStatPrefix(), local_info, *stats_store.rootScope(), cm,
-              runtime, random, std::move(shadow_writer), true, false, false, false, false, false,
-              {}, dispatcher.timeSource(), http_context, router_context),
+    : factory_context_(factory_context), cluster_(cluster),
+      config_(std::make_shared<Router::FilterConfig>(
+          factory_context, http_context.asyncClientStatPrefix(), factory_context.localInfo(),
+          *stats_store.rootScope(), cm, factory_context.runtime(),
+          factory_context.api().randomGenerator(), std::move(shadow_writer), true, false, false,
+          false, false, false, Protobuf::RepeatedPtrField<std::string>{}, dispatcher.timeSource(),
+          http_context, router_context)),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -75,16 +79,38 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
   return active_streams_.front().get();
 }
 
+std::unique_ptr<const Router::RetryPolicy>
+createRetryPolicy(AsyncClientImpl& parent, const AsyncClient::StreamOptions& options,
+                  Server::Configuration::CommonFactoryContext& context) {
+  if (options.retry_policy.has_value()) {
+    Upstream::RetryExtensionFactoryContextImpl factory_context(
+        parent.factory_context_.singletonManager());
+    return std::make_unique<Router::RetryPolicyImpl>(options.retry_policy.value(),
+                                                     ProtobufMessage::getNullValidationVisitor(),
+                                                     factory_context, context);
+  }
+  if (options.parsed_retry_policy == nullptr) {
+    return std::make_unique<Router::RetryPolicyImpl>();
+  }
+  return nullptr;
+}
+
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options)
-    : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(options.filter_config_ ? *options.filter_config_ : parent.config_,
-              parent.config_.async_stats_),
-      stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
+    : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_->random_.random()),
+      router_(options.filter_config_ ? options.filter_config_ : parent.config_,
+              parent.config_->async_stats_),
+      stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr,
+                   options.filter_state != nullptr
+                       ? options.filter_state
+                       : std::make_shared<StreamInfo::FilterStateImpl>(
+                             StreamInfo::FilterState::LifeSpan::FilterChain)),
       tracing_config_(Tracing::EgressConfig::get()),
-      route_(std::make_shared<NullRouteImpl>(parent_.cluster_->name(), parent_.singleton_manager_,
-                                             options.timeout, options.hash_policy,
-                                             options.retry_policy)),
+      retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_)),
+      route_(std::make_shared<NullRouteImpl>(
+          parent_.cluster_->name(),
+          retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
+          parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy)),
       account_(options.account_), buffer_limit_(options.buffer_limit_),
       send_xff_(options.send_xff) {
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
@@ -149,7 +175,7 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
   is_grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
   headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {
-    Utility::appendXff(headers, *parent_.config_.local_info_.address());
+    Utility::appendXff(headers, *parent_.config_->local_info_.address());
   }
 
   router_.decodeHeaders(headers, end_stream);
@@ -281,7 +307,12 @@ AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
 
 void AsyncRequestImpl::initialize() {
   Tracing::HttpTraceContext trace_context(request_->headers());
-  child_span_->injectContext(trace_context, nullptr);
+  Tracing::UpstreamContext upstream_context(nullptr,                    // host_
+                                            parent_.cluster_.get(),     // cluster_
+                                            Tracing::ServiceType::Http, // service_type_
+                                            true                        // async_client_span_
+  );
+  child_span_->injectContext(trace_context, upstream_context);
   sendHeaders(request_->headers(), request_->body().length() == 0);
   if (request_->body().length() != 0) {
     // It's possible this will be a no-op due to a local response synchronously generated in
@@ -293,11 +324,17 @@ void AsyncRequestImpl::initialize() {
 
 void AsyncOngoingRequestImpl::initialize() {
   Tracing::HttpTraceContext trace_context(*request_headers_);
-  child_span_->injectContext(trace_context, nullptr);
+  Tracing::UpstreamContext upstream_context(nullptr,                    // host_
+                                            parent_.cluster_.get(),     // cluster_
+                                            Tracing::ServiceType::Http, // service_type_
+                                            true                        // async_client_span_
+  );
+  child_span_->injectContext(trace_context, upstream_context);
   sendHeaders(*request_headers_, false);
 }
 
 void AsyncRequestSharedImpl::onComplete() {
+  complete_ = true;
   callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_, &response_->headers());
 
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, streamInfo(),
@@ -319,6 +356,11 @@ void AsyncRequestSharedImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
 }
 
 void AsyncRequestSharedImpl::onReset() {
+  if (complete_) {
+    // This request has already been completed; a reset should be ignored.
+    return;
+  }
+
   if (!cancelled_) {
     // Set "error reason" tag related to reset. The tagging for "error true" is done inside the
     // Tracing::HttpTracerUtility::finalizeUpstreamSpan.

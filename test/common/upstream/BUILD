@@ -168,7 +168,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "edf_scheduler_test",
     srcs = ["edf_scheduler_test.cc"],
-    deps = ["//source/common/upstream:scheduler_lib"],
+    deps = [
+        "//source/common/upstream:scheduler_lib",
+        "//test/test_common:utility_lib",
+    ],
 )
 
 envoy_cc_test_library(
@@ -188,6 +191,7 @@ envoy_cc_test_library(
         "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
     ],
@@ -220,6 +224,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
@@ -265,6 +270,7 @@ envoy_cc_test(
     srcs = ["load_balancer_impl_test.cc"],
     deps = [
         ":utility_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:upstream_includes",
@@ -377,13 +383,13 @@ envoy_cc_test(
     name = "hds_test",
     srcs = ["hds_test.cc"],
     deps = [
+        "//source/common/tls:context_lib",
         "//source/common/upstream:health_discovery_service_lib",
         "//source/common/upstream:transport_socket_match_lib",
         "//source/extensions/health_checkers/grpc:health_checker_lib",
         "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/health_checkers/tcp:health_checker_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
@@ -517,7 +523,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_impl_test",
     srcs = ["upstream_impl_test.cc"],
-    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
+    data = ["//test/common/tls/test_data:certs"],
     deps = [
         ":utility_lib",
         ":test_local_address_selector",
@@ -563,6 +569,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ] + envoy_select_enable_http3([
         "//source/common/quic:quic_transport_socket_factory_lib",
@@ -602,10 +609,10 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/tls:context_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/integration/clusters:custom_static_cluster",
         "//test/mocks/access_log:access_log_mocks",
@@ -714,6 +721,7 @@ envoy_cc_test_library(
         ":zone_aware_load_balancer_fuzz_proto_cc_proto",
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:priority_set_mocks",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 

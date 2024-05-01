@@ -43,7 +43,7 @@ public:
   void setUpFilter(std::string name, envoy_http_filter* platform_filter) {
     envoymobile::extensions::filters::http::platform_bridge::PlatformBridge config;
     config.set_platform_filter_name(name);
-    Api::External::registerApi(config.platform_filter_name(), platform_filter);
+    Api::External::registerApi(std::string(config.platform_filter_name()), platform_filter);
 
     config_ = std::make_shared<PlatformBridgeFilterConfig>(context_, config);
     filter_ = std::make_shared<PlatformBridgeFilter>(config_, dispatcher_);
@@ -62,7 +62,7 @@ public:
     std::stringstream ss;
     filter_->dumpState(ss, 0);
 
-    std::string expected_state_template =
+    constexpr absl::string_view expected_state_template =
         R"EOF(PlatformBridgeFilter, filter_name_: {}, error_response_: {}
   Request Filter, state_.iteration_state_: {}, state_.on_headers_called_: {}, state_.headers_forwarded_: {}, state_.on_data_called_: {}, state_.data_forwarded_: {}, state_.on_trailers_called_: {}, state_.trailers_forwarded_: {}, state_.on_resume_called_: {}, pending_headers_: {}, buffer: {}, pending_trailers_: {}, state_.stream_complete_: {}
   Response Filter, state_.iteration_state_: {}, state_.on_headers_called_: {}, state_.headers_forwarded_: {}, state_.on_data_called_: {}, state_.data_forwarded_: {}, state_.on_trailers_called_: {}, state_.trailers_forwarded_: {}, state_.on_resume_called_: {}, pending_headers_: {}, buffer: {}, pending_trailers_: {}, state_.stream_complete_: {}

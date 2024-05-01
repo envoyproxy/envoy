@@ -1,4 +1,4 @@
-#include "stream_client.h"
+#include "library/cc/stream_client.h"
 
 namespace Envoy {
 namespace Platform {

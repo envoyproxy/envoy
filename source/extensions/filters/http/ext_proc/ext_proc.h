@@ -45,7 +45,9 @@ namespace ExternalProcessing {
   COUNTER(override_message_timeout_received)                                                       \
   COUNTER(override_message_timeout_ignored)                                                        \
   COUNTER(clear_route_cache_ignored)                                                               \
-  COUNTER(clear_route_cache_disabled)
+  COUNTER(clear_route_cache_disabled)                                                              \
+  COUNTER(clear_route_cache_upstream_ignored)                                                      \
+  COUNTER(send_immediate_resp_upstream_ignored)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -122,26 +124,60 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
 };
 
+// Changes to headers are normally tested against the MutationRules supplied
+// with configuration. When writing an immediate response message, however,
+// we want to support a more liberal set of rules so that filters can create
+// custom error messages, and we want to prevent the MutationRules in the
+// configuration from making that impossible. This is a fixed, permissive
+// set of rules for that purpose.
+class ImmediateMutationChecker {
+public:
+  ImmediateMutationChecker(Regex::Engine& regex_engine) {
+    envoy::config::common::mutation_rules::v3::HeaderMutationRules rules;
+    rules.mutable_allow_all_routing()->set_value(true);
+    rules.mutable_allow_envoy()->set_value(true);
+    rule_checker_ = std::make_unique<Filters::Common::MutationRules::Checker>(rules, regex_engine);
+  }
+
+  const Filters::Common::MutationRules::Checker& checker() const { return *rule_checker_; }
+
+private:
+  std::unique_ptr<Filters::Common::MutationRules::Checker> rule_checker_;
+};
+
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
                const std::chrono::milliseconds message_timeout,
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
-               const std::string& stats_prefix,
+               const std::string& stats_prefix, bool is_upstream,
                Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
-               const LocalInfo::LocalInfo& local_info)
+               Server::Configuration::CommonFactoryContext& context)
       : failure_mode_allow_(config.failure_mode_allow()),
         disable_clear_route_cache_(config.disable_clear_route_cache()),
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-        processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
+        processing_mode_(config.processing_mode()),
+        mutation_checker_(config.mutation_rules(), context.regexEngine()),
         filter_metadata_(config.filter_metadata()),
         allow_mode_override_(config.allow_mode_override()),
         disable_immediate_response_(config.disable_immediate_response()),
-        allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
-        disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())),
-        expression_manager_(builder, local_info, config.request_attributes(),
-                            config.response_attributes()) {}
+        allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
+        disallowed_headers_(
+            initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
+        is_upstream_(is_upstream),
+        untyped_forwarding_namespaces_(
+            config.metadata_options().forwarding_namespaces().untyped().begin(),
+            config.metadata_options().forwarding_namespaces().untyped().end()),
+        typed_forwarding_namespaces_(
+            config.metadata_options().forwarding_namespaces().typed().begin(),
+            config.metadata_options().forwarding_namespaces().typed().end()),
+        untyped_receiving_namespaces_(
+            config.metadata_options().receiving_namespaces().untyped().begin(),
+            config.metadata_options().receiving_namespaces().untyped().end()),
+        expression_manager_(builder, context.localInfo(), config.request_attributes(),
+                            config.response_attributes()),
+        immediate_mutation_checker_(context.regexEngine()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -173,6 +209,24 @@ public:
 
   const ExpressionManager& expressionManager() const { return expression_manager_; }
 
+  bool isUpstream() const { return is_upstream_; }
+
+  const std::vector<std::string>& untypedForwardingMetadataNamespaces() const {
+    return untyped_forwarding_namespaces_;
+  }
+
+  const std::vector<std::string>& typedForwardingMetadataNamespaces() const {
+    return typed_forwarding_namespaces_;
+  }
+
+  const std::vector<std::string>& untypedReceivingMetadataNamespaces() const {
+    return untyped_receiving_namespaces_;
+  }
+
+  const ImmediateMutationChecker& immediateMutationChecker() const {
+    return immediate_mutation_checker_;
+  }
+
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
@@ -197,8 +251,14 @@ private:
   const std::vector<Matchers::StringMatcherPtr> allowed_headers_;
   // Empty disallowed_header_ means disallow nothing, i.e, allow all.
   const std::vector<Matchers::StringMatcherPtr> disallowed_headers_;
-
+  // is_upstream_ is true if ext_proc filter is in the upstream filter chain.
+  const bool is_upstream_;
+  const std::vector<std::string> untyped_forwarding_namespaces_;
+  const std::vector<std::string> typed_forwarding_namespaces_;
+  const std::vector<std::string> untyped_receiving_namespaces_;
   const ExpressionManager expression_manager_;
+
+  const ImmediateMutationChecker immediate_mutation_checker_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -222,22 +282,31 @@ public:
   const absl::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
     return grpc_service_;
   }
+  const std::vector<envoy::config::core::v3::HeaderValue>& grpcInitialMetadata() const {
+    return grpc_initial_metadata_;
+  }
+
+  const absl::optional<const std::vector<std::string>>&
+  untypedForwardingMetadataNamespaces() const {
+    return untyped_forwarding_namespaces_;
+  }
+  const absl::optional<const std::vector<std::string>>& typedForwardingMetadataNamespaces() const {
+    return typed_forwarding_namespaces_;
+  }
+  const absl::optional<const std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
+    return untyped_receiving_namespaces_;
+  }
 
 private:
-  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
-  initProcessingMode(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  absl::optional<envoy::config::core::v3::GrpcService>
-  initGrpcService(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
-  mergeProcessingMode(const FilterConfigPerRoute& less_specific,
-                      const FilterConfigPerRoute& more_specific);
-
   const bool disabled_;
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       processing_mode_;
   const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  std::vector<envoy::config::core::v3::HeaderValue> grpc_initial_metadata_;
+
+  const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
+  const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
+  const absl::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
 };
 
 class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
@@ -260,10 +329,19 @@ public:
          const envoy::config::core::v3::GrpcService& grpc_service)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
         grpc_service_(grpc_service), config_with_hash_key_(grpc_service),
-        decoding_state_(*this, config->processingMode()),
-        encoding_state_(*this, config->processingMode()) {}
+        decoding_state_(*this, config->processingMode(),
+                        config->untypedForwardingMetadataNamespaces(),
+                        config->typedForwardingMetadataNamespaces(),
+                        config->untypedReceivingMetadataNamespaces()),
+        encoding_state_(*this, config->processingMode(),
+                        config->untypedForwardingMetadataNamespaces(),
+                        config->typedForwardingMetadataNamespaces(),
+                        config->untypedReceivingMetadataNamespaces()) {}
 
   const FilterConfig& config() const { return *config_; }
+  const envoy::config::core::v3::GrpcService& grpc_service_config() const {
+    return config_with_hash_key_.config();
+  }
 
   ExtProcFilterStats& stats() { return stats_; }
   ExtProcLoggingInfo* loggingInfo() { return logging_info_; }
@@ -303,6 +381,9 @@ public:
             encoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback);
   }
 
+  const ProcessorState& encodingState() { return encoding_state_; }
+  const ProcessorState& decodingState() { return decoding_state_; }
+
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
@@ -313,13 +394,19 @@ private:
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream,
-                                      ProtobufWkt::Struct* proto);
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream);
 
   // Return a pair of whether to terminate returning the current result.
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
+  void setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                          const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void setEncoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void setDecoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void addDynamicMetadata(const ProcessorState& state,
+                          envoy::service::ext_proc::v3::ProcessingRequest& req);
+  void addAttributes(ProcessorState& state, envoy::service::ext_proc::v3::ProcessingRequest& req);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
@@ -347,6 +434,10 @@ private:
 
   // Set to true when the mergePerRouteConfig() method has been called.
   bool route_config_merged_ = false;
+
+  std::vector<std::string> untyped_forwarding_namespaces_{};
+  std::vector<std::string> typed_forwarding_namespaces_{};
+  std::vector<std::string> untyped_receiving_namespaces_{};
 };
 
 extern std::string responseCaseToString(

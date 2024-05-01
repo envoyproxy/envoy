@@ -90,7 +90,7 @@ public:
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override{};
   void finishSpan() override;
   void injectContext(Envoy::Tracing::TraceContext& /*trace_context*/,
-                     const Upstream::HostDescriptionConstSharedPtr&) override;
+                     const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
 
@@ -145,6 +145,11 @@ public:
   void setTracestate(const absl::string_view& tracestate) {
     span_.set_trace_state(std::string{tracestate});
   }
+
+  /**
+   * Sets a span attribute.
+   */
+  void setAttribute(absl::string_view name, const OTelAttribute& value);
 
   /**
    * Method to access the span for testing.

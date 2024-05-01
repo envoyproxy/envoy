@@ -75,7 +75,7 @@ public:
                                 quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, writer, owns_writer,
                                   supported_versions, dispatcher, std::move(connection_socket),
-                                  generator) {}
+                                  generator, /*prefer_gro=*/true) {}
 
   MOCK_METHOD(quic::MessageStatus, SendMessage,
               (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
@@ -100,7 +100,8 @@ public:
             *connection, connection->connection_id(), dispatcher, send_buffer_limit, {nullptr},
             std::make_unique<StreamInfo::StreamInfoImpl>(
                 dispatcher.timeSource(),
-                connection->connectionSocket()->connectionInfoProviderSharedPtr())),
+                connection->connectionSocket()->connectionInfoProviderSharedPtr(),
+                StreamInfo::FilterState::LifeSpan::Connection)),
         crypto_stream_(std::make_unique<TestQuicCryptoStream>(this)) {}
 
   void Initialize() override {
@@ -270,7 +271,8 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
 std::string spdyHeaderToHttp3StreamPayload(const spdy::Http2HeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
-  auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate);
+  auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate,
+                                                            quic::HuffmanEncoding::kEnabled);
   qpack_encoder->set_qpack_stream_sender_delegate(&encoder_stream_sender_delegate);
   // QpackEncoder does not use the dynamic table by default,
   // therefore the value of |stream_id| does not matter.

@@ -1,4 +1,4 @@
-#include "response_trailers_builder.h"
+#include "library/cc/response_trailers_builder.h"
 
 namespace Envoy {
 namespace Platform {

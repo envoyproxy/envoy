@@ -41,13 +41,19 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
+        "@envoy_mobile//library/common:engine_types_lib",
         "@envoy_mobile//library/common/config:certificates_lib",
         "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/local_error:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/network_configuration:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:filter_cc_proto",
         "@envoy_mobile//library/common/types:matcher_data_lib",
-    ],
+    ] + select({
+        "@envoy//bazel:apple": [
+            "@envoy_mobile//library/common/network:apple_proxy_resolution_lib",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(
@@ -55,11 +61,9 @@ envoy_cc_library(
     srcs = [
         "bridge_utility.cc",
         "engine.cc",
-        "engine_callbacks.cc",
         "headers.cc",
         "headers_builder.cc",
         "key_value_store.cc",
-        "log_level.cc",
         "request_headers.cc",
         "request_headers_builder.cc",
         "request_method.cc",
@@ -80,13 +84,10 @@ envoy_cc_library(
         "bridge_utility.h",
         "direct_response_testing.h",
         "engine.h",
-        "engine_callbacks.h",
         "envoy_error.h",
         "headers.h",
         "headers_builder.h",
         "key_value_store.h",
-        "log_level.h",
-        "pulse_client.h",
         "request_headers.h",
         "request_headers_builder.h",
         "request_method.h",
@@ -108,10 +109,12 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-        "//library/common:envoy_main_interface_lib_no_stamp",
+        "//library/common:internal_engine_lib_no_stamp",
         "//library/common/api:c_types",
         "//library/common/data:utility_lib",
         "//library/common/extensions/key_value/platform:config",
+        "@envoy//source/common/buffer:buffer_lib",
+        "@envoy//source/common/http:header_map_lib",
         "@envoy//source/common/http:utility_lib",
     ],
 )

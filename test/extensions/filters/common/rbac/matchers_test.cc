@@ -11,6 +11,7 @@
 #include "source/extensions/filters/common/rbac/matchers.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 
 #include "gmock/gmock.h"
@@ -40,11 +41,13 @@ PortRangeMatcher createPortRangeMatcher(envoy::type::v3::Int32Range range) { ret
 TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
 
 TEST(AndMatcher, Permission_Set) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   envoy::config::rbac::v3::Permission::Set set;
   envoy::config::rbac::v3::Permission* perm = set.add_rules();
   perm->set_any(true);
 
-  checkMatcher(RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor()), true);
+  checkMatcher(
+      RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor(), factory_context), true);
 
   perm = set.add_rules();
   perm->set_destination_port(123);
@@ -56,22 +59,25 @@ TEST(AndMatcher, Permission_Set) {
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   info.downstream_connection_info_provider_->setLocalAddress(addr);
 
-  checkMatcher(RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor()), true, conn,
-               headers, info);
+  checkMatcher(
+      RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor(), factory_context), true,
+      conn, headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 8080, false);
   info.downstream_connection_info_provider_->setLocalAddress(addr);
 
-  checkMatcher(RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor()), false, conn,
-               headers, info);
+  checkMatcher(
+      RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor(), factory_context), false,
+      conn, headers, info);
 }
 
 TEST(AndMatcher, Principal_Set) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   envoy::config::rbac::v3::Principal::Set set;
   envoy::config::rbac::v3::Principal* principal = set.add_ids();
   principal->set_any(true);
 
-  checkMatcher(RBAC::AndMatcher(set), true);
+  checkMatcher(RBAC::AndMatcher(set, factory_context), true);
 
   principal = set.add_ids();
   auto* cidr = principal->mutable_direct_remote_ip();
@@ -85,15 +91,16 @@ TEST(AndMatcher, Principal_Set) {
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
 
-  checkMatcher(RBAC::AndMatcher(set), true, conn, headers, info);
+  checkMatcher(RBAC::AndMatcher(set, factory_context), true, conn, headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.4.6", 123, false);
   info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
 
-  checkMatcher(RBAC::AndMatcher(set), false, conn, headers, info);
+  checkMatcher(RBAC::AndMatcher(set, factory_context), false, conn, headers, info);
 }
 
 TEST(OrMatcher, Permission_Set) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   envoy::config::rbac::v3::Permission::Set set;
   envoy::config::rbac::v3::Permission* perm = set.add_rules();
   perm->set_destination_port(123);
@@ -105,21 +112,21 @@ TEST(OrMatcher, Permission_Set) {
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
   info.downstream_connection_info_provider_->setLocalAddress(addr);
 
-  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor()), false, conn,
-               headers, info);
+  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor(), factory_context),
+               false, conn, headers, info);
 
   perm = set.add_rules();
   perm->mutable_destination_port_range()->set_start(123);
   perm->mutable_destination_port_range()->set_end(456);
 
-  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor()), false, conn,
-               headers, info);
+  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor(), factory_context),
+               false, conn, headers, info);
 
   perm = set.add_rules();
   perm->set_any(true);
 
-  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor()), true, conn,
-               headers, info);
+  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor(), factory_context),
+               true, conn, headers, info);
 }
 
 TEST(OrMatcher, Principal_Set) {
@@ -129,6 +136,7 @@ TEST(OrMatcher, Principal_Set) {
   cidr->set_address_prefix("1.2.3.0");
   cidr->mutable_prefix_len()->set_value(24);
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
   NiceMock<StreamInfo::MockStreamInfo> info;
@@ -136,30 +144,35 @@ TEST(OrMatcher, Principal_Set) {
       Envoy::Network::Utility::parseInternetAddress("1.2.4.6", 456, false);
   info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
 
-  checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
+  checkMatcher(RBAC::OrMatcher(set, factory_context), false, conn, headers, info);
 
   id = set.add_ids();
   id->set_any(true);
 
-  checkMatcher(RBAC::OrMatcher(set), true, conn, headers, info);
+  checkMatcher(RBAC::OrMatcher(set, factory_context), true, conn, headers, info);
 }
 
 TEST(NotMatcher, Permission) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   envoy::config::rbac::v3::Permission perm;
   perm.set_any(true);
 
-  checkMatcher(RBAC::NotMatcher(perm, ProtobufMessage::getStrictValidationVisitor()), false,
-               Envoy::Network::MockConnection());
+  checkMatcher(
+      RBAC::NotMatcher(perm, ProtobufMessage::getStrictValidationVisitor(), factory_context), false,
+      Envoy::Network::MockConnection());
 }
 
 TEST(NotMatcher, Principal) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   envoy::config::rbac::v3::Principal principal;
   principal.set_any(true);
 
-  checkMatcher(RBAC::NotMatcher(principal), false, Envoy::Network::MockConnection());
+  checkMatcher(RBAC::NotMatcher(principal, factory_context), false,
+               Envoy::Network::MockConnection());
 }
 
 TEST(HeaderMatcher, HeaderMatcher) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   envoy::config::route::v3::HeaderMatcher config;
   config.set_name("foo");
   config.mutable_string_match()->set_exact("bar");
@@ -169,7 +182,7 @@ TEST(HeaderMatcher, HeaderMatcher) {
   std::string value = "bar";
   headers.setReference(key, value);
 
-  RBAC::HeaderMatcher matcher(config);
+  RBAC::HeaderMatcher matcher(config, factory_context);
 
   checkMatcher(matcher, true, Envoy::Network::MockConnection(), headers);
 
@@ -315,15 +328,16 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
   // We should check if any URI SAN matches.
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   envoy::config::rbac::v3::Principal::Authenticated auth;
   auth.mutable_principal_name()->set_exact("foo");
-  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+  checkMatcher(AuthenticatedMatcher(auth, factory_context), true, conn);
 
   auth.mutable_principal_name()->set_exact("baz");
-  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+  checkMatcher(AuthenticatedMatcher(auth, factory_context), true, conn);
 
   auth.mutable_principal_name()->set_exact("bar");
-  checkMatcher(AuthenticatedMatcher(auth), false, conn);
+  checkMatcher(AuthenticatedMatcher(auth, factory_context), false, conn);
 }
 
 TEST(AuthenticatedMatcher, dnsSanPeerCertificate) {
@@ -344,14 +358,15 @@ TEST(AuthenticatedMatcher, dnsSanPeerCertificate) {
 
   // We should get check if any DNS SAN matches as URI SAN is not available.
   envoy::config::rbac::v3::Principal::Authenticated auth;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   auth.mutable_principal_name()->set_exact("foo");
-  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+  checkMatcher(AuthenticatedMatcher(auth, factory_context), true, conn);
 
   auth.mutable_principal_name()->set_exact("baz");
-  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+  checkMatcher(AuthenticatedMatcher(auth, factory_context), true, conn);
 
   auth.mutable_principal_name()->set_exact("bar");
-  checkMatcher(AuthenticatedMatcher(auth), false, conn);
+  checkMatcher(AuthenticatedMatcher(auth, factory_context), false, conn);
 }
 
 TEST(AuthenticatedMatcher, subjectPeerCertificate) {
@@ -366,11 +381,12 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
   envoy::config::rbac::v3::Principal::Authenticated auth;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   auth.mutable_principal_name()->set_exact("bar");
-  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+  checkMatcher(AuthenticatedMatcher(auth, factory_context), true, conn);
 
   auth.mutable_principal_name()->set_exact("foo");
-  checkMatcher(AuthenticatedMatcher(auth), false, conn);
+  checkMatcher(AuthenticatedMatcher(auth, factory_context), false, conn);
 }
 
 TEST(AuthenticatedMatcher, AnySSLSubject) {
@@ -381,19 +397,22 @@ TEST(AuthenticatedMatcher, AnySSLSubject) {
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
   envoy::config::rbac::v3::Principal::Authenticated auth;
-  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  checkMatcher(AuthenticatedMatcher(auth, factory_context), true, conn);
 
   auth.mutable_principal_name()->MergeFrom(TestUtility::createRegexMatcher(".*"));
-  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+  checkMatcher(AuthenticatedMatcher(auth, factory_context), true, conn);
 }
 
 TEST(AuthenticatedMatcher, NoSSL) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Envoy::Network::MockConnection conn;
   EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(nullptr));
-  checkMatcher(AuthenticatedMatcher({}), false, conn);
+  checkMatcher(AuthenticatedMatcher({}, factory_context), false, conn);
 }
 
 TEST(MetadataMatcher, MetadataMatcher) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl header;
   NiceMock<StreamInfo::MockStreamInfo> info;
@@ -411,12 +430,15 @@ TEST(MetadataMatcher, MetadataMatcher) {
   matcher.add_path()->set_key("label");
 
   matcher.mutable_value()->mutable_string_match()->set_exact("test");
-  checkMatcher(MetadataMatcher(matcher), false, conn, header, info);
+  checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context)), false, conn, header,
+               info);
   matcher.mutable_value()->mutable_string_match()->set_exact("prod");
-  checkMatcher(MetadataMatcher(matcher), true, conn, header, info);
+  checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context)), true, conn, header,
+               info);
 }
 
 TEST(PolicyMatcher, PolicyMatcher) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   envoy::config::rbac::v3::Policy policy;
   policy.add_permissions()->set_destination_port(123);
   policy.add_permissions()->set_destination_port(456);
@@ -424,7 +446,8 @@ TEST(PolicyMatcher, PolicyMatcher) {
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
   Expr::BuilderPtr builder = Expr::createBuilder(nullptr);
 
-  RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor());
+  RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor(),
+                              factory_context);
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
@@ -457,63 +480,81 @@ TEST(PolicyMatcher, PolicyMatcher) {
 }
 
 TEST(RequestedServerNameMatcher, ValidRequestedServerName) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Envoy::Network::MockConnection conn;
   EXPECT_CALL(conn, requestedServerName())
       .Times(9)
       .WillRepeatedly(Return(absl::string_view("www.cncf.io")));
 
-  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*cncf.io")), true,
-               conn);
-  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*cncf.*")), true, conn);
-  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher("www.*")), true, conn);
-  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*io")), true, conn);
-  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*")), true, conn);
+  checkMatcher(
+      RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*cncf.io"), factory_context),
+      true, conn);
+  checkMatcher(
+      RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*cncf.*"), factory_context),
+      true, conn);
+  checkMatcher(
+      RequestedServerNameMatcher(TestUtility::createRegexMatcher("www.*"), factory_context), true,
+      conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*io"), factory_context),
+               true, conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*"), factory_context),
+               true, conn);
 
-  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("")), false, conn);
-  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("www.cncf.io")), true,
-               conn);
-  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("xyz.cncf.io")), false,
-               conn);
-  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("example.com")), false,
-               conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher(""), factory_context),
+               false, conn);
+  checkMatcher(
+      RequestedServerNameMatcher(TestUtility::createExactMatcher("www.cncf.io"), factory_context),
+      true, conn);
+  checkMatcher(
+      RequestedServerNameMatcher(TestUtility::createExactMatcher("xyz.cncf.io"), factory_context),
+      false, conn);
+  checkMatcher(
+      RequestedServerNameMatcher(TestUtility::createExactMatcher("example.com"), factory_context),
+      false, conn);
 }
 
 TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Envoy::Network::MockConnection conn;
   EXPECT_CALL(conn, requestedServerName()).Times(3).WillRepeatedly(Return(absl::string_view("")));
 
-  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*"), factory_context),
+               true, conn);
 
-  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("")), true, conn);
-  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("example.com")), false,
-               conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher(""), factory_context),
+               true, conn);
+  checkMatcher(
+      RequestedServerNameMatcher(TestUtility::createExactMatcher("example.com"), factory_context),
+      false, conn);
 }
 
 TEST(PathMatcher, NoPathInHeader) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Envoy::Http::TestRequestHeaderMapImpl headers;
   envoy::type::matcher::v3::PathMatcher matcher;
   matcher.mutable_path()->mutable_safe_regex()->mutable_google_re2();
   matcher.mutable_path()->mutable_safe_regex()->set_regex(".*");
 
   headers.setPath("/path");
-  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers);
   headers.removePath();
-  checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
+  checkMatcher(PathMatcher(matcher, context), false, Envoy::Network::MockConnection(), headers);
 }
 
 TEST(PathMatcher, ValidPathInHeader) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Envoy::Http::TestRequestHeaderMapImpl headers;
   envoy::type::matcher::v3::PathMatcher matcher;
   matcher.mutable_path()->set_exact("/exact");
 
   headers.setPath("/exact");
-  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers);
   headers.setPath("/exact?param=val");
-  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers);
   headers.setPath("/exact#fragment");
-  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers);
   headers.setPath("/exacz");
-  checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
+  checkMatcher(PathMatcher(matcher, context), false, Envoy::Network::MockConnection(), headers);
 }
 
 class TestObject : public StreamInfo::FilterState::Object {
@@ -522,6 +563,7 @@ public:
 };
 
 TEST(FilterStateMatcher, FilterStateMatcher) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl header;
   NiceMock<StreamInfo::MockStreamInfo> info;
@@ -532,10 +574,54 @@ TEST(FilterStateMatcher, FilterStateMatcher) {
   matcher.set_key("test.key");
   matcher.mutable_string_match()->set_prefix("test");
 
-  checkMatcher(FilterStateMatcher(matcher), false, conn, header, info);
+  checkMatcher(FilterStateMatcher(matcher, context), false, conn, header, info);
   filter_state.setData("test.key", std::make_shared<TestObject>(),
                        StreamInfo::FilterState::StateType::ReadOnly);
-  checkMatcher(FilterStateMatcher(matcher), true, conn, header, info);
+  checkMatcher(FilterStateMatcher(matcher, context), true, conn, header, info);
+}
+
+TEST(UriTemplateMatcher, UriTemplateMatcherFactory) {
+  const std::string yaml_string = R"EOF(
+      name: envoy.path.match.uri_template.uri_template_matcher
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+        path_template: "/bar/{lang}/{country}"
+)EOF";
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  headers.setPath("/bar/lang/country");
+
+  envoy::config::core::v3::TypedExtensionConfig config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  const auto& factory =
+      &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(config);
+
+  EXPECT_NE(nullptr, factory);
+  EXPECT_EQ(factory->name(), "envoy.path.match.uri_template.uri_template_matcher");
+  EXPECT_EQ(factory->category(), "envoy.path.match");
+
+  auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
+
+  const auto uri_template_matcher = UriTemplateMatcher(factory->createPathMatcher(*message));
+
+  checkMatcher(uri_template_matcher, true, Envoy::Network::MockConnection(), headers);
+}
+
+TEST(UriTemplateMatcher, NoPathInHeader) {
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig
+      uri_template_match_config;
+  const std::string path_template = "/{foo}";
+  uri_template_match_config.set_path_template(path_template);
+  Router::PathMatcherSharedPtr matcher =
+      std::make_shared<Envoy::Extensions::UriTemplate::Match::UriTemplateMatcher>(
+          uri_template_match_config);
+
+  headers.setPath("/foo");
+  checkMatcher(UriTemplateMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  headers.removePath();
+  checkMatcher(UriTemplateMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
 }
 
 } // namespace

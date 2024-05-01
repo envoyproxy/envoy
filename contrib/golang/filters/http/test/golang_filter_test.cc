@@ -131,7 +131,7 @@ public:
     test_time.setSystemTime(std::chrono::microseconds(1583879145572237));
 
     filter_ = std::make_unique<TestFilter>(
-        config_, Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name));
+        config_, Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name), 0);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }

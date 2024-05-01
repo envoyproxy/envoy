@@ -224,7 +224,7 @@ TEST_F(ThriftRateLimitFilterTest, OkResponse) {
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_CALL(filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited))
       .Times(0);
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
                                nullptr, "", nullptr);
@@ -305,7 +305,7 @@ TEST_F(ThriftRateLimitFilterTest, ErrorResponse) {
 
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageEnd());
   EXPECT_CALL(filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited))
       .Times(0);
 
   EXPECT_EQ(
@@ -348,7 +348,7 @@ TEST_F(ThriftRateLimitFilterTest, ErrorResponseWithDynamicMetadata) {
 
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageEnd());
   EXPECT_CALL(filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited))
       .Times(0);
 
   EXPECT_EQ(
@@ -380,7 +380,7 @@ TEST_F(ThriftRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
         EXPECT_EQ(ThriftProxy::AppExceptionType::InternalError, app_ex.type_);
       }));
   EXPECT_CALL(filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError));
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimitServiceError));
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr,
                                nullptr, "", nullptr);
 
@@ -414,7 +414,7 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponse) {
       }));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited));
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr, nullptr,
                                nullptr, "", nullptr);
 
@@ -445,7 +445,7 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponseWithHeaders) {
   // TODO(zuercher): Headers are currently ignored, but sendLocalReply is the place to pass them.
   EXPECT_CALL(filter_callbacks_, sendLocalReply(_, false));
   EXPECT_CALL(filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited));
 
   Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl(*rl_headers)};
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,

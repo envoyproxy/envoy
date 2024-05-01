@@ -74,11 +74,12 @@ public:
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and needs to be called
    * before send_data.
-   * @param stream, the stream to send headers over.
-   * @param headers, the headers to send.
-   * @param end_stream, indicates whether to close the stream locally after sending this frame.
+   *
+   * @param stream the stream to send headers over.
+   * @param headers the headers to send.
+   * @param end_stream indicates whether to close the stream locally after sending this frame.
    */
-  void sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream);
+  void sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, bool end_stream);
 
   /**
    * Notify the stream that the caller is ready to receive more data from the response stream. Only
@@ -89,11 +90,11 @@ public:
 
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple times.
-   * @param stream, the stream to send data over.
-   * @param data, the data to send.
-   * @param end_stream, indicates whether to close the stream locally after sending this frame.
+   * @param stream the stream to send data over.
+   * @param buffer the data to send.
+   * @param end_stream indicates whether to close the stream locally after sending this frame.
    */
-  void sendData(envoy_stream_t stream, envoy_data data, bool end_stream);
+  void sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool end_stream);
 
   /**
    * Send metadata over an HTTP stream. This method can be invoked multiple times.
@@ -105,10 +106,11 @@ public:
   /**
    * Send trailers over an open HTTP stream. This method can only be invoked once per stream.
    * Note that this method implicitly closes the stream locally.
-   * @param stream, the stream to send trailers over.
-   * @param trailers, the trailers to send.
+   *
+   * @param stream the stream to send trailers over.
+   * @param trailers the trailers to send.
    */
-  void sendTrailers(envoy_stream_t stream, envoy_headers trailers);
+  void sendTrailers(envoy_stream_t stream, RequestTrailerMapPtr trailers);
 
   /**
    * Reset an open HTTP stream. This operation closes the stream locally, and remote.
@@ -151,10 +153,6 @@ private:
     void onError();
     void onSendWindowAvailable();
 
-    // Remove the stream and clear up state if possible, else set up deferred
-    // removal path.
-    void removeStream();
-
     // ResponseEncoder
     void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -188,7 +186,7 @@ private:
     // than bytes_to_send.
     void resumeData(size_t bytes_to_send);
 
-    void setFinalStreamIntel(StreamInfo::StreamInfo& stream_info);
+    void latchError();
 
   private:
     bool hasBufferedData() { return response_data_.get() && response_data_->length() != 0; }
@@ -198,7 +196,6 @@ private:
     void sendErrorToBridge();
     envoy_stream_intel streamIntel();
     envoy_final_stream_intel& finalStreamIntel();
-    envoy_error streamError();
 
     DirectStream& direct_stream_;
     const envoy_http_callbacks bridge_callbacks_;
@@ -239,11 +236,7 @@ private:
     // Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
-    CodecEventCallbacks*
-    registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
-      std::swap(codec_callbacks, codec_callbacks_);
-      return codec_callbacks;
-    }
+    CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override;
 
     void resetStream(StreamResetReason) override;
     Network::ConnectionInfoProvider& connectionInfoProvider() override {
@@ -363,18 +356,18 @@ private:
 
   using DirectStreamWrapperPtr = std::unique_ptr<DirectStreamWrapper>;
 
-  enum GetStreamFilters {
+  enum class GetStreamFilters {
     // If a stream has been finished from upstream, but stream completion has
     // not yet been communicated, the downstream mobile library should not be
     // allowed to access the stream. getStream takes an argument to ensure that
     // the mobile client won't do things like send further request data for
     // streams in this state.
-    ALLOW_ONLY_FOR_OPEN_STREAMS,
+    AllowOnlyForOpenStreams,
     // If a stream has been finished from upstream, make sure that getStream
     // will continue to work for functions such as resumeData (pushing that data
     // to the mobile library) and cancelStream (the client not wanting further
     // data for the stream).
-    ALLOW_FOR_ALL_STREAMS,
+    AllowForAllStreams,
   };
   DirectStreamSharedPtr getStream(envoy_stream_t stream_handle, GetStreamFilters filters);
   void removeStream(envoy_stream_t stream_handle);

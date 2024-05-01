@@ -24,6 +24,7 @@
 #include "source/common/http/http1/header_formatter.h"
 #include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
@@ -130,11 +131,8 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
 void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
   ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers")) {
-    // Don't consider 100-continue responses as the actual response.
-    started_response_ = false;
-  }
+  // Don't consider 100-continue responses as the actual response.
+  started_response_ = false;
 }
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
@@ -978,6 +976,10 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
+ExecutionContext* ConnectionImpl::executionContext() const {
+  return getConnectionExecutionContext(connection_);
+}
+
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "Http1::ConnectionImpl " << this << DUMP_MEMBER(dispatching_)
@@ -1069,8 +1071,8 @@ ServerConnectionImpl::ServerConnectionImpl(
           [&]() -> void { this->onAboveHighWatermark(); },
           []() -> void { /* TODO(adisuissa): handle overflow watermark */ })),
       headers_with_underscores_action_(headers_with_underscores_action),
-      abort_dispatch_(
-          overload_manager.getLoadShedPoint("envoy.load_shed_points.http1_server_abort_dispatch")) {
+      abort_dispatch_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H1ServerAbortDispatch)) {
   ENVOY_LOG_ONCE_IF(trace, abort_dispatch_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.http1_server_abort_dispatch is not "
                     "found. Is it configured?");

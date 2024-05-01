@@ -285,18 +285,10 @@ using ResponseSharedPtr = std::shared_ptr<Response>;
 
 template <class T> class StreamFramePtrHelper {
 public:
-  StreamFramePtrHelper(StreamFramePtr frame) {
-    auto frame_ptr = frame.release();
-
-    auto typed_frame_ptr = dynamic_cast<T*>(frame_ptr);
-
-    if (typed_frame_ptr == nullptr) {
-      // If the frame is not the expected type, wrap it
-      // in the original StreamFramePtr.
-      frame_ = StreamFramePtr{frame_ptr};
-    } else {
-      // If the frame is the expected type, wrap it
-      // in the typed frame unique pointer.
+  StreamFramePtrHelper(StreamFramePtr frame) : frame_(std::move(frame)) {
+    if (auto typed_frame_ptr = dynamic_cast<T*>(frame_.get()); typed_frame_ptr != nullptr) {
+      // If the frame is the expected type, wrap it in the typed frame unique pointer.
+      frame_.release();
       typed_frame_ = std::unique_ptr<T>{typed_frame_ptr};
     }
   }

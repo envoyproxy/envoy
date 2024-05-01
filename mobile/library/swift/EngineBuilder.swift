@@ -1,10 +1,5 @@
-#if canImport(EnvoyCxxSwiftInterop)
-@_implementationOnly import EnvoyCxxSwiftInterop
-#endif
 @_implementationOnly import EnvoyEngine
 import Foundation
-
-// swiftlint:disable file_length
 
 #if ENVOY_MOBILE_XDS
 /// Builder for generating the xDS configuration for the Envoy Mobile engine.
@@ -138,7 +133,7 @@ open class EngineBuilder: NSObject {
   private var connectTimeoutSeconds: UInt32 = 30
   private var dnsFailureRefreshSecondsBase: UInt32 = 2
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
-  private var dnsQueryTimeoutSeconds: UInt32 = 25
+  private var dnsQueryTimeoutSeconds: UInt32 = 5
   private var dnsMinRefreshSeconds: UInt32 = 60
   private var dnsPreresolveHostnames: [String] = []
   private var dnsRefreshSeconds: UInt32 = 60
@@ -156,6 +151,7 @@ open class EngineBuilder: NSObject {
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
+  private var respectSystemProxySettings: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
   private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
@@ -166,7 +162,7 @@ open class EngineBuilder: NSObject {
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
   private var onEngineRunning: (() -> Void)?
-  private var logger: ((String) -> Void)?
+  private var logger: ((LogLevel, String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
   private(set) var monitoringMode: NetworkMonitoringMode = .pathMonitor
   private var nativeFilterChain: [EnvoyNativeFilterConfig] = []
@@ -181,7 +177,6 @@ open class EngineBuilder: NSObject {
 #if ENVOY_MOBILE_XDS
   private var xdsBuilder: XdsBuilder?
 #endif
-  private var enableSwiftBootstrap = false
 
   // MARK: - Public
 
@@ -198,13 +193,13 @@ open class EngineBuilder: NSObject {
     self.base = .custom(yaml)
   }
 
-  /// Add a log level to use with Envoy.
+  /// Set a log level to use with Envoy.
   ///
   /// - parameter logLevel: The log level to use with Envoy.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addLogLevel(_ logLevel: LogLevel) -> Self {
+  public func setLogLevel(_ logLevel: LogLevel) -> Self {
     self.logLevel = logLevel
     return self
   }
@@ -363,6 +358,25 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enableInterfaceBinding(_ enableInterfaceBinding: Bool) -> Self {
     self.enableInterfaceBinding = enableInterfaceBinding
+    return self
+  }
+
+  ///
+  /// Specify whether system proxy settings should be respected. If yes, Envoy Mobile will
+  /// use iOS APIs to query iOS Proxy settings configured on a device and will
+  /// respect these settings when establishing connections with remote services.
+  ///
+  /// The method is introduced for experimentation purposes and as a safety guard against
+  /// critical issues in the implementation of the proxying feature. It's intended to be removed
+  /// after it's confirmed that proxies on iOS work as expected.
+  ///
+  /// - parameter respectSystemProxySettings: whether to use the system's proxy settings for
+  ///                                         outbound connections.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func respectSystemProxySettings(_ respectSystemProxySettings: Bool) -> Self {
+    self.respectSystemProxySettings = respectSystemProxySettings
     return self
   }
 
@@ -573,7 +587,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setLogger(closure: @escaping (String) -> Void) -> Self {
+  public func setLogger(closure: @escaping (LogLevel, String) -> Void) -> Self {
     self.logger = closure
     return self
   }
@@ -667,36 +681,23 @@ open class EngineBuilder: NSObject {
   }
 #endif
 
-#if canImport(EnvoyCxxSwiftInterop)
-  /// Use Swift's experimental C++ interop support to generate the bootstrap object
-  /// instead of going through the Objective-C layer.
-  ///
-  /// - parameter enableSwiftBootstrap: Whether or not to use the Swift / C++ interop
-  ///                                   to generate the bootstrap object.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func enableSwiftBootstrap(_ enableSwiftBootstrap: Bool) -> Self {
-    self.enableSwiftBootstrap = enableSwiftBootstrap
-    return self
-  }
-#endif
-
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
   /// - note: Must be strongly retained in order for network requests to be performed correctly.
   ///
   /// - returns: The built `Engine`.
   public func build() -> Engine {
-    let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
+    let engine = self.engineType.init(runningCallback: self.onEngineRunning,
+                                      logger: { level, message in
+                                        if let log = self.logger {
+                                          if let lvl = LogLevel(rawValue: level) {
+                                            log(lvl, message)
+                                          }
+                                        }
+                                      },
                                       eventTracker: self.eventTracker,
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue))
     let config = self.makeConfig()
-#if canImport(EnvoyCxxSwiftInterop)
-    if self.enableSwiftBootstrap {
-      config.bootstrapPointer = self.generateBootstrap().pointer
-    }
-#endif
 
     switch self.base {
     case .custom(let yaml):
@@ -766,6 +767,7 @@ open class EngineBuilder: NSObject {
       enforceTrustChainVerification: self.enforceTrustChainVerification,
       forceIPv6: self.forceIPv6,
       enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
+      respectSystemProxySettings: self.respectSystemProxySettings,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
@@ -797,111 +799,6 @@ open class EngineBuilder: NSObject {
 
   func bootstrapDebugDescription() -> String {
     let objcDescription = self.makeConfig().bootstrapDebugDescription()
-#if canImport(EnvoyCxxSwiftInterop)
-    assert(
-      self.generateBootstrap().debugDescription == objcDescription,
-      "Swift bootstrap is different from ObjC bootstrap"
-    )
-#endif
     return objcDescription
   }
 }
-
-#if canImport(EnvoyCxxSwiftInterop)
-private extension EngineBuilder {
-  func generateBootstrap() -> Bootstrap {
-    var cxxBuilder = Envoy.Platform.EngineBuilder()
-    cxxBuilder.addLogLevel(self.logLevel.toCXX())
-
-    cxxBuilder.addConnectTimeoutSeconds(Int32(self.connectTimeoutSeconds))
-    cxxBuilder.addDnsRefreshSeconds(Int32(self.dnsRefreshSeconds))
-    cxxBuilder.addDnsFailureRefreshSeconds(Int32(self.dnsFailureRefreshSecondsBase),
-                                           Int32(self.dnsFailureRefreshSecondsMax))
-    cxxBuilder.addDnsQueryTimeoutSeconds(Int32(self.dnsQueryTimeoutSeconds))
-    cxxBuilder.addDnsMinRefreshSeconds(Int32(self.dnsMinRefreshSeconds))
-    cxxBuilder.addDnsPreresolveHostnames(self.dnsPreresolveHostnames.toCXX())
-    cxxBuilder.enableDnsCache(self.enableDNSCache, Int32(self.dnsCacheSaveIntervalSeconds))
-#if ENVOY_ENABLE_QUIC
-    cxxBuilder.enableHttp3(self.enableHttp3)
-    for (host, port) in self.quicHints {
-      cxxBuilder.addQuicHint(host.toCXX(), Int32(port))
-    }
-    for (suffix) in self.quicCanonicalSuffixes {
-      cxxBuilder.addQuicCanonicalSuffix(suffix.toCXX())
-    }
-#endif
-    cxxBuilder.enableGzipDecompression(self.enableGzipDecompression)
-    cxxBuilder.enableBrotliDecompression(self.enableBrotliDecompression)
-    cxxBuilder.enableInterfaceBinding(self.enableInterfaceBinding)
-    cxxBuilder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh)
-    cxxBuilder.enforceTrustChainVerification(self.enforceTrustChainVerification)
-    cxxBuilder.setForceAlwaysUsev6(self.forceIPv6)
-    cxxBuilder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation)
-    cxxBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
-      Int32(self.h2ConnectionKeepaliveIdleIntervalMilliseconds)
-    )
-    cxxBuilder.addH2ConnectionKeepaliveTimeoutSeconds(
-      Int32(self.h2ConnectionKeepaliveTimeoutSeconds)
-    )
-    cxxBuilder.addMaxConnectionsPerHost(Int32(self.maxConnectionsPerHost))
-    cxxBuilder.setStreamIdleTimeoutSeconds(Int32(self.streamIdleTimeoutSeconds))
-    cxxBuilder.setPerTryIdleTimeoutSeconds(Int32(self.perTryIdleTimeoutSeconds))
-    cxxBuilder.setAppVersion(self.appVersion.toCXX())
-    cxxBuilder.setAppId(self.appId.toCXX())
-    cxxBuilder.setDeviceOs("iOS".toCXX())
-
-    for (runtimeGuard, value) in self.runtimeGuards {
-      cxxBuilder.setRuntimeGuard(runtimeGuard.toCXX(), value)
-    }
-
-    for filter in self.nativeFilterChain.reversed() {
-      cxxBuilder.addNativeFilter(filter.name.toCXX(), filter.typedConfig.toCXX())
-    }
-
-    for filter in self.platformFilterChain.reversed() {
-      cxxBuilder.addPlatformFilter(filter.filterName.toCXX())
-    }
-
-    if
-      let nodeRegion = self.nodeRegion,
-      let nodeZone = self.nodeZone,
-      let nodeSubZone = self.nodeSubZone
-    {
-      cxxBuilder.setNodeLocality(nodeRegion.toCXX(), nodeZone.toCXX(), nodeSubZone.toCXX())
-    }
-
-    if let nodeID = self.nodeID {
-      cxxBuilder.setNodeId(nodeID.toCXX())
-    }
-
-    generateXds(&cxxBuilder)
-
-    return cxxBuilder.generateBootstrap()
-  }
-
-  private func generateXds(_ cxxBuilder: inout Envoy.Platform.EngineBuilder) {
-#if ENVOY_MOBILE_XDS
-    if let xdsBuilder = self.xdsBuilder {
-      var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
-                                                    xdsBuilder.xdsServerPort)
-      for (header, value) in xdsBuilder.xdsGrpcInitialMetadata {
-        cxxXdsBuilder.addInitialStreamHeader(header.toCXX(), value.toCXX())
-      }
-      if let xdsSslRootCerts = xdsBuilder.sslRootCerts {
-        cxxXdsBuilder.setSslRootCerts(xdsSslRootCerts.toCXX())
-      }
-      if let rtdsResourceName = xdsBuilder.rtdsResourceName {
-        cxxXdsBuilder.addRuntimeDiscoveryService(rtdsResourceName.toCXX(),
-                                                 Int32(xdsBuilder.rtdsTimeoutInSeconds))
-      }
-      if xdsBuilder.enableCds {
-        cxxXdsBuilder.addClusterDiscoveryService(
-          xdsBuilder.cdsResourcesLocator?.toCXX() ?? "".toCXX(),
-          Int32(xdsBuilder.cdsTimeoutInSeconds))
-      }
-      cxxBuilder.setXds(cxxXdsBuilder)
-    }
-#endif
-  }
-}
-#endif

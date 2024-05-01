@@ -209,6 +209,35 @@ TEST(SubstitutionFormatUtilsTest, protocolToStringOrDefault) {
   EXPECT_EQ("-", SubstitutionFormatUtils::protocolToStringOrDefault({}));
 }
 
+TEST(SubstitutionFormatUtilsTest, truncate) {
+  std::string str;
+
+  str = "abcd";
+  SubstitutionFormatUtils::truncate(str, {});
+  EXPECT_EQ("abcd", str);
+
+  str = "abcd";
+  SubstitutionFormatUtils::truncate(str, 0);
+  EXPECT_EQ("", str);
+
+  str = "abcd";
+  SubstitutionFormatUtils::truncate(str, 2);
+  EXPECT_EQ("ab", str);
+
+  str = "abcd";
+  SubstitutionFormatUtils::truncate(str, 100);
+  EXPECT_EQ("abcd", str);
+}
+
+TEST(SubstitutionFormatUtilsTest, truncateStringView) {
+  std::string str = "abcd";
+
+  EXPECT_EQ("abcd", SubstitutionFormatUtils::truncateStringView(str, {}));
+  EXPECT_EQ("", SubstitutionFormatUtils::truncateStringView(str, 0));
+  EXPECT_EQ("ab", SubstitutionFormatUtils::truncateStringView(str, 2));
+  EXPECT_EQ("abcd", SubstitutionFormatUtils::truncateStringView(str, 100));
+}
+
 TEST(SubstitutionFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
   StreamInfo::MockStreamInfo stream_info;
@@ -230,7 +259,8 @@ TEST(SubstitutionFormatterTest, plainNumberFormatter) {
 TEST(SubstitutionFormatterTest, inFlightDuration) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
-  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr};
+  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
 
   {
     time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(100)));
@@ -540,8 +570,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter response_flags_format("RESPONSE_FLAGS");
-    ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
-        .WillByDefault(Return(true));
+    stream_info.setResponseFlag(StreamInfo::CoreResponseFlag::LocalReset);
     EXPECT_EQ("LR", response_flags_format.formatWithContext({}, stream_info));
     EXPECT_THAT(response_flags_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("LR")));
@@ -549,8 +578,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter response_flags_format("RESPONSE_FLAGS_LONG");
-    ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
-        .WillByDefault(Return(true));
+    stream_info.setResponseFlag(StreamInfo::CoreResponseFlag::LocalReset);
     EXPECT_EQ("LocalReset", response_flags_format.formatWithContext({}, stream_info));
     EXPECT_THAT(response_flags_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("LocalReset")));
@@ -893,6 +921,143 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(
         upstream_connection_pool_callback_duration_format.formatValueWithContext({}, stream_info),
         ProtoEq(ValueUtil::numberValue(15.0)));
+  }
+
+  {
+    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter upstream_format("COMMON_DURATION"); },
+                              EnvoyException, "COMMON_DURATION requires parameters");
+  }
+
+  {
+    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter duration_format("COMMON_DURATION", "a"); },
+                              EnvoyException, "Invalid common duration configuration: a.");
+  }
+
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        { StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:c:d"); }, EnvoyException,
+        "Invalid common duration configuration: a:b:c:d.");
+  }
+
+  {
+    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:zs"); },
+                              EnvoyException, "Invalid common duration precision: zs.");
+  }
+
+  {
+    std::vector<std::string> time_points{
+        "DS_RX_BEG", "DS_RX_END", "US_TX_BEG", "US_TX_END",         "US_RX_BEG",
+        "US_RX_END", "DS_TX_BEG", "DS_TX_END", "custom_time_point",
+    };
+
+    std::vector<std::string> precisions{"ms", "us", "ns"};
+
+    // No time points set.
+    {
+      NiceMock<StreamInfo::MockStreamInfo> stream_info;
+      MockTimeSystem time_system;
+      for (size_t start_index = 0; start_index < time_points.size(); start_index++) {
+        for (size_t end_index = 0; end_index < time_points.size(); end_index++) {
+          for (auto& precision : precisions) {
+            const std::string sub_command =
+                absl::StrCat(time_points[start_index], ":", time_points[end_index], ":", precision);
+            std::cout << sub_command << std::endl;
+            StreamInfoFormatter duration_format("COMMON_DURATION", sub_command);
+
+            if (start_index == end_index && start_index == 0) {
+              EXPECT_EQ("0", duration_format.formatWithContext({}, stream_info));
+              EXPECT_THAT(duration_format.formatValueWithContext({}, stream_info),
+                          ProtoEq(ValueUtil::numberValue(0)));
+            } else {
+              EXPECT_EQ(absl::nullopt, duration_format.formatWithContext({}, stream_info));
+              EXPECT_THAT(duration_format.formatValueWithContext({}, stream_info),
+                          ProtoEq(ValueUtil::nullValue()));
+            }
+          }
+        }
+      }
+    }
+
+    {
+      NiceMock<StreamInfo::MockStreamInfo> stream_info;
+      MockTimeSystem time_system;
+
+      // DS_RX_BEG
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(1000000))));
+      stream_info.start_time_monotonic_ = time_system.monotonicTime();
+
+      // DS_RX_END
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(2000000))));
+      stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
+
+      // US_TX_BEG
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(3000000))));
+      stream_info.upstream_info_->upstreamTiming().first_upstream_tx_byte_sent_ =
+          time_system.monotonicTime();
+
+      // US_TX_END
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(4000000))));
+      stream_info.upstream_info_->upstreamTiming().last_upstream_tx_byte_sent_ =
+          time_system.monotonicTime();
+
+      // US_RX_BEG
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+      stream_info.upstream_info_->upstreamTiming().first_upstream_rx_byte_received_ =
+          time_system.monotonicTime();
+
+      // US_RX_END
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(6000000))));
+      stream_info.upstream_info_->upstreamTiming().last_upstream_rx_byte_received_ =
+          time_system.monotonicTime();
+
+      // DS_TX_BEG
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(7000000))));
+      stream_info.downstream_timing_.onFirstDownstreamTxByteSent(time_system);
+
+      // DS_TX_END
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(8000000))));
+      stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
+
+      // custom_time_point
+      stream_info.downstream_timing_.setValue("custom_time_point",
+                                              MonotonicTime(std::chrono::nanoseconds(9000000)));
+
+      for (size_t start_index = 0; start_index < time_points.size(); start_index++) {
+        for (size_t end_index = 0; end_index < time_points.size(); end_index++) {
+          uint64_t precision_factor = 1;
+          for (auto& precision : precisions) {
+            auto current_factor = precision_factor;
+            precision_factor *= 1000;
+
+            const std::string sub_command =
+                absl::StrCat(time_points[start_index], ":", time_points[end_index], ":", precision);
+            std::cout << sub_command << std::endl;
+
+            StreamInfoFormatter duration_format("COMMON_DURATION", sub_command);
+
+            if (start_index > end_index) {
+              EXPECT_EQ(absl::nullopt, duration_format.formatWithContext({}, stream_info));
+              EXPECT_THAT(duration_format.formatValueWithContext({}, stream_info),
+                          ProtoEq(ValueUtil::nullValue()));
+              continue;
+            } else {
+              const auto diff = (end_index - start_index) * current_factor;
+              EXPECT_EQ(std::to_string(diff), duration_format.formatWithContext({}, stream_info));
+              EXPECT_THAT(duration_format.formatValueWithContext({}, stream_info),
+                          ProtoEq(ValueUtil::numberValue(diff)));
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -4227,9 +4392,9 @@ TEST(SubstitutionFormatParser, SyntaxVerifierFail) {
       };
 
   for (const auto& test_case : test_cases) {
-    EXPECT_THROW(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
-                                                    std::get<1>(test_case), std::get<2>(test_case)),
-                 EnvoyException);
+    EXPECT_FALSE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                    std::get<1>(test_case), std::get<2>(test_case))
+                     .ok());
   }
 }
 
@@ -4258,8 +4423,9 @@ TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
            absl::nullopt}};
 
   for (const auto& test_case : test_cases) {
-    EXPECT_NO_THROW(CommandSyntaxChecker::verifySyntax(
-        std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)));
+    EXPECT_TRUE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                   std::get<1>(test_case), std::get<2>(test_case))
+                    .ok());
   }
 }
 } // namespace

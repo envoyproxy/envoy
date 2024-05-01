@@ -22,7 +22,7 @@ public:
 
 protected:
   absl::optional<OnMatch<DataType>> doMatch(const std::string& data) override {
-    const auto result = children_.findLongestPrefix(data.c_str());
+    const auto result = children_.findLongestPrefix(data);
     if (result) {
       return *result;
     }

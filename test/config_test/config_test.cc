@@ -97,9 +97,13 @@ public:
         .Times(AtLeast(0));
 
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
-    Server::InstanceUtil::loadBootstrapConfig(
-        bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
-    Server::Configuration::InitialImpl initial_config(bootstrap);
+    EXPECT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
+                    bootstrap, options_,
+                    server_.messageValidationContext().staticValidationVisitor(), *api_)
+                    .ok());
+    absl::Status creation_status;
+    Server::Configuration::InitialImpl initial_config(bootstrap, creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     Server::Configuration::MainImpl main_config;
 
     // Emulate main implementation of initializing bootstrap extensions.
@@ -156,7 +160,7 @@ public:
     ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
 
     try {
-      main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
+      THROW_IF_NOT_OK(main_config.initialize(bootstrap, server_, *cluster_manager_factory_));
     } catch (const EnvoyException& ex) {
       ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", options_.configPath(),
                                    ex.what());
@@ -211,16 +215,13 @@ void testMerge() {
   OptionsImpl options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
                                                     Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  Server::InstanceUtil::loadBootstrapConfig(bootstrap, options,
-                                            ProtobufMessage::getStrictValidationVisitor(), *api);
+  ASSERT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
+                  bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
+                  .ok());
   EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
 }
 
 uint32_t run(const std::string& directory) {
-  // In the default startup process, we will inject regex engine before initializing config.
-  // While in the ConfigTest, these kind of bootstrap injections will not take place, so we must
-  // register regex engine in advance.
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   uint32_t num_tested = 0;
   Api::ApiPtr api = Api::createApiForTest();
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
@@ -241,8 +242,9 @@ uint32_t run(const std::string& directory) {
           Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
       ConfigTest test1(options);
       envoy::config::bootstrap::v3::Bootstrap bootstrap;
-      Server::InstanceUtil::loadBootstrapConfig(
-          bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api);
+      EXPECT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
+                      bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
+                      .ok());
       ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
       OptionsImpl config = asConfigYaml(options, *api);
       ConfigTest test2(config);

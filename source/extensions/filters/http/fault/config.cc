@@ -17,8 +17,7 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
   auto& server_context = context.serverFactoryContext();
 
   FaultFilterConfigSharedPtr filter_config(
-      std::make_shared<FaultFilterConfig>(config, server_context.runtime(), stats_prefix,
-                                          context.scope(), server_context.timeSource()));
+      std::make_shared<FaultFilterConfig>(config, stats_prefix, context.scope(), server_context));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
   };
@@ -27,9 +26,8 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
 Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
-  FaultFilterConfigSharedPtr filter_config(
-      std::make_shared<FaultFilterConfig>(config, server_context.runtime(), stats_prefix,
-                                          server_context.scope(), server_context.timeSource()));
+  FaultFilterConfigSharedPtr filter_config(std::make_shared<FaultFilterConfig>(
+      config, stats_prefix, server_context.scope(), server_context));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
   };
@@ -38,8 +36,8 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoWithServer
 Router::RouteSpecificFilterConfigConstSharedPtr
 FaultFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const Fault::FaultSettings>(config);
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<const Fault::FaultSettings>(config, context);
 }
 
 /**

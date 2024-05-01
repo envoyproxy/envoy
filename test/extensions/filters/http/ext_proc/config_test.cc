@@ -36,6 +36,15 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
     response_trailer_mode: send
   filter_metadata:
     hello: "world"
+  metadata_options:
+    forwarding_namespaces:
+      typed:
+      - ns1
+      untyped:
+      - ns2
+    receiving_namespaces:
+      untyped:
+      - ns2
   )EOF";
 
   ExternalProcessingFilterConfig factory;
@@ -73,6 +82,15 @@ TEST(HttpExtProcConfigTest, CorrectConfigServerContext) {
     response_trailer_mode: send
   filter_metadata:
     hello: "world"
+  metadata_options:
+    forwarding_namespaces:
+      typed:
+      - ns1
+      untyped:
+      - ns2
+    receiving_namespaces:
+      untyped:
+      - ns2
   )EOF";
 
   ExternalProcessingFilterConfig factory;
@@ -86,6 +104,23 @@ TEST(HttpExtProcConfigTest, CorrectConfigServerContext) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
+}
+
+TEST(HttpExtProcConfigTest, CorrectRouteMetadataOnlyConfig) {
+  std::string yaml = R"EOF(
+  overrides:
+    grpc_initial_metadata:
+      - key: "a"
+        value: "a"
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Router::RouteSpecificFilterConfigConstSharedPtr cb = factory.createRouteSpecificFilterConfig(
+      *proto_config, context, context.messageValidationVisitor());
 }
 
 } // namespace

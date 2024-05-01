@@ -1,4 +1,4 @@
-#include "redis_cluster.h"
+#include "source/extensions/clusters/redis/redis_cluster.h"
 
 #include <cstdint>
 #include <memory>
@@ -38,7 +38,9 @@ RedisCluster::RedisCluster(
       load_assignment_(cluster.load_assignment()),
       local_info_(context.serverFactoryContext().localInfo()),
       random_(context.serverFactoryContext().api().randomGenerator()),
-      redis_discovery_session_(*this, redis_client_factory), lb_factory_(std::move(lb_factory)),
+      redis_discovery_session_(
+          std::make_shared<RedisDiscoverySession>(*this, redis_client_factory)),
+      lb_factory_(std::move(lb_factory)),
       auth_username_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authUsername(
           info(), context.serverFactoryContext().api())),
       auth_password_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(
@@ -51,7 +53,7 @@ RedisCluster::RedisCluster(
       registration_handle_(refresh_manager_->registerCluster(
           cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
           failure_refresh_threshold_, host_degraded_refresh_threshold_, [&]() {
-            redis_discovery_session_.resolve_timer_->enableTimer(std::chrono::milliseconds(0));
+            redis_discovery_session_->resolve_timer_->enableTimer(std::chrono::milliseconds(0));
           })) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
@@ -75,7 +77,7 @@ void RedisCluster::startPreInit() {
 void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
                                   const Upstream::HostVector& hosts_removed,
                                   uint32_t current_priority) {
-  Upstream::PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
+  Upstream::PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
 
   auto locality_lb_endpoint = localityLbEndpoint();
   priority_state_manager.initializePriorityFor(locality_lb_endpoint);
@@ -205,8 +207,8 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
           // slots" command for service discovery and slot allocation. All subsequent
           // discoveries are handled by RedisDiscoverySession and will not use DNS
           // resolution again.
-          parent_.redis_discovery_session_.registerDiscoveryAddress(std::move(response), port_);
-          parent_.redis_discovery_session_.startResolveRedis();
+          parent_.redis_discovery_session_->registerDiscoveryAddress(std::move(response), port_);
+          parent_.redis_discovery_session_->startResolveRedis();
         }
       });
 }
@@ -295,9 +297,9 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   if (!client) {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
-    client->client_ = client_factory_.create(host, dispatcher_, *this, redis_command_stats_,
-                                             parent_.info()->statsScope(), parent_.auth_username_,
-                                             parent_.auth_password_, false);
+    client->client_ = client_factory_.create(host, dispatcher_, shared_from_this(),
+                                             redis_command_stats_, parent_.info()->statsScope(),
+                                             parent_.auth_username_, parent_.auth_password_, false);
     client->client_->addConnectionCallbacks(*client);
   }
   ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());

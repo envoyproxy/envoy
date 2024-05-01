@@ -62,7 +62,8 @@ void FrameUtils::fixupHeaders(Frame& frame) {
 
 CodecFrameInjector::CodecFrameInjector(const std::string& injector_name)
     : options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions())),
+                   envoy::config::core::v3::Http2ProtocolOptions())
+                   .value()),
       injector_name_(injector_name) {}
 
 ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("server") {

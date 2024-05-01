@@ -31,15 +31,15 @@ Tracing::Decision tracingDecision(const Tracing::ConnectionManagerTracingConfig&
   return {Tracing::Reason::NotTraceable, false};
 }
 
-StreamInfo::ResponseFlag
+StreamInfo::CoreResponseFlag
 responseFlagFromDownstreamReasonReason(DownstreamStreamResetReason reason) {
   switch (reason) {
   case DownstreamStreamResetReason::ConnectionTermination:
-    return StreamInfo::ResponseFlag::DownstreamConnectionTermination;
+    return StreamInfo::CoreResponseFlag::DownstreamConnectionTermination;
   case DownstreamStreamResetReason::LocalConnectionTermination:
-    return StreamInfo::ResponseFlag::LocalReset;
+    return StreamInfo::CoreResponseFlag::LocalReset;
   case DownstreamStreamResetReason::ProtocolError:
-    return StreamInfo::ResponseFlag::DownstreamProtocolError;
+    return StreamInfo::CoreResponseFlag::DownstreamProtocolError;
   }
   PANIC("Unknown reset reason");
 }
@@ -50,7 +50,8 @@ ActiveStream::ActiveStream(Filter& parent, StreamRequestPtr request)
     : parent_(parent), request_stream_(std::move(request)),
       request_stream_end_(request_stream_->frameFlags().endStream()),
       stream_info_(parent_.time_source_,
-                   parent_.callbacks_->connection().connectionInfoProviderSharedPtr()) {
+                   parent_.callbacks_->connection().connectionInfoProviderSharedPtr(),
+                   StreamInfo::FilterState::LifeSpan::FilterChain) {
   if (!request_stream_end_) {
     // If the request is not fully received, register the stream to the frame handler map.
     parent_.registerFrameHandler(requestStreamId(), this);
@@ -107,7 +108,7 @@ bool ActiveStream::spawnUpstreamSpan() const {
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() {
   return parent_.downstreamConnection().dispatcher();
 }
-const CodecFactory& ActiveStream::downstreamCodec() { return parent_.config_->codecFactory(); }
+const CodecFactory& ActiveStream::codecFactory() { return parent_.config_->codecFactory(); }
 void ActiveStream::resetStream(DownstreamStreamResetReason reason) {
   if (active_stream_reset_) {
     return;
@@ -313,6 +314,11 @@ void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) 
   parent_.deferredStream(*this);
 }
 
+void ActiveStream::onEncodingFailure(absl::string_view reason) {
+  ENVOY_LOG(error, "Generic proxy: response encoding failure: {}", reason);
+  resetStream(DownstreamStreamResetReason::ProtocolError);
+}
+
 void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
   factory.createFilterChain(*this);
   // Reverse the encoder filter chain so that the first encoder filter is the last filter in the
@@ -389,9 +395,9 @@ void Filter::onDecodingSuccess(StreamFramePtr request) {
   onDecodingFailure();
 }
 
-void Filter::onDecodingFailure() {
+void Filter::onDecodingFailure(absl::string_view reason) {
+  ENVOY_LOG(error, "generic proxy: request decoding failure: {}", reason);
   stats_helper_.onRequestDecodingError();
-
   resetDownstreamAllStreams(DownstreamStreamResetReason::ProtocolError);
   closeDownstreamConnection();
 }

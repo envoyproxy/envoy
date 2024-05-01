@@ -7,8 +7,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
-
-#include "quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -204,8 +203,8 @@ void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& sel
   // is the time to actually close the connection.
   maybeHandleCloseDuringInitialize();
   quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);
-  if (connection()->sent_server_preferred_address().IsInitialized() &&
-      self_address == connection()->sent_server_preferred_address()) {
+  if (connection()->expected_server_preferred_address().IsInitialized() &&
+      self_address == connection()->expected_server_preferred_address()) {
     connection_stats_.num_packets_rx_on_preferred_address_.inc();
   }
   maybeApplyDelayedClose();

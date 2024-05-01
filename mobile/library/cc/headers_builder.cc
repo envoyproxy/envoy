@@ -1,4 +1,4 @@
-#include "headers_builder.h"
+#include "library/cc/headers_builder.h"
 
 namespace Envoy {
 namespace Platform {

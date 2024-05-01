@@ -9,7 +9,7 @@ ThreadFactory& threadFactoryForTest() {
 #ifdef WIN32
   static auto* thread_factory = new ThreadFactoryImplWin32();
 #else
-  static auto* thread_factory = new ThreadFactoryImplPosix();
+  static auto* thread_factory = PosixThreadFactory::create().release();
 #endif
   return *thread_factory;
 }

@@ -28,7 +28,10 @@ private:
   Stats::StatNamePool pool_;
 
   std::vector<Stats::StatName> code_stat_names_;
-  absl::flat_hash_map<StreamInfo::ResponseFlag, Stats::StatName> flag_stat_names_;
+  // The flag_stat_names_ contains stat names of all response flags. The index of each flag
+  // is the same as the value of the flag. Size of this vector is the same as the size of
+  // StreamInfo::ResponseFlagUtils::responseFlagsVec().
+  std::vector<Stats::StatName> flag_stat_names_;
 
   Stats::StatName unknown_code_or_flag_;
 };

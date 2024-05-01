@@ -78,8 +78,9 @@ protected:
     return std::make_unique<TestActiveQuicListener>(
         runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
         listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
-        packets_to_read_to_connection_count_ratio, crypto_server_stream_factory,
-        proof_source_factory, std::move(cid_generator), testWorkerSelector);
+        packets_to_read_to_connection_count_ratio, /*receive_ecn=*/true,
+        crypto_server_stream_factory, proof_source_factory, std::move(cid_generator),
+        testWorkerSelector);
   }
 };
 
@@ -94,6 +95,8 @@ public:
   }
 
   static bool enabled(ActiveQuicListener& listener) { return listener.enabled_->enabled(); }
+
+  static Network::Socket& socket(ActiveQuicListener& listener) { return listener.listen_socket_; }
 };
 
 class ActiveQuicListenerFactoryPeer {
@@ -112,7 +115,8 @@ protected:
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
         connection_handler_(*dispatcher_, absl::nullopt),
         transport_socket_factory_(true, *store_.rootScope(),
-                                  std::make_unique<NiceMock<Ssl::MockServerContextConfig>>()),
+                                  std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
+                                  ssl_context_manager_, {}),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
@@ -328,6 +332,7 @@ protected:
   NiceMock<Network::MockUdpListenerConfig> udp_listener_config_;
   NiceMock<Network::MockListenerConfig> listener_config_;
   NiceMock<Network::MockUdpPacketWriterFactory> udp_packet_writer_factory_;
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   quic::QuicConfig quic_config_;
   Server::ConnectionHandlerImpl connection_handler_;
   std::unique_ptr<ActiveQuicListener> quic_listener_;
@@ -365,6 +370,13 @@ INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   initialize();
+#if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
+  EXPECT_TRUE(quic_listener_->udpPacketWriter().isBatchMode());
+#else
+  EXPECT_FALSE(quic_listener_->udpPacketWriter().isBatchMode());
+#endif
+  // The listener ignores read error.
+  quic_listener_->onReceiveError(Api::IoError::IoErrorCode::InvalidArgument);
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 1);
@@ -551,6 +563,23 @@ TEST_P(ActiveQuicListenerTest, QuicRejectsAllAndResumes) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
+}
+
+TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
+  initialize();
+  Network::Socket& socket = ActiveQuicListenerPeer::socket(*quic_listener_);
+  absl::optional<Network::Address::IpVersion> version = socket.ipVersion();
+  EXPECT_TRUE(version.has_value());
+  int optval;
+  socklen_t optlen = sizeof(optval);
+  Api::SysCallIntResult rv;
+  if (*version == Network::Address::IpVersion::v6) {
+    rv = socket.getSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, &optlen);
+  } else {
+    rv = socket.getSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, &optlen);
+  }
+  EXPECT_EQ(rv.return_value_, 0);
+  EXPECT_EQ(optval, 1);
 }
 
 class ActiveQuicListenerEmptyFlagConfigTest : public ActiveQuicListenerTest {

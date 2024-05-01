@@ -42,13 +42,6 @@ public:
 
 DECLARE_FACTORY(DownstreamSslSocketFactory);
 
-class SslContextManagerFactory : public Ssl::ContextManagerFactory {
-public:
-  Ssl::ContextManagerPtr createContextManager(TimeSource& time_source) override;
-};
-
-DECLARE_FACTORY(SslContextManagerFactory);
-
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

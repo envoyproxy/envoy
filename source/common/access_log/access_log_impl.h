@@ -166,7 +166,8 @@ private:
  */
 class HeaderFilter : public Filter {
 public:
-  HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config);
+  HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config,
+               Server::Configuration::CommonFactoryContext& context);
 
   // AccessLog::Filter
   bool evaluate(const Formatter::HttpFormatterContext& context,
@@ -188,7 +189,8 @@ public:
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
-  uint64_t configured_flags_{};
+  const bool has_configured_flags_{};
+  std::vector<bool> configured_flags_{};
 };
 
 /**
@@ -241,7 +243,8 @@ private:
  */
 class MetadataFilter : public Filter {
 public:
-  MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config);
+  MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config,
+                 Server::Configuration::CommonFactoryContext& context);
 
   bool evaluate(const Formatter::HttpFormatterContext& context,
                 const StreamInfo::StreamInfo& info) const override;

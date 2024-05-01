@@ -65,8 +65,8 @@ public:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
                                  const Upstream::ClusterInfo&, const VirtualCluster*,
-                                 RouteStatsContextOptRef, Runtime::Loader&,
-                                 Random::RandomGenerator&, Event::Dispatcher&, TimeSource&,
+                                 RouteStatsContextOptRef,
+                                 Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
                                  Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
     retry_state_ = new NiceMock<MockRetryState>();
@@ -118,7 +118,7 @@ public:
                                              ShadowWriterPtr(new MockShadowWriter()), router_proto);
     mock_upstream_log_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
     config_->upstream_logs_.push_back(mock_upstream_log_);
-    router_ = std::make_shared<TestFilter>(*config_, config_->default_stats_);
+    router_ = std::make_shared<TestFilter>(config_, config_->default_stats_);
     router_->setDecoderFilterCallbacks(callbacks_);
     EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(testing::AnyNumber());
     EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(testing::AnyNumber());

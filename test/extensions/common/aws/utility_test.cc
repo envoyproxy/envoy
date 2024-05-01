@@ -1,16 +1,18 @@
+#include <filesystem>
+
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::ElementsAre;
-using testing::InSequence;
 using testing::NiceMock;
 using testing::Pair;
-using testing::Ref;
 using testing::Return;
 using testing::Throw;
 
@@ -24,6 +26,55 @@ MATCHER_P(WithName, expectedName, "") {
   *result_listener << "\nexpected { name: \"" << expectedName << "\"} but got {name: \""
                    << arg.name() << "\"}\n";
   return ExplainMatchResult(expectedName, arg.name(), result_listener);
+}
+
+const char CREDENTIALS_FILE_CONTENTS[] =
+    R"(
+[default]
+aws_access_key_id=default_access_key
+aws_secret_access_key=default_secret
+aws_session_token=default_token
+
+# This profile has leading spaces that should get trimmed.
+  [profile1]
+# The "=" in the value should not interfere with how this line is parsed.
+aws_access_key_id=profile1_acc=ess_key
+aws_secret_access_key=profile1_secret
+foo=bar
+aws_session_token=profile1_token
+
+[profile2]
+aws_access_key_id=profile2_access_key
+
+[profile3]
+aws_access_key_id=profile3_access_key
+aws_secret_access_key=
+
+[profile4]
+aws_access_key_id = profile4_access_key
+aws_secret_access_key = profile4_secret
+aws_session_token = profile4_token
+)";
+
+TEST(UtilityTest, TestProfileResolver) {
+
+  absl::flat_hash_map<std::string, std::string> elements = {{"AWS_ACCESS_KEY_ID", "testoverwrite"},
+                                                            {"AWS_SECRET_ACCESS_KEY", ""}};
+  absl::flat_hash_map<std::string, std::string>::iterator it;
+
+  auto temp = TestEnvironment::temporaryDirectory();
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string credential_file(temp + "/.aws/credentials");
+
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      credential_file, CREDENTIALS_FILE_CONTENTS, true, false);
+
+  Utility::resolveProfileElements(file_path, "default", elements);
+  it = elements.find("AWS_ACCESS_KEY_ID");
+  EXPECT_EQ(it->second, "default_access_key");
+  Utility::resolveProfileElements(file_path, "profile4", elements);
+  it = elements.find("AWS_ACCESS_KEY_ID");
+  EXPECT_EQ(it->second, "profile4_access_key");
 }
 
 // Headers must be in alphabetical order by virtue of std::map
@@ -105,6 +156,7 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
 
 // Headers in the exclusion list are not canonicalized
 TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Http::TestRequestHeaderMapImpl headers{
       {":authority", "example.com"},          {"x-forwarded-for", "1.2.3.4"},
       {"x-forwarded-proto", "https"},         {"x-amz-date", "20130708T220855Z"},
@@ -118,7 +170,7 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
     config.set_exact(str);
     exclusion_list.emplace_back(
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config));
+            config, context));
   }
   std::vector<std::string> prefixes = {"x-envoy"};
   for (auto& match_str : prefixes) {
@@ -126,7 +178,7 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
     config.set_prefix(match_str);
     exclusion_list.emplace_back(
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config));
+            config, context));
   }
   const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
   EXPECT_THAT(map,
@@ -433,6 +485,33 @@ TEST(UtilityTest, GetGovCloudSTSEndpoints) {
   EXPECT_EQ("sts.us-gov-west-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-west-1"));
 }
 
+TEST(UtilityTest, JsonStringFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"access_key_id\":\"testvalue\"}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration =
+      Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
+  EXPECT_EQ(expiration, "testvalue");
+}
+TEST(UtilityTest, JsonStringNotFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"no_access_key_id\":\"testvalue\"}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration =
+      Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
+  EXPECT_EQ(expiration, "notfound");
+}
+TEST(UtilityTest, JsonIntegerFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":5}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  EXPECT_EQ(expiration, 5);
+}
+TEST(UtilityTest, JsonIntegerNotFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"noexpiration\":5}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  // Should return default value
+  EXPECT_EQ(expiration, 0);
+}
 } // namespace
 } // namespace Aws
 } // namespace Common

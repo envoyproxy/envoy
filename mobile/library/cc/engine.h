@@ -2,13 +2,11 @@
 
 #include <functional>
 
+#include "library/cc/stream_client.h"
 #include "library/common/types/c_types.h"
-#include "log_level.h"
-#include "pulse_client.h"
-#include "stream_client.h"
 
 namespace Envoy {
-class Engine;
+class InternalEngine;
 class BaseClientIntegrationTest;
 
 namespace Platform {
@@ -22,12 +20,12 @@ public:
 
   std::string dumpStats();
   StreamClientSharedPtr streamClient();
-  PulseClientSharedPtr pulseClient();
 
   envoy_status_t terminate();
+  Envoy::InternalEngine* engine() { return engine_; }
 
 private:
-  Engine(::Envoy::Engine* engine);
+  Engine(::Envoy::InternalEngine* engine);
 
   // required to access private constructor
   friend class EngineBuilder;
@@ -36,13 +34,11 @@ private:
   // for testing only
   friend class ::Envoy::BaseClientIntegrationTest;
 
-  Envoy::Engine* engine_;
+  Envoy::InternalEngine* engine_;
   StreamClientSharedPtr stream_client_;
-  PulseClientSharedPtr pulse_client_;
-  bool terminated_;
 };
 
-using EngineSharedPtr = std::shared_ptr<Engine>;
+using InternalEngineSharedPtr = std::shared_ptr<Engine>;
 
 } // namespace Platform
 } // namespace Envoy

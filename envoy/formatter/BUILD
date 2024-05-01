@@ -15,6 +15,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/http:header_map_interface",
+        "//source/common/tracing:null_span_lib",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
     ],
 )

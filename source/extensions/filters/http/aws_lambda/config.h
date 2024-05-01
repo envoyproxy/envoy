@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.h"
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
 
+#include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
@@ -11,20 +12,30 @@ namespace HttpFilters {
 namespace AwsLambdaFilter {
 
 class AwsLambdaFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::aws_lambda::v3::Config,
-                                 envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig> {
+    : public Common::DualFactoryBase<
+          envoy::extensions::filters::http::aws_lambda::v3::Config,
+          envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig>,
+      Logger::Loggable<Logger::Id::filter> {
 public:
-  AwsLambdaFilterFactory() : FactoryBase("envoy.filters.http.aws_lambda") {}
+  AwsLambdaFilterFactory() : DualFactoryBase("envoy.filters.http.aws_lambda") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  Extensions::Common::Aws::CredentialsProviderSharedPtr
+  getCredentialsProvider(const std::string& profile,
+                         Server::Configuration::ServerFactoryContext& server_context,
+                         const std::string& region) const;
+
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, DualInfo dual_info,
+      Server::Configuration::ServerFactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig&,
       Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };
+
+using UpstreamAwsLambdaFilterFactory = AwsLambdaFilterFactory;
 
 } // namespace AwsLambdaFilter
 } // namespace HttpFilters

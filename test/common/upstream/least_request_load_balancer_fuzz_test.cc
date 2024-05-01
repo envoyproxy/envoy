@@ -53,8 +53,35 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCa
                    MaxChoiceCountForTest);
     return;
   }
+
   const test::common::upstream::ZoneAwareLoadBalancerTestCase& zone_aware_load_balancer_test_case =
       input.zone_aware_load_balancer_test_case();
+
+  if (input.has_least_request_lb_config()) {
+    const auto& least_request_lb_config = input.least_request_lb_config();
+    // Validate the correctness of the Slow-Start config values.
+    if (least_request_lb_config.has_slow_start_config()) {
+      uint32_t num_hosts = 0;
+      for (const auto& setup_priority_level :
+           zone_aware_load_balancer_test_case.load_balancer_test_case().setup_priority_levels()) {
+        num_hosts += setup_priority_level.num_hosts_in_priority_level();
+      }
+      if (!ZoneAwareLoadBalancerFuzzBase::validateSlowStart(
+              input.least_request_lb_config().slow_start_config(), num_hosts)) {
+        return;
+      }
+    }
+    // Validate that the active_request_bias is not too large (or else it will
+    // effectively zero all the weights).
+    if (least_request_lb_config.has_active_request_bias() &&
+        least_request_lb_config.active_request_bias().default_value() > 25) {
+      ENVOY_LOG_MISC(debug,
+                     "active_request_bias default_value in the least-request config is too high "
+                     "({} > 25), skipping test as the config is invalid",
+                     least_request_lb_config.active_request_bias().default_value());
+      return;
+    }
+  }
 
   ZoneAwareLoadBalancerFuzzBase zone_aware_load_balancer_fuzz = ZoneAwareLoadBalancerFuzzBase(
       zone_aware_load_balancer_test_case.need_local_priority_set(),

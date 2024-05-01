@@ -1,7 +1,5 @@
 package io.envoyproxy.envoymobile.engine;
 
-import java.util.List;
-
 /* Datatype used by the EnvoyConfiguration to header matches for virtual clusters
  *
  * All the fields here map to the fields by the respective names in the HeaderMatcher message
@@ -15,7 +13,6 @@ public class HeaderMatchConfig {
     // Indicates the match value is a regular expression.
     SAFE_REGEX
   }
-  ;
 
   // The name of the matcher.
   public final String name;

@@ -409,6 +409,7 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
   MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+  MOCK_METHOD(ExecutionContext*, executionContext, (), (const));
 
   IoHandlePtr io_handle_;
   std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
@@ -426,6 +427,7 @@ public:
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(StreamInfo::FilterState&, filterState, (), ());
+  MOCK_METHOD(void, useOriginalDst, (bool));
 
   StreamInfo::FilterStateImpl filter_state_;
   NiceMock<MockConnectionSocket> socket_;

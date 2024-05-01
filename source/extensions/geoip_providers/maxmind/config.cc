@@ -5,8 +5,7 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/utility.h"
-
-#include "geoip_provider.h"
+#include "source/extensions/geoip_providers/maxmind/geoip_provider.h"
 
 namespace Envoy {
 namespace Extensions {

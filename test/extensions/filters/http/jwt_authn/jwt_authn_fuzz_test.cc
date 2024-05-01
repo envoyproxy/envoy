@@ -71,9 +71,6 @@ private:
 };
 
 DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
-  // Regex matcher requires this engine init.
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
-
   try {
     TestUtility::validate(input);
   } catch (const EnvoyException& e) {

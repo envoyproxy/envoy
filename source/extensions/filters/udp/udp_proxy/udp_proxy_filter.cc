@@ -26,7 +26,8 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
   }
 
   if (!config_->proxyAccessLogs().empty()) {
-    udp_proxy_stats_.emplace(StreamInfo::StreamInfoImpl(config_->timeSource(), nullptr));
+    udp_proxy_stats_.emplace(StreamInfo::StreamInfoImpl(
+        config_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::Connection));
   }
 }
 
@@ -284,7 +285,8 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
       idle_timer_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
           [this] { onIdleTimer(); })),
       udp_session_info_(StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(),
-                                                   CreateDownstreamConnectionInfoProvider())) {
+                                                   createDownstreamConnectionInfoProvider(),
+                                                   StreamInfo::FilterState::LifeSpan::Connection)) {
   udp_session_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   cluster_.filter_.config_->stats().downstream_sess_total_.inc();
   cluster_.filter_.config_->stats().downstream_sess_active_.inc();
@@ -338,7 +340,7 @@ void UdpProxyFilter::ActiveSession::onSessionComplete() {
 }
 
 std::shared_ptr<Network::ConnectionInfoSetterImpl>
-UdpProxyFilter::ActiveSession::CreateDownstreamConnectionInfoProvider() {
+UdpProxyFilter::ActiveSession::createDownstreamConnectionInfoProvider() {
   auto downstream_connection_info_provider =
       std::make_shared<Network::ConnectionInfoSetterImpl>(addresses_.local_, addresses_.peer_);
   downstream_connection_info_provider->setConnectionID(session_id_);
@@ -399,7 +401,8 @@ void UdpProxyFilter::UdpActiveSession::onReadReady() {
   uint32_t packets_dropped = 0;
   const Api::IoErrorPtr result = Network::Utility::readPacketsFromSocket(
       udp_socket_->ioHandle(), *addresses_.local_, *this, cluster_.filter_.config_->timeSource(),
-      cluster_.filter_.config_->upstreamSocketConfig().prefer_gro_, packets_dropped);
+      cluster_.filter_.config_->upstreamSocketConfig().prefer_gro_, /*allow_mmsg=*/true,
+      packets_dropped);
   if (result == nullptr) {
     udp_socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
     return;
@@ -912,13 +915,13 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
            ->resourceManager(Upstream::ResourcePriority::Default)
            .connections()
            .canCreate()) {
-    udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+    udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
     cluster_.cluster_.info()->trafficStats()->upstream_cx_overflow_.inc();
     return false;
   }
 
   if (connect_attempts_ >= cluster_.filter_.config_->tunnelingConfig()->maxConnectAttempts()) {
-    udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
+    udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
     cluster_.cluster_.info()->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
     return false;
   } else if (connect_attempts_ >= 1) {
@@ -938,7 +941,7 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
     return true;
   }
 
-  udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
+  udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
   return false;
 }
 
@@ -956,12 +959,12 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     onUpstreamEvent(Network::ConnectionEvent::LocalClose);
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
-    udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+    udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     if (connecting_) {
-      udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+      udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
     }
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
@@ -1075,7 +1078,7 @@ void UdpProxyFilter::TunnelingActiveSession::onUpstreamData(Buffer::Instance& da
 void UdpProxyFilter::TunnelingActiveSession::onIdleTimer() {
   ENVOY_LOG(debug, "session idle timeout: downstream={} local={}", addresses_.peer_->asStringView(),
             addresses_.local_->asStringView());
-  udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
+  udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout);
   cluster_.filter_.config_->stats().idle_timeout_.inc();
   upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
   cluster_.removeSession(this);

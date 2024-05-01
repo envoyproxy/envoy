@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "envoy/common/backoff_strategy.h"
 #include "envoy/common/conn_pool.h"
 #include "envoy/common/key_value_store.h"
 #include "envoy/common/random_generator.h"
@@ -67,6 +68,16 @@ public:
   Event::TestRealTimeSystem real_time_; // NO_CHECK_FORMAT(real_time)
 };
 
+class MockBackOffStrategy : public BackOffStrategy {
+public:
+  ~MockBackOffStrategy() override = default;
+
+  MOCK_METHOD(uint64_t, nextBackOffMs, ());
+  MOCK_METHOD(void, reset, ());
+  MOCK_METHOD(void, reset, (uint64_t base_interval));
+  MOCK_METHOD(bool, isOverTimeLimit, (uint64_t interval_ms), (const));
+};
+
 // Captures absl::string_view parameters into temp strings, for use
 // with gmock's SaveArg<n>. Providing an absl::string_view compiles,
 // but fails because by the time you examine the saved value, its
@@ -92,6 +103,7 @@ inline bool operator==(const StringViewSaver& saver, const char* str) {
 class MockScopeTrackedObject : public ScopeTrackedObject {
 public:
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+  MOCK_METHOD(ExecutionContext*, executionContext, (), (const));
 };
 
 namespace ConnectionPool {

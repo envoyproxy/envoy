@@ -50,7 +50,8 @@ TEST_F(RouterTestSuppressEnvoyHeaders, MaintenanceMode) {
       {":status", "503"}, {"content-length", "16"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow));
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -98,7 +99,8 @@ TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyAttemptCountInResponseNotPresent) {
       {":status", "503"}, {"content-length", "16"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow));
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -371,7 +373,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRemoteReset));
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset));
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -731,7 +733,7 @@ TEST_P(RouterTestStrictCheckOneHeader, SingleInvalidHeader) {
   auto checked_header = GetParam();
 
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders));
+              setResponseFlag(StreamInfo::CoreResponseFlag::InvalidEnvoyRequestHeaders));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& response_headers, bool end_stream) -> void {
@@ -808,7 +810,7 @@ TEST_P(RouterTestStrictCheckAllHeaders, MultipleInvalidHeaders) {
   HttpTestUtility::addDefaultHeaders(headers);
 
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders));
+              setResponseFlag(StreamInfo::CoreResponseFlag::InvalidEnvoyRequestHeaders));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& response_headers, bool end_stream) -> void {
@@ -892,7 +894,7 @@ TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout));
   EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
@@ -945,7 +947,7 @@ TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout));
   EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};

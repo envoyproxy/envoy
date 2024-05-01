@@ -117,8 +117,9 @@ public:
    * @param config supplies the protobuf configuration for the filter
    * @param validation_visitor message validation visitor instance.
    * @return Upstream::ProtocolOptionsConfigConstSharedPtr the protocol options
+   * or an error message.
    */
-  virtual Upstream::ProtocolOptionsConfigConstSharedPtr
+  virtual absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
   createProtocolOptionsConfig(const Protobuf::Message& config,
                               ProtocolOptionsFactoryContext& factory_context) {
     UNREFERENCED_PARAMETER(config);
@@ -147,9 +148,9 @@ public:
    * callback should always be initialized.
    * @param config supplies the general json configuration for the filter
    * @param filter_chain_factory_context supplies the filter's context.
-   * @return Network::FilterFactoryCb the factory creation function.
+   * @return Network::FilterFactoryCb the factory creation function or an error status.
    */
-  virtual Network::FilterFactoryCb
+  virtual absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                FactoryContext& filter_chain_factory_context) PURE;
 

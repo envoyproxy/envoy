@@ -102,8 +102,8 @@ struct SettingsEntryEquals {
   }
 };
 
-void validateCustomSettingsParameters(
-    const envoy::config::core::v3::Http2ProtocolOptions& options) {
+absl::Status
+validateCustomSettingsParameters(const envoy::config::core::v3::Http2ProtocolOptions& options) {
   std::vector<std::string> parameter_collisions, custom_parameter_collisions;
   absl::node_hash_set<SettingsEntry, SettingsEntryHash, SettingsEntryEquals> custom_parameters;
   // User defined and named parameters with the same SETTINGS identifier can not both be set.
@@ -122,7 +122,7 @@ void validateCustomSettingsParameters(
     switch (it.identifier().value()) {
     case http2::adapter::ENABLE_PUSH:
       if (it.value().value() == 1) {
-        throwEnvoyExceptionOrPanic(
+        return absl::InvalidArgumentError(
             "server push is not supported by Envoy and can not be enabled via a "
             "SETTINGS parameter.");
       }
@@ -130,8 +130,9 @@ void validateCustomSettingsParameters(
     case http2::adapter::ENABLE_CONNECT_PROTOCOL:
       // An exception is made for `allow_connect` which can't be checked for presence due to the
       // use of a primitive type (bool).
-      throwEnvoyExceptionOrPanic("the \"allow_connect\" SETTINGS parameter must only be configured "
-                                 "through the named field");
+      return absl::InvalidArgumentError(
+          "the \"allow_connect\" SETTINGS parameter must only be configured "
+          "through the named field");
     case http2::adapter::HEADER_TABLE_SIZE:
       if (options.has_hpack_table_size()) {
         parameter_collisions.push_back("hpack_table_size");
@@ -154,16 +155,17 @@ void validateCustomSettingsParameters(
   }
 
   if (!custom_parameter_collisions.empty()) {
-    throwEnvoyExceptionOrPanic(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "inconsistent HTTP/2 custom SETTINGS parameter(s) detected; identifiers = {{{}}}",
         absl::StrJoin(custom_parameter_collisions, ",")));
   }
   if (!parameter_collisions.empty()) {
-    throwEnvoyExceptionOrPanic(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "the {{{}}} HTTP/2 SETTINGS parameter(s) can not be configured through both named and "
         "custom parameters",
         absl::StrJoin(parameter_collisions, ",")));
   }
+  return absl::OkStatus();
 }
 
 } // namespace
@@ -186,23 +188,23 @@ const uint32_t OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 
-envoy::config::core::v3::Http2ProtocolOptions
+absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const ProtobufWkt::BoolValue& hcm_stream_error) {
   auto ret = initializeAndValidateOptions(options);
-  if (!options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
-    ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
+  if (ret.status().ok() && !options.has_override_stream_error_on_invalid_http_message() &&
+      hcm_stream_error_set) {
+    ret->mutable_override_stream_error_on_invalid_http_message()->set_value(
         hcm_stream_error.value());
   }
   return ret;
 }
 
-envoy::config::core::v3::Http2ProtocolOptions
+absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options) {
   envoy::config::core::v3::Http2ProtocolOptions options_clone(options);
-  // This will throw an exception when a custom parameter and a named parameter collide.
-  validateCustomSettingsParameters(options);
+  RETURN_IF_NOT_OK(validateCustomSettingsParameters(options));
 
   if (!options.has_override_stream_error_on_invalid_http_message()) {
     options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
@@ -465,22 +467,16 @@ void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostn
                               const bool append_xfh) {
   const auto host = headers.getHostValue();
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.append_xfh_idempotent")) {
-    // Only append to x-forwarded-host if the value was not the last value appended.
-    const auto xfh = headers.getForwardedHostValue();
+  // Only append to x-forwarded-host if the value was not the last value appended.
+  const auto xfh = headers.getForwardedHostValue();
 
-    if (append_xfh && !host.empty()) {
-      if (!xfh.empty()) {
-        const auto xfh_split = StringUtil::splitToken(xfh, ",");
-        if (!xfh_split.empty() && xfh_split.back() != host) {
-          headers.appendForwardedHost(host, ",");
-        }
-      } else {
+  if (append_xfh && !host.empty()) {
+    if (!xfh.empty()) {
+      const auto xfh_split = StringUtil::splitToken(xfh, ",");
+      if (!xfh_split.empty() && xfh_split.back() != host) {
         headers.appendForwardedHost(host, ",");
       }
-    }
-  } else {
-    if (append_xfh && !host.empty()) {
+    } else {
       headers.appendForwardedHost(host, ",");
     }
   }
@@ -1334,7 +1330,8 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   return {is_ip_address, host_to_resolve, port};
 }
 
-void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy) {
+absl::Status
+Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy) {
   if (retry_policy.has_retry_back_off()) {
     const auto& core_back_off = retry_policy.retry_back_off();
 
@@ -1343,9 +1340,11 @@ void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy
         PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
 
     if (max_interval_ms < base_interval_ms) {
-      throwEnvoyExceptionOrPanic("max_interval must be greater than or equal to the base_interval");
+      return absl::InvalidArgumentError(
+          "max_interval must be greater than or equal to the base_interval");
     }
   }
+  return absl::OkStatus();
 }
 
 envoy::config::route::v3::RetryPolicy
@@ -1382,9 +1381,30 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
       Protobuf::util::TimeUtil::MillisecondsToDuration(max_interval_ms));
 
   // set all the other fields with appropriate values.
-  route_retry_policy.set_retry_on(retry_on);
+  if (!retry_on.empty()) {
+    route_retry_policy.set_retry_on(retry_on);
+  } else {
+    route_retry_policy.set_retry_on(retry_policy.retry_on());
+  }
   route_retry_policy.mutable_per_try_timeout()->CopyFrom(
       route_retry_policy.retry_back_off().max_interval());
+
+  if (retry_policy.has_retry_priority()) {
+    route_retry_policy.mutable_retry_priority()->set_name(retry_policy.retry_priority().name());
+    route_retry_policy.mutable_retry_priority()->mutable_typed_config()->MergeFrom(
+        retry_policy.retry_priority().typed_config());
+  }
+
+  if (!retry_policy.retry_host_predicate().empty()) {
+    for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
+      auto* route_host_predicate = route_retry_policy.mutable_retry_host_predicate()->Add();
+      route_host_predicate->set_name(host_predicate.name());
+      route_host_predicate->mutable_typed_config()->MergeFrom(host_predicate.typed_config());
+    }
+  }
+
+  route_retry_policy.set_host_selection_retry_max_attempts(
+      retry_policy.host_selection_retry_max_attempts());
 
   return route_retry_policy;
 }
@@ -1409,16 +1429,10 @@ bool Utility::schemeIsValid(const absl::string_view scheme) {
 }
 
 bool Utility::schemeIsHttp(const absl::string_view scheme) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
-    return scheme == Headers::get().SchemeValues.Http;
-  }
   return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Http);
 }
 
 bool Utility::schemeIsHttps(const absl::string_view scheme) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
-    return scheme == Headers::get().SchemeValues.Https;
-  }
   return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Https);
 }
 

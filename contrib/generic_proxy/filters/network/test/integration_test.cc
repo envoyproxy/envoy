@@ -28,6 +28,10 @@ public:
       : BaseIntegrationTest(Network::Address::IpVersion::v4, config_yaml) {
     skip_tag_extraction_rule_check_ = true;
   };
+
+  const Upstream::ClusterManager& clusterManager() const {
+    return test_server_->server().clusterManager();
+  }
 };
 
 class IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion> {
@@ -66,13 +70,17 @@ public:
   using TestReadFilterSharedPtr = std::shared_ptr<TestReadFilter>;
 
   struct TestRequestEncoderCallback : public EncodingCallbacks {
+    OptRef<const RouteEntry> routeEntry() const override { return {}; }
     void onEncodingSuccess(Buffer::Instance& buffer, bool) override { buffer_.move(buffer); }
+    void onEncodingFailure(absl::string_view) override {}
     Buffer::OwnedImpl buffer_;
   };
   using TestRequestEncoderCallbackSharedPtr = std::shared_ptr<TestRequestEncoderCallback>;
 
   struct TestResponseEncoderCallback : public EncodingCallbacks {
+    OptRef<const RouteEntry> routeEntry() const override { return {}; }
     void onEncodingSuccess(Buffer::Instance& buffer, bool) override { buffer_.move(buffer); }
+    void onEncodingFailure(absl::string_view) override {}
     Buffer::OwnedImpl buffer_;
   };
   using TestResponseEncoderCallbackSharedPtr = std::shared_ptr<TestResponseEncoderCallback>;
@@ -106,11 +114,18 @@ public:
         parent_.integration_->dispatcher_->exit();
       }
     }
-    void onDecodingFailure() override {}
+    void onDecodingFailure(absl::string_view) override {}
     void writeToConnection(Buffer::Instance&) override {}
     OptRef<Network::Connection> connection() override {
       if (parent_.upstream_connection_ != nullptr) {
         return parent_.upstream_connection_->connection();
+      }
+      return {};
+    }
+    OptRef<const Upstream::ClusterInfo> upstreamCluster() const override {
+      auto result = parent_.integration_->clusterManager().clusters().getCluster("cluster_0");
+      if (result.has_value()) {
+        return makeOptRefFromPtr(result.value().get().info().get());
       }
       return {};
     }
@@ -192,6 +207,62 @@ public:
                                     cluster: cluster_0
 )EOF",
                                                                      bind_upstream_connection));
+  }
+
+  std::string timeoutConfig() {
+    return absl::StrCat(ConfigHelper::baseConfig(false), R"EOF(
+    filter_chains:
+      filters:
+        name: meta
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.v3.GenericProxy
+          stat_prefix: config_test
+          filters:
+          - name: envoy.filters.generic.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.router.v3.Router
+              bind_upstream_connection: false
+          codec_config:
+            name: fake
+            typed_config:
+              "@type": type.googleapis.com/xds.type.v3.TypedStruct
+              type_url: envoy.generic_proxy.codecs.fake.type
+              value: {}
+          route_config:
+            name: test-routes
+            virtual_hosts:
+            - name: test
+              hosts:
+              - "*"
+              routes:
+                matcher_tree:
+                  input:
+                    name: request-service
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput
+                  exact_match_map:
+                    map:
+                      service_name_0:
+                        matcher:
+                          matcher_list:
+                            matchers:
+                            - predicate:
+                                single_predicate:
+                                  input:
+                                    name: request-properties
+                                    typed_config:
+                                      "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
+                                      property_name: version
+                                  value_match:
+                                    exact: v1
+                              on_match:
+                                action:
+                                  name: route
+                                  typed_config:
+                                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+                                    cluster: cluster_0
+                                    timeout: 0.001s
+)EOF");
   }
 
   // Create client connection.
@@ -373,6 +444,39 @@ TEST_P(IntegrationTest, RequestAndResponse) {
   EXPECT_NE(response_decoder_callback_->responses_[0].response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->responses_[0].response_->status().code(), 0);
   EXPECT_EQ(response_decoder_callback_->responses_[0].response_->get("zzzz"), "xxxx");
+
+  cleanup();
+}
+
+TEST_P(IntegrationTest, RequestTimeout) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
+  initialize(timeoutConfig(), std::make_unique<FakeStreamCodecFactory>());
+
+  EXPECT_TRUE(makeClientConnectionForTest());
+
+  FakeStreamCodecFactory::FakeRequest request;
+  request.host_ = "service_name_0";
+  request.method_ = "hello";
+  request.path_ = "/path_or_anything";
+  request.protocol_ = "fake_fake_fake";
+  request.data_ = {{"version", "v1"}};
+
+  sendRequestForTest(request);
+
+  waitForUpstreamConnectionForTest();
+  const std::function<bool(const std::string&)> data_validator =
+      [](const std::string& data) -> bool { return data.find("v1") != std::string::npos; };
+  waitForUpstreamRequestForTest(data_validator);
+
+  // No response is sent, so the downstream should timeout.
+
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
+                 "unexpected timeout");
+
+  EXPECT_NE(response_decoder_callback_->responses_[0].response_, nullptr);
+  EXPECT_EQ(response_decoder_callback_->responses_[0].response_->status().code(), 4);
 
   cleanup();
 }

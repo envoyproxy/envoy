@@ -13,6 +13,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/utility.h"
+#include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 
@@ -100,7 +101,7 @@ absl::Status VhdsSubscription::onConfigUpdate(
               config_update_info_->protobufConfigurationCast().name(),
               config_update_info_->configHash());
     if (route_config_provider_ != nullptr) {
-      THROW_IF_NOT_OK(route_config_provider_->onConfigUpdate());
+      RETURN_IF_NOT_OK(route_config_provider_->onConfigUpdate());
     }
   }
 

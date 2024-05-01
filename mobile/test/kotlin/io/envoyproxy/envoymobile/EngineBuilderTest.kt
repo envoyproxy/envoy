@@ -1,8 +1,8 @@
 package io.envoyproxy.envoymobile
 
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.mockito.Mockito.mock
 
@@ -18,7 +18,7 @@ class EngineBuilderTest {
   fun `adding log level builder uses log level for running Envoy`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addLogLevel(LogLevel.DEBUG)
+    engineBuilder.setLogLevel(LogLevel.DEBUG)
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.logLevel).isEqualTo(LogLevel.DEBUG)

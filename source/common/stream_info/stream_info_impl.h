@@ -21,6 +21,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
+#include "source/common/stream_info/utility.h"
 
 #include "absl/strings/str_replace.h"
 
@@ -110,25 +111,30 @@ struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(
       TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
-      : StreamInfoImpl(absl::nullopt, time_source, downstream_connection_info_provider,
-                       std::make_shared<FilterStateImpl>(life_span)) {}
-
-  StreamInfoImpl(
-      Http::Protocol protocol, TimeSource& time_source,
-      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider)
-      : StreamInfoImpl(protocol, time_source, downstream_connection_info_provider,
-                       std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
+      FilterState::LifeSpan life_span, FilterStateSharedPtr ancestor_filter_state = nullptr)
+      : StreamInfoImpl(
+            absl::nullopt, time_source, downstream_connection_info_provider,
+            std::make_shared<FilterStateImpl>(std::move(ancestor_filter_state), life_span)) {}
 
   StreamInfoImpl(
       Http::Protocol protocol, TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan life_span)
+      FilterState::LifeSpan life_span, FilterStateSharedPtr ancestor_filter_state = nullptr)
       : StreamInfoImpl(
             protocol, time_source, downstream_connection_info_provider,
-            std::make_shared<FilterStateImpl>(
-                FilterStateImpl::LazyCreateAncestor(std::move(parent_filter_state), life_span),
-                FilterState::LifeSpan::FilterChain)) {}
+            std::make_shared<FilterStateImpl>(std::move(ancestor_filter_state), life_span)) {}
+
+  StreamInfoImpl(
+      absl::optional<Http::Protocol> protocol, TimeSource& time_source,
+      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
+      FilterStateSharedPtr filter_state)
+      : time_source_(time_source), start_time_(time_source.systemTime()),
+        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
+        filter_state_(std::move(filter_state)),
+        downstream_connection_info_provider_(downstream_connection_info_provider != nullptr
+                                                 ? downstream_connection_info_provider
+                                                 : emptyDownstreamAddressProvider()),
+        trace_reason_(Tracing::Reason::NotTraceable) {}
 
   SystemTime startTime() const override { return start_time_; }
 
@@ -231,17 +237,31 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t bytesSent() const override { return bytes_sent_; }
 
-  void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
-
-  bool intersectResponseFlags(uint64_t response_flags) const override {
-    return (response_flags_ & response_flags) != 0;
+  void setResponseFlag(ResponseFlag flag) override {
+    ASSERT(flag.value() < ResponseFlagUtils::responseFlagsVec().size());
+    if (!hasResponseFlag(flag)) {
+      response_flags_.push_back(flag);
+    }
   }
 
-  bool hasResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
+  bool hasResponseFlag(ResponseFlag flag) const override {
+    return std::find(response_flags_.begin(), response_flags_.end(), flag) != response_flags_.end();
+  }
 
-  bool hasAnyResponseFlag() const override { return response_flags_ != 0; }
+  bool hasAnyResponseFlag() const override { return !response_flags_.empty(); }
 
-  uint64_t responseFlags() const override { return response_flags_; }
+  absl::Span<const ResponseFlag> responseFlags() const override { return response_flags_; }
+
+  uint64_t legacyResponseFlags() const override {
+    uint64_t legacy_flags = 0;
+    for (ResponseFlag flag : response_flags_) {
+      if (flag.value() <= static_cast<uint16_t>(CoreResponseFlag::LastFlag)) {
+        ASSERT(flag.value() < 64, "Legacy response flag out of range");
+        legacy_flags |= (1UL << flag.value());
+      }
+    }
+    return legacy_flags;
+  }
 
   const std::string& getRouteName() const override {
     return route_ != nullptr ? route_->routeName() : EMPTY_STRING;
@@ -374,7 +394,10 @@ struct StreamInfoImpl : public StreamInfo {
       // derive final time from other info's complete duration and start time.
       final_time_ = info.startTimeMonotonic() + info.requestComplete().value();
     }
-    response_flags_ = info.responseFlags();
+    response_flags_.clear();
+    auto other_response_flags = info.responseFlags();
+    response_flags_.insert(response_flags_.end(), other_response_flags.begin(),
+                           other_response_flags.end());
     health_check_request_ = info.healthCheck();
     route_ = info.route();
     metadata_ = info.dynamicMetadata();
@@ -423,7 +446,7 @@ private:
 public:
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
-  uint64_t response_flags_{};
+  absl::InlinedVector<ResponseFlag, 4> response_flags_{};
   bool health_check_request_{};
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
@@ -439,18 +462,6 @@ private:
         Network::ConnectionInfoProviderSharedPtr,
         std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr));
   }
-
-  StreamInfoImpl(
-      absl::optional<Http::Protocol> protocol, TimeSource& time_source,
-      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterStateSharedPtr filter_state)
-      : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
-        filter_state_(std::move(filter_state)),
-        downstream_connection_info_provider_(downstream_connection_info_provider != nullptr
-                                                 ? downstream_connection_info_provider
-                                                 : emptyDownstreamAddressProvider()),
-        trace_reason_(Tracing::Reason::NotTraceable) {}
 
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t bytes_received_{};

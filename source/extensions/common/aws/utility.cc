@@ -5,6 +5,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
+#include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 
@@ -27,6 +28,13 @@ constexpr absl::string_view RESERVED_CHARS = "-._~";
 constexpr absl::string_view S3_SERVICE_NAME = "s3";
 constexpr absl::string_view URI_ENCODE = "%{:02X}";
 constexpr absl::string_view URI_DOUBLE_ENCODE = "%25{:02X}";
+
+constexpr char AWS_SHARED_CREDENTIALS_FILE[] = "AWS_SHARED_CREDENTIALS_FILE";
+constexpr char AWS_PROFILE[] = "AWS_PROFILE";
+constexpr char DEFAULT_AWS_SHARED_CREDENTIALS_FILE[] = "/.aws/credentials";
+constexpr char DEFAULT_AWS_PROFILE[] = "default";
+constexpr char AWS_CONFIG_FILE[] = "AWS_CONFIG_FILE";
+constexpr char DEFAULT_AWS_CONFIG_FILE[] = "/.aws/config";
 
 std::map<std::string, std::string>
 Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
@@ -379,6 +387,121 @@ bool Utility::addInternalClusterStatic(
     });
   }
   return true;
+}
+
+std::string Utility::getEnvironmentVariableOrDefault(const std::string& variable_name,
+                                                     const std::string& default_value) {
+  const char* value = getenv(variable_name.c_str());
+  return (value != nullptr) && (value[0] != '\0') ? value : default_value;
+}
+
+bool Utility::resolveProfileElements(const std::string& profile_file,
+                                     const std::string& profile_name,
+                                     absl::flat_hash_map<std::string, std::string>& elements) {
+  std::ifstream file(profile_file);
+  if (!file.is_open()) {
+    ENVOY_LOG_MISC(debug, "Error opening credentials file {}", profile_file);
+    return false;
+  }
+  const auto profile_start = absl::StrFormat("[%s]", profile_name);
+
+  bool found_profile = false;
+  std::string line;
+  while (std::getline(file, line)) {
+    line = std::string(StringUtil::trim(line));
+    if (line.empty()) {
+      continue;
+    }
+
+    if (line == profile_start) {
+      found_profile = true;
+      continue;
+    }
+
+    if (found_profile) {
+      // Stop reading once we find the start of the next profile.
+      if (absl::StartsWith(line, "[")) {
+        break;
+      }
+
+      std::vector<std::string> parts = absl::StrSplit(line, absl::MaxSplits('=', 1));
+      if (parts.size() == 2) {
+
+        const auto key = StringUtil::toUpper(StringUtil::trim(parts[0]));
+        const auto val = StringUtil::trim(parts[1]);
+        auto found = elements.find(key);
+        if (found != elements.end()) {
+          found->second = val;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+std::string Utility::getCredentialFilePath() {
+
+  // Default credential file path plus current home directory. Will fall back to / if HOME
+  // environment variable does
+  // not exist
+
+  const auto home = Utility::getEnvironmentVariableOrDefault("HOME", "");
+  const auto default_credentials_file_path =
+      absl::StrCat(home, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
+
+  return Utility::getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE,
+                                                  default_credentials_file_path);
+}
+
+std::string Utility::getConfigFilePath() {
+
+  // Default config file path plus current home directory. Will fall back to / if HOME environment
+  // variable does
+  // not exist
+
+  const auto home = Utility::getEnvironmentVariableOrDefault("HOME", "");
+  const auto default_credentials_file_path = absl::StrCat(home, DEFAULT_AWS_CONFIG_FILE);
+
+  return Utility::getEnvironmentVariableOrDefault(AWS_CONFIG_FILE, default_credentials_file_path);
+}
+
+std::string Utility::getCredentialProfileName() {
+  return Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+}
+
+std::string Utility::getConfigProfileName() {
+  auto profile_name = Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+  if (profile_name == DEFAULT_AWS_PROFILE) {
+    return profile_name;
+  } else {
+    return "profile " + profile_name;
+  }
+}
+
+std::string Utility::getStringFromJsonOrDefault(Json::ObjectSharedPtr json_object,
+                                                const std::string& string_value,
+                                                const std::string& string_default) {
+  absl::StatusOr<Envoy::Json::ValueType> value_or_error;
+  value_or_error = json_object->getValue(string_value);
+  if ((!value_or_error.ok()) || (!absl::holds_alternative<std::string>(value_or_error.value()))) {
+
+    ENVOY_LOG_MISC(error, "Unable to retrieve string value from json: {}", string_value);
+    return string_default;
+  }
+  return absl::get<std::string>(value_or_error.value());
+}
+
+int64_t Utility::getIntegerFromJsonOrDefault(Json::ObjectSharedPtr json_object,
+                                             const std::string& integer_value,
+                                             const int64_t integer_default) {
+  absl::StatusOr<Envoy::Json::ValueType> value_or_error;
+  value_or_error = json_object->getValue(integer_value);
+  if ((!value_or_error.ok()) || (!absl::holds_alternative<int64_t>(value_or_error.value()))) {
+
+    ENVOY_LOG_MISC(error, "Unable to retrieve integer value from json: {}", integer_value);
+    return integer_default;
+  }
+  return absl::get<int64_t>(value_or_error.value());
 }
 
 } // namespace Aws

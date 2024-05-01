@@ -8,11 +8,10 @@
 #include "source/common/http/utility.h"
 
 #include "library/common/bridge/utility.h"
-#include "library/common/common/system_helper.h"
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
-#include "library/common/http/headers.h"
 #include "library/common/stream_info/extra_stream_info.h"
+#include "library/common/system/system_helper.h"
 
 namespace Envoy {
 namespace Http {
@@ -49,8 +48,8 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
   ENVOY_LOG(debug, "[S{}] response headers for stream (end_stream={}):\n{}",
             direct_stream_.stream_handle_, end_stream, headers);
 
-  ASSERT(http_client_.getStream(direct_stream_.stream_handle_,
-                                GetStreamFilters::ALLOW_FOR_ALL_STREAMS));
+  ASSERT(
+      http_client_.getStream(direct_stream_.stream_handle_, GetStreamFilters::AllowForAllStreams));
 
   // Capture some metadata before potentially closing the stream.
   absl::string_view alpn = "";
@@ -87,7 +86,7 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_headers_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_headers_cb", "{}ms", elapsed.count());
   }
 
   response_headers_forwarded_ = true;
@@ -108,8 +107,8 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   ENVOY_LOG(debug, "[S{}] response data for stream (length={} end_stream={})",
             direct_stream_.stream_handle_, data.length(), end_stream);
 
-  ASSERT(http_client_.getStream(direct_stream_.stream_handle_,
-                                GetStreamFilters::ALLOW_FOR_ALL_STREAMS));
+  ASSERT(
+      http_client_.getStream(direct_stream_.stream_handle_, GetStreamFilters::AllowForAllStreams));
   direct_stream_.saveLatestStreamIntel();
   if (end_stream) {
     closeStream();
@@ -121,10 +120,10 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
     response_data_ = std::make_unique<Buffer::WatermarkBuffer>(
         [this]() -> void { onBufferedDataDrained(); }, [this]() -> void { onHasBufferedData(); },
         []() -> void {});
-    // Default to 1M per stream. This is fairly arbitrary and will result in
+    // Default to 2M per stream. This is fairly arbitrary and will result in
     // Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
-    // and having local data of 1M + kernel-buffer-limit for HTTP/1.1
-    response_data_->setWatermarks(1000000);
+    // and having local data of 2M + kernel-buffer-limit for HTTP/1.1
+    response_data_->setWatermarks(2 * 1024 * 1024);
   }
 
   // Send data if in default flow control mode, or if resumeData has been called in explicit
@@ -173,7 +172,7 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_data_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_data_cb", "{}ms", elapsed.count());
   }
 
   if (send_end_stream) {
@@ -186,8 +185,8 @@ void Client::DirectStreamCallbacks::encodeTrailers(const ResponseTrailerMap& tra
   ENVOY_LOG(debug, "[S{}] response trailers for stream:\n{}", direct_stream_.stream_handle_,
             trailers);
 
-  ASSERT(http_client_.getStream(direct_stream_.stream_handle_,
-                                GetStreamFilters::ALLOW_FOR_ALL_STREAMS));
+  ASSERT(
+      http_client_.getStream(direct_stream_.stream_handle_, GetStreamFilters::AllowForAllStreams));
   direct_stream_.saveLatestStreamIntel();
   closeStream(); // Trailers always indicate the end of the stream.
 
@@ -214,7 +213,7 @@ void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMa
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_trailers_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_trailers_cb", "{}ms", elapsed.count());
   }
 
   onComplete();
@@ -248,14 +247,21 @@ void Client::DirectStreamCallbacks::resumeData(size_t bytes_to_send) {
 }
 
 void Client::DirectStreamCallbacks::closeStream(bool end_stream) {
+  ENVOY_LOG(debug, "[S{}] close stream end stream {}\n", direct_stream_.stream_handle_, end_stream);
   remote_end_stream_received_ |= end_stream;
-  // Latch stream intel on stream completion, as the stream info will go away.
-  direct_stream_.saveFinalStreamIntel();
+  if (end_stream) {
+    // Latch stream intel on stream completion, as the stream info will go away.
+    // If end_stream is false this is the stream reset case and data is latched
+    // in resetStream
+    direct_stream_.saveFinalStreamIntel();
+  }
 
   auto& client = direct_stream_.parent_;
-  auto stream = client.getStream(direct_stream_.stream_handle_, ALLOW_ONLY_FOR_OPEN_STREAMS);
+  auto stream =
+      client.getStream(direct_stream_.stream_handle_, GetStreamFilters::AllowOnlyForOpenStreams);
   ASSERT(stream != nullptr);
   if (stream) {
+    ENVOY_LOG(debug, "[S{}] erased stream\n", direct_stream_.stream_handle_);
     client.closed_streams_.emplace(direct_stream_.stream_handle_, std::move(stream));
     size_t erased = client.streams_.erase(direct_stream_.stream_handle_);
     ASSERT(erased == 1, "closeStream should always remove one entry from the streams map");
@@ -282,7 +288,7 @@ void Client::DirectStreamCallbacks::onComplete() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_complete_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_complete_cb", "{}ms", elapsed.count());
   }
 }
 
@@ -296,11 +302,11 @@ void Client::DirectStreamCallbacks::onError() {
   // TODO(goaway): What is the expected behavior when an error is received, held, and then another
   // error occurs (e.g., timeout)?
 
-  error_ = streamError();
   if (explicit_flow_control_ && response_headers_forwarded_ && bytes_to_send_ == 0) {
     ENVOY_LOG(debug, "[S{}] defering remote reset stream due to explicit flow control",
               direct_stream_.stream_handle_);
-    if (!remote_end_stream_received_) {
+    if (direct_stream_.parent_.getStream(direct_stream_.stream_handle_,
+                                         GetStreamFilters::AllowOnlyForOpenStreams)) {
       closeStream(false);
     }
     return;
@@ -322,8 +328,8 @@ void Client::DirectStreamCallbacks::sendErrorToBridge() {
 
   // The stream should no longer be preset in the map, because onError() was either called from a
   // terminal callback that mapped to an error or it was called in response to a resetStream().
-  ASSERT(!http_client_.getStream(direct_stream_.stream_handle_,
-                                 GetStreamFilters::ALLOW_FOR_ALL_STREAMS));
+  ASSERT(
+      !http_client_.getStream(direct_stream_.stream_handle_, GetStreamFilters::AllowForAllStreams));
 
   ENVOY_LOG(debug, "[S{}] dispatching to platform remote reset stream",
             direct_stream_.stream_handle_);
@@ -339,7 +345,7 @@ void Client::DirectStreamCallbacks::sendErrorToBridge() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_error_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_error_cb", "{}ms", elapsed.count());
   }
 }
 
@@ -366,7 +372,7 @@ void Client::DirectStreamCallbacks::onCancel() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb", std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb", "{}ms", elapsed.count());
   }
 }
 
@@ -406,45 +412,67 @@ void Client::DirectStream::saveLatestStreamIntel() {
 }
 
 void Client::DirectStream::saveFinalStreamIntel() {
+  if (!parent_.getStream(stream_handle_, GetStreamFilters::AllowOnlyForOpenStreams)) {
+    return;
+  }
   OptRef<RequestDecoder> request_decoder = requestDecoder();
-  if (!request_decoder || !parent_.getStream(stream_handle_, ALLOW_ONLY_FOR_OPEN_STREAMS)) {
+  if (!request_decoder) {
     return;
   }
   StreamInfo::setFinalStreamIntel(request_decoder->streamInfo(), parent_.dispatcher_.timeSource(),
                                   envoy_final_stream_intel_);
 }
 
-envoy_error Client::DirectStreamCallbacks::streamError() {
-  envoy_error error{};
+void Client::DirectStreamCallbacks::latchError() {
+  if (error_.has_value()) {
+    return; // Only latch error once.
+  }
+  error_ = envoy_error();
+
   OptRef<RequestDecoder> request_decoder = direct_stream_.requestDecoder();
   if (!request_decoder) {
-    return error;
+    error_->message = envoy_nodata;
+    return;
   }
   const auto& info = request_decoder->streamInfo();
 
   if (info.responseCode().has_value()) {
-    error.error_code = Bridge::Utility::errorCodeFromLocalStatus(
+    error_->error_code = Bridge::Utility::errorCodeFromLocalStatus(
         static_cast<Http::Code>(info.responseCode().value()));
   } else if (StreamInfo::isStreamIdleTimeout(info)) {
-    error.error_code = ENVOY_REQUEST_TIMEOUT;
+    error_->error_code = ENVOY_REQUEST_TIMEOUT;
   } else {
-    error.error_code = ENVOY_STREAM_RESET;
+    error_->error_code = ENVOY_STREAM_RESET;
   }
 
   if (info.responseCodeDetails().has_value()) {
-    error.message = Data::Utility::copyToBridgeData(info.responseCodeDetails().value());
+    error_->message = Data::Utility::copyToBridgeData(info.responseCodeDetails().value());
   } else {
-    error.message = envoy_nodata;
+    error_->message = envoy_nodata;
   }
 
-  error.attempt_count = info.attemptCount().value_or(0);
-  return error;
+  error_->attempt_count = info.attemptCount().value_or(0);
 }
 
 Client::DirectStream::DirectStream(envoy_stream_t stream_handle, Client& http_client)
     : stream_handle_(stream_handle), parent_(http_client) {}
 
 Client::DirectStream::~DirectStream() { ENVOY_LOG(debug, "[S{}] destroy stream", stream_handle_); }
+
+CodecEventCallbacks*
+Client::DirectStream::registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) {
+  // registerCodecEventCallbacks is called with nullptr when the underlying
+  // Envoy stream is going away. Make sure Envoy Mobile sees the stream as
+  // closed as well.
+  if (codec_callbacks == nullptr &&
+      parent_.getStream(stream_handle_, GetStreamFilters::AllowOnlyForOpenStreams)) {
+    // Generally this only happens if Envoy closes the (virtual) downstream
+    // connection, otherwise Envoy would inform the codec to send a reset.
+    callbacks_->closeStream(false);
+  }
+  std::swap(codec_callbacks, codec_callbacks_);
+  return codec_callbacks;
+}
 
 // Correctly receiving resetStream() for errors in Http::Client relies on at least one filter
 // resetting the stream when handling a pending local response. By default, the LocalReplyFilter
@@ -453,9 +481,10 @@ void Client::DirectStream::resetStream(StreamResetReason reason) {
   // This seems in line with other codec implementations, and so the assumption is that this is in
   // line with upstream expectations.
   // TODO(goaway): explore an upstream fix to get the HCM to clean up ActiveStream itself.
-  saveFinalStreamIntel(); // Take a snapshot now in case the stream gets destroyed.
+  saveFinalStreamIntel();   // Take a snapshot now in case the stream gets destroyed.
+  callbacks_->latchError(); // Latch the error in case the stream gets destroyed.
   runResetCallbacks(reason);
-  if (!parent_.getStream(stream_handle_, GetStreamFilters::ALLOW_FOR_ALL_STREAMS)) {
+  if (!parent_.getStream(stream_handle_, GetStreamFilters::AllowForAllStreams)) {
     // We don't assert here, because Envoy will issue a stream reset if a stream closes remotely
     // while still open locally. In this case the stream will already have been removed from
     // our stream maps due to the remote closure.
@@ -503,10 +532,10 @@ void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks 
   ENVOY_LOG(debug, "[S{}] start stream", new_stream_handle);
 }
 
-void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream) {
+void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
-      getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
+      getStream(stream, GetStreamFilters::AllowOnlyForOpenStreams);
   // If direct_stream is not found, it means the stream has already closed or been reset
   // and the appropriate callback has been issued to the caller. There's nothing to do here
   // except silently swallow this.
@@ -523,18 +552,17 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   }
 
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-  RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
 
   // This is largely a check for the android platform: isCleartextPermitted
   // is a no-op for other platforms.
-  if (internal_headers->getSchemeValue() != "https" &&
-      !SystemHelper::getInstance().isCleartextPermitted(internal_headers->getHostValue())) {
+  if (headers->getSchemeValue() != "https" &&
+      !SystemHelper::getInstance().isCleartextPermitted(headers->getHostValue())) {
     request_decoder->sendLocalReply(Http::Code::BadRequest, "Cleartext is not permitted", nullptr,
                                     absl::nullopt, "");
     return;
   }
 
-  setDestinationCluster(*internal_headers);
+  setDestinationCluster(*headers);
   // Set the x-forwarded-proto header to https because Envoy Mobile only has clusters with TLS
   // enabled. This is done here because the ApiListener's synthetic connection would make the
   // Http::ConnectionManager set the scheme to http otherwise. In the future we might want to
@@ -548,10 +576,10 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   // router relies on the present of this header to determine if it should provided a route for
   // a request here:
   // https://github.com/envoyproxy/envoy/blob/c9e3b9d2c453c7fe56a0e3615f0c742ac0d5e768/source/common/router/config_impl.cc#L1091-L1096
-  internal_headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
+  headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
   ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
-            *internal_headers);
-  request_decoder->decodeHeaders(std::move(internal_headers), end_stream);
+            *headers);
+  request_decoder->decodeHeaders(std::move(headers), end_stream);
 }
 
 void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {
@@ -559,7 +587,7 @@ void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {
   // This is allowed for closed streams, else we could never send data up after
   // the FIN was received.
   Client::DirectStreamSharedPtr direct_stream =
-      getStream(stream, GetStreamFilters::ALLOW_FOR_ALL_STREAMS);
+      getStream(stream, GetStreamFilters::AllowForAllStreams);
   // If direct_stream is not found, it means the stream has already canceled or been reset
   // and the appropriate callback has been issued to the caller. There's nothing to do here
   // except silently swallow this.
@@ -568,15 +596,10 @@ void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {
   }
 }
 
-void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
+void Client::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
-      getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
-
-  // Take ownership of data early, in case of early returns.
-  // The buffer is moved internally, in a synchronous fashion, so we don't need the lifetime
-  // of the InstancePtr to outlive this function call.
-  Buffer::InstancePtr buf = Data::Utility::toInternalData(data);
+      getStream(stream, GetStreamFilters::AllowOnlyForOpenStreams);
 
   // If direct_stream is not found, it means the stream has already closed or been reset
   // and the appropriate callback has been issued to the caller. There's nothing to do here
@@ -595,9 +618,9 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
 
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
 
-  ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream, data.length,
-            end_stream);
-  request_decoder->decodeData(*buf, end_stream);
+  ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream,
+            buffer->length(), end_stream);
+  request_decoder->decodeData(*buffer, end_stream);
 
   if (direct_stream->explicit_flow_control_ && !end_stream) {
     if (direct_stream->read_disable_count_ == 0) {
@@ -620,10 +643,10 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
 
 void Client::sendMetadata(envoy_stream_t, envoy_headers) { PANIC("not implemented"); }
 
-void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
+void Client::sendTrailers(envoy_stream_t stream, RequestTrailerMapPtr trailers) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
-      getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
+      getStream(stream, GetStreamFilters::AllowOnlyForOpenStreams);
   // If direct_stream is not found, it means the stream has already closed or been reset
   // and the appropriate callback has been issued to the caller. There's nothing to do here
   // except silently swallow this.
@@ -639,9 +662,8 @@ void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
     return;
   }
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-  RequestTrailerMapPtr internal_trailers = Utility::toRequestTrailers(trailers);
-  ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *internal_trailers);
-  request_decoder->decodeTrailers(std::move(internal_trailers));
+  ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *trailers);
+  request_decoder->decodeTrailers(std::move(trailers));
 }
 
 void Client::cancelStream(envoy_stream_t stream) {
@@ -650,19 +672,18 @@ void Client::cancelStream(envoy_stream_t stream) {
   // for closed streams: if the client cancels the stream it should be canceled
   // whether it was closed or not.
   Client::DirectStreamSharedPtr direct_stream =
-      getStream(stream, GetStreamFilters::ALLOW_FOR_ALL_STREAMS);
+      getStream(stream, GetStreamFilters::AllowForAllStreams);
   scheduled_callback_ = nullptr;
   if (direct_stream) {
     // Attempt to latch the latest stream info. This will be a no-op if the stream
     // is already complete.
+    ENVOY_LOG(debug, "[S{}] application cancelled stream", stream);
     direct_stream->saveFinalStreamIntel();
-    bool stream_was_open =
-        getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS) != nullptr;
+    bool stream_was_open = getStream(stream, GetStreamFilters::AllowOnlyForOpenStreams) != nullptr;
     ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
     direct_stream->notifyAdapter(DirectStream::AdapterSignal::Cancel);
     removeStream(direct_stream->stream_handle_);
 
-    ENVOY_LOG(debug, "[S{}] application cancelled stream", stream);
     direct_stream->callbacks_->onCancel();
 
     // Since https://github.com/envoyproxy/envoy/pull/13052, the connection manager expects that
@@ -690,7 +711,7 @@ Client::DirectStreamSharedPtr Client::getStream(envoy_stream_t stream,
   if (direct_stream_pair_it != streams_.end()) {
     return direct_stream_pair_it->second;
   }
-  if (get_stream_filters == ALLOW_FOR_ALL_STREAMS) {
+  if (get_stream_filters == GetStreamFilters::AllowForAllStreams) {
     direct_stream_pair_it = closed_streams_.find(stream);
     if (direct_stream_pair_it != closed_streams_.end()) {
       return direct_stream_pair_it->second;
@@ -705,7 +726,7 @@ void Client::removeStream(envoy_stream_t stream_handle) {
       fmt::format("[S{}] stream removeStream must be performed on the dispatcher_'s thread.",
                   stream_handle));
   Client::DirectStreamSharedPtr direct_stream =
-      getStream(stream_handle, GetStreamFilters::ALLOW_FOR_ALL_STREAMS);
+      getStream(stream_handle, GetStreamFilters::AllowForAllStreams);
   RELEASE_ASSERT(
       direct_stream,
       fmt::format(

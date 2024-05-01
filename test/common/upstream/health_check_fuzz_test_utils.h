@@ -11,6 +11,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/health_checker_factory_context.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
 
@@ -21,12 +22,10 @@ class HealthCheckerTestBase {
 public:
   std::shared_ptr<MockClusterMockPrioritySet> cluster_{
       std::make_shared<NiceMock<MockClusterMockPrioritySet>>()};
-  NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<NiceMock<MockHealthCheckEventLogger>> event_logger_storage_{
       std::make_unique<NiceMock<MockHealthCheckEventLogger>>()};
   NiceMock<MockHealthCheckEventLogger>& event_logger_{*event_logger_storage_};
-  NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context_;
 };
 
 class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {

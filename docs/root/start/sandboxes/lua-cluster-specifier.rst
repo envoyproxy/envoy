@@ -1,6 +1,6 @@
 .. _install_sandboxes_lua_cluster_specifier:
 
-Lua Cluster Specifier
+Lua cluster specifier
 =====================
 
 .. sidebar:: Requirements
@@ -17,13 +17,15 @@ The example Envoy proxy configuration includes a Lua cluster specifier plugin th
 
 - ``envoy_on_route(route_handle)``
 
-:ref:`See here <config_http_cluster_specifier_lua>` for an overview of Envoy's Lua cluster specifier
-and documentation regarding the function.
+.. tip::
+
+   See the :ref:`Lua cluster configuration documentation <config_http_cluster_specifier_lua>` for an overview  and
+   documentation regarding the function.
 
 Step 1: Build the sandbox
 *************************
 
-Change to the ``examples/lua-cluster-specifier`` directory.
+Change to the ``examples/lua-cluster-specifier`` directory, and bring up the composition.
 
 .. code-block:: console
 
@@ -35,27 +37,23 @@ Change to the ``examples/lua-cluster-specifier`` directory.
 
   Name                                  Command                        State   Ports
   --------------------------------------------------------------------------------------------
-  lua-cluster-specifier-proxy-1         /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
-  lua-cluster-specifier-web_service-1   /bin/echo-server               Up      0.0.0.0:8080->8080/tcp
+  lua-cluster-specifier-proxy-1         /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:10000->10000/tcp
 
 Step 2: Send a request to the normal service
 ********************************************
 
 The output from the ``curl`` command below should return 200, since the lua code select the normal service.
 
-Terminal 1
-
 .. code-block:: console
 
-   $ curl -i localhost:8000/anything 2>&1 |grep 200
+   $ curl -i localhost:10000/anything 2>&1 |grep 200
    HTTP/1.1 200 OK
 
 Step 3: Send a request to the fake service
 ******************************************
 
-The output from the ``curl`` command below should return 503, since the lua code select the fake service.
-
-Terminal 1
+If you specify the request header ``header_key:fake``, curl will return a ``503`` response, as
+the Lua code will select the fake service.
 
 .. code-block:: console
 

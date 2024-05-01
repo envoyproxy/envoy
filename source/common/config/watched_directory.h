@@ -10,7 +10,7 @@ namespace Config {
 // Implement the common functionality of envoy::config::core::v3::WatchedDirectory.
 class WatchedDirectory {
 public:
-  using Callback = std::function<void()>;
+  using Callback = std::function<absl::Status()>;
 
   WatchedDirectory(const envoy::config::core::v3::WatchedDirectory& config,
                    Event::Dispatcher& dispatcher);

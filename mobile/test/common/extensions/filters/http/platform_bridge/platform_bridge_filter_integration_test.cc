@@ -33,8 +33,8 @@ public:
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 
-    Api::External::registerApi("filter_1", filter_1);
-    Api::External::registerApi("filter_2", filter_2);
+    Api::External::registerApi(std::string("filter_1"), filter_1);
+    Api::External::registerApi(std::string("filter_2"), filter_2);
 
     config_helper_.addFilter(filter_config_1);
     config_helper_.addFilter(filter_config_2);

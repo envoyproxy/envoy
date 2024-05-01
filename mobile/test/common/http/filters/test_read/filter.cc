@@ -34,7 +34,7 @@ Http::FilterHeadersStatus TestReadFilter::decodeHeaders(Http::RequestHeaderMap& 
   return Http::FilterHeadersStatus::Continue;
 }
 
-StreamInfo::ResponseFlag TestReadFilter::mapErrorToResponseFlag(uint64_t errorCode) {
+StreamInfo::CoreResponseFlag TestReadFilter::mapErrorToResponseFlag(uint64_t errorCode) {
   switch (errorCode) {
   case 0x4000000:
     return StreamInfo::DnsResolutionFailed;

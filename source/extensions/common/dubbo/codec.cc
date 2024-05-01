@@ -1,4 +1,3 @@
-#include "codec.h"
 #include "source/extensions/common/dubbo/codec.h"
 
 #include <cstdint>
@@ -8,10 +7,8 @@
 
 #include "source/common/common/assert.h"
 #include "source/extensions/common/dubbo/hessian2_serializer_impl.h"
-#include "source/extensions/common/dubbo/message_impl.h"
-
-#include "message.h"
-#include "metadata.h"
+#include "source/extensions/common/dubbo/message.h"
+#include "source/extensions/common/dubbo/metadata.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,7 +32,7 @@ void encodeHeader(Buffer::Instance& buffer, Context& context, uint32_t body_size
   buffer.writeBEInt<uint16_t>(MagicNumber);
 
   // Serialize type and flag.
-  uint8_t flag = static_cast<uint8_t>(context.serializeType());
+  uint8_t flag = static_cast<uint8_t>(SerializeType::Hessian2);
 
   switch (context.messageType()) {
   case MessageType::Response:
@@ -169,7 +166,6 @@ DecodeStatus DubboCodec::decodeHeader(Buffer::Instance& buffer, MessageMetadata&
         absl::StrCat("invalid dubbo message serialization type ",
                      static_cast<std::underlying_type<SerializeType>::type>(serialize_type)));
   }
-  context->setSerializeType(serialize_type);
 
   // Initial basic type of message.
   MessageType type =
@@ -279,7 +275,6 @@ MessageMetadataSharedPtr DirectResponseUtil::heartbeatResponse(MessageMetadata& 
   auto context = std::make_unique<Context>();
 
   // Set context.
-  context->setSerializeType(request_context.serializeType());
   context->setMessageType(MessageType::HeartbeatResponse);
   context->setResponseStatus(ResponseStatus::Ok);
   context->setRequestId(request_context.requestId());
@@ -301,7 +296,6 @@ MessageMetadataSharedPtr DirectResponseUtil::localResponse(MessageMetadata& requ
   auto context = std::make_unique<Context>();
 
   // Set context.
-  context->setSerializeType(request_context.serializeType());
   if (status != ResponseStatus::Ok) {
     context->setMessageType(MessageType::Exception);
   } else if (type.has_value() &&
@@ -311,16 +305,17 @@ MessageMetadataSharedPtr DirectResponseUtil::localResponse(MessageMetadata& requ
   } else {
     context->setMessageType(MessageType::Response);
   }
+
   context->setResponseStatus(status);
   context->setRequestId(request_context.requestId());
 
   // Set response.
-  auto response = std::make_unique<RpcResponseImpl>();
-  if (status == ResponseStatus::Ok && type.has_value()) {
+  auto response = std::make_unique<RpcResponse>();
+  if (status == ResponseStatus::Ok) {
     // No response type for non-Ok response.
-    response->setResponseType(type.value());
+    response->setResponseType(type.value_or(RpcResponseType::ResponseWithValue));
   }
-  response->setLocalRawMessage(content);
+  response->content().initialize(std::make_unique<Hessian2::StringObject>(content), {});
 
   auto metadata = std::make_shared<MessageMetadata>();
   metadata->setContext(std::move(context));

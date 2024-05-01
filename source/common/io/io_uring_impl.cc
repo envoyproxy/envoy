@@ -17,22 +17,6 @@ bool isIoUringSupported() {
   return is_supported;
 }
 
-IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-                                       ThreadLocal::SlotAllocator& tls)
-    : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling),
-      tls_(tls) {}
-
-IoUring& IoUringFactoryImpl::getOrCreate() const {
-  return const_cast<IoUringImpl&>(tls_.get().ref());
-}
-
-void IoUringFactoryImpl::onServerInitialized() {
-  tls_.set([io_uring_size = io_uring_size_,
-            use_submission_queue_polling = use_submission_queue_polling_](Event::Dispatcher&) {
-    return std::make_shared<IoUringImpl>(io_uring_size, use_submission_queue_polling);
-  });
-}
-
 IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling)
     : cqes_(io_uring_size, nullptr) {
   struct io_uring_params p {};

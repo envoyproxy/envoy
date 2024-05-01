@@ -15,8 +15,10 @@ ExternalProcessorStreamPtr
 ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
                                    const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                    const StreamInfo::StreamInfo& stream_info) {
-  Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(
-      client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true));
+  auto client_or_error =
+      client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true);
+  THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+  Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(client_or_error.value());
   return ExternalProcessorStreamImpl::create(std::move(grpcClient), callbacks, stream_info);
 }
 
@@ -41,6 +43,7 @@ bool ExternalProcessorStreamImpl::startStream(
   grpc_context_.stream_info = &stream_info;
   Http::AsyncClient::StreamOptions options;
   options.setParentContext(grpc_context_);
+  options.setBufferBodyForRetry(true);
   stream_ = client_.start(*descriptor, *this, options);
   // Returns true if the start succeeded and returns false on start failure.
   return stream_ != nullptr;

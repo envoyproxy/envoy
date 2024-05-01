@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "engine.h"
-#include "stream_prototype.h"
+#include "library/cc/engine.h"
+#include "library/cc/stream_prototype.h"
 
 namespace Envoy {
 namespace Platform {

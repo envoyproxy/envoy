@@ -68,7 +68,7 @@ TEST(KafkaCodecTest, KafkaRequestCallbacksTest) {
   }
 
   {
-    EXPECT_CALL(callbacks, onDecodingFailure());
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
     request_callbacks.onFailedParse(nullptr);
   }
 }
@@ -91,7 +91,7 @@ TEST(KafkaCodecTest, KafkaResponseCallbacksTest) {
   }
 
   {
-    EXPECT_CALL(callbacks, onDecodingFailure());
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
     response_callbacks.onFailedParse(nullptr);
   }
 }

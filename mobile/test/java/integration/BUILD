@@ -8,17 +8,17 @@ envoy_mobile_package()
 envoy_mobile_android_test(
     name = "android_engine_start_test",
     srcs = [
-        "AndroidEnvoyEngineStartUpTest.java",
+        "AndroidEngineStartUpTest.java",
     ],
     exec_properties = {
         # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
         ],
         "//conditions:default": [],
     }),
@@ -31,17 +31,17 @@ envoy_mobile_android_test(
 envoy_mobile_android_test(
     name = "android_engine_flow_test",
     srcs = [
-        "AndroidEnvoyFlowTest.java",
+        "AndroidEngineFlowTest.java",
     ],
     exec_properties = {
         # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
         ],
         "//conditions:default": [],
     }),
@@ -55,17 +55,17 @@ envoy_mobile_android_test(
 envoy_mobile_android_test(
     name = "android_engine_explicit_flow_test",
     srcs = [
-        "AndroidEnvoyExplicitFlowTest.java",
+        "AndroidEngineExplicitFlowTest.java",
     ],
     exec_properties = {
         # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
         ],
         "//conditions:default": [],
     }),
@@ -86,10 +86,10 @@ envoy_mobile_android_test(
         "sandboxNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
         ],
         "//conditions:default": [],
     }),
