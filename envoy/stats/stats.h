@@ -233,14 +233,14 @@ template <typename StatsStructType> class DeferredCreationCompatibleInterface {
 public:
   /**
    * Returns an already existing StatsStructType, or creates a new one and returns it.
-   * 
+   *
    * @return The new or already existing StatsStructType.
    */
   virtual StatsStructType& getOrCreate() PURE;
 
   /**
    * Returns whether or not the underlying stats have been initialized yet.
-   * 
+   *
    * @return If the underlying stats have been initialized.
    */
   virtual bool isPresent() const PURE;
@@ -263,7 +263,7 @@ public:
 
   /**
    * Returns whether or not the underlying data_ has been initialized yet.
-   * 
+   *
    * @return If the underlying data_ has been initialized.
    */
   bool isPresent() const { return data_->isPresent(); }
