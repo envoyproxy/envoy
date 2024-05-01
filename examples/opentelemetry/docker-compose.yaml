@@ -63,9 +63,11 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:13133 || exit 1"]
       interval: 1s
-      timeout: 120s
+      timeout: 10s
       retries: 120
-      start_period: 5s
-    command: ["--config=/etc/otel-collector-config.yaml"]
+      start_period: 2s
     ports:
+    - "4137:4137" # gRPC port
     - "${PORT_UI:-55679}:55679"
+    volumes:
+    - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml

@@ -4,6 +4,7 @@ extensions:
   zpages:
     endpoint: 0.0.0.0:55679
   health_check:
+    endpoint: 0.0.0.0:13133
 
 receivers:
   otlp:
@@ -21,18 +22,17 @@ processors:
     check_interval: 5s
 
 exporters:
-  logging:
-    loglevel: debug
+  debug:
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [logging]
+      exporters: [debug]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [logging]
+      exporters: [debug]
 
   extensions: [memory_ballast, zpages, health_check]
