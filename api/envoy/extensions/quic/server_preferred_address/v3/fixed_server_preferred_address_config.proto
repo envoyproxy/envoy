@@ -49,7 +49,8 @@ message FixedServerPreferredAddressConfig {
   string ipv4_address = 1;
 
   // The IPv4 address to advertise to clients for Server Preferred Address.
-  // This field takes precedence over `ipv4_address`.
+  // This field takes precedence over
+  // :ref:`ipv4_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.ipv4_address>`.
   Addresses ipv4_config = 3;
 
   // String representation of IPv6 address, i.e. "::1".
@@ -58,6 +59,7 @@ message FixedServerPreferredAddressConfig {
   string ipv6_address = 2;
 
   // The IPv6 address to advertise to clients for Server Preferred Address.
-  // This field takes precedence over `ipv6_address`.
+  // This field takes precedence over
+  // :ref:`ipv6_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.ipv6_address>`.
   Addresses ipv6_config = 4;
 }
