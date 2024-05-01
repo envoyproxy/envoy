@@ -111,27 +111,30 @@ struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(
       TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterState::LifeSpan life_span)
-      : StreamInfoImpl(absl::nullopt, time_source, downstream_connection_info_provider,
-                       std::make_shared<FilterStateImpl>(life_span)) {}
+      FilterState::LifeSpan life_span, FilterStateSharedPtr ancestor_filter_state = nullptr)
+      : StreamInfoImpl(
+            absl::nullopt, time_source, downstream_connection_info_provider,
+            std::make_shared<FilterStateImpl>(std::move(ancestor_filter_state), life_span)) {}
 
   StreamInfoImpl(
       Http::Protocol protocol, TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterState::LifeSpan life_span)
-      : StreamInfoImpl(protocol, time_source, downstream_connection_info_provider,
-                       std::make_shared<FilterStateImpl>(life_span)) {}
-
-  StreamInfoImpl(
-      Http::Protocol protocol, TimeSource& time_source,
-      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan parent_life_span,
-      FilterState::LifeSpan life_span)
+      FilterState::LifeSpan life_span, FilterStateSharedPtr ancestor_filter_state = nullptr)
       : StreamInfoImpl(
             protocol, time_source, downstream_connection_info_provider,
-            std::make_shared<FilterStateImpl>(FilterStateImpl::LazyCreateAncestor(
-                                                  std::move(parent_filter_state), parent_life_span),
-                                              life_span)) {}
+            std::make_shared<FilterStateImpl>(std::move(ancestor_filter_state), life_span)) {}
+
+  StreamInfoImpl(
+      absl::optional<Http::Protocol> protocol, TimeSource& time_source,
+      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
+      FilterStateSharedPtr filter_state)
+      : time_source_(time_source), start_time_(time_source.systemTime()),
+        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
+        filter_state_(std::move(filter_state)),
+        downstream_connection_info_provider_(downstream_connection_info_provider != nullptr
+                                                 ? downstream_connection_info_provider
+                                                 : emptyDownstreamAddressProvider()),
+        trace_reason_(Tracing::Reason::NotTraceable) {}
 
   SystemTime startTime() const override { return start_time_; }
 
@@ -459,18 +462,6 @@ private:
         Network::ConnectionInfoProviderSharedPtr,
         std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr));
   }
-
-  StreamInfoImpl(
-      absl::optional<Http::Protocol> protocol, TimeSource& time_source,
-      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterStateSharedPtr filter_state)
-      : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
-        filter_state_(std::move(filter_state)),
-        downstream_connection_info_provider_(downstream_connection_info_provider != nullptr
-                                                 ? downstream_connection_info_provider
-                                                 : emptyDownstreamAddressProvider()),
-        trace_reason_(Tracing::Reason::NotTraceable) {}
 
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t bytes_received_{};

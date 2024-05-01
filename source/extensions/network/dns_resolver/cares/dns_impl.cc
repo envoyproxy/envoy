@@ -1,5 +1,7 @@
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 
+#include <ares.h>
+
 #include <chrono>
 #include <cstdint>
 #include <list>
@@ -33,6 +35,8 @@ DnsResolverImpl::DnsResolverImpl(
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
       dns_resolver_options_(config.dns_resolver_options()),
       use_resolvers_as_fallback_(config.use_resolvers_as_fallback()),
+      udp_max_queries_(
+          static_cast<uint32_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, udp_max_queries, 0))),
       resolvers_csv_(maybeBuildResolversCsv(resolvers)),
       filter_unroutable_families_(config.filter_unroutable_families()),
       scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
@@ -90,6 +94,11 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
   if (dns_resolver_options_.no_default_search_domain()) {
     options.optmask_ |= ARES_OPT_FLAGS;
     options.options_.flags |= ARES_FLAG_NOSEARCH;
+  }
+
+  if (udp_max_queries_ > 0) {
+    options.optmask_ |= ARES_OPT_UDP_MAX_QUERIES;
+    options.options_.udp_max_queries = udp_max_queries_;
   }
 
   return options;

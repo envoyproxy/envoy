@@ -393,6 +393,37 @@ TEST_F(FilterTest, OnDecodingFailureWithActiveStreams) {
       2);
 }
 
+TEST_F(FilterTest, OnEncodingFailureWithActiveStreams) {
+  initializeFilter();
+
+  Buffer::OwnedImpl fake_empty_buffer;
+  EXPECT_CALL(*server_codec_, decode(_, _)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+    auto request_0 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+    auto request_1 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+
+    filter_->onDecodingSuccess(std::move(request_0));
+    filter_->onDecodingSuccess(std::move(request_1));
+  }));
+  filter_->onData(fake_empty_buffer, false);
+
+  EXPECT_EQ(2, filter_->activeStreamsForTest().size());
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 2);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 2);
+
+  // One of stream encoding failed.
+  filter_->activeStreamsForTest().begin()->get()->onEncodingFailure();
+
+  EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 2);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_reset_.value(), 1);
+  EXPECT_EQ(
+      factory_context_.store_.counter("generic_proxy.test_prefix.downstream_rq_flag.DPE").value(),
+      1);
+}
+
 TEST_F(FilterTest, ActiveStreamRouteEntry) {
   initializeFilter();
 

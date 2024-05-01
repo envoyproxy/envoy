@@ -23,7 +23,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#protodoc-title: Generic Proxy Route Action Configuration]
 
 // Configuration for the route match action.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RouteAction {
   // The name of the route action. This should be unique across all route actions.
   string name = 5;
@@ -53,6 +53,13 @@ message RouteAction {
   // spans between the point at which the entire downstream request (i.e. end-of-stream) has been
   // processed and when the upstream response has been completely processed. A value of 0 will
   // disable the route's timeout.
-  // [#not-implemented-hide:]
   google.protobuf.Duration timeout = 6;
+
+  // Specifies the retry policy for the route. If not specified, then no retries will be performed.
+  //
+  // .. note::
+  //   Only simplest retry policy is supported and only ``num_retries`` field is used for generic
+  //   proxy. The default value for ``num_retries`` is 1 means that the request will be tried once
+  //   and no additional retries will be performed.
+  config.core.v3.RetryPolicy retry_policy = 7;
 }
