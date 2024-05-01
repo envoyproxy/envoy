@@ -304,7 +304,7 @@ void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
 }
 
 quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte) {
-  // Explicit Congestion Notification is encoded in the two least signficant
+  // Explicit Congestion Notification is encoded in the two least significant
   // bits of the TOS byte of the IP header.
   constexpr uint8_t kEcnMask = 0b00000011;
   return static_cast<quic::QuicEcnCodepoint>(tos_byte & kEcnMask);

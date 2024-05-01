@@ -48,7 +48,7 @@ namespace Quic {
 
 namespace {
 constexpr int kECT1 = 1; // This is an Explicit Congestion Notification
-                         // codepoint defined in RFC3168.
+                         // code point defined in RFC3168.
 } // namespace
 
 // A test quic listener that exits after processing one round of packets.
