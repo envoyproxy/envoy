@@ -27,8 +27,9 @@ message FixedServerPreferredAddressConfig {
   message Addresses {
     // The server preferred address sent to clients.
     //
-    // Note: Envoy currently must receive all packets for a QUIC connection on the same port, so
-    // unless `dnat_address` is configured, the port for this address must be zero, and the listener's
+    // Note: Envoy currently must receive all packets for a QUIC connection on the same port, so unless
+    // :ref:`dnat_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.Addresses.dnat_address>`
+    // is configured, the port for this address must be zero, and the listener's
     // port will be used instead.
     config.core.v3.SocketAddress address = 1;
 
