@@ -89,6 +89,7 @@ public:
   }
 
   void SetUp() override {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
     quic_connection_ = new TestEnvoyQuicClientConnection(
         quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_, quic_version_,
         *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr, /*prefer_gro=*/true),
@@ -502,6 +503,39 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_EQ(self_addr_->asString(), quic_connection_->self_address().ToString());
+}
+
+TEST_P(EnvoyQuicClientSessionTest, EcnReportingIsEnabled) {
+  const Network::ConnectionSocketPtr& socket = quic_connection_->connectionSocket();
+  absl::optional<Network::Address::IpVersion> version = socket->ipVersion();
+  EXPECT_TRUE(version.has_value());
+  int optval;
+  socklen_t optlen = sizeof(optval);
+  Api::SysCallIntResult rv;
+  if (*version == Network::Address::IpVersion::v6) {
+    rv = socket->getSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, &optlen);
+  } else {
+    rv = socket->getSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, &optlen);
+  }
+  EXPECT_EQ(rv.return_value_, 0);
+  EXPECT_EQ(optval, 1);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
+  absl::optional<Network::Address::IpVersion> version = peer_socket_->ipVersion();
+  EXPECT_TRUE(version.has_value());
+  // Make the peer socket send ECN marks
+  Api::SysCallIntResult rv;
+  int optval = 1; // Code point for ECT(1) in RFC3168.
+  if (*version == Network::Address::IpVersion::v6) {
+    rv = peer_socket_->setSocketOption(IPPROTO_IPV6, IPV6_TCLASS, &optval, sizeof(optval));
+  } else {
+    rv = peer_socket_->setSocketOption(IPPROTO_IP, IP_TOS, &optval, sizeof(optval));
+  }
+  EXPECT_EQ(rv.return_value_, 0);
+  envoy_quic_session_->connect();
+  const quic::QuicConnectionStats& stats = quic_connection_->GetStats();
+  EXPECT_EQ(stats.num_ecn_marks_received.ect1, 1);
 }
 
 class MockOsSysCallsImpl : public Api::OsSysCallsImpl {
