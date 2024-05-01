@@ -603,15 +603,7 @@ public:
   // Creates a ValidatorFunction which returns true when data_to_wait_for
   // equals the incoming data string.
   static ValidatorFunction waitForMatch(const char* data_to_wait_for) {
-    return [data_to_wait_for](const std::string& data) -> bool {
-      for (char c : data) {
-        std::cout << std::hex << std::setw(2) << std::setfill('0')
-                  << static_cast<int>(static_cast<unsigned char>(c)) << " ";
-      }
-      std::cout << std::endl;
-      std::cout << data.length() << std::endl;
-      return data == data_to_wait_for;
-    };
+    return [data_to_wait_for](const std::string& data) -> bool { return data == data_to_wait_for; };
   }
 
   // Creates a ValidatorFunction which returns true when data_to_wait_for is
