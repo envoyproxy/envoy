@@ -12,10 +12,6 @@
 namespace Envoy {
 namespace Quic {
 
-namespace {
-constexpr uint8_t kEcnMask = 0x03;
-} // namespace
-
 // Used to defer deleting connection socket to avoid deleting IoHandle in a read loop.
 class DeferredDeletableSocket : public Event::DeferredDeletable {
 public:
@@ -103,7 +99,7 @@ void EnvoyQuicClientConnection::processPacket(
                                   /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false,
-                                  static_cast<quic::QuicEcnCodepoint>(tos & kEcnMask));
+                                  getQuicEcnCodepointFromTosByte(tos));
   ProcessUdpPacket(envoyIpAddressToQuicSocketAddress(local_address->ip()),
                    envoyIpAddressToQuicSocketAddress(peer_address->ip()), packet);
 }

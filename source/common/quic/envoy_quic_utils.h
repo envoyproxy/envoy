@@ -194,5 +194,7 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
 void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
                                      const quic::QuicConnectionId& old_connection_id);
 
+quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte);
+
 } // namespace Quic
 } // namespace Envoy

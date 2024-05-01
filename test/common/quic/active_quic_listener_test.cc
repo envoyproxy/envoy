@@ -47,7 +47,8 @@ namespace Envoy {
 namespace Quic {
 
 namespace {
-constexpr int kECT1 = 0x01;
+constexpr int kECT1 = 1; // This is an Explicit Congestion Notification
+                         // codepoint defined in RFC3168.
 } // namespace
 
 // A test quic listener that exits after processing one round of packets.
@@ -253,13 +254,11 @@ protected:
         std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_address_,
                                               nullptr, Network::SocketCreationOptions{}));
     // Set outgoing ECN marks on client packets.
-    int level, optname;
+    int level = IPPROTO_IP;
+    int optname = IP_TOS;
     if (local_address_->ip()->version() == Network::Address::IpVersion::v6) {
       level = IPPROTO_IPV6;
       optname = IPV6_TCLASS;
-    } else {
-      level = IPPROTO_IP;
-      optname = IP_TOS;
     }
     int value = kECT1;
     client_sockets_.back()->setSocketOption(level, optname, &value, sizeof(value));

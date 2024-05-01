@@ -96,6 +96,7 @@ protected:
 
   const bool udp_read_normalize_addresses_;
 
+  // Latches a copy of the runtime feature "envoy.reloadable_features.quic_receive_ecn".
   const bool receive_ecn_;
 };
 } // namespace Network
