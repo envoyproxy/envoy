@@ -134,15 +134,11 @@ addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t f
   return *address;
 }
 
-Ipv4Instance::Ipv4Instance(const sockaddr_in* address, bool generate_address_string,
-                           const SocketInterface* sock_interface)
+Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface)
     : IpInstance(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   throwOnError(validateProtocolSupported());
-  initHelper(address, generate_address_string);
+  initHelper(address, /*generate_address_string=*/true);
 }
-
-Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* socket_interface)
-    : Ipv4Instance(address, true, socket_interface) {}
 
 Ipv4Instance::Ipv4Instance(const std::string& address, const SocketInterface* sock_interface)
     : Ipv4Instance(address, 0, sockInterfaceOrDefault(sock_interface)) {}
@@ -163,7 +159,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
   ip_.address_string_ = address;
 }
 
-Ipv4Instance::Ipv4Instance(uint32_t port, Ipv4Instance const SocketInterface* sock_interface)
+Ipv4Instance::Ipv4Instance(uint32_t port, const SocketInterface* sock_interface)
     : IpInstance(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   throwOnError(validateProtocolSupported());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
@@ -174,8 +170,8 @@ Ipv4Instance::Ipv4Instance(uint32_t port, Ipv4Instance const SocketInterface* so
   ip_.address_string_ = "0.0.0.0";
 }
 
-Ipv4Instance::Ipv4Instance(absl::Status& status, const sockaddr_in* address,
-                           bool generate_address_string, const SocketInterface* sock_interface)
+Ipv4Instance::Ipv4Instance(absl::Status& status, bool generate_address_string,
+                           const sockaddr_in* address, const SocketInterface* sock_interface)
     : IpInstance(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   status = validateProtocolSupported();
   if (!status.ok()) {
@@ -238,6 +234,17 @@ absl::Status Ipv4Instance::validateProtocolSupported() {
 void Ipv4Instance::initHelper(const sockaddr_in* address, bool generate_address_string) {
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_ = *address;
+  if (generate_address_string) {
+    ip_.address_string_ = sockaddrToString(*address);
+    populateAddressPortString();
+  }
+}
+
+const std::string& Ipv4Instance::IpHelper::addressAsString() const {
+  if (address_string_.empty()) {
+    address_string_ = sockaddrToString(ipv4_.address_);
+  }
+  return address_string_;
 }
 
 void Ipv4Instance::populateAddressPortString() {
@@ -296,7 +303,7 @@ Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,
                            const SocketInterface* sock_interface)
     : IpInstance(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   throwOnError(validateProtocolSupported());
-  initHelper(address, v6only);
+  initHelper(address, v6only, /*generate_address_string*/ true);
 }
 
 Ipv6Instance::Ipv6Instance(const std::string& address, const SocketInterface* sock_interface)
@@ -317,7 +324,7 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
   } else {
     addr_in.sin6_addr = in6addr_any;
   }
-  initHelper(addr_in, v6only);
+  initHelper(addr_in, v6only, /*generate_address_string*/ true);
 }
 
 Ipv6Instance::Ipv6Instance(uint32_t port, const SocketInterface* sock_interface)
@@ -330,14 +337,15 @@ bool Ipv6Instance::operator==(const Instance& rhs) const {
           (ip_.ipv6_.scopeId() == rhs_casted->ip_.ipv6_.scopeId()));
 }
 
-Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bool v6only,
+Ipv6Instance::Ipv6Instance(absl::Status& status, bool generate_address_string,
+                           const sockaddr_in6& address, bool v6only,
                            const SocketInterface* sock_interface)
     : IpInstance(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   status = validateProtocolSupported();
   if (!status.ok()) {
     return;
   }
-  initHelper(address, v6only);
+  initHelper(address, v6only, generate_address_string);
 }
 
 namespace {
@@ -358,9 +366,14 @@ absl::Status Ipv6Instance::validateProtocolSupported() {
   return absl::FailedPreconditionError("IPv6 addresses are not supported on this machine");
 }
 
-void Ipv6Instance::initHelper(const sockaddr_in6& address, bool v6only) {
+void Ipv6Instance::initHelper(const sockaddr_in6& address, bool v6only,
+                              bool generate_address_string) {
   ip_.ipv6_.address_ = address;
   ip_.ipv6_.v6only_ = v6only;
+  if (generate_address_string) {
+    ip_.address_string_ = ip_.ipv6_.makeFriendlyAddress();
+    populateAddressPortString();
+  }
 }
 
 void Ipv6Instance::populateAddressPortString() {
@@ -426,8 +439,9 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
   pipe_.mode_ = mode;
 }
 
-PipeInstance::PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len,
-                           mode_t mode, const SocketInterface* sock_interface)
+PipeInstance::PipeInstance(absl::Status& error, bool /*generate_address_string*/,
+                           const sockaddr_un* address, socklen_t ss_len, mode_t mode,
+                           const SocketInterface* sock_interface)
     : InstanceBase(Type::Pipe, sockInterfaceOrDefault(sock_interface)) {
   if (address->sun_path[0] == '\0') {
 #if !defined(__linux__)

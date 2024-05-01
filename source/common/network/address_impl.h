@@ -13,6 +13,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/statusor.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Network {
@@ -85,10 +86,13 @@ class InstanceFactory {
 public:
   template <typename InstanceType, typename... Args>
   static StatusOr<InstanceConstSharedPtr> createInstancePtr(Args&&... args) {
+    const static bool generate_address_string = !Runtime::runtimeFeatureEnabled(
+        "envoy.restart_features.address_factory_lazy_create_address_string");
     absl::Status status;
     // Use new instead of make_shared here because the instance constructors are private and must be
     // called directly here.
-    std::shared_ptr<InstanceType> instance(new InstanceType(status, std::forward<Args>(args)...));
+    std::shared_ptr<InstanceType> instance(
+        new InstanceType(status, generate_address_string, std::forward<Args>(args)...));
     if (!status.ok()) {
       return status;
     }
@@ -125,8 +129,6 @@ public:
   explicit Ipv4Instance(const sockaddr_in* address,
                         const SocketInterface* sock_interface = nullptr);
 
-  Ipv4Instance(const sockaddr_in* address, bool generate_address_string,
-               const SocketInterface* socket_interface = nullptr);
   /**
    * Construct from a string IPv4 address such as "1.2.3.4". Port will be unset/0.
    */
@@ -184,8 +186,8 @@ private:
    * It is called by the factory method and the partially constructed instance will be discarded
    * upon error.
    */
-  explicit Ipv4Instance(absl::Status& error, const sockaddr_in* address,
-                        bool generate_address_string,
+  explicit Ipv4Instance(absl::Status& error, bool generate_address_string,
+                        const sockaddr_in* address,
                         const SocketInterface* sock_interface = nullptr);
 
   struct Ipv4Helper : public Ipv4 {
@@ -195,12 +197,7 @@ private:
   };
 
   struct IpHelper : public Ip {
-    const std::string& addressAsString() const override {
-      if (address_string_.empty()) {
-        address_string_ = sockaddrToString(ipv4_.address_);
-      }
-      return address_string_;
-    }
+    const std::string& addressAsString() const override;
     bool isAnyAddress() const override { return ipv4_.address_.sin_addr.s_addr == INADDR_ANY; }
     bool isUnicastAddress() const override {
       return !isAnyAddress() && (ipv4_.address_.sin_addr.s_addr != INADDR_BROADCAST) &&
@@ -281,8 +278,8 @@ private:
    * It is called by the factory method and the partially constructed instance will be discarded
    * upon error.
    */
-  Ipv6Instance(absl::Status& error, const sockaddr_in6& address, bool v6only = true,
-               const SocketInterface* sock_interface = nullptr);
+  Ipv6Instance(absl::Status& error, bool generate_address_string, const sockaddr_in6& address,
+               bool v6only = true, const SocketInterface* sock_interface = nullptr);
 
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
@@ -325,7 +322,7 @@ private:
     mutable std::string address_string_;
   };
 
-  void initHelper(const sockaddr_in6& address, bool v6only);
+  void initHelper(const sockaddr_in6& address, bool v6only, bool generate_address_string);
 
   IpHelper ip_;
   friend class InstanceFactory;
@@ -374,8 +371,8 @@ private:
    * It is called by the factory method and the partially constructed instance will be discarded
    * upon error.
    */
-  PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0,
-               const SocketInterface* sock_interface = nullptr);
+  PipeInstance(absl::Status& error, bool generate_address_string, const sockaddr_un* address,
+               socklen_t ss_len, mode_t mode = 0, const SocketInterface* sock_interface = nullptr);
 
   struct PipeHelper : public Pipe {
 
