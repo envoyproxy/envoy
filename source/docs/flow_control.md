@@ -144,7 +144,7 @@ The low watermark path is similar
 
  * When `pending_recv_data_` is drained, it calls
  `ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark`.
- * `pendingRecvBufferLowWatermarkwhich` calls `readDisable(false)` on the stream.
+ * `pendingRecvBufferLowWatermark` which calls `readDisable(false)` on the stream.
 
 ## HTTP/1 and HTTP/2 filters
 
@@ -283,7 +283,7 @@ The high watermark path is as follows:
    `Network::ConnectionCallbacks::onAboveWriteBufferHighWatermark()`.
  * When `Envoy::Http::CodecClient` receives `onAboveWriteBufferHighWatermark()` it
    calls `onUnderlyingConnectionAboveWriteBufferHighWatermark()` on `codec_`.
- * When `Envoy::Http::Http2::ConnectionImpl` or `Envoy::Http::Http1::ConnectionImpl` receives `onAboveWriteBufferHighWatermark()` it calls
+ * When `Envoy::Http::Http2::ConnectionImpl` or `Envoy::Http::Http1::ConnectionImpl` receives `onUnderlyingConnectionAboveWriteBufferHighWatermark()` it calls
    `runHighWatermarkCallbacks()` for each stream of the connection eventually.
  * `runHighWatermarkCallbacks()` results in all subscribers of `Envoy::Http::StreamCallback`
  receiving an `onAboveWriteBufferHighWatermark()` callback.
@@ -299,7 +299,7 @@ The low watermark path is as follows:
    `Network::ConnectionCallbacks::onBelowWriteBufferLowWatermark()`.
  * When `Envoy::Http::CodecClient` receives `onBelowWriteBufferLowWatermark()` it
    calls `onUnderlyingConnectionBelowWriteBufferLowWatermark()` on `codec_`.
- * When `Envoy::Http::Http2::ConnectionImpl` or `Envoy::Http::Http1::ConnectionImpl` receives `onBelowWriteBufferLowWatermark()` it calls
+ * When `Envoy::Http::Http2::ConnectionImpl` or `Envoy::Http::Http1::ConnectionImpl` receives `onUnderlyingConnectionBelowWriteBufferLowWatermark()` it calls
    `runLowWatermarkCallbacks()` for each stream of the connection eventually.
  * `runLowWatermarkCallbacks()` results in all subscribers of `Envoy::Http::StreamCallback`
  receiving a `onBelowWriteBufferLowWatermark()` callback.
