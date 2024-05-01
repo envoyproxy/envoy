@@ -388,6 +388,9 @@ TEST_F(XRayTracerTest, GetTraceId) {
 
   // This method is unimplemented and a noop.
   EXPECT_EQ(span->getTraceIdAsHex(), "");
+
+  // This method is unimplemented and a noop.
+  EXPECT_EQ(span->getSpanIdAsHex(), "");
 }
 
 TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
