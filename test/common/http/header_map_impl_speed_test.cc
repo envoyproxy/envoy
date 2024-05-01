@@ -295,5 +295,65 @@ static void headerMapImplRemovePrefix(benchmark::State& state) {
 }
 BENCHMARK(headerMapImplRemovePrefix)->Arg(0)->Arg(1)->Arg(5)->Arg(10)->Arg(50);
 
+template <class HeaderMapType> class StaticLookupBenchmarker {
+public:
+  absl::optional<HeaderMapImpl::StaticLookupResponse> lookup(absl::string_view key) {
+    return table_.lookup(*ignored_, key);
+  }
+
+private:
+  std::unique_ptr<RequestHeaderMapImpl> ignored_ = RequestHeaderMapImpl::create();
+  HeaderMapImpl::StaticLookupTable<HeaderMapType> table_;
+};
+
+template <class HeaderMapType>
+static void headerMapImplStaticLookups(benchmark::State& state,
+                                       const std::vector<std::string>& keys) {
+  int i = keys.size();
+  StaticLookupBenchmarker<HeaderMapType> table;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    auto result = table.lookup(keys[--i]);
+    if (i == 0) {
+      i = keys.size();
+    }
+    benchmark::DoNotOptimize(result);
+  }
+}
+
+static std::vector<std::string> makeMismatchedHeaders() {
+  return {
+      "x-envoy-banana",
+      "some-unknown-header",
+      "what-is-this-header",
+      "nobody-expects-this-header",
+      "another-unexpected-header",
+      "x-is-a-letter",
+      "x-y-problems-are-the-worst",
+  };
+}
+
+#define ADD_HEADER_TO_KEYS(name) keys.emplace_back(Http::Headers::get().name);
+static void bmHeaderMapImplRequestStaticLookupHits(benchmark::State& state) {
+  std::vector<std::string> keys;
+  INLINE_REQ_HEADERS(ADD_HEADER_TO_KEYS);
+  headerMapImplStaticLookups<RequestHeaderMap>(state, keys);
+}
+static void bmHeaderMapImplResponseStaticLookupHits(benchmark::State& state) {
+  std::vector<std::string> keys;
+  INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
+  headerMapImplStaticLookups<ResponseHeaderMap>(state, keys);
+}
+static void bmHeaderMapImplRequestStaticLookupMisses(benchmark::State& state) {
+  headerMapImplStaticLookups<RequestHeaderMap>(state, makeMismatchedHeaders());
+}
+static void bmHeaderMapImplResponseStaticLookupMisses(benchmark::State& state) {
+  headerMapImplStaticLookups<ResponseHeaderMap>(state, makeMismatchedHeaders());
+}
+BENCHMARK(bmHeaderMapImplRequestStaticLookupHits);
+BENCHMARK(bmHeaderMapImplResponseStaticLookupHits);
+BENCHMARK(bmHeaderMapImplRequestStaticLookupMisses);
+BENCHMARK(bmHeaderMapImplResponseStaticLookupMisses);
+
 } // namespace Http
 } // namespace Envoy
