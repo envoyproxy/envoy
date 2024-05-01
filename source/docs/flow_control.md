@@ -144,7 +144,7 @@ The low watermark path is similar
 
  * When `pending_recv_data_` is drained, it calls
  `ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark`.
- * `pendingRecvBufferLowWatermark` which calls `readDisable(false)` on the stream.
+ * `pendingRecvBufferLowWatermark` calls `readDisable(false)` on the stream.
 
 ## HTTP/1 and HTTP/2 filters
 
