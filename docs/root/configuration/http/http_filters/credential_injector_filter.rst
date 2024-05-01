@@ -33,20 +33,24 @@ Here is an example configuration with Generic credential, which injects an HTTP 
 
 .. literalinclude:: _include/credential-injector-generic-filter.yaml
     :language: yaml
-    :lines: 22-35
+    :lines: 29-39
+    :linenos:
+    :lineno-start: 29
     :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-generic-filter.yaml>`
 
 
-credential which is being used to inject a Basic Auth credential into the proxied requests:
+Credential which is being used to inject a ``Basic Auth`` credential into the proxied requests:
 
 .. literalinclude:: _include/credential-injector-generic-filter.yaml
     :language: yaml
-    :lines: 52-55
+    :lines: 56-59
+    :linenos:
+    :lineno-start: 56
     :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-generic-filter.yaml>`
 
-It can also be configured to inject a Bearer token into the proxied requests.
+It can also be configured to inject a ``Bearer`` token into the proxied requests.
 
-credential for Bearer Token:
+Credential for ``Bearer`` token:
 
 .. code-block:: yaml
 
@@ -65,7 +69,9 @@ Here is an example configuration with OAuth2 client credential injector, which i
 
 .. literalinclude:: _include/credential-injector-oauth2-filter.yaml
     :language: yaml
-    :lines: 26-40
+    :lines: 25-39
+    :linenos:
+    :lineno-start: 25
     :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-oauth2-filter.yaml>`
 
 Statistics

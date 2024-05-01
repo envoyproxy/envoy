@@ -24,6 +24,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // OAuth2 extension can be used to retrieve an OAuth2 access token from an authorization server and inject it into the
 // proxied requests.
+// Currently, only the Client Credentials Grant flow is supported.
 // The access token will be injected into the request headers using the ``Authorization`` header as a bearer token.
 message OAuth2 {
   enum AuthType {
