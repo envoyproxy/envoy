@@ -131,6 +131,12 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "docker"
+  directory: "/examples/opencensus"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "docker"
   directory: "/examples/opentelemetry"
   schedule:
     interval: daily
