@@ -602,7 +602,6 @@ public:
       // ProxyProtocol Signature + Local Command + "Ping"
       const char header[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                              0x54, 0x0a, 0x20, 0x00, 0x00, 0x00, 0x50, 0x69, 0x6e, 0x67};
-      auto p = std::string(header);
       ASSERT_TRUE(cluster_data.host_fake_raw_connection_->waitForData(
           FakeRawConnection::waitForInexactMatch(std::string(header).c_str())));
     }
