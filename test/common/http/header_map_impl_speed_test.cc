@@ -1,6 +1,8 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 
+#include "test/test_common/utility.h"
+
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -302,7 +304,10 @@ public:
   }
 
 private:
-  std::unique_ptr<RequestHeaderMapImpl> ignored_ = RequestHeaderMapImpl::create();
+  // We create both kinds of table so the entries that get registered dynamically
+  // are included in the static tables.
+  std::unique_ptr<HeaderMapImpl> ignored_ = RequestHeaderMapImpl::create();
+  std::unique_ptr<HeaderMapImpl> also_ignored_ = ResponseHeaderMapImpl::create();
   HeaderMapImpl::StaticLookupTable<HeaderMapType> table_;
 };
 
