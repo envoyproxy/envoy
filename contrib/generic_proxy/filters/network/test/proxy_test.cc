@@ -362,6 +362,29 @@ TEST_F(FilterTest, NewStreamAndDispatcher) {
   EXPECT_EQ(&active_stream->decoderFiltersForTest()[0]->dispatcher(), &active_stream->dispatcher());
 }
 
+TEST_F(FilterTest, NewStreamWithStartTime) {
+  mock_stream_filters_.push_back({"mock_0", std::make_shared<NiceMock<MockStreamFilter>>()});
+
+  initializeFilter();
+
+  auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+
+  StartTime start_time;
+  start_time.start_time =
+      std::chrono::time_point<std::chrono::system_clock>(std::chrono::milliseconds(111111111));
+  start_time.start_time_monotonic =
+      std::chrono::time_point<std::chrono::steady_clock>(std::chrono::milliseconds(222222222));
+  filter_->onDecodingSuccess(std::move(request), std::move(start_time));
+
+  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  EXPECT_EQ(111111111LL, std::chrono::duration_cast<std::chrono::milliseconds>(
+                             active_stream->streamInfo().startTime().time_since_epoch())
+                             .count());
+  EXPECT_EQ(222222222LL, std::chrono::duration_cast<std::chrono::milliseconds>(
+                             active_stream->streamInfo().startTimeMonotonic().time_since_epoch())
+                             .count());
+}
+
 TEST_F(FilterTest, OnDecodingFailureWithActiveStreams) {
   initializeFilter();
 

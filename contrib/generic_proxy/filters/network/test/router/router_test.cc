@@ -827,6 +827,56 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponse) {
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithStartTime) {
+  setup();
+  kickOffNewUpstreamRequest();
+
+  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
+
+  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+      .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
+        Buffer::OwnedImpl buffer;
+        buffer.add("hello");
+        // Expect response.
+        callback.onEncodingSuccess(buffer, true);
+      }));
+
+  if (with_tracing_) {
+    // Inject tracing context.
+    EXPECT_CALL(*child_span_, injectContext(_, _));
+  }
+
+  notifyPoolReady();
+
+  EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
+
+  if (with_tracing_) {
+    EXPECT_CALL(*child_span_, setTag(_, _)).Times(testing::AnyNumber());
+    EXPECT_CALL(*child_span_, finishSpan());
+  }
+
+  EXPECT_CALL(mock_filter_callback_, onResponseStart(_)).WillOnce(Invoke([this](ResponsePtr) {
+    // When the response is sent to callback, the upstream request should be removed.
+    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+  }));
+
+  StartTime start_time;
+  start_time.start_time =
+      std::chrono::time_point<std::chrono::system_clock>(std::chrono::milliseconds(111111111));
+  start_time.start_time_monotonic =
+      std::chrono::time_point<std::chrono::steady_clock>(std::chrono::milliseconds(222222222));
+  auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  notifyDecodingSuccess(std::move(response), start_time);
+
+  EXPECT_EQ(222222222LL, std::chrono::duration_cast<std::chrono::milliseconds>(
+                             mock_stream_info_.upstream_info_->upstreamTiming()
+                                 .first_upstream_rx_byte_received_->time_since_epoch())
+                             .count());
+
+  // Mock downstream closing.
+  mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseAndTimeout) {
   setup();
 
