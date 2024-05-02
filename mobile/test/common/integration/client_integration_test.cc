@@ -240,6 +240,15 @@ TEST_P(ClientIntegrationTest, Basic) {
   }
 }
 
+TEST_P(ClientIntegrationTest, BasicWithCares) {
+  builder_.setUseCares(true);
+  initialize();
+  basicTest();
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+  }
+}
+
 TEST_P(ClientIntegrationTest, LargeResponse) {
   initialize();
   std::string data(1024 * 32, 'a');

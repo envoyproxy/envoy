@@ -236,7 +236,7 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
     EXPECT_CALL(*raw_serializer, deserializeRpcRequest(_, _))
         .WillOnce(Return(ByMove(std::make_unique<RpcRequest>("a", "b", "c", "d"))));
 
-    EXPECT_CALL(callbacks, onDecodingSuccess(_));
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
     server_codec.decode(buffer, false);
   }
 
@@ -362,7 +362,7 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
     EXPECT_CALL(*raw_serializer, deserializeRpcResponse(_, _))
         .WillOnce(Return(ByMove(std::move(response))));
 
-    EXPECT_CALL(callbacks, onDecodingSuccess(_));
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
     client_codec.decode(buffer, false);
   }
 

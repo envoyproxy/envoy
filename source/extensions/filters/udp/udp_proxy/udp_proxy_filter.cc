@@ -629,7 +629,7 @@ void UdpProxyFilter::ActiveSession::onInjectWriteDatagramToFilterChain(ActiveWri
 void UdpProxyFilter::UdpActiveSession::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-    MonotonicTime receive_time) {
+    MonotonicTime receive_time, uint8_t tos) {
   const uint64_t rx_buffer_length = buffer->length();
   ENVOY_LOG(trace, "received {} byte datagram from upstream: downstream={} local={} upstream={}",
             rx_buffer_length, addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
@@ -639,7 +639,7 @@ void UdpProxyFilter::UdpActiveSession::processPacket(
   cluster_.cluster_.info()->trafficStats()->upstream_cx_rx_bytes_total_.add(rx_buffer_length);
 
   Network::UdpRecvData recv_data{
-      {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
+      {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time, tos};
   processUpstreamDatagram(recv_data);
 }
 
