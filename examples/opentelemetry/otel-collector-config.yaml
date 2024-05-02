@@ -4,7 +4,6 @@ extensions:
   zpages:
     endpoint: 0.0.0.0:55679
   health_check:
-    endpoint: 0.0.0.0:13133
 
 receivers:
   otlp:
