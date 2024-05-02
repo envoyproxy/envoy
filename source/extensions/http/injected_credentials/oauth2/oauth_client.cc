@@ -32,6 +32,9 @@ constexpr const char* GetAccessTokenBodyFormatStringWithScopes =
 OAuth2Client::GetTokenResult OAuth2ClientImpl::asyncGetAccessToken(const std::string& client_id,
                                                                    const std::string& secret,
                                                                    const std::string& scopes) {
+  if (in_flight_request_ != nullptr) {
+    return GetTokenResult::NotDispatchedAlreadyInFlight;
+  }
   const auto encoded_client_id = Envoy::Http::Utility::PercentEncoding::encode(client_id, ":/=&?");
   const auto encoded_secret = Envoy::Http::Utility::PercentEncoding::encode(secret, ":/=&?");
 
@@ -52,7 +55,7 @@ OAuth2Client::GetTokenResult
 OAuth2ClientImpl::dispatchRequest(Envoy::Http::RequestMessagePtr&& msg) {
   const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
   if (thread_local_cluster != nullptr) {
-    thread_local_cluster->httpAsyncClient().send(
+    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
         std::move(msg), *this,
         Envoy::Http::AsyncClient::RequestOptions().setTimeout(
             std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout))));
@@ -64,6 +67,7 @@ OAuth2ClientImpl::dispatchRequest(Envoy::Http::RequestMessagePtr&& msg) {
 
 void OAuth2ClientImpl::onSuccess(const Envoy::Http::AsyncClient::Request&,
                                  Envoy::Http::ResponseMessagePtr&& message) {
+  in_flight_request_ = nullptr;
   // Check that the auth cluster returned a happy response.
   const auto response_code = message->headers().Status()->value().getStringView();
   if (response_code != "200") {
@@ -100,6 +104,7 @@ void OAuth2ClientImpl::onSuccess(const Envoy::Http::AsyncClient::Request&,
 void OAuth2ClientImpl::onFailure(const Envoy::Http::AsyncClient::Request&,
                                  Envoy::Http::AsyncClient::FailureReason) {
   ENVOY_LOG(error, "OAuth request failed: stream reset");
+  in_flight_request_ = nullptr;
   parent_->onGetAccessTokenFailure(FilterCallbacks::FailureReason::StreamReset);
 }
 

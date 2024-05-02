@@ -18,7 +18,7 @@ absl::Status OAuth2ClientCredentialTokenInjector::inject(Envoy::Http::RequestHea
     return absl::NotFoundError("Failed to get oauth2 token from token provider");
   }
 
-  headers.setCopy(Envoy::Http::CustomHeaders::get().Authorization, token);
+  headers.setReferenceKey(Envoy::Http::CustomHeaders::get().Authorization, token);
   return absl::OkStatus();
 }
 

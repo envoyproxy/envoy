@@ -1,6 +1,6 @@
 .. _config_http_filters_credential_injector:
 
-Credential Injector
+Credential injector
 ===================
 
 The credential injector HTTP filter serves the purpose of injecting credentials into outgoing HTTP requests.
@@ -24,8 +24,8 @@ The filter is configured with one of the following supported ``credential_inject
 from the source. The credentials obtained are then injected into the ``Authorization`` header of the proxied HTTP requests, utilizing either the ``Basic``
 or ``Bearer`` scheme.
 
-Generic Credential Injector
-===========================
+Generic credential injector
+---------------------------
 * This extension should be configured with the type URL ``type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic``.
 * :ref:`generic <envoy_v3_api_msg_extensions.http.injected_credentials.generic.v3.Generic>`
 
@@ -43,25 +43,24 @@ Credential which is being used to inject a ``Basic Auth`` credential into the pr
 
 .. literalinclude:: _include/credential-injector-generic-filter.yaml
     :language: yaml
-    :lines: 56-59
+    :lines: 57-60
     :linenos:
-    :lineno-start: 56
+    :lineno-start: 57
     :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-generic-filter.yaml>`
 
 It can also be configured to inject a ``Bearer`` token into the proxied requests.
 
 Credential for ``Bearer`` token:
 
-.. code-block:: yaml
+.. literalinclude:: _include/credential-injector-generic-filter.yaml
+    :language: yaml
+    :lines: 61-64
+    :linenos:
+    :lineno-start: 61
+    :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-generic-filter.yaml>`
 
-  secrets:
-  - name: credential
-    generic_secret:
-      secret:
-        inline_string: "Bearer myToken"
-
-OAuth2 (Client Credential Grant) Credential Injector
-====================================================
+OAuth2 credential injector (client credential grant)
+---------------------------------------------------
 * This extension should be configured with the type URL ``type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2``.
 * :ref:`oauth2 client credentials grant <envoy_v3_api_msg_extensions.http.injected_credentials.oauth2.v3.OAuth2>`
 
@@ -87,7 +86,7 @@ The HTTP credential injector filter outputs statistics in the ``http.<stat_prefi
   ``failed``, Counter, Total number of requests that failed to inject credentials
   ``already_exists``, Counter, Total number of requests that already had credentials and overwrite is false
 
-OAuth2 Client Credential Injector extension specific statistics are also emitted in the ``http.<stat_prefix>.credential_injector.oauth2.`` namespace.
+OAuth2 client credential injector extension specific statistics are also emitted in the ``http.<stat_prefix>.credential_injector.oauth2.`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description

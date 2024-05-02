@@ -71,6 +71,9 @@ void TokenProvider::asyncGetAccessToken() {
   }
   auto result =
       oauth2_client_->asyncGetAccessToken(client_id_, secret_reader_->credential(), oauth_scopes_);
+  if (result == OAuth2Client::GetTokenResult::NotDispatchedAlreadyInFlight) {
+    return;
+  }
   if (result == OAuth2Client::GetTokenResult::NotDispatchedClusterNotFound) {
     ENVOY_LOG(error, "asyncGetAccessToken: OAuth cluster not found. Retrying in {} seconds.",
               retry_interval_.count());
@@ -78,6 +81,7 @@ void TokenProvider::asyncGetAccessToken() {
     stats_.token_fetch_failed_on_cluster_not_found_.inc();
     return;
   }
+
   stats_.token_requested_.inc();
   ENVOY_LOG(debug, "asyncGetAccessToken: Dispatched OAuth request for access token.");
 }
