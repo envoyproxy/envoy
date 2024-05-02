@@ -25,6 +25,7 @@ public:
 
   Http::Code start(Http::ResponseHeaderMap& response_headers) override;
   bool nextChunk(Buffer::Instance& response) override;
+
 private:
   uint64_t chunk_limit_{DefaultChunkLimit};
   Server::Instance& server_;
