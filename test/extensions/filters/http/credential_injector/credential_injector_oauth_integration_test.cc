@@ -500,7 +500,6 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
 
-  // wait for first token request and respond with bad response
   waitForOAuth2Response("test_client_secret");
 
   test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
@@ -668,6 +667,24 @@ typed_config:
                 ->value());
   test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_requested", 2,
                                  std::chrono::milliseconds(1200));
+  // wait for retried token request and respond with good response
+  handleOauth2TokenRequest("test_client_secret");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
+                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->value()
+                                            .getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 } // namespace
