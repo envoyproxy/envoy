@@ -38,6 +38,11 @@ bug_fixes:
 - area: http
   change: |
     Fix a crash when reloading the HTTP Connection Manager via ECDS.
+- area: socket address
+  change: |
+    Change the Address::InstanceFactory to create socket address instances without generating the string representation
+    and only generate the string form upon usage. This behavior can be reverted by setting the runtime flag
+    ``envoy.restart_features.address_factory_lazy_create_address_string`` to ``false``.
 - area: cares
   change: |
     Upgraded c-ares library to 1.20.1 and added fix to c-ares DNS implementation to additionally check for ``ARES_EREFUSED``,
