@@ -83,9 +83,7 @@ message Rule {
   // Specifies that a match will be performed on the value of a field. If set,
   // the whole http body will be buffered to extract the field value, which
   // may have performance implications.
-  FieldSelector field_selector = 2 [
-    (xds.annotations.v3.field_status).work_in_progress = true
-  ];
+  FieldSelector field_selector = 2 [(xds.annotations.v3.field_status).work_in_progress = true];
 
   // The key-value pair to set in the metadata if the field is present.
   KeyValuePair on_present = 3;
