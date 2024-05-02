@@ -154,7 +154,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
     throwEnvoyExceptionOrPanic(fmt::format("invalid ipv4 address '{}'", address));
   }
 
-  address_port_string_ = absl::StrCat(address, ":", port);
+  setAddressPortString(absl::StrCat(address, ":", port));
   ip_.address_string_ = address;
 }
 
@@ -165,7 +165,7 @@ Ipv4Instance::Ipv4Instance(uint32_t port, const SocketInterface* sock_interface)
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
   ip_.ipv4_.address_.sin_addr.s_addr = INADDR_ANY;
-  address_port_string_ = absl::StrCat("0.0.0.0:", port);
+  setAddressPortString(absl::StrCat("0.0.0.0:", port));
   ip_.address_string_ = "0.0.0.0";
 }
 
@@ -235,7 +235,7 @@ void Ipv4Instance::initHelper(const sockaddr_in* address, bool generate_address_
   ip_.ipv4_.address_ = *address;
   if (generate_address_string) {
     ip_.address_string_ = sockaddrToString(*address);
-    populateAddressPortString();
+    setAddressPortString(generateAddressPortString());
   }
 }
 
@@ -246,13 +246,15 @@ const std::string& Ipv4Instance::IpHelper::addressAsString() const {
   return address_string_;
 }
 
-void Ipv4Instance::populateAddressPortString() {
+std::string Ipv4Instance::generateAddressPortString() const {
   // Based on benchmark testing, this reserve+append implementation runs faster than absl::StrCat.
+  std::string address_port_string;
   fmt::format_int port(ntohs(ip_.ipv4_.address_.sin_port));
-  address_port_string_.reserve(ip_.addressAsString().size() + 1 + port.size());
-  address_port_string_.append(ip_.addressAsString());
-  address_port_string_.push_back(':');
-  address_port_string_.append(port.data(), port.size());
+  address_port_string.reserve(ip_.addressAsString().size() + 1 + port.size());
+  address_port_string.append(ip_.addressAsString());
+  address_port_string.push_back(':');
+  address_port_string.append(port.data(), port.size());
+  return address_port_string;
 }
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
@@ -371,7 +373,7 @@ void Ipv6Instance::initHelper(const sockaddr_in6& address, bool v6only,
   ip_.ipv6_.v6only_ = v6only;
   if (generate_address_string) {
     ip_.address_string_ = ip_.ipv6_.makeFriendlyAddress();
-    populateAddressPortString();
+    setAddressPortString(generateAddressPortString());
   }
 }
 
@@ -382,8 +384,8 @@ const std::string& Ipv6Instance::IpHelper::addressAsString() const {
   return address_string_;
 }
 
-void Ipv6Instance::populateAddressPortString() {
-  address_port_string_ = fmt::format("[{}]:{}", ip_.addressAsString(), ip_.port());
+std::string Ipv6Instance::generateAddressPortString() const {
+  return fmt::format("[{}]:{}", ip_.addressAsString(), ip_.port());
 }
 
 PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode,

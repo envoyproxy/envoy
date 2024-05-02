@@ -105,7 +105,7 @@ public:
   // InstanceBase
   const std::string& asString() const override {
     if (address_port_string_.empty()) {
-      const_cast<IpInstance*>(this)->populateAddressPortString();
+      address_port_string_ = generateAddressPortString();
     }
     return address_port_string_;
   }
@@ -116,8 +116,12 @@ protected:
   IpInstance(Type type, const SocketInterface* sock_interface)
       : InstanceBase(type, sock_interface) {}
 
-  virtual void populateAddressPortString() PURE;
-  std::string address_port_string_;
+  virtual std::string generateAddressPortString() const PURE;
+
+  void setAddressPortString(const std::string& str) { address_port_string_ = str; }
+
+private:
+  mutable std::string address_port_string_;
 };
 
 /**
@@ -179,7 +183,7 @@ public:
   static Envoy::Cleanup forceProtocolUnsupportedForTest(bool new_val);
 
 protected:
-  void populateAddressPortString() override;
+  std::string generateAddressPortString() const override;
 
 private:
   /**
@@ -271,7 +275,7 @@ public:
   static Envoy::Cleanup forceProtocolUnsupportedForTest(bool new_val);
 
 protected:
-  void populateAddressPortString() override;
+  std::string generateAddressPortString() const override;
 
 private:
   /**
