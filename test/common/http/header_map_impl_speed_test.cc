@@ -338,6 +338,10 @@ static std::vector<std::string> makeMismatchedHeaders() {
   };
 }
 
+// Macro is used in the two functions below to populate an array of the common
+// set of keys, to use for benchmarking. The INLINE_REQ_HEADERS and
+// INLINE_RESP_HEADERS macros do a macro "callback" with just one argument, so
+// we can't parameterize `keys` into the macro.
 #define ADD_HEADER_TO_KEYS(name) keys.emplace_back(Http::Headers::get().name);
 static void bmHeaderMapImplRequestStaticLookupHits(benchmark::State& state) {
   std::vector<std::string> keys;
