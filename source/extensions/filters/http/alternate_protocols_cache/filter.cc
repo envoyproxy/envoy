@@ -18,11 +18,16 @@ namespace AlternateProtocolsCache {
 using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
 
 FilterConfig::FilterConfig(
-    const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&,
+    const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig& config,
     Http::HttpServerPropertiesCacheManagerFactory& alternate_protocol_cache_manager_factory,
     TimeSource& time_source)
     : alternate_protocol_cache_manager_(alternate_protocol_cache_manager_factory.get()),
-      time_source_(time_source) {}
+      time_source_(time_source) {
+  if (config.has_alternate_protocols_cache_options()) {
+    ENVOY_LOG_MISC(warn, "Using deprecated and ignored alternate_protocols_cache_options in "
+                         "alternate_protocols_cache config.");
+  }
+}
 
 void Filter::onDestroy() {}
 
