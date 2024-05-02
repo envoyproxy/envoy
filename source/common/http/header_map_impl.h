@@ -11,9 +11,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 
+#include "source/common/common/compiled_string_map.h"
 #include "source/common/common/non_copyable.h"
 #include "source/common/common/utility.h"
-#include "source/common/common/compiled_string_map.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_features.h"
 
