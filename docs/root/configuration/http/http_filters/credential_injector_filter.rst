@@ -60,7 +60,7 @@ Credential for ``Bearer`` token:
     :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-generic-filter.yaml>`
 
 OAuth2 credential injector (client credential grant)
----------------------------------------------------
+----------------------------------------------------
 * This extension should be configured with the type URL ``type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2``.
 * :ref:`oauth2 client credentials grant <envoy_v3_api_msg_extensions.http.injected_credentials.oauth2.v3.OAuth2>`
 
