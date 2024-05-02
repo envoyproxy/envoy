@@ -19,24 +19,19 @@
 namespace Envoy {
 namespace Server {
 
-struct ClustersJsonContext {
-  ClustersJsonContext(std::unique_ptr<Json::Streamer> streamer,
-                      std::reference_wrapper<Buffer::Instance> buffer,
-                      Json::Streamer::MapPtr root_map, Json::Streamer::ArrayPtr clusters)
-      : streamer_(std::move(streamer)), buffer_(buffer.get()), root_map_(std::move(root_map)),
-        clusters_(std::move(clusters)) {}
-  std::unique_ptr<Json::Streamer> streamer_;
-  Buffer::Instance& buffer_;
-  Json::Streamer::MapPtr root_map_;
-  Json::Streamer::ArrayPtr clusters_;
-};
-
+/**
+ * ClustersChunkProcessor is the interface for streaming Clusters data in a response
+ * for /clusters.
+ */
 class ClustersChunkProcessor {
 public:
   virtual bool nextChunk(Buffer::Instance& response) PURE;
   virtual ~ClustersChunkProcessor() = default;
 };
 
+/**
+ * TextClustersChunkProcessor streams the response using a newline delimited text format.
+ */
 class TextClustersChunkProcessor : public ClustersChunkProcessor {
 public:
   TextClustersChunkProcessor(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
@@ -59,6 +54,28 @@ private:
   uint64_t idx_;
 };
 
+/**
+ * ClustersJsonContext holds an Envoy::Json::Streamer and the top-level JSON objects throughout the
+ * duration of a request. When it is destructed, the buffer will terminate the array and object
+ * herein. See the Envoy::Json::Streamer implementation for details.
+ */
+struct ClustersJsonContext {
+  ClustersJsonContext(std::unique_ptr<Json::Streamer> streamer,
+                      std::reference_wrapper<Buffer::Instance> buffer,
+                      Json::Streamer::MapPtr root_map, Json::Streamer::ArrayPtr clusters)
+      : streamer_(std::move(streamer)), buffer_(buffer.get()), root_map_(std::move(root_map)),
+        clusters_(std::move(clusters)) {}
+  std::unique_ptr<Json::Streamer> streamer_;
+  Buffer::Instance& buffer_;
+  Json::Streamer::MapPtr root_map_;
+  Json::Streamer::ArrayPtr clusters_;
+};
+
+/**
+ * JsonClustersChunkProcessor streams the response and emulates the JSON encoding behavior of
+ * the gRPC clients; specifically, "zero-value" values such as false, 0, empty string, and
+ * empty objects are omitted from the output.
+ */
 class JsonClustersChunkProcessor : public ClustersChunkProcessor {
 public:
   JsonClustersChunkProcessor(uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,

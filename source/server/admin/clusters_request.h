@@ -13,7 +13,10 @@
 namespace Envoy {
 namespace Server {
 
-// Captures context for a streaming request, implementing the Admin::Request interface.
+/**
+ * ClustersRequest captures context for a streaming request, implementing the
+ * Admin::Request interface.
+ */
 class ClustersRequest : public Admin::Request {
 public:
   static constexpr uint64_t DefaultChunkLimit = 2 << 20; // 2 MB
@@ -22,7 +25,6 @@ public:
 
   Http::Code start(Http::ResponseHeaderMap& response_headers) override;
   bool nextChunk(Buffer::Instance& response) override;
-
 private:
   uint64_t chunk_limit_{DefaultChunkLimit};
   Server::Instance& server_;

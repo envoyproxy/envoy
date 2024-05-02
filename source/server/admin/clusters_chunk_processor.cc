@@ -236,9 +236,6 @@ void JsonClustersChunkProcessor::processHost(Json::Streamer::Array* raw_host_sta
   setHealthFlags(host_ptr.get(), host, buffer);
   setSuccessRate(host, host_config);
 
-  // TODO(demitriswan) add test to ensure empty object doesn't get written if there
-  // is no relevant data to output due to the omitempty JSON encoding option typically
-  // used in generated client code to which this implementation is referencing.
   if (buffer.length()) {
     response.move(buffer);
   }
@@ -246,6 +243,7 @@ void JsonClustersChunkProcessor::processHost(Json::Streamer::Array* raw_host_sta
     addMapEntries(host_ptr.get(), response, host_config);
   }
 }
+
 void JsonClustersChunkProcessor::setHostname(
     const Upstream::HostSharedPtr& host,
     std::vector<const Json::Streamer::Map::NameValue>& host_config) {
