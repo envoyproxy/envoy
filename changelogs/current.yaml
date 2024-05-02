@@ -24,8 +24,8 @@ minor_behavior_changes:
     loop to work with GRO. This behavior can be reverted by setting runtime guard
     ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` to false.
 - area: statistics
-   change: |
-     Hot restart statistics like hot_restart_epoch are only set when hot restart is enabled.
+  change: |
+    Hot restart statistics like hot_restart_epoch are only set when hot restart is enabled.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
