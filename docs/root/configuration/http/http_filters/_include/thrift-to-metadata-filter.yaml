@@ -44,7 +44,6 @@ static_resources:
                   metadata_namespace: envoy.filters.http.thrift_to_metadata
                   key: response_message_type
                   value: "exception"
-              response_rules:
               - field: REPLY_TYPE
                 on_present:
                   metadata_namespace: envoy.filters.http.thrift_to_metadata
