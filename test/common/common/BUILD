@@ -282,6 +282,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "compiled_string_map_test",
+    srcs = ["compiled_string_map_test.cc"],
+)
+
+envoy_cc_test(
     name = "packed_struct_test",
     srcs = ["packed_struct_test.cc"],
     deps = [

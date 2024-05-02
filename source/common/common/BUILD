@@ -474,6 +474,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "compiled_string_map_lib",
+    hdrs = ["compiled_string_map.h"],
+)
+
+envoy_cc_library(
     name = "packed_struct_lib",
     hdrs = ["packed_struct.h"],
     deps = [

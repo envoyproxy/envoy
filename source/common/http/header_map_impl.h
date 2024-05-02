@@ -13,6 +13,7 @@
 
 #include "source/common/common/non_copyable.h"
 #include "source/common/common/utility.h"
+#include "source/common/common/compiled_string_map.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -146,18 +147,23 @@ protected:
    */
   template <class Interface>
   struct StaticLookupTable
-      : public TrieLookupTable<std::function<StaticLookupResponse(HeaderMapImpl&)>> {
+      : public CompiledStringMap<std::function<StaticLookupResponse(HeaderMapImpl&)>> {
     StaticLookupTable();
 
-    void finalizeTable() {
+    void finalizeTable(std::vector<Pair> extra = {}) {
       CustomInlineHeaderRegistry::finalize<Interface::header_map_type>();
       auto& headers = CustomInlineHeaderRegistry::headers<Interface::header_map_type>();
-      size_ = headers.size();
+      size_ = headers.size() + extra.size();
+      std::vector<Pair> input;
+      input.reserve(size_);
       for (const auto& header : headers) {
-        this->add(header.first.get().c_str(), [&header](HeaderMapImpl& h) -> StaticLookupResponse {
-          return {&h.inlineHeaders()[header.second], &header.first};
-        });
+        input.emplace_back(std::make_pair(
+            std::string{header.first.get()}, [&header](HeaderMapImpl& h) -> StaticLookupResponse {
+              return {&h.inlineHeaders()[header.second], &header.first};
+            }));
       }
+      std::copy(extra.begin(), extra.end(), std::back_inserter(input));
+      compile(input);
     }
 
     static size_t size() {
