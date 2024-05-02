@@ -420,8 +420,9 @@ void DecodingProcessorState::clearWatermark() {
 }
 
 void DecodingProcessorState::clearRouteCache(const CommonResponse& common_response) {
+  bool response_clear_route_cache = common_response.clear_route_cache();
   if (filter_.config().isUpstream()) {
-    if (common_response.clear_route_cache()) {
+    if (response_clear_route_cache) {
       filter_.stats().clear_route_cache_upstream_ignored_.inc();
       ENVOY_LOG(debug, "NOT clearing route cache. The filter is in upstream filter chain.");
     }
@@ -429,7 +430,7 @@ void DecodingProcessorState::clearRouteCache(const CommonResponse& common_respon
   }
 
   if (!common_response.has_header_mutation()) {
-    if (common_response.clear_route_cache()) {
+    if (response_clear_route_cache) {
       filter_.stats().clear_route_cache_ignored_.inc();
       ENVOY_LOG(debug, "NOT clearing route cache. No header mutation in the response");
     }
@@ -440,7 +441,7 @@ void DecodingProcessorState::clearRouteCache(const CommonResponse& common_respon
   switch (filter_.config().routeCacheAction()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT:
-    if (common_response.clear_route_cache()) {
+    if (response_clear_route_cache) {
       ENVOY_LOG(debug, "Clearing route cache due to the filter RouterCacheAction is configured "
                        "with DEFAULT and response has clear_route_cache set.");
       decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
@@ -452,10 +453,9 @@ void DecodingProcessorState::clearRouteCache(const CommonResponse& common_respon
     decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     break;
   case envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RETAIN:
-    if (common_response.clear_route_cache()) {
+    if (response_clear_route_cache) {
       filter_.stats().clear_route_cache_disabled_.inc();
-      ENVOY_LOG(debug, "NOT clearing route cache, it is disabled by the filter "
-                       "disable_clear_route_cache config");
+      ENVOY_LOG(debug, "NOT clearing route cache, it is disabled by the filter config");
     }
     break;
   }
