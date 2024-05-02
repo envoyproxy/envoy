@@ -130,7 +130,9 @@ TEST(OpenCensusTracerTest, Span) {
 
     // Trace id is automatically created when no parent context exists.
     ASSERT_NE(span->getTraceIdAsHex(), "");
-    ASSERT_NE(span->getSpanIdAsHex(), "");
+
+    // Span id should be empty since this is not yet supported
+    ASSERT_EQ(span->getSpanIdAsHex(), "");
   }
 
   // Retrieve SpanData from the OpenCensus trace exporter.
