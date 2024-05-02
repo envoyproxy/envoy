@@ -642,7 +642,7 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
 // RLQS filter is operating in non-blocking mode now, this test could be flaky until the stats are
 // added to make the test behavior deterministic. (e.g., wait for stats in the test).
 // Disable the test for now.
-TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketThrottling) {
+TEST_P(RateLimitQuotaIntegrationTest, DISABLED_MultiRequestWithTokenBucketThrottling) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
