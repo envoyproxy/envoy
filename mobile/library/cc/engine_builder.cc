@@ -476,17 +476,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   if (enable_http3_) {
 #ifdef ENVOY_ENABLE_QUIC
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig cache_config;
-    cache_config.mutable_alternate_protocols_cache_options()->set_name(
-        "default_alternate_protocols_cache");
-    for (const auto& [host, port] : quic_hints_) {
-      auto* entry =
-          cache_config.mutable_alternate_protocols_cache_options()->add_prepopulated_entries();
-      entry->set_hostname(host);
-      entry->set_port(port);
-    }
-    for (const auto& suffix : quic_suffixes_) {
-      cache_config.mutable_alternate_protocols_cache_options()->add_canonical_suffixes(suffix);
-    }
     auto* cache_filter = hcm->add_http_filters();
     cache_filter->set_name("alternate_protocols_cache");
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
