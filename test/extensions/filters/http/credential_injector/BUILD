@@ -57,12 +57,25 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "oauth2_config_test",
-    size = "large",
     srcs = ["oauth2_config_test.cc"],
     extension_names = ["envoy.filters.http.credential_injector"],
     deps = [
         "//source/extensions/http/injected_credentials/oauth2:config",
         "//test/mocks/server:factory_context_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "token_provider_test",
+    srcs = ["token_provider_test.cc"],
+    extension_names = ["envoy.filters.http.credential_injector"],
+    deps = [
+        "//source/extensions/http/injected_credentials/common:secret_reader_lib",
+        "//source/extensions/http/injected_credentials/oauth2:token_provider_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
     ],
 )
 

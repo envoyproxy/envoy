@@ -28,9 +28,7 @@ std::string oauthScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_
     }
   }
   return absl::StrJoin(scopes, " ");
-  ;
 }
-
 } // namespace
 
 // TokenProvider Constructor
@@ -92,14 +90,14 @@ void TokenProvider::onGetAccessTokenSuccess(const std::string& access_token,
   ThreadLocalOauth2ClientCredentialsTokenSharedPtr value(
       new ThreadLocalOauth2ClientCredentialsToken(token));
   stats_.token_fetched_.inc();
-
+  ENVOY_LOG(debug, "onGetAccessTokenSuccess: Token fetched successfully, expires in {} seconds.",
+            expires_in.count());
   tls_->set(
       [value](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return value; });
   if (timer_->enabled()) {
     return;
   }
-  ENVOY_LOG(debug, "onGetAccessTokenSuccess: Token fetched successfully, expires in {} seconds.",
-            expires_in.count());
+
   timer_->enableTimer(expires_in / 2);
 }
 
