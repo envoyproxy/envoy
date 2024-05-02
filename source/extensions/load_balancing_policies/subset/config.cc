@@ -12,25 +12,6 @@ namespace Subset {
 using SubsetLbProto = envoy::extensions::load_balancing_policies::subset::v3::Subset;
 using ClusterProto = envoy::config::cluster::v3::Cluster;
 
-Upstream::LoadBalancerPtr Factory::create(const Upstream::ClusterInfo& cluster,
-                                          const Upstream::PrioritySet& priority_set,
-                                          const Upstream::PrioritySet* local_priority_set,
-                                          Runtime::Loader& runtime, Random::RandomGenerator& random,
-                                          TimeSource& time_source) {
-  auto child_lb_creator = std::make_unique<Upstream::LegacyChildLoadBalancerCreatorImpl>(
-      cluster.lbType(), cluster.lbRingHashConfig(), cluster.lbMaglevConfig(),
-      cluster.lbRoundRobinConfig(), cluster.lbLeastRequestConfig(), cluster.lbConfig());
-
-  return std::make_unique<Upstream::SubsetLoadBalancer>(
-      cluster.lbSubsetInfo(), std::move(child_lb_creator), priority_set, local_priority_set,
-      cluster.lbStats(), cluster.statsScope(), runtime, random, time_source);
-}
-
-/**
- * Static registration for the Factory. @see RegisterFactory.
- */
-REGISTER_FACTORY(Factory, Upstream::NonThreadAwareLoadBalancerFactory);
-
 class ChildLoadBalancerCreatorImpl : public Upstream::ChildLoadBalancerCreator {
 public:
   ChildLoadBalancerCreatorImpl(const Upstream::SubsetLoadBalancerConfig& subset_config,

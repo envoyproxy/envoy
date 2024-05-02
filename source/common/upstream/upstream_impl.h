@@ -94,55 +94,6 @@ public:
 };
 
 /**
- * Class for LBPolicies
- * Uses a absl::variant to store pointers for the LBPolicy
- */
-class LBPolicyConfig {
-public:
-  LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config);
-
-  OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lbRoundRobinConfig() const {
-    return getConfig<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>();
-  }
-
-  OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
-  lbLeastRequestConfig() const {
-    return getConfig<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>();
-  }
-
-  OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lbRingHashConfig() const {
-    return getConfig<envoy::config::cluster::v3::Cluster::RingHashLbConfig>();
-  }
-
-  OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lbMaglevConfig() const {
-    return getConfig<envoy::config::cluster::v3::Cluster::MaglevLbConfig>();
-  }
-
-  OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
-  lbOriginalDstConfig() const {
-    return getConfig<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>();
-  }
-
-private:
-  template <typename T> OptRef<const T> getConfig() const {
-    // Condition checks for the type of LbConfig, it also checks that the value is not nullptr
-    // The Round Robin config being set to nullptr is the default value of the variant
-    if (const auto lbPtr = absl::get_if<std::unique_ptr<const T>>(&lb_policy_); lbPtr && *lbPtr) {
-      return *(*lbPtr);
-    } else {
-      return absl::nullopt;
-    }
-  }
-
-  absl::variant<std::unique_ptr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>,
-                std::unique_ptr<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>,
-                std::unique_ptr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>,
-                std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>,
-                std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>>
-      lb_policy_;
-};
-
-/**
  * Null implementation of HealthCheckHostMonitor.
  */
 class HealthCheckHostMonitorNullImpl : public HealthCheckHostMonitor {
@@ -864,7 +815,10 @@ public:
   OptRef<const LoadBalancerConfig> loadBalancerConfig() const override {
     return makeOptRefFromPtr<const LoadBalancerConfig>(load_balancer_config_.get());
   }
-  TypedLoadBalancerFactory* loadBalancerFactory() const override { return load_balancer_factory_; }
+  TypedLoadBalancerFactory& loadBalancerFactory() const override {
+    ASSERT(load_balancer_factory_ != nullptr, "null load balancer factory");
+    return *load_balancer_factory_;
+  }
   const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const override {
     return *common_lb_config_;
   }
@@ -920,7 +874,6 @@ public:
                            Server::Configuration::ServerFactoryContext& context);
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
-  LoadBalancerType lbType() const override { return lb_type_; }
   envoy::config::cluster::v3::Cluster::DiscoveryType type() const override { return type_; }
 
   OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>
@@ -930,45 +883,9 @@ public:
     }
     return *cluster_type_;
   }
-  OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
-  lbRoundRobinConfig() const override {
-    if (lb_policy_config_ == nullptr) {
-      return {};
-    }
-
-    return lb_policy_config_->lbRoundRobinConfig();
-  }
-  OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
-  lbLeastRequestConfig() const override {
-    if (lb_policy_config_ == nullptr) {
-      return {};
-    }
-
-    return lb_policy_config_->lbLeastRequestConfig();
-  }
-  OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
-  lbRingHashConfig() const override {
-    if (lb_policy_config_ == nullptr) {
-      return {};
-    }
-
-    return lb_policy_config_->lbRingHashConfig();
-  }
-  OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
-  lbMaglevConfig() const override {
-    if (lb_policy_config_ == nullptr) {
-      return {};
-    }
-
-    return lb_policy_config_->lbMaglevConfig();
-  }
   OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
   lbOriginalDstConfig() const override {
-    if (lb_policy_config_ == nullptr) {
-      return {};
-    }
-
-    return lb_policy_config_->lbOriginalDstConfig();
+    return makeOptRefFromPtr(original_dst_lb_config_.get());
   }
   OptRef<const envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const override {
     if (upstream_config_ == nullptr) {
@@ -1020,12 +937,6 @@ public:
 
   UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;
-  }
-  const LoadBalancerSubsetInfo& lbSubsetInfo() const override {
-    if (lb_subset_ != nullptr) {
-      return *lb_subset_;
-    }
-    return DefaultLoadBalancerSubsetInfoImpl::get();
   }
   using DefaultMetadata = ConstSingleton<envoy::config::core::v3::Metadata>;
   const envoy::config::core::v3::Metadata& metadata() const override {
@@ -1157,11 +1068,12 @@ private:
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
   UpstreamLocalAddressSelectorConstSharedPtr upstream_local_address_selector_;
-  std::unique_ptr<const LBPolicyConfig> lb_policy_config_;
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
-  std::unique_ptr<LoadBalancerSubsetInfoImpl> lb_subset_;
   std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
   std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
+  // The load balancing configuration for original dst cluster.
+  std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
+      original_dst_lb_config_;
   LoadBalancerConfigPtr load_balancer_config_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
@@ -1187,7 +1099,6 @@ private:
   // overhead via alignment
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint32_t max_response_headers_count_;
-  LoadBalancerType lb_type_;
   const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
   const bool drain_connections_on_host_removal_ : 1;
   const bool connection_pool_per_downstream_connection_ : 1;
