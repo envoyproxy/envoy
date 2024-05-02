@@ -138,7 +138,7 @@ public:
   virtual std::string getTraceIdAsHex() const PURE;
 
   /**
-   * Retrieve the span ID associated with this span.
+   * Retrieve the span's identifier.
    * @return span ID as a hex string
    */
   virtual std::string getSpanIdAsHex() const PURE;
