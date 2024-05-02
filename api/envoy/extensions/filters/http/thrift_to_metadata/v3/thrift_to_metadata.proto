@@ -84,7 +84,6 @@ message Rule {
   // the whole http body will be buffered to extract the field value, which
   // may have performance implications.
   FieldSelector field_selector = 2 [
-    (validate.rules).message = {required: true},
     (xds.annotations.v3.field_status).work_in_progress = true
   ];
 
