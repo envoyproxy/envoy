@@ -11,7 +11,8 @@ OpenTelemetry tracing
         Used to make ``HTTP`` requests.
 
 The OpenTelemetry tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
-capabilities using `OpenTelemetry <https://opentelemetry.io/>`_ as the tracing provider.
+capabilities using `OpenTelemetry <https://opentelemetry.io/>`_ as the tracing provider, and how it
+correlates :ref:`access logs <arch_overview_access_logs>` with the tracing data.
 
 In this example, 2 backend services are provided:
 
@@ -119,3 +120,72 @@ In the ``Latency Samples`` of ``opentelemetry.proto.collector.trace.v1.TraceServ
 
    `OpenTelemetry <https://opentelemetry.io/>`_
       OpenTelemetry tracing website.
+
+Step 5: View the access logs in the OpenTelemetry collector output
+*******************************************
+
+Check the spans Docker-compose logs:
+
+.. code-block:: console
+    opentelemetry-opentelemetry-1      | 2024-05-02T15:08:02.068Z   info    ResourceSpans #0
+    opentelemetry-opentelemetry-1      | Resource SchemaURL: 
+    opentelemetry-opentelemetry-1      | Resource attributes:
+    opentelemetry-opentelemetry-1      |      -> service.name: Str(envoy-1)
+    opentelemetry-opentelemetry-1      | ScopeSpans #0
+    opentelemetry-opentelemetry-1      | ScopeSpans SchemaURL: 
+    opentelemetry-opentelemetry-1      | InstrumentationScope  
+    opentelemetry-opentelemetry-1      | Span #0
+    opentelemetry-opentelemetry-1      |     Trace ID       : 832518ad68578df8182cd76847693a93
+    opentelemetry-opentelemetry-1      |     Parent ID      : 869247f07978fa64
+    opentelemetry-opentelemetry-1      |     ID             : 8af519328fd9ec0c
+    opentelemetry-opentelemetry-1      |     Name           : egress localhost:10000
+    opentelemetry-opentelemetry-1      |     Kind           : Client
+    opentelemetry-opentelemetry-1      |     Start time     : 2024-05-02 15:08:01.190174 +0000 UTC
+    opentelemetry-opentelemetry-1      |     End time       : 2024-05-02 15:08:01.199308 +0000 UTC
+    opentelemetry-opentelemetry-1      |     Status code    : Unset
+    opentelemetry-opentelemetry-1      |     Status message : 
+    opentelemetry-opentelemetry-1      | Attributes:
+    opentelemetry-opentelemetry-1      |      -> node_id: Str()
+    opentelemetry-opentelemetry-1      |      -> zone: Str()
+    opentelemetry-opentelemetry-1      |      -> guid:x-request-id: Str(84b13eee-db19-9fa4-b34d-b9a2d43b1064)
+    opentelemetry-opentelemetry-1      |      -> http.url: Str(http://localhost:10000/trace/2)
+    opentelemetry-opentelemetry-1      |      -> http.method: Str(GET)
+    opentelemetry-opentelemetry-1      |      -> downstream_cluster: Str(-)
+    opentelemetry-opentelemetry-1      |      -> user_agent: Str(curl/8.1.2)
+    opentelemetry-opentelemetry-1      |      -> http.protocol: Str(HTTP/1.1)
+    opentelemetry-opentelemetry-1      |      -> peer.address: Str(172.30.0.7)
+    opentelemetry-opentelemetry-1      |      -> request_size: Str(0)
+    opentelemetry-opentelemetry-1      |      -> response_size: Str(37)
+    opentelemetry-opentelemetry-1      |      -> component: Str(proxy)
+    opentelemetry-opentelemetry-1      |      -> upstream_cluster: Str(envoy_cluster2)
+    opentelemetry-opentelemetry-1      |      -> upstream_cluster.name: Str(envoy_cluster2)
+    opentelemetry-opentelemetry-1      |      -> http.status_code: Str(200)
+    opentelemetry-opentelemetry-1      |      -> response_flags: Str(-)
+    opentelemetry-opentelemetry-1      |    {"kind": "exporter", "data_type": "traces", "name": "debug"}
+
+And the matching access log:
+
+.. code-block:: console
+    opentelemetry-opentelemetry-1      | 2024-05-02T15:08:01.867Z   info    LogsExporter {"kind": "exporter", "data_type": "logs", "name": "debug", "resource logs": 1, "log records": 1}
+    opentelemetry-opentelemetry-1      | 2024-05-02T15:08:01.867Z   info    ResourceLog #0
+    opentelemetry-opentelemetry-1      | Resource SchemaURL: 
+    opentelemetry-opentelemetry-1      | Resource attributes:
+    opentelemetry-opentelemetry-1      |      -> log_name: Str(otel_envoy_accesslog)
+    opentelemetry-opentelemetry-1      |      -> zone_name: Str()
+    opentelemetry-opentelemetry-1      |      -> cluster_name: Str()
+    opentelemetry-opentelemetry-1      |      -> node_name: Str()
+    opentelemetry-opentelemetry-1      | ScopeLogs #0
+    opentelemetry-opentelemetry-1      | ScopeLogs SchemaURL: 
+    opentelemetry-opentelemetry-1      | InstrumentationScope  
+    opentelemetry-opentelemetry-1      | LogRecord #0
+    opentelemetry-opentelemetry-1      | ObservedTimestamp: 1970-01-01 00:00:00 +0000 UTC
+    opentelemetry-opentelemetry-1      | Timestamp: 2024-05-02 15:08:01.188307 +0000 UTC
+    opentelemetry-opentelemetry-1      | SeverityText: 
+    opentelemetry-opentelemetry-1      | SeverityNumber: Unspecified(0)
+    opentelemetry-opentelemetry-1      | Body: Empty()
+    opentelemetry-opentelemetry-1      | Trace ID: 832518ad68578df8182cd76847693a93
+    opentelemetry-opentelemetry-1      | Span ID: 8af519328fd9ec0c
+    opentelemetry-opentelemetry-1      | Flags: 0
+    opentelemetry-opentelemetry-1      |    {"kind": "exporter", "data_type": "logs", "name": "debug"}
+
+Notice how the log record's `Trace ID: 832518ad68578df8182cd76847693a93` and `Span ID: 8af519328fd9ec0c` match the span's `Trace ID: 832518ad68578df8182cd76847693a93` and `ID: 8af519328fd9ec0c`.
