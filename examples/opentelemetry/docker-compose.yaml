@@ -69,5 +69,3 @@ services:
     ports:
     - "4137:4137" # gRPC port
     - "${PORT_UI:-55679}:55679"
-    volumes:
-    - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
