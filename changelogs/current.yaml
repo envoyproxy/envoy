@@ -23,6 +23,11 @@ minor_behavior_changes:
     Change GRO read buffer to 64kB to avoid MSG_TRUNC. And change the way to limit the number of packets processed per event
     loop to work with GRO. This behavior can be reverted by setting runtime guard
     ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` to false.
+- area: udp
+  change: |
+    Change GRO read buffer to 64kB to avoid MSG_TRUNC. And change the way to limit the number of packets processed per event
+    loop to work with GRO. This behavior can be reverted by setting runtime guard
+    ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -38,11 +43,12 @@ bug_fixes:
 - area: http
   change: |
     Fix a crash when reloading the HTTP Connection Manager via ECDS.
-- area: cares
+- area: dns
   change: |
-    Upgraded c-ares library to 1.20.1 and added fix to c-ares DNS implementation to additionally check for ``ARES_EREFUSED``,
-    ``ARES_ESERVFAIL``and ``ARES_ENOTIMP`` status. Without this fix, ``DestroyChannelOnRefused`` and
-    ``CustomResolverValidAfterChannelDestruction`` unit test will break.
+    Changes the behavior of the getaddrinfo DNS resolver so that it treats EAI_NODATA and EAI_NONAME
+    as successful queries with empty results, instead of as DNS failures. This change brings the
+    getaddrinfo behavior in-line with the c-ares resolver behavior. This behavior can be reverted by
+    setting the runtime guard ``envoy.reloadable_features.dns_nodata_noname_is_success`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
