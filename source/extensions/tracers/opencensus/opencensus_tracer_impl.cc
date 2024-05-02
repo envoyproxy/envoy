@@ -237,7 +237,7 @@ void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::Up
   }
 }
 
-std::string Span::getSpanIdAsHex() const { return std::string{}; }
+std::string Span::getSpanIdAsHex() const { return EMPTY_STRING; }
 
 std::string Span::getTraceIdAsHex() const {
   const auto& ctx = span_.context();

@@ -143,7 +143,7 @@ std::string Span::getTraceIdAsHex() const {
 }
 
 std::string Span::getSpanIdAsHex() const {
-  // TODO not implemented
+  // TODO(ashishb-solo) not implemented
   return EMPTY_STRING;
 }
 
