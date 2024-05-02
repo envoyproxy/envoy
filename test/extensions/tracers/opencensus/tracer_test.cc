@@ -131,7 +131,7 @@ TEST(OpenCensusTracerTest, Span) {
     // Trace id is automatically created when no parent context exists.
     ASSERT_NE(span->getTraceIdAsHex(), "");
 
-    // Span id should be empty since this is not yet supported
+    // Span id should be empty since this is not yet supported.
     ASSERT_EQ(span->getSpanIdAsHex(), "");
   }
 
