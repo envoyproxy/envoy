@@ -32,7 +32,7 @@ bug_fixes:
     if the downstream request ``:authority`` was longer than 255 characters.
 - area: tracing
   change: |
-    Fix an issue where span id is missing from opentelemetry access log entries
+    Fix an issue where span id is missing from opentelemetry access log entries.
 - area: http
   change: |
     Fix a crash when reloading the HTTP Connection Manager via ECDS.
