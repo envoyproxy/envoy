@@ -15,18 +15,21 @@ template <class Value> class CompiledStringMap {
 
 public:
   using Pair = std::pair<std::string, Value>;
-  Value find(const absl::string_view& key) const { return find_(key); }
+  Value find(const absl::string_view& key) const {
+    if (key.size() >= table_.size() || table_[key.size()] == nullptr) {
+      return {};
+    }
+    return table_[key.size()](key);
+  };
   void compile(std::vector<Pair> initial) {
     if (initial.empty()) {
-      find_ = findEmpty;
       return;
     }
     size_t longest = 0;
     for (const Pair& pair : initial) {
       longest = std::max(pair.first.size(), longest);
     }
-    std::vector<FindFn> nodes;
-    nodes.resize(longest + 1);
+    table_.resize(longest + 1);
     std::sort(initial.begin(), initial.end(),
               [](const Pair& a, const Pair& b) { return a.first.size() < b.first.size(); });
     auto it = initial.begin();
@@ -35,24 +38,17 @@ public:
       while (it != initial.end() && it->first.size() == i) {
         it++;
       }
-      std::vector<Pair> node_contents;
-      node_contents.reserve(it - start);
-      std::copy(start, it, std::back_inserter(node_contents));
-      nodes[i] = createEqualLengthNode(node_contents);
-    }
-    find_ = [nodes = std::move(nodes)](const absl::string_view& key) -> Value {
-      if (key.size() < nodes.size()) {
-        return nodes[key.size()](key);
+      if (it != start) {
+        std::vector<Pair> node_contents;
+        node_contents.reserve(it - start);
+        std::copy(start, it, std::back_inserter(node_contents));
+        table_[i] = createEqualLengthNode(node_contents);
       }
-      return {};
-    };
+    }
   }
 
 private:
   static FindFn createEqualLengthNode(std::vector<Pair> node_contents) {
-    if (node_contents.empty()) {
-      return findEmpty;
-    }
     if (node_contents.size() == 1) {
       return [pair = node_contents[0]](const absl::string_view& key) -> Value {
         if (key != pair.first) {
@@ -91,22 +87,24 @@ private:
       while (it != node_contents.end() && it->first[best.index] == i) {
         it++;
       }
-      std::vector<Pair> next_contents;
-      next_contents.reserve(it - start);
-      std::copy(start, it, std::back_inserter(next_contents));
-      nodes[i - best.min] = createEqualLengthNode(next_contents);
+      if (it != start) {
+        std::vector<Pair> next_contents;
+        next_contents.reserve(it - start);
+        std::copy(start, it, std::back_inserter(next_contents));
+        nodes[i - best.min] = createEqualLengthNode(next_contents);
+      }
     }
     return [nodes = std::move(nodes), min = best.min,
             index = best.index](const absl::string_view& key) -> Value {
       uint8_t k = static_cast<uint8_t>(key[index]);
-      if (k < min || k >= min + nodes.size()) {
+      if (k < min || k >= min + nodes.size() || nodes[k - min] == nullptr) {
         return {};
       }
       return nodes[k - min](key);
     };
   }
   static Value findEmpty(const absl::string_view&) { return nullptr; }
-  FindFn find_;
+  std::vector<FindFn> table_;
 };
 
 } // namespace Envoy
