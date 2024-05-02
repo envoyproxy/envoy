@@ -150,11 +150,11 @@ protected:
       : public CompiledStringMap<std::function<StaticLookupResponse(HeaderMapImpl&)>> {
     StaticLookupTable();
 
-    void finalizeTable(std::vector<Pair> extra = {}) {
+    void finalizeTable(std::vector<KV> extra = {}) {
       CustomInlineHeaderRegistry::finalize<Interface::header_map_type>();
       auto& headers = CustomInlineHeaderRegistry::headers<Interface::header_map_type>();
       size_ = headers.size() + extra.size();
-      std::vector<Pair> input;
+      std::vector<KV> input;
       input.reserve(size_);
       for (const auto& header : headers) {
         input.emplace_back(std::make_pair(
