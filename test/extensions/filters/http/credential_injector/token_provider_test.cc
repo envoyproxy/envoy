@@ -3,8 +3,8 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 
 #include "gtest/gtest.h"
 
