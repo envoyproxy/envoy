@@ -7,6 +7,7 @@
 #include "envoy/server/instance.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/headers.h"
 #include "source/server/admin/clusters_chunk_processor.h"
 
 #include "clusters_params.h"
@@ -27,6 +28,7 @@ Http::Code ClustersRequest::start(Http::ResponseHeaderMap& response_headers) {
   case ClustersParams::Format::Json:
     chunk_processor_ = std::make_unique<JsonClustersChunkProcessor>(
         chunk_limit_, response_headers, server_.clusterManager().clusters().active_clusters_);
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
     break;
   default:
     // TODO(demitriswan) handle this case properly.
