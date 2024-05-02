@@ -50,9 +50,9 @@ protected:
             .value();
     ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
         .WillByDefault(testing::Return(UINT32_MAX));
-    filter_config_ = std::make_unique<FilterConfig>(
+    filter_config_ = std::make_shared<FilterConfig>(
         proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_);
-    filter_ = std::make_unique<Filter>(*filter_config_);
+    filter_ = std::make_unique<Filter>(filter_config_);
     filter_->setDecoderFilterCallbacks(mock_decoder_callbacks_);
   }
 
@@ -77,7 +77,7 @@ extractions_by_method: {
 
   Api::ApiPtr api_;
   GrpcFieldExtractionConfig proto_config_;
-  std::unique_ptr<FilterConfig> filter_config_;
+  std::shared_ptr<FilterConfig> filter_config_;
   testing::NiceMock<MockStreamDecoderFilterCallbacks> mock_decoder_callbacks_;
   std::unique_ptr<Filter> filter_;
 };

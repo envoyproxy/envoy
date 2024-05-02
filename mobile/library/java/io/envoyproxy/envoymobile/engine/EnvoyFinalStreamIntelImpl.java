@@ -1,8 +1,10 @@
 package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
+import androidx.annotation.VisibleForTesting;
 
-class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
+@VisibleForTesting
+public class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
   private final long streamStartMs;
   private final long dnsStartMs;
   private final long dnsEndMs;
@@ -37,6 +39,11 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
     receivedByteCount = values[13];
     responseFlags = values[14];
     upstreamProtocol = values[15];
+  }
+
+  @VisibleForTesting
+  public static EnvoyFinalStreamIntelImpl createForTesting(long[] values) {
+    return new EnvoyFinalStreamIntelImpl(values);
   }
 
   @Override

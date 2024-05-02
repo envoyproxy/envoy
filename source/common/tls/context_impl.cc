@@ -170,8 +170,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-  auto verify_mode = cert_validator_->initializeSslContexts(
-      ssl_contexts, config.capabilities().provides_certificates);
+  auto verify_mode =
+      THROW_OR_RETURN_VALUE(cert_validator_->initializeSslContexts(
+                                ssl_contexts, config.capabilities().provides_certificates),
+                            int);
   if (!capabilities_.verifies_peer_certificates) {
     for (auto ctx : ssl_contexts) {
       if (verify_mode != SSL_VERIFY_NONE) {
@@ -844,8 +846,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
     auto& ctx = tls_contexts_[i];
     if (!config.capabilities().verifies_peer_certificates) {
-      cert_validator_->addClientValidationContext(ctx.ssl_ctx_.get(),
-                                                  config.requireClientCertificate());
+      THROW_IF_NOT_OK(cert_validator_->addClientValidationContext(
+          ctx.ssl_ctx_.get(), config.requireClientCertificate()));
     }
 
     if (!parsed_alpn_protocols_.empty() && !config.capabilities().handles_alpn_selection) {
@@ -898,12 +900,13 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
         throwEnvoyExceptionOrPanic("Required OCSP response is missing from TLS context");
       }
     } else {
-      auto response = std::make_unique<Ocsp::OcspResponseWrapper>(ocsp_resp_bytes,
-                                                                  factory_context_.timeSource());
-      if (!response->matchesCertificate(*ctx.cert_chain_)) {
+      auto response_or_error =
+          Ocsp::OcspResponseWrapper::create(ocsp_resp_bytes, factory_context_.timeSource());
+      THROW_IF_STATUS_NOT_OK(response_or_error, throw);
+      if (!response_or_error.value()->matchesCertificate(*ctx.cert_chain_)) {
         throwEnvoyExceptionOrPanic("OCSP response does not match its TLS certificate");
       }
-      ctx.ocsp_response_ = std::move(response);
+      ctx.ocsp_response_ = std::move(response_or_error.value());
     }
   }
 }

@@ -10,18 +10,72 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: tracers
+  change: |
+    Set status code for OpenTelemetry tracers (previously unset).
+- area: xds
+  change: |
+    Updated xDS-TP path naming to better comply with RFC-3986. Encoded resource paths can now include an a colon ``:``,
+    instead of ``%3A``. This behavior can be reverted by setting the runtime flag
+    ``envoy.reloadable_features.xdstp_path_avoid_colon_encoding`` to ``false``.
+- area: udp
+  change: |
+    Change GRO read buffer to 64kB to avoid MSG_TRUNC. And change the way to limit the number of packets processed per event
+    loop to work with GRO. This behavior can be reverted by setting runtime guard
+    ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: outlier detection
+  change: |
+    Fixed :ref:`successful_active_health_check_uneject_host
+    <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`.
+    Before, a failed health check could uneject the host if the ``FAILED_ACTIVE_HC`` health flag had not been set.
 - area: tls
   change: |
     Fix a RELEASE_ASSERT when using :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>`
     if the downstream request ``:authority`` was longer than 255 characters.
-
+- area: http
+  change: |
+    Fix a crash when reloading the HTTP Connection Manager via ECDS.
+- area: cares
+  change: |
+    Upgraded c-ares library to 1.20.1 and added fix to c-ares DNS implementation to additionally check for ``ARES_EREFUSED``,
+    ``ARES_ESERVFAIL``and ``ARES_ENOTIMP`` status. Without this fix, ``DestroyChannelOnRefused`` and
+    ``CustomResolverValidAfterChannelDestruction`` unit test will break.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.proxy_status_upstream_request_timeout`` runtime flag and lagacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.handle_uppercase_scheme`` runtime flag and legacy code paths.
+- area: tcp
+  change: |
+    Removed ``envoy.reloadable_features.detect_and_raise_rst_tcp_connection`` runtime flag and legacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and lagacy code paths.
+- area: router
+  change: |
+    Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
 
 new_features:
+- area: matching
+  change: |
+    Added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`
+    for matching http input based on filter state objects.
+- area: cares
+  change: |
+    Added :ref:`udp_max_queries<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.udp_max_queries>`
+    option to limit the number of UDP queries.
+- area: http
+  change: |
+    Added :ref:`disable_shadow_host_suffix_append
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
+    in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>`
+    for disabling appending of the ``-shadow`` suffix to the shadowed host/authority header.
 
 deprecated:

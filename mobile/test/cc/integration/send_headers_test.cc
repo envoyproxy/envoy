@@ -63,7 +63,7 @@ TEST(SendHeadersTest, Success) {
   headers->addCopy(Http::LowerCaseString(":method"), "GET");
   headers->addCopy(Http::LowerCaseString(":scheme"), "https");
   headers->addCopy(Http::LowerCaseString(":authority"),
-                   absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()));
+                   engine_with_test_server.testServer().getAddress());
   headers->addCopy(Http::LowerCaseString(":path"), "/");
   stream->sendHeaders(std::move(headers), true);
   stream_complete.WaitForNotification();
@@ -105,8 +105,8 @@ TEST(SendHeadersTest, SuccessWithDeprecatedFunction) {
           .start();
 
   Platform::RequestHeadersBuilder request_headers_builder(
-      Platform::RequestMethod::GET, "https",
-      absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()), "/");
+      Platform::RequestMethod::GET, "https", engine_with_test_server.testServer().getAddress(),
+      "/");
   auto request_headers = request_headers_builder.build();
   auto request_headers_ptr =
       Platform::RequestHeadersSharedPtr(new Platform::RequestHeaders(request_headers));

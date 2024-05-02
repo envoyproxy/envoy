@@ -25,19 +25,19 @@ services:
     - ${PORT_DEV_PROXY:-10001}:10001
     - ${PORT_PROXY:-10000}:10000
     command:
-      - envoy
-      - "-c"
-      - /etc/envoy.yaml
-      - "--component-log-level"
-      - oauth2:trace,http:debug
+    - envoy
+    - "-c"
+    - /etc/envoy.yaml
+    - "--component-log-level"
+    - oauth2:trace,http:debug
     entrypoint:
-      - /bin/bash
-      - -c
-      - |
-        set -eo pipefail
-        touch /var/lib/envoy/lds.yml
-        chmod +w /var/lib/envoy/lds.yml
-        exec envoy "$${@}"
+    - /bin/bash
+    - -c
+    - |
+      set -eo pipefail
+      touch /var/lib/envoy/lds.yml
+      chmod +w /var/lib/envoy/lds.yml
+      exec envoy "$${@}"
     volumes:
     - ${SECRETS_PATH:-./secrets}:/etc/envoy/secrets
     - ${XDS_PATH:-./xds}:/var/lib/envoy

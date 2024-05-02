@@ -20,9 +20,10 @@ namespace {
 
 using Envoy::Protobuf::util::MessageDifferencer;
 
-class FilterTest : public ::testing::Test {
+class CompositeFilterTest : public ::testing::Test {
 public:
-  FilterTest() : filter_(stats_, decoder_callbacks_.dispatcher()) {
+  CompositeFilterTest(bool is_upstream)
+      : filter_(stats_, decoder_callbacks_.dispatcher(), is_upstream) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -98,6 +99,11 @@ public:
   Http::TestResponseHeaderMapImpl default_response_headers_{{":status", "200"}};
   Http::TestResponseTrailerMapImpl default_response_trailers_{
       {"response-trailer", "something-else"}};
+};
+
+class FilterTest : public CompositeFilterTest {
+public:
+  FilterTest() : CompositeFilterTest(false) {}
 };
 
 TEST_F(FilterTest, StreamEncoderFilterDelegation) {
@@ -633,6 +639,41 @@ TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
   fields["otherRootFilterName"] = ValueUtil::stringValue("anyActionName");
   fields["rootFilterName"] = ValueUtil::stringValue("actionName");
   EXPECT_TRUE(MessageDifferencer::Equals(expected, *(info->serializeAsProto())));
+
+  EXPECT_CALL(*stream_filter, onStreamComplete());
+  EXPECT_CALL(*stream_filter, onDestroy());
+  filter_.onStreamComplete();
+  filter_.onDestroy();
+}
+
+class UpstreamFilterTest : public CompositeFilterTest {
+public:
+  UpstreamFilterTest() : CompositeFilterTest(true) {}
+};
+
+TEST_F(UpstreamFilterTest, StreamEncoderFilterDelegationUpstream) {
+  auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(encoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(encoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamEncoderFilter(stream_filter);
+  };
+
+  EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
+  ExecuteFilterAction action(factory_callback, "actionName");
+  EXPECT_CALL(success_counter_, inc());
+  filter_.onMatchCallback(action);
+
+  auto* info = filter_state->getDataMutable<MatchedActionInfo>(MatchedActionsFilterStateKey);
+  EXPECT_EQ(nullptr, info);
+
+  doAllDecodingCallbacks();
+  expectDelegatedEncoding(*stream_filter);
+  doAllEncodingCallbacks();
 
   EXPECT_CALL(*stream_filter, onStreamComplete());
   EXPECT_CALL(*stream_filter, onDestroy());

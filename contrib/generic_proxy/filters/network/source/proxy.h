@@ -263,6 +263,7 @@ public:
 
   // ResponseEncoderCallback
   void onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) override;
+  void onEncodingFailure(absl::string_view reason = {}) override;
   OptRef<const RouteEntry> routeEntry() const override {
     return makeOptRefFromPtr<const RouteEntry>(cached_route_entry_.get());
   }
@@ -372,7 +373,7 @@ public:
 
   // RequestDecoderCallback
   void onDecodingSuccess(StreamFramePtr request) override;
-  void onDecodingFailure() override;
+  void onDecodingFailure(absl::string_view reason = {}) override;
   void writeToConnection(Buffer::Instance& buffer) override;
   OptRef<Network::Connection> connection() override;
 
