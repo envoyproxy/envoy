@@ -36,6 +36,7 @@ public class EnvoyConfiguration {
   public final Integer dnsCacheSaveIntervalSeconds;
   public final Boolean enableDrainPostDnsRefresh;
   public final Boolean enableHttp3;
+  public final Boolean useCares;
   public final String http3ConnectionOptions;
   public final String http3ClientConnectionOptions;
   public final Map<String, String> quicHints;
@@ -100,6 +101,7 @@ public class EnvoyConfiguration {
    *     DNS refresh.
    * @param enableHttp3                                   whether to enable experimental support for
    *     HTTP/3 (QUIC).
+   * @param useCares                                      whether to use the c_ares library for DNS
    * @param http3ConnectionOptions                        connection options to be used in HTTP/3.
    * @param http3ClientConnectionOptions                  client connection options to be used in
    *     HTTP/3.
@@ -156,14 +158,14 @@ public class EnvoyConfiguration {
       int connectTimeoutSeconds, int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
       int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds,
       List<String> dnsPreresolveHostnames, boolean enableDNSCache, int dnsCacheSaveIntervalSeconds,
-      boolean enableDrainPostDnsRefresh, boolean enableHttp3, String http3ConnectionOptions,
-      String http3ClientConnectionOptions, Map<String, Integer> quicHints,
-      List<String> quicCanonicalSuffixes, boolean enableGzipDecompression,
-      boolean enableBrotliDecompression, boolean enablePortMigration, boolean enableSocketTagging,
-      boolean enableInterfaceBinding, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      int h2ConnectionKeepaliveTimeoutSeconds, int maxConnectionsPerHost,
-      int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
-      TrustChainVerification trustChainVerification,
+      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares,
+      String http3ConnectionOptions, String http3ClientConnectionOptions,
+      Map<String, Integer> quicHints, List<String> quicCanonicalSuffixes,
+      boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      boolean enablePortMigration, boolean enableSocketTagging, boolean enableInterfaceBinding,
+      int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
+      int maxConnectionsPerHost, int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds,
+      String appVersion, String appId, TrustChainVerification trustChainVerification,
       List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
@@ -185,6 +187,7 @@ public class EnvoyConfiguration {
     this.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
+    this.useCares = useCares;
     this.http3ConnectionOptions = http3ConnectionOptions;
     this.http3ClientConnectionOptions = http3ClientConnectionOptions;
     this.quicHints = new HashMap<>();
@@ -258,7 +261,7 @@ public class EnvoyConfiguration {
         connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dnsPreresolve,
         enableDNSCache, dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
-        http3ConnectionOptions, http3ClientConnectionOptions, quicHints, quicSuffixes,
+        useCares, http3ConnectionOptions, http3ClientConnectionOptions, quicHints, quicSuffixes,
         enableGzipDecompression, enableBrotliDecompression, enablePortMigration,
         enableSocketTagging, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
         h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,

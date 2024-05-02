@@ -923,13 +923,9 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
 
   // Check if the cluster provided load balancing policy is used. We need handle it as special
   // case.
-  bool cluster_provided_lb = cluster_info->lbType() == LoadBalancerType::ClusterProvided;
-  if (cluster_info->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
-    TypedLoadBalancerFactory* typed_lb_factory = cluster_info->loadBalancerFactory();
-    RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
-    cluster_provided_lb =
-        typed_lb_factory->name() == "envoy.load_balancing_policies.cluster_provided";
-  }
+  TypedLoadBalancerFactory& typed_lb_factory = cluster_info->loadBalancerFactory();
+  const bool cluster_provided_lb =
+      typed_lb_factory.name() == "envoy.load_balancing_policies.cluster_provided";
 
   if (cluster_provided_lb && lb == nullptr) {
     return absl::InvalidArgumentError(
@@ -979,31 +975,13 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
                                       required_for_ads, std::move(new_cluster), time_source_));
     ASSERT(inserted);
   }
-  // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
-  // finishes. For RingHash/Maglev don't create the LB here if subset balancing is enabled,
-  // because the thread_aware_lb_ field takes precedence over the subset lb).
-  if (cluster_info->lbType() == LoadBalancerType::RingHash) {
-    if (!cluster_info->lbSubsetInfo().isEnabled()) {
-      auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
-          "envoy.load_balancing_policies.ring_hash");
-      cluster_entry_it->second->thread_aware_lb_ = factory.create(
-          {}, *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
-    }
-  } else if (cluster_info->lbType() == LoadBalancerType::Maglev) {
-    if (!cluster_info->lbSubsetInfo().isEnabled()) {
-      auto& factory = Config::Utility::getAndCheckFactoryByName<TypedLoadBalancerFactory>(
-          "envoy.load_balancing_policies.maglev");
-      cluster_entry_it->second->thread_aware_lb_ = factory.create(
-          {}, *cluster_info, cluster_reference.prioritySet(), runtime_, random_, time_source_);
-    }
-  } else if (cluster_provided_lb) {
+
+  if (cluster_provided_lb) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(lb);
-  } else if (cluster_info->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
-    TypedLoadBalancerFactory* typed_lb_factory = cluster_info->loadBalancerFactory();
-    RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
+  } else {
     cluster_entry_it->second->thread_aware_lb_ =
-        typed_lb_factory->create(cluster_info->loadBalancerConfig(), *cluster_info,
-                                 cluster_reference.prioritySet(), runtime_, random_, time_source_);
+        typed_lb_factory.create(cluster_info->loadBalancerConfig(), *cluster_info,
+                                cluster_reference.prioritySet(), runtime_, random_, time_source_);
   }
 
   updateClusterCounts();
@@ -1900,48 +1878,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
-  if (cluster->lbSubsetInfo().isEnabled()) {
-    auto& factory = Config::Utility::getAndCheckFactoryByName<NonThreadAwareLoadBalancerFactory>(
-        "envoy.load_balancing_policies.subset");
-    lb_ = factory.create(*cluster, priority_set_, parent_.local_priority_set_,
-                         parent.parent_.runtime_, parent.parent_.random_,
-                         parent_.thread_local_dispatcher_.timeSource());
-  } else {
-    switch (cluster->lbType()) {
-    case LoadBalancerType::LeastRequest: {
-      ASSERT(lb_factory_ == nullptr);
-      lb_ = std::make_unique<LeastRequestLoadBalancer>(
-          priority_set_, parent_.local_priority_set_, cluster->lbStats(), parent.parent_.runtime_,
-          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig(),
-          parent.thread_local_dispatcher_.timeSource());
-      break;
-    }
-    case LoadBalancerType::Random: {
-      ASSERT(lb_factory_ == nullptr);
-      lb_ = std::make_unique<RandomLoadBalancer>(priority_set_, parent_.local_priority_set_,
-                                                 cluster->lbStats(), parent.parent_.runtime_,
-                                                 parent.parent_.random_, cluster->lbConfig());
-      break;
-    }
-    case LoadBalancerType::RoundRobin: {
-      ASSERT(lb_factory_ == nullptr);
-      lb_ = std::make_unique<RoundRobinLoadBalancer>(
-          priority_set_, parent_.local_priority_set_, cluster->lbStats(), parent.parent_.runtime_,
-          parent.parent_.random_, cluster->lbConfig(), cluster->lbRoundRobinConfig(),
-          parent.thread_local_dispatcher_.timeSource());
-      break;
-    }
-    case LoadBalancerType::ClusterProvided:
-    case LoadBalancerType::LoadBalancingPolicyConfig:
-    case LoadBalancerType::RingHash:
-    case LoadBalancerType::Maglev:
-    case LoadBalancerType::OriginalDst: {
-      ASSERT(lb_factory_ != nullptr);
-      lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
-      break;
-    }
-    }
-  }
+  ASSERT(lb_factory_ != nullptr);
+  lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(

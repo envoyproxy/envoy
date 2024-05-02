@@ -38,9 +38,9 @@ public:
 
   void runReloadTest() {
     // Send a request on the data plane.
-    stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+    stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                         true);
     terminal_callback_.waitReady();
-
     EXPECT_EQ(cc_.on_headers_calls, 1);
     EXPECT_EQ(cc_.status, "200");
     EXPECT_EQ(cc_.on_data_calls, 2);

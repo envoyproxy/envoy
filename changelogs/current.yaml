@@ -13,11 +13,19 @@ minor_behavior_changes:
 - area: tracers
   change: |
     Set status code for OpenTelemetry tracers (previously unset).
+- area: xds
+  change: |
+    Updated xDS-TP path naming to better comply with RFC-3986. Encoded resource paths can now include an a colon ``:``,
+    instead of ``%3A``. This behavior can be reverted by setting the runtime flag
+    ``envoy.reloadable_features.xdstp_path_avoid_colon_encoding`` to ``false``.
 - area: udp
   change: |
     Change GRO read buffer to 64kB to avoid MSG_TRUNC. And change the way to limit the number of packets processed per event
     loop to work with GRO. This behavior can be reverted by setting runtime guard
     ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` to false.
+- area: statistics
+  change: |
+    Hot restart statistics like hot_restart_epoch are only set when hot restart is enabled.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -41,9 +49,16 @@ bug_fixes:
 - area: udp
   change: |
     Fixed a bug that would cause Envoy to crash when updates to a pre-existing cluster were made (e.g. ``HostSet`` changes).
+- area: ext_authz
+  change: |
+    Handle ``append_action`` from :ref:`external authorization service <envoy_v3_api_msg_service.auth.v3.CheckResponse>`
+    that was ignored.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` runtime flag and lagacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.proxy_status_upstream_request_timeout`` runtime flag and lagacy code paths.
@@ -56,6 +71,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and lagacy code paths.
+- area: upstream
+  change: |
+    Removed ``envoy.reloadable_features.convert_legacy_lb_config`` runtime flag and lagacy code paths.
 - area: router
   change: |
     Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
@@ -69,5 +87,11 @@ new_features:
   change: |
     Added :ref:`udp_max_queries<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.udp_max_queries>`
     option to limit the number of UDP queries.
+- area: http
+  change: |
+    Added :ref:`disable_shadow_host_suffix_append
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
+    in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>`
+    for disabling appending of the ``-shadow`` suffix to the shadowed host/authority header.
 
 deprecated:

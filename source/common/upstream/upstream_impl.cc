@@ -447,7 +447,7 @@ HostDescriptionImplBase::HostDescriptionImplBase(
 HostDescription::SharedConstAddressVector HostDescriptionImplBase::makeAddressListOrNull(
     const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list) {
   if (address_list.empty()) {
-    return SharedConstAddressVector();
+    return {};
   }
   ASSERT(*address_list.front() == *address);
   return std::make_shared<AddressVector>(address_list);
@@ -1021,7 +1021,6 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
                     ClusterProto::LbPolicy_Name(cluster.lb_policy())));
   }
 
-  ASSERT(lb_factory != nullptr);
   return Result{lb_factory, lb_factory->loadConfig(cluster, visitor)};
 }
 
@@ -1042,35 +1041,6 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
   }
 
   return getTypedLbConfigFromLegacyProtoWithoutSubset(cluster, visitor);
-}
-
-LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
-  switch (config.lb_config_case()) {
-  case envoy::config::cluster::v3::Cluster::kRoundRobinLbConfig:
-    lb_policy_ = std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
-        config.round_robin_lb_config());
-    break;
-  case envoy::config::cluster::v3::Cluster::kLeastRequestLbConfig:
-    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
-        config.least_request_lb_config());
-    break;
-  case envoy::config::cluster::v3::Cluster::kRingHashLbConfig:
-    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-        config.ring_hash_lb_config());
-    break;
-  case envoy::config::cluster::v3::Cluster::kMaglevLbConfig:
-    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
-        config.maglev_lb_config());
-    break;
-  case envoy::config::cluster::v3::Cluster::kOriginalDstLbConfig:
-    lb_policy_ = std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
-        config.original_dst_lb_config());
-    break;
-  case envoy::config::cluster::v3::Cluster::LB_CONFIG_NOT_SET:
-    // The default value of the variant if there is no config would be nullptr
-    // Which is set when the class is initialized. No action needed if config isn't set
-    break;
-  }
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
@@ -1127,14 +1097,10 @@ ClusterInfoImpl::ClusterInfoImpl(
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(createUpstreamLocalAddressSelector(config, bind_config)),
-      lb_policy_config_(std::make_unique<const LBPolicyConfig>(config)),
       upstream_config_(config.has_upstream_config()
                            ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())
                            : nullptr),
-      lb_subset_(config.has_lb_subset_config()
-                     ? std::make_unique<LoadBalancerSubsetInfoImpl>(config.lb_subset_config())
-                     : nullptr),
       metadata_(config.has_metadata()
                     ? std::make_unique<envoy::config::core::v3::Metadata>(config.metadata())
                     : nullptr),
@@ -1199,69 +1165,31 @@ ClusterInfoImpl::ClusterInfoImpl(
                                "HttpProtocolOptions can be specified");
   }
 
-  // If load_balancing_policy is set we will use it directly, ignoring lb_policy.
+  // Handle the original_dst_lb_config case first.
+  if (config.lb_config_case() == envoy::config::cluster::v3::Cluster::kOriginalDstLbConfig) {
+    original_dst_lb_config_ =
+        std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
+            config.original_dst_lb_config());
+  }
+
   if (config.has_load_balancing_policy() ||
       config.lb_policy() == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
+    // If load_balancing_policy is set we will use it directly, ignoring lb_policy.
+
     configureLbPolicies(config, server_context);
-  } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.convert_legacy_lb_config")) {
+  } else {
+    // If load_balancing_policy is not set, we will try to convert legacy lb_policy
+    // to load_balancing_policy and use it.
+
     auto lb_pair = LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
         config, server_context.messageValidationVisitor());
 
     if (!lb_pair.ok()) {
       throwEnvoyExceptionOrPanic(std::string(lb_pair.status().message()));
     }
-
-    load_balancer_config_ = std::move(lb_pair->config);
     load_balancer_factory_ = lb_pair->factory;
-    lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
-
-    RELEASE_ASSERT(
-        load_balancer_factory_,
-        fmt::format(
-            "No load balancer factory found from legacy LB configuration (type: {}, subset: {}).",
-            envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy()),
-            config.has_lb_subset_config()));
-
-    // Clear unnecessary legacy config because all legacy config is wrapped in load_balancer_config_
-    // except the original_dst_lb_config.
-    lb_subset_ = nullptr;
-    if (config.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
-      lb_policy_config_ = nullptr;
-    }
-  } else {
-    switch (config.lb_policy()) {
-      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-    case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
-      lb_type_ = LoadBalancerType::RoundRobin;
-      break;
-    case envoy::config::cluster::v3::Cluster::LEAST_REQUEST:
-      lb_type_ = LoadBalancerType::LeastRequest;
-      break;
-    case envoy::config::cluster::v3::Cluster::RANDOM:
-      lb_type_ = LoadBalancerType::Random;
-      break;
-    case envoy::config::cluster::v3::Cluster::RING_HASH:
-      lb_type_ = LoadBalancerType::RingHash;
-      break;
-    case envoy::config::cluster::v3::Cluster::MAGLEV:
-      lb_type_ = LoadBalancerType::Maglev;
-      break;
-    case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED:
-      if (config.has_lb_subset_config()) {
-        throwEnvoyExceptionOrPanic(
-            fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                        envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-      }
-
-      lb_type_ = LoadBalancerType::ClusterProvided;
-      break;
-    case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
-      // 'LOAD_BALANCING_POLICY_CONFIG' should be handled by the 'configureLbPolicies'
-      // function in previous branch and should not reach here.
-      PANIC("Should not reach here");
-      break;
-    }
-    }
+    ASSERT(load_balancer_factory_ != nullptr, "null load balancer factory");
+    load_balancer_config_ = std::move(lb_pair->config);
   }
 
   if (config.lb_subset_config().locality_weight_aware() &&
@@ -1418,10 +1346,10 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
       Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
                                              context.messageValidationVisitor(), *proto_message);
 
+      load_balancer_factory_ = factory;
       load_balancer_config_ =
           factory->loadConfig(*proto_message, context.messageValidationVisitor());
 
-      load_balancer_factory_ = factory;
       break;
     }
     missing_policies.push_back(policy.typed_extension_config().name());
@@ -1433,8 +1361,6 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
                     "implementation for cluster: '{}' with names from [{}]",
                     name_, absl::StrJoin(missing_policies, ", ")));
   }
-
-  lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
 }
 
 ProtocolOptionsConfigConstSharedPtr
@@ -2141,19 +2067,9 @@ void PriorityStateManager::updateClusterPrioritySet(
   LocalityWeightsSharedPtr locality_weights;
   std::vector<HostVector> per_locality;
 
-  // If we are configured for locality weighted LB we populate the locality weights. We also
-  // populate locality weights if the cluster uses load balancing extensions, since the extension
-  // may want to make use of locality weights and we cannot tell by inspecting the config whether
-  // this is the case.
-  //
   // TODO: have the load balancing extension indicate, programmatically, whether it needs locality
   // weights, as an optimization in cases where it doesn't.
-  const bool locality_weighted_lb =
-      parent_.info()->lbConfig().has_locality_weighted_lb_config() ||
-      parent_.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig;
-  if (locality_weighted_lb) {
-    locality_weights = std::make_shared<LocalityWeights>();
-  }
+  locality_weights = std::make_shared<LocalityWeights>();
 
   // We use std::map to guarantee a stable ordering for zone aware routing.
   std::map<envoy::config::core::v3::Locality, HostVector, LocalityLess> hosts_per_locality;
@@ -2178,9 +2094,7 @@ void PriorityStateManager::updateClusterPrioritySet(
   // first if non_empty_local_locality.
   if (non_empty_local_locality) {
     per_locality.emplace_back(hosts_per_locality[local_locality]);
-    if (locality_weighted_lb) {
-      locality_weights->emplace_back(locality_weights_map[local_locality]);
-    }
+    locality_weights->emplace_back(locality_weights_map[local_locality]);
   }
 
   // After the local locality hosts (if any), we place the remaining locality host groups in
@@ -2188,9 +2102,7 @@ void PriorityStateManager::updateClusterPrioritySet(
   for (auto& entry : hosts_per_locality) {
     if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, entry.first)) {
       per_locality.emplace_back(entry.second);
-      if (locality_weighted_lb) {
-        locality_weights->emplace_back(locality_weights_map[entry.first]);
-      }
+      locality_weights->emplace_back(locality_weights_map[entry.first]);
     }
   }
 

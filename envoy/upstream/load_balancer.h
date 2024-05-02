@@ -284,32 +284,5 @@ public:
   std::string category() const override { return "envoy.load_balancing_policies"; }
 };
 
-/**
- * Factory config for non-thread-aware load balancers. To support a load balancing policy of
- * LOAD_BALANCING_POLICY_CONFIG, at least one load balancer factory corresponding to a policy in
- * load_balancing_policy must be registered with Envoy. Envoy will use the first policy for which
- * it has a registered factory.
- */
-class NonThreadAwareLoadBalancerFactory : public Config::UntypedFactory {
-public:
-  ~NonThreadAwareLoadBalancerFactory() override = default;
-
-  /**
-   * @return LoadBalancerPtr a new non-thread-aware load balancer.
-   *
-   * @param cluster_info supplies the cluster info.
-   * @param priority_set supplies the priority set.
-   * @param local_priority_set supplies the local priority set.
-   * @param runtime supplies the runtime loader.
-   * @param random supplies the random generator.
-   * @param time_source supplies the time source.
-   */
-  virtual LoadBalancerPtr create(const ClusterInfo& cluster_info, const PrioritySet& priority_set,
-                                 const PrioritySet* local_priority_set, Runtime::Loader& runtime,
-                                 Random::RandomGenerator& random, TimeSource& time_source) PURE;
-
-  std::string category() const override { return "envoy.load_balancing_policies"; }
-};
-
 } // namespace Upstream
 } // namespace Envoy

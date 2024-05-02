@@ -2287,9 +2287,8 @@ TEST_F(StaticClusterImplTest, RingHash) {
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_EQ("envoy.load_balancing_policies.ring_hash",
-            cluster->info()->loadBalancerFactory()->name());
+            cluster->info()->loadBalancerFactory().name());
   EXPECT_TRUE(cluster->info()->addedViaApi());
 }
 
@@ -2324,9 +2323,8 @@ TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
 
   cluster->initialize([] {});
 
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_EQ("envoy.load_balancing_policies.round_robin",
-            cluster->info()->loadBalancerFactory()->name());
+            cluster->info()->loadBalancerFactory().name());
   auto slow_start_config =
       dynamic_cast<const Extensions::LoadBalancingPolices::RoundRobin::LegacyRoundRobinLbConfig*>(
           cluster->info()->loadBalancerConfig().ptr())
@@ -2370,9 +2368,8 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
 
   cluster->initialize([] {});
 
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_EQ("envoy.load_balancing_policies.least_request",
-            cluster->info()->loadBalancerFactory()->name());
+            cluster->info()->loadBalancerFactory().name());
   auto slow_start_config =
       dynamic_cast<
           const Extensions::LoadBalancingPolices::LeastRequest::LegacyLeastRequestLbConfig*>(
@@ -2688,8 +2685,7 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(0U, cluster->info()->maxRequestsPerConnection());
   EXPECT_EQ(::Envoy::Http2::Utility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE,
             cluster->info()->http2Options().hpack_table_size().value());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
-  EXPECT_EQ("envoy.load_balancing_policies.random", cluster->info()->loadBalancerFactory()->name());
+  EXPECT_EQ("envoy.load_balancing_policies.random", cluster->info()->loadBalancerFactory().name());
   EXPECT_THAT(
       std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
       ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
@@ -2766,10 +2762,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_TRUE(cluster->info()->addedViaApi());
   EXPECT_TRUE(cluster->info()->loadBalancerConfig().has_value());
-  EXPECT_NE(nullptr, cluster->info()->loadBalancerFactory());
 }
 
 // lb_policy is set to LOAD_BALANCING_POLICY_CONFIG and has no load_balancing_policy.
@@ -2958,7 +2952,7 @@ TEST_F(StaticClusterImplTest, EmptyLbSubsetConfig) {
 
   auto cluster = createCluster(cluster_config, factory_context);
 
-  EXPECT_EQ(cluster->info()->loadBalancerFactory()->name(),
+  EXPECT_EQ(cluster->info()->loadBalancerFactory().name(),
             "envoy.load_balancing_policies.round_robin");
 }
 
@@ -3044,7 +3038,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_TRUE(cluster->info()->addedViaApi());
 }
 
@@ -3083,7 +3076,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_TRUE(cluster->info()->addedViaApi());
 }
 
@@ -4001,8 +3993,7 @@ TEST_F(ClusterInfoImplTest, Metadata) {
             Config::Metadata::metadataValue(&cluster->info()->metadata(), "com.bar.foo", "baz")
                 .string_value());
   EXPECT_EQ(0.3, cluster->info()->lbConfig().healthy_panic_threshold().value());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
-  EXPECT_EQ("envoy.load_balancing_policies.maglev", cluster->info()->loadBalancerFactory()->name());
+  EXPECT_EQ("envoy.load_balancing_policies.maglev", cluster->info()->loadBalancerFactory().name());
 }
 
 // Verify retry budget default values are honored.
