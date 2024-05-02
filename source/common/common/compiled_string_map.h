@@ -1,11 +1,8 @@
 #pragma once
 
 #include <algorithm>
-#include <array>
-#include <cstring>
-#include <iostream>
-#include <set>
 #include <string>
+#include <vector>
 
 #include "absl/strings/string_view.h"
 
@@ -20,23 +17,27 @@ namespace Envoy {
  * 2. a trie that branches on the "most divisions" position of the key.
  *
  * For example, if we consider the case where the set of headers is
- * x-prefix-banana
- * x-prefix-babana
- * x-prefix-apple
- * x-prefix-pineapple
- * x-prefix-barana
- * x-prefix-banaka
+ * `x-prefix-banana`
+ * `x-prefix-babana`
+ * `x-prefix-apple`
+ * `x-prefix-pineapple`
+ * `x-prefix-barana`
+ * `x-prefix-banaka`
  *
- * A standard front-first trie looking for "x-prefix-banana" would walk
- * 7 nodes through the tree, first for x, then for -, etc.
+ * A standard front-first trie looking for `x-prefix-banana` would walk
+ * 7 nodes through the tree, first for `x`, then for `-`, etc.
  *
  * This structure first jumps to matching length, eliminating in this
  * example case apple and pineapple.
- * Then the "best split" node is on x-prefix-ba*n*ana which splits 3 ways,
- * so the first node has 3 non-miss branches, n, b and r in that position.
- * Down that n branch, the "best split" is at x-prefix-bana*n*a, which has
- * two branches, n or k.
- * Down the n branch is the leaf node (only x-prefix-banana remains) - at
+ * Then the "best split" node is on
+ *   `x-prefix-banana`
+ *               ^
+ * so the first node has 3 non-miss branches, n, b and r for that position.
+ * Down that n branch, the "best split" is on
+ *   `x-prefix-banana`
+ *                 ^
+ * which has two branches, n or k.
+ * Down the n branch is the leaf node (only `x-prefix-banana` remains) - at
  * this point a regular string-compare checks if the key is an exact match
  * for the string node.
  */
