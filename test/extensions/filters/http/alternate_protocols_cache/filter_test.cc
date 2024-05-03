@@ -32,7 +32,6 @@ public:
 
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
     if (populate_config) {
-      proto_config.mutable_alternate_protocols_cache_options()->set_name("foo");
       EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
           .Times(testing::AnyNumber())
           .WillOnce(Return(alternate_protocols_cache_));
@@ -86,7 +85,6 @@ TEST_F(FilterTest, InvalidAltSvc) {
 
   // Set up the cluster info correctly to have a cache configuration.
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
-  proto_config.mutable_alternate_protocols_cache_options()->set_name("foo");
   auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   callbacks_.stream_info_.upstream_cluster_info_ = info;
   absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> options =
@@ -122,7 +120,6 @@ TEST_F(FilterTest, ValidAltSvc) {
 
   // Set up the cluster info correctly to have a cache configuration.
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
-  proto_config.mutable_alternate_protocols_cache_options()->set_name("foo");
   auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   callbacks_.stream_info_.upstream_cluster_info_ = info;
   absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> options =
@@ -178,7 +175,6 @@ TEST_F(FilterTest, ValidAltSvcMissingPort) {
 
   // Set up the cluster info correctly to have a cache configuration.
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
-  proto_config.mutable_alternate_protocols_cache_options()->set_name("foo");
   auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   callbacks_.stream_info_.upstream_cluster_info_ = info;
   absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> options =
@@ -203,50 +199,6 @@ TEST_F(FilterTest, ValidAltSvcMissingPort) {
   // The address() call returns nullptr, so we won't get a port, but the filter should use the
   // default port.
   EXPECT_CALL(*hd, address()).WillOnce(Return(nullptr));
-  EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(_, _))
-      .WillOnce(testing::DoAll(
-          testing::WithArg<0>(Invoke([expected_origin](auto& actual_origin) {
-            EXPECT_EQ(expected_origin, actual_origin)
-                << dumpOrigin(expected_origin) << dumpOrigin(actual_origin);
-          })),
-          testing::WithArg<1>(Invoke([expected_protocols](auto& actual_protocols) {
-            EXPECT_EQ(expected_protocols, actual_protocols) << dumpAlternative(actual_protocols[0]);
-            ;
-          }))));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
-  filter_->onDestroy();
-}
-
-TEST_F(FilterTest, ValidAltSvcLegacy) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter", "false"}});
-
-  Http::TestResponseHeaderMapImpl headers{
-      {":status", "200"}, {"alt-svc", "h3-29=\":443\"; ma=86400, h3=\":443\"; ma=60"}};
-  Http::HttpServerPropertiesCache::Origin expected_origin("https", "host1", 443);
-  MonotonicTime now = simTime().monotonicTime();
-  const std::vector<Http::HttpServerPropertiesCache::AlternateProtocol> expected_protocols = {
-      Http::HttpServerPropertiesCache::AlternateProtocol("h3-29", "", 443,
-                                                         now + std::chrono::seconds(86400)),
-      Http::HttpServerPropertiesCache::AlternateProtocol("h3", "", 443,
-                                                         now + std::chrono::seconds(60)),
-  };
-
-  std::shared_ptr<Network::MockResolvedAddress> address =
-      std::make_shared<Network::MockResolvedAddress>("1.2.3.4:443", "1.2.3.4:443");
-  Network::MockIp ip;
-  std::string hostname = "host1";
-
-  // Get the pointer to MockHostDescription.
-  std::shared_ptr<const Upstream::MockHostDescription> hd =
-      std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
-          callbacks_.stream_info_.upstreamInfo()->upstreamHost());
-  EXPECT_CALL(*hd, hostname()).WillOnce(ReturnRef(hostname));
-  EXPECT_CALL(*hd, address()).WillOnce(Return(address));
-  EXPECT_CALL(*address, ip()).WillOnce(Return(&ip));
-  EXPECT_CALL(ip, port()).WillOnce(Return(443));
   EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(_, _))
       .WillOnce(testing::DoAll(
           testing::WithArg<0>(Invoke([expected_origin](auto& actual_origin) {

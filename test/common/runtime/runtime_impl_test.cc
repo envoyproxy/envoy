@@ -95,10 +95,11 @@ public:
 
     envoy::config::bootstrap::v3::LayeredRuntime layered_runtime;
     Config::translateRuntime(runtime, layered_runtime);
-    absl::Status creation_status;
-    loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
-                                           generator_, validation_visitor_, *api_, creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
+        Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, store_,
+                                    generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
+    loader_ = std::move(loader.value());
   }
 
   void write(const std::string& path, const std::string& value) {
@@ -519,11 +520,10 @@ TEST_F(DiskLoaderImplTest, MultipleAdminLayersFail) {
     layer->set_name("admin_1");
     layer->mutable_admin_layer();
   }
-  absl::Status creation_status;
-  auto loader =
-      std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
-                                   generator_, validation_visitor_, *api_, creation_status);
-  EXPECT_EQ(creation_status.message(),
+  absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
+      Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, store_,
+                                  generator_, validation_visitor_, *api_);
+  EXPECT_EQ(loader.status().message(),
             "Too many admin layers specified in LayeredRuntime, at most one may be specified");
 }
 
@@ -542,10 +542,11 @@ protected:
       layer->set_name("admin");
       layer->mutable_admin_layer();
     }
-    absl::Status creation_status;
-    loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
-                                           generator_, validation_visitor_, *api_, creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
+        Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, store_,
+                                    generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
+    loader_ = std::move(loader.value());
   }
 
   ProtobufWkt::Struct base_;
@@ -957,10 +958,10 @@ public:
               rtds_callbacks_.push_back(&callbacks);
               return ret;
             }));
-    absl::Status creation_status;
-    loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, config, local_info_, store_,
-                                           generator_, validation_visitor_, *api_, creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
+        dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
+    loader_ = std::move(loader.value());
     loader_->initialize(cm_);
     for (auto* sub : rtds_subscriptions_) {
       EXPECT_CALL(*sub, start(_));
@@ -1294,11 +1295,10 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
   rtds_layer->mutable_rtds_config();
 
   EXPECT_CALL(cm_, subscriptionFactory());
-  absl::Status creation_status;
-  LoaderImpl loader(dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_,
-                    *api_, creation_status);
+  absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
+      dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
 
-  EXPECT_THROW_WITH_MESSAGE(loader.initialize(cm_), EnvoyException, "bad config");
+  EXPECT_THROW_WITH_MESSAGE(loader.value()->initialize(cm_), EnvoyException, "bad config");
 }
 
 } // namespace

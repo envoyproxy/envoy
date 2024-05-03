@@ -15,6 +15,7 @@ envoy_contrib_package()
 
 make(
     name = "dlb",
+    env = {"DLB_DISABLE_DOMAIN_SERVER": "TRUE"},
     includes = [],
     lib_source = "@intel_dlb//:libdlb",
     out_static_libs = ["libdlb.a"],

@@ -3,7 +3,9 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/config_provider_manager.h"
 #include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/json/json_object.h"
@@ -58,6 +60,31 @@ public:
 
 using RouteConfigProviderManagerPtr = std::unique_ptr<RouteConfigProviderManager>;
 using RouteConfigProviderManagerSharedPtr = std::shared_ptr<RouteConfigProviderManager>;
+
+// This factory exists to avoid direct-linking the SRDS libraries into Envoy so
+// they can be compiled or substituted out.
+class SrdsFactory : public Envoy::Config::UntypedFactory {
+public:
+  // UntypedFactory
+  virtual std::string category() const override { return "envoy.srds_factory"; }
+  virtual std::unique_ptr<Envoy::Config::ConfigProviderManager>
+  createScopedRoutesConfigProviderManager(
+      Server::Configuration::ServerFactoryContext& factory_context,
+      Router::RouteConfigProviderManager& route_config_provider_manager) PURE;
+  // If enabled in the HttpConnectionManager config, returns a ConfigProvider for scoped routing
+  // configuration.
+  virtual Envoy::Config::ConfigProviderPtr createConfigProvider(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          config,
+      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager) PURE;
+
+  // If enabled in the HttpConnectionManager config, returns a ConfigProvider for scoped routing
+  // configuration.
+  virtual ScopeKeyBuilderPtr createScopeKeyBuilder(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          config) PURE;
+};
 
 } // namespace Router
 } // namespace Envoy

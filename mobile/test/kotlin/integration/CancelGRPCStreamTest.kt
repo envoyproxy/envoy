@@ -72,7 +72,7 @@ class CancelGRPCStreamTest {
   fun `cancel grpc stream calls onCancel callback`() {
     val engine =
       EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .addPlatformFilter(
           name = FILTER_NAME,

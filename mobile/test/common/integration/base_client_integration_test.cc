@@ -8,7 +8,6 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/bridge_utility.h"
-#include "library/cc/log_level.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 #include "spdlog/spdlog.h"
@@ -120,32 +119,6 @@ void BaseClientIntegrationTest::initialize() {
   stream_ = (*stream_prototype_).start(explicit_flow_control_);
   HttpTestUtility::addDefaultHeaders(default_request_headers_);
   default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
-}
-
-std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobileHeaders(
-    const Http::TestRequestHeaderMapImpl& request_headers) {
-
-  Platform::RequestHeadersBuilder builder(
-      Platform::RequestMethod::GET,
-      std::string(default_request_headers_.Scheme()->value().getStringView()),
-      std::string(default_request_headers_.Host()->value().getStringView()),
-      std::string(default_request_headers_.Path()->value().getStringView()));
-
-  request_headers.iterate(
-      [&request_headers, &builder](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-        std::string key = std::string(header.key().getStringView());
-        if (request_headers.formatter().has_value()) {
-          const Envoy::Http::StatefulHeaderKeyFormatter& formatter =
-              request_headers.formatter().value();
-          key = formatter.format(key);
-        }
-        auto value = std::vector<std::string>();
-        value.push_back(std::string(header.value().getStringView()));
-        builder.set(key, value);
-        return Http::HeaderMap::Iterate::Continue;
-      });
-
-  return std::make_shared<Platform::RequestHeaders>(builder.build());
 }
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {

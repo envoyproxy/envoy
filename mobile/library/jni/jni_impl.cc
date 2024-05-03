@@ -954,31 +954,23 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
       ->readData(static_cast<envoy_stream_t>(stream_handle), byte_count);
 }
 
-// The Java counterpart guarantees to invoke this method with a non-null direct ByteBuffer where the
-// provided length is between 0 and ByteBuffer.capacity(), inclusively.
+// This function can accept either direct (off the JVM heap) ByteBuffer or non-direct (on the JVM
+// heap) ByteBuffer.
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendData(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject data, jint length,
+    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject byte_buffer, jint length,
     jboolean end_stream) {
   Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::Buffer::InstancePtr cpp_buffer_instance;
+  if (Envoy::JNI::isJavaDirectByteBuffer(jni_helper, byte_buffer)) {
+    cpp_buffer_instance =
+        Envoy::JNI::javaDirectByteBufferToCppBufferInstance(jni_helper, byte_buffer, length);
+  } else {
+    cpp_buffer_instance =
+        Envoy::JNI::javaNonDirectByteBufferToCppBufferInstance(jni_helper, byte_buffer, length);
+  }
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendData(static_cast<envoy_stream_t>(stream_handle),
-                 Envoy::JNI::javaByteBufferToEnvoyData(jni_helper, data, length), end_stream);
-}
-
-// The Java counterpart guarantees to invoke this method with a non-null jbyteArray where the
-// provided length is between 0 and the size of the jbyteArray, inclusively. And given that this
-// jbyteArray comes from a ByteBuffer, it is also guaranteed that its length will not be greater
-// than 2^31 - this is why the length type is jint.
-extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendDataByteArray(JNIEnv* env, jclass,
-                                                                   jlong engine_handle,
-                                                                   jlong stream_handle,
-                                                                   jbyteArray data, jint length,
-                                                                   jboolean end_stream) {
-  Envoy::JNI::JniHelper jni_helper(env);
-  return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendData(static_cast<envoy_stream_t>(stream_handle),
-                 Envoy::JNI::javaByteArrayToEnvoyData(jni_helper, data, length), end_stream);
+      ->sendData(static_cast<envoy_stream_t>(stream_handle), std::move(cpp_buffer_instance),
+                 end_stream);
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendHeaders(
@@ -1107,11 +1099,11 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
                       jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames,
                       jboolean enable_dns_cache, jlong dns_cache_save_interval_seconds,
                       jboolean enable_drain_post_dns_refresh, jboolean enable_http3,
-                      jstring http3_connection_options, jstring http3_client_connection_options,
-                      jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
-                      jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-                      jboolean enable_port_migration, jboolean enable_socket_tagging,
-                      jboolean enable_interface_binding,
+                      jboolean use_cares, jstring http3_connection_options,
+                      jstring http3_client_connection_options, jobjectArray quic_hints,
+                      jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
+                      jboolean enable_brotli_decompression, jboolean enable_port_migration,
+                      jboolean enable_socket_tagging, jboolean enable_interface_binding,
                       jlong h2_connection_keepalive_idle_interval_milliseconds,
                       jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
                       jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds,
@@ -1159,6 +1151,7 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   builder.enablePortMigration(enable_port_migration);
 
 #endif
+  builder.setUseCares(use_cares == JNI_TRUE);
   builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
   builder.enableDrainPostDnsRefresh(enable_drain_post_dns_refresh == JNI_TRUE);
   builder.enforceTrustChainVerification(trust_chain_verification == JNI_TRUE);
@@ -1214,7 +1207,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
     jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
-    jboolean enable_http3, jstring http3_connection_options,
+    jboolean enable_http3, jboolean use_cares, jstring http3_connection_options,
     jstring http3_client_connection_options, jobjectArray quic_hints,
     jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
     jboolean enable_brotli_decompression, jboolean enable_port_migration,
@@ -1232,19 +1225,19 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::Platform::EngineBuilder builder;
 
-  configureBuilder(jni_helper, connect_timeout_seconds, dns_refresh_seconds,
-                   dns_failure_refresh_seconds_base, dns_failure_refresh_seconds_max,
-                   dns_query_timeout_seconds, dns_min_refresh_seconds, dns_preresolve_hostnames,
-                   enable_dns_cache, dns_cache_save_interval_seconds, enable_drain_post_dns_refresh,
-                   enable_http3, http3_connection_options, http3_client_connection_options,
-                   quic_hints, quic_canonical_suffixes, enable_gzip_decompression,
-                   enable_brotli_decompression, enable_port_migration, enable_socket_tagging,
-                   enable_interface_binding, h2_connection_keepalive_idle_interval_milliseconds,
-                   h2_connection_keepalive_timeout_seconds, max_connections_per_host,
-                   stream_idle_timeout_seconds, per_try_idle_timeout_seconds, app_version, app_id,
-                   trust_chain_verification, filter_chain, enable_platform_certificates_validation,
-                   runtime_guards, node_id, node_region, node_zone, node_sub_zone,
-                   serialized_node_metadata, builder);
+  configureBuilder(
+      jni_helper, connect_timeout_seconds, dns_refresh_seconds, dns_failure_refresh_seconds_base,
+      dns_failure_refresh_seconds_max, dns_query_timeout_seconds, dns_min_refresh_seconds,
+      dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds,
+      enable_drain_post_dns_refresh, enable_http3, use_cares, http3_connection_options,
+      http3_client_connection_options, quic_hints, quic_canonical_suffixes,
+      enable_gzip_decompression, enable_brotli_decompression, enable_port_migration,
+      enable_socket_tagging, enable_interface_binding,
+      h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
+      max_connections_per_host, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
+      app_version, app_id, trust_chain_verification, filter_chain,
+      enable_platform_certificates_validation, runtime_guards, node_id, node_region, node_zone,
+      node_sub_zone, serialized_node_metadata, builder);
 
   std::string native_xds_address = Envoy::JNI::javaStringToCppString(jni_helper, xds_address);
   if (!native_xds_address.empty()) {
@@ -1297,7 +1290,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setPreferredNetwork(JNIEnv* /*e
                                                                      jclass, // class
                                                                      jlong engine, jint network) {
   return reinterpret_cast<Envoy::InternalEngine*>(engine)->setPreferredNetwork(
-      static_cast<envoy_network_t>(network));
+      static_cast<Envoy::NetworkType>(network));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_setProxySettings(

@@ -20,20 +20,20 @@ namespace {
  */
 enum class CertVerifyStatus : int {
   // Certificate is trusted.
-  OK = 0,
+  Ok = 0,
   // Certificate verification could not be conducted.
-  FAILED = -1,
+  Failed = -1,
   // Certificate is not trusted due to non-trusted root of the certificate chain.
-  NO_TRUSTED_ROOT = -2,
+  NoTrustedRoot = -2,
   // Certificate is not trusted because it has expired.
-  EXPIRED = -3,
+  Expired = -3,
   // Certificate is not trusted because it is not valid yet.
-  NOT_YET_VALID = -4,
+  NotYetValid = -4,
   // Certificate is not trusted because it could not be parsed.
-  UNABLE_TO_PARSE = -5,
+  UnableToParse = -5,
   // Certificate is not trusted because it has an extendedKeyUsage field, but its value is not
   // correct for a web server.
-  INCORRECT_KEY_USAGE = -6,
+  IncorrectKeyUsage = -6,
 };
 
 bool jvmCertIsIssuedByKnownRoot(JniHelper& jni_helper, jobject result) {
@@ -72,7 +72,7 @@ static void extractCertVerifyResult(JniHelper& jni_helper, jobject result, CertV
                                     bool* is_issued_by_known_root,
                                     std::vector<std::string>* verified_chain) {
   *status = jvmCertGetStatus(jni_helper, result);
-  if (*status == CertVerifyStatus::OK) {
+  if (*status == CertVerifyStatus::Ok) {
     *is_issued_by_known_root = jvmCertIsIssuedByKnownRoot(jni_helper, result);
     LocalRefUniquePtr<jobjectArray> chain_byte_array =
         jvmCertGetCertificateChainEncoded(jni_helper, result);
@@ -91,12 +91,12 @@ static void jvmVerifyX509CertChain(const std::vector<std::string>& cert_chain,
   LocalRefUniquePtr<jobject> result =
       callJvmVerifyX509CertChain(jni_helper, cert_chain, auth_type, hostname);
   if (Exception::checkAndClear()) {
-    *status = CertVerifyStatus::NOT_YET_VALID;
+    *status = CertVerifyStatus::NotYetValid;
   } else {
     extractCertVerifyResult(jni_helper, result.get(), status, is_issued_by_known_root,
                             verified_chain);
     if (Exception::checkAndClear()) {
-      *status = CertVerifyStatus::FAILED;
+      *status = CertVerifyStatus::Failed;
     }
   }
 }
@@ -139,26 +139,26 @@ envoy_cert_validation_result verifyX509CertChain(const std::vector<std::string>&
   jvmVerifyX509CertChain(cert_chain, "RSA", hostname, &result, &is_issued_by_known_root,
                          &verified_chain);
   switch (result) {
-  case CertVerifyStatus::OK:
+  case CertVerifyStatus::Ok:
     return {ENVOY_SUCCESS, 0, nullptr};
-  case CertVerifyStatus::EXPIRED: {
+  case CertVerifyStatus::Expired: {
     return {ENVOY_FAILURE, SSL_AD_CERTIFICATE_EXPIRED,
             "AndroidNetworkLibrary_verifyServerCertificates failed: expired cert."};
   }
-  case CertVerifyStatus::NO_TRUSTED_ROOT:
+  case CertVerifyStatus::NoTrustedRoot:
     return {ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
             "AndroidNetworkLibrary_verifyServerCertificates failed: no trusted root."};
-  case CertVerifyStatus::UNABLE_TO_PARSE:
+  case CertVerifyStatus::UnableToParse:
     return {ENVOY_FAILURE, SSL_AD_BAD_CERTIFICATE,
             "AndroidNetworkLibrary_verifyServerCertificates failed: unable to parse cert."};
-  case CertVerifyStatus::INCORRECT_KEY_USAGE:
+  case CertVerifyStatus::IncorrectKeyUsage:
     return {ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
             "AndroidNetworkLibrary_verifyServerCertificates failed: incorrect key usage."};
-  case CertVerifyStatus::FAILED:
+  case CertVerifyStatus::Failed:
     return {
         ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
         "AndroidNetworkLibrary_verifyServerCertificates failed: validation couldn't be conducted."};
-  case CertVerifyStatus::NOT_YET_VALID:
+  case CertVerifyStatus::NotYetValid:
     return {ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
             "AndroidNetworkLibrary_verifyServerCertificates failed: not yet valid."};
   default:
