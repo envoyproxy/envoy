@@ -129,115 +129,32 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
-class RejectedTest : public ExtAuthzGrpcClientTest {
-public:
-  RejectedTest()
-      : invalid_header_value_(reinterpret_cast<const char*>(invalid_header_value_raw_bytes_)),
-        invalid_header_name_("invalid-\nkey"),
-        headers_invalid_name_(
-            TestCommon::makeHeaderValueOption({{invalid_header_name_, "value", false}})),
-        headers_invalid_value_(
-            TestCommon::makeHeaderValueOption({{"name", invalid_header_value_, false}})) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.ext_authz_grpc_reject_invalid_response", "true"}});
+// Test that the client just passes through invalid headers (they will fail validation in the filter
+// later).
+TEST_F(ExtAuthzGrpcClientTest, IndifferentToInvalidHeaders) {
+  initialize();
 
-    initialize();
-  }
-
-  // Test that the grpc client rejects the given response.
-  void testResponse(CheckResponsePtr&& check_response,
-                    absl::string_view ext_authz_status_value = "ext_authz_ok") {
-    envoy::service::auth::v3::CheckRequest request;
-    expectCallSend(request);
-    client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
-
-    Http::TestRequestHeaderMapImpl headers;
-    client_->onCreateInitialMetadata(headers);
-
-    EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq(ext_authz_status_value)));
-    EXPECT_CALL(request_callbacks_,
-                onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzResponseRejected())));
-    client_->onSuccess(std::move(check_response), span_);
-  }
-
-  TestScopedRuntime scoped_runtime_;
-  const uint8_t invalid_header_value_raw_bytes_[3]{0x7f, 0x7f, 0};
-  const std::string invalid_header_value_;
-  const std::string invalid_header_name_;
-  const HeaderValueOptionVector headers_invalid_name_;
-  const HeaderValueOptionVector headers_invalid_value_;
-  const std::string empty_body_{};
-};
-
-TEST_F(RejectedTest, OkHeaderInvalidName) {
+  const std::string empty_body{};
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
+  const auto expected_downstream_headers = TestCommon::makeHeaderValueOption(
+      {{"invalid-key\n\n\n\n\n", "TestAuthService", false}, {"cookie", "authtoken=1234", true}});
   auto check_response =
       TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
-                                    empty_body_, headers_invalid_name_, {}, {});
-  testResponse(std::move(check_response));
-}
+                                    empty_body, expected_headers, expected_downstream_headers);
+  auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::OK, Http::Code::OK, empty_body, expected_headers, expected_downstream_headers);
 
-TEST_F(RejectedTest, OkHeaderInvalidValue) {
-  auto check_response =
-      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
-                                    empty_body_, headers_invalid_value_, {}, {});
-  testResponse(std::move(check_response));
-}
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
 
-TEST_F(RejectedTest, DeniedHeaderInvalidName) {
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::PermissionDenied, envoy::type::v3::OK, empty_body_,
-      headers_invalid_name_, {}, {});
-  testResponse(std::move(check_response), "ext_authz_unauthorized");
-}
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
 
-TEST_F(RejectedTest, DeniedHeaderInvalidValue) {
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::PermissionDenied, envoy::type::v3::OK, empty_body_,
-      headers_invalid_value_, {}, {});
-  testResponse(std::move(check_response), "ext_authz_unauthorized");
-}
-
-TEST_F(RejectedTest, OkDownstreamHeaderInvalidName) {
-  auto check_response =
-      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
-                                    empty_body_, {}, headers_invalid_name_, {});
-  testResponse(std::move(check_response));
-}
-
-TEST_F(RejectedTest, OkDownstreamHeaderInvalidValue) {
-  auto check_response =
-      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
-                                    empty_body_, {}, headers_invalid_value_, {});
-  testResponse(std::move(check_response));
-}
-
-TEST_F(RejectedTest, OkRemoveHeaderInvalidName) {
-  auto check_response =
-      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
-                                    empty_body_, {}, {}, {invalid_header_name_});
-  testResponse(std::move(check_response));
-}
-
-TEST_F(RejectedTest, OkSetQueryParamInvalidKey) {
-  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok,
-                                                      envoy::type::v3::OK, empty_body_, {}, {}, {});
-
-  auto* query_parameter = check_response->mutable_ok_response()->add_query_parameters_to_set();
-  query_parameter->set_key("\n\n\n");
-  query_parameter->set_value("value");
-
-  testResponse(std::move(check_response));
-}
-
-TEST_F(RejectedTest, OkSetQueryParamInvalidValue) {
-  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok,
-                                                      envoy::type::v3::OK, empty_body_, {}, {}, {});
-
-  auto* query_parameter = check_response->mutable_ok_response()->add_query_parameters_to_set();
-  query_parameter->set_key("key");
-  query_parameter->set_value("\n\n\n");
-
-  testResponse(std::move(check_response));
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+  client_->onSuccess(std::move(check_response), span_);
 }
 
 // Test the client when a denied response is received.

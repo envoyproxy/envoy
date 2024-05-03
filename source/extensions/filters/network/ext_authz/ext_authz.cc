@@ -96,21 +96,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     response_code_details = Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied;
     config_->stats().denied_.inc();
     break;
-  case Filters::Common::ExtAuthz::CheckStatus::Rejected:
-    response_code_details = Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzRejected;
-    config_->stats().rejected_.inc();
-    break;
   }
 
   if (!response->dynamic_metadata.fields().empty()) {
-
     filter_callbacks_->connection().streamInfo().setDynamicMetadata(
         NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
   }
 
   // Fail open only if configured to do so and if the check status was a error.
   if (response->status == Filters::Common::ExtAuthz::CheckStatus::Denied ||
-      response->status == Filters::Common::ExtAuthz::CheckStatus::Rejected ||
       (response->status == Filters::Common::ExtAuthz::CheckStatus::Error &&
        !config_->failureModeAllow())) {
     config_->stats().cx_closed_.inc();

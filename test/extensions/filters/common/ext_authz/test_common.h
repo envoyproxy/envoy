@@ -53,11 +53,11 @@ public:
 
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
-  static bool compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs);
+  static bool compareHeaderVector(const UnsafeHeaderVector& lhs, const UnsafeHeaderVector& rhs);
   static bool compareQueryParamsVector(const Http::Utility::QueryParamsVector& lhs,
                                        const Http::Utility::QueryParamsVector& rhs);
-  static bool compareVectorOfHeaderName(const std::vector<Http::LowerCaseString>& lhs,
-                                        const std::vector<Http::LowerCaseString>& rhs);
+  static bool compareVectorOfHeaderName(const std::vector<std::string>& lhs,
+                                        const std::vector<std::string>& rhs);
   static bool compareVectorOfUnorderedStrings(const std::vector<std::string>& lhs,
                                               const std::vector<std::string>& rhs);
 };
@@ -87,55 +87,6 @@ MATCHER_P(AuthzResponseNoAttributes, response, "") {
                      << "=======================================================================\n";
   }
   return equal_status && equal_metadata;
-}
-
-MATCHER(AuthzResponseRejected, "") {
-  if (arg->status != CheckStatus::Rejected) {
-    return false;
-  }
-
-  // Everything else should be empty.
-  if (arg->body.compare("")) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(arg->headers_to_append, {})) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(arg->headers_to_set, {})) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(arg->headers_to_add, {})) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(arg->response_headers_to_add, {})) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(arg->response_headers_to_set, {})) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(arg->response_headers_to_set, {})) {
-    return false;
-  }
-
-  if (!TestCommon::compareQueryParamsVector(arg->query_parameters_to_set, {})) {
-    return false;
-  }
-
-  if (!TestCommon::compareVectorOfHeaderName(arg->headers_to_remove, {})) {
-    return false;
-  }
-
-  if (!TestCommon::compareVectorOfUnorderedStrings(arg->query_parameters_to_remove, {})) {
-    return false;
-  }
-
-  return true;
 }
 
 MATCHER_P(AuthzDeniedResponse, response, "") {

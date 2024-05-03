@@ -32,9 +32,12 @@ bug_fixes:
     if the downstream request ``:authority`` was longer than 255 characters.
 - area: ext_authz
   change: |
-    Added validation for header & query parameter mutations (for the GRPC client), which prevents
-    other filters from being exposed to invalid headers. If an invalid mutation is found in the
-    CheckResponse, ext_authz sends a local response with status 500 (status code is configurable).
+    Added field
+    :ref:`validate_mutations <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.validate_mutations>`,
+    which, when set to true, adds header & query parameter mutation validation to the http ext_authz
+    filter. If an authz response contains invalid mutations, the filter responds to the downstream
+    request with HTTP 500 Internal Server Error. If you use ext_authz with an untrusted side stream,
+    it's recommended you set this to true.
 - area: http
   change: |
     Fix a crash when reloading the HTTP Connection Manager via ECDS.

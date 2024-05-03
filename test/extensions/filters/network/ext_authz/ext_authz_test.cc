@@ -96,7 +96,7 @@ public:
 
     Filters::Common::ExtAuthz::Response response{};
     response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-    response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+    response.headers_to_set = Filters::Common::ExtAuthz::UnsafeHeaderVector{{"foo", "bar"}};
 
     auto* fields = response.dynamic_metadata.mutable_fields();
     (*fields)["foo"] = ValueUtil::stringValue("ok");
@@ -301,42 +301,6 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
-  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.cx_closed").value());
-}
-
-TEST_F(ExtAuthzFilterTest, RejectedUnimplemented) {
-  initialize(default_yaml_string_);
-  InSequence s;
-
-  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      addr_);
-  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
-      addr_);
-  EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            request_callbacks_ = &callbacks;
-          })));
-
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
-  Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
-
-  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
-  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
-  EXPECT_CALL(
-      filter_callbacks_.connection_.stream_info_,
-      setResponseCodeDetails(Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzRejected));
-  request_callbacks_->onComplete(
-      makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Rejected));
-
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
-  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.rejected").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());

@@ -23,20 +23,21 @@ using testing::ValuesIn;
 
 namespace Envoy {
 
-using Headers = std::vector<std::pair<const std::string, const std::string>>;
+using Extensions::Filters::Common::ExtAuthz::UnsafeHeaderVector;
 
 struct GrpcInitializeConfigOpts {
   bool disable_with_metadata = false;
   bool failure_mode_allow = false;
   bool encode_raw_headers = false;
   uint64_t timeout_ms = 300'000; // 5 minutes.
+  bool validate_mutations = false;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
-  // Fields of type Headers must be set at initialization.
-  const Headers headers_to_add = {};
-  const Headers headers_to_append = {};
-  const Headers headers_to_remove = {};
+  // Fields of type UnsafeHeaderVector must be set at initialization.
+  const UnsafeHeaderVector headers_to_add = {};
+  const UnsafeHeaderVector headers_to_append = {};
+  const UnsafeHeaderVector headers_to_remove = {};
   const Http::TestRequestHeaderMapImpl new_headers_from_upstream = {};
   const Http::TestRequestHeaderMapImpl headers_to_append_multiple = {};
   bool failure_mode_allowed_header = false;
@@ -108,6 +109,7 @@ public:
 
       proto_config_.set_failure_mode_allow(opts.failure_mode_allow);
       proto_config_.set_failure_mode_allow_header_add(opts.failure_mode_allow);
+      proto_config_.set_validate_mutations(opts.validate_mutations);
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
 
       // Add labels and verify they are passed.
@@ -154,10 +156,11 @@ public:
     }
   }
 
-  void initiateClientConnection(uint64_t request_body_length,
-                                const Headers& headers_to_add = Headers{},
-                                const Headers& headers_to_append = Headers{},
-                                const Headers& headers_to_remove = Headers{}) {
+  void
+  initiateClientConnection(uint64_t request_body_length,
+                           const UnsafeHeaderVector& headers_to_add = UnsafeHeaderVector{},
+                           const UnsafeHeaderVector& headers_to_append = UnsafeHeaderVector{},
+                           const UnsafeHeaderVector& headers_to_remove = UnsafeHeaderVector{}) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers{
@@ -386,12 +389,13 @@ public:
     EXPECT_EQ(response_size_, response_->body().size());
   }
 
-  void sendExtAuthzResponse(const Headers& headers_to_add, const Headers& headers_to_append,
-                            const Headers& headers_to_remove,
+  void sendExtAuthzResponse(const UnsafeHeaderVector& headers_to_add,
+                            const UnsafeHeaderVector& headers_to_append,
+                            const UnsafeHeaderVector& headers_to_remove,
                             const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
                             const Http::TestRequestHeaderMapImpl& headers_to_append_multiple,
-                            const Headers& response_headers_to_append,
-                            const Headers& response_headers_to_set = {}) {
+                            const UnsafeHeaderVector& response_headers_to_append,
+                            const UnsafeHeaderVector& response_headers_to_set = {}) {
     ext_authz_request_->startGrpcStream();
     envoy::service::auth::v3::CheckResponse check_response;
     check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
@@ -508,14 +512,15 @@ attributes:
   }
 
   void expectCheckRequestWithBody(Http::CodecType downstream_protocol, uint64_t request_size) {
-    expectCheckRequestWithBodyWithHeaders(downstream_protocol, request_size, Headers{}, Headers{},
-                                          Headers{}, Http::TestRequestHeaderMapImpl{},
-                                          Http::TestRequestHeaderMapImpl{});
+    expectCheckRequestWithBodyWithHeaders(
+        downstream_protocol, request_size, UnsafeHeaderVector{}, UnsafeHeaderVector{},
+        UnsafeHeaderVector{}, Http::TestRequestHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{});
   }
 
   void expectCheckRequestWithBodyWithHeaders(
-      Http::CodecType downstream_protocol, uint64_t request_size, const Headers& headers_to_add,
-      const Headers& headers_to_append, const Headers& headers_to_remove,
+      Http::CodecType downstream_protocol, uint64_t request_size,
+      const UnsafeHeaderVector& headers_to_add, const UnsafeHeaderVector& headers_to_append,
+      const UnsafeHeaderVector& headers_to_remove,
       const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
       const Http::TestRequestHeaderMapImpl& headers_to_append_multiple) {
     initializeConfig();
@@ -524,18 +529,19 @@ attributes:
     initiateClientConnection(request_size, headers_to_add, headers_to_append, headers_to_remove);
     waitForExtAuthzRequest(expectedCheckRequest(downstream_protocol));
 
-    Headers updated_headers_to_add;
+    UnsafeHeaderVector updated_headers_to_add;
     for (auto& header_to_add : headers_to_add) {
       updated_headers_to_add.push_back(
           std::make_pair(header_to_add.first, header_to_add.second + "-replaced"));
     }
-    Headers updated_headers_to_append;
+    UnsafeHeaderVector updated_headers_to_append;
     for (const auto& header_to_append : headers_to_append) {
       updated_headers_to_append.push_back(
           std::make_pair(header_to_append.first, header_to_append.second + "-appended"));
     }
     sendExtAuthzResponse(updated_headers_to_add, updated_headers_to_append, headers_to_remove,
-                         new_headers_from_upstream, headers_to_append_multiple, Headers{});
+                         new_headers_from_upstream, headers_to_append_multiple,
+                         UnsafeHeaderVector{});
 
     WaitForSuccessfulUpstreamResponseOpts opts{
         updated_headers_to_add,    updated_headers_to_append,  headers_to_remove,
@@ -897,9 +903,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
 TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
   expectCheckRequestWithBodyWithHeaders(
       Http::CodecType::HTTP1, 4,
-      /*headers_to_add=*/Headers{{"header1", "header1"}},
-      /*headers_to_append=*/Headers{{"header2", "header2"}},
-      /*headers_to_remove=*/Headers{{"remove-me", "upstream-should-not-see-me"}},
+      /*headers_to_add=*/UnsafeHeaderVector{{"header1", "header1"}},
+      /*headers_to_append=*/UnsafeHeaderVector{{"header2", "header2"}},
+      /*headers_to_remove=*/UnsafeHeaderVector{{"remove-me", "upstream-should-not-see-me"}},
       /*new_headers_from_upstream=*/Http::TestRequestHeaderMapImpl{{"new1", "new1"}},
       /*headers_to_append_multiple=*/
       Http::TestRequestHeaderMapImpl{{"multiple", "multiple-first"},
@@ -956,8 +962,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
   // Expect that since the buffer is full, the request is sent to the authorization server
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1, 2000));
 
-  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{});
+  sendExtAuthzResponse(UnsafeHeaderVector{}, UnsafeHeaderVector{}, UnsafeHeaderVector{},
+                       Http::TestRequestHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{},
+                       UnsafeHeaderVector{}, UnsafeHeaderVector{});
 
   // Send the rest of the data and end the stream
   codec_client_->sendData(encoder_decoder.first, final_body, true);
@@ -990,11 +997,11 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
 
   // Send back an ext_authz response with response_headers_to_add set.
-  sendExtAuthzResponse(
-      Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-      Http::TestRequestHeaderMapImpl{},
-      Headers{{"downstream2", "downstream-should-see-me"}, {"set-cookie", "cookie2=gingerbread"}},
-      Headers{{"replaceable", "by-ext-authz"}});
+  sendExtAuthzResponse(UnsafeHeaderVector{}, UnsafeHeaderVector{}, UnsafeHeaderVector{},
+                       Http::TestRequestHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{},
+                       UnsafeHeaderVector{{"downstream2", "downstream-should-see-me"},
+                                          {"set-cookie", "cookie2=gingerbread"}},
+                       UnsafeHeaderVector{{"replaceable", "by-ext-authz"}});
 
   // Wait for the upstream response.
   waitForSuccessfulUpstreamResponse("200");
@@ -1032,6 +1039,30 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("403", response_->headers().getStatusValue()); // Unauthorized status.
+
+  cleanup();
+}
+
+// Test behavior when validate_mutations is true & side stream provides invalid mutations (should
+// respond downstream with HTTP 500 Internal Server Error).
+TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutations) {
+  GrpcInitializeConfigOpts opts;
+  opts.validate_mutations = true;
+  initializeConfig(opts);
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and request.
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+  sendExtAuthzResponse({{"invalid-\nheader-\nname", "blah"}}, {}, {}, {}, {}, {}, {});
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
 
   cleanup();
 }
@@ -1092,11 +1123,11 @@ TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
 
   // Send back an ext_authz response with response_headers_to_add set.
-  sendExtAuthzResponse(
-      Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-      Http::TestRequestHeaderMapImpl{},
-      Headers{{"downstream2", "downstream-should-see-me"}, {"set-cookie", "cookie2=gingerbread"}},
-      Headers{{"replaceable", "by-ext-authz"}});
+  sendExtAuthzResponse(UnsafeHeaderVector{}, UnsafeHeaderVector{}, UnsafeHeaderVector{},
+                       Http::TestRequestHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{},
+                       UnsafeHeaderVector{{"downstream2", "downstream-should-see-me"},
+                                          {"set-cookie", "cookie2=gingerbread"}},
+                       UnsafeHeaderVector{{"replaceable", "by-ext-authz"}});
 
   // Wait for the upstream response.
   waitForSuccessfulUpstreamResponse("200");
@@ -1423,10 +1454,11 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
 
   int expected_grpc_client_creation_count = 0;
 
-  initiateClientConnection(4, Headers{}, Headers{});
+  initiateClientConnection(4, UnsafeHeaderVector{}, UnsafeHeaderVector{});
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
-  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{}, Headers{});
+  sendExtAuthzResponse(UnsafeHeaderVector{}, UnsafeHeaderVector{}, UnsafeHeaderVector{},
+                       Http::TestRequestHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{},
+                       UnsafeHeaderVector{});
 
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
 
@@ -1463,8 +1495,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
     EXPECT_EQ(expected_grpc_client_creation_count,
               test_server_->counter("grpc.ext_authz_cluster.google_grpc_client_creation")->value());
   }
-  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{}, Headers{});
+  sendExtAuthzResponse(UnsafeHeaderVector{}, UnsafeHeaderVector{}, UnsafeHeaderVector{},
+                       Http::TestRequestHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{},
+                       UnsafeHeaderVector{});
 
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
   RELEASE_ASSERT(result, result.message());

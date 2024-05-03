@@ -16,75 +16,42 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-absl::Status copyHeaderFieldIntoResponse(
+void copyHeaderFieldIntoResponse(
     ResponsePtr& response,
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers) {
-  bool reject_invalid_response = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.ext_authz_grpc_reject_invalid_response");
   for (const auto& header : headers) {
-    if (reject_invalid_response &&
-        (!Http::HeaderUtility::headerNameIsValid(header.header().key()) ||
-         !Http::HeaderUtility::headerValueIsValid(header.header().value()))) {
-      return absl::InternalError("Field 'headers' contained invalid header.");
-    }
     if (header.append().value()) {
-      response->headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),
-                                               header.header().value());
+      response->headers_to_append.emplace_back(header.header().key(), header.header().value());
     } else {
-      response->headers_to_set.emplace_back(Http::LowerCaseString(header.header().key()),
-                                            header.header().value());
+      response->headers_to_set.emplace_back(header.header().key(), header.header().value());
     }
   }
-  return absl::OkStatus();
 }
 
-absl::Status copyOkResponseMutations(ResponsePtr& response,
-                                     const envoy::service::auth::v3::OkHttpResponse& ok_response) {
-  if (auto header_field_status = copyHeaderFieldIntoResponse(response, ok_response.headers());
-      !header_field_status.ok()) {
-    return header_field_status;
-  }
-  bool reject_invalid_response = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.ext_authz_grpc_reject_invalid_response");
+void copyOkResponseMutations(ResponsePtr& response,
+                             const envoy::service::auth::v3::OkHttpResponse& ok_response) {
+  copyHeaderFieldIntoResponse(response, ok_response.headers());
+
   for (const auto& header : ok_response.response_headers_to_add()) {
-    if (reject_invalid_response &&
-        (!Http::HeaderUtility::headerNameIsValid(header.header().key()) ||
-         !Http::HeaderUtility::headerValueIsValid(header.header().value()))) {
-      return absl::InternalError("Field 'response_headers_to_add' contained invalid header.");
-    }
     if (header.append().value()) {
-      response->response_headers_to_add.emplace_back(Http::LowerCaseString(header.header().key()),
+      response->response_headers_to_add.emplace_back(header.header().key(),
                                                      header.header().value());
     } else {
-      response->response_headers_to_set.emplace_back(Http::LowerCaseString(header.header().key()),
+      response->response_headers_to_set.emplace_back(header.header().key(),
                                                      header.header().value());
     }
   }
 
-  for (const auto& name : ok_response.headers_to_remove()) {
-    if (reject_invalid_response && !Http::HeaderUtility::headerNameIsValid(name)) {
-      return absl::InternalError("Field 'headers_to_remove' contained invalid header.");
-    }
-    response->headers_to_remove.emplace_back(name);
-  }
+  response->headers_to_remove = std::vector<std::string>{ok_response.headers_to_remove().begin(),
+                                                         ok_response.headers_to_remove().end()};
 
   for (const auto& query_parameter : ok_response.query_parameters_to_set()) {
-    if (reject_invalid_response &&
-        (!Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(query_parameter.key()) ||
-         !Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(query_parameter.value()))) {
-      return absl::InternalError("Field 'query_parameters_to_set' contained invalid header.");
-    }
     response->query_parameters_to_set.emplace_back(query_parameter.key(), query_parameter.value());
   }
 
-  for (const auto& query_parameter_name : ok_response.query_parameters_to_remove()) {
-    if (reject_invalid_response &&
-        !Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(query_parameter_name)) {
-      return absl::InternalError("Field 'query_parameters_to_remove' contained invalid header.");
-    }
-    response->query_parameters_to_remove.push_back(query_parameter_name);
-  }
-  return absl::OkStatus();
+  response->query_parameters_to_remove =
+      std::vector<std::string>{ok_response.query_parameters_to_remove().begin(),
+                               ok_response.query_parameters_to_remove().end()};
 }
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
@@ -123,11 +90,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
       const auto& ok_response = response->ok_response();
-      absl::Status status = copyOkResponseMutations(authz_response, ok_response);
-      if (!status.ok()) {
-        rejectResponse(status);
-        return;
-      }
+      copyOkResponseMutations(authz_response, ok_response);
     }
   } else {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
@@ -136,12 +99,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     // The default HTTP status code for denied response is 403 Forbidden.
     authz_response->status_code = Http::Code::Forbidden;
     if (response->has_denied_response()) {
-      absl::Status status =
-          copyHeaderFieldIntoResponse(authz_response, response->denied_response().headers());
-      if (!status.ok()) {
-        rejectResponse(status);
-        return;
-      }
+      copyHeaderFieldIntoResponse(authz_response, response->denied_response().headers());
 
       const uint32_t status_code = response->denied_response().status().code();
       if (status_code > 0) {
@@ -171,15 +129,6 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   Response response{};
   response.status = CheckStatus::Error;
   response.status_code = Http::Code::Forbidden;
-  callbacks_->onComplete(std::make_unique<Response>(response));
-  callbacks_ = nullptr;
-}
-
-void GrpcClientImpl::rejectResponse(const absl::Status& status) {
-  ENVOY_LOG(trace, "Rejecting CheckResponse. Reason: {}.", status.message());
-  Response response{};
-  response.status = CheckStatus::Rejected;
-  response.status_code = Http::Code::InternalServerError;
   callbacks_->onComplete(std::make_unique<Response>(response));
   callbacks_ = nullptr;
 }

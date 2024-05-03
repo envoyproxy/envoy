@@ -60,8 +60,6 @@ public:
                  Tracing::Span& span) override;
 
 private:
-  void rejectResponse(const absl::Status& status);
-
   Grpc::AsyncClient<envoy::service::auth::v3::CheckRequest, envoy::service::auth::v3::CheckResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
