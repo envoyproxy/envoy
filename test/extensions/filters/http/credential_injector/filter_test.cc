@@ -6,7 +6,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <string_view>
 
 namespace Envoy {
 namespace Extensions {
