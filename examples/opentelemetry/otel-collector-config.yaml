@@ -33,5 +33,8 @@ service:
       receivers: [otlp]
       processors: [memory_limiter, batch]
       exporters: [debug]
-
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
   extensions: [memory_ballast, zpages, health_check]
