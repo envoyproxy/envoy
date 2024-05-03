@@ -515,6 +515,76 @@ debugging information files (`.dwp` files) and we can build a DWARF package file
 with `.dwp ` target. The `.dwp` file need to be presented in the same folder with the
 binary for a full debugging experience.
 
+# Debugging production core dumps
+
+In production, you'll likely be running a version of envoy compiled with `-c
+opt`. When we build envoy with `-c opt` it still has debug symbols attached
+which greatly bloats the binary size.
+Envoy uses fission which uses `gsplit-dwarf` to have the debug info partially in
+the `.o` but mostly in `.dwo` file for each object file.
+
+Most likely when you distribute the binary (or if you use the Envoy's
+release docker image) you will have stripped the debug information such that
+when you list the sections of the binary it might look as follows:
+
+```
+envoy  :
+section                   size       addr
+.interp                     28        736
+.note.ABI-tag               32        764
+.note.gnu.build-id          36        796
+.dynsym                  13536        832
+.gnu.version              1128      14368
+.gnu.version_r             624      15496
+.gnu.hash                 1396      16120
+.dynstr                   7368      17516
+.rela.dyn              6817440      24888
+.rela.plt                 9024    6842328
+.rodata                6839560    6852608
+.gcc_except_table      2919968   13692168
+protodesc_cold          612768   16612144
+flags_help_cold           5827   17224912
+.eh_frame_hdr          1389404   17230740
+.eh_frame              7087852   18620144
+.text                 43412112   25714688
+.init                       27   69126800
+.fini                       13   69126828
+google_malloc           257110   69126848
+malloc_hook                456   69383958
+.plt                      6032   69384416
+.tdata                     192   69394560
+.tbss                     9637   69394752
+.fini_array                  8   69394752
+.init_array              20128   69394760
+.data.rel.ro           2447856   69414896
+.dynamic                   512   71862752
+.got                     30880   71863264
+.got.plt                  3032   71894144
+.tm_clone_table              0   71901272
+.data                   516960   71905280
+__rseq_cs                 2624   72422240
+__rseq_cs_ptr_array        656   72424864
+.bss                  10255648   72425536
+.comment                    97          0
+Total                 82669971
+
+```
+
+In particular there is no debug information.
+
+In order to get the decent debugging experience when loading a core into `gdb`
+you'll need the following:
+
+- You should have a unstripped version of the binary e.g. compiled with
+`-c opt` that is not stripped. The code generated will be the same as the
+stripped binary and thus compatible with the core generated from a stripped
+binary.
+- The DWOs produced from `gsplit-dwarf` will need to be in the same relative
+directories to be picked up by GDB.
+- The above two will provide filenames, line numbers (among other things), but
+in order to get the source lines you need to provide the source files for gdb
+to pick it up.
+
 # Running Bazel tests requiring privileges
 
 Some tests may require privileges (e.g. CAP_NET_ADMIN) in order to execute. One option is to run
