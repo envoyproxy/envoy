@@ -1,86 +1,103 @@
 #pragma once
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
-
+#include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
+#include "envoy/event/timer.h"
+#include "envoy/grpc/async_client.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
-#include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
-
-#include "test/extensions/filters/http/rate_limit_quota/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/status_utility.h"
-
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
-namespace {
 
 using Server::Configuration::MockFactoryContext;
+using testing::_;
 using testing::Invoke;
+using testing::Return;
 using testing::Unused;
 
+// Used to mock a local rate limit client entirely.
+class MockRateLimitClient : public RateLimitClient {
+ public:
+  MockRateLimitClient() = default;
+  ~MockRateLimitClient() override = default;
+
+  MOCK_METHOD(void, createBucket,
+              (const BucketId& bucket_id, size_t id,
+               const BucketAction& initial_bucket_action,
+               bool initial_request_allowed),
+              (override));
+  MOCK_METHOD(std::shared_ptr<CachedBucket>, getBucket, (size_t id),
+              (override));
+};
+
+// Used when creating a "real" global rate limit client with mocked, underlying
+// interfaces.
 class RateLimitTestClient {
-public:
+ public:
   RateLimitTestClient() {
-    // Initialize with own mock objects.
     grpc_service_.mutable_envoy_grpc()->set_cluster_name("rate_limit_quota");
-    init(context_, grpc_service_);
+    config_with_hash_key_ = Grpc::GrpcServiceConfigWithHashKey(grpc_service_);
   }
 
-  RateLimitTestClient(bool start_failed) : start_failed_(start_failed) {
-    // Initialize with own mock objects.
-    grpc_service_.mutable_envoy_grpc()->set_cluster_name("rate_limit_quota");
-    init(context_, grpc_service_);
+  void expectClientCreation() {
+    EXPECT_CALL(
+        context_.server_factory_context_.cluster_manager_.async_client_manager_,
+        getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
   }
 
-  RateLimitTestClient(NiceMock<MockFactoryContext>& context,
-                      envoy::config::core::v3::GrpcService& grpc_service) {
-    // Initialize with mock objects that are passed in externally.
-    external_inited_ = true;
-    init(context, grpc_service);
-  }
-
-  void init(NiceMock<MockFactoryContext>& context,
-            envoy::config::core::v3::GrpcService& grpc_service) {
-    // Set the expected behavior for async_client_manager in mock context.
-    // Note, we need to set it through `MockFactoryContext` rather than `MockAsyncClientManager`
-    // directly because the rate limit client object below requires context argument as the input.
-    if (external_inited_) {
-      EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
-                  getOrCreateRawAsyncClient(_, _, _))
-          .Times(2)
-          .WillRepeatedly(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
+  void expectStreamCreation(int times) {
+    if (times == 0) {
+      EXPECT_CALL(
+          *async_client_,
+          startRaw("envoy.service.rate_limit_quota.v3.RateLimitQuotaService",
+                   "StreamRateLimitQuotas", _, _))
+          .Times(0);
+    } else if (times == 1) {
+      EXPECT_CALL(
+          *async_client_,
+          startRaw("envoy.service.rate_limit_quota.v3.RateLimitQuotaService",
+                   "StreamRateLimitQuotas", _, _))
+          .WillOnce(Invoke(this, &RateLimitTestClient::mockStartRaw));
     } else {
-      EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
-                  getOrCreateRawAsyncClientWithHashKey(_, _, _))
-          .WillOnce(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
+      EXPECT_CALL(
+          *async_client_,
+          startRaw("envoy.service.rate_limit_quota.v3.RateLimitQuotaService",
+                   "StreamRateLimitQuotas", _, _))
+          .Times(times)
+          .WillRepeatedly(Invoke(this, &RateLimitTestClient::mockStartRaw));
     }
+  }
 
-    Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-        Grpc::GrpcServiceConfigWithHashKey(grpc_service);
-
-    client_ =
-        createRateLimitClient(context, &callbacks_, bucket_cache_, domain_, config_with_hash_key);
+  void expectTimerCreation(std::chrono::milliseconds period) {
+    timer_ = new Event::MockTimer(dispatcher_);
+    EXPECT_CALL(*timer_, enableTimer(period, _))
+        .WillRepeatedly([&](Unused, Unused) { timer_->enabled_ = true; });
   }
 
   Grpc::RawAsyncClientSharedPtr mockCreateAsyncClient(Unused, Unused, Unused) {
-    auto async_client = std::make_shared<Grpc::MockAsyncClient>();
-    EXPECT_CALL(*async_client, startRaw("envoy.service.rate_limit_quota.v3.RateLimitQuotaService",
-                                        "StreamRateLimitQuotas", _, _))
-        .WillOnce(Invoke(this, &RateLimitTestClient::mockStartRaw));
-
-    return async_client;
+    auto client = std::make_shared<Grpc::MockAsyncClient>();
+    async_client_ = client.get();
+    return client;
   }
 
-  Grpc::RawAsyncStream* mockStartRaw(Unused, Unused, Grpc::RawAsyncStreamCallbacks& callbacks,
+  void setStreamStartToFail(int fail_starts) { fail_starts_ = fail_starts; }
+
+  Grpc::RawAsyncStream* mockStartRaw(Unused, Unused,
+                                     Grpc::RawAsyncStreamCallbacks& callbacks,
                                      const Http::AsyncClient::StreamOptions&) {
-    if (start_failed_) {
+    if (fail_starts_ > 0) {
+      fail_starts_--;
       return nullptr;
     }
     stream_callbacks_ = &callbacks;
@@ -91,22 +108,37 @@ public:
 
   NiceMock<MockFactoryContext> context_;
 
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   envoy::config::core::v3::GrpcService grpc_service_;
+  Grpc::MockAsyncClient* async_client_ = nullptr;
   Grpc::MockAsyncStream stream_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Grpc::RawAsyncStreamCallbacks* stream_callbacks_;
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
-  RateLimitClientPtr client_;
-  // std::unique_ptr<RateLimitClient> client_;
-  MockRateLimitQuotaCallbacks callbacks_;
-  bool external_inited_ = false;
-  bool start_failed_ = false;
-  BucketsCache bucket_cache_;
+  int fail_starts_ = 0;
   std::string domain_ = "cloud_12345_67890_rlqs";
+  // Control timing by directly calling invokeCallback().
+  Event::MockTimer* timer_ = nullptr;
+  Event::MockDispatcher* dispatcher_ =
+      &context_.server_factory_context_.dispatcher_;
 };
 
-} // namespace
-} // namespace RateLimitQuota
-} // namespace HttpFilters
-} // namespace Extensions
-} // namespace Envoy
+class MockTokenBucket : public TokenBucket {
+ public:
+  MockTokenBucket() = default;
+  ~MockTokenBucket() override = default;
+
+  MOCK_METHOD(uint64_t, consume, (uint64_t tokens, bool allow_partial),
+              (override));
+  MOCK_METHOD(uint64_t, consume,
+              (uint64_t tokens, bool allow_partial,
+               std::chrono::milliseconds& time_to_next_token),
+              (override));
+  MOCK_METHOD(std::chrono::milliseconds, nextTokenAvailable, (), (override));
+  MOCK_METHOD(void, maybeReset, (uint64_t num_tokens), (override));
+};
+
+}  // namespace RateLimitQuota
+}  // namespace HttpFilters
+}  // namespace Extensions
+}  // namespace Envoy
