@@ -1,17 +1,18 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
-    "envoy_package",
+    "envoy_cc_extension",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "outlier_detection_monitors_lib",
     srcs = ["monitor_base_impl.cc"],
     hdrs = ["monitor_base_impl.h"],
+    visibility = ["//visibility:public"],
     deps = [
         #"//envoy/access_log:access_log_interface",
         #"//envoy/event:dispatcher_interface",
@@ -27,6 +28,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib_header",
         #"@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         #"@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/outlier_detection_monitors/common/v3:pkg_cc_proto",
     ],
 )
-

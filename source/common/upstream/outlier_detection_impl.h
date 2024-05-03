@@ -165,6 +165,8 @@ public:
     getSRMonitor(type).setSuccessRate(new_success_rate);
   }
 
+  std::function<void(uint32_t)> getCallback();
+
   // handlers for reporting local origin errors
   void localOriginFailure();
   void localOriginNoFailure();
@@ -175,7 +177,7 @@ public:
   void setJitter(const std::chrono::milliseconds jitter) { jitter_ = jitter; }
   std::chrono::milliseconds getJitter() const { return jitter_; }
 
-private:
+  // private:
   std::weak_ptr<DetectorImpl> detector_;
   std::weak_ptr<Host> host_;
   absl::optional<MonotonicTime> last_ejection_time_;
@@ -208,6 +210,10 @@ private:
   void putResultWithLocalExternalSplit(Result result, absl::optional<uint64_t> code);
   std::function<void(DetectorHostMonitorImpl*, Result, absl::optional<uint64_t> code)>
       put_result_func_;
+
+  // Set of extension monitors.
+  // TODO: do method and enable private
+  std::unique_ptr<Extensions::Outlier::MonitorsSet> monitors_set_;
 };
 
 /**
@@ -321,6 +327,7 @@ public:
   bool successfulActiveHealthCheckUnejectHost() const {
     return successful_active_health_check_uneject_host_;
   }
+  std::unique_ptr<Extensions::Outlier::MonitorsSet> createMonitorExtensions();
 
 private:
   const uint64_t interval_ms_;
@@ -369,13 +376,13 @@ private:
   static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_MS = 10 * DEFAULT_BASE_EJECTION_TIME_MS;
   static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_JITTER_MS = 0;
 
-  // explicitly call constructor to increment ownership count of the shared pointer.
-  std::shared_ptr<Extensions::Outlier::MonitorsSet> monitorsSet() {
-    return std::shared_ptr<Extensions::Outlier::MonitorsSet>(monitors_set_);
-  }
-
-private:
-  std::shared_ptr<Extensions::Outlier::MonitorsSet> monitors_set_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+  // Store extensions config. It will be used when monitors are created and extensions
+  // must be attached.
+  ::google::protobuf::RepeatedPtrField<::envoy::config::core::v3::TypedExtensionConfig>
+      extensions_config_;
+  // const envoy::config::cluster::v3::Extensions::outlier_detection_monitors::common::v3::Monitors
+  // extensions_config_;
 };
 
 /**

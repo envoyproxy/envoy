@@ -11,7 +11,9 @@ envoy_extension_package()
 envoy_cc_extension(
     name = "consecutive_errors_monitor_lib",
     srcs = ["consecutive_errors_monitor.cc"],
+    hdrs = ["consecutive_errors_monitor.h"],
     deps = [
+        "@envoy_api//envoy/extensions/outlier_detection_monitors/common/v3:pkg_cc_proto",
         #"//envoy/access_log:access_log_interface",
         #"//envoy/event:dispatcher_interface",
         #"//envoy/event:timer_interface",

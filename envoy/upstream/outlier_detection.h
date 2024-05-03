@@ -65,8 +65,13 @@ enum class ErrorType; // {
 
 class Error {
 public:
-  virtual ErrorType type() const PURE;
+  Error() = delete;
+  Error(ErrorType type) : type_(type) {}
+  virtual ErrorType type() const { return type_; };
   virtual ~Error() = default;
+
+private:
+  ErrorType type_;
 };
 using ErrorPtr = std::unique_ptr<Error>;
 

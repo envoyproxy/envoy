@@ -68,12 +68,12 @@ void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
 
 void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   external_origin_sr_monitor_.incTotalReqCounter();
+  std::shared_ptr<DetectorImpl> detector = detector_.lock();
+  if (!detector) {
+    // It's possible for the cluster/detector to go away while we still have a host in use.
+    return;
+  }
   if (Http::CodeUtility::is5xx(response_code)) {
-    std::shared_ptr<DetectorImpl> detector = detector_.lock();
-    if (!detector) {
-      // It's possible for the cluster/detector to go away while we still have a host in use.
-      return;
-    }
     if (Http::CodeUtility::isGatewayError(response_code)) {
       if (++consecutive_gateway_failure_ ==
           detector->runtime().snapshot().getInteger(
@@ -93,6 +93,25 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     consecutive_5xx_ = 0;
     consecutive_gateway_failure_ = 0;
   }
+
+  if (monitors_set_ == nullptr) {
+    return;
+  }
+  // Wrap reported HTTP code into outlier detection extension's wrapper and forward
+  // it to configured extensions.
+  for (auto& monitor : monitors_set_->monitors()) {
+    monitor->reportResult(Extensions::Outlier::HttpCode(response_code));
+  }
+}
+std::function<void(uint32_t)> DetectorHostMonitorImpl::getCallback() {
+  return [this](uint32_t) {
+    std::shared_ptr<DetectorImpl> detector = detector_.lock();
+    if (!detector) {
+      // It's possible for the cluster/detector to go away while we still have a host in use.
+      return;
+    }
+    detector->onConsecutive5xx(host_.lock());
+  };
 }
 
 absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result result) {
@@ -261,20 +280,34 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
       max_ejection_time_jitter_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(
           config, max_ejection_time_jitter, DEFAULT_MAX_EJECTION_TIME_JITTER_MS))),
       successful_active_health_check_uneject_host_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, successful_active_health_check_uneject_host, true)) {
+          config, successful_active_health_check_uneject_host, true)),
+      validation_visitor_(validation_visitor) {
 
+  // Store extensions' config. It will be used to create extensions monitors
+  // when host are added to the cluster.
+  extensions_config_ = config.monitors();
+}
+
+std::unique_ptr<Extensions::Outlier::MonitorsSet> DetectorConfig::createMonitorExtensions() {
   // Create outlier detection extensions.
-  Extensions::Outlier::MonitorFactoryContext context(validation_visitor);
-  for (const auto& monitor : config.monitors()) {
+  if (extensions_config_.empty()) {
+    return nullptr;
+  }
+
+  auto monitors_set = std::make_unique<Extensions::Outlier::MonitorsSet>();
+  Extensions::Outlier::MonitorFactoryContext context(validation_visitor_);
+  for (const auto& monitor : extensions_config_) {
     const auto& name = monitor.name();
     printf("Evaluating monitor %s\n", name.c_str());
     auto& factory =
         Config::Utility::getAndCheckFactory<Extensions::Outlier::MonitorFactory>(monitor);
     printf("Found factory: %s\n", factory.category().c_str());
     auto config = Config::Utility::translateToFactoryConfig(
-        monitor, validation_visitor /*.staticValidationVisitor()*/, factory);
-    auto m = factory.createMonitor(*config, context);
+        monitor, validation_visitor_ /*.staticValidationVisitor()*/, factory);
+    monitors_set->addMonitor(factory.createMonitor(*config, context));
   }
+
+  return monitors_set;
 }
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
@@ -360,6 +393,14 @@ void DetectorImpl::initialize(Cluster& cluster) {
 void DetectorImpl::addHostMonitor(HostSharedPtr host) {
   ASSERT(host_monitors_.count(host) == 0);
   DetectorHostMonitorImpl* monitor = new DetectorHostMonitorImpl(shared_from_this(), host);
+  // TODO: change monitors_set_ to monitor_extensions.
+  // Move callback as parameter to createMonitorExtensions
+  monitor->monitors_set_ = config_.createMonitorExtensions();
+  if (monitor->monitors_set_ != nullptr) {
+    for (auto& extension : monitor->monitors_set_->monitors()) {
+      extension->callback_ = monitor->getCallback();
+    }
+  }
   host_monitors_[host] = monitor;
   host->setOutlierDetector(DetectorHostMonitorPtr{monitor});
 }
@@ -396,6 +437,14 @@ void DetectorImpl::unejectHost(HostSharedPtr host) {
   host_monitors_[host]->resetConsecutiveGatewayFailure();
   host_monitors_[host]->resetConsecutiveLocalOriginFailure();
   host_monitors_[host]->uneject(time_source_.monotonicTime());
+
+  // TODO: maybe std::for_each or similar.
+  if (host_monitors_[host]->monitors_set_ != nullptr) {
+    for (auto& extension : host_monitors_[host]->monitors_set_->monitors()) {
+      extension->reset();
+    }
+  }
+
   runCallbacks(host);
 
   if (event_logger_) {
