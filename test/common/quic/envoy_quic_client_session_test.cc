@@ -270,7 +270,7 @@ TEST_P(EnvoyQuicClientSessionTest, SendResetFrame) {
 
   // IETF bi-directional stream.
   quic::QuicStreamId stream_id = stream.id();
-  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ProtocolError, _));
   EXPECT_CALL(*quic_connection_, SendControlFrame(_));
   envoy_quic_session_->ResetStream(stream_id, quic::QUIC_ERROR_PROCESSING_STREAM);
 
