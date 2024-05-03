@@ -203,28 +203,28 @@ The configuration is divided in two parts: setting up the reporting of tracing d
 
 Set up a cluster to report to the OpenTelemetry collector (or another endpoint that accepts OTLP v1):
 
-.. literalinclude:: _include/envoy-opentelemetry.yaml
+.. literalinclude:: _include/opentelemetry/envoy-front-proxy.yaml
    :language: yaml
-   :lines: 104-111
+   :lines: 109-125
    :linenos:
    :caption: Envoy configuration for a cluster representing an OTLP endpoint
 
 To enable the reporting of tracing data, add the following to the ``envoy.filters.network.http_connection_manager`` filter: 
 
-.. literalinclude:: _include/envoy-opentelemetry.yaml
+.. literalinclude:: _include/opentelemetry/envoy-front-proxy.yaml
    :language: yaml
-   :lines: 10-23
+   :lines: 15-28
    :linenos:
    :emphasize-lines: 5-14
    :caption: Adding the ``envoy.tracers.opentelemetry`` tracing provider to an existing filter
 
 To enable the reporting of access logs as log records, add the following to the ``envoy.filters.network.http_connection_manager`` filter:
 
-.. literalinclude:: _include/envoy-opentelemetry.yaml
+.. literalinclude:: _include/opentelemetry/envoy-front-proxy.yaml
    :language: yaml
-   :lines: 24-73
+   :lines: 15-18,29-58
    :linenos:
-   :emphasize-lines: 10
+   :emphasize-lines: 14
    :caption: Setting up the reporting of access logs to the OTLP cluster
 
 In OpenTelemetry, the ``service.name`` resource attribute is the single, most important piece of metadata to add to an OpenTelemetry resource.
@@ -232,20 +232,20 @@ OpenTelemetry resources are metadata dictionaries to describe which system emits
 The resource attributes, i.e., the key-value pairs that specify the resource metadata, are sent along with every piece of telemetry.
 The ``tracing`` provider has the ``service_name`` field to set up the ``service.name`` resource attribute:
 
-.. literalinclude:: _include/envoy-opentelemetry.yaml
+.. literalinclude:: _include/opentelemetry/envoy-front-proxy.yaml
    :language: yaml
-   :lines: 12-21
+   :lines: 19-28
    :linenos:
    :emphasize-lines: 10
    :caption: Setting the ``service.name`` resource attribute for tracing data
 
 For access logs, however, you need to set up the ``service.name`` resource attribute using the ``resource_attributes`` configuration:
 
-.. literalinclude:: _include/envoy-opentelemetry.yaml
+.. literalinclude:: _include/opentelemetry/envoy-front-proxy.yaml
    :language: yaml
-   :lines: 24-71
+   :lines: 30-58
    :linenos:
-   :emphasize-lines: 12-16
+   :emphasize-lines: 11-15
    :caption: Adding the ``service.name`` resource attribute to access logs
 
 You should use the same value for the service name between tracing data and access logs.
