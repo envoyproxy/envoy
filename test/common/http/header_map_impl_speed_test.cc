@@ -297,28 +297,26 @@ static void headerMapImplRemovePrefix(benchmark::State& state) {
 }
 BENCHMARK(headerMapImplRemovePrefix)->Arg(0)->Arg(1)->Arg(5)->Arg(10)->Arg(50);
 
-template <class HeaderMapType> class StaticLookupBenchmarker {
+class StaticLookupBenchmarker {
 public:
+  explicit StaticLookupBenchmarker(std::unique_ptr<HeaderMapImpl> impl)
+      : header_map_(std::move(impl)) {}
   absl::optional<HeaderMapImpl::StaticLookupResponse> lookup(absl::string_view key) {
-    return table_.lookup(*ignored_, key);
+    return header_map_->staticLookup(key);
   }
 
 private:
-  // We create both kinds of table so the entries that get registered dynamically
-  // are included in the static tables.
-  std::unique_ptr<HeaderMapImpl> ignored_ = RequestHeaderMapImpl::create();
-  std::unique_ptr<HeaderMapImpl> also_ignored_ = ResponseHeaderMapImpl::create();
-  HeaderMapImpl::StaticLookupTable<HeaderMapType> table_;
+  std::unique_ptr<HeaderMapImpl> header_map_;
 };
 
-template <class HeaderMapType>
 static void headerMapImplStaticLookups(benchmark::State& state,
+                                       std::unique_ptr<HeaderMapImpl> header_map,
                                        const std::vector<std::string>& keys) {
   int i = keys.size();
-  StaticLookupBenchmarker<HeaderMapType> table;
+  StaticLookupBenchmarker benchmarker{std::move(header_map)};
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
-    auto result = table.lookup(keys[--i]);
+    auto result = benchmarker.lookup(keys[--i]);
     if (i == 0) {
       i = keys.size();
     }
@@ -346,18 +344,18 @@ static std::vector<std::string> makeMismatchedHeaders() {
 static void bmHeaderMapImplRequestStaticLookupHits(benchmark::State& state) {
   std::vector<std::string> keys;
   INLINE_REQ_HEADERS(ADD_HEADER_TO_KEYS);
-  headerMapImplStaticLookups<RequestHeaderMap>(state, keys);
+  headerMapImplStaticLookups(state, RequestHeaderMapImpl::create(), keys);
 }
 static void bmHeaderMapImplResponseStaticLookupHits(benchmark::State& state) {
   std::vector<std::string> keys;
   INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
-  headerMapImplStaticLookups<ResponseHeaderMap>(state, keys);
+  headerMapImplStaticLookups(state, ResponseHeaderMapImpl::create(), keys);
 }
 static void bmHeaderMapImplRequestStaticLookupMisses(benchmark::State& state) {
-  headerMapImplStaticLookups<RequestHeaderMap>(state, makeMismatchedHeaders());
+  headerMapImplStaticLookups(state, RequestHeaderMapImpl::create(), makeMismatchedHeaders());
 }
 static void bmHeaderMapImplResponseStaticLookupMisses(benchmark::State& state) {
-  headerMapImplStaticLookups<ResponseHeaderMap>(state, makeMismatchedHeaders());
+  headerMapImplStaticLookups(state, ResponseHeaderMapImpl::create(), makeMismatchedHeaders());
 }
 BENCHMARK(bmHeaderMapImplRequestStaticLookupHits);
 BENCHMARK(bmHeaderMapImplResponseStaticLookupHits);
