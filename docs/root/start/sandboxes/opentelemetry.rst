@@ -194,7 +194,7 @@ And the matching access log:
     opentelemetry-opentelemetry-1      | Flags: 0
     opentelemetry-opentelemetry-1      |    {"kind": "exporter", "data_type": "logs", "name": "debug"}
 
-Notice how the log record's `Trace ID` and `Span ID` fields match the span's `Trace ID` and `ID` fields.
+Notice how the log record's ``Trace ID`` and ``Span ID`` fields match the span's ``Trace ID`` and ``ID`` fields.
 
 Step 6: How to replicate this in your setup
 *******************************************
