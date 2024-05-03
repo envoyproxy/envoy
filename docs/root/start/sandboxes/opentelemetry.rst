@@ -189,3 +189,88 @@ And the matching access log:
     opentelemetry-opentelemetry-1      |    {"kind": "exporter", "data_type": "logs", "name": "debug"}
 
 Notice how the log record's `Trace ID: 832518ad68578df8182cd76847693a93` and `Span ID: 8af519328fd9ec0c` match the span's `Trace ID: 832518ad68578df8182cd76847693a93` and `ID: 8af519328fd9ec0c`.
+
+Step 6: How to replicate this in your setup
+*******************************************
+
+The configuration is divided in two parts: setting up the reporting of tracing data over OpenTelemetry, and the reporting of access logs:
+
+Set up a cluster to report to the OpenTelemetry collector (or another endpoint that accepts OTLP v1):
+
+.. code-block:: yaml
+    clusters:
+    - name: opentelemetry_collector
+        type: STRICT_DNS
+        lb_policy: ROUND_ROBIN
+        typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+            explicit_http_config:
+            http2_protocol_options: {}
+    load_assignment:
+      cluster_name: &otel_cluster_name opentelemetry_collector
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: opentelemetry
+                port_value: 4317
+
+To enable the reporting of tracing data, add the following to the `envoy.filters.network.http_connection_manager` filter: 
+
+.. code-block:: yaml
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          tracing:
+            provider:
+              name: envoy.tracers.opentelemetry
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
+                grpc_service:
+                  envoy_grpc:
+                    cluster_name: *otel_cluster_name # This is the cluster pointing at the OpenTelemetry collector
+                  timeout: 0.250s
+                service_name: envoy-1 # <-- Change this to set up the `service.name` resource attribute
+
+To enable the reporting of access logs as log records, add the following to the `envoy.filters.network.http_connection_manager` filter:
+
+.. code-block:: yaml
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          access_log:
+          - name: envoy.access_loggers.open_telemetry
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig
+              common_config:
+                log_name: "otel_envoy_accesslog"
+                transport_api_version: V3
+                grpc_service:
+                  envoy_grpc:
+                    cluster_name: *otel_cluster_name
+              # Configuration of OTel metadata starts here
+              resource_attributes:
+                values:
+                - key: "service.name"
+                  value:
+                    string_value: envoy-1 # Should match `service_name` in tracing section
+              body:
+                string_value: |
+                  "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              attributes:
+                values:
+                - key: "url.path"
+                  value:
+                    string_value: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+                - key: "http.request.method"
+                  value:
+                    string_value: "%REQ(:METHOD)%"
+                - key: "http.response.status_code"
+                  value:
+                    string_value: "%RESPONSE_CODE%"

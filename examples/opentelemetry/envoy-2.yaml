@@ -1,6 +1,36 @@
 # This proxy listens on port 10000 and routes all queries to `service-2`.
 
 static_resources:
+  clusters:
+  - name: service_cluster2
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: service_cluster2
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service-2
+                port_value: 8080
+  - name: &otel_cluster_name opentelemetry_collector
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    load_assignment:
+      cluster_name: opentelemetry_collector
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: opentelemetry
+                port_value: 4317
   listeners:
   - address:
       socket_address:
@@ -19,9 +49,9 @@ static_resources:
                 "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
                 grpc_service:
                   envoy_grpc:
-                    cluster_name: opentelemetry_collector
+                    cluster_name: *otel_cluster_name
                   timeout: 0.250s
-                service_name: envoy-2
+                service_name: &service_name envoy-2
           access_log:
           - name: envoy.access_loggers.open_telemetry
             typed_config:
@@ -31,7 +61,27 @@ static_resources:
                 transport_api_version: V3
                 grpc_service:
                   envoy_grpc:
-                    cluster_name: opentelemetry_collector
+                    cluster_name: *otel_cluster_name
+                  timeout: 0.250s
+              resource_attributes:
+                values:
+                - key: "service.name"
+                  value:
+                    string_value: *service_name # Should match `service_name` in tracing section
+              body:
+                string_value: |
+                  "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              attributes:
+                values:
+                - key: "url.path"
+                  value:
+                    string_value: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+                - key: "http.request.method"
+                  value:
+                    string_value: "%REQ(:METHOD)%"
+                - key: "http.response.status_code"
+                  value:
+                    string_value: "%RESPONSE_CODE%"
           codec_type: AUTO
           stat_prefix: ingress_http
           http_filters:
@@ -51,34 +101,3 @@ static_resources:
                   cluster: service_cluster2
                 decorator:
                   operation: routeToService2
-
-  clusters:
-  - name: service_cluster2
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: service_cluster2
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: service-2
-                port_value: 8080
-  - name: opentelemetry_collector
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-    load_assignment:
-      cluster_name: opentelemetry_collector
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: opentelemetry
-                port_value: 4317
