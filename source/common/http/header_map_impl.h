@@ -352,7 +352,8 @@ protected:
   // This holds the max count of the headers in the HeaderMap.
   const uint32_t max_headers_count_ = UINT32_MAX;
 
-  template <class T> friend class StaticLookupBenchmarker;
+  // For benchmarking to access non-public methods to test staticLookup.
+  friend class StaticLookupBenchmarker;
 };
 
 /**
