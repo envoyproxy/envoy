@@ -51,15 +51,8 @@ private:
 
 using ThreadLocalOauth2ClientCredentialsTokenSharedPtr =
     std::shared_ptr<ThreadLocalOauth2ClientCredentialsToken>;
-class TokenReader {
-public:
-  virtual ~TokenReader() = default;
-  virtual const std::string& token() const PURE;
-};
 
-using TokenReaderConstSharedPtr = std::shared_ptr<const TokenReader>;
-
-class TokenProvider : public TokenReader,
+class TokenProvider : public Common::SecretReader,
                       public FilterCallbacks,
                       public Logger::Loggable<Logger::Id::credential_injector> {
 public:
@@ -73,8 +66,8 @@ public:
     return tls_->getTyped<ThreadLocalOauth2ClientCredentialsToken>();
   }
 
-  // TokenReader
-  const std::string& token() const override;
+  // Common::SecretReader
+  const std::string& credential() const override;
 
   // FilterCallbacks
   void onGetAccessTokenSuccess(const std::string& access_code, std::chrono::seconds) override;

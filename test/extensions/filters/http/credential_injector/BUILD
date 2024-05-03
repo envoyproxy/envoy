@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/credential_injector:credential_injector_lib",
         "//source/extensions/http/injected_credentials/generic:generic_lib",
+        "//source/extensions/http/injected_credentials/oauth2:client_credentials_lib",
         "//test/mocks/server:server_mocks",
     ],
 )

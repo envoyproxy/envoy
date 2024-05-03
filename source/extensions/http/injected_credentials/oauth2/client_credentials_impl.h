@@ -13,15 +13,17 @@ namespace OAuth2 {
 /**
  * Implementation of credential injector's interface.
  */
-class OAuth2ClientCredentialTokenInjector : public Common::CredentialInjector {
+class OAuth2ClientCredentialTokenInjector
+    : public Common::CredentialInjector,
+      public Logger::Loggable<Logger::Id::credential_injector> {
 public:
-  OAuth2ClientCredentialTokenInjector(TokenReaderConstSharedPtr token_reader)
+  OAuth2ClientCredentialTokenInjector(Common::SecretReaderConstSharedPtr token_reader)
       : token_reader_(token_reader){};
 
   absl::Status inject(Envoy::Http::RequestHeaderMap& headers, bool overwrite) override;
 
 private:
-  TokenReaderConstSharedPtr token_reader_;
+  Common::SecretReaderConstSharedPtr token_reader_;
 };
 
 } // namespace OAuth2

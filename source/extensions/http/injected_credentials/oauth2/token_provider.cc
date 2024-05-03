@@ -130,7 +130,7 @@ void TokenProvider::onGetAccessTokenFailure(FailureReason failure_reason) {
   timer_->enableTimer(retry_interval_);
 }
 
-const std::string& TokenProvider::token() const { return threadLocal().token(); }
+const std::string& TokenProvider::credential() const { return threadLocal().token(); }
 
 } // namespace OAuth2
 } // namespace InjectedCredentials

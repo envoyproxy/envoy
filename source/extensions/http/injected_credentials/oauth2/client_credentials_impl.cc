@@ -12,9 +12,10 @@ absl::Status OAuth2ClientCredentialTokenInjector::inject(Envoy::Http::RequestHea
     return absl::AlreadyExistsError("Credential already exists in the header");
   }
 
-  auto token = token_reader_->token();
+  auto token = token_reader_->credential();
 
   if (token.empty()) {
+    ENVOY_LOG(error, "Failed to get oauth2 token from token provider");
     return absl::NotFoundError("Failed to get oauth2 token from token provider");
   }
 
