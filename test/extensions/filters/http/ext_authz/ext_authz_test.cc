@@ -228,7 +228,7 @@ public:
                 const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                 const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
-    // (The path pseudoheader needs to be set for the query parameter tests.)
+    // (The path pseudo header needs to be set for the query parameter tests.)
     request_headers_.addCopy(Http::Headers::get().Path, "/some-endpoint");
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter_->decodeHeaders(request_headers_, false));
