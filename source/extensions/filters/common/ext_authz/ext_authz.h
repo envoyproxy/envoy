@@ -72,7 +72,7 @@ enum class CheckStatus {
   // The authz service could not be queried.
   Error,
   // The request is denied.
-  Denied,
+  Denied
 };
 
 using UnsafeHeader = std::pair<std::string, std::string>;
