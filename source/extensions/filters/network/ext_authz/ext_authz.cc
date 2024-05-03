@@ -73,7 +73,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   status_ = Status::Complete;
   config_->stats().active_.dec();
 
-  absl::string_view response_code_details;
   switch (response->status) {
   case Filters::Common::ExtAuthz::CheckStatus::OK:
     config_->stats().ok_.inc();
@@ -89,11 +88,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     }
     break;
   case Filters::Common::ExtAuthz::CheckStatus::Error:
-    response_code_details = Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError;
     config_->stats().error_.inc();
     break;
   case Filters::Common::ExtAuthz::CheckStatus::Denied:
-    response_code_details = Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied;
     config_->stats().denied_.inc();
     break;
   }
@@ -112,7 +109,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     filter_callbacks_->connection().streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
 
-    filter_callbacks_->connection().streamInfo().setResponseCodeDetails(response_code_details);
+    filter_callbacks_->connection().streamInfo().setResponseCodeDetails(
+        response->status == Filters::Common::ExtAuthz::CheckStatus::Denied
+            ? Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied
+            : Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
   } else {
     // Let the filter chain continue.
     filter_return_ = FilterReturn::Continue;
