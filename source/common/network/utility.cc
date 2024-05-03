@@ -800,7 +800,7 @@ bool Utility::isTransparent(Socket& sock) {
     call = IPV6_TRANSPARENT;
   }
 
-  status = sock.getSocketOption(SOL_IP, call, &value, &value_len).rc_;
+  status = sock.getSocketOption(SOL_IP, call, &value, &value_len).return_value_;
 
   if (status != 0 || value == 0) {
     return false;
