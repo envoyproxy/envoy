@@ -452,8 +452,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         }
       }
       response_headers_to_overwrite_if_exists_ =
-          Http::HeaderVector(response->response_headers_to_overwrite_if_exists.begin(),
-                             response->response_headers_to_overwrite_if_exists.end());
+          Http::HeaderVector{response->response_headers_to_overwrite_if_exists.begin(),
+                             response->response_headers_to_overwrite_if_exists.end()};
     }
 
     absl::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
