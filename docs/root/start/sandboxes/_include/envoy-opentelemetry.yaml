@@ -1,46 +1,4 @@
 static_resources:
-  clusters:
-  - name: envoy_cluster1
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: envoy_cluster1
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: envoy-1
-                port_value: 10000
-  - name: envoy_cluster2
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: envoy_cluster2
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: envoy-1
-                port_value: 10001
-  - name: &otel_cluster_name opentelemetry_collector
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-    load_assignment:
-      cluster_name: opentelemetry_collector
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: opentelemetry
-                port_value: 4317
   listeners:
   - address:
       socket_address:
@@ -60,7 +18,7 @@ static_resources:
                 "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
                 grpc_service:
                   envoy_grpc:
-                    cluster_name: *otel_cluster_name
+                    cluster_name: opentelemetry_collector
                   timeout: 0.250s
                 service_name: &service_name front-envoy
           access_log:
@@ -72,7 +30,7 @@ static_resources:
                 transport_api_version: V3
                 grpc_service:
                   envoy_grpc:
-                    cluster_name: *otel_cluster_name
+                    cluster_name: opentelemetry_collector
                   timeout: 0.250s
               resource_attributes:
                 values:
@@ -118,3 +76,45 @@ static_resources:
                   cluster: envoy_cluster2
                 decorator:
                   operation: routeToEnvoy2ViaEnvoy1
+  clusters:
+  - name: envoy_cluster1
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: envoy_cluster1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: envoy-1
+                port_value: 10000
+  - name: envoy_cluster2
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: envoy_cluster2
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: envoy-1
+                port_value: 10001
+  - name: opentelemetry_collector
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    load_assignment:
+      cluster_name: opentelemetry_collector
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: opentelemetry
+                port_value: 4317

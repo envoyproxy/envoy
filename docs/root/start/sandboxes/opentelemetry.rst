@@ -205,7 +205,7 @@ Set up a cluster to report to the OpenTelemetry collector (or another endpoint t
 
 .. literalinclude:: _include/envoy-opentelemetry.yaml
    :language: yaml
-   :lines: 27-34
+   :lines: 104-111
    :linenos:
    :caption: Envoy configuration for a cluster representing an OTLP endpoint
 
@@ -213,7 +213,7 @@ To enable the reporting of tracing data, add the following to the `envoy.filters
 
 .. literalinclude:: _include/envoy-opentelemetry.yaml
    :language: yaml
-   :lines: 52-65
+   :lines: 10-23
    :linenos:
    :emphasize-lines: 5-14
    :caption: Adding the `envoy.tracers.opentelemetry` tracing provider to an existing filter
@@ -222,7 +222,7 @@ To enable the reporting of access logs as log records, add the following to the 
 
 .. literalinclude:: _include/envoy-opentelemetry.yaml
    :language: yaml
-   :lines: 66-95
+   :lines: 24-73
    :linenos:
    :emphasize-lines: 10
    :caption: Setting up the reporting of access logs to the OTLP cluster
@@ -234,7 +234,7 @@ The `tracing` provider has a `service_name` field to set up the `service.name` r
 
 .. literalinclude:: _include/envoy-opentelemetry.yaml
    :language: yaml
-   :lines: 56-65
+   :lines: 12-21
    :linenos:
    :emphasize-lines: 10
    :caption: Setting the `service.name` resource attribute for tracing data
@@ -243,7 +243,7 @@ For access logs, however, you need to set up the `service.name` resource attribu
 
 .. literalinclude:: _include/envoy-opentelemetry.yaml
    :language: yaml
-   :lines: 66-95
+   :lines: 24-71
    :linenos:
    :emphasize-lines: 12-16
    :caption: Adding the `service.name` resource attribute to access logs
