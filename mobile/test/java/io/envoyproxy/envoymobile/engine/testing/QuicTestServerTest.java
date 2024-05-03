@@ -43,7 +43,6 @@ public class QuicTestServerTest {
     Map<String, String> headers = new HashMap<>();
     headers.put("Cache-Control", "max-age=0");
     headers.put("Content-Type", "text/plain");
-    // headers.put("X-Original-Url", "https://localhost/simple.txt");
     httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP3, headers,
                                                  "This is a simple text file served by QUIC.\n",
                                                  Collections.emptyMap());
@@ -76,8 +75,8 @@ public class QuicTestServerTest {
     RequestScenario requestScenario =
         new RequestScenario()
             .setHttpMethod(RequestMethod.GET)
-            // .addHeader("no_trailers", "true")
-            .setUrl("https://" + httpTestServer.getAddress() + "/simple.txt");
+            .addHeader("no_trailers", "true")
+            .setUrl("https://localhost:" + httpTestServer.getPort() + "/simple.txt");
 
     Response response = sendRequest(requestScenario);
 
