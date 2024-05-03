@@ -198,7 +198,8 @@ static_resources:
           common_tls_context:
             tls_certificates:
             # The following self-signed certificate pair is generated using:
-            # $ openssl req -x509 -newkey rsa:2048 -keyout a/front-proxy-key.pem -out  a/front-proxy-crt.pem -days 3650 -nodes -subj '/CN=front-envoy'
+            # $ openssl req -x509 -newkey rsa:2048 -keyout a/front-proxy-key.pem -out  a/front-proxy-crt.pem \
+            #       -days 3650 -nodes -subj '/CN=front-envoy'
             #
             # Instead of feeding it as an inline_string, certificate pair can also be fed to Envoy
             # via filename. Reference: https://envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#config-core-v3-datasource.

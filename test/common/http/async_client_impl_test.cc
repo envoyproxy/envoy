@@ -5,6 +5,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/async_client_impl.h"
@@ -13,6 +14,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/buffer/mocks.h"
@@ -690,6 +692,64 @@ TEST_F(AsyncClientImplTest, WithMetadata) {
       {Envoy::Config::MetadataFilters::get().ENVOY_LB,
        MessageUtil::keyValueStruct("fake_test_key", "fake_test_value")});
   options.setMetadata(metadata);
+
+  auto* request = client_.send(std::move(message_), callbacks_, options);
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 200);
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(data, true);
+}
+
+class TestStateObject : public StreamInfo::FilterState::Object {
+public:
+  TestStateObject(std::string value) : value_(value) {}
+
+  const std::string& value() const { return value_; }
+
+private:
+  std::string value_;
+};
+
+TEST_F(AsyncClientImplTest, WithFilterState) {
+  message_->body().add("test-body");
+  Buffer::Instance& data = message_->body();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
+      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
+                           Upstream::LoadBalancerContext* context) {
+        const StreamInfo::FilterState& filter_state = context->requestStreamInfo()->filterState();
+        const TestStateObject* state = filter_state.getDataReadOnly<TestStateObject>("test-filter");
+        EXPECT_NE(state, nullptr);
+        EXPECT_EQ(state->value(), "stored-test-state");
+        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+      }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
+
+  AsyncClient::RequestOptions options;
+  auto state_object = std::make_shared<TestStateObject>("stored-test-state");
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData("test-filter", state_object, StreamInfo::FilterState::StateType::Mutable);
+  options.setFilterState(filter_state);
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
   EXPECT_NE(request, nullptr);

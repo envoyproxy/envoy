@@ -1928,41 +1928,6 @@ TEST_F(EdsTest, EndpointLocalityUpdated) {
   }
 }
 
-// Validate that onConfigUpdate() does not propagate locality weights to the host set when
-// locality weighted balancing isn't configured and the cluster does not use LB policy extensions.
-TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.reloadable_features.convert_legacy_lb_config", "false"}});
-
-  // Reset the cluster after the runtime change.
-  resetCluster();
-
-  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
-  cluster_load_assignment.set_cluster_name("fare");
-
-  {
-    auto* endpoints = cluster_load_assignment.add_endpoints();
-    auto* locality = endpoints->mutable_locality();
-    locality->set_region("oceania");
-    locality->set_zone("hello");
-    locality->set_sub_zone("world");
-    endpoints->mutable_load_balancing_weight()->set_value(42);
-
-    auto* endpoint_address = endpoints->add_lb_endpoints()
-                                 ->mutable_endpoint()
-                                 ->mutable_address()
-                                 ->mutable_socket_address();
-    endpoint_address->set_address("1.2.3.4");
-    endpoint_address->set_port_value(80);
-  }
-
-  initialize();
-  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_TRUE(initialized_);
-
-  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
-}
-
 class EdsLocalityWeightsTest : public EdsTest {
 public:
   void expectLocalityWeightsPresentForClusterConfig(const std::string& config) {

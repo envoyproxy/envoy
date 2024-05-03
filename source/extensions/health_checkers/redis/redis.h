@@ -63,24 +63,14 @@ private:
   friend class RedisHealthCheckerTest;
   RedisHealthCheckerStats generateRedisStats(Stats::Scope& scope);
 
-  struct RedisActiveHealthCheckSession
-      : public ActiveHealthCheckSession,
-        public Extensions::NetworkFilters::Common::Redis::Client::Config,
-        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks,
-        public Network::ConnectionCallbacks {
-    RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host);
-    ~RedisActiveHealthCheckSession() override;
-
-    // ActiveHealthCheckSession
-    void onInterval() override;
-    void onTimeout() override;
-    void onDeferredDelete() final;
+  struct RedisConfig : public Extensions::NetworkFilters::Common::Redis::Client::Config {
+    RedisConfig(std::chrono::milliseconds timeout) : parent_timeout_(timeout) {}
 
     // Extensions::NetworkFilters::Common::Redis::Client::Config
     bool disableOutlierEvents() const override { return true; }
     std::chrono::milliseconds opTimeout() const override {
       // Allow the main Health Check infra to control timeout.
-      return parent_.timeout_ * 2;
+      return parent_timeout_ * 2;
     }
     bool enableHashtagging() const override { return false; }
     bool enableRedirection() const override {
@@ -103,6 +93,21 @@ private:
     bool connectionRateLimitEnabled() const override { return false; }
     uint32_t connectionRateLimitPerSec() const override { return 0; }
 
+    const std::chrono::milliseconds parent_timeout_;
+  };
+
+  struct RedisActiveHealthCheckSession
+      : public ActiveHealthCheckSession,
+        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks,
+        public Network::ConnectionCallbacks {
+    RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host);
+    ~RedisActiveHealthCheckSession() override;
+
+    // ActiveHealthCheckSession
+    void onInterval() override;
+    void onTimeout() override;
+    void onDeferredDelete() final;
+
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
@@ -115,6 +120,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     RedisHealthChecker& parent_;
+    std::shared_ptr<RedisConfig> redis_config_{std::make_shared<RedisConfig>(parent_.timeout_)};
     Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client_;
     Extensions::NetworkFilters::Common::Redis::Client::PoolRequest* current_request_{};
     Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;

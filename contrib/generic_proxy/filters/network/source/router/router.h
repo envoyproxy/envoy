@@ -35,6 +35,8 @@ enum class StreamResetReason : uint32_t {
   Overflow,
   // Protocol error.
   ProtocolError,
+
+  LastReason = ProtocolError,
 };
 
 class RouterFilter;
@@ -47,7 +49,8 @@ class GenericUpstream : public ClientCodecCallbacks,
                         public Envoy::Logger::Loggable<Envoy::Logger::Id::upstream> {
 public:
   GenericUpstream(Upstream::TcpPoolData&& tcp_pool_data, ClientCodecPtr&& client_codec)
-      : tcp_pool_data_(std::move(tcp_pool_data)), client_codec_(std::move(client_codec)) {
+      : tcp_pool_data_(std::move(tcp_pool_data)), client_codec_(std::move(client_codec)),
+        upstream_host_(tcp_pool_data_.host()) {
     client_codec_->setCodecCallbacks(*this);
   }
   ~GenericUpstream() override;
@@ -68,14 +71,22 @@ public:
   void onEvent(Network::ConnectionEvent event) override { onEventImpl(event); }
 
   ClientCodec& clientCodec() { return *client_codec_; }
+  void mayUpdateUpstreamHost(Upstream::HostDescriptionConstSharedPtr real_host) {
+    if (real_host == nullptr || real_host == upstream_host_) {
+      return;
+    }
+
+    // Update the upstream host iff the connection pool callbacks provide a different
+    // value.
+    upstream_host_ = std::move(real_host);
+  }
+  Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
 
   // ResponseDecoderCallback
   void writeToConnection(Buffer::Instance& buffer) override;
   OptRef<Network::Connection> connection() override;
   OptRef<const Upstream::ClusterInfo> upstreamCluster() const override {
-    if (upstream_host_ == nullptr) {
-      return {};
-    }
+    ASSERT(upstream_host_ != nullptr);
     return upstream_host_->cluster();
   }
 
@@ -89,6 +100,7 @@ public:
 protected:
   Upstream::TcpPoolData tcp_pool_data_;
   ClientCodecPtr client_codec_;
+  Upstream::HostDescriptionConstSharedPtr upstream_host_;
 
   // Whether the upstream connection is created. This will be set to true when the initialize()
   // is called.
@@ -96,8 +108,6 @@ protected:
 
   Tcp::ConnectionPool::Cancellable* tcp_pool_handle_{};
   Tcp::ConnectionPool::ConnectionDataPtr owned_conn_data_;
-
-  Upstream::HostDescriptionConstSharedPtr upstream_host_;
 };
 using GenericUpstreamSharedPtr = std::shared_ptr<GenericUpstream>;
 
@@ -118,9 +128,11 @@ public:
   void onEventImpl(Network::ConnectionEvent event) override;
   void cleanUp(bool close_connection) override;
 
-  // ResponseDecoderCallback
-  void onDecodingSuccess(StreamFramePtr response) override;
-  void onDecodingFailure() override;
+  // ClientCodecCallbacks
+  void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
+                         absl::optional<StartTime> start_time = {}) override;
+  void onDecodingSuccess(ResponseCommonFramePtr response_common_frame) override;
+  void onDecodingFailure(absl::string_view reason = {}) override;
 
   // GenericUpstream
   void insertUpstreamRequest(uint64_t stream_id, UpstreamRequest* pending_request) override;
@@ -147,6 +159,7 @@ private:
   std::unique_ptr<EventWatcher> connection_event_watcher_;
 
   absl::optional<bool> upstream_connection_ready_;
+  bool prevent_clean_up_{};
 
   // Pending upstream requests that are waiting for the upstream response to be received.
   absl::flat_hash_map<uint64_t, UpstreamRequest*> waiting_response_requests_;
@@ -167,9 +180,11 @@ public:
   void onPoolFailureImpl(ConnectionPool::PoolFailureReason reason,
                          absl::string_view transport_failure_reason) override;
 
-  // ResponseDecoderCallback
-  void onDecodingSuccess(StreamFramePtr response) override;
-  void onDecodingFailure() override;
+  // ClientCodecCallbacks
+  void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
+                         absl::optional<StartTime> start_time = {}) override;
+  void onDecodingSuccess(ResponseCommonFramePtr response_common_frame) override;
+  void onDecodingFailure(absl::string_view reason = {}) override;
 
   // GenericUpstream
   void insertUpstreamRequest(uint64_t stream_id, UpstreamRequest* pending_request) override;
@@ -187,31 +202,36 @@ public:
   UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr generic_upstream);
 
   void startStream();
-  void resetStream(StreamResetReason reason);
+  void resetStream(StreamResetReason reason, absl::string_view reason_detail);
   void clearStream(bool close_connection);
 
   // Called when the stream has been reset or completed.
   void deferredDelete();
 
   void onUpstreamFailure(ConnectionPool::PoolFailureReason reason,
-                         absl::string_view transport_failure_reason,
-                         Upstream::HostDescriptionConstSharedPtr host);
-  void onUpstreamSuccess(Upstream::HostDescriptionConstSharedPtr host);
+                         absl::string_view transport_failure_reason);
+  void onUpstreamSuccess();
 
   void onConnectionClose(Network::ConnectionEvent event);
 
-  void onDecodingSuccess(StreamFramePtr response);
-  void onDecodingFailure();
+  void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
+                         absl::optional<StartTime> start_time = {});
+  void onDecodingSuccess(ResponseCommonFramePtr response_common_frame);
+  void onDecodingFailure(absl::string_view reason);
 
   // RequestEncoderCallback
   void onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) override;
+  void onEncodingFailure(absl::string_view reason) override;
   OptRef<const RouteEntry> routeEntry() const override;
 
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
+  void onUpstreamConnectionReady();
   void encodeBufferToUpstream(Buffer::Instance& buffer);
 
   void sendRequestStartToUpstream();
   void sendRequestFrameToUpstream();
+
+  void onUpstreamResponseComplete(bool drain_close);
 
   RouterFilter& parent_;
   uint64_t stream_id_{};
@@ -251,7 +271,7 @@ using RouterConfigSharedPtr = std::shared_ptr<RouterConfig>;
 
 class RouterFilter : public DecoderFilter,
                      public Upstream::LoadBalancerContextBase,
-                     public StreamFrameHandler,
+                     public RequestFramesHandler,
                      Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   RouterFilter(RouterConfigSharedPtr config, Server::Configuration::FactoryContext& context)
@@ -269,14 +289,18 @@ public:
   }
   FilterStatus onStreamDecoded(StreamRequest& request) override;
 
-  void onResponseStart(StreamResponsePtr response);
-  void onResponseFrame(StreamFramePtr frame);
+  void onResponseStart(ResponseHeaderFramePtr response_header_frame);
+  void onResponseFrame(ResponseCommonFramePtr response_common_frame);
   void completeDirectly();
 
-  void onUpstreamRequestReset(UpstreamRequest& upstream_request, StreamResetReason reason);
-  void cleanUpstreamRequests(bool filter_complete);
+  void onUpstreamRequestReset(UpstreamRequest& upstream_request, StreamResetReason reason,
+                              absl::string_view reason_detail);
+  void onTimeout();
 
-  void setRouteEntry(const RouteEntry* route_entry) { route_entry_ = route_entry; }
+  void setRouteEntry(const RouteEntry* route_entry) {
+    route_entry_ = route_entry;
+    max_retries_ = route_entry_ ? route_entry->retryPolicy().numRetries() : 1;
+  }
 
   std::list<UpstreamRequestPtr>& upstreamRequestsForTest() { return upstream_requests_; }
 
@@ -284,31 +308,52 @@ public:
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override;
   const Network::Connection* downstreamConnection() const override;
 
-  // StreamFrameHandler
-  void onStreamFrame(StreamFramePtr frame) override;
+  // RequestFramesHandler
+  void onRequestCommonFrame(RequestCommonFramePtr frame) override;
 
 private:
   friend class UpstreamRequest;
   friend class UpstreamManagerImpl;
 
   void kickOffNewUpstreamRequest();
-  void resetStream(StreamResetReason reason);
+  void resetStream(StreamResetReason reason, absl::string_view reason_detail);
+  void completeAndSendLocalReply(absl::Status status, absl::string_view details,
+                                 absl::optional<StreamInfo::CoreResponseFlag> flag = {});
 
-  // Set filter_complete_ to true before any local or upstream response. Because the
-  // response processing may complete and destroy the L7 filter chain directly and cause the
-  // onDestory() of RouterFilter to be called. The filter_complete_ will be used to block
-  // unnecessary clearUpstreamRequests() in the onDestory() of RouterFilter.
+  // Clean up all the upstream requests, statuses and timers. All further events will be
+  // ignored.
+  void onFilterComplete();
+
+  // Check if all request frames are ready and fire the timeout timer if necessary.
+  void mayRequestStreamEnd(bool stream_end_stream);
+
+  // Check if retry is allowed.
+  bool couldRetry(absl::optional<StreamResetReason> reason) {
+    // If the upstream connection is bound to the downstream connection and resetting happens,
+    // we should not retry the request because the downstream connection will be closed.
+    if (reason.has_value() && config_->bindUpstreamConnection()) {
+      return false;
+    }
+    return num_retries_ < max_retries_;
+  }
+
+  // Set this flag if the downstream request is cancelled, reset or completed, or the upstream
+  // response is completely received to tell the filter to ignore all further events.
   bool filter_complete_{};
 
   const RouteEntry* route_entry_{};
+  uint32_t num_retries_{0};
+  uint32_t max_retries_{1};
+
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Request* request_stream_{};
-  std::list<StreamFramePtr> request_stream_frames_;
+  std::list<RequestCommonFramePtr> request_stream_frames_;
   bool request_stream_end_{};
 
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_;
 
   std::list<UpstreamRequestPtr> upstream_requests_;
+  Envoy::Event::TimerPtr timeout_timer_;
 
   DecoderFilterCallback* callbacks_{};
 
