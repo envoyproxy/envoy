@@ -67,5 +67,4 @@ services:
       retries: 120
       start_period: 2s
     ports:
-    - "4137:4137" # gRPC port
     - "${PORT_UI:-55679}:55679"
