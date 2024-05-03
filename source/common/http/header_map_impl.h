@@ -150,20 +150,19 @@ protected:
       : public CompiledStringMap<std::function<StaticLookupResponse(HeaderMapImpl&)>> {
     StaticLookupTable();
 
-    void finalizeTable(std::vector<KV> extra = {}) {
+    std::vector<KV> finalizedTable() {
       CustomInlineHeaderRegistry::finalize<Interface::header_map_type>();
       auto& headers = CustomInlineHeaderRegistry::headers<Interface::header_map_type>();
-      size_ = headers.size() + extra.size();
+      size_ = headers.size();
       std::vector<KV> input;
       input.reserve(size_);
       for (const auto& header : headers) {
-        input.emplace_back(std::make_pair(
-            std::string{header.first.get()}, [&header](HeaderMapImpl& h) -> StaticLookupResponse {
-              return {&h.inlineHeaders()[header.second], &header.first};
-            }));
+        input.emplace_back(std::string{header.first.get()},
+                           [&header](HeaderMapImpl& h) -> StaticLookupResponse {
+                             return {&h.inlineHeaders()[header.second], &header.first};
+                           });
       }
-      std::copy(extra.begin(), extra.end(), std::back_inserter(input));
-      compile(input);
+      return input;
     }
 
     static size_t size() {
@@ -187,6 +186,9 @@ protected:
       }
     }
 
+    // This is the size of the number of callbacks; in the case of Requests,
+    // this is one smaller than the number of entries in the lookup table,
+    // because of legacy `host` mapping to the same thing as `:authority`.
     size_t size_;
   };
 

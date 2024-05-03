@@ -119,19 +119,21 @@ template <> HeaderMapImpl::StaticLookupTable<RequestHeaderMap>::StaticLookupTabl
   INLINE_REQ_HEADERS(REGISTER_DEFAULT_REQUEST_HEADER)
   INLINE_REQ_RESP_HEADERS(REGISTER_DEFAULT_REQUEST_HEADER)
 
+  auto input = finalizedTable();
+
   // Special case where we map a legacy host header to :authority.
   const auto handle =
       CustomInlineHeaderRegistry::getInlineHeader<RequestHeaderMap::header_map_type>(
           Headers::get().Host);
-  finalizeTable(
-      {{std::string{Headers::get().HostLegacy.get()},
-        [handle](HeaderMapImpl& h) -> StaticLookupResponse {
-          return {&h.inlineHeaders()[handle.value().it_->second], &handle.value().it_->first};
-        }}});
+  input.emplace_back(
+      Headers::get().HostLegacy.get(), [handle](HeaderMapImpl& h) -> StaticLookupResponse {
+        return {&h.inlineHeaders()[handle.value().it_->second], &handle.value().it_->first};
+      });
+  compile(input);
 }
 
 template <> HeaderMapImpl::StaticLookupTable<RequestTrailerMap>::StaticLookupTable() {
-  finalizeTable();
+  compile(finalizedTable());
 }
 
 template <> HeaderMapImpl::StaticLookupTable<ResponseHeaderMap>::StaticLookupTable() {
@@ -142,7 +144,7 @@ template <> HeaderMapImpl::StaticLookupTable<ResponseHeaderMap>::StaticLookupTab
   INLINE_REQ_RESP_HEADERS(REGISTER_RESPONSE_HEADER)
   INLINE_RESP_HEADERS_TRAILERS(REGISTER_RESPONSE_HEADER)
 
-  finalizeTable();
+  compile(finalizedTable());
 }
 
 template <> HeaderMapImpl::StaticLookupTable<ResponseTrailerMap>::StaticLookupTable() {
@@ -151,7 +153,7 @@ template <> HeaderMapImpl::StaticLookupTable<ResponseTrailerMap>::StaticLookupTa
       Headers::get().name);
   INLINE_RESP_HEADERS_TRAILERS(REGISTER_RESPONSE_TRAILER)
 
-  finalizeTable();
+  compile(finalizedTable());
 }
 
 uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data,
