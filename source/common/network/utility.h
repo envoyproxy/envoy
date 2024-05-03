@@ -50,7 +50,8 @@ public:
    */
   virtual void processPacket(Address::InstanceConstSharedPtr local_address,
                              Address::InstanceConstSharedPtr peer_address,
-                             Buffer::InstancePtr buffer, MonotonicTime receive_time) PURE;
+                             Buffer::InstancePtr buffer, MonotonicTime receive_time,
+                             uint8_t tos) PURE;
 
   /**
    * Called whenever datagrams are dropped due to overflow or truncation.

@@ -10,6 +10,7 @@
 #include "source/exe/platform_impl.h"
 
 #include "library/common/data/utility.h"
+#include "library/common/http/header_utility.h"
 
 namespace Envoy {
 
@@ -94,11 +95,13 @@ void Fetch::sendRequest(const absl::string_view url_string) {
 
   Platform::StreamSharedPtr stream = stream_prototype->start(/*explicit_flow_control=*/false);
 
-  Platform::RequestHeadersBuilder builder(Platform::RequestMethod::GET, std::string(url.scheme()),
-                                          std::string(url.hostAndPort()),
-                                          std::string(url.pathAndQueryParams()));
+  auto headers = Http::Utility::createRequestHeaderMapPtr();
+  headers->addCopy(Http::LowerCaseString(":method"), "GET");
+  headers->addCopy(Http::LowerCaseString(":scheme"), "https");
+  headers->addCopy(Http::LowerCaseString(":authority"), url.hostAndPort());
+  headers->addCopy(Http::LowerCaseString(":path"), url.pathAndQueryParams());
+  stream->sendHeaders(std::move(headers), true);
 
-  stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(builder.build()), true);
   request_finished.WaitForNotification();
 }
 

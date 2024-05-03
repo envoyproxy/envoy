@@ -1001,24 +1001,16 @@ public:
   virtual OptRef<const LoadBalancerConfig> loadBalancerConfig() const PURE;
 
   /**
-   * @return the load balancer factory for this cluster if the load balancing type is
-   * LOAD_BALANCING_POLICY_CONFIG.
-   * TODO(wbpcode): change the return type to return a reference after
-   * 'envoy_reloadable_features_convert_legacy_lb_config' is removed. The factory should never be
-   * nullptr when the load balancing type is LOAD_BALANCING_POLICY_CONFIG.
+   * @return the load balancer factory for this cluster. Cluster will always has a valid load
+   * balancer factory if it is created successfully.
    */
-  virtual TypedLoadBalancerFactory* loadBalancerFactory() const PURE;
+  virtual TypedLoadBalancerFactory& loadBalancerFactory() const PURE;
 
   /**
    * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for
    * all load balancers for this cluster.
    */
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
-
-  /**
-   * @return the type of load balancing that the cluster should use.
-   */
-  virtual LoadBalancerType lbType() const PURE;
 
   /**
    * @return the service discovery type to use for resolving the cluster.
@@ -1030,30 +1022,6 @@ public:
    */
   virtual OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>
   clusterType() const PURE;
-
-  /**
-   * @return configuration for round robin load balancing, only used if LB type is round robin.
-   */
-  virtual OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
-  lbRoundRobinConfig() const PURE;
-
-  /**
-   * @return configuration for least request load balancing, only used if LB type is least request.
-   */
-  virtual OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
-  lbLeastRequestConfig() const PURE;
-
-  /**
-   * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
-   */
-  virtual OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
-  lbRingHashConfig() const PURE;
-
-  /**
-   * @return configuration for maglev load balancing, only used if type is set to maglev_lb.
-   */
-  virtual OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
-  lbMaglevConfig() const PURE;
 
   /**
    * @return const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& the
@@ -1166,11 +1134,6 @@ public:
    * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
    */
   virtual UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const PURE;
-
-  /**
-   * @return the configuration for load balancer subsets.
-   */
-  virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the configuration metadata for this cluster.
