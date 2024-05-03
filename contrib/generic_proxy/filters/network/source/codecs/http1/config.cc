@@ -391,7 +391,7 @@ Http::Http1::CallbackResult Http1ServerCodec::onHeadersCompleteImpl() {
   } else if (non_end_stream) {
     auto request =
         std::make_unique<HttpRequestFrame>(std::move(active_request_->request_headers_), false);
-    onDecodingSuccess(std::move(request));
+    onDecodingSuccess(std::move(request), {});
   } else {
     deferred_end_stream_headers_ = true;
   }
@@ -420,12 +420,12 @@ Http::Http1::CallbackResult Http1ServerCodec::onMessageCompleteImpl() {
       request->headerMap().removeTransferEncoding();
       request->headerMap().setContentLength(request->optionalBuffer().length());
     }
-    onDecodingSuccess(std::move(request));
+    onDecodingSuccess(std::move(request), {});
   } else if (deferred_end_stream_headers_) {
     deferred_end_stream_headers_ = false;
     auto request =
         std::make_unique<HttpRequestFrame>(std::move(active_request_->request_headers_), true);
-    onDecodingSuccess(std::move(request));
+    onDecodingSuccess(std::move(request), {});
   } else {
     dispatchBufferedBody(true);
   }
@@ -566,7 +566,7 @@ Http::Http1::CallbackResult Http1ClientCodec::onHeadersCompleteImpl() {
   } else if (non_end_stream) {
     auto request =
         std::make_unique<HttpResponseFrame>(std::move(expect_response_->response_headers_), false);
-    onDecodingSuccess(std::move(request));
+    onDecodingSuccess(std::move(request), {});
   } else {
     deferred_end_stream_headers_ = true;
   }
@@ -613,12 +613,12 @@ Http::Http1::CallbackResult Http1ClientCodec::onMessageCompleteImpl() {
       response->headerMap().setContentLength(response->optionalBuffer().length());
     }
 
-    onDecodingSuccess(std::move(response));
+    onDecodingSuccess(std::move(response), {});
   } else if (deferred_end_stream_headers_) {
     deferred_end_stream_headers_ = false;
     auto response =
         std::make_unique<HttpResponseFrame>(std::move(expect_response_->response_headers_), true);
-    onDecodingSuccess(std::move(response));
+    onDecodingSuccess(std::move(response), {});
   } else {
     dispatchBufferedBody(true);
   }

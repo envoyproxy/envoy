@@ -125,7 +125,8 @@ void UdpUpstream::onSocketReadReady() {
 // connected to the upstream server in the encodeHeaders method.
 void UdpUpstream::processPacket(Network::Address::InstanceConstSharedPtr /*local_address*/,
                                 Network::Address::InstanceConstSharedPtr /*peer_address*/,
-                                Buffer::InstancePtr buffer, MonotonicTime /*receive_time*/) {
+                                Buffer::InstancePtr buffer, MonotonicTime /*receive_time*/,
+                                uint8_t /*tos*/) {
   std::string data = buffer->toString();
   quiche::ConnectUdpDatagramUdpPacketPayload payload(data);
   quiche::QuicheBuffer serialized_capsule =

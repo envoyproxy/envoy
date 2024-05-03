@@ -7,17 +7,17 @@ services:
   # `DD_API_KEY` environment variable.
   dd-agent:
     volumes:
-      - '/var/run/docker.sock:/var/run/docker.sock:ro'
-      - '/run/user:/run/user:ro'
-      - '/proc/:/host/proc/:ro'
-      - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
+    - '/var/run/docker.sock:/var/run/docker.sock:ro'
+    - '/run/user:/run/user:ro'
+    - '/proc/:/host/proc/:ro'
+    - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
     environment:
-      - DOCKER_HOST
-      - DD_API_KEY
-      - DD_APM_ENABLED=true
-      - DD_LOG_LEVEL=ERROR
+    - DOCKER_HOST
+    - DD_API_KEY
+    - DD_APM_ENABLED=true
+    - DD_LOG_LEVEL=ERROR
     ports:
-      - 8126:8126
+    - 8126:8126
     image: 'datadog/agent@sha256:1d9b8e28704b207626cdeca5386019f673d9f3a9baf817f5094b8e08b1f99fca'
 
   # `http` is an HTTP server that is reverse proxied by `nginx`.
@@ -26,10 +26,10 @@ services:
       context: .
       dockerfile: ./http.dockerfile
     environment:
-      - DD_ENV=prod
-      - DD_AGENT_HOST=dd-agent
-      - DD_SERVICE=envoy-demo-http
+    - DD_ENV=prod
+    - DD_AGENT_HOST=dd-agent
+    - DD_SERVICE=envoy-demo-http
     ports:
-      - 8080:8080
+    - 8080:8080
     depends_on:
-      - dd-agent
+    - dd-agent

@@ -191,7 +191,7 @@ stat_prefix: test
     encoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockEncoderFilter>>();
     bidirectional_filter_ = std::make_shared<NiceMock<ThriftFilters::MockBidirectionalFilter>>();
 
-    config_ = std::make_unique<TestConfigImpl>(proto_config_, context_,
+    config_ = std::make_shared<TestConfigImpl>(proto_config_, context_,
                                                *route_config_provider_manager_, decoder_filter_,
                                                encoder_filter_, bidirectional_filter_, stats_);
     if (custom_transport_) {
@@ -209,7 +209,7 @@ stat_prefix: test
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
+        config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     ON_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
         .WillByDefault(Invoke([this](const std::string& key, const ProtobufWkt::Struct& obj) {
@@ -686,7 +686,7 @@ stat_prefix: test
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config_;
 
   std::unique_ptr<Router::RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  std::unique_ptr<TestConfigImpl> config_;
+  std::shared_ptr<TestConfigImpl> config_;
 
   Buffer::OwnedImpl buffer_;
   Buffer::OwnedImpl write_buffer_;
@@ -1680,7 +1680,7 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReachedRepeate
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
+        config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 

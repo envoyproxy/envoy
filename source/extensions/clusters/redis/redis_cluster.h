@@ -198,7 +198,8 @@ private:
 
   struct RedisDiscoverySession
       : public Extensions::NetworkFilters::Common::Redis::Client::Config,
-        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks {
+        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks,
+        public std::enable_shared_from_this<RedisDiscoverySession> {
     RedisDiscoverySession(RedisCluster& parent,
                           NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
@@ -277,7 +278,7 @@ private:
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
   Random::RandomGenerator& random_;
-  RedisDiscoverySession redis_discovery_session_;
+  std::shared_ptr<RedisDiscoverySession> redis_discovery_session_;
   const ClusterSlotUpdateCallBackSharedPtr lb_factory_;
 
   Upstream::HostVector hosts_;

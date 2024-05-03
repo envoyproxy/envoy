@@ -202,10 +202,9 @@ INSTANTIATE_TEST_SUITE_P(ParameterizedFilterConfig, HttpFilterTestParam,
                          testing::Combine(testing::Bool(), testing::Bool()),
                          HttpFilterTestParam::ParamsToString);
 
-class HeaderMutationValidationTest : public HttpFilterTestBase<testing::Test> {
+class InvalidMutationTest : public HttpFilterTestBase<testing::Test> {
 public:
-  HeaderMutationValidationTest()
-      : invalid_value_(reinterpret_cast<const char*>(invalid_value_bytes_)) {}
+  InvalidMutationTest() : invalid_value_(reinterpret_cast<const char*>(invalid_value_bytes_)) {}
 
   void testResponse(const Filters::Common::ExtAuthz::Response& response) {
     InSequence s;
@@ -215,7 +214,7 @@ public:
         grpc_service:
           envoy_grpc:
             cluster_name: "ext_authz_server"
-        validate_authz_response: true
+        validate_mutations: true
     )");
 
     // Simulate a downstream request.
@@ -259,7 +258,7 @@ public:
 
 // Tests that the filter rejects authz responses with mutations with an invalid key when
 // validate_authz_response is set to true in config.
-TEST_F(HeaderMutationValidationTest, HeadersToSetKey) {
+TEST_F(InvalidMutationTest, HeadersToSetKey) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_set = {{invalid_key_, "bar"}};
@@ -267,7 +266,7 @@ TEST_F(HeaderMutationValidationTest, HeadersToSetKey) {
 }
 
 // Same as above, setting a different field...
-TEST_F(HeaderMutationValidationTest, HeadersToAddKey) {
+TEST_F(InvalidMutationTest, HeadersToAddKey) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_add = {{invalid_key_, "bar"}};
@@ -275,35 +274,49 @@ TEST_F(HeaderMutationValidationTest, HeadersToAddKey) {
 }
 
 // headers_to_set is also used when the authz response has status denied.
-TEST_F(HeaderMutationValidationTest, HeadersToSetKeyDenied) {
+TEST_F(InvalidMutationTest, HeadersToSetKeyDenied) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.headers_to_set = {{invalid_key_, "bar"}};
   testResponse(response);
 }
 
-TEST_F(HeaderMutationValidationTest, HeadersToAppendKey) {
+TEST_F(InvalidMutationTest, HeadersToAppendKey) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_append = {{invalid_key_, "bar"}};
   testResponse(response);
 }
 
-TEST_F(HeaderMutationValidationTest, ResponseHeadersToAddKey) {
+TEST_F(InvalidMutationTest, ResponseHeadersToAddKey) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.response_headers_to_set = UnsafeHeaderVector{{invalid_key_, "bar"}};
   testResponse(response);
 }
 
-TEST_F(HeaderMutationValidationTest, ResponseHeadersToSetKey) {
+TEST_F(InvalidMutationTest, ResponseHeadersToSetKey) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.response_headers_to_set = UnsafeHeaderVector{{invalid_key_, "bar"}};
   testResponse(response);
 }
 
-TEST_F(HeaderMutationValidationTest, QueryParametersToSetKey) {
+TEST_F(InvalidMutationTest, ResponseHeadersToAddIfAbsentKey) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_add_if_absent = UnsafeHeaderVector{{invalid_key_, "bar"}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, ResponseHeadersToOverwriteIfExistsKey) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_overwrite_if_exists = UnsafeHeaderVector{{invalid_key_, "bar"}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, QueryParametersToSetKey) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.query_parameters_to_set = Http::Utility::QueryParamsVector{{"f o o", "bar"}};
@@ -311,7 +324,7 @@ TEST_F(HeaderMutationValidationTest, QueryParametersToSetKey) {
 }
 
 // Test that the filter rejects mutations with an invalid value
-TEST_F(HeaderMutationValidationTest, HeadersToSetValueOk) {
+TEST_F(InvalidMutationTest, HeadersToSetValueOk) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_set = {{"foo", invalid_value_}};
@@ -319,7 +332,7 @@ TEST_F(HeaderMutationValidationTest, HeadersToSetValueOk) {
 }
 
 // Same as above, setting a different field...
-TEST_F(HeaderMutationValidationTest, HeadersToAddValue) {
+TEST_F(InvalidMutationTest, HeadersToAddValue) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_add = {{"foo", invalid_value_}};
@@ -327,21 +340,21 @@ TEST_F(HeaderMutationValidationTest, HeadersToAddValue) {
 }
 
 // headers_to_set is also used when the authz response has status denied.
-TEST_F(HeaderMutationValidationTest, HeadersToSetValueDenied) {
+TEST_F(InvalidMutationTest, HeadersToSetValueDenied) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.headers_to_set = {{"foo", invalid_value_}};
   testResponse(response);
 }
 
-TEST_F(HeaderMutationValidationTest, HeadersToAppendValue) {
+TEST_F(InvalidMutationTest, HeadersToAppendValue) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_append = {{"foo", invalid_value_}};
   testResponse(response);
 }
 
-TEST_F(HeaderMutationValidationTest, ResponseHeadersToAddValue) {
+TEST_F(InvalidMutationTest, ResponseHeadersToAddValue) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Add a valid header to see if it gets added to the downstream response.
@@ -349,7 +362,7 @@ TEST_F(HeaderMutationValidationTest, ResponseHeadersToAddValue) {
   testResponse(response);
 }
 
-TEST_F(HeaderMutationValidationTest, ResponseHeadersToSetValue) {
+TEST_F(InvalidMutationTest, ResponseHeadersToSetValue) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Add a valid header to see if it gets added to the downstream response.
@@ -357,7 +370,23 @@ TEST_F(HeaderMutationValidationTest, ResponseHeadersToSetValue) {
   testResponse(response);
 }
 
-TEST_F(HeaderMutationValidationTest, QueryParametersToSetValue) {
+TEST_F(InvalidMutationTest, ResponseHeadersToAddIfAbsentValue) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  // Add a valid header to see if it gets added to the downstream response.
+  response.response_headers_to_add_if_absent = UnsafeHeaderVector{{"foo", invalid_value_}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, ResponseHeadersToOverwriteIfExistsValue) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  // Add a valid header to see if it gets added to the downstream response.
+  response.response_headers_to_overwrite_if_exists = UnsafeHeaderVector{{"foo", invalid_value_}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, QueryParametersToSetValue) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Add a valid header to see if it gets added to the downstream response.
@@ -2656,6 +2685,84 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
                 .value(),
             "cookie1=snickerdoodle,cookie2=gingerbread");
   EXPECT_EQ(response_headers.get_("should-be-overridden"), "finally-set-by-auth-server");
+}
+
+TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActions) {
+  InSequence s;
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_add_if_absent =
+      UnsafeHeaderVector{{"header-to-add-if-absent", "new-value"}};
+  response.response_headers_to_overwrite_if_exists =
+      UnsafeHeaderVector{{"header-to-overwrite-if-exists", "new-value"}};
+
+  auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::move(response_ptr));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  Buffer::OwnedImpl response_data{};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"header-to-overwrite-if-exists", "original-value"}};
+  Http::TestResponseTrailerMapImpl response_trailers{};
+  Http::MetadataMap response_metadata{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
+  EXPECT_EQ(response_headers.get_("header-to-add-if-absent"), "new-value");
+  EXPECT_EQ(response_headers.get_("header-to-overwrite-if-exists"), "new-value");
+}
+
+TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActionsDoNotTakeEffect) {
+  InSequence s;
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_add_if_absent =
+      UnsafeHeaderVector{{"header-to-add-if-absent", "new-value"}};
+  response.response_headers_to_overwrite_if_exists =
+      UnsafeHeaderVector{{"header-to-overwrite-if-exists", "new-value"}};
+
+  auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::move(response_ptr));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  Buffer::OwnedImpl response_data{};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"header-to-add-if-absent", "original-value"}};
+  Http::TestResponseTrailerMapImpl response_trailers{};
+  Http::MetadataMap response_metadata{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
+  EXPECT_EQ(response_headers.get_("header-to-add-if-absent"), "original-value");
+  EXPECT_FALSE(response_headers.has("header-to-overwrite-if-exists"));
 }
 
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithUnmodifiedQueryParameters) {

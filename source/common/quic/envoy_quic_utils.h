@@ -194,5 +194,8 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
 void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
                                      const quic::QuicConnectionId& old_connection_id);
 
+// Extract the two ECN bits from the TOS byte in the IP header.
+quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte);
+
 } // namespace Quic
 } // namespace Envoy

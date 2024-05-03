@@ -43,10 +43,10 @@ static_resources:
     lb_subset_config:
       fallback_policy: NO_FALLBACK
       subset_selectors:
-        - keys:
-            - default
-        - keys:
-            - version
+      - keys:
+        - default
+      - keys:
+        - version
     load_assignment:
       cluster_name: versioned-cluster
       endpoints:
