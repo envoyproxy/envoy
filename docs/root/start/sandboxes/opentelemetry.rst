@@ -122,11 +122,14 @@ In the ``Latency Samples`` of ``opentelemetry.proto.collector.trace.v1.TraceServ
       OpenTelemetry tracing website.
 
 Step 5: View the access logs in the OpenTelemetry collector output
-*******************************************
+******************************************************************
 
 Check the spans Docker-compose logs:
 
 .. code-block:: console
+   :linenos:
+   :emphasize-lines: 9,11
+
     opentelemetry-opentelemetry-1      | 2024-05-02T15:08:02.068Z   info    ResourceSpans #0
     opentelemetry-opentelemetry-1      | Resource SchemaURL: 
     opentelemetry-opentelemetry-1      | Resource attributes:
@@ -166,6 +169,9 @@ Check the spans Docker-compose logs:
 And the matching access log:
 
 .. code-block:: console
+   :linenos:
+   :emphasize-lines: 18-19
+
     opentelemetry-opentelemetry-1      | 2024-05-02T15:08:01.867Z   info    LogsExporter {"kind": "exporter", "data_type": "logs", "name": "debug", "resource logs": 1, "log records": 1}
     opentelemetry-opentelemetry-1      | 2024-05-02T15:08:01.867Z   info    ResourceLog #0
     opentelemetry-opentelemetry-1      | Resource SchemaURL: 
@@ -188,7 +194,7 @@ And the matching access log:
     opentelemetry-opentelemetry-1      | Flags: 0
     opentelemetry-opentelemetry-1      |    {"kind": "exporter", "data_type": "logs", "name": "debug"}
 
-Notice how the log record's `Trace ID: 832518ad68578df8182cd76847693a93` and `Span ID: 8af519328fd9ec0c` match the span's `Trace ID: 832518ad68578df8182cd76847693a93` and `ID: 8af519328fd9ec0c`.
+Notice how the log record's `Trace ID` and `Span ID` fields match the span's `Trace ID` and `ID` fields.
 
 Step 6: How to replicate this in your setup
 *******************************************
@@ -197,80 +203,49 @@ The configuration is divided in two parts: setting up the reporting of tracing d
 
 Set up a cluster to report to the OpenTelemetry collector (or another endpoint that accepts OTLP v1):
 
-.. code-block:: yaml
-    clusters:
-    - name: opentelemetry_collector
-        type: STRICT_DNS
-        lb_policy: ROUND_ROBIN
-        typed_extension_protocol_options:
-        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-            explicit_http_config:
-            http2_protocol_options: {}
-    load_assignment:
-      cluster_name: &otel_cluster_name opentelemetry_collector
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: opentelemetry
-                port_value: 4317
+.. literalinclude:: _include/envoy-opentelemetry.yaml
+   :language: yaml
+   :lines: 27-34
+   :linenos:
+   :caption: Envoy configuration for a cluster representing an OTLP endpoint
 
 To enable the reporting of tracing data, add the following to the `envoy.filters.network.http_connection_manager` filter: 
 
-.. code-block:: yaml
-    filter_chains:
-    - filters:
-      - name: envoy.filters.network.http_connection_manager
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          tracing:
-            provider:
-              name: envoy.tracers.opentelemetry
-              typed_config:
-                "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
-                grpc_service:
-                  envoy_grpc:
-                    cluster_name: *otel_cluster_name # This is the cluster pointing at the OpenTelemetry collector
-                  timeout: 0.250s
-                service_name: envoy-1 # <-- Change this to set up the `service.name` resource attribute
+.. literalinclude:: _include/envoy-opentelemetry.yaml
+   :language: yaml
+   :lines: 52-65
+   :linenos:
+   :emphasize-lines: 5-14
+   :caption: Adding the `envoy.tracers.opentelemetry` tracing provider to an existing filter
 
 To enable the reporting of access logs as log records, add the following to the `envoy.filters.network.http_connection_manager` filter:
 
-.. code-block:: yaml
-    filter_chains:
-    - filters:
-      - name: envoy.filters.network.http_connection_manager
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          access_log:
-          - name: envoy.access_loggers.open_telemetry
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig
-              common_config:
-                log_name: "otel_envoy_accesslog"
-                transport_api_version: V3
-                grpc_service:
-                  envoy_grpc:
-                    cluster_name: *otel_cluster_name
-              # Configuration of OTel metadata starts here
-              resource_attributes:
-                values:
-                - key: "service.name"
-                  value:
-                    string_value: envoy-1 # Should match `service_name` in tracing section
-              body:
-                string_value: |
-                  "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
-              attributes:
-                values:
-                - key: "url.path"
-                  value:
-                    string_value: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
-                - key: "http.request.method"
-                  value:
-                    string_value: "%REQ(:METHOD)%"
-                - key: "http.response.status_code"
-                  value:
-                    string_value: "%RESPONSE_CODE%"
+.. literalinclude:: _include/envoy-opentelemetry.yaml
+   :language: yaml
+   :lines: 66-95
+   :linenos:
+   :emphasize-lines: 10
+   :caption: Setting up the reporting of access logs to the OTLP cluster
+
+In OpenTelemetry, the `service.name` resource attribute is the single, most important piece of metadata to add to an OpenTelemetry resource.
+OpenTelemetry resources are metadata dictionaries to describe which system emits the telemetry.
+The resource attributes, i.e., the key-value pairs that specify the resource metadata, are sent along with every piece of telemetry.
+The `tracing` provider has a `service_name` field to set up the `service.name` resource attribute:
+
+.. literalinclude:: _include/envoy-opentelemetry.yaml
+   :language: yaml
+   :lines: 56-65
+   :linenos:
+   :emphasize-lines: 10
+   :caption: Setting the `service.name` resource attribute for tracing data
+
+For access logs, however, you need to set up the `service.name` resource attribute using the `resource_attributes` configuration:
+
+.. literalinclude:: _include/envoy-opentelemetry.yaml
+   :language: yaml
+   :lines: 66-95
+   :linenos:
+   :emphasize-lines: 12-16
+   :caption: Adding the `service.name` resource attribute to access logs
+
+You should use the same value for the service name between tracing data and access logs.
