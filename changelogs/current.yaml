@@ -7,6 +7,10 @@ behavior_changes:
     Changes the behavior of the ``SlotImpl`` class destructor. With this change the destructor can be called on any thread.
     This behavior can be reverted by setting the runtime flag ``envoy.reloadable_features.allow_slot_destroy_on_worker_threads``
     to false.
+- area: http2
+  change: |
+    Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
+    requests and responses. This behavior can be reverted by setting the feature to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
