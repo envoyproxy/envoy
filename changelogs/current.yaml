@@ -79,3 +79,6 @@ new_features:
     for disabling appending of the ``-shadow`` suffix to the shadowed host/authority header.
 
 deprecated:
+- area: tracing
+  change: |
+    Disable opencensus by default, as it is no longer supported/maintained upstream.
