@@ -414,16 +414,13 @@ ok_response:
   auto expected_authz_response = Response{
       .status = CheckStatus::OK,
       .response_headers_to_add =
-          Http::HeaderVector{
-              {Http::LowerCaseString{"append-if-exists-or-add"}, "append-if-exists-or-add-value"}},
+          UnsafeHeaderVector{{"append-if-exists-or-add", "append-if-exists-or-add-value"}},
       .response_headers_to_set =
-          Http::HeaderVector{{Http::LowerCaseString{"overwrite-if-exists-or-add"},
-                              "overwrite-if-exists-or-add-value"}},
+          UnsafeHeaderVector{{"overwrite-if-exists-or-add", "overwrite-if-exists-or-add-value"}},
       .response_headers_to_add_if_absent =
-          Http::HeaderVector{{Http::LowerCaseString{"add-if-absent"}, "add-if-absent-value"}},
+          UnsafeHeaderVector{{"add-if-absent", "add-if-absent-value"}},
       .response_headers_to_overwrite_if_exists =
-          Http::HeaderVector{
-              {Http::LowerCaseString{"overwrite-if-exists"}, "overwrite-if-exists-value"}},
+          UnsafeHeaderVector{{"overwrite-if-exists", "overwrite-if-exists-value"}},
       .status_code = Http::Code::OK,
   };
 

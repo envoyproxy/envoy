@@ -42,8 +42,7 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
                                                envoy::type::v3::StatusCode http_status_code,
                                                const std::string& body,
                                                const HeaderValueOptionVector& headers,
-                                               const HeaderValueOptionVector& downstream_headers,
-                                               const std::vector<std::string> headers_to_remove) {
+                                               const HeaderValueOptionVector& downstream_headers) {
   auto response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = response->mutable_status();
   status->set_code(response_status);
@@ -80,9 +79,6 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
         item->CopyFrom(header);
       }
     }
-    for (const auto& key : headers_to_remove) {
-      response->mutable_ok_response()->add_headers_to_remove(key);
-    }
   }
   return response;
 }
@@ -90,8 +86,7 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
 Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code,
                                        const std::string& body,
                                        const HeaderValueOptionVector& headers,
-                                       const HeaderValueOptionVector& downstream_headers,
-                                       const std::vector<std::string> headers_to_remove) {
+                                       const HeaderValueOptionVector& downstream_headers) {
   auto authz_response = Response{};
   authz_response.status = status;
   authz_response.status_code = status_code;
@@ -120,10 +115,6 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
     }
   }
 
-  if (!headers_to_remove.empty()) {
-    authz_response.headers_to_remove =
-        std::vector<std::string>{headers_to_remove.begin(), headers_to_remove.end()};
-  }
   return authz_response;
 }
 

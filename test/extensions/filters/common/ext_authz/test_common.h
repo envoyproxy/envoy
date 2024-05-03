@@ -41,15 +41,13 @@ public:
                                             envoy::type::v3::StatusCode http_status_code,
                                             const std::string& body,
                                             const HeaderValueOptionVector& headers,
-                                            const HeaderValueOptionVector& downstream_headers,
-                                            const std::vector<std::string> headers_to_remove = {});
+                                            const HeaderValueOptionVector& downstream_headers);
 
   static Response
   makeAuthzResponse(CheckStatus status, Http::Code status_code = Http::Code::OK,
                     const std::string& body = std::string{},
                     const HeaderValueOptionVector& headers = HeaderValueOptionVector{},
-                    const HeaderValueOptionVector& downstream_headers = HeaderValueOptionVector{},
-                    const std::vector<std::string> headers_to_remove = {});
+                    const HeaderValueOptionVector& downstream_headers = HeaderValueOptionVector{});
 
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
