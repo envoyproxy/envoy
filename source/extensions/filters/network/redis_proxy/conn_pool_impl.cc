@@ -37,20 +37,7 @@ const Common::Redis::RespValue& getRequest(const RespVariant& request) {
 static uint16_t default_port = 6379;
 
 bool isClusterProvidedLb(const Upstream::ClusterInfo& info) {
-  const auto lb_type = info.lbType();
-  bool cluster_provided_lb = lb_type == Upstream::LoadBalancerType::ClusterProvided;
-  if (lb_type == Upstream::LoadBalancerType::LoadBalancingPolicyConfig) {
-    auto* typed_lb_factory = info.loadBalancerFactory();
-    if (typed_lb_factory == nullptr) {
-      // This should never happen because if there is no valid factory, the cluster should
-      // have been rejected during config load and this code should never be reached.
-      IS_ENVOY_BUG("ClusterInfo should contain a valid factory");
-      return false;
-    }
-    cluster_provided_lb =
-        typed_lb_factory->name() == "envoy.load_balancing_policies.cluster_provided";
-  }
-  return cluster_provided_lb;
+  return info.loadBalancerFactory().name() == "envoy.load_balancing_policies.cluster_provided";
 }
 
 } // namespace
@@ -277,7 +264,7 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
       client = std::make_unique<ThreadLocalActiveClient>(*this);
       client->host_ = host;
       client->redis_client_ =
-          client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
+          client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
                                  auth_username_, auth_password_, false);
       client->redis_client_->addConnectionCallbacks(*client);
     }
@@ -309,7 +296,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
   // If there is an active transaction, establish a new connection if necessary.
   if (transaction.active_ && !transaction.connection_established_) {
     transaction.clients_[client_idx] =
-        client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
+        client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
                                auth_username_, auth_password_, true);
     if (transaction.connection_cb_) {
       transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);

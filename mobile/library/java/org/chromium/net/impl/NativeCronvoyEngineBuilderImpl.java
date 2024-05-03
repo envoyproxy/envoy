@@ -39,12 +39,13 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mDnsFailureRefreshSecondsBase = 2;
   private final int mDnsFailureRefreshSecondsMax = 10;
   private int mDnsQueryTimeoutSeconds = 5;
-  private final int mDnsMinRefreshSeconds = 60;
+  private int mDnsMinRefreshSeconds = 60;
   private final List<String> mDnsPreresolveHostnames = Collections.emptyList();
   private final boolean mEnableDNSCache = false;
   private final int mDnsCacheSaveIntervalSeconds = 1;
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
+  private boolean mUseCares = false;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
@@ -53,7 +54,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 1;
   private final int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private final int mMaxConnectionsPerHost = 7;
-  private final int mStreamIdleTimeoutSeconds = 15;
+  private int mStreamIdleTimeoutSeconds = 15;
   private final int mPerTryIdleTimeoutSeconds = 15;
   private final String mAppVersion = "unspecified";
   private final String mAppId = "unspecified";
@@ -84,6 +85,15 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
+   * Enable using the c_ares DNS resolver.
+   *
+   * @param enable If true, use c_ares.
+   */
+  public NativeCronvoyEngineBuilderImpl setUseCares(boolean enable) {
+    mUseCares = enable;
+    return this;
+  }
+  /**
    * Set the DNS query timeout, in seconds, which ensures that DNS queries succeed or fail
    * within that time range. See the DnsCacheConfig.dns_query_timeout proto field for details.
    *
@@ -93,6 +103,34 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setDnsQueryTimeoutSeconds(int timeout) {
     mDnsQueryTimeoutSeconds = timeout;
+    return this;
+  }
+
+  /**
+   * Set the DNS minimum refresh time, in seconds, which ensures that we wait to refresh a DNS
+   * entry for at least the minimum refresh time. For example, if the DNS record TTL is 60 seconds
+   * and setMinDnsRefreshSeconds(120) is invoked, then at least 120 seconds will transpire before
+   * the DNS entry for a host is refreshed.
+   *
+   * The default is 60s.
+   *
+   * @param minRefreshSeconds The DNS minimum refresh time, in seconds.
+   */
+  public NativeCronvoyEngineBuilderImpl setMinDnsRefreshSeconds(int minRefreshSeconds) {
+    mDnsMinRefreshSeconds = minRefreshSeconds;
+    return this;
+  }
+
+  /**
+   * Set the stream idle timeout, in seconds, which is defined as the period in which there are no
+   * active requests. When the idle timeout is reached, the connection is closed.
+   *
+   * The default is 15s.
+   *
+   * @param timeout The stream idle timeout, in seconds.
+   */
+  public NativeCronvoyEngineBuilderImpl setStreamIdleTimeoutSeconds(int timeout) {
+    mStreamIdleTimeoutSeconds = timeout;
     return this;
   }
 
@@ -162,7 +200,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mEnableDrainPostDnsRefresh, quicEnabled(), quicConnectionOptions(),
+        mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, quicConnectionOptions(),
         quicClientConnectionOptions(), quicHints(), quicCanonicalSuffixes(),
         mEnableGzipDecompression, brotliEnabled(), portMigrationEnabled(), mEnableSocketTag,
         mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,

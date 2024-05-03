@@ -39,7 +39,7 @@ Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromP
   return [route_config_provider_manager, filter_config,
           &server_context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
-        std::make_shared<ConnectionManager>(*filter_config, server_context.api().randomGenerator(),
+        std::make_shared<ConnectionManager>(filter_config, server_context.api().randomGenerator(),
                                             server_context.mainThreadDispatcher().timeSource()));
   };
 }

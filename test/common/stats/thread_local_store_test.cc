@@ -2182,11 +2182,11 @@ protected:
       layer->set_name("admin");
       layer->mutable_admin_layer();
     }
-    absl::Status creation_status;
-    loader_ = std::make_unique<Runtime::LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_,
-                                                    *store_, generator_, validation_visitor_, *api_,
-                                                    creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
+        Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, *store_,
+                                    generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
+    loader_ = std::move(loader.value());
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;

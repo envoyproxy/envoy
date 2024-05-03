@@ -140,6 +140,7 @@ open class EngineBuilder() {
   private var dnsCacheSaveIntervalSeconds = 1
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
+  internal var useCares = false
   private var http3ConnectionOptions = ""
   private var http3ClientConnectionOptions = ""
   private var quicHints = mutableMapOf<String, Int>()
@@ -297,6 +298,17 @@ open class EngineBuilder() {
    */
   fun enableHttp3(enableHttp3: Boolean): EngineBuilder {
     this.enableHttp3 = enableHttp3
+    return this
+  }
+
+  /**
+   * Specify whether to use c_ares for dns resolution. Defaults to false.
+   *
+   * @param useCares whether or not to use c_ares
+   * @return This builder.
+   */
+  fun useCares(useCares: Boolean): EngineBuilder {
+    this.useCares = useCares
     return this
   }
 
@@ -648,6 +660,7 @@ open class EngineBuilder() {
         dnsCacheSaveIntervalSeconds,
         enableDrainPostDnsRefresh,
         enableHttp3,
+        useCares,
         http3ConnectionOptions,
         http3ClientConnectionOptions,
         quicHints,

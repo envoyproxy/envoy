@@ -18,19 +18,15 @@ namespace AlternateProtocolsCache {
 using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
 
 FilterConfig::FilterConfig(
-    const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
-        proto_config,
+    const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig& config,
     Http::HttpServerPropertiesCacheManagerFactory& alternate_protocol_cache_manager_factory,
     TimeSource& time_source)
     : alternate_protocol_cache_manager_(alternate_protocol_cache_manager_factory.get()),
-      proto_config_(proto_config), time_source_(time_source) {}
-
-Http::HttpServerPropertiesCacheSharedPtr
-FilterConfig::getAlternateProtocolCache(Event::Dispatcher& dispatcher) {
-  return proto_config_.has_alternate_protocols_cache_options()
-             ? alternate_protocol_cache_manager_->getCache(
-                   proto_config_.alternate_protocols_cache_options(), dispatcher)
-             : nullptr;
+      time_source_(time_source) {
+  if (config.has_alternate_protocols_cache_options()) {
+    ENVOY_LOG_MISC(warn, "Using deprecated and ignored alternate_protocols_cache_options in "
+                         "alternate_protocols_cache config.");
+  }
 }
 
 void Filter::onDestroy() {}
@@ -43,17 +39,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   if (alt_svc.empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
-  const bool use_cluster_cache = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter");
   Http::HttpServerPropertiesCacheSharedPtr cache;
-  if (use_cluster_cache) {
-    auto info = encoder_callbacks_->streamInfo().upstreamClusterInfo();
-    if (info && (*info)->alternateProtocolsCacheOptions()) {
-      cache = config_->alternateProtocolCacheManager()->getCache(
-          *((*info)->alternateProtocolsCacheOptions()), dispatcher_);
-    }
-  } else {
-    cache = config_->getAlternateProtocolCache(dispatcher_);
+  auto info = encoder_callbacks_->streamInfo().upstreamClusterInfo();
+  if (info && (*info)->alternateProtocolsCacheOptions()) {
+    cache = config_->alternateProtocolCacheManager()->getCache(
+        *((*info)->alternateProtocolsCacheOptions()), dispatcher_);
   }
   if (!cache) {
     return Http::FilterHeadersStatus::Continue;

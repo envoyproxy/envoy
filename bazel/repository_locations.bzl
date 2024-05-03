@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "24.4"
+PROTOBUF_VERSION = "25.3"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,11 +8,11 @@ PROTOBUF_VERSION = "24.4"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "83ac000ff540e242b6a2ff221a3ac88d2d8e55443801b7a28e9697e5f40e8937",
-    linux_x86_64 = "5871398dfd6ac954a6adebf41f1ae3a4de915a36a6ab2fd3e8f2c00d45b50dec",
-    osx_aarch_64 = "d80544480397fe8a05d966fba291cf1233ad0db0ebc24ec72d7bd077d6e7ac59",
-    osx_x86_64 = "6c3b6bf4038d733b6d31f1cc4516a656570b5b5aafb966b650f8182afd0b98cf",
-    win64 = "8f3f92fbf7dd2995129e6fe223c07c0aaa97fb182f19cecfb424e9146b273eb6",
+    linux_aarch_64 = "9eae1f20f70cccc912d1c318c3929b86aebf5afd4b0f32c196ef682c222ed5ae",
+    linux_x86_64 = "f853e691868d0557425ea290bf7ba6384eef2fa9b04c323afab49a770ba9da80",
+    osx_aarch_64 = "d0fcd6d3b3ef6f22f1c47cc30a80c06727e1eccdddcaf0f4a3be47c070ffd3fe",
+    osx_x86_64 = "247e003b8e115405172eacc50bd19825209d85940728e766f0848eee7c80e2a1",
+    win64 = "d6b336b852726364313330631656b7f395dde5b1141b169f5c4b8d43cdf01482",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -218,12 +218,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "c-ares",
         project_desc = "C library for asynchronous DNS requests",
         project_url = "https://c-ares.haxx.se/",
-        version = "1.19.1",
-        sha256 = "321700399b72ed0e037d0074c629e7741f6b2ec2dda92956abe3e9671d3e268e",
+        version = "1.20.1",
+        sha256 = "de24a314844cb157909730828560628704f4f896d167dd7da0fa2fb93ea18b10",
         strip_prefix = "c-ares-{version}",
         urls = ["https://github.com/c-ares/c-ares/releases/download/cares-{underscore_version}/c-ares-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2023-05-22",
+        release_date = "2023-10-08",
         cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
         license = "c-ares",
         license_url = "https://github.com/c-ares/c-ares/blob/cares-{underscore_version}/LICENSE.md",
@@ -306,12 +306,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "spdlog",
         project_desc = "Very fast, header-only/compiled, C++ logging library",
         project_url = "https://github.com/gabime/spdlog",
-        version = "1.13.0",
-        sha256 = "534f2ee1a4dcbeb22249856edfb2be76a1cf4f708a20b0ac2ed090ee24cfdbc9",
+        version = "1.14.1",
+        sha256 = "1586508029a7d0670dfcb2d97575dcdc242d3868a259742b69f100801ab4e16b",
         strip_prefix = "spdlog-{version}",
         urls = ["https://github.com/gabime/spdlog/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2024-01-12",
+        release_date = "2024-04-30",
         cpe = "N/A",
         license = "MIT",
         license_url = "https://github.com/gabime/spdlog/blob/v{version}/LICENSE",
@@ -376,12 +376,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "gRPC",
         project_desc = "gRPC C core library",
         project_url = "https://grpc.io",
-        version = "1.59.4",
-        sha256 = "6edc67c2ad200c5b618c421f6e8c1b734a4aa3e741975e683491da03390ebf63",
+        version = "1.62.1",
+        sha256 = "c9f9ae6e4d6f40464ee9958be4068087881ed6aa37e30d0e64d40ed7be39dd01",
         strip_prefix = "grpc-{version}",
         urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2024-02-05",
+        release_date = "2024-03-08",
         cpe = "cpe:2.3:a:grpc:grpc:*",
         license = "Apache-2.0",
         license_url = "https://github.com/grpc/grpc/blob/v{version}/LICENSE",
@@ -934,11 +934,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "616bb3536ac1fff3fb1a141450fa28b875e985712170ea7f1bfe5e5fc41e2cd8",
+        sha256 = "d19643d265b978383352b3143f04c0641eea75a75235c111cc01a1350173180e",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2023-10-04",
+        release_date = "2024-02-15",
         cpe = "cpe:2.3:a:google:protobuf:*",
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
@@ -1192,12 +1192,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "62f5f6c9caabe019240b2a4377090bb657012c3f",
-        sha256 = "d4d976917b173167a8d600b87f01a4b9c169d15b92625894bfce2802362c76ad",
+        version = "e08f8dde2d09ad28f0c3458be3703cb1c8a9c9fb",
+        sha256 = "749752c27151ba9dfef1676866178131bc6abb4ff9a8360e12789732ab738544",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2024-04-19",
+        release_date = "2024-04-24",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1312,20 +1312,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         cpe = "cpe:2.3:a:llvm:compiler-rt:*",
         license = "Apache-2.0",
         license_url = "https://github.com/llvm/llvm-project/blob/llvmorg-{version}/compiler-rt/LICENSE.TXT",
-    ),
-    upb = dict(
-        project_name = "upb",
-        project_desc = "A small protobuf implementation in C (gRPC dependency)",
-        project_url = "https://github.com/protocolbuffers/upb",
-        version = "e074c038c35e781a1876f8eb52b14f822ae2db66",
-        sha256 = "8608c15b5612c6154d4ee0c23910afe6c283985e1d368ea71704dcd8684135d4",
-        release_date = "2023-07-21",
-        strip_prefix = "upb-{version}",
-        urls = ["https://github.com/protocolbuffers/upb/archive/{version}.tar.gz"],
-        use_category = ["controlplane"],
-        cpe = "N/A",
-        license = "upb",
-        license_url = "https://github.com/protocolbuffers/upb/blob/{version}/LICENSE",
     ),
     kafka_source = dict(
         project_name = "Kafka (source)",
@@ -1584,7 +1570,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2023-10-04",
+            release_date = "2024-02-15",
             cpe = "N/A",
             license = "Protocol Buffers",
             license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
