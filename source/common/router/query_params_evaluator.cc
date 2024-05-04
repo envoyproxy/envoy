@@ -7,7 +7,9 @@
 namespace Envoy {
 namespace Router {
 
-QueryParamsEvaluatorPtr QueryParamsEvaluator::configure(const Protobuf::Map<std::string, std::string>& query_params_to_add, const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove) {
+QueryParamsEvaluatorPtr QueryParamsEvaluator::configure(
+    const Protobuf::Map<std::string, std::string>& query_params_to_add,
+    const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove) {
   QueryParamsEvaluatorPtr query_params_evaluator(new QueryParamsEvaluator());
 
   for (const auto& [key, val] : query_params_to_add) {
@@ -32,7 +34,8 @@ void QueryParamsEvaluator::evaluateQueryParams(Http::RequestHeaderMap& headers) 
   }
 
   absl::string_view path = headers.getPathValue();
-  Http::Utility::QueryParamsMulti query_params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+  Http::Utility::QueryParamsMulti query_params =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
 
   // Remove desired query parameters.
   for (const auto& val : query_params_to_remove_) {

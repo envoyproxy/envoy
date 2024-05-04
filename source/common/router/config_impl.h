@@ -1124,7 +1124,8 @@ private:
    */
   absl::InlinedVector<const HeaderParser*, 3>
   getRequestHeaderParsers(bool specificity_ascend) const;
-  absl::InlinedVector<const QueryParamsEvaluator*, 3> getQueryParamEvaluators(bool specificity_ascend) const;
+  absl::InlinedVector<const QueryParamsEvaluator*, 3>
+  getQueryParamEvaluators(bool specificity_ascend) const;
 
   /**
    * Returns a vector of response header parsers which applied or will apply header transformations

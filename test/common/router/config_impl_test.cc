@@ -2095,7 +2095,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
 }
 
 TEST_F(RouteMatcherTest, TestAddRemoveQueryParameters) {
-const std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -2167,12 +2167,12 @@ query_params_to_remove:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   {
-    Http::TestRequestHeaderMapImpl headers =
-        genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     absl::string_view path = headers.getPathValue();
-    const Http::Utility::QueryParamsMulti query_params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+    const Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
     EXPECT_EQ("route_override", query_params.getFirstValue("global_param1"));
     EXPECT_EQ("route_override", query_params.getFirstValue("vhost_param1"));
     EXPECT_EQ("route_new_endpoint", query_params.getFirstValue("route_param"));
@@ -2184,7 +2184,8 @@ query_params_to_remove:
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     absl::string_view path = headers.getPathValue();
-    const Http::Utility::QueryParamsMulti query_params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+    const Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
     EXPECT_EQ("vhost_override", query_params.getFirstValue("global_param1"));
     EXPECT_EQ("vhost1_www2", query_params.getFirstValue("vhost_param1"));
     EXPECT_EQ("route_allpath", query_params.getFirstValue("route_param"));
@@ -2196,7 +2197,8 @@ query_params_to_remove:
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     absl::string_view path = headers.getPathValue();
-    const Http::Utility::QueryParamsMulti query_params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+    const Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
     EXPECT_EQ("global1", query_params.getFirstValue("global_param1"));
     EXPECT_EQ("vhost1-www2_staging", query_params.getFirstValue("vhost_param1"));
     EXPECT_EQ("route_allprefix", query_params.getFirstValue("route_param"));
@@ -2208,7 +2210,8 @@ query_params_to_remove:
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     absl::string_view path = headers.getPathValue();
-    const Http::Utility::QueryParamsMulti query_params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+    const Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
     EXPECT_EQ("global1", query_params.getFirstValue("global_param1"));
   }
 }

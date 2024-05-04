@@ -16,7 +16,9 @@ using QueryParamsEvaluatorPtr = std::unique_ptr<QueryParamsEvaluator>;
 
 class QueryParamsEvaluator {
 public:
-  static QueryParamsEvaluatorPtr configure(const Protobuf::Map<std::string, std::string>& query_params_to_add, const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove);
+  static QueryParamsEvaluatorPtr
+  configure(const Protobuf::Map<std::string, std::string>& query_params_to_add,
+            const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove);
 
   /**
    * Returns the same static instance for uses where query params are not configured to save memory.
