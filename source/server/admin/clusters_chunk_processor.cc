@@ -234,7 +234,14 @@ void JsonClustersChunkProcessor::processHost(Json::Streamer::Array* raw_host_sta
   setLocality(host_ptr.get(), host, buffer);
   buildHostStats(host_ptr.get(), host, buffer);
   setHealthFlags(host_ptr.get(), host, buffer);
-  setSuccessRate(host, host_config);
+  setSuccessRate(host_ptr.get(), host, buffer);
+
+  if (uint64_t weight = host->weight(); weight) {
+    host_config.emplace_back("weight", weight);
+  }
+  if (uint64_t priority = host->priority(); priority) {
+    host_config.emplace_back("priority", priority);
+  }
 
   if (buffer.length()) {
     response.move(buffer);
@@ -251,8 +258,9 @@ void JsonClustersChunkProcessor::setHostname(
   }
 }
 
-void JsonClustersChunkProcessor::setSuccessRate(
-    const Upstream::HostSharedPtr& host, std::vector<Json::Streamer::Map::NameValue>& host_config) {
+void JsonClustersChunkProcessor::setSuccessRate(Json::Streamer::Map* raw_host_statuses_ptr,
+                                                const Upstream::HostSharedPtr& host,
+                                                Buffer::Instance& response) {
 
   double external_success_rate = host->outlierDetector().successRate(
       Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
@@ -263,16 +271,17 @@ void JsonClustersChunkProcessor::setSuccessRate(
   }
 
   if (external_success_rate >= 0.0) {
-    host_config.emplace_back("success_rate", external_success_rate);
-  }
-  if (uint64_t weight = host->weight(); weight) {
-    host_config.emplace_back("weight", weight);
-  }
-  if (uint64_t priority = host->priority(); priority) {
-    host_config.emplace_back("priority", priority);
+    raw_host_statuses_ptr->addKey("success_rate");
+    Json::Streamer::MapPtr success_rate_map = raw_host_statuses_ptr->addMap();
+    std::vector<Json::Streamer::Map::NameValue> success_rate{{"value", external_success_rate}};
+    addMapEntries(success_rate_map.get(), response, success_rate);
   }
   if (local_success_rate >= 0.0) {
-    host_config.emplace_back("local_origin_success_rate", local_success_rate);
+    raw_host_statuses_ptr->addKey("local_origin_success_rate");
+    Json::Streamer::MapPtr local_origin_map = raw_host_statuses_ptr->addMap();
+    std::vector<Json::Streamer::Map::NameValue> local_origin_success_rate{
+        {"value", local_success_rate}};
+    addMapEntries(local_origin_map.get(), response, local_origin_success_rate);
   }
 }
 
@@ -327,7 +336,7 @@ void JsonClustersChunkProcessor::addAddress(Json::Streamer::Map* raw_host_ptr,
         socket_address.emplace_back("address", address);
       }
       if (uint64_t port = uint64_t(host->address()->ip()->port()); port) {
-        socket_address.emplace_back("port", port);
+        socket_address.emplace_back("port_value", port);
       }
       addMapEntries(socket_address_ptr.get(), response, socket_address);
     }
@@ -497,22 +506,26 @@ void JsonClustersChunkProcessor::addEjectionThresholds(Json::Streamer::Map* raw_
   if (outlier_detector != nullptr &&
       outlier_detector->successRateEjectionThreshold(
           Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin) > 0.0) {
-    std::vector<Json::Streamer::Map::NameValue> success_rate_ejection_threshold{
-        {"success_rate_ejection_threshold",
-         double(outlier_detector->successRateEjectionThreshold(
-             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))},
-    };
-    addMapEntries(raw_clusters_map_ptr, response, success_rate_ejection_threshold);
+    raw_clusters_map_ptr->addKey("success_rate_ejection_threshold");
+    Json::Streamer::MapPtr success_rate_map_ptr = raw_clusters_map_ptr->addMap();
+    std::vector<Json::Streamer::Map::NameValue> success_rate_ejection_threshold;
+    success_rate_ejection_threshold.emplace_back(
+        "value",
+        double(outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
+    addMapEntries(success_rate_map_ptr.get(), response, success_rate_ejection_threshold);
   }
   if (outlier_detector != nullptr &&
       outlier_detector->successRateEjectionThreshold(
           Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin) > 0.0) {
-    std::vector<Json::Streamer::Map::NameValue> local_success_rate_ejection_threshold{
-        {"local_success_rate_ejection_threshold",
-         double(outlier_detector->successRateEjectionThreshold(
-             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))},
-    };
-    addMapEntries(raw_clusters_map_ptr, response, local_success_rate_ejection_threshold);
+    raw_clusters_map_ptr->addKey("local_origin_success_rate_ejection_threshold");
+    Json::Streamer::MapPtr local_success_rate_map_ptr = raw_clusters_map_ptr->addMap();
+    std::vector<Json::Streamer::Map::NameValue> local_origin_success_rate_ejection_threshold;
+    local_origin_success_rate_ejection_threshold.emplace_back(
+        "value", double(outlier_detector->successRateEjectionThreshold(
+                     Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
+    addMapEntries(local_success_rate_map_ptr.get(), response,
+                  local_origin_success_rate_ejection_threshold);
   }
 }
 
@@ -549,7 +562,7 @@ void JsonClustersChunkProcessor::addCircuitBreakerForPriority(
   if (uint64_t max_requests = resource_manager.requests().max(); max_requests) {
     entries.emplace_back("max_requests", max_requests);
   }
-  if (uint64_t max_retries = resource_manager.requests().max(); max_retries) {
+  if (uint64_t max_retries = resource_manager.retries().max(); max_retries) {
     entries.emplace_back("max_retries", max_retries);
   }
   addMapEntries(threshold.get(), response, entries);

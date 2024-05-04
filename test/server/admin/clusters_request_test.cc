@@ -204,19 +204,23 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
             "max_connections": 1024,
             "max_pending_requests": 1024,
             "max_requests": 1024,
-            "max_retries": 1024
+            "max_retries": 16
           },
           {
             "priority": "HIGH",
             "max_connections": 4096,
             "max_pending_requests": 4096,
             "max_requests": 4096,
-            "max_retries": 4096
+            "max_retries": 16
           }
         ]
       },
-      "success_rate_ejection_threshold": 1.1,
-      "local_success_rate_ejection_threshold": 1.1,
+      "success_rate_ejection_threshold": {
+        "value": 1.1
+      },
+      "local_origin_success_rate_ejection_threshold": {
+        "value": 1.1
+      },
       "name": "test_cluster",
       "observability_name": "observability_name",
       "eds_service_name": "potato_launcher",
@@ -226,7 +230,7 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
           "address": {
             "socket_address": {
               "address": "1.2.3.4",
-              "port": 80
+              "port_value": 80
             }
           },
           "locality": {
@@ -256,11 +260,15 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
             "pending_active_hc": true,
             "pending_dynamic_removal": true
           },
+          "success_rate": {
+            "value": 1
+          },
+          "local_origin_success_rate": {
+            "value": 1
+          },
           "hostname": "test_hostname",
-          "success_rate": 1,
           "weight": 1,
-          "priority": 1,
-          "local_origin_success_rate": 1
+          "priority": 1
         }
       ]
     },
@@ -272,19 +280,23 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
             "max_connections": 1024,
             "max_pending_requests": 1024,
             "max_requests": 1024,
-            "max_retries": 1024
+            "max_retries": 16
           },
           {
             "priority": "HIGH",
             "max_connections": 4096,
             "max_pending_requests": 4096,
             "max_requests": 4096,
-            "max_retries": 4096
+            "max_retries": 16
           }
         ]
       },
-      "success_rate_ejection_threshold": 1.1,
-      "local_success_rate_ejection_threshold": 1.1,
+      "success_rate_ejection_threshold": {
+        "value": 1.1
+      },
+      "local_origin_success_rate_ejection_threshold": {
+        "value": 1.1
+      },
       "name": "test_cluster",
       "observability_name": "observability_name",
       "eds_service_name": "potato_launcher",
@@ -294,7 +306,7 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
           "address": {
             "socket_address": {
               "address": "1.2.3.4",
-              "port": 80
+              "port_value": 80
             }
           },
           "locality": {
@@ -324,11 +336,15 @@ TEST_P(VerifyJsonOutputFixture, VerifyJsonOutput) {
             "pending_active_hc": true,
             "pending_dynamic_removal": true
           },
+          "success_rate": {
+            "value": 1
+          },
+          "local_origin_success_rate": {
+            "value": 1
+          },
           "hostname": "test_hostname",
-          "success_rate": 1,
           "weight": 1,
-          "priority": 1,
-          "local_origin_success_rate": 1
+          "priority": 1
         }
       ]
     }

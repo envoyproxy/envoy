@@ -111,8 +111,8 @@ private:
                       Buffer::Instance& response);
   void setLocality(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host,
                    Buffer::Instance& response);
-  void setSuccessRate(const Upstream::HostSharedPtr& host,
-                      std::vector<Json::Streamer::Map::NameValue>& top_level_entries);
+  void setSuccessRate(Json::Streamer::Map* raw_host_statuses_ptr,
+                      const Upstream::HostSharedPtr& host, Buffer::Instance& response);
   void setHostname(const Upstream::HostSharedPtr& host,
                    std::vector<Json::Streamer::Map::NameValue>& top_level_entries);
   void loadHealthFlagMap(

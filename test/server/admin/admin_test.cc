@@ -143,7 +143,7 @@ TEST_P(AdminInstanceTest, Help) {
   const std::string expected = R"EOF(admin commands are:
   /: Admin home page
   /certs: print certs on machine
-  /clusters: upstream cluster status
+  /clusters: upstream clusters status
       format: The output format; One of (text, json)
   /config_dump: dump current Envoy configs (experimental)
       resource: The resource to dump
