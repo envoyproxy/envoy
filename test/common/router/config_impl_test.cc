@@ -2094,6 +2094,125 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
                                                         Http::LowerCaseString("x-vhost-remove")));
 }
 
+TEST_F(RouteMatcherTest, TestAddRemoveQueryParameters) {
+const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  query_params_to_add:
+    global_param1: vhost_override
+    vhost_param1: vhost1_www2
+  query_params_to_remove:
+  - remove_at_vhost_level_1
+  routes:
+  - match:
+      prefix: "/new_endpoint"
+    route:
+      prefix_rewrite: "/api/new_endpoint"
+      cluster: www2
+    query_params_to_add:
+      global_param1: route_override
+      vhost_param1: route_override
+      route_param: route_new_endpoint
+    query_params_to_remove:
+      - remove_at_route_level_1
+  - match:
+      path: "/"
+    route:
+      cluster: root_www2
+    query_params_to_add:
+      route_param: route_allpath
+    query_params_to_remove:
+      - remove_at_route_level_2
+  - match:
+      prefix: "/"
+    route:
+      cluster: www2
+- name: www2_staging
+  domains:
+  - www-staging.lyft.net
+  - www-staging-orca.lyft.com
+  query_params_to_add:
+    vhost_param1: vhost1-www2_staging
+  query_params_to_remove:
+  - remove_at_vhost_level_2
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: www2_staging
+    query_params_to_add:
+      route_param: route_allprefix
+    query_params_to_remove:
+      - remove_at_route_level_3
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: instant-server
+      timeout: 3s
+query_params_to_add:
+  global_param1: global1
+query_params_to_remove:
+  - remove_at_global_level
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www2", "root_www2", "www2_staging", "instant-server"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    absl::string_view path = headers.getPathValue();
+    const Http::Utility::QueryParamsMulti query_params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+    EXPECT_EQ("route_override", query_params.getFirstValue("global_param1"));
+    EXPECT_EQ("route_override", query_params.getFirstValue("vhost_param1"));
+    EXPECT_EQ("route_new_endpoint", query_params.getFirstValue("route_param"));
+  }
+
+  // Multiple routes can have same route-level query parameters with different values.
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    absl::string_view path = headers.getPathValue();
+    const Http::Utility::QueryParamsMulti query_params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+    EXPECT_EQ("vhost_override", query_params.getFirstValue("global_param1"));
+    EXPECT_EQ("vhost1_www2", query_params.getFirstValue("vhost_param1"));
+    EXPECT_EQ("route_allpath", query_params.getFirstValue("route_param"));
+  }
+
+  // Multiple virtual hosts can have same virtual host level parameters with different values.
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www-staging.lyft.net", "/foo", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    absl::string_view path = headers.getPathValue();
+    const Http::Utility::QueryParamsMulti query_params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+    EXPECT_EQ("global1", query_params.getFirstValue("global_param1"));
+    EXPECT_EQ("vhost1-www2_staging", query_params.getFirstValue("vhost_param1"));
+    EXPECT_EQ("route_allprefix", query_params.getFirstValue("route_param"));
+  }
+
+  // Global params.
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    absl::string_view path = headers.getPathValue();
+    const Http::Utility::QueryParamsMulti query_params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+    EXPECT_EQ("global1", query_params.getFirstValue("global_param1"));
+  }
+}
+
 class HeaderTransformsDoFormattingTest : public RouteMatcherTest {
 protected:
   void runTest(bool run_request_header_test) {
