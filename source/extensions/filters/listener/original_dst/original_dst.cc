@@ -27,7 +27,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
     Network::Address::InstanceConstSharedPtr original_local_address;
 
     if (Network::Utility::isTransparent(socket)) {
-      original_local_address = socket.addressProvider().localAddress();
+      original_local_address = socket.connectionInfoProvider().localAddress()
     } else {
       original_local_address = getOriginalDst(socket);
     }
