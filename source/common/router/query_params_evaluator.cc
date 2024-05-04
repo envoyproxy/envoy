@@ -22,12 +22,15 @@ QueryParamsEvaluatorPtr QueryParamsEvaluator::configure(const Protobuf::Map<std:
 }
 
 const QueryParamsEvaluator& QueryParamsEvaluator::defaultEvaluator() {
-    std::cout << "default evaluator called" << std::endl;
-    static QueryParamsEvaluator* instance = new QueryParamsEvaluator();
-    return *instance;
-  }
+  static QueryParamsEvaluator* instance = new QueryParamsEvaluator();
+  return *instance;
+}
 
 void QueryParamsEvaluator::evaluateQueryParams(Http::RequestHeaderMap& headers) const {
+  if (query_params_to_remove_.empty() && query_params_to_add_.empty()) {
+    return;
+  }
+
   absl::string_view path = headers.getPathValue();
   Http::Utility::QueryParamsMulti query_params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
 
