@@ -1,7 +1,6 @@
 #include "source/server/admin/clusters_request.h"
 
 #include <cstdint>
-#include <format>
 #include <memory>
 
 #include "envoy/server/instance.h"
