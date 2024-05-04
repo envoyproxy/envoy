@@ -23,6 +23,7 @@ Http::Code ClustersRequest::start(Http::ResponseHeaderMap& response_headers) {
   case ClustersParams::Format::Text:
     chunk_processor_ = std::make_unique<TextClustersChunkProcessor>(
         chunk_limit_, response_headers, server_.clusterManager().clusters().active_clusters_);
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
     break;
   case ClustersParams::Format::Json:
     chunk_processor_ = std::make_unique<JsonClustersChunkProcessor>(

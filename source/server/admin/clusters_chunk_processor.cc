@@ -465,6 +465,7 @@ void JsonClustersChunkProcessor::loadHealthFlagMap(
       flag_map.insert_or_assign("eds_health_status", envoy::config::core::v3::HealthStatus_Name(
                                                          envoy::config::core::v3::HEALTHY));
     }
+    break;
   case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
     if (bool value = host.get()->healthFlagGet(flag); value) {
       flag_map.insert_or_assign("failed_active_degraded_check", value);
