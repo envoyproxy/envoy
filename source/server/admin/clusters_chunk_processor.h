@@ -89,7 +89,7 @@ private:
   void addAddress(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host,
                   Buffer::Instance& response);
   void addMapEntries(Json::Streamer::Map* raw_map_ptr, Buffer::Instance& response,
-                     std::vector<const Json::Streamer::Map::NameValue>& entries);
+                     std::vector<Json::Streamer::Map::NameValue>& entries);
   void addCircuitBreakers(Json::Streamer::Map* raw_clusters_map_ptr,
                           Upstream::ClusterInfoConstSharedPtr cluster_info,
                           Buffer::Instance& response);
@@ -112,9 +112,9 @@ private:
   void setLocality(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host,
                    Buffer::Instance& response);
   void setSuccessRate(const Upstream::HostSharedPtr& host,
-                      std::vector<const Json::Streamer::Map::NameValue>& top_level_entries);
+                      std::vector<Json::Streamer::Map::NameValue>& top_level_entries);
   void setHostname(const Upstream::HostSharedPtr& host,
-                   std::vector<const Json::Streamer::Map::NameValue>& top_level_entries);
+                   std::vector<Json::Streamer::Map::NameValue>& top_level_entries);
   void loadHealthFlagMap(
       absl::btree_map<absl::string_view, absl::variant<bool, absl::string_view>>& flag_map,
       Upstream::Host::HealthFlag flag, const Upstream::HostSharedPtr& host);

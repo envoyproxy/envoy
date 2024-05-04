@@ -181,7 +181,7 @@ void JsonClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
   Json::Streamer::MapPtr cluster_map = json_context_holder_.back()->clusters_->addMap();
   Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.get().info();
 
-  std::vector<const Json::Streamer::Map::NameValue> top_level_entries;
+  std::vector<Json::Streamer::Map::NameValue> top_level_entries;
   if (const std::string& name = cluster_info->name(); !name.empty()) {
     top_level_entries.emplace_back("name", name);
   }
@@ -228,7 +228,7 @@ void JsonClustersChunkProcessor::processHost(Json::Streamer::Array* raw_host_sta
                                              Buffer::Instance& response) {
   Buffer::OwnedImpl buffer;
   Json::Streamer::MapPtr host_ptr = raw_host_statuses_ptr->addMap();
-  std::vector<const Json::Streamer::Map::NameValue> host_config;
+  std::vector<Json::Streamer::Map::NameValue> host_config;
   setHostname(host, host_config);
   addAddress(host_ptr.get(), host, buffer);
   setLocality(host_ptr.get(), host, buffer);
@@ -245,16 +245,14 @@ void JsonClustersChunkProcessor::processHost(Json::Streamer::Array* raw_host_sta
 }
 
 void JsonClustersChunkProcessor::setHostname(
-    const Upstream::HostSharedPtr& host,
-    std::vector<const Json::Streamer::Map::NameValue>& host_config) {
+    const Upstream::HostSharedPtr& host, std::vector<Json::Streamer::Map::NameValue>& host_config) {
   if (const std::string& hostname = host->hostname(); !hostname.empty()) {
     host_config.emplace_back("hostname", hostname);
   }
 }
 
 void JsonClustersChunkProcessor::setSuccessRate(
-    const Upstream::HostSharedPtr& host,
-    std::vector<const Json::Streamer::Map::NameValue>& host_config) {
+    const Upstream::HostSharedPtr& host, std::vector<Json::Streamer::Map::NameValue>& host_config) {
 
   double external_success_rate = host->outlierDetector().successRate(
       Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
@@ -288,7 +286,7 @@ void JsonClustersChunkProcessor::setLocality(Json::Streamer::Map* raw_host_ptr,
   }
   raw_host_ptr->addKey("locality");
   Json::Streamer::MapPtr locality_ptr = raw_host_ptr->addMap();
-  std::vector<const Json::Streamer::Map::NameValue> locality;
+  std::vector<Json::Streamer::Map::NameValue> locality;
   if (const std::string& region = host->locality().region(); !region.empty()) {
     locality.emplace_back("region", region);
   }
@@ -311,7 +309,7 @@ void JsonClustersChunkProcessor::addAddress(Json::Streamer::Map* raw_host_ptr,
       Json::Streamer::MapPtr address_ptr = raw_host_ptr->addMap();
       address_ptr->addKey("pipe");
       Json::Streamer::MapPtr pipe_ptr = address_ptr->addMap();
-      std::vector<const Json::Streamer::Map::NameValue> pipe{
+      std::vector<Json::Streamer::Map::NameValue> pipe{
           {"pipe", host->address()->asString()},
       };
       addMapEntries(pipe_ptr.get(), response, pipe);
@@ -324,7 +322,7 @@ void JsonClustersChunkProcessor::addAddress(Json::Streamer::Map* raw_host_ptr,
       Json::Streamer::MapPtr address_ptr = raw_host_ptr->addMap();
       address_ptr->addKey("socket_address");
       Json::Streamer::MapPtr socket_address_ptr = address_ptr->addMap();
-      std::vector<const Json::Streamer::Map::NameValue> socket_address;
+      std::vector<Json::Streamer::Map::NameValue> socket_address;
       if (const std::string& address = host->address()->ip()->addressAsString(); !address.empty()) {
         socket_address.emplace_back("address", address);
       }
@@ -342,7 +340,7 @@ void JsonClustersChunkProcessor::addAddress(Json::Streamer::Map* raw_host_ptr,
       Json::Streamer::MapPtr address_ptr = raw_host_ptr->addMap();
       raw_host_ptr->addKey("envoy_internal_address");
       Json::Streamer::MapPtr envoy_internal_address_ptr = raw_host_ptr->addMap();
-      std::vector<const Json::Streamer::Map::NameValue> envoy_internal_address;
+      std::vector<Json::Streamer::Map::NameValue> envoy_internal_address;
       if (const std::string& server_listener_name =
               host->address()->envoyInternalAddress()->addressId();
           !server_listener_name.empty()) {
@@ -371,7 +369,7 @@ void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_pt
     if (counter_name.empty() || counter.get().value() == 0) {
       continue;
     }
-    std::vector<const Json::Streamer::Map::NameValue> counter_object{
+    std::vector<Json::Streamer::Map::NameValue> counter_object{
         {"type",
          envoy::admin::v3::SimpleMetric_Type_Name(envoy::admin::v3::SimpleMetric::COUNTER)}};
     if (!counter_name.empty()) {
@@ -387,7 +385,7 @@ void JsonClustersChunkProcessor::buildHostStats(Json::Streamer::Map* raw_host_pt
     if (gauge_name.empty() || gauge.get().value() == 0) {
       continue;
     }
-    std::vector<const Json::Streamer::Map::NameValue> gauge_object{
+    std::vector<Json::Streamer::Map::NameValue> gauge_object{
         {"type", envoy::admin::v3::SimpleMetric_Type_Name(envoy::admin::v3::SimpleMetric::GAUGE)}};
     if (!gauge_name.empty()) {
       gauge_object.emplace_back("name", gauge_name);
@@ -414,7 +412,7 @@ void JsonClustersChunkProcessor::setHealthFlags(Json::Streamer::Map* raw_host_pt
   }
   raw_host_ptr->addKey("health_status");
   Json::Streamer::MapPtr health_flags_ptr = raw_host_ptr->addMap();
-  std::vector<const Json::Streamer::Map::NameValue> flags;
+  std::vector<Json::Streamer::Map::NameValue> flags;
   for (const auto& [name, flag_value] : flag_map) {
     if (name == "eds_health_status") {
       if (absl::holds_alternative<absl::string_view>(flag_value)) {
@@ -499,7 +497,7 @@ void JsonClustersChunkProcessor::addEjectionThresholds(Json::Streamer::Map* raw_
   if (outlier_detector != nullptr &&
       outlier_detector->successRateEjectionThreshold(
           Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin) > 0.0) {
-    std::vector<const Json::Streamer::Map::NameValue> success_rate_ejection_threshold{
+    std::vector<Json::Streamer::Map::NameValue> success_rate_ejection_threshold{
         {"success_rate_ejection_threshold",
          double(outlier_detector->successRateEjectionThreshold(
              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))},
@@ -509,7 +507,7 @@ void JsonClustersChunkProcessor::addEjectionThresholds(Json::Streamer::Map* raw_
   if (outlier_detector != nullptr &&
       outlier_detector->successRateEjectionThreshold(
           Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin) > 0.0) {
-    std::vector<const Json::Streamer::Map::NameValue> local_success_rate_ejection_threshold{
+    std::vector<Json::Streamer::Map::NameValue> local_success_rate_ejection_threshold{
         {"local_success_rate_ejection_threshold",
          double(outlier_detector->successRateEjectionThreshold(
              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin))},
@@ -538,7 +536,7 @@ void JsonClustersChunkProcessor::addCircuitBreakerForPriority(
     Json::Streamer::Array* raw_thresholds_ptr, Buffer::Instance& response,
     Upstream::ResourceManager& resource_manager) {
   Json::Streamer::MapPtr threshold = raw_thresholds_ptr->addMap();
-  std::vector<const Json::Streamer::Map::NameValue> entries{
+  std::vector<Json::Streamer::Map::NameValue> entries{
       {"priority",
        priority == envoy::config::core::v3::RoutingPriority::DEFAULT ? "DEFAULT" : "HIGH"}};
   if (uint64_t max_connections = resource_manager.connections().max(); max_connections) {
@@ -569,7 +567,7 @@ void JsonClustersChunkProcessor::drainBufferIntoResponse(Buffer::Instance& respo
 
 void JsonClustersChunkProcessor::addMapEntries(
     Json::Streamer::Map* raw_map_ptr, Buffer::Instance& response,
-    std::vector<const Json::Streamer::Map::NameValue>& entries) {
+    std::vector<Json::Streamer::Map::NameValue>& entries) {
   raw_map_ptr->addEntries(entries);
   drainBufferIntoResponse(response);
 }
