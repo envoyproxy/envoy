@@ -40,6 +40,11 @@ public:
       MissingConfig,
     };
 
+    enum class ReceiverState {
+      Initializing,
+      Ready,
+    };
+
     virtual ~MetadataReceiver() = default;
 
     /**

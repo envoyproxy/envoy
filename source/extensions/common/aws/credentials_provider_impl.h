@@ -138,6 +138,8 @@ protected:
   const std::string uri_;
   // The cache duration of the fetched credentials.
   const std::chrono::seconds cache_duration_;
+  // Metadata receiver state
+  MetadataFetcher::MetadataReceiver::ReceiverState receiver_state_;
   // The thread local slot for cache.
   ThreadLocal::TypedSlotPtr<ThreadLocalCredentialsCache> tls_;
   // The timer to trigger fetch due to cache duration.
