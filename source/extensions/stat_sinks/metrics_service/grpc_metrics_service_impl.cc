@@ -33,14 +33,18 @@ void GrpcMetricsStreamerImpl::send(MetricsPtr&& metrics) {
   message.mutable_envoy_metrics()->MergeFrom(*metrics);
 
   if (stream_ == nullptr) {
+    ENVOY_LOG(debug, "Establishing new gRPC metrics service stream");
     stream_ = client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
     // For perf reasons, the identifier is only sent on establishing the stream.
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = local_info_.node();
   }
-  if (stream_ != nullptr) {
-    stream_->sendMessage(message, false);
+  if (stream_ == nullptr) {
+    ENVOY_LOG(error,
+              "unable to establish metrics service stream. Will retry in the next flush cycle");
+    return;
   }
+  stream_->sendMessage(message, false);
 }
 
 MetricsPtr MetricsFlusher::flush(Stats::MetricSnapshot& snapshot) const {
