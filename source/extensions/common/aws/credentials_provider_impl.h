@@ -140,7 +140,8 @@ protected:
   const std::chrono::seconds cache_duration_;
   // Metadata receiver state
   MetadataFetcher::MetadataReceiver::ReceiverState receiver_state_;
-  // Metadata receiver initialisation timer - number of seconds between retries before initialization is complete
+  // Metadata receiver initialization timer - number of seconds between retries before
+  // initialization is complete
   std::chrono::seconds initialization_timer_;
   // The thread local slot for cache.
   ThreadLocal::TypedSlotPtr<ThreadLocalCredentialsCache> tls_;
