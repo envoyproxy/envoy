@@ -103,7 +103,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
     : api_(api), context_(context), fetch_metadata_using_curl_(fetch_metadata_using_curl),
       create_metadata_fetcher_cb_(create_metadata_fetcher_cb),
       cluster_name_(std::string(cluster_name)), cluster_type_(cluster_type), uri_(std::string(uri)),
-      cache_duration_(getCacheDuration()), receiver_state_(MetadataFetcher::MetadataReceiver::ReceiverState::Initializing),
+      cache_duration_(getCacheDuration()), receiver_state_(MetadataFetcher::MetadataReceiver::ReceiverState::Initializing), initialization_timer_(std::chrono::seconds(2)),
       debug_name_(absl::StrCat("Fetching aws credentials from cluster=", cluster_name)) {
   if (context_) {
     context_->mainThreadDispatcher().post([this]() {
@@ -114,9 +114,6 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
                   cluster_name_, uri_);
         return;
       }
-      
-      ENVOY_LOG_MISC(debug, "********** Cluster manager added {}",uri_);
-
     });
 
     tls_ = ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(context_->threadLocal());
@@ -126,20 +123,18 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
     cache_duration_timer_ = context_->mainThreadDispatcher().createTimer([this]() -> void {
       if (useHttpAsyncClient()) {
         const Thread::LockGuard lock(lock_);
-        ENVOY_LOG_MISC(debug, "********** Timer refresh");
         refresh();
       }
     });
 
-    // if (useHttpAsyncClient()) {
-    //   // Register with init_manager, force the listener to wait for fetching (refresh).
-    //   init_target_ =
-    //       std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void { 
-    //         ENVOY_LOG_MISC(debug, "********** Init manager refresh");
-    //         refresh(); 
-    //         });
-    //   context_->initManager().add(*init_target_);
-    // }
+    if (useHttpAsyncClient()) {
+      // Register with init_manager, force the listener to wait for fetching (refresh).
+      init_target_ =
+          std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void { 
+            refresh(); 
+            });
+      context_->initManager().add(*init_target_);
+    }
   }
 }
 
@@ -161,20 +156,22 @@ std::chrono::seconds MetadataCredentialsProviderBase::getCacheDuration() {
 
 void MetadataCredentialsProviderBase::handleFetchDone() {
   if (useHttpAsyncClient() && context_) {
-    // if (init_target_) {
-    //               ENVOY_LOG_MISC(debug, "********** Init target ready and reset");
-
-    //   init_target_->ready();
-    //   init_target_.reset();
-    // }
+    if (init_target_) {
+      init_target_->ready();
+      init_target_.reset();
+    }
     if (cache_duration_timer_ && !cache_duration_timer_->enabled()) {
       if(receiver_state_ == MetadataFetcher::MetadataReceiver::ReceiverState::Initializing)
       {
-        ENVOY_LOG_MISC(debug,"********** initialising reset: resetting timer 5s");
-        cache_duration_timer_->enableTimer(std::chrono::seconds(5));
+        cache_duration_timer_->enableTimer(initialization_timer_);
+        // Timer begins at 2 seconds and doubles each time, to a maximum of 30 seconds. This avoids excessive retries against sts or IMDS
+        if(initialization_timer_ < std::chrono::seconds(30))
+        {
+          initialization_timer_ = initialization_timer_ * 2;
+          ENVOY_LOG_MISC(debug,"Metadata fetcher initialisation failed, retrying in {} seconds", initialization_timer_.count());
+        }
       }
       else {
-        ENVOY_LOG_MISC(debug,"********** Normal reset: resetting timer {}",cache_duration_.count());
         cache_duration_timer_->enableTimer(cache_duration_);
       }
     }
@@ -431,8 +428,8 @@ void InstanceProfileCredentialsProvider::extractCredentials(
 void InstanceProfileCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   // TODO(suniltheta): increment fetch success stats
   ENVOY_LOG(debug, "AWS Instance metadata fetch success, calling callback func");
-  on_async_fetch_cb_(std::move(body));
   receiver_state_ = MetadataFetcher::MetadataReceiver::ReceiverState::Ready;
+  on_async_fetch_cb_(std::move(body));
 }
 
 void InstanceProfileCredentialsProvider::onMetadataError(Failure reason) {
@@ -572,8 +569,8 @@ void ContainerCredentialsProvider::extractCredentials(
 void ContainerCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   // TODO(suniltheta): increment fetch success stats
   ENVOY_LOG(debug, "AWS Task metadata fetch success, calling callback func");
-  on_async_fetch_cb_(std::move(body));
   receiver_state_ = MetadataFetcher::MetadataReceiver::ReceiverState::Ready;
+  on_async_fetch_cb_(std::move(body));
 }
 
 void ContainerCredentialsProvider::onMetadataError(Failure reason) {
@@ -727,8 +724,8 @@ void WebIdentityCredentialsProvider::extractCredentials(
 void WebIdentityCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   // TODO(suniltheta): increment fetch success stats
   ENVOY_LOG(debug, "AWS metadata fetch from STS success, calling callback func");
-  on_async_fetch_cb_(std::move(body));
   receiver_state_ = MetadataFetcher::MetadataReceiver::ReceiverState::Ready;
+  on_async_fetch_cb_(std::move(body));
 }
 
 void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
