@@ -40,8 +40,9 @@ public:
       MissingConfig,
     };
 
-    // Metadata fetcher begins in initializing state and stays there until first success, then reverts to standard cache duration timing
-    // Initializing state will cause credential refresh at 2 sec, doubling to a maximum of 30 sec until successful.
+    // Metadata fetcher begins in initializing state and stays there until first success, then
+    // reverts to standard cache duration timing Initializing state will cause credential refresh at
+    // 2 sec, doubling to a maximum of 30 sec until successful.
     enum class ReceiverState {
       Initializing,
       Ready,
