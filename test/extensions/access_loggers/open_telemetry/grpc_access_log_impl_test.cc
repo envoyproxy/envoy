@@ -181,7 +181,7 @@ TEST_F(GrpcAccessLoggerImplTest, StatsWithOnFailure) {
                 .value(),
             0);
 
-    // TODO(TAOXUY): support record stats for failed otel requests.
+  // TODO(TAOXUY): support record stats for failed otel requests.
   // Here `log_written` should be 1 instead of 2 and `logs_dropped` should be 1 instead of 0.
   grpc_access_logger_impl_test_helper_.expectSentMessage(
       expected_message_yaml, Grpc::Status::WellKnownGrpcStatus::Internal, 1);
