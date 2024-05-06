@@ -1597,6 +1597,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithAbortedClientConnection) {
   waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
+  // Abruptly close the client connection.
   codec_client_->close(Envoy::Network::ConnectionCloseType::Abort);
 
   std::string log = waitForAccessLog(access_log_name_);
@@ -1604,6 +1605,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithAbortedClientConnection) {
   std::vector<std::string> metrics = absl::StrSplit(log, ',');
   ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
+  // No roundtrip duration is logged; we never received a final ack from client.
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
   EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
   EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
