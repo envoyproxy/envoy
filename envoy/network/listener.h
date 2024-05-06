@@ -347,6 +347,7 @@ struct UdpRecvData {
   LocalPeerAddresses addresses_;
   Buffer::InstancePtr buffer_;
   MonotonicTime receive_time_;
+  uint8_t tos_ = 0;
 };
 
 /**

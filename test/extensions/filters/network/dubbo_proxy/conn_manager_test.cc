@@ -143,7 +143,7 @@ public:
     }
 
     proto_config_.set_stat_prefix("test");
-    config_ = std::make_unique<TestConfigImpl>(proto_config_, factory_context_,
+    config_ = std::make_shared<TestConfigImpl>(proto_config_, factory_context_,
                                                *route_config_provider_manager_, stats_);
     if (custom_serializer_) {
       config_->serializer_ = custom_serializer_;
@@ -154,7 +154,7 @@ public:
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     conn_manager_ = std::make_unique<ConnectionManager>(
-        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource());
+        config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
     conn_manager_->onNewConnection();
 
@@ -322,7 +322,7 @@ public:
   ConfigDubboProxy proto_config_;
 
   std::unique_ptr<Router::RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  std::unique_ptr<TestConfigImpl> config_;
+  std::shared_ptr<TestConfigImpl> config_;
 
   Buffer::OwnedImpl buffer_;
   Buffer::OwnedImpl write_buffer_;

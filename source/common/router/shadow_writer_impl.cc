@@ -58,7 +58,10 @@ Upstream::ThreadLocalCluster* ShadowWriterImpl::getClusterAndPreprocessHeadersAn
     return nullptr;
   }
 
-  headers.setHost(shadowAppendedHost(headers.getHostValue()));
+  // Append "-shadow" suffix if option is disabled.
+  if (!options.is_shadow_suffixed_disabled) {
+    headers.setHost(shadowAppendedHost(headers.getHostValue()));
+  }
 
   const_cast<Http::AsyncClient::RequestOptions&>(options).setIsShadow(true);
   return thread_local_cluster;

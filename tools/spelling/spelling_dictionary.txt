@@ -27,6 +27,7 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+ECN
 ECS
 EKS
 NID
@@ -1373,6 +1374,7 @@ tokenized
 tokenizes
 tokenizing
 toolchain
+tos
 traceid
 traceparent
 tracestate

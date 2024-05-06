@@ -100,7 +100,8 @@ public:
             *connection, connection->connection_id(), dispatcher, send_buffer_limit, {nullptr},
             std::make_unique<StreamInfo::StreamInfoImpl>(
                 dispatcher.timeSource(),
-                connection->connectionSocket()->connectionInfoProviderSharedPtr())),
+                connection->connectionSocket()->connectionInfoProviderSharedPtr(),
+                StreamInfo::FilterState::LifeSpan::Connection)),
         crypto_stream_(std::make_unique<TestQuicCryptoStream>(this)) {}
 
   void Initialize() override {

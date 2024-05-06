@@ -48,6 +48,7 @@ using LegacySubsetLoadbalancingPolicyProto = envoy::config::cluster::v3::Cluster
 /**
  * Implementation of LoadBalancerSubsetInfo. Both the legacy and extension subset proto configs
  * are converted to this class.
+ * TODO(wbpcode): move this implementation to extensions directory.
  */
 class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
 public:

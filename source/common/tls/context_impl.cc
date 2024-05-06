@@ -170,8 +170,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-  auto verify_mode = cert_validator_->initializeSslContexts(
-      ssl_contexts, config.capabilities().provides_certificates);
+  auto verify_mode =
+      THROW_OR_RETURN_VALUE(cert_validator_->initializeSslContexts(
+                                ssl_contexts, config.capabilities().provides_certificates),
+                            int);
   if (!capabilities_.verifies_peer_certificates) {
     for (auto ctx : ssl_contexts) {
       if (verify_mode != SSL_VERIFY_NONE) {
@@ -463,7 +465,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-bssl::UniquePtr<SSL>
+absl::StatusOr<bssl::UniquePtr<SSL>>
 ContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) {
   // We use the first certificate for a new SSL object, later in the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello, we replace with the
@@ -701,16 +703,25 @@ bool ContextImpl::parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl
   return false;
 }
 
-bssl::UniquePtr<SSL>
+absl::StatusOr<bssl::UniquePtr<SSL>>
 ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) {
-  bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(options));
+  absl::StatusOr<bssl::UniquePtr<SSL>> ssl_con_or_status(ContextImpl::newSsl(options));
+  if (!ssl_con_or_status.ok()) {
+    return ssl_con_or_status;
+  }
+
+  bssl::UniquePtr<SSL> ssl_con = std::move(ssl_con_or_status.value());
 
   const std::string server_name_indication = options && options->serverNameOverride().has_value()
                                                  ? options->serverNameOverride().value()
                                                  : server_name_indication_;
   if (!server_name_indication.empty()) {
     const int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());
-    RELEASE_ASSERT(rc, Utility::getLastCryptoError().value_or(""));
+    if (rc != 1) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to create upstream TLS due to failure setting SNI: ",
+                       Utility::getLastCryptoError().value_or("unknown")));
+    }
   }
 
   if (options && !options->verifySubjectAltNameListOverride().empty()) {
@@ -835,8 +846,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
     auto& ctx = tls_contexts_[i];
     if (!config.capabilities().verifies_peer_certificates) {
-      cert_validator_->addClientValidationContext(ctx.ssl_ctx_.get(),
-                                                  config.requireClientCertificate());
+      THROW_IF_NOT_OK(cert_validator_->addClientValidationContext(
+          ctx.ssl_ctx_.get(), config.requireClientCertificate()));
     }
 
     if (!parsed_alpn_protocols_.empty() && !config.capabilities().handles_alpn_selection) {
@@ -889,12 +900,13 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
         throwEnvoyExceptionOrPanic("Required OCSP response is missing from TLS context");
       }
     } else {
-      auto response = std::make_unique<Ocsp::OcspResponseWrapper>(ocsp_resp_bytes,
-                                                                  factory_context_.timeSource());
-      if (!response->matchesCertificate(*ctx.cert_chain_)) {
+      auto response_or_error =
+          Ocsp::OcspResponseWrapper::create(ocsp_resp_bytes, factory_context_.timeSource());
+      THROW_IF_STATUS_NOT_OK(response_or_error, throw);
+      if (!response_or_error.value()->matchesCertificate(*ctx.cert_chain_)) {
         throwEnvoyExceptionOrPanic("OCSP response does not match its TLS certificate");
       }
-      ctx.ocsp_response_ = std::move(response);
+      ctx.ocsp_response_ = std::move(response_or_error.value());
     }
   }
 }

@@ -8,7 +8,6 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/protobuf.h"
@@ -55,26 +54,6 @@ TEST(UtilityTest, ConfigSourceInitFetchTimeout) {
   config_source.mutable_initial_fetch_timeout()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(654));
   EXPECT_EQ(654, Utility::configSourceInitialFetchTimeout(config_source).count());
-}
-
-TEST(UtilityTest, createTagProducer) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = StatsUtility::createTagProducer(bootstrap, {});
-  ASSERT_TRUE(producer != nullptr);
-  Stats::TagVector tags;
-  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
-  ASSERT_EQ(extracted_name, "http.rq_total");
-  ASSERT_EQ(tags.size(), 1);
-}
-
-TEST(UtilityTest, createTagProducerWithDefaultTgs) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = StatsUtility::createTagProducer(bootstrap, {{"foo", "bar"}});
-  ASSERT_TRUE(producer != nullptr);
-  Stats::TagVector tags;
-  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
-  EXPECT_EQ(extracted_name, "http.rq_total");
-  EXPECT_EQ(tags.size(), 2);
 }
 
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {

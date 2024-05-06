@@ -8,7 +8,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.chromium.net.NetworkException;
 
@@ -75,18 +75,26 @@ public class Errors {
   public static NetError mapEnvoyMobileErrorToNetError(EnvoyFinalStreamIntel finalStreamIntel) {
     // if connection fails to be established, check if user is offline
     long responseFlag = finalStreamIntel.getResponseFlags();
-    if ((responseFlag == EnvoyMobileError.DNS_RESOLUTION_FAILED ||
-         responseFlag == EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE) &&
+    if (((responseFlag & EnvoyMobileError.DNS_RESOLUTION_FAILED) != 0 ||
+         (responseFlag & EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE) != 0) &&
         !AndroidNetworkMonitor.getInstance().isOnline()) {
       return NetError.ERR_INTERNET_DISCONNECTED;
     }
 
     // Check if negotiated_protocol is quic
+    // TODO(abeyad): Assigning all errors that happen when using HTTP/3 to QUIC_PROTOCOL_ERROR
+    // can mask the real error (DNS, upstream connection, etc). Revisit the error conversion logic.
     if (finalStreamIntel.getUpstreamProtocol() == UpstreamHttpProtocol.HTTP3) {
       return NetError.ERR_QUIC_PROTOCOL_ERROR;
     }
 
-    return ENVOYMOBILE_ERROR_TO_NET_ERROR.getOrDefault(responseFlag, NetError.ERR_OTHER);
+    // This will only map the first matched error to a NetError code.
+    for (Map.Entry<Long, NetError> entry : ENVOYMOBILE_ERROR_TO_NET_ERROR.entrySet()) {
+      if ((responseFlag & entry.getKey()) != 0) {
+        return entry.getValue();
+      }
+    }
+    return NetError.ERR_OTHER;
   }
 
   /**
@@ -127,7 +135,10 @@ public class Errors {
   }
 
   private static Map<Long, NetError> buildErrorMap() {
-    Map<Long, NetError> errorMap = new HashMap<>();
+    // Mapping potentially multiple response flags to a NetError requires iterating over the map's
+    // entries in a deterministic order, so using a LinkedHashMap here, at the expense of a little
+    // extra memory overhead.
+    Map<Long, NetError> errorMap = new LinkedHashMap<>();
     errorMap.put(EnvoyMobileError.DNS_RESOLUTION_FAILED, NetError.ERR_NAME_NOT_RESOLVED);
     errorMap.put(EnvoyMobileError.DURATION_TIMEOUT, NetError.ERR_TIMED_OUT);
     errorMap.put(EnvoyMobileError.STREAM_IDLE_TIMEOUT, NetError.ERR_TIMED_OUT);

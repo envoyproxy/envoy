@@ -31,7 +31,8 @@ namespace SipProxy {
 
 class SipTraTest : public testing::Test {
 public:
-  SipTraTest() : stream_info_(time_source_, nullptr) {}
+  SipTraTest()
+      : stream_info_(time_source_, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain) {}
   std::shared_ptr<SipProxy::MockTrafficRoutingAssistantHandlerDeep> initTraHandler() {
     std::string tra_yaml = R"EOF(
                grpc_service:
@@ -49,7 +50,7 @@ public:
     auto config = std::make_shared<NiceMock<MockConfig>>();
     EXPECT_CALL(*config, stats()).WillRepeatedly(ReturnRef(stat));
     auto context = std::make_shared<NiceMock<Server::Configuration::MockFactoryContext>>();
-    filter_ = std::make_shared<NiceMock<MockConnectionManager>>(*config, random_, time_source_,
+    filter_ = std::make_shared<NiceMock<MockConnectionManager>>(config, random_, time_source_,
                                                                 *context, nullptr);
 
     auto tra_handler = std::make_shared<NiceMock<SipProxy::MockTrafficRoutingAssistantHandlerDeep>>(

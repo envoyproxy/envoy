@@ -162,7 +162,8 @@ public:
             listener_config_.listenerScope(), crypto_stream_factory_,
             std::make_unique<StreamInfo::StreamInfoImpl>(
                 dispatcher_->timeSource(),
-                quic_connection_->connectionSocket()->connectionInfoProviderSharedPtr()),
+                quic_connection_->connectionSocket()->connectionInfoProviderSharedPtr(),
+                StreamInfo::FilterState::LifeSpan::Connection),
             connection_stats_),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),

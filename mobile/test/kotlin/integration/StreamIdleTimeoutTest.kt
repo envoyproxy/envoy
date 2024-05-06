@@ -87,7 +87,7 @@ class StreamIdleTimeoutTest {
   fun `stream idle timeout triggers onError callbacks`() {
     val engine =
       EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
         .addPlatformFilter(
@@ -103,7 +103,7 @@ class StreamIdleTimeoutTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "localhost:${httpTestServer.port}",
+          authority = httpTestServer.address,
           path = "/simple.txt"
         )
         .build()

@@ -236,6 +236,28 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       headers.setCopy(header.first, header.second);
     }
   }
+
+  if (!response_headers_to_add_if_absent_.empty()) {
+    for (const auto& header : response_headers_to_add_if_absent_) {
+      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, header.first.get(), header.second);
+      if (auto header_entry = headers.get(header.first); header_entry.empty()) {
+        ENVOY_STREAM_LOG(trace, "ext_authz filter added header(s) to the encoded response:",
+                         *encoder_callbacks_);
+        headers.addCopy(header.first, header.second);
+      }
+    }
+  }
+
+  if (!response_headers_to_overwrite_if_exists_.empty()) {
+    for (const auto& header : response_headers_to_overwrite_if_exists_) {
+      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, header.first.get(), header.second);
+      if (auto header_entry = headers.get(header.first); !header_entry.empty()) {
+        ENVOY_STREAM_LOG(
+            trace, "ext_authz filter set header(s) to the encoded response:", *encoder_callbacks_);
+        headers.setCopy(header.first, header.second);
+      }
+    }
+  }
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -351,6 +373,20 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to set to the response:",
                        *decoder_callbacks_, response->response_headers_to_set.size());
       response_headers_to_set_ = std::move(response->response_headers_to_set);
+    }
+
+    if (!response->response_headers_to_add_if_absent.empty()) {
+      ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to add to the response:",
+                       *decoder_callbacks_, response->response_headers_to_add_if_absent.size());
+      response_headers_to_add_if_absent_ = std::move(response->response_headers_to_add_if_absent);
+    }
+
+    if (!response->response_headers_to_overwrite_if_exists.empty()) {
+      ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to set to the response:",
+                       *decoder_callbacks_,
+                       response->response_headers_to_overwrite_if_exists.size());
+      response_headers_to_overwrite_if_exists_ =
+          std::move(response->response_headers_to_overwrite_if_exists);
     }
 
     absl::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
