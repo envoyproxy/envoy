@@ -1024,14 +1024,6 @@ public:
   clusterType() const PURE;
 
   /**
-   * @return const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& the
-   * configuration for the Original Destination load balancing policy, only used if type is set to
-   *         ORIGINAL_DST_LB.
-   */
-  virtual OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
-  lbOriginalDstConfig() const PURE;
-
-  /**
    * @return const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration
    *         for the upstream, if a custom upstream is configured.
    */

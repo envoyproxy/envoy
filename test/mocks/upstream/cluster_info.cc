@@ -131,13 +131,6 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke(
           [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
-  ON_CALL(*this, lbOriginalDstConfig())
-      .WillByDefault(Invoke(
-          [this]() -> OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> {
-            return makeOptRefFromPtr<
-                const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
-                lb_original_dst_config_.get());
-          }));
   ON_CALL(*this, upstreamConfig())
       .WillByDefault(
           Invoke([this]() -> OptRef<const envoy::config::core::v3::TypedExtensionConfig> {
