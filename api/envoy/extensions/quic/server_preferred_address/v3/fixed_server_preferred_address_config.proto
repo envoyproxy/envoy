@@ -24,11 +24,11 @@ message FixedServerPreferredAddressConfig {
   option (xds.annotations.v3.message_status).work_in_progress = true;
 
   // Addresses for server preferred address for a single address family (IPv4 or IPv6).
-  message Addresses {
+  message AddressFamilyConfig {
     // The server preferred address sent to clients.
     //
     // Note: Envoy currently must receive all packets for a QUIC connection on the same port, so unless
-    // :ref:`dnat_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.Addresses.dnat_address>`
+    // :ref:`dnat_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig.dnat_address>`
     // is configured, the port for this address must be zero, and the listener's
     // port will be used instead.
     config.core.v3.SocketAddress address = 1;
@@ -51,7 +51,7 @@ message FixedServerPreferredAddressConfig {
   // The IPv4 address to advertise to clients for Server Preferred Address.
   // This field takes precedence over
   // :ref:`ipv4_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.ipv4_address>`.
-  Addresses ipv4_config = 3;
+  AddressFamilyConfig ipv4_config = 3;
 
   // String representation of IPv6 address, i.e. "::1".
   // The listener's port will be used.
@@ -61,5 +61,5 @@ message FixedServerPreferredAddressConfig {
   // The IPv6 address to advertise to clients for Server Preferred Address.
   // This field takes precedence over
   // :ref:`ipv6_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.ipv6_address>`.
-  Addresses ipv6_config = 4;
+  AddressFamilyConfig ipv6_config = 4;
 }

@@ -64,7 +64,7 @@ parseIpAddressFromSocketAddress(const envoy::config::core::v3::SocketAddress& ad
 FixedServerPreferredAddressConfig::FamilyAddresses
 parseFamily(const std::string& addr_string,
             const envoy::extensions::quic::server_preferred_address::v3::
-                FixedServerPreferredAddressConfig::Addresses* addresses,
+                FixedServerPreferredAddressConfig::AddressFamilyConfig* addresses,
             Network::Address::IpVersion version, absl::string_view address_family,
             const Protobuf::Message& message) {
   FixedServerPreferredAddressConfig::FamilyAddresses ret;
