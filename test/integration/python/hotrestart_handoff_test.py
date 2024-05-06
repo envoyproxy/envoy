@@ -33,7 +33,7 @@ def random_loopback_host():
 # This is a timeout that must be long enough that the hot restarted
 # instance can reliably be fully started up within this many seconds, or the
 # test will be flaky. 3 seconds is enough on a not-busy host with a non-tsan
-# non-coverage build; 10 seconds should be enough to be not flaky in most
+# non-coverage build; 15 seconds should be enough to be not flaky in most
 # configurations.
 #
 # Unfortunately, because the test is verifying the behavior of a connection
@@ -44,7 +44,7 @@ def random_loopback_host():
 # Ideally this would be adjusted (3x) for tsan and coverage runs, but making that
 # possible for python is outside the scope of this test, so we're stuck using the
 # 3x value for all tests.
-STARTUP_TOLERANCE_SECONDS = 10
+STARTUP_TOLERANCE_SECONDS = 15
 
 # We send multiple requests in parallel and require them all to function correctly
 # - this makes it so if something is flaky we're more likely to encounter it, and
