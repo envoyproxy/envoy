@@ -1,0 +1,36 @@
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+  - cron: '0 5 * * 1,2,3,4,5'
+
+permissions:
+  contents: read  # to fetch code (actions/checkout)
+
+jobs:
+  setec_notifier:
+    permissions:
+      contents: read  # to fetch code (actions/checkout)
+      statuses: read  # for setec_notifier.py
+      pull-requests: read  # for setec_notifier.py
+      issues: read  # for setec_notifier.py
+    name: PR Notifier
+    runs-on: ubuntu-22.04
+    if: >-
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || !contains(github.actor, '[bot]'))
+      }}
+    steps:
+    - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+    - name: Notify about issues
+      run: |
+        ARGS=()
+        if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
+            ARGS+=(--dry_run)
+        fi
+        bazel run //tools/repo:setec-notify -- "${ARGS[@]}"
+      env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

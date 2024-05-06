@@ -19,3 +19,14 @@ envoy_pytool_binary(
         requirement("slack_sdk"),
     ],
 )
+
+envoy_pytool_binary(
+    name = "notify-setec",
+    srcs = ["notify-setec.py"],
+    deps = [
+        requirement("aio.api.github"),
+        requirement("aio.run.runner"),
+        requirement("icalendar"),
+        requirement("slack_sdk"),
+    ],
+)
