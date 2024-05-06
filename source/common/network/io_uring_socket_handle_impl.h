@@ -8,10 +8,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/network/io_socket_handle_base_impl.h"
 
-#if defined(__ANDROID_API__)
-#include "does_not_exist.h"
-#endif
-
 namespace Envoy {
 
 namespace Network {
