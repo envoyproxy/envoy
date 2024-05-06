@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <mutex>
 #include <string>
 
 #include "envoy/common/platform.h"
@@ -103,12 +104,7 @@ public:
 class IpInstance : public InstanceBase {
 public:
   // InstanceBase
-  const std::string& asString() const override {
-    if (address_port_string_.empty()) {
-      address_port_string_ = generateAddressPortString();
-    }
-    return address_port_string_;
-  }
+  const std::string& asString() const override;
 
 protected:
   friend class IpInstancePeer;
@@ -122,6 +118,7 @@ protected:
 
 private:
   mutable std::string address_port_string_;
+  mutable std::once_flag populate_address_port_string_;
 };
 
 /**
@@ -217,6 +214,7 @@ private:
 
     Ipv4Helper ipv4_;
     mutable std::string address_string_;
+    mutable std::once_flag populate_address_string_;
   };
 
   void initHelper(const sockaddr_in* address, bool generate_address_string);
@@ -321,6 +319,7 @@ private:
 
     Ipv6Helper ipv6_;
     mutable std::string address_string_;
+    mutable std::once_flag populate_address_string_;
   };
 
   void initHelper(const sockaddr_in6& address, bool v6only, bool generate_address_string);

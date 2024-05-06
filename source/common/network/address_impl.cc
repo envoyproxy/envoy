@@ -133,6 +133,14 @@ addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t f
   return *address;
 }
 
+const std::string& IpInstance::asString() const {
+  if (address_port_string_.empty()) {
+    std::call_once(populate_address_port_string_,
+                   [this]() { address_port_string_ = generateAddressPortString(); });
+  }
+  return address_port_string_;
+}
+
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface)
     : IpInstance(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   throwOnError(validateProtocolSupported());
@@ -241,7 +249,8 @@ void Ipv4Instance::initHelper(const sockaddr_in* address, bool generate_address_
 
 const std::string& Ipv4Instance::IpHelper::addressAsString() const {
   if (address_string_.empty()) {
-    address_string_ = sockaddrToString(ipv4_.address_);
+    std::call_once(populate_address_string_,
+                   [this]() { address_string_ = sockaddrToString(ipv4_.address_); });
   }
   return address_string_;
 }
@@ -379,7 +388,8 @@ void Ipv6Instance::initHelper(const sockaddr_in6& address, bool v6only,
 
 const std::string& Ipv6Instance::IpHelper::addressAsString() const {
   if (address_string_.empty()) {
-    address_string_ = ipv6_.makeFriendlyAddress();
+    std::call_once(populate_address_string_,
+                   [this]() { address_string_ = ipv6_.makeFriendlyAddress(); });
   }
   return address_string_;
 }
