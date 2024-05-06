@@ -58,8 +58,9 @@ public:
    *
    * @param context the store context
    * @param require_client_cert whether or not client cert is required
+   * @return an error status if the context was invalid.
    */
-  virtual void addClientValidationContext(SSL_CTX* context, bool require_client_cert) PURE;
+  virtual absl::Status addClientValidationContext(SSL_CTX* context, bool require_client_cert) PURE;
 
   /**
    * Called by customVerifyCallback to do the actual cert chain verification which could be
@@ -89,10 +90,10 @@ public:
    * @param contexts the store context
    * @param handshaker_provides_certificates whether or not a handshaker implementation provides
    * certificates itself.
-   * @return the ssl verification mode flag
+   * @return the ssl verification mode flag or an error if initialization failed.
    */
-  virtual int initializeSslContexts(std::vector<SSL_CTX*> contexts,
-                                    bool handshaker_provides_certificates) PURE;
+  virtual absl::StatusOr<int> initializeSslContexts(std::vector<SSL_CTX*> contexts,
+                                                    bool handshaker_provides_certificates) PURE;
 
   /**
    * Called when calculation hash for session context ids. This hash MUST include all

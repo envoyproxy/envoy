@@ -14,7 +14,8 @@ public class CronvoyQuicExceptionImpl extends QuicException {
    *
    * @param message explanation of failure.
    * @param netErrorCode Error code from
-   * <a href=https://chromium.googlesource.com/chromium/src/+/master/net/base/net_error_list.h>
+   * <a
+   * href=https://github.com/envoyproxy/envoy/blob/5451efd9b8f8a444431197050e45ba974ed4e9d8/mobile/library/java/org/chromium/net/impl/Errors.java#L43>
    * this list</a>.
    * @param quicDetailedErrorCode Detailed <a href="https://www.chromium.org/quic">QUIC</a> error
    * code from <a
@@ -23,8 +24,28 @@ public class CronvoyQuicExceptionImpl extends QuicException {
    */
   public CronvoyQuicExceptionImpl(String message, int errorCode, int netErrorCode,
                                   int quicDetailedErrorCode) {
+    this(message, errorCode, netErrorCode, quicDetailedErrorCode, "");
+  }
+
+  /**
+   * Constructs an exception with a specific error and error details.
+   *
+   * @param message explanation of failure.
+   * @param netErrorCode Error code from
+   * <a
+   * href=https://github.com/envoyproxy/envoy/blob/5451efd9b8f8a444431197050e45ba974ed4e9d8/mobile/library/java/org/chromium/net/impl/Errors.java#L43>
+   * this list</a>.
+   * @param quicDetailedErrorCode Detailed <a href="https://www.chromium.org/quic">QUIC</a> error
+   * code from <a
+   * href="https://cs.chromium.org/search/?q=symbol:%5CbQuicErrorCode%5Cb">
+   * QuicErrorCode</a>.
+   * @param errorDetails a string of error details.
+   */
+  public CronvoyQuicExceptionImpl(String message, int errorCode, int netErrorCode,
+                                  int quicDetailedErrorCode, String errorDetails) {
     super(message, null);
-    mNetworkException = new CronvoyNetworkExceptionImpl(message, errorCode, netErrorCode);
+    mNetworkException =
+        new CronvoyNetworkExceptionImpl(message, errorCode, netErrorCode, errorDetails);
     mQuicDetailedErrorCode = quicDetailedErrorCode;
   }
 
@@ -52,4 +73,6 @@ public class CronvoyQuicExceptionImpl extends QuicException {
   public int getQuicDetailedErrorCode() {
     return mQuicDetailedErrorCode;
   }
+
+  public String getErrorDetails() { return mNetworkException.getErrorDetails(); }
 }

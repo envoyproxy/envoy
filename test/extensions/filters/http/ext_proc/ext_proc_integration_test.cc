@@ -54,6 +54,7 @@ struct ConfigOptions {
   bool add_logging_filter = false;
   bool http1_codec = false;
   bool add_metadata = false;
+  bool downstream_filter = true;
 };
 
 // These tests exercise the ext_proc filter through Envoy's integration test
@@ -132,7 +133,7 @@ protected:
       }
 
       std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
-      if (downstream_filter_) {
+      if (config_option.downstream_filter) {
         // Construct a configuration proto for our filter and then re-write it
         // to JSON so that we can add it to the overall config
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
@@ -598,7 +599,6 @@ protected:
   TestScopedRuntime scoped_runtime_;
   std::string header_raw_value_{"false"};
   std::string filter_mutation_rule_{"false"};
-  bool downstream_filter_{true};
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;
 };
@@ -3764,8 +3764,10 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
 #endif
 
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
-  downstream_filter_ = false;
-  initializeConfig();
+  ConfigOptions config_option = {};
+  config_option.downstream_filter = false;
+
+  initializeConfig(config_option);
   // Add ext_proc as upstream filter.
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
@@ -3925,6 +3927,13 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
   ASSERT_OK_AND_ASSIGN(host_id_2, FakeUpstream::waitForHttpConnection(
                                       *dispatcher_, fake_upstreams_, processor_connection_2,
                                       std::chrono::milliseconds(5000)));
+  Cleanup close_connection2{[&processor_connection_2]() {
+    if (processor_connection_2 != nullptr) {
+      ASSERT_TRUE(processor_connection_2->close());
+      ASSERT_TRUE(processor_connection_2->waitForDisconnect());
+    }
+  }};
+
   // Retry happens on a new host.
   ASSERT_NE(host_id_2, first_host_id);
   FakeStreamPtr processor_stream_2;
@@ -3943,6 +3952,7 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
   new_header->mutable_header()->set_raw_value("bluh");
   processor_stream_2->sendGrpcMessage(processing_response);
   processor_stream_2->finishGrpcStream(Grpc::Status::Ok);
+  ASSERT_TRUE(processor_stream_2->waitForReset());
 
   handleUpstreamRequest();
   EXPECT_EQ(upstream_request_->headers()

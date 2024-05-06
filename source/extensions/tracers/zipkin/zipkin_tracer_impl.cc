@@ -40,7 +40,7 @@ void ZipkinSpan::setBaggage(absl::string_view, absl::string_view) {}
 std::string ZipkinSpan::getBaggage(absl::string_view) { return EMPTY_STRING; }
 
 void ZipkinSpan::injectContext(Tracing::TraceContext& trace_context,
-                               const Upstream::HostDescriptionConstSharedPtr&) {
+                               const Tracing::UpstreamContext&) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
   ZipkinCoreConstants::get().X_B3_TRACE_ID.setRefKey(trace_context, span_.traceIdAsHexString());
   ZipkinCoreConstants::get().X_B3_SPAN_ID.setRefKey(trace_context, span_.idAsHexString());

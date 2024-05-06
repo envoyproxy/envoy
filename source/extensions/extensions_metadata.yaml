@@ -1543,6 +1543,7 @@ envoy.matching.inputs.application_protocol:
   - envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
 envoy.matching.inputs.filter_state:
   categories:
+  - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
   status: stable

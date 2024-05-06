@@ -387,6 +387,8 @@ private:
   Http::RequestHeaderMap* request_headers_;
   Http::HeaderVector response_headers_to_add_{};
   Http::HeaderVector response_headers_to_set_{};
+  Http::HeaderVector response_headers_to_add_if_absent_{};
+  Http::HeaderVector response_headers_to_overwrite_if_exists_{};
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;

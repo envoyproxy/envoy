@@ -65,6 +65,10 @@
 #include "source/common/tls/cert_validator/default_validator.h"
 #endif
 
+#if !defined(__APPLE__)
+#include "source/extensions/network/dns_resolver/cares/dns_impl.h"
+#endif
+
 namespace Envoy {
 
 void ExtensionRegistry::registerFactories() {
@@ -146,8 +150,6 @@ void ExtensionRegistry::registerFactories() {
   // These are required to support specific route configs, if they are on.
   // It's likely no current users of E-M require them so we could optionally compile out by default.
   Router::forceRegisterDefaultEarlyDataPolicyFactory();
-  Router::forceRegisterRouteListMatchActionFactory();
-  Router::forceRegisterRouteMatchActionFactory();
   Extensions::UriTemplate::Match::forceRegisterUriTemplateMatcherFactory();
   Extensions::UriTemplate::Rewrite::forceRegisterUriTemplateRewriterFactory();
   Http::Matching::forceRegisterHttpRequestHeadersDataInputFactory();
@@ -158,6 +160,9 @@ void ExtensionRegistry::registerFactories() {
   // Envoy Mobile uses the GetAddrInfo resolver for DNS lookups on android by default.
   // This could be compiled out for iOS.
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
+#if !defined(__APPLE__)
+  Network::forceRegisterCaresDnsResolverFactory();
+#endif
 
   Network::Address::forceRegisterIpResolver();
 

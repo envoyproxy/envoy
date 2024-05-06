@@ -122,7 +122,7 @@ void PlatformBridgeCertValidator::verifyCertChainByPlatform(
   if (!success) {
     ENVOY_LOG(debug, result.error_details);
     postVerifyResultAndCleanUp(success, std::move(hostname), result.error_details, result.tls_alert,
-                               ValidationFailureType::FAIL_VERIFY_ERROR, dispatcher, parent);
+                               ValidationFailureType::FailVerifyError, dispatcher, parent);
     return;
   }
 
@@ -135,11 +135,11 @@ void PlatformBridgeCertValidator::verifyCertChainByPlatform(
     error_details = "PlatformBridgeCertValidator_verifySubjectAltName failed: SNI mismatch.";
     ENVOY_LOG(debug, error_details);
     postVerifyResultAndCleanUp(success, std::move(hostname), error_details, SSL_AD_BAD_CERTIFICATE,
-                               ValidationFailureType::FAIL_VERIFY_SAN, dispatcher, parent);
+                               ValidationFailureType::FailVerifySan, dispatcher, parent);
     return;
   }
   postVerifyResultAndCleanUp(success, std::move(hostname), error_details,
-                             SSL_AD_CERTIFICATE_UNKNOWN, ValidationFailureType::SUCCESS, dispatcher,
+                             SSL_AD_CERTIFICATE_UNKNOWN, ValidationFailureType::Success, dispatcher,
                              parent);
 }
 
@@ -184,14 +184,14 @@ void PlatformBridgeCertValidator::onVerificationComplete(const Thread::ThreadId&
 
   Ssl::ClientValidationStatus detailed_status = Envoy::Ssl::ClientValidationStatus::NotValidated;
   switch (failure_type) {
-  case ValidationFailureType::SUCCESS:
+  case ValidationFailureType::Success:
     detailed_status = Envoy::Ssl::ClientValidationStatus::Validated;
     break;
-  case ValidationFailureType::FAIL_VERIFY_ERROR:
+  case ValidationFailureType::FailVerifyError:
     detailed_status = Envoy::Ssl::ClientValidationStatus::Failed;
     stats_.fail_verify_error_.inc();
     break;
-  case ValidationFailureType::FAIL_VERIFY_SAN:
+  case ValidationFailureType::FailVerifySan:
     detailed_status = Envoy::Ssl::ClientValidationStatus::Failed;
     stats_.fail_verify_san_.inc();
     break;

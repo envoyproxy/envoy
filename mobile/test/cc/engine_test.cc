@@ -3,10 +3,10 @@
 #include "test/common/integration/engine_with_test_server.h"
 #include "test/common/integration/test_server.h"
 
-#include "absl/strings/str_format.h"
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
+#include "library/common/http/header_utility.h"
 
 namespace Envoy {
 
@@ -50,12 +50,13 @@ TEST(EngineTest, SetLogger) {
                     })
                     .start();
 
-  auto request_headers =
-      Platform::RequestHeadersBuilder(
-          Platform::RequestMethod::GET, "https",
-          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()), "/")
-          .build();
-  stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
+  auto headers = Http::Utility::createRequestHeaderMapPtr();
+  headers->addCopy(Http::LowerCaseString(":method"), "GET");
+  headers->addCopy(Http::LowerCaseString(":scheme"), "https");
+  headers->addCopy(Http::LowerCaseString(":authority"),
+                   engine_with_test_server.testServer().getAddress());
+  headers->addCopy(Http::LowerCaseString(":path"), "/");
+  stream->sendHeaders(std::move(headers), true);
   stream_complete.WaitForNotification();
 
   EXPECT_EQ(actual_status_code, 200);
@@ -64,9 +65,6 @@ TEST(EngineTest, SetLogger) {
 }
 
 TEST(EngineTest, SetEngineCallbacks) {
-  TestServer test_server;
-  test_server.start(TestServerType::HTTP2_WITH_TLS);
-
   absl::Notification engine_running;
   auto engine_callbacks = std::make_unique<EngineCallbacks>();
   engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
@@ -101,12 +99,13 @@ TEST(EngineTest, SetEngineCallbacks) {
                     })
                     .start();
 
-  auto request_headers =
-      Platform::RequestHeadersBuilder(
-          Platform::RequestMethod::GET, "https",
-          absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()), "/")
-          .build();
-  stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
+  auto headers = Http::Utility::createRequestHeaderMapPtr();
+  headers->addCopy(Http::LowerCaseString(":method"), "GET");
+  headers->addCopy(Http::LowerCaseString(":scheme"), "https");
+  headers->addCopy(Http::LowerCaseString(":authority"),
+                   engine_with_test_server.testServer().getAddress());
+  headers->addCopy(Http::LowerCaseString(":path"), "/");
+  stream->sendHeaders(std::move(headers), true);
   stream_complete.WaitForNotification();
 
   EXPECT_EQ(actual_status_code, 200);

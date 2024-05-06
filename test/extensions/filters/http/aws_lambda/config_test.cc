@@ -167,6 +167,34 @@ TEST(AwsLambdaFilterConfigTest, UpstreamFactoryTest) {
   ASSERT_NE(factory, nullptr);
 }
 
+TEST(AwsLambdaFilterConfigTest, ValidConfigWithProfileCreatesFilter) {
+  const std::string yaml = R"EOF(
+arn: "arn:aws:lambda:region:424242:function:fun"
+payload_passthrough: true
+invocation_mode: asynchronous
+credentials_profile: test_profile
+  )EOF";
+
+  LambdaConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsLambdaFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
+    auto filter = std::static_pointer_cast<Filter>(stream_filter);
+    const auto& settings = filter->settingsForTest();
+
+    return settings.payloadPassthrough() &&
+           settings.invocationMode() == InvocationMode::Asynchronous;
+  };
+  EXPECT_CALL(filter_callbacks, addStreamFilter(Truly(has_expected_settings)));
+  cb(filter_callbacks);
+}
+
 } // namespace
 } // namespace AwsLambdaFilter
 } // namespace HttpFilters

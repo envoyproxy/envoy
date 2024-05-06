@@ -30,6 +30,7 @@ envoy_cc_mock(
         "//envoy/upstream:cluster_manager_interface",
         "//test/mocks:common_lib",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:host_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

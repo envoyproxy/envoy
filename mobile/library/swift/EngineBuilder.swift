@@ -1,8 +1,6 @@
 @_implementationOnly import EnvoyEngine
 import Foundation
 
-// swiftlint:disable file_length
-
 #if ENVOY_MOBILE_XDS
 /// Builder for generating the xDS configuration for the Envoy Mobile engine.
 /// xDS is a protocol for dynamic configuration of Envoy instances, more information can be found in
@@ -195,13 +193,13 @@ open class EngineBuilder: NSObject {
     self.base = .custom(yaml)
   }
 
-  /// Add a log level to use with Envoy.
+  /// Set a log level to use with Envoy.
   ///
   /// - parameter logLevel: The log level to use with Envoy.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addLogLevel(_ logLevel: LogLevel) -> Self {
+  public func setLogLevel(_ logLevel: LogLevel) -> Self {
     self.logLevel = logLevel
     return self
   }
@@ -804,103 +802,3 @@ open class EngineBuilder: NSObject {
     return objcDescription
   }
 }
-
-#if canImport(EnvoyCxxSwiftInterop)
-private extension EngineBuilder {
-  func generateBootstrap() -> Bootstrap {
-    var cxxBuilder = Envoy.Platform.EngineBuilder()
-    cxxBuilder.addLogLevel(self.logLevel.toCXX())
-
-    cxxBuilder.addConnectTimeoutSeconds(Int32(self.connectTimeoutSeconds))
-    cxxBuilder.addDnsRefreshSeconds(Int32(self.dnsRefreshSeconds))
-    cxxBuilder.addDnsFailureRefreshSeconds(Int32(self.dnsFailureRefreshSecondsBase),
-                                           Int32(self.dnsFailureRefreshSecondsMax))
-    cxxBuilder.addDnsQueryTimeoutSeconds(Int32(self.dnsQueryTimeoutSeconds))
-    cxxBuilder.addDnsMinRefreshSeconds(Int32(self.dnsMinRefreshSeconds))
-    cxxBuilder.addDnsPreresolveHostnames(self.dnsPreresolveHostnames.toCXX())
-    cxxBuilder.enableDnsCache(self.enableDNSCache, Int32(self.dnsCacheSaveIntervalSeconds))
-#if ENVOY_ENABLE_QUIC
-    cxxBuilder.enableHttp3(self.enableHttp3)
-    for (host, port) in self.quicHints {
-      cxxBuilder.addQuicHint(host.toCXX(), Int32(port))
-    }
-    for (suffix) in self.quicCanonicalSuffixes {
-      cxxBuilder.addQuicCanonicalSuffix(suffix.toCXX())
-    }
-#endif
-    cxxBuilder.enableGzipDecompression(self.enableGzipDecompression)
-    cxxBuilder.enableBrotliDecompression(self.enableBrotliDecompression)
-    cxxBuilder.enableInterfaceBinding(self.enableInterfaceBinding)
-    cxxBuilder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh)
-    cxxBuilder.enforceTrustChainVerification(self.enforceTrustChainVerification)
-    cxxBuilder.setForceAlwaysUsev6(self.forceIPv6)
-    cxxBuilder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation)
-    cxxBuilder.respectSystemProxySettings(self.respectSystemProxySettings)
-    cxxBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
-      Int32(self.h2ConnectionKeepaliveIdleIntervalMilliseconds)
-    )
-    cxxBuilder.addH2ConnectionKeepaliveTimeoutSeconds(
-      Int32(self.h2ConnectionKeepaliveTimeoutSeconds)
-    )
-    cxxBuilder.addMaxConnectionsPerHost(Int32(self.maxConnectionsPerHost))
-    cxxBuilder.setStreamIdleTimeoutSeconds(Int32(self.streamIdleTimeoutSeconds))
-    cxxBuilder.setPerTryIdleTimeoutSeconds(Int32(self.perTryIdleTimeoutSeconds))
-    cxxBuilder.setAppVersion(self.appVersion.toCXX())
-    cxxBuilder.setAppId(self.appId.toCXX())
-    cxxBuilder.setDeviceOs("iOS".toCXX())
-
-    for (runtimeGuard, value) in self.runtimeGuards {
-      cxxBuilder.setRuntimeGuard(runtimeGuard.toCXX(), value)
-    }
-
-    for filter in self.nativeFilterChain.reversed() {
-      cxxBuilder.addNativeFilter(filter.name.toCXX(), filter.typedConfig.toCXX())
-    }
-
-    for filter in self.platformFilterChain.reversed() {
-      cxxBuilder.addPlatformFilter(filter.filterName.toCXX())
-    }
-
-    if
-      let nodeRegion = self.nodeRegion,
-      let nodeZone = self.nodeZone,
-      let nodeSubZone = self.nodeSubZone
-    {
-      cxxBuilder.setNodeLocality(nodeRegion.toCXX(), nodeZone.toCXX(), nodeSubZone.toCXX())
-    }
-
-    if let nodeID = self.nodeID {
-      cxxBuilder.setNodeId(nodeID.toCXX())
-    }
-
-    generateXds(&cxxBuilder)
-
-    return cxxBuilder.generateBootstrap()
-  }
-
-  private func generateXds(_ cxxBuilder: inout Envoy.Platform.EngineBuilder) {
-#if ENVOY_MOBILE_XDS
-    if let xdsBuilder = self.xdsBuilder {
-      var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
-                                                    xdsBuilder.xdsServerPort)
-      for (header, value) in xdsBuilder.xdsGrpcInitialMetadata {
-        cxxXdsBuilder.addInitialStreamHeader(header.toCXX(), value.toCXX())
-      }
-      if let xdsSslRootCerts = xdsBuilder.sslRootCerts {
-        cxxXdsBuilder.setSslRootCerts(xdsSslRootCerts.toCXX())
-      }
-      if let rtdsResourceName = xdsBuilder.rtdsResourceName {
-        cxxXdsBuilder.addRuntimeDiscoveryService(rtdsResourceName.toCXX(),
-                                                 Int32(xdsBuilder.rtdsTimeoutInSeconds))
-      }
-      if xdsBuilder.enableCds {
-        cxxXdsBuilder.addClusterDiscoveryService(
-          xdsBuilder.cdsResourcesLocator?.toCXX() ?? "".toCXX(),
-          Int32(xdsBuilder.cdsTimeoutInSeconds))
-      }
-      cxxBuilder.setXds(cxxXdsBuilder)
-    }
-#endif
-  }
-}
-#endif

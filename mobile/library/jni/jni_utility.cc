@@ -3,12 +3,12 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 
 #include "library/common/types/matcher_data.h"
 #include "library/jni/jni_support.h"
 #include "library/jni/types/env.h"
-#include "library/jni/types/exception.h"
 
 namespace Envoy {
 namespace JNI {
@@ -525,6 +525,70 @@ void javaHeadersToCppHeaders(JniHelper& jni_helper, jobject java_headers,
       cpp_headers.addCopy(Http::LowerCaseString(cpp_key), cpp_value);
     }
   }
+}
+
+bool isJavaDirectByteBuffer(JniHelper& jni_helper, jobject java_byte_buffer) {
+  auto java_byte_buffer_class = jni_helper.findClass("java/nio/ByteBuffer");
+  auto java_byte_buffer_is_direct_method_id =
+      jni_helper.getMethodId(java_byte_buffer_class.get(), "isDirect", "()Z");
+  return jni_helper.callBooleanMethod(java_byte_buffer, java_byte_buffer_is_direct_method_id);
+}
+
+Buffer::InstancePtr javaDirectByteBufferToCppBufferInstance(JniHelper& jni_helper,
+                                                            jobject java_byte_buffer,
+                                                            jlong length) {
+  void* java_byte_buffer_address = jni_helper.getDirectBufferAddress(java_byte_buffer);
+  RELEASE_ASSERT(java_byte_buffer != nullptr,
+                 "The ByteBuffer argument is not a direct ByteBuffer.");
+  Buffer::BufferFragmentImpl* byte_buffer_fragment = new Buffer::BufferFragmentImpl(
+      java_byte_buffer_address, static_cast<size_t>(length),
+      [](const void*, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+        delete this_fragment;
+      });
+  Buffer::InstancePtr cpp_buffer_instance = std::make_unique<Buffer::OwnedImpl>();
+  cpp_buffer_instance->addBufferFragment(*byte_buffer_fragment);
+  return cpp_buffer_instance;
+}
+
+LocalRefUniquePtr<jobject>
+cppBufferInstanceToJavaDirectByteBuffer(JniHelper& jni_helper,
+                                        const Buffer::Instance& cpp_buffer_instance) {
+  // The JNI implementation guarantees that there is only going to be a single slice.
+  Buffer::RawSlice raw_slice = cpp_buffer_instance.frontSlice();
+  LocalRefUniquePtr<jobject> java_byte_buffer =
+      jni_helper.newDirectByteBuffer(raw_slice.mem_, static_cast<jlong>(raw_slice.len_));
+  return java_byte_buffer;
+}
+
+Buffer::InstancePtr javaNonDirectByteBufferToCppBufferInstance(JniHelper& jni_helper,
+                                                               jobject java_byte_buffer,
+                                                               jlong length) {
+  auto java_byte_buffer_class = jni_helper.findClass("java/nio/ByteBuffer");
+  auto java_byte_buffer_array_method_id =
+      jni_helper.getMethodId(java_byte_buffer_class.get(), "array", "()[B");
+  auto java_byte_array =
+      jni_helper.callObjectMethod<jbyteArray>(java_byte_buffer, java_byte_buffer_array_method_id);
+  RELEASE_ASSERT(java_byte_array != nullptr,
+                 "The ByteBuffer argument is not a non-direct ByteBuffer.");
+  auto java_byte_array_elements = jni_helper.getByteArrayElements(java_byte_array.get(), nullptr);
+  Buffer::InstancePtr cpp_buffer_instance = std::make_unique<Buffer::OwnedImpl>();
+  cpp_buffer_instance->add(static_cast<void*>(java_byte_array_elements.get()),
+                           static_cast<uint64_t>(length));
+  return cpp_buffer_instance;
+}
+
+LocalRefUniquePtr<jobject>
+cppBufferInstanceToJavaNonDirectByteBuffer(JniHelper& jni_helper,
+                                           const Buffer::Instance& cpp_buffer_instance) {
+  auto java_byte_buffer_class = jni_helper.findClass("java/nio/ByteBuffer");
+  auto java_byte_buffer_wrap_method_id = jni_helper.getStaticMethodId(
+      java_byte_buffer_class.get(), "wrap", "([B)Ljava/nio/ByteBuffer;");
+  auto java_byte_array = jni_helper.newByteArray(static_cast<jsize>(cpp_buffer_instance.length()));
+  auto java_byte_array_elements = jni_helper.getByteArrayElements(java_byte_array.get(), nullptr);
+  cpp_buffer_instance.copyOut(0, cpp_buffer_instance.length(),
+                              static_cast<void*>(java_byte_array_elements.get()));
+  return jni_helper.callStaticObjectMethod(java_byte_buffer_class.get(),
+                                           java_byte_buffer_wrap_method_id, java_byte_array.get());
 }
 
 } // namespace JNI
