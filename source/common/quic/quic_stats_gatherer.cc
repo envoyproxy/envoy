@@ -7,6 +7,12 @@
 namespace Envoy {
 namespace Quic {
 
+QuicStatsGatherer::~QuicStatsGatherer() {
+  if (!logging_done_) {
+    maybeDoDeferredLog(false);
+  }
+}
+
 void QuicStatsGatherer::OnPacketAcked(int acked_bytes,
                                       quic::QuicTime::Delta /* delta_largest_observed */) {
   bytes_outstanding_ -= acked_bytes;
