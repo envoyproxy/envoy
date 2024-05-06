@@ -137,79 +137,7 @@ private:
   RequestCallbacks request_cb_;
 };
 
-template <typename LogRequest, typename LogResponse>
-class StreamingGrpcAccessLogClient : public GrpcAccessLogClient<LogRequest, LogResponse> {
-public:
-  StreamingGrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
-                               const Protobuf::MethodDescriptor& service_method,
-                               OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
-      : GrpcAccessLogClient<LogRequest, LogResponse>(client, service_method, retry_policy) {}
-
-public:
-  struct LocalStream : public Grpc::AsyncStreamCallbacks<LogResponse> {
-    LocalStream(StreamingGrpcAccessLogClient& parent) : parent_(parent) {}
-
-    // Grpc::AsyncStreamCallbacks
-    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
-    void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
-    void onReceiveMessage(std::unique_ptr<LogResponse>&&) override {}
-    void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
-    void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
-      ASSERT(parent_.stream_ != nullptr);
-      if (parent_.stream_->stream_ != nullptr) {
-        // Only reset if we have a stream. Otherwise we had an inline failure and we will clear the
-        // stream data in send().
-        parent_.stream_.reset();
-      }
-    }
-
-    StreamingGrpcAccessLogClient& parent_;
-    Grpc::AsyncStream<LogRequest> stream_{};
-  };
-
-  bool isConnected() override { return stream_ != nullptr && stream_->stream_ != nullptr; }
-
-  bool log(const LogRequest& request) override {
-    if (!stream_) {
-      stream_ = std::make_unique<LocalStream>(*this);
-    }
-
-    if (stream_->stream_ == nullptr) {
-      stream_->stream_ = GrpcAccessLogClient<LogRequest, LogResponse>::client_->start(
-          GrpcAccessLogClient<LogRequest, LogResponse>::service_method_, *stream_,
-          GrpcAccessLogClient<LogRequest, LogResponse>::opts_);
-    }
-
-    if (stream_->stream_ != nullptr) {
-      if (stream_->stream_->isAboveWriteBufferHighWatermark()) {
-        return false;
-      }
-      stream_->stream_->sendMessage(request, false);
-    } else {
-      // Clear out the stream data due to stream creation failure.
-      stream_.reset();
-    }
-    return true;
-  }
-
-  std::unique_ptr<LocalStream> stream_;
-};
-
 } // namespace Detail
-
-/**
- * All stats for the grpc access logger. @see stats_macros.h
- */
-#define ALL_GRPC_ACCESS_LOGGER_STATS(COUNTER)                                                      \
-  COUNTER(logs_written)                                                                            \
-  COUNTER(logs_dropped)
-
-/**
- * Wrapper struct for the access log stats. @see stats_macros.h
- */
-struct GrpcAccessLoggerStats {
-  ALL_GRPC_ACCESS_LOGGER_STATS(GENERATE_COUNTER_STRUCT)
-};
 
 /**
  * Base class for defining a gRPC logger with the `HttpLogProto` and `TcpLogProto` access log
@@ -224,30 +152,22 @@ public:
   GrpcAccessLogger(
       const Grpc::RawAsyncClientSharedPtr& client,
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-      Event::Dispatcher& dispatcher, Stats::Scope& scope, std::string access_log_prefix,
-      const Protobuf::MethodDescriptor& service_method, bool stream = true)
+      Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method)
       : buffer_flush_interval_msec_(
             PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
         flush_timer_(dispatcher.createTimer([this]() {
           flush();
           flush_timer_->enableTimer(buffer_flush_interval_msec_);
         })),
-        max_buffer_size_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384)),
-        stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, access_log_prefix))}) {
-    if (stream) {
-      client_ = std::make_unique<Detail::StreamingGrpcAccessLogClient<LogRequest, LogResponse>>(
-          client, service_method, GrpcCommon::optionalRetryPolicy(config));
-    } else {
-      client_ = std::make_unique<Detail::UnaryGrpcAccessLogClient<LogRequest, LogResponse>>(
-          client, service_method, GrpcCommon::optionalRetryPolicy(config));
-    }
+        max_buffer_size_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384)){
+
+    client_ = std::make_unique<Detail::UnaryGrpcAccessLogClient<LogRequest, LogResponse>>(
+        client, service_method, GrpcCommon::optionalRetryPolicy(config));
+
     flush_timer_->enableTimer(buffer_flush_interval_msec_);
   }
 
   void log(HttpLogProto&& entry) override {
-    if (!canLogMore()) {
-      return;
-    }
     approximate_message_size_bytes_ += entry.ByteSizeLong();
     addEntry(std::move(entry));
     if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
@@ -284,32 +204,16 @@ private:
       initMessage();
     }
 
-    if (client_->log(message_)) {
-      // Clear the message regardless of the success.
-      approximate_message_size_bytes_ = 0;
-      clearMessage();
-    }
-  }
-
-  bool canLogMore() {
-    if (max_buffer_size_bytes_ == 0 || approximate_message_size_bytes_ < max_buffer_size_bytes_) {
-      stats_.logs_written_.inc();
-      return true;
-    }
-    flush();
-    if (approximate_message_size_bytes_ < max_buffer_size_bytes_) {
-      stats_.logs_written_.inc();
-      return true;
-    }
-    stats_.logs_dropped_.inc();
-    return false;
+    client_->log(message_);
+    // Clear the message regardless of the success.
+    approximate_message_size_bytes_ = 0;
+    clearMessage();
   }
 
   const std::chrono::milliseconds buffer_flush_interval_msec_;
   const Event::TimerPtr flush_timer_;
   const uint64_t max_buffer_size_bytes_;
   uint64_t approximate_message_size_bytes_ = 0;
-  GrpcAccessLoggerStats stats_;
 };
 
 /**

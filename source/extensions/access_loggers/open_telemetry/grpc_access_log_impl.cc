@@ -25,15 +25,14 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
     Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
-    : GrpcAccessLogger(client, config.common_config(), dispatcher, scope, GRPC_LOG_STATS_PREFIX,
+    : GrpcAccessLogger(client, config.common_config(), dispatcher,
                        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "opentelemetry.proto.collector.logs.v1.LogsService.Export"),
-                       false) {
+                           "opentelemetry.proto.collector.logs.v1.LogsService.Export")),
+      stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, GRPC_LOG_STATS_PREFIX))}) {
   initMessageRoot(config, local_info);
 }
 
 namespace {
-
 opentelemetry::proto::common::v1::KeyValue getStringKeyValue(const std::string& key,
                                                              const std::string& value) {
   opentelemetry::proto::common::v1::KeyValue keyValue;
@@ -65,6 +64,7 @@ void GrpcAccessLoggerImpl::initMessageRoot(
 }
 
 void GrpcAccessLoggerImpl::addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) {
+  stats_.logs_written_.inc();
   root_->mutable_log_records()->Add(std::move(entry));
 }
 

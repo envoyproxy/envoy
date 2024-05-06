@@ -22,6 +22,20 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace OpenTelemetry {
 
+/**
+ * All stats for the grpc access logger. @see stats_macros.h
+ */
+#define ALL_GRPC_ACCESS_LOGGER_STATS(COUNTER)                                                      \
+  COUNTER(logs_written)                                                                            \
+  COUNTER(logs_dropped)
+
+/**
+ * Wrapper struct for the access log stats. @see stats_macros.h
+ */
+struct GrpcAccessLoggerStats {
+  ALL_GRPC_ACCESS_LOGGER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 // Note: OpenTelemetry protos are extra flexible and used also in the OT collector for batching and
 // so forth. As a result, some fields are repeated, but for our use case we assume the following
 // structure:
@@ -56,6 +70,7 @@ private:
   void clearMessage() override;
 
   opentelemetry::proto::logs::v1::ScopeLogs* root_;
+  GrpcAccessLoggerStats stats_;
 };
 
 class GrpcAccessLoggerCacheImpl

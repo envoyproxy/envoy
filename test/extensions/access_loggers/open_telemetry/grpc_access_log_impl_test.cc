@@ -48,19 +48,30 @@ public:
     }
   }
 
-  void expectSentMessage(const std::string& expected_message_yaml) {
+  void expectSentMessage(const std::string& expected_message_yaml,   Grpc::Status::GrpcStatus response_status =
+                             Grpc::Status::WellKnownGrpcStatus::Ok,
+                         uint32_t rejected_log_records = 0) {
     opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest expected_message;
     TestUtility::loadFromYaml(expected_message_yaml, expected_message);
     EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
-        .WillOnce(Invoke([expected_message](absl::string_view, absl::string_view,
+        .WillOnce(Invoke([expected_message, response_status, rejected_log_records](absl::string_view, absl::string_view,
                                             Buffer::InstancePtr&& request,
-                                            Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                                            Grpc::RawAsyncRequestCallbacks& callback, Tracing::Span& span,
                                             const Http::AsyncClient::RequestOptions&) {
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
           EXPECT_EQ(message.DebugString(), expected_message.DebugString());
-          return nullptr; // We don't care about the returned request.
+          if (response_status != Grpc::Status::WellKnownGrpcStatus::Ok) {
+            callback.onFailure(response_status, "err", span);
+          } else {
+            opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse
+                resp;
+            resp.mutable_partial_success()->set_rejected_log_records(
+                rejected_log_records);
+            callback.onSuccessRaw(Grpc::Common::serializeMessage(resp), span);
+          }
+          return nullptr;  // We don't care about the returned request.
         }));
   }
 
@@ -80,11 +91,11 @@ public:
         std::chrono::duration_cast<std::chrono::nanoseconds>(FlushInterval).count());
     logger_ =
         std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_}, config_,
-                                               dispatcher_, local_info_, *stats_store_.rootScope());
+                                               dispatcher_, local_info_, *store_.rootScope());
   }
 
   Grpc::MockAsyncClient* async_client_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
   LocalInfo::MockLocalInfo local_info_;
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* timer_;
@@ -119,6 +130,85 @@ TEST_F(GrpcAccessLoggerImplTest, Log) {
   logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
   // TCP logging shouldn't do anything.
   logger_->log(ProtobufWkt::Empty());
+
+  EXPECT_EQ(store_
+                .findCounterByString(
+                    "access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
+
+  // TCP logging shouldn't do anything.
+  logger_->log(ProtobufWkt::Empty());
+  EXPECT_EQ(store_
+                .findCounterByString(
+                    "access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
+}
+
+
+TEST_F(GrpcAccessLoggerImplTest, StatsWithOnFailure) {
+  std::string expected_message_yaml = R"EOF(
+  resource_logs:
+    resource:
+      attributes:
+        - key: "log_name"
+          value:
+            string_value: "test_log_name"
+        - key: "zone_name"
+          value:
+            string_value: "zone_name"
+        - key: "cluster_name"
+          value:
+            string_value: "cluster_name"
+        - key: "node_name"
+          value:
+            string_value: "node_name"
+    scope_logs:
+      - log_records:
+          - severity_text: "test-severity-text"
+  )EOF";
+  grpc_access_logger_impl_test_helper_.expectSentMessage(expected_message_yaml);
+  opentelemetry::proto::logs::v1::LogRecord entry;
+  entry.set_severity_text("test-severity-text");
+  logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  EXPECT_EQ(store_
+                .findCounterByString(
+                    "access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
+  EXPECT_EQ(store_
+                .findCounterByString(
+                    "access_logs.open_telemetry_access_log.logs_dropped")
+                .value()
+                .get()
+                .value(),
+            0);
+
+  grpc_access_logger_impl_test_helper_.expectSentMessage(
+      expected_message_yaml, Grpc::Status::WellKnownGrpcStatus::Internal, 1);
+  logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  // TODO(TAOXUY): support record stats for failed otel requests.
+  EXPECT_EQ(store_
+                .findCounterByString(
+                    "access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            2);
+  EXPECT_EQ(store_
+                .findCounterByString(
+                    "access_logs.open_telemetry_access_log.logs_dropped")
+                .value()
+                .get()
+                .value(),
+            0);
 }
 
 class GrpcAccessLoggerCacheImplTest : public testing::Test {
@@ -181,7 +271,15 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
   logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+    EXPECT_EQ(store_
+                .findCounterByString(
+                    "access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
 }
+
 
 TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreationResourceAttributes) {
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
@@ -241,6 +339,13 @@ values:
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
   logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+    EXPECT_EQ(store_
+                .findCounterByString(
+                    "access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
 }
 
 class GrpcAccessLoggerDisableBuiltinImplTest : public testing::Test {
