@@ -584,9 +584,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       metadata_match_criteria_ = std::make_unique<MetadataMatchCriteriaImpl>(filter_it->second);
     }
   }
-  if (!route.query_params_to_add().empty() || !route.query_params_to_remove().empty()) {
-    query_params_evaluator_ = QueryParamsEvaluator::configure(route.query_params_to_add(),
-                                                              route.query_params_to_remove());
+  if (!route.query_parameters_to_add().empty() || !route.query_parameters_to_remove().empty()) {
+    query_params_evaluator_ = QueryParamsEvaluator::configure(route.query_parameters_to_add(),
+                                                              route.query_parameters_to_remove());
   }
 
   shadow_policies_.reserve(route.route().request_mirror_policies().size());
@@ -1737,10 +1737,10 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
                                                        virtual_host.response_headers_to_remove());
   }
 
-  if (!virtual_host.query_params_to_add().empty() ||
-      !virtual_host.query_params_to_remove().empty()) {
+  if (!virtual_host.query_parameters_to_add().empty() ||
+      !virtual_host.query_parameters_to_remove().empty()) {
     query_params_evaluator_ = QueryParamsEvaluator::configure(
-        virtual_host.query_params_to_add(), virtual_host.query_params_to_remove());
+        virtual_host.query_parameters_to_add(), virtual_host.query_parameters_to_remove());
   }
 
   // Retry and Hedge policies must be set before routes, since they may use them.
@@ -2172,9 +2172,9 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
                                                        config.response_headers_to_remove());
   }
 
-  if (!config.query_params_to_add().empty() || !config.query_params_to_remove().empty()) {
-    query_params_evaluator_ = QueryParamsEvaluator::configure(config.query_params_to_add(),
-                                                              config.query_params_to_remove());
+  if (!config.query_parameters_to_add().empty() || !config.query_parameters_to_remove().empty()) {
+    query_params_evaluator_ = QueryParamsEvaluator::configure(config.query_parameters_to_add(),
+                                                              config.query_parameters_to_remove());
   }
 
   if (config.has_metadata()) {

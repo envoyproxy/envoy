@@ -224,10 +224,10 @@ message VirtualHost {
   core.v3.Metadata metadata = 24;
 
   // Specifies a list of HTTP query parameters that will be added to the HTTP path.
-  repeated core.v3.QueryParameter query_params_to_add = 25;
+  repeated core.v3.QueryParameter query_parameters_to_add = 25;
 
   // Specifies a list of HTTP query parameters that will be removed from the HTTP path.
-  repeated string query_params_to_remove = 26;
+  repeated string query_parameters_to_remove = 26;
 }
 
 // A filter-defined action type.
@@ -366,10 +366,10 @@ message Route {
   string stat_prefix = 19;
 
   // Specifies a list of HTTP query parameters that will be added to the HTTP path.
-  repeated core.v3.QueryParameter query_params_to_add = 20;
+  repeated core.v3.QueryParameter query_parameters_to_add = 20;
 
   // Specifies a list of HTTP query parameters that will be removed from the HTTP path.
-  repeated string query_params_to_remove = 21;
+  repeated string query_parameters_to_remove = 21;
 }
 
 // Compared to the :ref:`cluster <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` field that specifies a

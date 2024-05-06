@@ -105,8 +105,8 @@ new_features:
     for disabling appending of the ``-shadow`` suffix to the shadowed host/authority header.
 - area: http
   change: |
-    Added :ref:`query_params_to_add<envoy_v3_api_field_config.route.v3.Route.query_params_to_add>` and
-    :ref:`query_params_to_remove<envoy_v3_api_field_config.route.v3.Route.query_params_to_remove>` at the route, virtual host,
-    and global level for adding and removing query parameters on a request.
+    Added :ref:`query_parameters_to_add<envoy_v3_api_field_config.route.v3.Route.query_parameters_to_add>` and
+    :ref:`query_parameters_to_remove<envoy_v3_api_field_config.route.v3.Route.query_parameters_to_remove>` at
+    the route, virtual host, and global level for adding and removing query parameters on a request.
 
 deprecated:
