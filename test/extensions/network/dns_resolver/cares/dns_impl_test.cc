@@ -1437,7 +1437,7 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
   }
 
   if (GetParam() == Address::IpVersion::v6) {
-    EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::V6Only,
+    EXPECT_EQ(nullptr, resolveWithExpectations("ip6-localhost", DnsLookupFamily::V6Only,
                                                DnsResolver::ResolutionStatus::Success, {"::1"}, {},
                                                std::chrono::seconds(0)));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1445,7 +1445,7 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
                0 /*get_addr_failure*/, 0 /*timeouts*/);
     resolve_total++;
 
-    EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::Auto,
+    EXPECT_EQ(nullptr, resolveWithExpectations("ip6-localhost", DnsLookupFamily::Auto,
                                                DnsResolver::ResolutionStatus::Success, {"::1"}, {},
                                                std::chrono::seconds(0)));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
