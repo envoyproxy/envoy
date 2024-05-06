@@ -34,12 +34,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
+import org.chromium.net.impl.CronvoyNetworkExceptionImpl;
 import org.chromium.net.impl.CronvoyUrlRequest;
+import org.chromium.net.impl.CronvoyUrlRequestContext;
 import org.chromium.net.impl.Errors.EnvoyMobileError;
 import org.chromium.net.impl.Errors.NetError;
 import org.chromium.net.impl.CronvoyUrlResponseInfoImpl;
 import org.chromium.net.testing.CronetTestRule;
-import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
 import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
 import org.chromium.net.testing.FailurePhase;
 import org.chromium.net.testing.Feature;
@@ -77,7 +78,6 @@ public class CronetUrlRequestTest {
   @Rule
   public final RuleChain chain = RuleChain.outerRule(mTestRule).around(mRuntimePermissionRule);
 
-  private CronetTestFramework mTestFramework;
   private MockUrlRequestJobFactory mMockUrlRequestJobFactory;
 
   @Before
@@ -91,6 +91,11 @@ public class CronetUrlRequestTest {
   public void tearDown() {
     mMockUrlRequestJobFactory.shutdown();
     NativeTestServer.shutdownNativeTestServer();
+    // Calling AndroidNetworkMonitor.shutdown() will set the AndroidNetworkMonitor singleton
+    // instance to null so that the next EnvoyEngine creation will have a new AndroidNetworkMonitor
+    // instance instead of holding on a dangling EnvoyEngine because AndroidNetworkMonitor.load
+    // does not update the singleton instance to a new one if there is already an existing instance.
+    AndroidNetworkMonitor.shutdown();
   }
 
   private TestUrlRequestCallback startAndWaitForComplete(CronetEngine engine, String url)
@@ -1765,6 +1770,7 @@ public class CronetUrlRequestTest {
     assertNull(callback.mResponseInfo);
     assertContains("Exception in CronetUrlRequest: net::ERR_CONNECTION_REFUSED",
                    callback.mError.getMessage());
+    assertEquals("", ((CronvoyNetworkExceptionImpl)callback.mError).getErrorDetails());
   }
 
   private TestUrlRequestCallback throwOrCancel(FailureType failureType, ResponseStep failureStep,
@@ -2215,6 +2221,7 @@ public class CronetUrlRequestTest {
     assertEquals(0, callback.mRedirectCount);
     assertTrue(callback.mOnErrorCalled);
     assertEquals(ResponseStep.ON_FAILED, callback.mResponseStep);
+    assertEquals("", ((CronvoyNetworkExceptionImpl)callback.mError).getErrorDetails());
   }
 
   // Returns the contents of byteBuffer, from its position() to its limit(),

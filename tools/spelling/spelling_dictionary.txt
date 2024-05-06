@@ -27,6 +27,7 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+ECN
 ECS
 EKS
 NID
@@ -300,9 +301,11 @@ NGHTTP
 NLOHMANN
 NOAUTH
 NOCHECKRESP
+NODATA
 NODELAY
 NOLINT
 NOLINTNEXTLINE
+NONAME
 NONBLOCK
 NONCES
 NOSORT
@@ -1373,6 +1376,7 @@ tokenized
 tokenizes
 tokenizing
 toolchain
+tos
 traceid
 traceparent
 tracestate

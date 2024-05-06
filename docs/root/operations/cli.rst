@@ -67,6 +67,16 @@ following are the command line options that Envoy supports.
   :option:`--restart-epoch` is non-zero. Instead, for subsequent hot restarts, set
   :option:`--base-id` option with the selected base ID. See :option:`--base-id-path`.
 
+.. option:: --skip-hot-restart-on-no-parent
+
+  *(optional)* In conjunction with :option:`--restart-epoch`, this flag allows for a failing hot
+  restart to fall back to normal startup behavior. When this flag is false, if the parent instance
+  was terminated, the child instance will also terminate during startup.
+
+  This only impacts if the parent instance was terminated before the new instance is initialized -
+  an unexpected parent termination after interprocess communication is established will still cause
+  the child instance to terminate due to failing communication.
+
 .. option:: --base-id-path <path_string>
 
   *(optional)* Writes the base ID to the given path. While this option is compatible with

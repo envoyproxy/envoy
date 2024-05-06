@@ -73,8 +73,8 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::Connect
 void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   if (!client_) {
     client_ =
-        parent_.client_factory_.create(host_, parent_.dispatcher_, *this, redis_command_stats_,
-                                       parent_.cluster_.info()->statsScope(),
+        parent_.client_factory_.create(host_, parent_.dispatcher_, redis_config_,
+                                       redis_command_stats_, parent_.cluster_.info()->statsScope(),
                                        parent_.auth_username_, parent_.auth_password_, false);
     client_->addConnectionCallbacks(*this);
   }

@@ -1,0 +1,11 @@
+date: April 18, 2024
+
+bug_fixes:
+- area: tls
+  change: |
+    Fix a RELEASE_ASSERT when using :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>`
+    if the downstream request ``:authority`` was longer than 255 characters.
+- area: admin
+  change: |
+    Fixed a bug where the config_dump & init_dump admin endpoint would return an empty response when called with empty
+    query parameters (e.g. ``/config_dump?resource=&mask=&name_regex=``).

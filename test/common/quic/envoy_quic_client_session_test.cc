@@ -450,14 +450,14 @@ TEST_P(EnvoyQuicClientSessionTest, HandlePacketsWithoutDestinationAddress) {
     auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
                                                       stateless_reset_packet->length());
     quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
-                                    time_system_.monotonicTime());
+                                    time_system_.monotonicTime(), /*tos=*/0);
   }
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
       .Times(0);
   auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
                                                     stateless_reset_packet->length());
   quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
-                                  time_system_.monotonicTime());
+                                  time_system_.monotonicTime(), /*tos=*/0);
 }
 
 // Tests that receiving a STATELESS_RESET packet on the probing socket doesn't cause crash.
@@ -666,6 +666,7 @@ TEST_P(EnvoyQuicClientSessionAllowMmsgTest, UsesRecvMmsgWhenNoGroAndMmsgAllowed)
       .WillRepeatedly(Invoke([&](os_fd_t, struct mmsghdr*, unsigned int, int,
                                  struct timespec*) -> Api::SysCallIntResult {
         dispatcher_->exit();
+        // EAGAIN should be returned with -1 but returning 0 here shouldn't cause busy looping.
         return {0, SOCKET_ERROR_AGAIN};
       }));
 

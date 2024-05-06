@@ -61,17 +61,9 @@ jobs:
             --config=mobile-remote-release-clang
             //test/performance:test_binary_size
           # Ensure files don't leak back into the main binary
-          source: >-
-            rm
-            source/common/http/route_config_update_requster.h
-            source/common/listener_manager/listener_manager_impl.h
-            source/server/overload_manager_impl.cc
-            source/common/network/listen_socket_impl.h
-            source/common/network/tcp_listener_impl.h
-            source/server/guarddog_impl.h
-            source/server/watchdog_impl.h
-            source/server/options_impl.cc
-            source/extensions/access_loggers/common/file_access_log_impl.h
+          source: |-
+            TOREMOVE=$(cat mobile/test/performance/files_em_does_not_use | grep -vE '^#')
+            rm $TOREMOVE
           target: size-current
         - name: Main size
           args: >-

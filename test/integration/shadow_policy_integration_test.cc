@@ -927,5 +927,47 @@ TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithAddBody) {
   EXPECT_EQ(1, test_server_->counter("http.async-client.rq_total")->value());
 }
 
+TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderAppendsSuffix) {
+  initialConfigSetup("cluster_1", "");
+  // By default `disable_shadow_host_suffix_append` is "false".
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_1");
+      });
+
+  initialize();
+  sendRequestAndValidateResponse();
+  // Ensure shadowed host header has suffix "-shadow".
+  EXPECT_EQ(upstream_headers_->Host()->value().getStringView(), "sni.lyft.com");
+  EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "sni.lyft.com-shadow");
+}
+
+TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderDisabledAppendSuffix) {
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_disable_shadow_host_suffix_append(true);
+        mirror_policy->set_cluster("cluster_1");
+      });
+
+  initialize();
+  sendRequestAndValidateResponse();
+  // Ensure shadowed host header does not have suffix "-shadow".
+  EXPECT_EQ(upstream_headers_->Host()->value().getStringView(), "sni.lyft.com");
+  EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "sni.lyft.com");
+}
+
 } // namespace
 } // namespace Envoy

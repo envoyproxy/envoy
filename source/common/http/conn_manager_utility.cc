@@ -209,9 +209,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.setScheme(
         getScheme(request_headers.getForwardedProtoValue(), connection.ssl() != nullptr));
   }
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.lowercase_scheme")) {
-    request_headers.setScheme(absl::AsciiStrToLower(request_headers.getSchemeValue()));
-  }
+  request_headers.setScheme(absl::AsciiStrToLower(request_headers.getSchemeValue()));
 
   // At this point we can determine whether this is an internal or external request. The
   // determination of internal status uses the following:

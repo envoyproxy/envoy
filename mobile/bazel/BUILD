@@ -5,11 +5,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
 
-config_setting(
-    name = "envoy_mobile_swift_cxx_interop",
-    values = {"define": "envoy_mobile_swift_cxx_interop=enabled"},
-)
-
 kt_jvm_library(
     name = "envoy_mobile_test_suite",
     srcs = [

@@ -155,6 +155,19 @@ TEST_F(RouteEntryImplTest, RoutePerFilterConfig) {
 };
 
 /**
+ * Test the method that get timeout from the route entry.
+ */
+TEST_F(RouteEntryImplTest, RouteTimeout) {
+  const std::string yaml_config = R"EOF(
+    cluster: cluster_0
+    timeout: 10s
+  )EOF";
+  initialize(yaml_config);
+
+  EXPECT_EQ(10000, route_->timeout().count());
+};
+
+/**
  * Test the method that get route level per filter config from the route entry. In this case,
  * unexpected type is used to find the filter factory and finally an exception is thrown.
  */
