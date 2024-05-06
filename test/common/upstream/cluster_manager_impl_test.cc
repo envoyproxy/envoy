@@ -1817,8 +1817,9 @@ TEST_P(ClusterManagerLifecycleTest, DynamicRemoveWithLocalCluster) {
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
   auto priority_update_cb = foo->prioritySet().addPriorityUpdateCb(
-      [&membership_updated](uint32_t, const HostVector&, const HostVector&) -> void {
+      [&membership_updated](uint32_t, const HostVector&, const HostVector&) -> absl::Status {
         membership_updated.ready();
+        return absl::OkStatus();
       });
 
   // Remove the new cluster.

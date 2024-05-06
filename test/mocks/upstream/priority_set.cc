@@ -40,6 +40,7 @@ HostSet& MockPrioritySet::getHostSet(uint32_t priority) {
           host_set->addMemberUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
                                              const HostVector& hosts_removed) {
             runUpdateCallbacks(priority, hosts_added, hosts_removed);
+            return absl::OkStatus();
           }));
     }
   }

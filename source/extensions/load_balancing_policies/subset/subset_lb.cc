@@ -204,6 +204,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets,
       [this](uint32_t priority, const HostVector&, const HostVector&) {
         refreshSubsets(priority);
         purgeEmptySubsets(subsets_);
+        return absl::OkStatus();
       });
 }
 
@@ -832,7 +833,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
 
   if (lb_pair.first != nullptr) {
     thread_aware_lb_ = std::move(lb_pair.first);
-    thread_aware_lb_->initialize();
+    THROW_IF_NOT_OK(thread_aware_lb_->initialize());
     lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
   } else {
     lb_ = std::move(lb_pair.second);
