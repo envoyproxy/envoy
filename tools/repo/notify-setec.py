@@ -57,10 +57,6 @@ class RepoNotifier(runner.Runner):
     def session(self):
         return aiohttp.ClientSession()
 
-    @async_property(cache=True)
-    async def shepherd_notifications(self):
-        return (await self.tracked_issues)["shepherd_notifications"]
-
     @cached_property
     def slack_client(self):
         return AsyncWebClient(token=self.slack_bot_token)
@@ -137,10 +133,10 @@ class RepoNotifier(runner.Runner):
             unassigned = "\n".join(await self.unassigned_issues)
             stalled = "\n".join(await self.stalled_issues)
             await self.send_message(
-                channel='#envoy-maintainer-oncall',
+                channel='#envoy-security-team',
                 text=(f"*'Unassigned' Issues* (Issues with no maintainer assigned)\n{unassigned}"))
             await self.send_message(
-                channel='#envoy-maintainer-oncall',
+                channel='#envoy-security-team',
                 text=(f"*Stalled Issues* (Issues with review out-SLO, please address)\n{stalled}"))
         except SlackApiError as e:
             self.log.error(f"Unexpected error {e.response['error']}")

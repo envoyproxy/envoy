@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-22.04
     if: >-
       ${{
-          github.repository == 'envoyproxy/envoy'
+          github.repository == 'envoyproxy/envoy-setec'
           && (github.event.schedule
               || !contains(github.actor, '[bot]'))
       }}
