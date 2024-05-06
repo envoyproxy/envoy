@@ -132,7 +132,7 @@ type HeaderMap interface {
 	// RangeWithCopy calls f sequentially for each key and value copied from the map.
 	RangeWithCopy(f func(key, value string) bool)
 
-	// GetAllHeaders returns a copy of the underlying header map
+	// GetAllHeaders returns all the headers.
 	GetAllHeaders() map[string][]string
 }
 
