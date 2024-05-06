@@ -124,10 +124,10 @@ FixedServerPreferredAddressConfigFactory::createServerPreferredAddressConfig(
                                            FixedServerPreferredAddressConfig&>(message,
                                                                                validation_visitor);
 
-  auto v4 =
+  FixedServerPreferredAddressConfig::FamilyAddresses v4 =
       parseFamily(config.ipv4_address(), config.has_ipv4_config() ? &config.ipv4_config() : nullptr,
                   Network::Address::IpVersion::v4, "v4", message);
-  auto v6 =
+  FixedServerPreferredAddressConfig::FamilyAddresses v6 =
       parseFamily(config.ipv6_address(), config.has_ipv6_config() ? &config.ipv6_config() : nullptr,
                   Network::Address::IpVersion::v6, "v6", message);
 
