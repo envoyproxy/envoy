@@ -95,6 +95,6 @@ message TlvsMetadata {
   // :ref:`rule key <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.key>` and a value (TLV value in bytes).
   // When runtime flag ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` is enabled,
   // :ref:`Proxy protocol filter <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol>`
-  // will set typed metadata instead of regular metadata. By default filter will use typed metadata.
+  // will populate typed metadata and regular metadata. By default filter will populate both metadatas.
   map<string, bytes> typed_metadata = 1;
 }
