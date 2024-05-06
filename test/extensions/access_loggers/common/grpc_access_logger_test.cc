@@ -50,10 +50,8 @@ public:
   MockGrpcAccessLoggerImpl(
       const Grpc::RawAsyncClientSharedPtr& client,
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-      Event::Dispatcher& dispatcher,
-      const Protobuf::MethodDescriptor& service_method)
-      : GrpcAccessLogger(std::move(client), config, dispatcher,
-                         service_method) {}
+      Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method)
+      : GrpcAccessLogger(std::move(client), config, dispatcher, service_method) {}
 
   int numInits() const { return num_inits_; }
 
@@ -119,7 +117,7 @@ public:
         std::chrono::duration_cast<std::chrono::nanoseconds>(buffer_flush_interval_msec).count());
 
     logger_ = std::make_unique<MockGrpcAccessLoggerImpl>(
-        Grpc::RawAsyncClientPtr{async_client_}, config_, dispatcher_,  mockMethodDescriptor());
+        Grpc::RawAsyncClientPtr{async_client_}, config_, dispatcher_, mockMethodDescriptor());
   }
 
   void expectFlushedLogEntriesCount(const std::string& key, int count) {

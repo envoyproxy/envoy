@@ -159,7 +159,7 @@ public:
           flush();
           flush_timer_->enableTimer(buffer_flush_interval_msec_);
         })),
-        max_buffer_size_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384)){
+        max_buffer_size_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384)) {
 
     client_ = std::make_unique<Detail::UnaryGrpcAccessLogClient<LogRequest, LogResponse>>(
         client, service_method, GrpcCommon::optionalRetryPolicy(config));

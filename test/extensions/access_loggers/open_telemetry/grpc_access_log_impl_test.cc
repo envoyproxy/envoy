@@ -48,16 +48,17 @@ public:
     }
   }
 
-  void expectSentMessage(const std::string& expected_message_yaml,   Grpc::Status::GrpcStatus response_status =
-                             Grpc::Status::WellKnownGrpcStatus::Ok,
-                         uint32_t rejected_log_records = 0) {
+  void expectSentMessage(
+      const std::string& expected_message_yaml,
+      Grpc::Status::GrpcStatus response_status = Grpc::Status::WellKnownGrpcStatus::Ok,
+      uint32_t rejected_log_records = 0) {
     opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest expected_message;
     TestUtility::loadFromYaml(expected_message_yaml, expected_message);
     EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
-        .WillOnce(Invoke([expected_message, response_status, rejected_log_records](absl::string_view, absl::string_view,
-                                            Buffer::InstancePtr&& request,
-                                            Grpc::RawAsyncRequestCallbacks& callback, Tracing::Span& span,
-                                            const Http::AsyncClient::RequestOptions&) {
+        .WillOnce(Invoke([expected_message, response_status, rejected_log_records](
+                             absl::string_view, absl::string_view, Buffer::InstancePtr&& request,
+                             Grpc::RawAsyncRequestCallbacks& callback, Tracing::Span& span,
+                             const Http::AsyncClient::RequestOptions&) {
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
@@ -65,13 +66,11 @@ public:
           if (response_status != Grpc::Status::WellKnownGrpcStatus::Ok) {
             callback.onFailure(response_status, "err", span);
           } else {
-            opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse
-                resp;
-            resp.mutable_partial_success()->set_rejected_log_records(
-                rejected_log_records);
+            opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse resp;
+            resp.mutable_partial_success()->set_rejected_log_records(rejected_log_records);
             callback.onSuccessRaw(Grpc::Common::serializeMessage(resp), span);
           }
-          return nullptr;  // We don't care about the returned request.
+          return nullptr; // We don't care about the returned request.
         }));
   }
 
@@ -131,9 +130,7 @@ TEST_F(GrpcAccessLoggerImplTest, Log) {
   // TCP logging shouldn't do anything.
   logger_->log(ProtobufWkt::Empty());
 
-  EXPECT_EQ(store_
-                .findCounterByString(
-                    "access_logs.open_telemetry_access_log.logs_written")
+  EXPECT_EQ(store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
                 .value()
                 .get()
                 .value(),
@@ -141,15 +138,12 @@ TEST_F(GrpcAccessLoggerImplTest, Log) {
 
   // TCP logging shouldn't do anything.
   logger_->log(ProtobufWkt::Empty());
-  EXPECT_EQ(store_
-                .findCounterByString(
-                    "access_logs.open_telemetry_access_log.logs_written")
+  EXPECT_EQ(store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
                 .value()
                 .get()
                 .value(),
             1);
 }
-
 
 TEST_F(GrpcAccessLoggerImplTest, StatsWithOnFailure) {
   std::string expected_message_yaml = R"EOF(
@@ -176,16 +170,12 @@ TEST_F(GrpcAccessLoggerImplTest, StatsWithOnFailure) {
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
   logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
-  EXPECT_EQ(store_
-                .findCounterByString(
-                    "access_logs.open_telemetry_access_log.logs_written")
+  EXPECT_EQ(store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
                 .value()
                 .get()
                 .value(),
             1);
-  EXPECT_EQ(store_
-                .findCounterByString(
-                    "access_logs.open_telemetry_access_log.logs_dropped")
+  EXPECT_EQ(store_.findCounterByString("access_logs.open_telemetry_access_log.logs_dropped")
                 .value()
                 .get()
                 .value(),
@@ -195,16 +185,12 @@ TEST_F(GrpcAccessLoggerImplTest, StatsWithOnFailure) {
       expected_message_yaml, Grpc::Status::WellKnownGrpcStatus::Internal, 1);
   logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
   // TODO(TAOXUY): support record stats for failed otel requests.
-  EXPECT_EQ(store_
-                .findCounterByString(
-                    "access_logs.open_telemetry_access_log.logs_written")
+  EXPECT_EQ(store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
                 .value()
                 .get()
                 .value(),
             2);
-  EXPECT_EQ(store_
-                .findCounterByString(
-                    "access_logs.open_telemetry_access_log.logs_dropped")
+  EXPECT_EQ(store_.findCounterByString("access_logs.open_telemetry_access_log.logs_dropped")
                 .value()
                 .get()
                 .value(),
@@ -271,15 +257,12 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
   logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
-    EXPECT_EQ(store_
-                .findCounterByString(
-                    "access_logs.open_telemetry_access_log.logs_written")
+  EXPECT_EQ(store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
                 .value()
                 .get()
                 .value(),
             1);
 }
-
 
 TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreationResourceAttributes) {
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
@@ -339,9 +322,7 @@ values:
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
   logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
-    EXPECT_EQ(store_
-                .findCounterByString(
-                    "access_logs.open_telemetry_access_log.logs_written")
+  EXPECT_EQ(store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
                 .value()
                 .get()
                 .value(),
