@@ -156,7 +156,8 @@ message RouteConfiguration {
   // the filter name should be specified as ``envoy.filters.http.router``.
   core.v3.Metadata metadata = 17;
 
-  // Specifies a list of HTTP query parameters that will be added to the HTTP path.
+  // Specifies a list of HTTP query parameters that will be added to the HTTP path. Repeat values are supported. For example,
+  // `foo: 1, foo: 2` will appear as `?foo=1&foo=2`. Values are added as exact strings, command substitution is not supported.
   repeated core.v3.QueryParameter query_parameters_to_add = 18;
 
   // Specifies a list of HTTP query parameters that will be removed from the HTTP path.
