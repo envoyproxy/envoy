@@ -124,7 +124,11 @@ new_features:
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
-
+- area: access_log
+  change: |
+    added new ``access_log`` command operators to retrieve upstream connection information change: ``%UPSTREAM_PEER_URI_SAN%``,
+    ``%UPSTREAM_PEER_IP_SAN%``, ``%UPSTREAM_PEER_DNS_SAN%``, ``%UPSTREAM_LOCAL_URI_SAN%``, ``%UPSTREAM_LOCAL_DNS_SAN%``,
+    ``%UPSTREAM_LOCAL_IP_SAN%``.
 deprecated:
 - area: tracing
   change: |
