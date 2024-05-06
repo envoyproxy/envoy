@@ -45,10 +45,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ProxyProtoIntegrationTest, CaptureTlvToMetadata) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener", "false"},
-  });
   useListenerAccessLog(
       "%DYNAMIC_METADATA(envoy.filters.listener.proxy_protocol:PP2TypeAuthority)%");
 
