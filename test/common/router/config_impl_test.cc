@@ -2101,10 +2101,12 @@ virtual_hosts:
   domains:
   - www.lyft.com
   query_params_to_add:
-    global_param1: vhost_override
-    vhost_param1: vhost1_www2
+    - key: global_param1
+      value: vhost_override
+    - key: vhost_param1
+      value: vhost1_www2
   query_params_to_remove:
-  - remove_at_vhost_level_1
+    - remove_at_vhost_level_1
   routes:
   - match:
       prefix: "/new_endpoint"
@@ -2112,9 +2114,12 @@ virtual_hosts:
       prefix_rewrite: "/api/new_endpoint"
       cluster: www2
     query_params_to_add:
-      global_param1: route_override
-      vhost_param1: route_override
-      route_param: route_new_endpoint
+      - key: global_param1
+        value: route_override
+      - key: vhost_param1
+        value: route_override
+      - key: route_param
+        value: route_new_endpoint
     query_params_to_remove:
       - remove_at_route_level_1
   - match:
@@ -2122,7 +2127,8 @@ virtual_hosts:
     route:
       cluster: root_www2
     query_params_to_add:
-      route_param: route_allpath
+      - key: route_param
+        value: route_allpath
     query_params_to_remove:
       - remove_at_route_level_2
   - match:
@@ -2134,7 +2140,8 @@ virtual_hosts:
   - www-staging.lyft.net
   - www-staging-orca.lyft.com
   query_params_to_add:
-    vhost_param1: vhost1-www2_staging
+    - key: vhost_param1
+      value: vhost1-www2_staging
   query_params_to_remove:
   - remove_at_vhost_level_2
   routes:
@@ -2143,7 +2150,8 @@ virtual_hosts:
     route:
       cluster: www2_staging
     query_params_to_add:
-      route_param: route_allprefix
+      - key: route_param
+        value: route_allprefix
     query_params_to_remove:
       - remove_at_route_level_3
 - name: default
@@ -2156,7 +2164,8 @@ virtual_hosts:
       cluster: instant-server
       timeout: 3s
 query_params_to_add:
-  global_param1: global1
+  - key: global_param1
+    value: global1
 query_params_to_remove:
   - remove_at_global_level
   )EOF";

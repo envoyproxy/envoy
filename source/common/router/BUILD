@@ -442,6 +442,7 @@ envoy_cc_library(
         "//envoy/http:query_params_interface",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ]
 )
 

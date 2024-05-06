@@ -1,10 +1,11 @@
 #pragma once
 
-#include <map>
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/query_params.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -17,7 +18,8 @@ using QueryParamsEvaluatorPtr = std::unique_ptr<QueryParamsEvaluator>;
 class QueryParamsEvaluator {
 public:
   static QueryParamsEvaluatorPtr
-  configure(const Protobuf::Map<std::string, std::string>& query_params_to_add,
+  configure(const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter>&
+                query_params_to_add,
             const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove);
 
   /**
@@ -31,7 +33,7 @@ protected:
   QueryParamsEvaluator() = default;
 
 private:
-  std::map<std::string, std::string> query_params_to_add_;
+  Http::Utility::QueryParamsVector query_params_to_add_;
   std::vector<std::string> query_params_to_remove_;
 };
 

@@ -1,6 +1,7 @@
 #include "source/common/router/query_params_evaluator.h"
 
 #include <string>
+#include <utility>
 
 #include "envoy/http/query_params.h"
 
@@ -8,12 +9,13 @@ namespace Envoy {
 namespace Router {
 
 QueryParamsEvaluatorPtr QueryParamsEvaluator::configure(
-    const Protobuf::Map<std::string, std::string>& query_params_to_add,
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter>& query_params_to_add,
     const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove) {
   QueryParamsEvaluatorPtr query_params_evaluator(new QueryParamsEvaluator());
 
-  for (const auto& [key, val] : query_params_to_add) {
-    query_params_evaluator->query_params_to_add_[key] = val;
+  for (const auto& query_param : query_params_to_add) {
+    const auto& pair = std::make_pair(query_param.key(), query_param.value());
+    query_params_evaluator->query_params_to_add_.emplace_back(pair);
   }
 
   for (const auto& val : query_params_to_remove) {

@@ -157,7 +157,7 @@ message RouteConfiguration {
   core.v3.Metadata metadata = 17;
 
   // Specifies a list of HTTP query parameters that will be added to the HTTP path.
-  map<string, string> query_params_to_add = 18;
+  repeated core.v3.QueryParameter query_params_to_add = 18;
 
   // Specifies a list of HTTP query parameters that will be removed from the HTTP path.
   repeated string query_params_to_remove = 19;
