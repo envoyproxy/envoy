@@ -44,7 +44,6 @@ message FixedServerPreferredAddressConfig {
   }
 
   // String representation of IPv4 address, i.e. "127.0.0.2".
-  // The listener's port will be used.
   // If not specified, none will be configured.
   string ipv4_address = 1;
 
@@ -54,7 +53,6 @@ message FixedServerPreferredAddressConfig {
   AddressFamilyConfig ipv4_config = 3;
 
   // String representation of IPv6 address, i.e. "::1".
-  // The listener's port will be used.
   // If not specified, none will be configured.
   string ipv6_address = 2;
 
