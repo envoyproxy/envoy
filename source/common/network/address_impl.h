@@ -4,7 +4,6 @@
 
 #include <array>
 #include <cstdint>
-#include <mutex>
 #include <string>
 
 #include "envoy/common/platform.h"
