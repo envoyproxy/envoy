@@ -2,6 +2,7 @@
 #include "source/server/admin/clusters_chunk_processor.h"
 
 #include <cstdint>
+#include <format>
 #include <functional>
 #include <memory>
 #include <variant>

@@ -290,3 +290,18 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "clusters_chunk_processor_test",
+    srcs = envoy_select_admin_functionality(["clusters_chunk_processor_test.cc"],
+    deps = [
+        "//source/common/upstream:reosurce_manager_lib",
+        "//envoy/upstream:outlier_detection_interface",
+        "//envoy/upstream:resource_manager_interface",
+        "//envoy/stats:primitive_stats_interface",
+        "//test/mocks/upstream:cluster_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "@com_google_absl//absl/strings",
+    ],
+)
