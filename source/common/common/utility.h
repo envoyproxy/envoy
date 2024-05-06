@@ -655,7 +655,7 @@ private:
 // performance is not critical, or where the contents may be large.
 template <class Value> class BigTrieEntry {
 public:
-  const BigTrieEntry* operator[](uint8_t i) const { return entries_[i].get(); }
+  BigTrieEntry* operator[](uint8_t i) const { return entries_[i].get(); }
   void set(uint8_t branch, std::unique_ptr<BigTrieEntry<Value>> entry) {
     entries_[branch] = std::move(entry);
   }
@@ -687,7 +687,7 @@ private:
 template <class Value> class SmallTrieEntry {
 public:
   Value value_{};
-  const SmallTrieEntry* operator[](uint8_t i) const {
+  SmallTrieEntry* operator[](uint8_t i) const {
     if (i >= min_child_ && i < min_child_ + children_.size()) {
       return children_[i - min_child_].get();
     }
