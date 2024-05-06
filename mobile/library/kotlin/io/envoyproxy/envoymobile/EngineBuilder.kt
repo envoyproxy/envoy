@@ -163,6 +163,7 @@ open class EngineBuilder() {
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var enablePlatformCertificatesValidation = false
+  private var upstreamTlsSni: String = ""
   private var nodeId: String = ""
   private var nodeRegion: String = ""
   private var nodeZone: String = ""
@@ -558,6 +559,17 @@ open class EngineBuilder() {
   }
 
   /**
+   * Sets the upstream TLS socket's SNI override. If empty, no SNI override will be configured.
+   *
+   * @param sni the SNI.
+   * @return this builder.
+   */
+  fun setUpstreamTlsSni(sni: String): EngineBuilder {
+    this.upstreamTlsSni = sni
+    return this
+  }
+
+  /**
    * Sets the node.id field in the Bootstrap configuration.
    *
    * @param nodeId the node ID.
@@ -684,6 +696,7 @@ open class EngineBuilder() {
         keyValueStores,
         runtimeGuards,
         enablePlatformCertificatesValidation,
+        upstreamTlsSni,
         xdsBuilder?.rtdsResourceName,
         xdsBuilder?.rtdsTimeoutInSeconds ?: 0,
         xdsBuilder?.xdsServerAddress,

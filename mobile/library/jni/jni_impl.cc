@@ -1102,8 +1102,9 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
                       jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds,
                       jstring app_version, jstring app_id, jboolean trust_chain_verification,
                       jobjectArray filter_chain, jboolean enable_platform_certificates_validation,
-                      jobjectArray runtime_guards, jstring node_id, jstring node_region,
-                      jstring node_zone, jstring node_sub_zone, jbyteArray serialized_node_metadata,
+                      jstring upstream_tls_sni, jobjectArray runtime_guards, jstring node_id,
+                      jstring node_region, jstring node_zone, jstring node_sub_zone,
+                      jbyteArray serialized_node_metadata,
                       Envoy::Platform::EngineBuilder& builder) {
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
@@ -1149,6 +1150,7 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   builder.enableDrainPostDnsRefresh(enable_drain_post_dns_refresh == JNI_TRUE);
   builder.enforceTrustChainVerification(trust_chain_verification == JNI_TRUE);
   builder.enablePlatformCertificatesValidation(enable_platform_certificates_validation == JNI_TRUE);
+  builder.setUpstreamTlsSni(Envoy::JNI::javaStringToCppString(jni_helper, upstream_tls_sni));
   builder.setForceAlwaysUsev6(true);
 
   auto guards = javaObjectArrayToStringPairVector(jni_helper, runtime_guards);
@@ -1209,12 +1211,12 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
-    jboolean enable_platform_certificates_validation, jobjectArray runtime_guards,
-    jstring rtds_resource_name, jlong rtds_timeout_seconds, jstring xds_address, jlong xds_port,
-    jobjectArray xds_grpc_initial_metadata, jstring xds_root_certs, jstring node_id,
-    jstring node_region, jstring node_zone, jstring node_sub_zone,
-    jbyteArray serialized_node_metadata, jstring cds_resources_locator, jlong cds_timeout_seconds,
-    jboolean enable_cds) {
+    jboolean enable_platform_certificates_validation, jstring upstream_tls_sni,
+    jobjectArray runtime_guards, jstring rtds_resource_name, jlong rtds_timeout_seconds,
+    jstring xds_address, jlong xds_port, jobjectArray xds_grpc_initial_metadata,
+    jstring xds_root_certs, jstring node_id, jstring node_region, jstring node_zone,
+    jstring node_sub_zone, jbyteArray serialized_node_metadata, jstring cds_resources_locator,
+    jlong cds_timeout_seconds, jboolean enable_cds) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::Platform::EngineBuilder builder;
 
@@ -1229,8 +1231,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
       max_connections_per_host, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
       app_version, app_id, trust_chain_verification, filter_chain,
-      enable_platform_certificates_validation, runtime_guards, node_id, node_region, node_zone,
-      node_sub_zone, serialized_node_metadata, builder);
+      enable_platform_certificates_validation, upstream_tls_sni, runtime_guards, node_id,
+      node_region, node_zone, node_sub_zone, serialized_node_metadata, builder);
 
   std::string native_xds_address = Envoy::JNI::javaStringToCppString(jni_helper, xds_address);
   if (!native_xds_address.empty()) {

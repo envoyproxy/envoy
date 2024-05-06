@@ -144,6 +144,7 @@ open class EngineBuilder: NSObject {
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
+  private var upstreamTlsSni: String?
   private var respectSystemProxySettings: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
   private var forceIPv6: Bool = false
@@ -397,6 +398,17 @@ open class EngineBuilder: NSObject {
   public func enablePlatformCertificateValidation(
     _ enablePlatformCertificateValidation: Bool) -> Self {
     self.enablePlatformCertificateValidation = enablePlatformCertificateValidation
+    return self
+  }
+
+  /// Sets the SNI override on the upstream TLS socket context.
+  ///
+  /// - parameter sni: The SNI.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setUpstreamTlsSni(_ sni: String) -> Self {
+    self.upstreamTlsSni = sni
     return self
   }
 
@@ -745,6 +757,7 @@ open class EngineBuilder: NSObject {
       enforceTrustChainVerification: self.enforceTrustChainVerification,
       forceIPv6: self.forceIPv6,
       enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
+      upstreamTlsSni: self.upstreamTlsSni,
       respectSystemProxySettings: self.respectSystemProxySettings,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,

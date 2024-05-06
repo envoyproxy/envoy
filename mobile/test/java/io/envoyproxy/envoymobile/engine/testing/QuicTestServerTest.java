@@ -58,7 +58,12 @@ public class QuicTestServerTest {
                    latch.countDown();
                    return null;
                  })
-                 .addQuicHint("localhost", httpTestServer.getPort())
+                 .addQuicCanonicalSuffix(".lyft.com")
+                 .addQuicHint("sni.lyft.com", httpTestServer.getPort())
+                 // We need to force set the upstream TLS SNI, since the alternate protocols cache
+                 // will use the SNI for the hostname lookup, and for certificate leaf node
+                 // matching.
+                 .setUpstreamTlsSni("sni.lyft.com")
                  .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
                  .build();
     latch.await(); // Don't launch a request before initialization has completed.
@@ -76,7 +81,7 @@ public class QuicTestServerTest {
         new RequestScenario()
             .setHttpMethod(RequestMethod.GET)
             .addHeader("no_trailers", "true")
-            .setUrl("https://localhost:" + httpTestServer.getPort() + "/simple.txt");
+            .setUrl("https://" + httpTestServer.getAddress() + "/simple.txt");
 
     Response response = sendRequest(requestScenario);
 

@@ -60,6 +60,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private final boolean mEnablePlatformCertificatesValidation = true;
+  private String mUpstreamTlsSni = "";
   private final String mNodeId = "";
   private final String mNodeRegion = "";
   private final String mNodeZone = "";
@@ -150,6 +151,16 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
+   * Sets the upstream TLS socket's SNI override. If empty, no SNI override will be configured.
+   *
+   * @param sni The SNI to override on the upstream HTTP/3 or HTTP/2 TLS socket.
+   */
+  public NativeCronvoyEngineBuilderImpl setUpstreamTlsSni(String sni) {
+    mUpstreamTlsSni = sni;
+    return this;
+  }
+
+  /**
    * Indicates to skip the TLS certificate verification.
    *
    * @return the builder to facilitate chaining.
@@ -207,7 +218,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
         platformFilterChain, stringAccessors, keyValueStores, mRuntimeGuards,
-        mEnablePlatformCertificatesValidation,
+        mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
         /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
         /*xdsPort=*/0, /*xdsGrpcInitialMetadata=*/Collections.emptyMap(),
         /*xdsSslRootCerts=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone,

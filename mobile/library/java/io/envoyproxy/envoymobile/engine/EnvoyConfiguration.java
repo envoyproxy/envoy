@@ -60,6 +60,7 @@ public class EnvoyConfiguration {
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
   public final Map<String, String> runtimeGuards;
   public final Boolean enablePlatformCertificatesValidation;
+  public final String upstreamTlsSni;
   public final String rtdsResourceName;
   public final Integer rtdsTimeoutSeconds;
   public final String xdsAddress;
@@ -134,7 +135,8 @@ public class EnvoyConfiguration {
    * @param stringAccessors                               platform string accessors to register.
    * @param keyValueStores                                platform key-value store implementations.
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
-   * @param rtdsResourceName                                 the RTDS layer name for this client.
+   * @param upstreamTlsSni                                the upstream TLS socket SNI override.
+   * @param rtdsResourceName                              the RTDS layer name for this client.
    * @param rtdsTimeoutSeconds                            the timeout for RTDS fetches.
    * @param xdsAddress                                    the address for the xDS management server.
    * @param xdsPort                                       the port for the xDS server.
@@ -170,7 +172,7 @@ public class EnvoyConfiguration {
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, Map<String, Boolean> runtimeGuards,
-      boolean enablePlatformCertificatesValidation, String rtdsResourceName,
+      boolean enablePlatformCertificatesValidation, String upstreamTlsSni, String rtdsResourceName,
       Integer rtdsTimeoutSeconds, String xdsAddress, Integer xdsPort,
       Map<String, String> xdsGrpcInitialMetadata, String xdsRootCerts, String nodeId,
       String nodeRegion, String nodeZone, String nodeSubZone, Struct nodeMetadata,
@@ -228,6 +230,7 @@ public class EnvoyConfiguration {
       this.runtimeGuards.put(guardAndValue.getKey(), String.valueOf(guardAndValue.getValue()));
     }
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
+    this.upstreamTlsSni = upstreamTlsSni;
     this.rtdsResourceName = rtdsResourceName;
     this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
     this.xdsAddress = xdsAddress;
@@ -266,9 +269,10 @@ public class EnvoyConfiguration {
         enableSocketTagging, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
         h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
-        enablePlatformCertificatesValidation, runtimeGuards, rtdsResourceName, rtdsTimeoutSeconds,
-        xdsAddress, xdsPort, xdsGrpcInitialMetadata, xdsRootCerts, nodeId, nodeRegion, nodeZone,
-        nodeSubZone, nodeMetadata.toByteArray(), cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
+        enablePlatformCertificatesValidation, upstreamTlsSni, runtimeGuards, rtdsResourceName,
+        rtdsTimeoutSeconds, xdsAddress, xdsPort, xdsGrpcInitialMetadata, xdsRootCerts, nodeId,
+        nodeRegion, nodeZone, nodeSubZone, nodeMetadata.toByteArray(), cdsResourcesLocator,
+        cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {

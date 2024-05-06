@@ -86,6 +86,7 @@
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
                                         forceIPv6:(BOOL)forceIPv6
               enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
+                                   upstreamTlsSni:(nullable NSString *)upstreamTlsSni
                        respectSystemProxySettings:(BOOL)respectSystemProxySettings
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
@@ -145,6 +146,7 @@
   self.enforceTrustChainVerification = enforceTrustChainVerification;
   self.forceIPv6 = forceIPv6;
   self.enablePlatformCertificateValidation = enablePlatformCertificateValidation;
+  self.upstreamTlsSni = upstreamTlsSni;
   self.respectSystemProxySettings = respectSystemProxySettings;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
@@ -242,6 +244,9 @@
   builder.respectSystemProxySettings(self.respectSystemProxySettings);
   builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
 
+  if (self.upstreamTlsSni != nil) {
+    builder.setUpstreamTlsSni([self.upstreamTlsSni toCXXString]);
+  }
   if (self.nodeRegion != nil) {
     builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
                             [self.nodeSubZone toCXXString]);
