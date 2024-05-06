@@ -2928,10 +2928,6 @@ public:
 
 TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  ENVOY_LOG_MISC(debug, "env var AWS_CONTAINER_CREDENTIALS_FULL_URI = {}",
-                 getenv("AWS_CONTAINER_CREDENTIALS_FULL_URI"));
-  ENVOY_LOG_MISC(debug, "env var AWS_CONTAINER_CREDENTIALS_RELATIVE_URI = {}",
-                 getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _));
 
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),

@@ -83,7 +83,6 @@ Credentials EnvironmentCredentialsProvider::getCredentials() {
 }
 
 void CachedCredentialsProviderBase::refreshIfNeeded() {
-  const Thread::LockGuard lock(lock_);
   if (needsRefresh()) {
     refresh();
   }
@@ -131,8 +130,10 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
 
     if (useHttpAsyncClient()) {
       // Register with init_manager, force the listener to wait for fetching (refresh).
-      init_target_ =
-          std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void { refresh(); });
+      init_target_ = std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void {
+        const Thread::LockGuard lock(lock_);
+        refresh();
+      });
       context_->initManager().add(*init_target_);
     }
   }
@@ -140,7 +141,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
 
 Credentials MetadataCredentialsProviderBase::getCredentials() {
   if (useHttpAsyncClient() && context_ && tls_) {
-    // If server factor context was supplied then we would have thread local slot initialized.
+    // If server factory context was supplied then we would have thread local slot initialized.
     return *(*tls_)->credentials_.get();
   } else {
     refreshIfNeeded();
