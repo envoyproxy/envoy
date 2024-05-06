@@ -91,9 +91,25 @@ public:
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(4);
     EXPECT_CALL(os_sys_calls_, close(_)).Times(4);
     fake_parent_ = std::make_unique<FakeHotRestartingParent>(os_sys_calls_, 0, 0, socket_path_);
-    hot_restarting_child_ = std::make_unique<HotRestartingChild>(0, 1, socket_path_, 0);
-    EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, Event::FileReadyType::Read))
-        .WillOnce(DoAll(SaveArg<1>(&fake_parent_->udp_file_ready_callback_), Return(nullptr)));
+    hot_restarting_child_ =
+        std::make_unique<HotRestartingChild>(0, 1, socket_path_, 0, skipHotRestartOnNoParent());
+    if (skipHotRestartOnNoParent()) {
+      if (hotRestartIsSkipped()) {
+        // A message is attempted to be sent to the parent and returns ECONNREFUSED.
+        EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+          return Api::SysCallSizeResult{0, ECONNREFUSED};
+        });
+      } else {
+        // Should be a message sent to the parent that does nothing.
+        EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+          return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+        });
+      }
+    }
+    if (!hotRestartIsSkipped()) {
+      EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, Event::FileReadyType::Read))
+          .WillOnce(DoAll(SaveArg<1>(&fake_parent_->udp_file_ready_callback_), Return(nullptr)));
+    }
     hot_restarting_child_->initialize(dispatcher_);
   }
   void TearDown() override { hot_restarting_child_.reset(); }
@@ -103,7 +119,29 @@ public:
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   std::unique_ptr<FakeHotRestartingParent> fake_parent_;
   std::unique_ptr<HotRestartingChild> hot_restarting_child_;
+  virtual bool skipHotRestartOnNoParent() const { return false; }
+  virtual bool hotRestartIsSkipped() const { return false; }
 };
+
+class HotRestartingChildWithSkipTest : public HotRestartingChildTest {
+public:
+  bool skipHotRestartOnNoParent() const override { return true; }
+  bool hotRestartIsSkipped() const override { return false; }
+};
+
+class HotRestartingChildWithSkipAndNoParentTest : public HotRestartingChildWithSkipTest {
+public:
+  bool skipHotRestartOnNoParent() const override { return true; }
+  bool hotRestartIsSkipped() const override { return true; }
+};
+
+TEST_F(HotRestartingChildWithSkipTest, BehavesNormallyIfParentConnectWorked) {
+  // the mock expectations perform all actions of this test
+}
+
+TEST_F(HotRestartingChildWithSkipAndNoParentTest, SkipsOtherActionsIfParentConnectFailed) {
+  // the mock expectations perform all actions of this test
+}
 
 TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalled) {
   auto test_listener_addr = Network::Utility::resolveUrl("udp://127.0.0.1:1234");

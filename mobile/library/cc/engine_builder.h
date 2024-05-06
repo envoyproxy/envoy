@@ -14,7 +14,6 @@
 #include "absl/types/optional.h"
 #include "library/cc/engine.h"
 #include "library/cc/key_value_store.h"
-#include "library/cc/log_level.h"
 #include "library/cc/string_accessor.h"
 #include "library/common/engine_types.h"
 
@@ -123,14 +122,13 @@ public:
   EngineBuilder();
   EngineBuilder(EngineBuilder&&) = default;
   virtual ~EngineBuilder() = default;
+  static std::string nativeNameToConfig(absl::string_view name);
 
-  [[deprecated("Use EngineBuilder::setLogLevel instead")]] EngineBuilder&
-  addLogLevel(LogLevel log_level);
   EngineBuilder& setLogLevel(Logger::Logger::Levels log_level);
   EngineBuilder& setLogger(std::unique_ptr<EnvoyLogger> logger);
   EngineBuilder& setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks);
-  [[deprecated("Use EngineBuilder::setEngineCallbacks instead")]] EngineBuilder&
-  setOnEngineRunning(std::function<void()> closure);
+  EngineBuilder& setOnEngineRunning(absl::AnyInvocable<void()> closure);
+  EngineBuilder& setOnEngineExit(absl::AnyInvocable<void()> closure);
   EngineBuilder& setEventTracker(std::unique_ptr<EnvoyEventTracker> event_tracker);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
@@ -138,7 +136,6 @@ public:
   EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
   EngineBuilder& addDnsMinRefreshSeconds(int dns_min_refresh_seconds);
   EngineBuilder& addMaxConnectionsPerHost(int max_connections_per_host);
-  EngineBuilder& useDnsSystemResolver(bool use_system_resolver);
   EngineBuilder& addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       int h2_connection_keepalive_idle_interval_milliseconds);
   EngineBuilder&
@@ -195,12 +192,20 @@ public:
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
   EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
 
+  // Sets the thread priority of the Envoy main (network) thread.
+  // The value must be an integer between -20 (highest priority) and 19 (lowest priority). Values
+  // outside of this range will be ignored.
+  EngineBuilder& setNetworkThreadPriority(int thread_priority);
+
 #if defined(__APPLE__)
   // Right now, this API is only used by Apple (iOS) to register the Apple proxy resolver API for
   // use in reading and using the system proxy settings.
   // If/when we move Android system proxy registration to the C++ Engine Builder, we will make this
   // API available on all platforms.
   EngineBuilder& respectSystemProxySettings(bool value);
+#else
+  // Only android supports c_ares
+  EngineBuilder& setUseCares(bool use_cares);
 #endif
 
   // This is separated from build() for the sake of testability
@@ -226,8 +231,7 @@ private:
   int dns_refresh_seconds_ = 60;
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
-  int dns_query_timeout_seconds_ = 25;
-  bool use_system_resolver_ = true;
+  int dns_query_timeout_seconds_ = 5;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;
   std::string app_version_ = "unspecified";
@@ -244,6 +248,7 @@ private:
   absl::optional<ProtobufWkt::Struct> node_metadata_ = absl::nullopt;
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
+  absl::optional<int> network_thread_priority_ = absl::nullopt;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
@@ -251,6 +256,9 @@ private:
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
   bool enable_http3_ = true;
+#if !defined(__APPLE__)
+  bool use_cares_ = false;
+#endif
   std::string http3_connection_options_ = "";
   std::string http3_client_connection_options_ = "";
   std::vector<std::pair<std::string, int>> quic_hints_;

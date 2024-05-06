@@ -54,10 +54,6 @@ protected:
   void createEnvoy() override;
   void threadRoutine(absl::Notification& engine_running);
 
-  // Converts TestRequestHeaderMapImpl to Envoy::Platform::RequestHeadersSharedPtr
-  Envoy::Platform::RequestHeadersSharedPtr
-  envoyToMobileHeaders(const Http::TestRequestHeaderMapImpl& request_headers);
-
   // Get the value of a Counter in the Envoy instance.
   uint64_t getCounterValue(const std::string& name);
   // Wait until the Counter specified by `name` is >= `value`.

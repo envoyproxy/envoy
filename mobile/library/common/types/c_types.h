@@ -61,18 +61,6 @@ typedef enum {
   ENVOY_REQUEST_TIMEOUT,
 } envoy_error_code_t;
 
-/**
- * Networks classified by last physical link.
- * ENVOY_NET_GENERIC is default and includes cases where network characteristics are unknown.
- * ENVOY_NET_WLAN includes WiFi and other local area wireless networks.
- * ENVOY_NET_WWAN includes all mobile phone networks.
- */
-typedef enum {
-  ENVOY_NET_GENERIC = 0,
-  ENVOY_NET_WLAN = 1,
-  ENVOY_NET_WWAN = 2,
-} envoy_network_t;
-
 #ifdef __cplusplus
 extern "C" { // release function
 #endif
@@ -427,27 +415,3 @@ typedef struct {
   // Context passed through to callbacks to provide dispatch and execution state.
   void* context;
 } envoy_http_callbacks;
-
-/**
- * The list of certificate verification results returned from Java side to the
- * C++ side.
- * A Java counterpart lives in org.chromium.net.CertVerifyStatusAndroid.java
- */
-typedef enum {
-  // Certificate is trusted.
-  CERT_VERIFY_STATUS_OK = 0,
-  // Certificate verification could not be conducted.
-  CERT_VERIFY_STATUS_FAILED = -1,
-  // Certificate is not trusted due to non-trusted root of the certificate
-  // chain.
-  CERT_VERIFY_STATUS_NO_TRUSTED_ROOT = -2,
-  // Certificate is not trusted because it has expired.
-  CERT_VERIFY_STATUS_EXPIRED = -3,
-  // Certificate is not trusted because it is not valid yet.
-  CERT_VERIFY_STATUS_NOT_YET_VALID = -4,
-  // Certificate is not trusted because it could not be parsed.
-  CERT_VERIFY_STATUS_UNABLE_TO_PARSE = -5,
-  // Certificate is not trusted because it has an extendedKeyUsage field, but
-  // its value is not correct for a web server.
-  CERT_VERIFY_STATUS_INCORRECT_KEY_USAGE = -6,
-} envoy_cert_verify_status_t;

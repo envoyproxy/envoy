@@ -53,7 +53,8 @@ public:
     std::unique_ptr<StreamInfo::StreamInfoImpl> new_stream_info =
         std::make_unique<StreamInfo::StreamInfoImpl>(
             filterManagerConnection()->dispatcher().timeSource(),
-            filterManagerConnection()->connectionInfoProviderSharedPtr());
+            filterManagerConnection()->connectionInfoProviderSharedPtr(),
+            StreamInfo::FilterState::LifeSpan::FilterChain);
     new_stream_info->setFrom(stream_info, request_header_map.get());
     stats_gatherer_->setDeferredLoggingHeadersAndTrailers(
         request_header_map, response_header_map, response_trailer_map, std::move(new_stream_info));

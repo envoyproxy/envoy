@@ -186,9 +186,10 @@ void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
   }
 }
 
-void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition changed_state) {
+void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition changed_state,
+                                         HealthState current_check_result) {
   for (const HostStatusCb& cb : callbacks_) {
-    cb(host, changed_state);
+    cb(host, changed_state, current_check_result);
   }
 }
 
@@ -258,12 +259,14 @@ HealthCheckerImplBase::ActiveHealthCheckSession::~ActiveHealthCheckSession() {
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
+  HealthState state = HealthState::Unhealthy;
   // The session is about to be deferred deleted. Make sure all timers are gone and any
   // implementation specific state is destroyed.
   interval_timer_.reset();
   timeout_timer_.reset();
   if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent_.decHealthy();
+    state = HealthState::Healthy;
   }
   if (host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
     parent_.decDegraded();
@@ -272,7 +275,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
 
   // Run callbacks in case something is waiting for health checks to run which will now never run.
   if (first_check_) {
-    parent_.runCallbacks(host_, HealthTransition::Unchanged);
+    parent_.runCallbacks(host_, HealthTransition::Unchanged, state);
   }
 }
 
@@ -336,7 +339,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
 
   parent_.stats_.success_.inc();
   first_check_ = false;
-  parent_.runCallbacks(host_, changed_state);
+  parent_.runCallbacks(host_, changed_state, HealthState::Healthy);
 
   timeout_timer_->disableTimer();
   interval_timer_->enableTimer(parent_.interval(HealthState::Healthy, changed_state));
@@ -394,7 +397,7 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
   }
 
   first_check_ = false;
-  parent_.runCallbacks(host_, changed_state);
+  parent_.runCallbacks(host_, changed_state, HealthState::Unhealthy);
   return changed_state;
 }
 

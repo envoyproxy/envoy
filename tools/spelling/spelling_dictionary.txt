@@ -27,6 +27,9 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+ECN
+ECS
+EKS
 NID
 NIST
 bm
@@ -177,6 +180,7 @@ FIRSTHDR
 FQDN
 FREEBIND
 curr
+doo
 eslint
 freeifaddrs
 FUZZER
@@ -259,6 +263,7 @@ LEV
 LF
 LHS
 hls
+hoo
 iframe
 ilp
 ingressed
@@ -296,9 +301,11 @@ NGHTTP
 NLOHMANN
 NOAUTH
 NOCHECKRESP
+NODATA
 NODELAY
 NOLINT
 NOLINTNEXTLINE
+NONAME
 NONBLOCK
 NONCES
 NOSORT
@@ -1369,6 +1376,7 @@ tokenized
 tokenizes
 tokenizing
 toolchain
+tos
 traceid
 traceparent
 tracestate
@@ -1471,6 +1479,7 @@ xxhash
 xxs
 xyz
 xyzwebservices
+yml
 zag
 zig
 zipkin

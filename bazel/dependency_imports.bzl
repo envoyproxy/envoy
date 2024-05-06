@@ -1,22 +1,21 @@
-load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
-load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
+load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
+load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
-load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
-load("@upb//bazel:workspace_deps.bzl", "upb_deps")
-load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
-load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
-load("@rules_rust//rust:defs.bzl", "rust_common")
-load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
-load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
-load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
-load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
-load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@com_github_aignas_rules_shellcheck//:deps.bzl", "shellcheck_dependencies")
-load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
-load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
 load("@com_github_chrusty_protoc_gen_jsonschema//:deps.bzl", protoc_gen_jsonschema_go_dependencies = "go_dependencies")
+load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
+load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
+load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
+load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
+load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
+load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
+load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
+load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
+load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
+load("@rules_rust//rust:defs.bzl", "rust_common")
+load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
 
 # go version for rules_go
 GO_VERSION = "1.20"
@@ -53,7 +52,6 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         ],
     )
     shellcheck_dependencies()
-    upb_deps()
     proxy_wasm_rust_sdk_dependencies()
     rules_fuzzing_dependencies(
         oss_fuzz = True,
@@ -100,6 +98,20 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # last_update = "2021-06-16"
         # use_category = ["api"],
         # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L148-L153"
+    )
+    go_repository(
+        name = "org_golang_google_genproto_googleapis_api",
+        importpath = "google.golang.org/genproto/googleapis/api",
+        sum = "h1:DoPTO70H+bcDXcd39vOqb2viZxgqeBeSGtZ55yZU4/Q=",
+        version = "v0.0.0-20230822172742-b8732ec3820d",
+        build_external = "external",
+    )
+    go_repository(
+        name = "org_golang_google_genproto_googleapis_rpc",
+        importpath = "google.golang.org/genproto/googleapis/rpc",
+        sum = "h1:uvYuEyMHKNt+lT4K3bN6fGswmK8qSvcreM3BwjDh+y4=",
+        version = "v0.0.0-20230822172742-b8732ec3820d",
+        build_external = "external",
     )
     go_repository(
         name = "org_golang_google_protobuf",
@@ -151,8 +163,8 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     go_repository(
         name = "com_github_planetscale_vtprotobuf",
         importpath = "github.com/planetscale/vtprotobuf",
-        sum = "h1:nve54OLsoKDQhb8ZnnHHUyvAK3vjBiwTEJeC3UsqzJ8=",
-        version = "v0.5.1-0.20231205081218-d930d8ac92f8",
+        sum = "h1:ujRGEVWJEoaxQ+8+HMl8YEpGaDAgohgZxJ5S+d2TTFQ=",
+        version = "v0.6.1-0.20240409071808-615f978279ca",
         build_external = "external",
     )
 

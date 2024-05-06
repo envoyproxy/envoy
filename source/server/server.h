@@ -379,7 +379,7 @@ private:
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Event::DispatcherPtr dispatcher_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
-  std::unique_ptr<Admin> admin_;
+  std::shared_ptr<Admin> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::unique_ptr<Runtime::Loader> runtime_;

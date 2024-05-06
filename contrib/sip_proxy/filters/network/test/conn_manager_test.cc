@@ -72,7 +72,7 @@ public:
 
     decoder_filter_ = std::make_shared<NiceMock<SipFilters::MockDecoderFilter>>();
 
-    config_ = std::make_unique<TestConfigImpl>(proto_config_, context_, decoder_filter_, stats_);
+    config_ = std::make_shared<TestConfigImpl>(proto_config_, context_, decoder_filter_, stats_);
     EXPECT_EQ(config_->settings()->transactionTimeout(), std::chrono::milliseconds(32000));
     if (custom_filter_) {
       config_->custom_filter_ = custom_filter_;
@@ -84,7 +84,7 @@ public:
         .WillRepeatedly(testing::ReturnRef(local_info_));
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), context_,
+        config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), context_,
         transaction_infos_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
@@ -457,7 +457,7 @@ settings:
   SipFilterStats stats_;
   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy proto_config_;
 
-  std::unique_ptr<TestConfigImpl> config_;
+  std::shared_ptr<TestConfigImpl> config_;
 
   Buffer::OwnedImpl buffer_;
   Buffer::OwnedImpl write_buffer_;

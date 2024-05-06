@@ -1,5 +1,7 @@
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 
+#include <ares.h>
+
 #include <chrono>
 #include <cstdint>
 #include <list>
@@ -33,6 +35,8 @@ DnsResolverImpl::DnsResolverImpl(
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
       dns_resolver_options_(config.dns_resolver_options()),
       use_resolvers_as_fallback_(config.use_resolvers_as_fallback()),
+      udp_max_queries_(
+          static_cast<uint32_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, udp_max_queries, 0))),
       resolvers_csv_(maybeBuildResolversCsv(resolvers)),
       filter_unroutable_families_(config.filter_unroutable_families()),
       scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
@@ -68,9 +72,13 @@ absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
     // resolver->asString() is avoided as that format may be modified by custom
     // Address::Instance implementations in ways that make the <port> not a simple
     // integer. See https://github.com/envoyproxy/envoy/pull/3366.
-    resolver_addrs.push_back(fmt::format(fmt::runtime(resolver->ip()->ipv6() ? "[{}]:{}" : "{}:{}"),
-                                         resolver->ip()->addressAsString(),
-                                         resolver->ip()->port()));
+    if (resolver->ip()->ipv6()) {
+      resolver_addrs.push_back(
+          fmt::format("[{}]:{}", resolver->ip()->addressAsString(), resolver->ip()->port()));
+    } else {
+      resolver_addrs.push_back(
+          fmt::format("{}:{}", resolver->ip()->addressAsString(), resolver->ip()->port()));
+    }
   }
   return {absl::StrJoin(resolver_addrs, ",")};
 }
@@ -86,6 +94,11 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
   if (dns_resolver_options_.no_default_search_domain()) {
     options.optmask_ |= ARES_OPT_FLAGS;
     options.options_.flags |= ARES_FLAG_NOSEARCH;
+  }
+
+  if (udp_max_queries_ > 0) {
+    options.optmask_ |= ARES_OPT_UDP_MAX_QUERIES;
+    options.options_.udp_max_queries = udp_max_queries_;
   }
 
   return options;
@@ -190,7 +203,8 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     //
     // The channel cannot be destroyed and reinitialized here because that leads to a c-ares
     // segfault.
-    if (status == ARES_ECONNREFUSED) {
+    if (status == ARES_ECONNREFUSED || status == ARES_EREFUSED || status == ARES_ESERVFAIL ||
+        status == ARES_ENOTIMP) {
       parent_.dirty_channel_ = true;
     }
   }
@@ -550,7 +564,7 @@ public:
     ASSERT(dispatcher.isThreadSafe());
     // Only c-ares DNS factory will call into this function.
     // Directly unpack the typed config to a c-ares object.
-    Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares);
+    THROW_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares));
     if (!cares.resolvers().empty()) {
       const auto& resolver_addrs = cares.resolvers();
       resolvers.reserve(resolver_addrs.size());
