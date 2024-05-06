@@ -196,19 +196,22 @@ void ClientIntegrationTest::basicTest() {
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
                                    std::to_string(request_data.length()));
 
-  stream_prototype_->setOnData([this](envoy_data c_data, bool end_stream) {
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+  stream_callbacks.on_data_ = [this](const Buffer::Instance& buffer, uint64_t length,
+                                     bool end_stream, envoy_stream_intel) {
     if (end_stream) {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "");
+      std::string response_body(length, ' ');
+      buffer.copyOut(0, length, response_body.data());
+      EXPECT_EQ(response_body, "");
     }
     cc_.on_data_calls++;
-    release_envoy_data(c_data);
-  });
+  };
 
+  stream_ = stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        false);
 
-  envoy_data c_data = Data::Utility::toBridgeData(request_data);
-  stream_->sendData(c_data);
+  stream_->sendData(std::make_unique<Buffer::OwnedImpl>(std::move(request_data)));
 
   stream_->close(Http::Utility::createRequestTrailerMapPtr());
 
@@ -268,23 +271,24 @@ void ClientIntegrationTest::trickleTest() {
 
   initialize();
 
-  stream_prototype_->setOnData([this](envoy_data c_data, bool) {
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+  stream_callbacks.on_data_ = [this](const Buffer::Instance&, uint64_t /* length */,
+                                     bool /* end_stream */, envoy_stream_intel) {
     if (explicit_flow_control_) {
       // Allow reading up to 100 bytes.
       stream_->readData(100);
     }
     cc_.on_data_calls++;
-    release_envoy_data(c_data);
-  });
+  };
+
+  stream_ = stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        false);
   if (explicit_flow_control_) {
     // Allow reading up to 100 bytes
     stream_->readData(100);
   }
-  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  envoy_data c_data = Data::Utility::toBridgeData(request_data);
-  stream_->sendData(c_data);
+  stream_->sendData(std::make_unique<Buffer::OwnedImpl>("request body"));
   stream_->close(Http::Utility::createRequestTrailerMapPtr());
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
@@ -328,25 +332,28 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
       absl::MutexLock l(&engine_lock_);
       stream_prototype = engine_->streamClient()->newStreamPrototype();
     }
-    Platform::StreamSharedPtr stream = (*stream_prototype).start(explicit_flow_control_);
-    stream_prototype->setOnComplete(
-        [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
-          cc_.on_complete_calls++;
-          if (cc_.on_complete_calls == num_requests) {
-            cc_.terminal_callback->setReady();
-          }
-        });
 
-    stream_prototype->setOnData([stream](envoy_data c_data, bool) {
-      // Allow reading up to 10 bytes.
-      stream->readData(100);
-      release_envoy_data(c_data);
-    });
+    EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+    stream_callbacks.on_complete_ = [this, &num_requests](envoy_stream_intel,
+                                                          envoy_final_stream_intel) {
+      cc_.on_complete_calls++;
+      if (cc_.on_complete_calls == num_requests) {
+        cc_.terminal_callback->setReady();
+      }
+    };
+
+    stream_callbacks.on_data_ = [&streams, i](const Buffer::Instance&, uint64_t /* length */,
+                                              bool /* end_stream */, envoy_stream_intel) {
+      // Allow reading up to 100 bytes.
+      streams[i]->readData(100);
+    };
+    auto stream = stream_prototype->start(std::move(stream_callbacks), explicit_flow_control_);
+    prototype_streams.push_back(stream_prototype);
+    streams.push_back(stream);
+
     stream->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                         true);
     stream->readData(100);
-    prototype_streams.push_back(stream_prototype);
-    streams.push_back(stream);
   }
   ASSERT(streams.size() == num_requests);
   ASSERT(prototype_streams.size() == num_requests);
@@ -377,31 +384,32 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
       absl::MutexLock l(&engine_lock_);
       stream_prototype = engine_->streamClient()->newStreamPrototype();
     }
-    Platform::StreamSharedPtr stream = (*stream_prototype).start(explicit_flow_control_);
-    stream_prototype->setOnComplete(
-        [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
-          cc_.on_complete_calls++;
-          if (cc_.on_complete_calls + cc_.on_cancel_calls == num_requests) {
-            cc_.terminal_callback->setReady();
-          }
-        });
-    stream_prototype->setOnCancel(
-        [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
-          cc_.on_cancel_calls++;
-          if (cc_.on_complete_calls + cc_.on_cancel_calls == num_requests) {
-            cc_.terminal_callback->setReady();
-          }
-        });
-    stream_prototype->setOnData([stream](envoy_data c_data, bool) {
-      // Allow reading up to 10 bytes.
-      stream->readData(100);
-      release_envoy_data(c_data);
-    });
-    stream_prototype_->setOnError(
-        [](Platform::EnvoyErrorSharedPtr, envoy_stream_intel, envoy_final_stream_intel) {
-          RELEASE_ASSERT(0, "unexpected");
-        });
 
+    EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+    stream_callbacks.on_complete_ = [this, &num_requests](envoy_stream_intel,
+                                                          envoy_final_stream_intel) {
+      cc_.on_complete_calls++;
+      if (cc_.on_complete_calls + cc_.on_cancel_calls == num_requests) {
+        cc_.terminal_callback->setReady();
+      }
+    };
+    stream_callbacks.on_cancel_ = [this, &num_requests](envoy_stream_intel,
+                                                        envoy_final_stream_intel) {
+      cc_.on_cancel_calls++;
+      if (cc_.on_complete_calls + cc_.on_cancel_calls == num_requests) {
+        cc_.terminal_callback->setReady();
+      }
+    };
+    stream_callbacks.on_data_ = [&streams, i](const Buffer::Instance&, uint64_t /* length */,
+                                              bool /* end_stream */, envoy_stream_intel) {
+      // Allow reading up to 100 bytes.
+      streams[i]->readData(100);
+    };
+    stream_callbacks.on_error_ = [](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {
+      RELEASE_ASSERT(0, "unexpected");
+    };
+
+    auto stream = stream_prototype->start(std::move(stream_callbacks), explicit_flow_control_);
     stream->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                         true);
     prototype_streams.push_back(stream_prototype);
@@ -463,14 +471,18 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
                                    std::to_string(request_data.length()));
 
-  stream_prototype_->setOnData([this](envoy_data c_data, bool end_stream) {
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+  stream_callbacks.on_data_ = [this](const Buffer::Instance& buffer, uint64_t length,
+                                     bool end_stream, envoy_stream_intel) {
     if (end_stream) {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "Cleartext is not permitted");
+      std::string response_body(length, ' ');
+      buffer.copyOut(0, length, response_body.data());
+      EXPECT_EQ(response_body, "Cleartext is not permitted");
     }
     cc_.on_data_calls++;
-    release_envoy_data(c_data);
-  });
+  };
 
+  stream_ = stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
 
@@ -498,21 +510,24 @@ TEST_P(ClientIntegrationTest, BasicHttps) {
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
                                    std::to_string(request_data.length()));
 
-  stream_prototype_->setOnData([this](envoy_data c_data, bool end_stream) {
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+  stream_callbacks.on_data_ = [this](const Buffer::Instance& buffer, uint64_t length,
+                                     bool end_stream, envoy_stream_intel) {
     if (end_stream) {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "");
+      std::string response_body(length, ' ');
+      buffer.copyOut(0, length, response_body.data());
+      EXPECT_EQ(response_body, "");
     } else {
-      EXPECT_EQ(c_data.length, 10);
+      EXPECT_EQ(length, 10);
     }
     cc_.on_data_calls++;
-    release_envoy_data(c_data);
-  });
+  };
 
+  stream_ = stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        false);
 
-  envoy_data c_data = Data::Utility::toBridgeData(request_data);
-  stream_->sendData(c_data);
+  stream_->sendData(std::make_unique<Buffer::OwnedImpl>(std::move(request_data)));
 
   stream_->close(Http::Utility::createRequestTrailerMapPtr());
 
@@ -535,6 +550,7 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
           Http::TestResponseHeaderMapImpl({{":status", "503"}})));
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   terminal_callback_.waitReady();
@@ -549,6 +565,7 @@ TEST_P(ClientIntegrationTest, InvalidDomain) {
   initialize();
 
   default_request_headers_.setHost("www.doesnotexist.com");
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   terminal_callback_.waitReady();
@@ -570,6 +587,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainFakeResolver) {
 
   default_request_headers_.setHost(
       absl::StrCat("www.doesnotexist.com:", fake_upstreams_[0]->localAddress()->ip()->port()));
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   // Force the lookup to resolve to localhost.
@@ -587,6 +605,7 @@ TEST_P(ClientIntegrationTest, BasicBeforeResponseHeaders) {
 
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   terminal_callback_.waitReady();
@@ -602,6 +621,7 @@ TEST_P(ClientIntegrationTest, ResetAfterResponseHeaders) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   terminal_callback_.waitReady();
@@ -617,6 +637,7 @@ TEST_P(ClientIntegrationTest, ResetAfterResponseHeadersExplicit) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   // Read the body chunk. This releases the error.
@@ -634,6 +655,7 @@ TEST_P(ClientIntegrationTest, ResetAfterHeaderOnlyResponse) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "0");
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        false);
   terminal_callback_.waitReady();
@@ -648,6 +670,7 @@ TEST_P(ClientIntegrationTest, ResetBetweenDataChunks) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_DATA, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "2");
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   terminal_callback_.waitReady();
@@ -662,6 +685,7 @@ TEST_P(ClientIntegrationTest, ResetAfterData) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_DATA, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   terminal_callback_.waitReady();
@@ -673,6 +697,7 @@ TEST_P(ClientIntegrationTest, CancelBeforeRequestHeadersSent) {
   autonomous_upstream_ = false;
   initialize();
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->cancel();
 
   terminal_callback_.waitReady();
@@ -685,6 +710,7 @@ TEST_P(ClientIntegrationTest, CancelAfterRequestHeadersSent) {
 
   default_request_headers_.addCopy(AutonomousStream::RESPOND_AFTER_REQUEST_HEADERS, "yes");
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        false);
   stream_->cancel();
@@ -696,6 +722,7 @@ TEST_P(ClientIntegrationTest, CancelAfterRequestComplete) {
   autonomous_upstream_ = false;
   initialize();
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   stream_->cancel();
@@ -708,15 +735,17 @@ TEST_P(ClientIntegrationTest, CancelDuringResponse) {
   initialize();
   ConditionalInitializer headers_callback;
 
-  stream_prototype_->setOnHeaders(
-      [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
-                                envoy_stream_intel) {
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_headers_calls++;
-        headers_callback.setReady();
-        return nullptr;
-      });
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+  stream_callbacks.on_headers_ = [this, &headers_callback](const Http::ResponseHeaderMap& headers,
+                                                           bool /* end_stream */,
+                                                           envoy_stream_intel) {
+    cc_.status = headers.getStatusValue();
+    cc_.on_headers_calls++;
+    headers_callback.setReady();
+    return nullptr;
+  };
 
+  stream_ = stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
 
@@ -765,6 +794,7 @@ TEST_P(ClientIntegrationTest, BasicCancelWithCompleteStream) {
 
   initialize();
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
 
@@ -790,15 +820,17 @@ TEST_P(ClientIntegrationTest, CancelWithPartialStream) {
   initialize();
   ConditionalInitializer headers_callback;
 
-  stream_prototype_->setOnHeaders(
-      [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
-                                envoy_stream_intel) {
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_headers_calls++;
-        headers_callback.setReady();
-        return nullptr;
-      });
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+  stream_callbacks.on_headers_ = [this, &headers_callback](const Http::ResponseHeaderMap& headers,
+                                                           bool /* end_stream */,
+                                                           envoy_stream_intel) {
+    cc_.status = headers.getStatusValue();
+    cc_.on_headers_calls++;
+    headers_callback.setReady();
+    return nullptr;
+  };
 
+  stream_ = stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
 
@@ -845,14 +877,17 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
   formatter.processKey("FoO");
   headers->addCopy(Http::LowerCaseString("FoO"), "bar");
 
-  stream_prototype_->setOnHeaders(
-      [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel) {
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_headers_calls++;
-        EXPECT_TRUE(headers->contains("My-ResponsE-Header"));
-        EXPECT_TRUE((*headers)["My-ResponsE-Header"][0] == "foo");
-        return nullptr;
-      });
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+  stream_callbacks.on_headers_ = [this](const Http::ResponseHeaderMap& headers, bool,
+                                        envoy_stream_intel) {
+    cc_.status = headers.getStatusValue();
+    cc_.on_headers_calls++;
+    auto result = headers.get(Http::LowerCaseString("My-ResponsE-Header"));
+    ASSERT_FALSE(result.empty());
+    EXPECT_TRUE(result[0]->value() == "foo");
+  };
+
+  stream_ = stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
   stream_->sendHeaders(std::move(headers), true);
 
   Envoy::FakeRawConnectionPtr upstream_connection;
@@ -882,6 +917,7 @@ TEST_P(ClientIntegrationTest, TimeoutOnRequestPath) {
   autonomous_upstream_ = false;
   initialize();
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        false);
 
@@ -909,6 +945,7 @@ TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
   autonomous_upstream_ = false;
   initialize();
 
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
 
@@ -939,15 +976,17 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTraffic) {
   initialize();
   ConditionalInitializer headers_callback;
 
-  stream_prototype_->setOnHeaders(
-      [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
-                                envoy_stream_intel) {
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_headers_calls++;
-        headers_callback.setReady();
-        return nullptr;
-      });
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+  stream_callbacks.on_headers_ = [this, &headers_callback](const Http::ResponseHeaderMap& headers,
+                                                           bool /* end_stream */,
+                                                           envoy_stream_intel) {
+    cc_.status = headers.getStatusValue();
+    cc_.on_headers_calls++;
+    headers_callback.setReady();
+    return nullptr;
+  };
 
+  stream_ = stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        false);
 
@@ -964,9 +1003,7 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTraffic) {
   upstream_request_->encodeResetStream();
 
   // Encoding data should not be problematic.
-  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  envoy_data c_data = Data::Utility::toBridgeData(request_data);
-  stream_->sendData(c_data);
+  stream_->sendData(std::make_unique<Buffer::OwnedImpl>("request body"));
   // Make sure cancel isn't problematic.
   stream_->cancel();
 }
@@ -978,15 +1015,17 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
   initialize();
   ConditionalInitializer headers_callback;
 
-  stream_prototype_->setOnHeaders(
-      [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
-                                envoy_stream_intel) {
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_headers_calls++;
-        headers_callback.setReady();
-        return nullptr;
-      });
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+  stream_callbacks.on_headers_ = [this, &headers_callback](const Http::ResponseHeaderMap& headers,
+                                                           bool /* end_stream */,
+                                                           envoy_stream_intel) {
+    cc_.status = headers.getStatusValue();
+    cc_.on_headers_calls++;
+    headers_callback.setReady();
+    return nullptr;
+  };
 
+  stream_ = stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        false);
 
@@ -1003,9 +1042,7 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
   headers_callback.waitReady();
 
   // Encoding data should not be problematic.
-  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  envoy_data c_data = Data::Utility::toBridgeData(request_data);
-  stream_->sendData(c_data);
+  stream_->sendData(std::make_unique<Buffer::OwnedImpl>("request body"));
   // Make sure cancel isn't problematic.
   stream_->cancel();
 }
@@ -1020,6 +1057,8 @@ TEST_P(ClientIntegrationTest, Proxying) {
     engine_->engine()->setProxySettings(fake_upstreams_[0]->localAddress()->asString().c_str(),
                                         fake_upstreams_[0]->localAddress()->ip()->port());
   }
+
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   // The initial request will do the DNS lookup.
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
@@ -1029,7 +1068,7 @@ TEST_P(ClientIntegrationTest, Proxying) {
   stream_.reset();
 
   // The second request will use the cached DNS entry and should succeed as well.
-  stream_ = (*stream_prototype_).start(explicit_flow_control_);
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   terminal_callback_.waitReady();
@@ -1041,16 +1080,17 @@ TEST_P(ClientIntegrationTest, DirectResponse) {
   initialize();
 
   // Override to not validate stream intel.
-  stream_prototype_->setOnComplete(
-      [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-        cc_.on_complete_received_byte_count = final_intel.received_byte_count;
-        cc_.on_complete_calls++;
-        cc_.terminal_callback->setReady();
-      });
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+  stream_callbacks.on_complete_ = [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+    cc_.on_complete_received_byte_count = final_intel.received_byte_count;
+    cc_.on_complete_calls++;
+    cc_.terminal_callback->setReady();
+  };
 
   default_request_headers_.setHost("127.0.0.1");
   default_request_headers_.setPath("/");
 
+  stream_ = stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   terminal_callback_.waitReady();

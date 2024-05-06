@@ -11,6 +11,7 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
+        "//library/common:engine_types_lib",
         "//library/common/data:utility_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/http:codes_interface",

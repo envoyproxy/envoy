@@ -5,6 +5,7 @@
 #include "source/common/http/codes.h"
 
 #include "library/common/data/utility.h"
+#include "library/common/engine_types.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
@@ -33,6 +34,9 @@ template <class T> envoy_map makeEnvoyMap(const T& map) {
 
 // Function overload that helps resolve makeEnvoyMap({{"key", "value"}}).
 envoy_map makeEnvoyMap(std::initializer_list<std::pair<std::string, std::string>> map);
+
+// Converts from `EnvoyError` to `envoy_error`.
+envoy_error toBridgeError(const EnvoyError& envoy_error);
 
 } // namespace Utility
 } // namespace Bridge
