@@ -7,6 +7,10 @@ behavior_changes:
     Changes the behavior of the ``SlotImpl`` class destructor. With this change the destructor can be called on any thread.
     This behavior can be reverted by setting the runtime flag ``envoy.reloadable_features.allow_slot_destroy_on_worker_threads``
     to false.
+- area: http2
+  change: |
+    Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
+    requests and responses. This behavior can be reverted by setting the feature to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -26,6 +30,12 @@ minor_behavior_changes:
 - area: statistics
   change: |
     Hot restart statistics like hot_restart_epoch are only set when hot restart is enabled.
+- area: dns
+  change: |
+    Changes the behavior of the getaddrinfo DNS resolver so that it treats EAI_NODATA and EAI_NONAME
+    as successful queries with empty results, instead of as DNS failures. This change brings the
+    getaddrinfo behavior in-line with the c-ares resolver behavior. This behavior can be reverted by
+    setting the runtime guard ``envoy.reloadable_features.dns_nodata_noname_is_success`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
