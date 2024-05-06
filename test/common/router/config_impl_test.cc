@@ -2176,7 +2176,11 @@ query_params_to_remove:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
+    Http::TestRequestHeaderMapImpl headers = genHeaders(
+        "www.lyft.com",
+        "/new_endpoint/"
+        "foo?remove_at_route_level_1=true&remove_at_vhost_level_1=true&remove_at_global_level=true",
+        "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     absl::string_view path = headers.getPathValue();
@@ -2185,11 +2189,17 @@ query_params_to_remove:
     EXPECT_EQ("route_override", query_params.getFirstValue("global_param1"));
     EXPECT_EQ("route_override", query_params.getFirstValue("vhost_param1"));
     EXPECT_EQ("route_new_endpoint", query_params.getFirstValue("route_param"));
+    EXPECT_EQ(std::nullopt, query_params.getFirstValue("remove_at_route_level_1"));
+    EXPECT_EQ(std::nullopt, query_params.getFirstValue("remove_at_vhost_level_1"));
+    EXPECT_EQ(std::nullopt, query_params.getFirstValue("remove_at_global_level"));
   }
 
   // Multiple routes can have same route-level query parameters with different values.
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    Http::TestRequestHeaderMapImpl headers = genHeaders(
+        "www.lyft.com",
+        "/?remove_at_route_level_2=true&remove_at_vhost_level_1=true&remove_at_global_level=true",
+        "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     absl::string_view path = headers.getPathValue();
@@ -2198,11 +2208,18 @@ query_params_to_remove:
     EXPECT_EQ("vhost_override", query_params.getFirstValue("global_param1"));
     EXPECT_EQ("vhost1_www2", query_params.getFirstValue("vhost_param1"));
     EXPECT_EQ("route_allpath", query_params.getFirstValue("route_param"));
+    EXPECT_EQ(std::nullopt, query_params.getFirstValue("remove_at_route_level_2"));
+    EXPECT_EQ(std::nullopt, query_params.getFirstValue("remove_at_vhost_level_1"));
+    EXPECT_EQ(std::nullopt, query_params.getFirstValue("remove_at_global_level"));
   }
 
   // Multiple virtual hosts can have same virtual host level parameters with different values.
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www-staging.lyft.net", "/foo", "GET");
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("www-staging.lyft.net",
+                   "/foo?remove_at_route_level_3=true&remove_at_vhost_level_2=true&remove_at_"
+                   "global_level=true",
+                   "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     absl::string_view path = headers.getPathValue();
@@ -2211,18 +2228,88 @@ query_params_to_remove:
     EXPECT_EQ("global1", query_params.getFirstValue("global_param1"));
     EXPECT_EQ("vhost1-www2_staging", query_params.getFirstValue("vhost_param1"));
     EXPECT_EQ("route_allprefix", query_params.getFirstValue("route_param"));
+    EXPECT_EQ(std::nullopt, query_params.getFirstValue("remove_at_route_level_3"));
+    EXPECT_EQ(std::nullopt, query_params.getFirstValue("remove_at_vhost_level_2"));
+    EXPECT_EQ(std::nullopt, query_params.getFirstValue("remove_at_global_level"));
   }
 
   // Global params.
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/", "GET");
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("api.lyft.com", "/?remove_at_global_level=true", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     absl::string_view path = headers.getPathValue();
     const Http::Utility::QueryParamsMulti query_params =
         Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
     EXPECT_EQ("global1", query_params.getFirstValue("global_param1"));
+    EXPECT_EQ(std::nullopt, query_params.getFirstValue("remove_at_global_level"));
   }
+}
+
+TEST_F(RouteMatcherTest, TestQueryParametersDescendingOrder) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  query_params_to_add:
+    - key: param
+      value: vhost
+  routes:
+  - match:
+      path: /
+    route:
+      cluster: www
+    query_params_to_add:
+      - key: param
+        value: route
+query_params_to_add:
+  - key: param
+    value: global
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"www"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/foo?param=route", headers.getPathValue());
+}
+
+TEST_F(RouteMatcherTest, TestQueryParametersAscendingOrder) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  query_params_to_add:
+    - key: param
+      value: vhost
+  routes:
+  - match:
+      path: /
+    route:
+      cluster: www
+    query_params_to_add:
+      - key: param
+        value: route
+query_params_to_add:
+  - key: param
+    value: global
+most_specific_header_mutations_wins: false
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"www"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/foo?param=global", headers.getPathValue());
 }
 
 class HeaderTransformsDoFormattingTest : public RouteMatcherTest {
