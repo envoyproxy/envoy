@@ -416,7 +416,8 @@ public:
 void MessageUtil::validateDurationFields(const Protobuf::Message& message, bool recurse_into_any) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
     DurationFieldProtoVisitor duration_field_visitor;
-    ProtobufMessage::traverseMessage(duration_field_visitor, message, recurse_into_any);
+    THROW_IF_NOT_OK(
+        ProtobufMessage::traverseMessage(duration_field_visitor, message, recurse_into_any));
   }
 }
 
