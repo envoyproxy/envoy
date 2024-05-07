@@ -328,6 +328,11 @@ EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) 
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setUseGroIfAvailable(bool value) {
+  use_gro_if_available_ = value;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on) {
   enable_drain_post_dns_refresh_ = drain_post_dns_refresh_on;
   return *this;
@@ -877,6 +882,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         guard_and_value.second);
   }
   (*reloadable_features.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
+  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(
+      use_gro_if_available_);
   ProtobufWkt::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
   // TODO(abeyad): This runtime flag is set because https://github.com/envoyproxy/envoy/pull/32370
