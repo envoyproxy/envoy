@@ -12,7 +12,7 @@ envoy_cc_extension(
     name = "outlier_detection_monitors_lib",
     srcs = ["monitor_base_impl.cc"],
     hdrs = ["monitor_base_impl.h"],
-    visibility = ["//visibility:public"],
+    extra_visibility = ["//source/common/upstream:__subpackages__"],
     deps = [
         #"//envoy/access_log:access_log_interface",
         #"//envoy/event:dispatcher_interface",
