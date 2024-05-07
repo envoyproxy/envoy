@@ -37,6 +37,9 @@ public:
   MOCK_METHOD(double, successRate, (DetectorHostMonitor::SuccessRateMonitorType type), (const));
   MOCK_METHOD(void, successRate,
               (DetectorHostMonitor::SuccessRateMonitorType type, double new_success_rate));
+  MOCK_METHOD(std::string ,getFailedMonitorName, (), (const));
+  MOCK_METHOD(std::string, getFailedMonitorExtraInfo, (), (const));
+  MOCK_METHOD(uint32_t, getFailedMonitorEnforce, (), (const));
 };
 
 class MockEventLogger : public EventLogger {

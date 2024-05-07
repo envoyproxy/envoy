@@ -103,14 +103,21 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     monitor->reportResult(Extensions::Outlier::HttpCode(response_code));
   }
 }
-std::function<void(uint32_t)> DetectorHostMonitorImpl::getCallback() {
-  return [this](uint32_t) {
+std::function<void(uint32_t, std::string, std::optional<std::string>)>
+DetectorHostMonitorImpl::getCallback() {
+  return [this](uint32_t enforce, std::string failed_monitor_name,
+                std::optional<std::string> extra_info) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
       // It's possible for the cluster/detector to go away while we still have a host in use.
       return;
     }
-    detector->onConsecutive5xx(host_.lock());
+    failed_monitor_name_ = failed_monitor_name;
+    if (extra_info.has_value()) {
+      failed_extra_info_ = extra_info.value();
+    }
+    failed_monitor_enforce_ = enforce;
+    detector->notifyMainThreadConsecutiveError(host_.lock(), envoy::data::cluster::v3::EXTENSION);
   };
 }
 
@@ -452,7 +459,8 @@ void DetectorImpl::unejectHost(HostSharedPtr host) {
   }
 }
 
-bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type) {
+bool DetectorImpl::enforceEjection(HostSharedPtr host,
+                                   envoy::data::cluster::v3::OutlierEjectionType type) {
   switch (type) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::data::cluster::v3::CONSECUTIVE_5XX:
@@ -476,6 +484,10 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageLocalOriginRuntime,
                                               config_.enforcingFailurePercentageLocalOrigin());
+  case envoy::data::cluster::v3::EXTENSION:
+    return runtime_.snapshot().featureEnabled(std::string(EnforcingExtensionRuntime) + "." +
+                                                  host->outlierDetector().getFailedMonitorName(),
+                                              host->outlierDetector().getFailedMonitorEnforce());
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
@@ -506,10 +518,13 @@ void DetectorImpl::updateEnforcedEjectionStats(envoy::data::cluster::v3::Outlier
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     stats_.ejections_enforced_local_origin_failure_percentage_.inc();
     break;
+  case envoy::data::cluster::v3::EXTENSION:
+    break;
   }
 }
 
 void DetectorImpl::updateDetectedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type) {
+  // TODO: add counter to count total detected ejections.
   switch (type) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::data::cluster::v3::SUCCESS_RATE:
@@ -533,6 +548,8 @@ void DetectorImpl::updateDetectedEjectionStats(envoy::data::cluster::v3::Outlier
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     stats_.ejections_detected_local_origin_failure_percentage_.inc();
     break;
+  case envoy::data::cluster::v3::EXTENSION:
+    break;
   }
 }
 
@@ -553,7 +570,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
       // Deprecated counter, preserving old behaviour until it's removed.
       stats_.ejections_total_.inc();
     }
-    if (enforceEjection(type)) {
+    if (enforceEjection(host, type)) {
       ejections_active_helper_.inc();
       updateEnforcedEjectionStats(type);
       host_monitors_[host]->eject(time_source_.monotonicTime());
@@ -671,6 +688,9 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
     break;
   case envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
     host_monitors_[host]->resetConsecutiveLocalOriginFailure();
+    break;
+  case envoy::data::cluster::v3::EXTENSION:
+    // Extensions' state is reset when the event is reported and when the host is unejected.
     break;
   }
 }
@@ -860,6 +880,7 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
 
   event.set_enforced(enforced);
 
+  // TODO: change this to switch.
   if ((type == envoy::data::cluster::v3::SUCCESS_RATE) ||
       (type == envoy::data::cluster::v3::SUCCESS_RATE_LOCAL_ORIGIN)) {
     const DetectorHostMonitor::SuccessRateMonitorType monitor_type =
@@ -880,6 +901,11 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
             : DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin;
     event.mutable_eject_failure_percentage_event()->set_host_success_rate(
         host->outlierDetector().successRate(monitor_type));
+  } else if (type == envoy::data::cluster::v3::EXTENSION) {
+    event.mutable_eject_extension_event()->set_monitor_name(
+        host->outlierDetector().getFailedMonitorName());
+    event.mutable_eject_extension_event()->set_extra_info(
+        host->outlierDetector().getFailedMonitorExtraInfo());
   } else {
     event.mutable_eject_consecutive_event();
   }

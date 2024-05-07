@@ -178,6 +178,9 @@ public:
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
   double successRate(SuccessRateMonitorType) const override { return -1; }
+  std::string getFailedMonitorName() const override { return ""; }
+  std::string getFailedMonitorExtraInfo() const override { return ""; }
+  uint32_t getFailedMonitorEnforce() const override { return 0; };
 
 private:
   const absl::optional<MonotonicTime> time_{};

@@ -41,6 +41,7 @@ private:
                                          MonitorFactoryContext&) override {
     // TODO: Create consecutive errors type of monitor.
     auto monitor = std::make_unique<ConsecutiveErrorsMonitor>(
+        config.name(), config.enforcing().value(),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, threshold, 3));
     processBucketsConfig(*monitor, config.error_buckets());
 

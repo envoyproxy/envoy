@@ -30,10 +30,12 @@ void Monitor::reportResult(const Error& error) {
     if (bucket->match(error)) {
       // Count as error.
       if (onError()) {
-        // TODO: this should return bool indicating if this was tripped.
-        // if so, call a callback function to post to main thread.
-        // ASSERT(false);
-        callback_(1);
+        callback_(enforce_, name(), std::nullopt);
+        // Reaching error was reported via callback.
+        // but the host may or may not be ejected based on enforce_ parameter.
+        // Reset the monitor's state, so a single new error does not
+        // immediately trigger error condition again.
+        onReset();
       }
     } else {
       onSuccess();

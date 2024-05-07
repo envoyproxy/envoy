@@ -160,12 +160,15 @@ public:
   double successRate(SuccessRateMonitorType type) const override {
     return getSRMonitor(type).getSuccessRate();
   }
+  std::string getFailedMonitorName() const override { return failed_monitor_name_; }
+  std::string getFailedMonitorExtraInfo() const override { return failed_extra_info_; }
+  uint32_t getFailedMonitorEnforce() const override { return failed_monitor_enforce_; }
   void updateCurrentSuccessRateBucket();
   void successRate(SuccessRateMonitorType type, double new_success_rate) {
     getSRMonitor(type).setSuccessRate(new_success_rate);
   }
 
-  std::function<void(uint32_t)> getCallback();
+  std::function<void(uint32_t, std::string, std::optional<std::string>)> getCallback();
 
   // handlers for reporting local origin errors
   void localOriginFailure();
@@ -214,6 +217,10 @@ public:
   // Set of extension monitors.
   // TODO: do method and enable private
   std::unique_ptr<Extensions::Outlier::MonitorsSet> monitors_set_;
+  // TODO: maybe somehow indicate which monitor failed and extract data from there.
+  std::string failed_monitor_name_;
+  uint32_t failed_monitor_enforce_;
+  std::string failed_extra_info_;
 };
 
 /**
@@ -286,6 +293,7 @@ constexpr absl::string_view FailurePercentageThresholdRuntime =
     "outlier_detection.failure_percentage_threshold";
 constexpr absl::string_view MaxEjectionTimeJitterMsRuntime =
     "outlier_detection.max_ejection_time_jitter_ms";
+constexpr absl::string_view EnforcingExtensionRuntime = "outlier_detection.enforcing_extension";
 
 /**
  * Configuration for the outlier detection.
@@ -402,6 +410,8 @@ public:
   void onConsecutive5xx(HostSharedPtr host);
   void onConsecutiveGatewayFailure(HostSharedPtr host);
   void onConsecutiveLocalOriginFailure(HostSharedPtr host);
+  void notifyMainThreadConsecutiveError(HostSharedPtr host,
+                                        envoy::data::cluster::v3::OutlierEjectionType type);
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
   void unejectHost(HostSharedPtr host);
@@ -453,11 +463,9 @@ private:
   void initialize(Cluster& cluster);
   void onConsecutiveErrorWorker(HostSharedPtr host,
                                 envoy::data::cluster::v3::OutlierEjectionType type);
-  void notifyMainThreadConsecutiveError(HostSharedPtr host,
-                                        envoy::data::cluster::v3::OutlierEjectionType type);
   void onIntervalTimer();
   void runCallbacks(HostSharedPtr host);
-  bool enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type);
+  bool enforceEjection(HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type);
   void updateEnforcedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type);
   void updateDetectedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type);
   void processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType monitor_type);

@@ -110,27 +110,32 @@ private:
 // Each monitor may implement different health detection algorithm.
 class Monitor {
 public:
-  //  Monitor() = delete;
+  Monitor(std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
+  Monitor() = delete;
   virtual ~Monitor() {}
   void addErrorBucket(ErrorsBucketPtr&& bucket); // {buckets_.push_back(std::move(bucket));}
   void reportResult(const Error&);
   // TODO - make this private.
   // absl::flat_hash_map<ErrorType, std::vector<ErrorsBucketPtr>> buckets_;
   std::vector<ErrorsBucketPtr> buckets_;
-  std::function<void(uint32_t)> callback_;
+  std::function<void(uint32_t, std::string, std::optional<std::string>)> callback_;
 
   bool tripped() const { return tripped_; }
   void reset() {
     tripped_ = false;
     onReset();
   }
+  std::string name() const { return name_; }
 
 protected:
   virtual bool onError() PURE;
   virtual void onSuccess() PURE;
   virtual void onReset() PURE;
+  virtual std::string getFailedExtraInfo() { return ""; }
 
   bool tripped_{false};
+  std::string name_;
+  uint32_t enforce_{100};
 };
 
 using MonitorPtr = std::unique_ptr<Monitor>;
