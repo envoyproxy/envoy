@@ -127,7 +127,9 @@ void WatcherImpl::onKqueueEvent() {
 
       if (event.fflags & NOTE_WRITE) {
         // directory was written -- check if the file we're actually watching appeared
-        FileWatchPtr new_file = addWatch(file->file_, file->events_, file->callback_, true);
+        auto file_or_error = addWatch(file->file_, file->events_, file->callback_, true);
+        THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+        FileWatchPtr new_file = file_or_error.value();
         if (new_file != nullptr) {
           removeWatch(file);
           file = new_file;
@@ -146,7 +148,9 @@ void WatcherImpl::onKqueueEvent() {
       if (event.fflags & NOTE_DELETE) {
         removeWatch(file);
 
-        FileWatchPtr new_file = addWatch(file->file_, file->events_, file->callback_, true);
+        auto file_or_error = addWatch(file->file_, file->events_, file->callback_, true);
+        THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+        FileWatchPtr new_file = file_or_error.value();
         if (new_file == nullptr) {
           return;
         }
