@@ -23,7 +23,7 @@ using testing::ValuesIn;
 
 namespace Envoy {
 
-using Extensions::Filters::Common::ExtAuthz::UnsafeHeaderVector;
+using Headers = std::vector<std::pair<const std::string, const std::string>>;
 
 struct GrpcInitializeConfigOpts {
   bool disable_with_metadata = false;
