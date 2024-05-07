@@ -11,19 +11,6 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
 import java.util.UUID
 
-/** Envoy engine configuration. */
-sealed class BaseConfiguration
-
-/** The standard configuration. */
-class Standard : BaseConfiguration()
-
-/**
- * The configuration based off a custom yaml.
- *
- * @param yaml the custom config.
- */
-class Custom(val yaml: String) : BaseConfiguration()
-
 /**
  * Builder for generating the xDS configuration for the Envoy Mobile engine. xDS is a protocol for
  * dynamic configuration of Envoy instances, more information can be found in
@@ -128,7 +115,7 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
 }
 
 /** Builder used for creating and running a new `Engine` instance. */
-open class EngineBuilder(private val configuration: BaseConfiguration = Standard()) {
+open class EngineBuilder() {
   protected var onEngineRunning: (() -> Unit) = {}
   protected var logger: ((LogLevel, String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
@@ -176,6 +163,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var enablePlatformCertificatesValidation = false
+  private var upstreamTlsSni: String = ""
   private var nodeId: String = ""
   private var nodeRegion: String = ""
   private var nodeZone: String = ""
@@ -571,6 +559,17 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   }
 
   /**
+   * Sets the upstream TLS socket's SNI override. If empty, no SNI override will be configured.
+   *
+   * @param sni the SNI.
+   * @return this builder.
+   */
+  fun setUpstreamTlsSni(sni: String): EngineBuilder {
+    this.upstreamTlsSni = sni
+    return this
+  }
+
+  /**
    * Sets the node.id field in the Bootstrap configuration.
    *
    * @param nodeId the node ID.
@@ -697,6 +696,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         keyValueStores,
         runtimeGuards,
         enablePlatformCertificatesValidation,
+        upstreamTlsSni,
         xdsBuilder?.rtdsResourceName,
         xdsBuilder?.rtdsTimeoutInSeconds ?: 0,
         xdsBuilder?.xdsServerAddress,
@@ -713,14 +713,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         xdsBuilder?.enableCds ?: false,
       )
 
-    return when (configuration) {
-      is Custom -> {
-        EngineImpl(engineType(), engineConfiguration, configuration.yaml, logLevel)
-      }
-      is Standard -> {
-        EngineImpl(engineType(), engineConfiguration, logLevel)
-      }
-    }
+    return EngineImpl(engineType(), engineConfiguration, logLevel)
   }
 
   /**

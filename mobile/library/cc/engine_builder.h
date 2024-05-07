@@ -161,6 +161,7 @@ public:
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
+  EngineBuilder& setUpstreamTlsSni(std::string sni);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
   // Sets the node.id field in the Bootstrap configuration.
   EngineBuilder& setNodeId(std::string node_id);
@@ -255,6 +256,7 @@ private:
   bool enable_interface_binding_ = false;
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
+  std::string upstream_tls_sni_;
   bool enable_http3_ = true;
 #if !defined(__APPLE__)
   bool use_cares_ = false;

@@ -44,11 +44,6 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public EnvoyStatus runWithYaml(String configurationYAML, String logLevel) {
-    return envoyEngine.runWithYaml(configurationYAML, logLevel);
-  }
-
-  @Override
   public EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
     return envoyEngine.runWithConfig(envoyConfiguration, logLevel);
   }

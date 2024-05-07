@@ -365,6 +365,11 @@ EngineBuilder& EngineBuilder::setXds(XdsBuilder xds_builder) {
 }
 #endif
 
+EngineBuilder& EngineBuilder::setUpstreamTlsSni(std::string sni) {
+  upstream_tls_sni_ = std::move(sni);
+  return *this;
+}
+
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
   platform_certificates_validation_on_ = platform_certificates_validation_on;
@@ -413,9 +418,6 @@ EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
 #endif
 
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
-  // The yaml utilities have non-relevant thread asserts.
-  Thread::SkipAsserts skip;
-
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
       std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
@@ -612,6 +614,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Basic TLS config.
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_socket;
+  if (!upstream_tls_sni_.empty()) {
+    tls_socket.set_sni(upstream_tls_sni_);
+  }
   tls_socket.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
   auto* validation = tls_socket.mutable_common_tls_context()->mutable_validation_context();
