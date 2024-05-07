@@ -6,4 +6,8 @@
 //
 // Please refer to the development docs for more information:
 // https://envoymobile.io/docs/envoy-mobile/latest/development/performance/binary_size.html
-int main() { return reinterpret_cast<Envoy::InternalEngine*>(0)->run(nullptr); }
+int main() {
+  Envoy::InternalEngine engine(nullptr, nullptr, nullptr);
+  auto options = std::make_shared<Envoy::OptionsImplBase>();
+  engine.run(std::move(options));
+}

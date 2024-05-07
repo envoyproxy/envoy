@@ -23,7 +23,6 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/health_check_host_monitor.h"
-#include "envoy/upstream/load_balancer_type.h"
 #include "envoy/upstream/locality.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
@@ -1022,14 +1021,6 @@ public:
    */
   virtual OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>
   clusterType() const PURE;
-
-  /**
-   * @return const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& the
-   * configuration for the Original Destination load balancing policy, only used if type is set to
-   *         ORIGINAL_DST_LB.
-   */
-  virtual OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
-  lbOriginalDstConfig() const PURE;
 
   /**
    * @return const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration

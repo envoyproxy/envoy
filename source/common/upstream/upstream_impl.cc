@@ -1165,13 +1165,6 @@ ClusterInfoImpl::ClusterInfoImpl(
                                "HttpProtocolOptions can be specified");
   }
 
-  // Handle the original_dst_lb_config case first.
-  if (config.lb_config_case() == envoy::config::cluster::v3::Cluster::kOriginalDstLbConfig) {
-    original_dst_lb_config_ =
-        std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
-            config.original_dst_lb_config());
-  }
-
   if (config.has_load_balancing_policy() ||
       config.lb_policy() == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
     // If load_balancing_policy is set we will use it directly, ignoring lb_policy.

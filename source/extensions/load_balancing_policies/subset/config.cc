@@ -12,26 +12,6 @@ namespace Subset {
 using SubsetLbProto = envoy::extensions::load_balancing_policies::subset::v3::Subset;
 using ClusterProto = envoy::config::cluster::v3::Cluster;
 
-class ChildLoadBalancerCreatorImpl : public Upstream::ChildLoadBalancerCreator {
-public:
-  ChildLoadBalancerCreatorImpl(const Upstream::SubsetLoadBalancerConfig& subset_config,
-                               const Upstream::ClusterInfo& cluster_info)
-      : subset_config_(subset_config), cluster_info_(cluster_info) {}
-
-  std::pair<Upstream::ThreadAwareLoadBalancerPtr, Upstream::LoadBalancerPtr>
-  createLoadBalancer(const Upstream::PrioritySet& child_priority_set, const Upstream::PrioritySet*,
-                     Upstream::ClusterLbStats&, Stats::Scope&, Runtime::Loader& runtime,
-                     Random::RandomGenerator& random, TimeSource& time_source) override {
-    return {subset_config_.createLoadBalancer(cluster_info_, child_priority_set, runtime, random,
-                                              time_source),
-            nullptr};
-  }
-
-private:
-  const Upstream::SubsetLoadBalancerConfig& subset_config_;
-  const Upstream::ClusterInfo& cluster_info_;
-};
-
 class LbFactory : public Upstream::LoadBalancerFactory {
 public:
   LbFactory(const Upstream::SubsetLoadBalancerConfig& subset_config,
@@ -41,13 +21,9 @@ public:
         random_(random), time_source_(time_source) {}
 
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
-    auto child_lb_creator =
-        std::make_unique<ChildLoadBalancerCreatorImpl>(subset_config_, cluster_info_);
-
     return std::make_unique<Upstream::SubsetLoadBalancer>(
-        subset_config_.subsetInfo(), std::move(child_lb_creator), params.priority_set,
-        params.local_priority_set, cluster_info_.lbStats(), cluster_info_.statsScope(), runtime_,
-        random_, time_source_);
+        subset_config_, cluster_info_, params.priority_set, params.local_priority_set,
+        cluster_info_.lbStats(), cluster_info_.statsScope(), runtime_, random_, time_source_);
   }
   bool recreateOnHostChange() const override { return false; }
 
@@ -97,7 +73,6 @@ SubsetLbFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
 Upstream::LoadBalancerConfigPtr
 SubsetLbFactory::loadConfig(const Protobuf::Message& config,
                             ProtobufMessage::ValidationVisitor& visitor) {
-
   auto active_or_legacy = Common::ActiveOrLegacy<SubsetLbProto, ClusterProto>::get(&config);
   ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive());
 
@@ -109,18 +84,8 @@ SubsetLbFactory::loadConfig(const Protobuf::Message& config,
                       envoy::config::cluster::v3::Cluster::LbPolicy_Name(
                           active_or_legacy.legacy()->lb_policy())));
     }
-
-    auto sub_lb_pair =
-        Upstream::LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
-            *active_or_legacy.legacy(), visitor);
-
-    if (!sub_lb_pair.ok()) {
-      throw EnvoyException(std::string(sub_lb_pair.status().message()));
-    }
-
-    return std::make_unique<Upstream::SubsetLoadBalancerConfig>(
-        active_or_legacy.legacy()->lb_subset_config(), std::move(sub_lb_pair->config),
-        sub_lb_pair->factory);
+    return std::make_unique<Upstream::SubsetLoadBalancerConfig>(*active_or_legacy.legacy(),
+                                                                visitor);
   }
 
   // Load the subset load balancer configuration. This will contains child load balancer
