@@ -1,8 +1,8 @@
 #include <string>
 
-#include "test/test_common/utility.h"
-
 #include "source/common/router/query_params_evaluator.h"
+
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

@@ -102,7 +102,7 @@ envoy_cc_test(
     srcs = ["query_params_evaluator_test.cc"],
     deps = [
         "//source/common/router:query_params_evaluator_lib",
-    ]
+    ],
 )
 
 envoy_cc_test(
