@@ -46,7 +46,10 @@ resources:
   }
 
   void createUpstreams() override {
+    // backend server
     addFakeUpstream(Http::CodecType::HTTP1);
+
+    // oauth2 server
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
@@ -79,7 +82,7 @@ resources:
     getFakeOuth2Connection();
     acceptNewStream();
     checkClientSecretInRequest("test_client_secret");
-    oauth2_request_->encodeHeaders(Http::TestRequestHeaderMapImpl{{":status", "503"}}, false);
+    oauth2_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
   }
 
   void handleOauth2TokenRequest(absl::string_view client_secret, bool success = true,
@@ -88,24 +91,24 @@ resources:
     checkClientSecretInRequest(client_secret);
     if (success) {
       oauth2_request_->encodeHeaders(
-          Http::TestRequestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+          Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
           false);
     } else {
-      oauth2_request_->encodeHeaders(Http::TestRequestHeaderMapImpl{{":status", "503"}}, false);
+      oauth2_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
     }
 
     envoy::extensions::http::injected_credentials::oauth2::OAuthResponse oauth_response;
-    oauth_response.mutable_access_token()->set_value("test-access-token");
-    if (good_token) {
-      oauth_response.mutable_expires_in()->set_value(2); // 2 seconds
-    }
-
-    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
     if (!good_json) {
       Buffer::OwnedImpl buffer("bad json");
       oauth2_request_->encodeData(buffer, true);
       return;
     }
+    oauth_response.mutable_access_token()->set_value("test-access-token");
+    if (good_token) {
+      oauth_response.mutable_expires_in()->set_value(2); // 2 seconds
+    }
+    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
+
     oauth2_request_->encodeData(buffer, true);
   }
 
