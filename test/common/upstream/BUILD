@@ -468,8 +468,8 @@ envoy_cc_test(
     srcs = ["bounded_load_hlb_test.cc"],
     deps = [
         ":utility_lib",
-        "//source/common/upstream:thread_aware_lb_lib",
         "//source/common/upstream:upstream_includes",
+        "//source/extensions/load_balancing_policies/common:thread_aware_lb_lib",
         "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
