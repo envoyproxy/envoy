@@ -46,6 +46,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mUseCares = false;
+  private boolean mUseGro = false;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
@@ -94,6 +95,18 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     mUseCares = enable;
     return this;
   }
+
+  /**
+   * Specify whether to use UDP GRO for upstream QUIC/HTTP3 sockets, if GRO is available on the
+   * system.
+   *
+   * @param enable If true, use UDP GRO.
+   */
+  public NativeCronvoyEngineBuilderImpl setUseGro(boolean enable) {
+    mUseGro = enable;
+    return this;
+  }
+
   /**
    * Set the DNS query timeout, in seconds, which ensures that DNS queries succeed or fail
    * within that time range. See the DnsCacheConfig.dns_query_timeout proto field for details.
@@ -211,7 +224,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, quicConnectionOptions(),
+        mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mUseGro, quicConnectionOptions(),
         quicClientConnectionOptions(), quicHints(), quicCanonicalSuffixes(),
         mEnableGzipDecompression, brotliEnabled(), portMigrationEnabled(), mEnableSocketTag,
         mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,

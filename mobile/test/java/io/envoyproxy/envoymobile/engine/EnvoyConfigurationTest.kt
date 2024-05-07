@@ -78,6 +78,7 @@ class EnvoyConfigurationTest {
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
     enableCares: Boolean = false,
+    enableGro: Boolean = false,
     http3ConnectionOptions: String = "5RTO",
     http3ClientConnectionOptions: String = "MPQC",
     quicHints: Map<String, Int> = mapOf("www.abc.com" to 443, "www.def.com" to 443),
@@ -129,6 +130,7 @@ class EnvoyConfigurationTest {
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableCares,
+      enableGro,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
       quicHints,
@@ -252,6 +254,7 @@ class EnvoyConfigurationTest {
       dnsCacheSaveIntervalSeconds = 101,
       enableHttp3 = false,
       enableCares = true,
+      enableGro = true,
       enableGzipDecompression = false,
       enableBrotliDecompression = true,
       enableSocketTagging = true,
@@ -273,6 +276,9 @@ class EnvoyConfigurationTest {
 
     // enableCares = true
     assertThat(resolvedTemplate).contains("envoy.network.dns_resolver.cares")
+
+    // enableGro = true
+    assertThat(resolvedTemplate).contains("key: \"prefer_quic_client_udp_gro\" value { bool_value: true }")
 
     // enableDNSCache = true
     assertThat(resolvedTemplate).contains("key: \"dns_persistent_cache\"")

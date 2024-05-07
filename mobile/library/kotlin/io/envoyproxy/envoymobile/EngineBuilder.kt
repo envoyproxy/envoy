@@ -141,6 +141,7 @@ open class EngineBuilder() {
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
   internal var useCares = false
+  private var useGro = false
   private var http3ConnectionOptions = ""
   private var http3ClientConnectionOptions = ""
   private var quicHints = mutableMapOf<String, Int>()
@@ -310,6 +311,18 @@ open class EngineBuilder() {
    */
   fun useCares(useCares: Boolean): EngineBuilder {
     this.useCares = useCares
+    return this
+  }
+
+  /**
+   * Specify whether to use UDP GRO for upstream QUIC/HTTP3 sockets, if GRO is available on the
+   * system.
+   *
+   * @param useGro whether or not to use UDP GRO
+   * @return This builder.
+   */
+  fun useGro(useGro: Boolean): EngineBuilder {
+    this.useGro = useGro
     return this
   }
 
@@ -673,6 +686,7 @@ open class EngineBuilder() {
         enableDrainPostDnsRefresh,
         enableHttp3,
         useCares,
+        useGro,
         http3ConnectionOptions,
         http3ClientConnectionOptions,
         quicHints,
