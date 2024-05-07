@@ -29,8 +29,12 @@ class CacheFilterTest : public ::testing::Test {
 protected:
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
-  CacheFilterSharedPtr makeFilter(std::shared_ptr<HttpCache> cache, bool auto_destroy = true) {
-    auto config = std::make_shared<CacheFilterConfig>(config_, context_.server_factory_context_);
+  CacheFilterSharedPtr makeFilter(std::shared_ptr<HttpCache> cache, bool auto_destroy = true,
+                                  std::shared_ptr<CacheFilterConfig> custom_config = nullptr) {
+    auto config =
+        custom_config
+            ? custom_config
+            : std::make_shared<CacheFilterConfig>(config_, context_.server_factory_context_);
     std::shared_ptr<CacheFilter> filter(new CacheFilter(config, cache),
                                         [auto_destroy](CacheFilter* f) {
                                           if (auto_destroy) {
@@ -351,6 +355,84 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
   }
 }
 
+TEST_F(CacheFilterTest, ConsultsThunderingHerdHandlerOnCacheMissAndAbortsItOnDestroy) {
+  request_headers_.setHost("CacheMiss");
+  auto mock_thundering_herd_handler = std::make_shared<MockThunderingHerdHandler>();
+  auto filter =
+      makeFilter(simple_cache_, false,
+                 std::make_shared<CacheFilterConfig>(
+                     Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>(), true,
+                     mock_thundering_herd_handler, context_.server_factory_context_));
+  EXPECT_CALL(*mock_thundering_herd_handler, handleUpstreamRequest(_, _, _, _))
+      .WillOnce([](std::weak_ptr<ThunderingHerdRetryInterface>,
+                   Http::StreamDecoderFilterCallbacks* decoder_callbacks, const Key&,
+                   Http::RequestHeaderMap&) { decoder_callbacks->continueDecoding(); });
+  testDecodeRequestMiss(filter);
+  // Destroying the filter (before any upstream response)
+  // should abort the thundering herd blockage.
+  EXPECT_CALL(*mock_thundering_herd_handler, handleInsertFinished(_, false));
+  filter->onDestroy();
+}
+
+TEST_F(CacheFilterTest,
+       ConsultsThunderingHerdHandlerOnCacheMissAndAbortsItOnPartialResponseDestroy) {
+  request_headers_.setHost("CacheMiss");
+  auto mock_thundering_herd_handler = std::make_shared<MockThunderingHerdHandler>();
+  auto filter =
+      makeFilter(simple_cache_, false,
+                 std::make_shared<CacheFilterConfig>(
+                     Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>(), true,
+                     mock_thundering_herd_handler, context_.server_factory_context_));
+  EXPECT_CALL(*mock_thundering_herd_handler, handleUpstreamRequest(_, _, _, _))
+      .WillOnce([](std::weak_ptr<ThunderingHerdRetryInterface>,
+                   Http::StreamDecoderFilterCallbacks* decoder_callbacks, const Key&,
+                   Http::RequestHeaderMap&) { decoder_callbacks->continueDecoding(); });
+  testDecodeRequestMiss(filter);
+
+  // Encode response headers.
+  response_headers_.setContentLength(999);
+  EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+  // The insertHeaders callback should be posted to the dispatcher.
+  // Run events on the dispatcher so that the callback is invoked.
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Destroying the filter (e.g. client cancel) should abort the thundering herd blockage.
+  EXPECT_CALL(*mock_thundering_herd_handler, handleInsertFinished(_, false));
+  filter->onDestroy();
+}
+
+TEST_F(CacheFilterTest,
+       ConsultsThunderingHerdHandlerOnCacheMissAndUnblocksItOnCacheWriteCompletion) {
+  request_headers_.setHost("CacheMiss");
+  auto mock_thundering_herd_handler = std::make_shared<MockThunderingHerdHandler>();
+  auto filter =
+      makeFilter(simple_cache_, false,
+                 std::make_shared<CacheFilterConfig>(
+                     Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>(), true,
+                     mock_thundering_herd_handler, context_.server_factory_context_));
+  EXPECT_CALL(*mock_thundering_herd_handler, handleUpstreamRequest(_, _, _, _))
+      .WillOnce([](std::weak_ptr<ThunderingHerdRetryInterface>,
+                   Http::StreamDecoderFilterCallbacks* decoder_callbacks, const Key&,
+                   Http::RequestHeaderMap&) { decoder_callbacks->continueDecoding(); });
+  testDecodeRequestMiss(filter);
+
+  // Encode response headers.
+
+  Buffer::OwnedImpl buf("AAAAAAAAAA");
+  response_headers_.setContentLength(buf.length());
+  EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter->encodeData(buf, true), Http::FilterDataStatus::Continue);
+  // Thundering herd should be notified immediately when the cache write completes.
+  EXPECT_CALL(*mock_thundering_herd_handler, handleInsertFinished(_, true));
+  // The cache insertion callbacks should be posted to the dispatcher.
+  // Run events on the dispatcher so that the callbacks are invoked.
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Make sure the InsertFinished was received on completion, not on destruction.
+  testing::Mock::VerifyAndClearExpectations(mock_thundering_herd_handler.get());
+  filter->onDestroy();
+}
+
 TEST_F(CacheFilterTest, WatermarkEventsAreSentIfCacheBlocksStreamAndLimitExceeded) {
   request_headers_.setHost("CacheHitWithBody");
   const std::string body1 = "abcde";
@@ -358,7 +440,7 @@ TEST_F(CacheFilterTest, WatermarkEventsAreSentIfCacheBlocksStreamAndLimitExceede
   // Set the buffer limit to 2 bytes to ensure we send watermark events.
   EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(2));
   auto mock_http_cache = std::make_shared<MockHttpCache>();
-  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  auto mock_lookup_context = std::make_unique<NiceMock<MockLookupContext>>();
   auto mock_insert_context = std::make_unique<MockInsertContext>();
   EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
       .WillOnce([&](LookupRequest&&,
@@ -430,7 +512,7 @@ TEST_F(CacheFilterTest, FilterDestroyedWhileWatermarkedSendsLowWatermarkEvent) {
   // Set the buffer limit to 2 bytes to ensure we send watermark events.
   EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(2));
   auto mock_http_cache = std::make_shared<MockHttpCache>();
-  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  auto mock_lookup_context = std::make_unique<NiceMock<MockLookupContext>>();
   auto mock_insert_context = std::make_unique<MockInsertContext>();
   EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
       .WillOnce([&](LookupRequest&&,
@@ -500,7 +582,7 @@ TEST_F(CacheFilterTest, BodyReadFromCacheLimitedToBufferSizeChunks) {
   // 8 bytes.
   EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(5));
   auto mock_http_cache = std::make_shared<MockHttpCache>();
-  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  auto mock_lookup_context = std::make_unique<NiceMock<MockLookupContext>>();
   EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
       .WillOnce([&](LookupRequest&&,
                     Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
@@ -556,7 +638,7 @@ TEST_F(CacheFilterTest, CacheInsertAbortedByCache) {
   request_headers_.setHost("CacheHitWithBody");
   const std::string body = "abc";
   auto mock_http_cache = std::make_shared<MockHttpCache>();
-  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  auto mock_lookup_context = std::make_unique<NiceMock<MockLookupContext>>();
   auto mock_insert_context = std::make_unique<MockInsertContext>();
   EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
       .WillOnce([&](LookupRequest&&,
@@ -606,7 +688,7 @@ TEST_F(CacheFilterTest, FilterDeletedWhileIncompleteCacheWriteInQueueShouldAband
   const std::string body = "abc";
   auto mock_http_cache = std::make_shared<MockHttpCache>();
   std::weak_ptr<MockHttpCache> weak_cache_pointer = mock_http_cache;
-  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  auto mock_lookup_context = std::make_unique<NiceMock<MockLookupContext>>();
   auto mock_insert_context = std::make_unique<MockInsertContext>();
   EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
       .WillOnce([&](LookupRequest&&,
@@ -654,7 +736,7 @@ TEST_F(CacheFilterTest, FilterDeletedWhileCompleteCacheWriteInQueueShouldContinu
   request_headers_.setHost("CacheHitWithBody");
   const std::string body = "abc";
   auto mock_http_cache = std::make_shared<MockHttpCache>();
-  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  auto mock_lookup_context = std::make_unique<NiceMock<MockLookupContext>>();
   auto mock_insert_context = std::make_unique<MockInsertContext>();
   EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
       .WillOnce([&](LookupRequest&&,

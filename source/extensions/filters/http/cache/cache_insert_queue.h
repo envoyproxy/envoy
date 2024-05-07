@@ -13,6 +13,12 @@ namespace Cache {
 using OverHighWatermarkCallback = std::function<void()>;
 using UnderLowWatermarkCallback = std::function<void()>;
 using AbortInsertCallback = std::function<void()>;
+// InsertFinishedCallback is called whenever the queue is finished;
+// inserted is true if the cache entry was successfully written, or false
+// if it was aborted or failed for any other reason.
+// Unlike AbortInsertCallback, InsertFinishedCallback is called even if
+// the filter was deleted.
+using InsertFinishedCallback = std::function<void(bool inserted)>;
 class CacheInsertFragment;
 
 // This queue acts as an intermediary between CacheFilter and the cache
@@ -36,7 +42,8 @@ class CacheInsertQueue {
 public:
   CacheInsertQueue(std::shared_ptr<HttpCache> cache,
                    Http::StreamEncoderFilterCallbacks& encoder_callbacks,
-                   InsertContextPtr insert_context, AbortInsertCallback abort);
+                   InsertContextPtr insert_context, AbortInsertCallback abort,
+                   InsertFinishedCallback finished);
   void insertHeaders(const Http::ResponseHeaderMap& response_headers,
                      const ResponseMetadata& metadata, bool end_stream);
   void insertBody(const Buffer::Instance& fragment, bool end_stream);
@@ -52,6 +59,7 @@ private:
   const size_t low_watermark_bytes_, high_watermark_bytes_;
   OptRef<Http::StreamEncoderFilterCallbacks> encoder_callbacks_;
   AbortInsertCallback abort_callback_;
+  InsertFinishedCallback finished_callback_;
   std::deque<std::unique_ptr<CacheInsertFragment>> fragments_;
   // Size of the data currently in the queue (including any fragment in flight).
   size_t queue_size_bytes_ = 0;

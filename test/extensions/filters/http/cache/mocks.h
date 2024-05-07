@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/extensions/filters/http/cache/http_cache.h"
+#include "source/extensions/filters/http/cache/thundering_herd_handler.h"
 
 #include "gmock/gmock.h"
 
@@ -21,12 +22,29 @@ public:
   MOCK_METHOD(CacheInfo, cacheInfo, (), (const));
 };
 
+class MockThunderingHerdHandler : public ThunderingHerdHandler {
+public:
+  MOCK_METHOD(void, handleUpstreamRequest,
+              (std::weak_ptr<ThunderingHerdRetryInterface> weak_filter,
+               Http::StreamDecoderFilterCallbacks* decoder_callbacks, const Key& key,
+               Http::RequestHeaderMap& request_headers));
+  MOCK_METHOD(void, handleInsertFinished, (const Key& key, bool insert_succeeded));
+};
+
+class MockThunderingHerdRetryInterface : public ThunderingHerdRetryInterface {
+public:
+  MOCK_METHOD(void, retryHeaders, (Http::RequestHeaderMap & request_headers));
+};
+
 class MockLookupContext : public LookupContext {
 public:
+  MockLookupContext() { ON_CALL(*this, key).WillByDefault(::testing::ReturnRef(key_)); }
   MOCK_METHOD(void, getHeaders, (LookupHeadersCallback && cb));
   MOCK_METHOD(void, getBody, (const AdjustedByteRange& range, LookupBodyCallback&& cb));
   MOCK_METHOD(void, getTrailers, (LookupTrailersCallback && cb));
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(const Key&, key, (), (const));
+  Key key_;
 };
 
 class MockInsertContext : public InsertContext {

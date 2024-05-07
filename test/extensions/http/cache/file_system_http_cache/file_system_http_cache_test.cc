@@ -39,13 +39,23 @@ using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::StrictMock;
 
-absl::string_view yaml_config = R"(
+constexpr absl::string_view yaml_config = R"(
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig
     manager_config:
       thread_pool:
         thread_count: 1
     cache_path: /tmp
+)";
+
+constexpr absl::string_view yaml_config_with_parallel_writes = R"(
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig
+    manager_config:
+      thread_pool:
+        thread_count: 1
+    cache_path: /tmp
+    allow_parallel_inserts: true
 )";
 
 class FileSystemCacheTestContext {
@@ -65,6 +75,7 @@ public:
     ON_CALL(context_.server_factory_context_.api_, threadFactory())
         .WillByDefault([]() -> Thread::ThreadFactory& { return Thread::threadFactoryForTest(); });
   }
+  virtual ~FileSystemCacheTestContext() = default;
 
   void initCache() {
     cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
@@ -73,9 +84,11 @@ public:
 
   void waitForEvictionThreadIdle() { cache_->cache_eviction_thread_.waitForIdle(); }
 
+  virtual absl::string_view configSource() const { return yaml_config; }
+
   ConfigProto testConfig() {
     envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
-    TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
+    TestUtility::loadFromYaml(std::string{configSource()}, cache_config);
     ConfigProto cfg;
     EXPECT_TRUE(MessageUtil::unpackTo(cache_config.typed_config(), cfg).ok());
     cfg.set_cache_path(cache_path_);
@@ -389,6 +402,12 @@ protected:
   size_t trailers_size_;
 };
 
+class FileSystemHttpCacheTestWithMockFilesAndAllowParallelWrites
+    : public FileSystemHttpCacheTestWithMockFiles {
+public:
+  absl::string_view configSource() const override { return yaml_config_with_parallel_writes; }
+};
+
 TEST_F(FileSystemHttpCacheTestWithMockFiles, WriteVaryNodeFailingToCreateFileJustAborts) {
   auto inserter = testInserter();
   absl::Cleanup destroy_inserter{[&inserter]() { inserter->onDestroy(); }};
@@ -458,6 +477,31 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, LookupDuringAnotherInsertPreventsIn
   EXPECT_EQ(false_callbacks_called_, 3);
   // The file handle didn't actually get used in this test, but is expected to be closed.
   EXPECT_OK(mock_async_file_handle_->close([](absl::Status) {}));
+}
+
+TEST_F(FileSystemHttpCacheTestWithMockFilesAndAllowParallelWrites,
+       DuplicateInsertWhileInsertInProgressIsAllowed) {
+  auto inserter = testInserter();
+  absl::Cleanup destroy_inserter{[&inserter]() { inserter->onDestroy(); }};
+  auto inserter2 = testInserter();
+  absl::Cleanup destroy_inserter2{[&inserter2]() { inserter2->onDestroy(); }};
+  // First inserter will try to create a file.
+  EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
+  inserter->insertHeaders(response_headers_, metadata_, expect_false_callback_, false);
+  // Second inserter will also try to create a file.
+  EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
+  EXPECT_CALL(*mock_async_file_handle_, write(_, _, _));
+  inserter2->insertHeaders(response_headers_, metadata_, expect_false_callback_, false);
+  // Allow the first inserter to complete (and fail) after the second insert was called.
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>{absl::UnknownError("intentionally failed to open file")});
+  // Second inserter should also be creating a file; allow it to create successfully,
+  // then fail to write.
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(
+      absl::UnknownError("intentionally failed write to empty header block")));
+  EXPECT_EQ(false_callbacks_called_, 2);
 }
 
 TEST_F(FileSystemHttpCacheTestWithMockFiles, DuplicateInsertWhileInsertInProgressIsPrevented) {

@@ -12,6 +12,7 @@
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/cache_insert_queue.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
+#include "source/extensions/filters/http/cache/thundering_herd_handler.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -48,6 +49,11 @@ enum class FilterState {
 
 class CacheFilterConfig {
 public:
+  CacheFilterConfig(const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>&
+                        allowed_vary_headers,
+                    bool ignore_request_cache_control_header,
+                    std::shared_ptr<ThunderingHerdHandler> thundering_herd_handler,
+                    Server::Configuration::CommonFactoryContext& context);
   CacheFilterConfig(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
                     Server::Configuration::CommonFactoryContext& context);
 
@@ -55,17 +61,23 @@ public:
   const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
   TimeSource& timeSource() const { return time_source_; }
   bool ignoreRequestCacheControlHeader() const { return ignore_request_cache_control_header_; }
+  ThunderingHerdHandler& thunderingHerdHandler() const { return *thundering_herd_handler_; }
+  std::shared_ptr<ThunderingHerdHandler> sharedThunderingHerdHandler() const {
+    return thundering_herd_handler_;
+  }
 
 private:
   const VaryAllowList vary_allow_list_;
   TimeSource& time_source_;
   const bool ignore_request_cache_control_header_;
+  std::shared_ptr<ThunderingHerdHandler> thundering_herd_handler_;
 };
 
 /**
  * A filter that caches responses and attempts to satisfy requests from cache.
  */
 class CacheFilter : public Http::PassThroughFilter,
+                    public ThunderingHerdRetryInterface,
                     public Logger::Loggable<Logger::Id::cache_filter>,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
@@ -77,6 +89,8 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
+  // ThunderingHerdRetryInterface
+  void retryHeaders(Http::RequestHeaderMap& headers) override;
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
@@ -149,6 +163,7 @@ private:
   std::shared_ptr<HttpCache> cache_;
   LookupContextPtr lookup_;
   LookupResultPtr lookup_result_;
+  Key key_;
 
   // Tracks what body bytes still need to be read from the cache. This is
   // currently only one Range, but will expand when full range support is added. Initialized by
@@ -171,6 +186,9 @@ private:
   // The status of the insert operation or header update, or decision not to insert or update.
   // If it's too early to determine the final status, this is empty.
   absl::optional<InsertStatus> insert_status_;
+  // An optional function to be called during onDestroy. This can be used to notify
+  // a ThunderingHerdHandler that an insert action it is waiting for didn't even begin.
+  std::function<void()> additional_destroy_action_;
 };
 
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;

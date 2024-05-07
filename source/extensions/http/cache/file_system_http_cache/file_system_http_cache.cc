@@ -315,6 +315,9 @@ bool FileSystemHttpCache::workInProgress(const Key& key) {
 }
 
 std::shared_ptr<Cleanup> FileSystemHttpCache::maybeStartWritingEntry(const Key& key) {
+  if (config().allow_parallel_inserts()) {
+    return std::make_shared<Cleanup>([] {});
+  }
   absl::MutexLock lock(&cache_mu_);
   if (!entries_being_written_.emplace(key).second) {
     return nullptr;
@@ -343,7 +346,7 @@ InsertContextPtr FileSystemHttpCache::makeInsertContext(LookupContextPtr&& looku
   auto file_lookup_context = std::unique_ptr<FileLookupContext>(
       dynamic_cast<FileLookupContext*>(lookup_context.release()));
   ASSERT(file_lookup_context);
-  if (file_lookup_context->workInProgress()) {
+  if (!config().allow_parallel_inserts() && file_lookup_context->workInProgress()) {
     return std::make_unique<DontInsertContext>();
   }
   return std::make_unique<FileInsertContext>(shared_from_this(), std::move(file_lookup_context));

@@ -27,7 +27,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // By default this cache uses a least-recently-used eviction strategy.
 //
 // For implementation details, see `DESIGN.md <https://github.com/envoyproxy/envoy/blob/main/source/extensions/http/cache/file_system_http_cache/DESIGN.md>`_.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message FileSystemHttpCacheConfig {
   // Configuration of a manager for how the file system is used asynchronously.
   common.async_files.v3.AsyncFileManagerConfig manager_config = 1
@@ -128,4 +128,14 @@ message FileSystemHttpCacheConfig {
   //
   // [#not-implemented-hide:]
   bool create_cache_path = 10;
+
+  // If true and multiple requests are made for the same cache key while the
+  // entry is not populated, each request attempts to populate the same cache entry.
+  //
+  // If false, only one attempt to populate a given cache key will be active at a time,
+  // and other parallel requests will bypass the cache.
+  //
+  // It is recommended to set this to true when using a
+  // :ref:`ThunderingHerdHandler <envoy_v3_api_field_CacheConfig.thundering_herd_handler>`.
+  bool allow_parallel_inserts = 11;
 }

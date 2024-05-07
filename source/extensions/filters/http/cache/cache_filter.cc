@@ -42,10 +42,19 @@ struct CacheResponseCodeDetailValues {
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
 CacheFilterConfig::CacheFilterConfig(
+    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allowed_vary_headers,
+    bool ignore_request_cache_control_header,
+    std::shared_ptr<ThunderingHerdHandler> thundering_herd_handler,
+    Server::Configuration::CommonFactoryContext& context)
+    : vary_allow_list_(allowed_vary_headers, context), time_source_(context.timeSource()),
+      ignore_request_cache_control_header_(ignore_request_cache_control_header),
+      thundering_herd_handler_(std::move(thundering_herd_handler)) {}
+
+CacheFilterConfig::CacheFilterConfig(
     const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
     Server::Configuration::CommonFactoryContext& context)
-    : vary_allow_list_(config.allowed_vary_headers(), context), time_source_(context.timeSource()),
-      ignore_request_cache_control_header_(config.ignore_request_cache_control_header()) {}
+    : CacheFilterConfig(config.allowed_vary_headers(), config.ignore_request_cache_control_header(),
+                        ThunderingHerdHandler::create(config.thundering_herd_handler()), context) {}
 
 CacheFilter::CacheFilter(std::shared_ptr<const CacheFilterConfig> config,
                          std::shared_ptr<HttpCache> http_cache)
@@ -66,6 +75,9 @@ void CacheFilter::onDestroy() {
     // complete, setSelfOwned will provoke the queue to abort the write operation.
     insert_queue_->setSelfOwned(std::move(insert_queue_));
     insert_queue_.reset();
+  }
+  if (additional_destroy_action_ != nullptr) {
+    additional_destroy_action_();
   }
 }
 
@@ -110,6 +122,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   lookup_ = cache_->makeLookupContext(std::move(lookup_request), *decoder_callbacks_);
 
   ASSERT(lookup_);
+  key_ = lookup_->key();
   getHeaders(headers);
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
 
@@ -163,13 +176,17 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
       // The callbacks passed to CacheInsertQueue are all called through the dispatcher,
       // so they're thread-safe. During CacheFilter::onDestroy the queue is given ownership
       // of itself and all the callbacks are cancelled, so they are also filter-destruction-safe.
-      insert_queue_ =
-          std::make_unique<CacheInsertQueue>(cache_, *encoder_callbacks_, std::move(insert_context),
-                                             // Cache aborted callback.
-                                             [this]() {
-                                               insert_queue_ = nullptr;
-                                               insert_status_ = InsertStatus::InsertAbortedByCache;
-                                             });
+      insert_queue_ = std::make_unique<CacheInsertQueue>(
+          cache_, *encoder_callbacks_, std::move(insert_context),
+          // Cache aborted callback.
+          [this]() {
+            insert_queue_ = nullptr;
+            insert_status_ = InsertStatus::InsertAbortedByCache;
+          },
+          [thh = config_->sharedThunderingHerdHandler(), key = key_](bool write_completed) {
+            thh->handleInsertFinished(key, write_completed);
+          });
+      additional_destroy_action_ = nullptr;
       // Add metadata associated with the cached response. Right now this is only response_time;
       const ResponseMetadata metadata = {config_->timeSource().systemTime()};
       insert_queue_->insertHeaders(headers, metadata, end_stream);
@@ -302,6 +319,10 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
   return LookupStatus::Unknown;
 }
 
+void CacheFilter::retryHeaders(Http::RequestHeaderMap& request_headers) {
+  getHeaders(request_headers);
+}
+
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   ASSERT(lookup_, "CacheFilter is trying to call getHeaders with no LookupContext");
 
@@ -422,7 +443,11 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
     handleCacheHit();
     return;
   case CacheEntryStatus::Unusable:
-    decoder_callbacks_->continueDecoding();
+    config_->thunderingHerdHandler().handleUpstreamRequest(weak_from_this(), decoder_callbacks_,
+                                                           key_, request_headers);
+    additional_destroy_action_ = [thh = config_->sharedThunderingHerdHandler(), key = key_]() {
+      thh->handleInsertFinished(key, false);
+    };
     return;
   case CacheEntryStatus::LookupError:
     filter_state_ = FilterState::NotServingFromCache;

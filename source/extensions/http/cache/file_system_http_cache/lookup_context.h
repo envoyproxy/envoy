@@ -32,7 +32,7 @@ public:
   ~FileLookupContext() override { onDestroy(); }
 
   const LookupRequest& lookup() const { return lookup_; }
-  const Key& key() const { return key_; }
+  const Key& key() const override { return key_; }
   bool workInProgress() const;
 
 private:

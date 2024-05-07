@@ -93,6 +93,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "thundering_herd_handler_test",
+    srcs = ["thundering_herd_handler_test.cc"],
+    extension_names = ["envoy.filters.http.cache"],
+    deps = [
+        ":mocks",
+        "//source/extensions/filters/http/cache:thundering_herd_handler_lib",
+        "//test/mocks/http:http_mocks",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "cacheability_utils_test",
     srcs = ["cacheability_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],

@@ -24,6 +24,7 @@ envoy_cc_library(
         ":cache_insert_queue_lib",
         ":cacheability_utils_lib",
         ":http_cache_lib",
+        ":thundering_herd_handler_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
@@ -31,6 +32,19 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "thundering_herd_handler_lib",
+    srcs = ["thundering_herd_handler.cc"],
+    hdrs = ["thundering_herd_handler.h"],
+    deps = [
+        ":http_cache_lib",
+        "//envoy/http:filter_interface",
+        "//source/common/protobuf:utility_lib_header",
+        "//source/common/common:thread_annotations",
         "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
