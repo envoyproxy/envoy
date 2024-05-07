@@ -601,6 +601,7 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
                         peer_addess->asString(),
                         (local_address == nullptr ? "unknown" : local_address->asString()),
                         bytes_read));
+  printf("mhd calling udp_packet_processor.processPacket %u\n", tos);
   udp_packet_processor.processPacket(std::move(local_address), std::move(peer_addess),
                                      std::move(buffer), receive_time, tos);
 }
@@ -627,6 +628,7 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
 
   Api::IoCallUint64Result result =
       receiveMessage(max_rx_datagram_size_with_gro, buffer, output, handle, local_address);
+  printf("mhd readFromSocketRecvGro tos %u\n", output.msg_[0].tos_);
 
   if (!result.ok() || output.msg_[0].truncated_and_dropped_) {
     return result;
@@ -640,6 +642,7 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
     if (num_packets_read != nullptr) {
       *num_packets_read += 1;
     }
+    printf("mhd passing 1\n");
     passPayloadToProcessor(result.return_value_, std::move(buffer),
                            std::move(output.msg_[0].peer_address_),
                            std::move(output.msg_[0].local_address_), udp_packet_processor,
@@ -657,6 +660,7 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
     if (num_packets_read != nullptr) {
       *num_packets_read += 1;
     }
+    printf("mhd passing 2\n");
     passPayloadToProcessor(bytes_to_copy, std::move(sub_buffer), output.msg_[0].peer_address_,
                            output.msg_[0].local_address_, udp_packet_processor, receive_time,
                            output.msg_[0].tos_);
@@ -743,6 +747,7 @@ Api::IoCallUint64Result readFromSocketRecvMsg(IoHandle& handle,
   ENVOY_LOG_MISC(trace, "starting recvmsg with max={}", udp_packet_processor.maxDatagramSize());
   Api::IoCallUint64Result result =
       receiveMessage(udp_packet_processor.maxDatagramSize(), buffer, output, handle, local_address);
+  printf("mhd readFromSocketRecvMsg tos %u\n", output.msg_[0].tos_);
 
   if (!result.ok() || output.msg_[0].truncated_and_dropped_) {
     return result;
@@ -767,13 +772,17 @@ Utility::readFromSocket(IoHandle& handle, const Address::Instance& local_address
                         UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time,
                         UdpRecvMsgMethod recv_msg_method, uint32_t* packets_dropped,
                         uint32_t* num_packets_read) {
+  printf("mhd readFromSocket\n");
   if (recv_msg_method == UdpRecvMsgMethod::RecvMsgWithGro) {
+    printf("mhd Gro\n");
     return readFromSocketRecvGro(handle, local_address, udp_packet_processor, receive_time,
                                  packets_dropped, num_packets_read);
   } else if (recv_msg_method == UdpRecvMsgMethod::RecvMmsg) {
+    printf("mhd recvmmmsg");
     return readFromSocketRecvMmsg(handle, local_address, udp_packet_processor, receive_time,
                                   packets_dropped, num_packets_read);
   }
+  printf("mhd recvmsg");
   return readFromSocketRecvMsg(handle, local_address, udp_packet_processor, receive_time,
                                packets_dropped, num_packets_read);
 }
