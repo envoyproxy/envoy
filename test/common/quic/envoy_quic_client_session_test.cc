@@ -546,12 +546,12 @@ TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
   char server_hello[] = {
       0x02, 0x00, 0x00, 0x56, 0x03, 0x03,
   };
-  quic::QuicEncryptedPacket* packet = quic::test::ConstructEncryptedPacket(
+  auto packet = absl::WrapUnique<quic::QuicEncryptedPacket>(quic::test::ConstructEncryptedPacket(
       quic_connection_->client_connection_id(), quic_connection_->connection_id(),
       /*version_flag=*/true, /*reset_flag=*/false, /*packet_number=*/1,
       std::string(server_hello, sizeof(server_hello)), /*full_padding=*/false,
       quic::CONNECTION_ID_PRESENT, quic::CONNECTION_ID_PRESENT, quic::PACKET_1BYTE_PACKET_NUMBER,
-      &quic_version_, quic::Perspective::IS_SERVER);
+      &quic_version_, quic::Perspective::IS_SERVER));
 
   Buffer::RawSlice slice;
   // packet->data() is const, so it has to be copied to send to sendmsg.
@@ -568,7 +568,6 @@ TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   const quic::QuicConnectionStats& stats = quic_connection_->GetStats();
   EXPECT_EQ(stats.num_ecn_marks_received.ect1, 1);
-  delete packet;
 }
 
 class MockOsSysCallsImpl : public Api::OsSysCallsImpl {
