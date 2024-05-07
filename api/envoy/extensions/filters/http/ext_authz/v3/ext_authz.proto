@@ -92,7 +92,8 @@ message ExtAuthz {
   // or cannot be reached. The default status is HTTP 403 Forbidden.
   type.v3.HttpStatus status_on_error = 7;
 
-  // When this is set to true, the filter will check the side stream response for invalid header &
+  // When this is set to true, the filter will check the :ref:`ext_authz response
+  // <envoy_v3_api_msg_service.auth.v3.CheckResponse>` for invalid header &
   // query parameter mutations. If the side stream response is invalid, it will send a local reply
   // to the downstream request with status HTTP 500 Internal Server Error.
   //
@@ -103,7 +104,7 @@ message ExtAuthz {
   // When set to false, any invalid mutations will be visible to the rest of envoy and may cause
   // unexpected behavior.
   //
-  // If you are using ext_authz with an untrusted side stream, you should set this to true.
+  // If you are using ext_authz with an untrusted ext_authz server, you should set this to true.
   bool validate_mutations = 24;
 
   // Specifies a list of metadata namespaces whose values, if present, will be passed to the
