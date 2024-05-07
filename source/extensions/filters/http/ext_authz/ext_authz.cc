@@ -346,8 +346,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       request_headers_->addCopy(Http::LowerCaseString(key), value);
     }
     for (const auto& [key, value] : response->headers_to_append) {
-      if (config_->validateMutations() && !(Http::HeaderUtility::headerNameIsValid(key) &&
-                                            Http::HeaderUtility::headerValueIsValid(value))) {
+      if (config_->validateMutations() && (!Http::HeaderUtility::headerNameIsValid(key) ||
+                                           !Http::HeaderUtility::headerValueIsValid(value))) {
         ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_, key,
                          value);
         rejectResponse();
@@ -381,7 +381,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       // If the response contains an invalid header to remove, it's the same as trying to remove a
       // header that doesn't exist, so just ignore it.
       if (!Http::HeaderUtility::isRemovableHeader(key) ||
-          !Http::HeaderUtility::headerNameIsValid(key)) {
+          (config_->validateMutations() && !Http::HeaderUtility::headerNameIsValid(key))) {
         ENVOY_STREAM_LOG(trace, "Not removing header '{}'.", *decoder_callbacks_, key);
         continue;
       }
@@ -393,8 +393,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to add to the response:",
                        *decoder_callbacks_, response->response_headers_to_add.size());
       for (const auto& [key, value] : response->response_headers_to_add) {
-        if (config_->validateMutations() && !(Http::HeaderUtility::headerNameIsValid(key) &&
-                                              Http::HeaderUtility::headerValueIsValid(value))) {
+        if (config_->validateMutations() && (!Http::HeaderUtility::headerNameIsValid(key) ||
+                                             !Http::HeaderUtility::headerValueIsValid(value))) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_, key,
                            value);
           rejectResponse();
@@ -409,8 +409,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to set to the response:",
                        *decoder_callbacks_, response->response_headers_to_set.size());
       for (const auto& [key, value] : response->response_headers_to_set) {
-        if (config_->validateMutations() && !(Http::HeaderUtility::headerNameIsValid(key) &&
-                                              Http::HeaderUtility::headerValueIsValid(value))) {
+        if (config_->validateMutations() && (!Http::HeaderUtility::headerNameIsValid(key) ||
+                                             !Http::HeaderUtility::headerValueIsValid(value))) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_, key,
                            value);
           rejectResponse();
@@ -425,8 +425,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to add to the response:",
                        *decoder_callbacks_, response->response_headers_to_add_if_absent.size());
       for (const auto& [key, value] : response->response_headers_to_add_if_absent) {
-        if (config_->validateMutations() && !(Http::HeaderUtility::headerNameIsValid(key) &&
-                                              Http::HeaderUtility::headerValueIsValid(value))) {
+        if (config_->validateMutations() && (!Http::HeaderUtility::headerNameIsValid(key) ||
+                                             !Http::HeaderUtility::headerValueIsValid(value))) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_, key,
                            value);
           rejectResponse();
@@ -443,8 +443,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                        *decoder_callbacks_,
                        response->response_headers_to_overwrite_if_exists.size());
       for (const auto& [key, value] : response->response_headers_to_overwrite_if_exists) {
-        if (config_->validateMutations() && !(Http::HeaderUtility::headerNameIsValid(key) &&
-                                              Http::HeaderUtility::headerValueIsValid(value))) {
+        if (config_->validateMutations() && (!Http::HeaderUtility::headerNameIsValid(key) ||
+                                             !Http::HeaderUtility::headerValueIsValid(value))) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_, key,
                            value);
           rejectResponse();
@@ -464,8 +464,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           trace, "ext_authz filter set query parameter(s) on the request:", *decoder_callbacks_);
       for (const auto& [key, value] : response->query_parameters_to_set) {
         if (config_->validateMutations() &&
-            !(Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(key) &&
-              Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(value))) {
+            (!Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(key) ||
+             !Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(value))) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid query parameter {}={}.", *decoder_callbacks_,
                            key, value);
           rejectResponse();
