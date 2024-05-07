@@ -93,6 +93,11 @@ new_features:
   change: |
     Added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`
     for matching http input based on filter state objects.
+- area: quic
+  change: |
+    Added support for QUIC server preferred address when there is a DNAT between the client and Envoy. See
+    :ref:`new config
+    <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig.dnat_address>`.
 - area: cares
   change: |
     Added :ref:`udp_max_queries<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.udp_max_queries>`

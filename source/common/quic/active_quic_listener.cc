@@ -344,22 +344,37 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
     Network::ListenerConfig& config) {
   ASSERT(crypto_server_stream_factory_.has_value());
   if (server_preferred_address_config_ != nullptr) {
-    std::pair<quic::QuicSocketAddress, quic::QuicSocketAddress> addresses =
+    const EnvoyQuicServerPreferredAddressConfig::Addresses addresses =
         server_preferred_address_config_->getServerPreferredAddresses(
             listen_socket_ptr->connectionInfoProvider().localAddress());
-    quic::QuicSocketAddress v4_address = addresses.first;
-    if (v4_address.IsInitialized()) {
-      ENVOY_BUG(v4_address.host().address_family() == quiche::IpAddressFamily::IP_V4,
+    if (addresses.ipv4_.IsInitialized()) {
+      ENVOY_BUG(addresses.ipv4_.host().address_family() == quiche::IpAddressFamily::IP_V4,
                 absl::StrCat("Configured IPv4 server's preferred address isn't a v4 address:",
-                             v4_address.ToString()));
-      quic_config_.SetIPv4AlternateServerAddressToSend(v4_address);
+                             addresses.ipv4_.ToString()));
+      if (addresses.dnat_ipv4_.IsInitialized()) {
+        ENVOY_BUG(
+            addresses.dnat_ipv4_.host().address_family() == quiche::IpAddressFamily::IP_V4,
+            absl::StrCat("Configured IPv4 server's preferred DNAT address isn't a v4 address:",
+                         addresses.dnat_ipv4_.ToString()));
+        quic_config_.SetIPv4AlternateServerAddressForDNat(addresses.ipv4_, addresses.dnat_ipv4_);
+      } else {
+        quic_config_.SetIPv4AlternateServerAddressToSend(addresses.ipv4_);
+      }
     }
-    quic::QuicSocketAddress v6_address = addresses.second;
-    if (v6_address.IsInitialized()) {
-      ENVOY_BUG(v6_address.host().address_family() == quiche::IpAddressFamily::IP_V6,
+
+    if (addresses.ipv6_.IsInitialized()) {
+      ENVOY_BUG(addresses.ipv6_.host().address_family() == quiche::IpAddressFamily::IP_V6,
                 absl::StrCat("Configured IPv6 server's preferred address isn't a v6 address:",
-                             v4_address.ToString()));
-      quic_config_.SetIPv6AlternateServerAddressToSend(v6_address);
+                             addresses.ipv6_.ToString()));
+      if (addresses.dnat_ipv6_.IsInitialized()) {
+        ENVOY_BUG(
+            addresses.dnat_ipv6_.host().address_family() == quiche::IpAddressFamily::IP_V6,
+            absl::StrCat("Configured IPv6 server's preferred DNAT address isn't a v6 address:",
+                         addresses.dnat_ipv6_.ToString()));
+        quic_config_.SetIPv6AlternateServerAddressForDNat(addresses.ipv6_, addresses.dnat_ipv6_);
+      } else {
+        quic_config_.SetIPv6AlternateServerAddressToSend(addresses.ipv6_);
+      }
     }
   }
 
