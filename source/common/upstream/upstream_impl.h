@@ -883,10 +883,6 @@ public:
     }
     return *cluster_type_;
   }
-  OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
-  lbOriginalDstConfig() const override {
-    return makeOptRefFromPtr(original_dst_lb_config_.get());
-  }
   OptRef<const envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const override {
     if (upstream_config_ == nullptr) {
       return absl::nullopt;
@@ -1071,9 +1067,6 @@ private:
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
   std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
-  // The load balancing configuration for original dst cluster.
-  std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
-      original_dst_lb_config_;
   LoadBalancerConfigPtr load_balancer_config_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>

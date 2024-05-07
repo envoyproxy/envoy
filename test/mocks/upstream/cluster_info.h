@@ -146,8 +146,6 @@ public:
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>, clusterType, (),
               (const));
-  MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>,
-              lbOriginalDstConfig, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::core::v3::TypedExtensionConfig>, upstreamConfig, (),
               (const));
   MOCK_METHOD(bool, maintenanceMode, (), (const));
@@ -243,8 +241,6 @@ public:
       upstream_http_protocol_options_;
   absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocols_cache_options_;
-  std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
-      lb_original_dst_config_;
   Upstream::TypedLoadBalancerFactory* lb_factory_ =
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
           "envoy.load_balancing_policies.round_robin");
