@@ -543,14 +543,15 @@ TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
 
   // The first six bytes of a server hello, which is enough for the client to
   // process the packet successfully.
-  char server_hello[] = { 0x02, 0x00, 0x00, 0x56, 0x03, 0x03, };
-  quic::QuicEncryptedPacket *packet = quic::test::ConstructEncryptedPacket(
+  char server_hello[] = {
+      0x02, 0x00, 0x00, 0x56, 0x03, 0x03,
+  };
+  quic::QuicEncryptedPacket* packet = quic::test::ConstructEncryptedPacket(
       quic_connection_->client_connection_id(), quic_connection_->connection_id(),
       /*version_flag=*/true, /*reset_flag=*/false, /*packet_number=*/1,
       std::string(server_hello, sizeof(server_hello)), /*full_padding=*/false,
-      quic::CONNECTION_ID_PRESENT, quic::CONNECTION_ID_PRESENT,
-      quic::PACKET_1BYTE_PACKET_NUMBER, &quic_version_,
-      quic::Perspective::IS_SERVER);
+      quic::CONNECTION_ID_PRESENT, quic::CONNECTION_ID_PRESENT, quic::PACKET_1BYTE_PACKET_NUMBER,
+      &quic_version_, quic::Perspective::IS_SERVER);
 
   Buffer::RawSlice slice;
   // packet->data() is const, so it has to be copied to send to sendmsg.
@@ -560,8 +561,7 @@ TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
   slice.len_ = packet->length();
   quic::CrypterPair crypters;
   quic::CryptoUtils::CreateInitialObfuscators(quic::Perspective::IS_CLIENT, GetParam(),
-                                              quic_connection_->connection_id(),
-                                              &crypters);
+                                              quic_connection_->connection_id(), &crypters);
   quic_connection_->InstallDecrypter(quic::ENCRYPTION_INITIAL, std::move(crypters.decrypter));
 
   peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
