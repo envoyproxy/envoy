@@ -15,7 +15,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using envoy::service::auth::v3::CheckResponse;
 using testing::_;
 using testing::Eq;
 using testing::Invoke;
@@ -67,7 +66,7 @@ public:
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
   initialize();
 
-  auto check_response = std::make_unique<CheckResponse>();
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
 
   ProtobufWkt::Struct expected_dynamic_metadata;
@@ -160,7 +159,7 @@ TEST_F(ExtAuthzGrpcClientTest, IndifferentToInvalidHeaders) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
   initialize();
 
-  auto check_response = std::make_unique<CheckResponse>();
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
   status->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
   auto authz_response = Response{};
@@ -184,7 +183,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
   initialize();
 
-  auto check_response = std::make_unique<CheckResponse>();
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
   status->set_code(Grpc::Status::WellKnownGrpcStatus::Unknown);
   auto authz_response = Response{};
@@ -308,7 +307,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   initialize();
 
-  auto check_response = std::make_unique<CheckResponse>();
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
 
   ProtobufWkt::Struct expected_dynamic_metadata;
@@ -347,7 +346,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
   initialize();
 
-  auto check_response = std::make_unique<CheckResponse>();
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
 
   status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
