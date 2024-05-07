@@ -1,0 +1,39 @@
+# This file must live on every branch and pass necessary secrets and permissions
+#   to initiate the request
+name: Request
+
+permissions:
+  contents: read
+
+on:
+  pull_request_target:
+  push:
+    branches:
+    - main
+    - release/v*
+
+concurrency:
+  group: |
+    ${{ github.head_ref
+        || github.run_id
+    }}-${{ github.workflow }}-request
+  cancel-in-progress: true
+
+
+jobs:
+  request:
+    # For branches this can be pinned to a specific version if required
+    # NB: `uses` cannot be dynamic so it _must_ be hardcoded anywhere it is read
+    uses: envoyproxy/envoy/.github/workflows/_request.yml@main
+    if: ${{ vars.ENVOY_CI || github.repository == 'envoyproxy/envoy' }}
+    permissions:
+      actions: read
+      contents: read
+      # required for engflow/bazel caching (not yet used)
+      packages: read
+      # required to fetch merge commit
+      pull-requests: read
+    secrets:
+      # these are required to start checks
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
