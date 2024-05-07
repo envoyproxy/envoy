@@ -103,10 +103,10 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     monitor->reportResult(Extensions::Outlier::HttpCode(response_code));
   }
 }
-std::function<void(uint32_t, std::string, std::optional<std::string>)>
+std::function<void(uint32_t, std::string, absl::optional<std::string>)>
 DetectorHostMonitorImpl::getCallback() {
   return [this](uint32_t enforce, std::string failed_monitor_name,
-                std::optional<std::string> extra_info) {
+                absl::optional<std::string> extra_info) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
       // It's possible for the cluster/detector to go away while we still have a host in use.
@@ -204,6 +204,20 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
 // config parameter.
 void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> code) {
   put_result_func_(this, result, code);
+
+  // Call extensions
+  // Check all other monitors
+  std::shared_ptr<DetectorImpl> detector = detector_.lock();
+  if (!detector) {
+    // It's possible for the cluster/detector to go away while we still have a host in use.
+    return;
+  }
+
+  // Returned shared object is safe to operate on. If an other thread decrements the ownership count
+  // during the configuration update the shared pointer stays safe to operate on.
+  for (auto& monitor : monitors_set_->monitors()) {
+    monitor->reportResult(Extensions::Outlier::LocalOriginEvent(result));
+  }
 }
 
 void DetectorHostMonitorImpl::localOriginFailure() {

@@ -54,6 +54,18 @@ private:
   uint64_t code_;
 };
 
+// LocalOriginEvent is used to report errors like resets, timeouts but also
+// successful connection attempts.
+class LocalOriginEvent : public TypedError<Upstream::Outlier::ErrorType::LOCAL_ORIGIN> {
+public:
+  LocalOriginEvent(Result result) : result_(result) {}
+  LocalOriginEvent() = delete;
+  Result result() const { return result_; }
+
+private:
+  Result result_;
+};
+
 // ErrorsBucket is used by outlier detection monitors and is used to
 // "catch" reported Error (TypedError);
 class ErrorsBucket {
@@ -101,8 +113,23 @@ public:
   virtual ~HTTPErrorCodesBucket() {}
 
 private:
+  // TODO: can I move name_ to base class
   std::string name_;
   uint64_t start_, end_;
+};
+
+// Class defines a "bucket" which catches LocalOriginEvent.
+class LocalOriginEventsBucket
+    : public TypedErrorsBucket<Upstream::Outlier::ErrorType::LOCAL_ORIGIN> {
+public:
+  LocalOriginEventsBucket() = delete;
+  LocalOriginEventsBucket(const std::string& name) : name_(name) {}
+  const std::string& name() const { return name_; }
+  bool matches(const TypedError<Upstream::Outlier::ErrorType::LOCAL_ORIGIN>&) const override;
+
+private:
+  // TODO: can I move name_ to base class
+  std::string name_;
 };
 
 // Class groups error buckets. Buckets may be of different types.
@@ -118,7 +145,7 @@ public:
   // TODO - make this private.
   // absl::flat_hash_map<ErrorType, std::vector<ErrorsBucketPtr>> buckets_;
   std::vector<ErrorsBucketPtr> buckets_;
-  std::function<void(uint32_t, std::string, std::optional<std::string>)> callback_;
+  std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback_;
 
   bool tripped() const { return tripped_; }
   void reset() {

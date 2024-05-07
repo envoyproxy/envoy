@@ -12,6 +12,16 @@ bool HTTPErrorCodesBucket::matches(
   return ((http_code.code() >= start_) && (http_code.code() <= end_));
 }
 
+bool LocalOriginEventsBucket::matches(
+    const TypedError<Upstream::Outlier::ErrorType::LOCAL_ORIGIN>& event) const {
+  // We should not get here with errors other then HTTP codes.
+  ASSERT(event.type() == ErrorType::LOCAL_ORIGIN);
+  const LocalOriginEvent& local_origin_event = dynamic_cast<const LocalOriginEvent&>(event);
+  // Capture all events except the success
+  return (!((local_origin_event.result() == Result::LocalOriginConnectSuccessFinal) ||
+            (local_origin_event.result() == Result::ExtOriginRequestSuccess)));
+}
+
 void Monitor::reportResult(const Error& error) {
   // Ignore all results/errors until monitor is reset.
   if (tripped_) {
@@ -30,7 +40,7 @@ void Monitor::reportResult(const Error& error) {
     if (bucket->match(error)) {
       // Count as error.
       if (onError()) {
-        callback_(enforce_, name(), std::nullopt);
+        callback_(enforce_, name(), absl::nullopt);
         // Reaching error was reported via callback.
         // but the host may or may not be ejected based on enforce_ parameter.
         // Reset the monitor's state, so a single new error does not
@@ -49,6 +59,9 @@ void processBucketsConfig(
   for (const auto& http_bucket : config.http_errors()) {
     monitor.buckets_.push_back(std::make_unique<HTTPErrorCodesBucket>(
         "not-needed", http_bucket.range().start(), http_bucket.range().end()));
+  }
+  if (config.local_origin_errors().size() > 0) {
+    monitor.buckets_.push_back(std::make_unique<LocalOriginEventsBucket>("not-needed"));
   }
 }
 } // namespace Outlier
