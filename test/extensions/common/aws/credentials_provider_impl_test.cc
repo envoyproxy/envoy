@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -365,6 +366,7 @@ public:
 
     setupProvider();
     expected_duration_ = provider_->getCacheDuration();
+
     init_target_handle_->initialize(init_watcher_);
   }
 
@@ -595,21 +597,31 @@ TEST_F(InstanceProfileCredentialsProviderTest, TestClusterMissing) {
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingUnsecure) {
   // Setup timer.
+  // ::testing::FLAGS_gmock_verbose = "info";
+
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(403 /*Forbidden*/, std::move(std::string()));
   expectCredentialListing(403 /*Forbidden*/, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
+
   // Cancel is called once.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  // Expect refresh timer to be started as a result of completing the init callback
+  std::chrono::milliseconds timer_duration = std::chrono::seconds(2);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   setupProviderWithContext();
+
+  time_system_.advanceTimeWait(timer_duration);
   // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+
+  timer_duration = std::chrono::seconds(4);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
+  // Trigger refresh, which should then validate the previous two expectations
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -625,14 +637,19 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingSecure) {
   init_watcher_.expectReady();
   // Cancel is called once.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  // Expect refresh timer to be started as a result of completing the init callback
+  std::chrono::milliseconds timer_duration = std::chrono::seconds(2);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   setupProviderWithContext();
+
   // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_duration = std::chrono::seconds(4);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
+  // Trigger refresh, which should then validate the previous two expectations
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -646,16 +663,22 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingUnsecure) {
   expectCredentialListing(200, std::move(std::string("")));
   // init_watcher ready is called.
   init_watcher_.expectReady();
+
   // Cancel is called once.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  // Expect refresh timer to be started as a result of completing the init callback
+  std::chrono::milliseconds timer_duration = std::chrono::seconds(2);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   setupProviderWithContext();
-  // Cancel is called once for fetching once again as previous attempt wasn't a success.
+
+  // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_duration = std::chrono::seconds(4);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
+  // Trigger refresh, which should then validate the previous two expectations
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -671,14 +694,19 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingSecure) {
   init_watcher_.expectReady();
   // Cancel is called once.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  // Expect refresh timer to be started as a result of completing the init callback
+  std::chrono::milliseconds timer_duration = std::chrono::seconds(2);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   setupProviderWithContext();
+
   // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_duration = std::chrono::seconds(4);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
+  // Trigger refresh, which should then validate the previous two expectations
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -692,16 +720,22 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingUnsecur
   expectCredentialListing(200, std::move(std::string("\n")));
   // init_watcher ready is called.
   init_watcher_.expectReady();
+
   // Cancel is called once.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  // Expect refresh timer to be started as a result of completing the init callback
+  std::chrono::milliseconds timer_duration = std::chrono::seconds(2);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   setupProviderWithContext();
-  // Cancel is called once for fetching once again as previous attempt wasn't a success.
+
+  // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_duration = std::chrono::seconds(4);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
+  // Trigger refresh, which should then validate the previous two expectations
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -715,16 +749,22 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingSecure)
   expectCredentialListingSecure(200, std::move(std::string("\n")));
   // init_watcher ready is called.
   init_watcher_.expectReady();
+
   // Cancel is called once.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  // Expect refresh timer to be started as a result of completing the init callback
+  std::chrono::milliseconds timer_duration = std::chrono::seconds(2);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   setupProviderWithContext();
+
   // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_duration = std::chrono::seconds(4);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
+  // Trigger refresh, which should then validate the previous two expectations
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -739,16 +779,22 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentUnsecure) {
   expectDocument(401 /*Unauthorized*/, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
+
   // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  // Expect refresh timer to be started as a result of completing the init callback
+  std::chrono::milliseconds timer_duration = std::chrono::seconds(2);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   setupProviderWithContext();
-  // Cancel is called thrice.
+
+  // Cancel is called three times.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_duration = std::chrono::seconds(4);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
+  // Trigger refresh, which should then validate the previous two expectations
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -763,16 +809,23 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentSecure) {
   expectDocumentSecure(401 /*Unauthorized*/, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
+
   // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  // Expect refresh timer to be started as a result of completing the init callback
+  std::chrono::milliseconds timer_duration = std::chrono::seconds(2);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   setupProviderWithContext();
-  // Cancel is called thrice.
+
+  // Cancel is called three times.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_duration = std::chrono::seconds(4);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
+  // Trigger refresh, which should then validate the previous two expectations
+  timer_->invokeCallback();
+
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -787,16 +840,22 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentUnsecure) {
   expectDocument(200, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
-  // Cancel is called twice.
+
+    // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  // Expect refresh timer to be started as a result of completing the init callback
+  std::chrono::milliseconds timer_duration = std::chrono::seconds(2);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   setupProviderWithContext();
-  // Cancel is called thrice.
+
+  // Cancel is called three times.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_duration = std::chrono::seconds(4);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
+  // Trigger refresh, which should then validate the previous two expectations
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -811,16 +870,22 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentSecure) {
   expectDocumentSecure(200, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
-  // Cancel is called twice.
+
+    // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  // Expect refresh timer to be started as a result of completing the init callback
+  std::chrono::milliseconds timer_duration = std::chrono::seconds(2);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   setupProviderWithContext();
-  // Cancel is called thrice.
+
+  // Cancel is called three times.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_duration = std::chrono::seconds(4);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
+  // Trigger refresh, which should then validate the previous two expectations
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -837,16 +902,22 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentUnsecure) {
  )EOF"));
   // init_watcher ready is called.
   init_watcher_.expectReady();
-  // Cancel is called twice.
+  
+    // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  // Expect refresh timer to be started as a result of completing the init callback
+  std::chrono::milliseconds timer_duration = std::chrono::seconds(2);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   setupProviderWithContext();
-  // Cancel is called thrice.
+
+  // Cancel is called three times.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_duration = std::chrono::seconds(4);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
+  // Trigger refresh, which should then validate the previous two expectations
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -863,16 +934,22 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentSecure) {
  )EOF"));
   // init_watcher ready is called.
   init_watcher_.expectReady();
-  // Cancel is called twice.
+  
+    // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
+  // Expect refresh timer to be started as a result of completing the init callback
+  std::chrono::milliseconds timer_duration = std::chrono::seconds(2);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   setupProviderWithContext();
-  // Cancel is called thrice
+
+  // Cancel is called three times.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_duration = std::chrono::seconds(4);
+  EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
+  // Trigger refresh, which should then validate the previous two expectations
+  timer_->invokeCallback();
+  
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -951,6 +1028,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsUnsecure) {
  )EOF"));
   // init_watcher ready is called.
   init_watcher_.expectReady();
+
   // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
   // Expect refresh timer to be started after fetch done from init.
