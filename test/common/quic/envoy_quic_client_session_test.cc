@@ -568,6 +568,7 @@ TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   const quic::QuicConnectionStats& stats = quic_connection_->GetStats();
   EXPECT_EQ(stats.num_ecn_marks_received.ect1, 1);
+  delete packet;
 }
 
 class MockOsSysCallsImpl : public Api::OsSysCallsImpl {
