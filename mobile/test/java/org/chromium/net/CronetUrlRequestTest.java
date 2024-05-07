@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
+import org.chromium.net.impl.CronvoyNetworkExceptionImpl;
 import org.chromium.net.impl.CronvoyUrlRequest;
 import org.chromium.net.impl.CronvoyUrlRequestContext;
 import org.chromium.net.impl.Errors.EnvoyMobileError;
@@ -1769,6 +1770,7 @@ public class CronetUrlRequestTest {
     assertNull(callback.mResponseInfo);
     assertContains("Exception in CronetUrlRequest: net::ERR_CONNECTION_REFUSED",
                    callback.mError.getMessage());
+    assertEquals("", ((CronvoyNetworkExceptionImpl)callback.mError).getErrorDetails());
   }
 
   private TestUrlRequestCallback throwOrCancel(FailureType failureType, ResponseStep failureStep,
@@ -2219,6 +2221,7 @@ public class CronetUrlRequestTest {
     assertEquals(0, callback.mRedirectCount);
     assertTrue(callback.mOnErrorCalled);
     assertEquals(ResponseStep.ON_FAILED, callback.mResponseStep);
+    assertEquals("", ((CronvoyNetworkExceptionImpl)callback.mError).getErrorDetails());
   }
 
   // Returns the contents of byteBuffer, from its position() to its limit(),

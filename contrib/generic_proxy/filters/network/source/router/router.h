@@ -129,7 +129,9 @@ public:
   void cleanUp(bool close_connection) override;
 
   // ClientCodecCallbacks
-  void onDecodingSuccess(StreamFramePtr response) override;
+  void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
+                         absl::optional<StartTime> start_time = {}) override;
+  void onDecodingSuccess(ResponseCommonFramePtr response_common_frame) override;
   void onDecodingFailure(absl::string_view reason = {}) override;
 
   // GenericUpstream
@@ -178,8 +180,10 @@ public:
   void onPoolFailureImpl(ConnectionPool::PoolFailureReason reason,
                          absl::string_view transport_failure_reason) override;
 
-  // ResponseDecoderCallback
-  void onDecodingSuccess(StreamFramePtr response) override;
+  // ClientCodecCallbacks
+  void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
+                         absl::optional<StartTime> start_time = {}) override;
+  void onDecodingSuccess(ResponseCommonFramePtr response_common_frame) override;
   void onDecodingFailure(absl::string_view reason = {}) override;
 
   // GenericUpstream
@@ -210,7 +214,9 @@ public:
 
   void onConnectionClose(Network::ConnectionEvent event);
 
-  void onDecodingSuccess(StreamFramePtr response);
+  void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
+                         absl::optional<StartTime> start_time = {});
+  void onDecodingSuccess(ResponseCommonFramePtr response_common_frame);
   void onDecodingFailure(absl::string_view reason);
 
   // RequestEncoderCallback
@@ -224,6 +230,8 @@ public:
 
   void sendRequestStartToUpstream();
   void sendRequestFrameToUpstream();
+
+  void onUpstreamResponseComplete(bool drain_close);
 
   RouterFilter& parent_;
   uint64_t stream_id_{};
@@ -263,7 +271,7 @@ using RouterConfigSharedPtr = std::shared_ptr<RouterConfig>;
 
 class RouterFilter : public DecoderFilter,
                      public Upstream::LoadBalancerContextBase,
-                     public StreamFrameHandler,
+                     public RequestFramesHandler,
                      Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   RouterFilter(RouterConfigSharedPtr config, Server::Configuration::FactoryContext& context)
@@ -281,8 +289,8 @@ public:
   }
   FilterStatus onStreamDecoded(StreamRequest& request) override;
 
-  void onResponseStart(StreamResponsePtr response);
-  void onResponseFrame(StreamFramePtr frame);
+  void onResponseStart(ResponseHeaderFramePtr response_header_frame);
+  void onResponseFrame(ResponseCommonFramePtr response_common_frame);
   void completeDirectly();
 
   void onUpstreamRequestReset(UpstreamRequest& upstream_request, StreamResetReason reason,
@@ -300,8 +308,8 @@ public:
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override;
   const Network::Connection* downstreamConnection() const override;
 
-  // StreamFrameHandler
-  void onStreamFrame(StreamFramePtr frame) override;
+  // RequestFramesHandler
+  void onRequestCommonFrame(RequestCommonFramePtr frame) override;
 
 private:
   friend class UpstreamRequest;
@@ -339,7 +347,7 @@ private:
 
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Request* request_stream_{};
-  std::list<StreamFramePtr> request_stream_frames_;
+  std::list<RequestCommonFramePtr> request_stream_frames_;
   bool request_stream_end_{};
 
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_;

@@ -9,8 +9,8 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 struct FormatterContext {
-  const Request* request_{};
-  const Response* response_{};
+  const RequestHeaderFrame* request_{};
+  const ResponseHeaderFrame* response_{};
 
   static constexpr absl::string_view category() { return "generic_proxy"; }
 };

@@ -173,16 +173,16 @@ public:
       parent_.sendLocalReply(status, data, std::move(func));
     }
     void continueDecoding() override { parent_.continueDecoding(); }
-    void onResponseStart(ResponsePtr response) override {
-      parent_.onResponseStart(std::move(response));
+    void onResponseStart(ResponseHeaderFramePtr frame) override {
+      parent_.onResponseStart(std::move(frame));
     }
-    void onResponseFrame(StreamFramePtr frame) override {
+    void onResponseFrame(ResponseCommonFramePtr frame) override {
       parent_.onResponseFrame(std::move(frame));
     }
-    void setRequestFramesHandler(StreamFrameHandler& handler) override {
-      ASSERT(parent_.request_stream_frame_handler_ == nullptr,
+    void setRequestFramesHandler(RequestFramesHandler& handler) override {
+      ASSERT(parent_.request_stream_frames_handler_ == nullptr,
              "request frames handler is already set");
-      parent_.request_stream_frame_handler_ = &handler;
+      parent_.request_stream_frames_handler_ = &handler;
     }
     void completeDirectly() override { parent_.completeDirectly(); }
 
@@ -231,7 +231,7 @@ public:
     FilterContext context_;
   };
 
-  ActiveStream(Filter& parent, StreamRequestPtr request);
+  ActiveStream(Filter& parent, RequestHeaderFramePtr request, absl::optional<StartTime> start_time);
 
   void addDecoderFilter(ActiveDecoderFilterPtr filter) {
     decoder_filters_.emplace_back(std::move(filter));
@@ -249,8 +249,8 @@ public:
 
   void sendLocalReply(Status status, absl::string_view data, ResponseUpdateFunction func);
   void continueDecoding();
-  void onResponseStart(StreamResponsePtr response);
-  void onResponseFrame(StreamFramePtr frame);
+  void onResponseStart(ResponseHeaderFramePtr response_header_frame);
+  void onResponseFrame(ResponseCommonFramePtr response_common_frame);
   void completeDirectly();
 
   void continueEncoding();
@@ -268,7 +268,7 @@ public:
     return makeOptRefFromPtr<const RouteEntry>(cached_route_entry_.get());
   }
 
-  void onRequestFrame(StreamFramePtr frame);
+  void onRequestFrame(RequestCommonFramePtr request_common_frame);
 
   std::vector<ActiveDecoderFilterPtr>& decoderFiltersForTest() { return decoder_filters_; }
   std::vector<ActiveEncoderFilterPtr>& encoderFiltersForTest() { return encoder_filters_; }
@@ -317,15 +317,15 @@ private:
 
   Filter& parent_;
 
-  StreamRequestPtr request_stream_;
-  std::list<StreamFramePtr> request_stream_frames_;
+  RequestHeaderFramePtr request_stream_;
+  std::list<RequestCommonFramePtr> request_stream_frames_;
   bool request_stream_end_{false};
   bool request_filter_chain_complete_{false};
 
-  StreamFrameHandler* request_stream_frame_handler_{nullptr};
+  RequestFramesHandler* request_stream_frames_handler_{nullptr};
 
-  StreamResponsePtr response_stream_;
-  std::list<StreamFramePtr> response_stream_frames_;
+  ResponseHeaderFramePtr response_stream_;
+  std::list<ResponseCommonFramePtr> response_stream_frames_;
   bool response_stream_end_{false};
   bool response_filter_chain_complete_{false};
   bool local_reply_{false};
@@ -371,8 +371,10 @@ public:
     callbacks_->connection().addConnectionCallbacks(*this);
   }
 
-  // RequestDecoderCallback
-  void onDecodingSuccess(StreamFramePtr request) override;
+  // ServerCodecCallbacks
+  void onDecodingSuccess(RequestHeaderFramePtr header_frame,
+                         absl::optional<StartTime> start_time = {}) override;
+  void onDecodingSuccess(RequestCommonFramePtr common_frame) override;
   void onDecodingFailure(absl::string_view reason = {}) override;
   void writeToConnection(Buffer::Instance& buffer) override;
   OptRef<Network::Connection> connection() override;
@@ -402,8 +404,9 @@ public:
   /**
    * Create a new active stream and add it to the active stream list.
    * @param request the request to be processed.
+   * @param start_time the start time of the request.
    */
-  void newDownstreamRequest(StreamRequestPtr request);
+  void newDownstreamRequest(StreamRequestPtr request, absl::optional<StartTime> start_time = {});
 
   /**
    * Move the stream to the deferred delete stream list. This is called when the stream is reset

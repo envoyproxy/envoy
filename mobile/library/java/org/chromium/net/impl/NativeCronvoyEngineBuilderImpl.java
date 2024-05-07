@@ -45,6 +45,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mDnsCacheSaveIntervalSeconds = 1;
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
+  private boolean mUseCares = false;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
@@ -83,6 +84,15 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return this;
   }
 
+  /**
+   * Enable using the c_ares DNS resolver.
+   *
+   * @param enable If true, use c_ares.
+   */
+  public NativeCronvoyEngineBuilderImpl setUseCares(boolean enable) {
+    mUseCares = enable;
+    return this;
+  }
   /**
    * Set the DNS query timeout, in seconds, which ensures that DNS queries succeed or fail
    * within that time range. See the DnsCacheConfig.dns_query_timeout proto field for details.
@@ -190,7 +200,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mEnableDrainPostDnsRefresh, quicEnabled(), quicConnectionOptions(),
+        mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, quicConnectionOptions(),
         quicClientConnectionOptions(), quicHints(), quicCanonicalSuffixes(),
         mEnableGzipDecompression, brotliEnabled(), portMigrationEnabled(), mEnableSocketTag,
         mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
