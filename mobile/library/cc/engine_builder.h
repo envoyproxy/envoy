@@ -161,7 +161,7 @@ public:
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   // Sets whether to use GRO for upstream UDP sockets (QUIC/HTTP3).
-  EngineBuilder& setUseGroIfAvailable(bool value);
+  EngineBuilder& setUseGroIfAvailable(bool use_gro_if_available);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
   // Sets the node.id field in the Bootstrap configuration.

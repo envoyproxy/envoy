@@ -328,8 +328,8 @@ EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) 
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setUseGroIfAvailable(bool value) {
-  use_gro_if_available_ = value;
+EngineBuilder& EngineBuilder::setUseGroIfAvailable(bool use_gro_if_available) {
+  use_gro_if_available_ = use_gro_if_available;
   return *this;
 }
 
