@@ -9,5 +9,4 @@ mkdir -p "$DIR"
 tar --force-local -xvf "$TEST_SRCDIR"/"$EXAMPLE_CONFIGS_TAR_PATH" -C "$DIR"
 
 # find uses full path to prevent using Windows find on Windows.
-# grep -v is used to exclude the secrets directory because secrets are yamls but are not configs to be tested.
-/usr/bin/find "$DIR" -type f | grep -v "config_test/secrets" | grep -c .yaml >"$TEST_TMPDIR"/config-file-count.txt
+/usr/bin/find "$DIR" -type f | grep -c .yaml > "$TEST_TMPDIR"/config-file-count.txt
