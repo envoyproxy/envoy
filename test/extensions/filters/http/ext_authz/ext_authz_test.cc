@@ -53,10 +53,6 @@ namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
 
-using Filters::Common::ExtAuthz::Response;
-using Filters::Common::ExtAuthz::ResponsePtr;
-using Filters::Common::ExtAuthz::UnsafeHeaderVector;
-
 template <class T> class HttpFilterTestBase : public T {
 public:
   HttpFilterTestBase() {}
@@ -124,12 +120,12 @@ public:
 
     prepareCheck();
 
-    Response response{};
+    Filters::Common::ExtAuthz::Response response{};
     response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
     response.query_parameters_to_set = add_me;
     response.query_parameters_to_remove = remove_me;
 
-    auto response_ptr = std::make_unique<Response>(response);
+    auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
     EXPECT_CALL(*client_, check(_, _, _, _))
         .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
@@ -175,7 +171,7 @@ class HttpFilterTest : public HttpFilterTestBase<testing::Test> {
 public:
   HttpFilterTest() = default;
 
-  void initializeMetadata(Response& response) {
+  void initializeMetadata(Filters::Common::ExtAuthz::Response& response) {
     auto* fields = response.dynamic_metadata.mutable_fields();
     (*fields)["foo"] = ValueUtil::stringValue("cool");
     (*fields)["bar"] = ValueUtil::numberValue(1);
@@ -206,7 +202,8 @@ class InvalidMutationTest : public HttpFilterTestBase<testing::Test> {
 public:
   InvalidMutationTest() : invalid_value_(reinterpret_cast<const char*>(invalid_value_bytes_)) {}
 
-  void testResponse(const Filters::Common::ExtAuthz::Response& response) {
+  void testResponse(
+      const Filters::Common::ExtAuthz::Response& response) {
     InSequence s;
 
     initialize(R"(
@@ -241,7 +238,8 @@ public:
         }));
 
     // Send this test's response. It should get invalidated.
-    request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+    request_callbacks_->onComplete(
+        std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
     EXPECT_EQ(decoder_filter_callbacks_.details(), "ext_authz_invalid");
     EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
@@ -291,35 +289,35 @@ TEST_F(InvalidMutationTest, HeadersToAppendKey) {
 TEST_F(InvalidMutationTest, ResponseHeadersToAddKey) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_set = UnsafeHeaderVector{{invalid_key_, "bar"}};
+  response.response_headers_to_set = {{invalid_key_, "bar"}};
   testResponse(response);
 }
 
 TEST_F(InvalidMutationTest, ResponseHeadersToSetKey) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_set = UnsafeHeaderVector{{invalid_key_, "bar"}};
+  response.response_headers_to_set = {{invalid_key_, "bar"}};
   testResponse(response);
 }
 
 TEST_F(InvalidMutationTest, ResponseHeadersToAddIfAbsentKey) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_add_if_absent = UnsafeHeaderVector{{invalid_key_, "bar"}};
+  response.response_headers_to_add_if_absent = {{invalid_key_, "bar"}};
   testResponse(response);
 }
 
 TEST_F(InvalidMutationTest, ResponseHeadersToOverwriteIfExistsKey) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_overwrite_if_exists = UnsafeHeaderVector{{invalid_key_, "bar"}};
+  response.response_headers_to_overwrite_if_exists = {{invalid_key_, "bar"}};
   testResponse(response);
 }
 
 TEST_F(InvalidMutationTest, QueryParametersToSetKey) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.query_parameters_to_set = Http::Utility::QueryParamsVector{{"f o o", "bar"}};
+  response.query_parameters_to_set = {{"f o o", "bar"}};
   testResponse(response);
 }
 
@@ -358,7 +356,7 @@ TEST_F(InvalidMutationTest, ResponseHeadersToAddValue) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Add a valid header to see if it gets added to the downstream response.
-  response.response_headers_to_set = UnsafeHeaderVector{{"foo", invalid_value_}};
+  response.response_headers_to_set = {{"foo", invalid_value_}};
   testResponse(response);
 }
 
@@ -366,7 +364,7 @@ TEST_F(InvalidMutationTest, ResponseHeadersToSetValue) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Add a valid header to see if it gets added to the downstream response.
-  response.response_headers_to_set = UnsafeHeaderVector{{"foo", invalid_value_}};
+  response.response_headers_to_set = {{"foo", invalid_value_}};
   testResponse(response);
 }
 
@@ -374,7 +372,7 @@ TEST_F(InvalidMutationTest, ResponseHeadersToAddIfAbsentValue) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Add a valid header to see if it gets added to the downstream response.
-  response.response_headers_to_add_if_absent = UnsafeHeaderVector{{"foo", invalid_value_}};
+  response.response_headers_to_add_if_absent = {{"foo", invalid_value_}};
   testResponse(response);
 }
 
@@ -382,7 +380,7 @@ TEST_F(InvalidMutationTest, ResponseHeadersToOverwriteIfExistsValue) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Add a valid header to see if it gets added to the downstream response.
-  response.response_headers_to_overwrite_if_exists = UnsafeHeaderVector{{"foo", invalid_value_}};
+  response.response_headers_to_overwrite_if_exists = {{"foo", invalid_value_}};
   testResponse(response);
 }
 
@@ -390,7 +388,7 @@ TEST_F(InvalidMutationTest, QueryParametersToSetValue) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Add a valid header to see if it gets added to the downstream response.
-  response.query_parameters_to_set = Http::Utility::QueryParamsVector{{"foo", "b a r"}};
+  response.query_parameters_to_set = {{"foo", "b a r"}};
   testResponse(response);
 }
 
@@ -466,9 +464,9 @@ TEST_F(HttpFilterTest, StatsWithPrefix) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _));
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString(error_counter_name_with_prefix)
@@ -510,9 +508,9 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
         EXPECT_EQ(headers.getStatusValue(), std::to_string(enumToInt(Http::Code::Forbidden)));
       }));
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.error")
@@ -552,9 +550,9 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
                   std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
       }));
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.error")
@@ -590,9 +588,9 @@ TEST_F(HttpFilterTest, ErrorFailOpen) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.error")
@@ -620,13 +618,13 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                            const StreamInfo::StreamInfo&) -> void {
-        callbacks.onComplete(std::make_unique<Response>(response));
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
       }));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
@@ -673,9 +671,9 @@ TEST_F(HttpFilterTest, ErrorOpenWithHeaderAddClose) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.error")
@@ -703,13 +701,13 @@ TEST_F(HttpFilterTest, ImmediateErrorOpenWithHeaderAddClose) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                            const StreamInfo::StreamInfo&) -> void {
-        callbacks.onComplete(std::make_unique<Response>(response));
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
       }));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
@@ -875,9 +873,9 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer4, false));
   data_.add(buffer4.toString());
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
   Buffer::OwnedImpl buffer5("more data after calling check request");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer5, true));
@@ -1206,7 +1204,7 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
               setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Let's try to remove all the headers in the request.
   response.headers_to_remove = std::vector<std::string>{
@@ -1218,7 +1216,7 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
       Http::Headers::get().Scheme.get(),
       "remove-me",
   };
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
   // All :-prefixed headers (and Host) should still be there - only the user
   // defined header should have been removed.
@@ -1264,12 +1262,12 @@ TEST_F(HttpFilterTest, ClearCache) {
               setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = UnsafeHeaderVector{{"foo", "bar"}};
-  response.headers_to_set = UnsafeHeaderVector{{"bar", "foo"}};
+  response.headers_to_append = {{"foo", "bar"}};
+  response.headers_to_set = {{"bar", "foo"}};
   response.headers_to_remove = std::vector<std::string>{"remove-me"};
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.ok")
@@ -1310,10 +1308,10 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
               setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = UnsafeHeaderVector{{"foo", "bar"}};
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  response.headers_to_append = {{"foo", "bar"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.ok")
@@ -1354,10 +1352,10 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
               setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_set = UnsafeHeaderVector{{"foo", "bar"}};
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  response.headers_to_set = {{"foo", "bar"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.ok")
@@ -1398,10 +1396,10 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
               setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_remove = {"remove-me"};
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.ok")
@@ -1442,9 +1440,9 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
               setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.ok")
@@ -1480,11 +1478,11 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
               setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = UnsafeHeaderVector{{"foo", "bar"}};
-  response.headers_to_set = UnsafeHeaderVector{{"bar", "foo"}};
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  response.headers_to_append = {{"foo", "bar"}};
+  response.headers_to_set = {{"bar", "foo"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.ok")
@@ -1506,11 +1504,11 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
 
   prepareCheck();
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  response.headers_to_set = UnsafeHeaderVector{{"foo", "bar"}};
-  auto response_ptr = std::make_unique<Response>(response);
+  response.headers_to_set = {{"foo", "bar"}};
+  auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
@@ -2423,11 +2421,11 @@ TEST_P(HttpFilterTestParam, OkResponse) {
               setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Send an OK response Without setting the dynamic metadata field.
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.ok")
@@ -2562,14 +2560,14 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponse) {
 
   prepareCheck();
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
 
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                            const StreamInfo::StreamInfo&) -> void {
-        callbacks.onComplete(std::make_unique<Response>(response));
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
       }));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -2589,13 +2587,13 @@ TEST_P(HttpFilterTestParam, ImmediateDeniedResponseWithHttpAttributes) {
 
   prepareCheck();
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  response.headers_to_set = UnsafeHeaderVector{{"foo", "bar"}};
+  response.headers_to_set = {{"foo", "bar"}};
   response.body = std::string{"baz"};
 
-  auto response_ptr = std::make_unique<Response>(response);
+  auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
@@ -2637,20 +2635,18 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
 
   prepareCheck();
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = UnsafeHeaderVector{{request_header_key.get(), "bar"}};
-  response.headers_to_set =
-      UnsafeHeaderVector{{key_to_add.get(), "foo"}, {key_to_override.get(), "bar"}};
+  response.headers_to_append = {{request_header_key.get(), "bar"}};
+  response.headers_to_set = {{key_to_add.get(), "foo"}, {key_to_override.get(), "bar"}};
   response.headers_to_remove = {key_to_remove.get()};
   // This cookie will be appended to the encoded headers.
-  response.response_headers_to_add = UnsafeHeaderVector{{"set-cookie", "cookie2=gingerbread"}};
+  response.response_headers_to_add = {{"set-cookie", "cookie2=gingerbread"}};
   // This "should-be-overridden" header value from the auth server will override the
   // "should-be-overridden" entry from the upstream server.
-  response.response_headers_to_set =
-      UnsafeHeaderVector{{"should-be-overridden", "finally-set-by-auth-server"}};
+  response.response_headers_to_set = {{"should-be-overridden", "finally-set-by-auth-server"}};
 
-  auto response_ptr = std::make_unique<Response>(response);
+  auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
@@ -2694,10 +2690,9 @@ TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActions) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_add_if_absent =
-      UnsafeHeaderVector{{"header-to-add-if-absent", "new-value"}};
+  response.response_headers_to_add_if_absent = {{"header-to-add-if-absent", "new-value"}};
   response.response_headers_to_overwrite_if_exists =
-      UnsafeHeaderVector{{"header-to-overwrite-if-exists", "new-value"}};
+      {{"header-to-overwrite-if-exists", "new-value"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2733,10 +2728,9 @@ TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActionsDoNotTakeEffect
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_add_if_absent =
-      UnsafeHeaderVector{{"header-to-add-if-absent", "new-value"}};
+  response.response_headers_to_add_if_absent = {{"header-to-add-if-absent", "new-value"}};
   response.response_headers_to_overwrite_if_exists =
-      UnsafeHeaderVector{{"header-to-overwrite-if-exists", "new-value"}};
+      {{"header-to-overwrite-if-exists", "new-value"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2828,13 +2822,13 @@ TEST_P(HttpFilterTestParam, ImmediateDeniedResponse) {
 
   prepareCheck();
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                            const StreamInfo::StreamInfo&) -> void {
-        callbacks.onComplete(std::make_unique<Response>(response));
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
       }));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
@@ -2869,10 +2863,10 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401) {
               encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.denied")
@@ -2914,10 +2908,10 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401NoClusterResponseCodeStats) {
               encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.denied")
@@ -2950,10 +2944,10 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith403) {
               encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.denied")
@@ -2973,12 +2967,12 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith403) {
 TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   InSequence s;
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   response.body = std::string{"foo"};
-  response.headers_to_set = UnsafeHeaderVector{{"foo", "bar"}, {"bar", "foo"}};
-  ResponsePtr response_ptr = std::make_unique<Response>(response);
+  response.headers_to_set = {{"foo", "bar"}, {"bar", "foo"}};
+  Filters::Common::ExtAuthz::ResponsePtr response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
@@ -3029,16 +3023,13 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
 TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
   InSequence s;
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   response.body = std::string{"foo"};
-  response.headers_to_set = UnsafeHeaderVector{{"foo", "bar"},
-                                               {"bar", "foo"},
-                                               {"set-cookie", "cookie1=value"},
-                                               {"set-cookie", "cookie2=value"},
-                                               {"accept-encoding", "gzip,deflate"}};
-  ResponsePtr response_ptr = std::make_unique<Response>(response);
+  response.headers_to_set = {{"foo", "bar"}, {"bar", "foo"}, {"set-cookie", "cookie1=value"},
+                             {"set-cookie", "cookie2=value"}, {"accept-encoding", "gzip,deflate"}};
+  Filters::Common::ExtAuthz::ResponsePtr response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
@@ -3127,9 +3118,9 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   ProtobufWkt::Value ext_authz_duration_value;
   ext_authz_duration_value.set_number_value(10);
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_set = UnsafeHeaderVector{{"foo", "bar"}};
+  response.headers_to_set = {{"foo", "bar"}};
   (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] = ext_authz_duration_value;
 
   initializeMetadata(response);
@@ -3150,7 +3141,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
@@ -3172,14 +3163,14 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
   )EOF");
 
   prepareCheck();
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  response.headers_to_set = UnsafeHeaderVector{{"foo", "bar"}};
+  response.headers_to_set = {{"foo", "bar"}};
 
   initializeMetadata(response);
 
-  auto response_ptr = std::make_unique<Response>(response);
+  auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
@@ -3240,12 +3231,12 @@ TEST_F(HttpFilterTest, EmittingMetadataWhenError) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _));
 
-  Response response{};
+  Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
 
   // Set the response metadata.
   initializeMetadata(response);
-  request_callbacks_->onComplete(std::make_unique<Response>(response));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.error")
