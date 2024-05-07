@@ -1070,12 +1070,12 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     if (host == nullptr) {
                       return absl::nullopt;
                     }
-                    const auto host_name = host->hostname();
+                    std::string host_name = host->hostname();
                     if (host_name.empty()) {
                       // If no hostname is available, the main address is used.
                       return host->address()->asString();
                     }
-                    return std::move(host_name);
+                    return absl::make_optional<std::string>(std::move(host_name));
                   });
             }}},
           {"UPSTREAM_HOST",
