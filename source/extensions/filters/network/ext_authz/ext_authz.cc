@@ -96,6 +96,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 
   if (!response->dynamic_metadata.fields().empty()) {
+
     filter_callbacks_->connection().streamInfo().setDynamicMetadata(
         NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
   }
@@ -108,7 +109,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, "ext_authz_close");
     filter_callbacks_->connection().streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
-
     filter_callbacks_->connection().streamInfo().setResponseCodeDetails(
         response->status == Filters::Common::ExtAuthz::CheckStatus::Denied
             ? Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied
