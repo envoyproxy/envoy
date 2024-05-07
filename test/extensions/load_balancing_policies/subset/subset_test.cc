@@ -7,6 +7,8 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.validate.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
@@ -37,41 +39,39 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
-class SubsetLoadBalancerInternalStateTester {
+class MockLoadBalancerSubsetInfo : public LoadBalancerSubsetInfo {
 public:
-  SubsetLoadBalancerInternalStateTester(std::shared_ptr<SubsetLoadBalancer> lb) : lb_(lb) {}
+  MockLoadBalancerSubsetInfo();
+  ~MockLoadBalancerSubsetInfo() override;
 
-  using MetadataVector = std::vector<std::pair<std::string, ProtobufWkt::Value>>;
+  // Upstream::LoadBalancerSubsetInfo
+  MOCK_METHOD(bool, isEnabled, (), (const));
+  MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy,
+              fallbackPolicy, (), (const));
+  MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy,
+              metadataFallbackPolicy, (), (const));
+  MOCK_METHOD(const ProtobufWkt::Struct&, defaultSubset, (), (const));
+  MOCK_METHOD(const std::vector<SubsetSelectorPtr>&, subsetSelectors, (), (const));
+  MOCK_METHOD(bool, localityWeightAware, (), (const));
+  MOCK_METHOD(bool, scaleLocalityWeight, (), (const));
+  MOCK_METHOD(bool, panicModeAny, (), (const));
+  MOCK_METHOD(bool, listAsAny, (), (const));
+  MOCK_METHOD(bool, allowRedundantKeys, (), (const));
 
-  void testDescribeMetadata(std::string expected, const MetadataVector& metadata) {
-    const SubsetLoadBalancer::SubsetMetadata& subset_metadata(metadata);
-    EXPECT_EQ(expected, lb_.get()->describeMetadata(subset_metadata));
-  }
-
-  void validateLbTypeConfigs() const {
-    const auto* legacy_child_lb_creator =
-        dynamic_cast<const LegacyChildLoadBalancerCreatorImpl*>(lb_->child_lb_creator_.get());
-
-    if (legacy_child_lb_creator == nullptr) {
-      return;
-    }
-
-    // Each of these expects that an lb_type is set to that type iff the
-    // returned config for that type exists.
-    EXPECT_EQ(legacy_child_lb_creator->lbType() == LoadBalancerType::RingHash,
-              legacy_child_lb_creator->lbRingHashConfig() != absl::nullopt);
-    EXPECT_EQ(legacy_child_lb_creator->lbType() == LoadBalancerType::Maglev,
-              legacy_child_lb_creator->lbMaglevConfig() != absl::nullopt);
-    EXPECT_EQ(legacy_child_lb_creator->lbType() == LoadBalancerType::RoundRobin,
-              legacy_child_lb_creator->lbRoundRobinConfig() != absl::nullopt);
-    EXPECT_EQ(legacy_child_lb_creator->lbType() == LoadBalancerType::LeastRequest,
-              legacy_child_lb_creator->lbLeastRequestConfig() != absl::nullopt);
-  }
-
-private:
-  std::shared_ptr<SubsetLoadBalancer> lb_;
+  std::vector<SubsetSelectorPtr> subset_selectors_;
 };
+
+MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
+  ON_CALL(*this, isEnabled()).WillByDefault(Return(true));
+  ON_CALL(*this, fallbackPolicy())
+      .WillByDefault(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+  ON_CALL(*this, defaultSubset()).WillByDefault(ReturnRef(ProtobufWkt::Struct::default_instance()));
+  ON_CALL(*this, subsetSelectors()).WillByDefault(ReturnRef(subset_selectors_));
+}
+
+MockLoadBalancerSubsetInfo::~MockLoadBalancerSubsetInfo() = default;
 
 class TestMetadataMatchCriterion : public Router::MetadataMatchCriterion {
 public:
@@ -160,7 +160,142 @@ private:
   std::vector<Router::MetadataMatchCriterionConstSharedPtr> matches_;
 };
 
-namespace SubsetLoadBalancerTest {
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetFallbackValid) {
+  auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
+  auto selector1 = subset_config.mutable_subset_selectors()->Add();
+  selector1->add_keys("key1");
+  selector1->add_keys("key2");
+  selector1->add_keys("key3");
+  selector1->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  selector1->add_fallback_keys_subset("key1");
+  selector1->add_fallback_keys_subset("key3");
+
+  auto selector2 = subset_config.mutable_subset_selectors()->Add();
+  selector2->add_keys("key1");
+  selector2->add_keys("key3");
+  selector2->add_keys("key4");
+  selector2->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  selector2->add_fallback_keys_subset("key4");
+
+  auto subset_info = LoadBalancerSubsetInfoImpl(subset_config);
+
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallbackPolicy(),
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->selectorKeys(),
+            std::set<std::string>({"key1", "key2", "key3"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallbackKeysSubset(),
+            std::set<std::string>({"key1", "key3"}));
+
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallbackPolicy(),
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->selectorKeys(),
+            std::set<std::string>({"key1", "key3", "key4"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallbackKeysSubset(),
+            std::set<std::string>({"key4"}));
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetForOtherPolicyInvalid) {
+  auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
+  auto selector = subset_config.mutable_subset_selectors()->Add();
+
+  selector->add_keys("key1");
+  selector->add_keys("key2");
+  selector->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
+  selector->add_fallback_keys_subset("key1");
+
+  EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
+                            "fallback_keys_subset can be set only for KEYS_SUBSET fallback_policy");
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetNotASubsetInvalid) {
+  auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
+  auto selector = subset_config.mutable_subset_selectors()->Add();
+
+  selector->add_keys("key1");
+  selector->add_keys("key2");
+  selector->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  selector->add_fallback_keys_subset("key3");
+
+  EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
+                            "fallback_keys_subset must be a subset of selector keys");
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetEmptyInvalid) {
+  auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
+  auto selector = subset_config.mutable_subset_selectors()->Add();
+
+  selector->add_keys("key1");
+  selector->add_keys("key2");
+  selector->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+
+  EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
+                            "fallback_keys_subset cannot be empty");
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetEqualKeysInvalid) {
+  auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
+  auto selector = subset_config.mutable_subset_selectors()->Add();
+
+  selector->add_keys("key1");
+  selector->add_keys("key2");
+  selector->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  selector->add_fallback_keys_subset("key2");
+  selector->add_fallback_keys_subset("key1");
+
+  EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
+                            "fallback_keys_subset cannot be equal to keys");
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, DefaultConfigIsDiabled) {
+  auto subset_info = LoadBalancerSubsetInfoImpl(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance());
+
+  EXPECT_FALSE(subset_info.isEnabled());
+  EXPECT_TRUE(subset_info.fallbackPolicy() ==
+              envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK);
+  EXPECT_EQ(subset_info.defaultSubset().fields_size(), 0);
+  EXPECT_EQ(subset_info.subsetSelectors().size(), 0);
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
+  auto subset_value = ProtobufWkt::Value();
+  subset_value.set_string_value("the value");
+
+  auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
+  subset_config.set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
+  subset_config.mutable_default_subset()->mutable_fields()->insert({"key", subset_value});
+  auto subset_selector1 = subset_config.mutable_subset_selectors()->Add();
+  subset_selector1->add_keys("selector_key1");
+  auto subset_selector2 = subset_config.mutable_subset_selectors()->Add();
+  subset_selector2->add_keys("selector_key2");
+  subset_selector2->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
+
+  auto subset_info = LoadBalancerSubsetInfoImpl(subset_config);
+
+  EXPECT_TRUE(subset_info.isEnabled());
+  EXPECT_TRUE(subset_info.fallbackPolicy() ==
+              envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
+  EXPECT_EQ(subset_info.defaultSubset().fields_size(), 1);
+  EXPECT_EQ(subset_info.defaultSubset().fields().at("key").string_value(),
+            std::string("the value"));
+  EXPECT_EQ(subset_info.subsetSelectors().size(), 2);
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->selectorKeys(),
+            std::set<std::string>({"selector_key1"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallbackPolicy(),
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED);
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->selectorKeys(),
+            std::set<std::string>({"selector_key2"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallbackPolicy(),
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
+}
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
@@ -190,13 +325,26 @@ class SubsetLoadBalancerTest : public Event::TestUsingSimulatedTime,
 public:
   SubsetLoadBalancerTest()
       : scope_(stats_store_.createScope("testprefix")), stat_names_(stats_store_.symbolTable()),
-        stats_(stat_names_, *stats_store_.rootScope()) {
-    least_request_lb_config_.mutable_choice_count()->set_value(2);
-  }
+        stats_(stat_names_, *stats_store_.rootScope()) {}
 
   using HostMetadata = std::map<std::string, std::string>;
   using HostListMetadata = std::map<std::string, std::vector<std::string>>;
   using HostURLMetadataMap = std::map<std::string, HostMetadata>;
+
+  void initLbConfigAndLB(LoadBalancerSubsetInfoPtr subset_info = nullptr, bool zone_aware = false) {
+    lb_config_ = std::make_unique<SubsetLoadBalancerConfig>(
+        [&]() -> LoadBalancerSubsetInfoPtr {
+          if (subset_info == nullptr) {
+            return std::move(mock_subset_info_ptr_);
+          }
+          return std::move(subset_info);
+        }(),
+        Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_),
+        std::move(child_lb_config_));
+    lb_ = std::make_shared<SubsetLoadBalancer>(*lb_config_, *info_, priority_set_,
+                                               zone_aware ? &local_priority_set_ : nullptr, stats_,
+                                               *scope_, runtime_, random_, simTime());
+  }
 
   void init() {
     init({
@@ -255,42 +403,14 @@ public:
   }
 
   void init(const HostURLMetadataMap& host_metadata,
-            const HostURLMetadataMap& failover_host_metadata, bool use_actual_subset_info = false) {
-
-    if (!use_actual_subset_info) {
-      EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
-    }
-
+            const HostURLMetadataMap& failover_host_metadata,
+            LoadBalancerSubsetInfoPtr subset_info = nullptr) {
     configureHostSet(host_metadata, host_set_);
     if (!failover_host_metadata.empty()) {
       configureHostSet(failover_host_metadata, *priority_set_.getMockHostSet(1));
     }
 
-    auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
-        lb_type_,
-        lb_type_ == LoadBalancerType::RingHash
-            ? makeOptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-                  ring_hash_lb_config_)
-            : absl::nullopt,
-        lb_type_ == LoadBalancerType::Maglev
-            ? makeOptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
-                  maglev_lb_config_)
-            : absl::nullopt,
-        lb_type_ == LoadBalancerType::RoundRobin
-            ? makeOptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
-                  round_robin_lb_config_)
-            : absl::nullopt,
-        lb_type_ == LoadBalancerType::LeastRequest
-            ? makeOptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
-                  least_request_lb_config_)
-            : absl::nullopt,
-        common_config_);
-
-    lb_ = std::make_shared<SubsetLoadBalancer>(
-        use_actual_subset_info ? static_cast<const LoadBalancerSubsetInfo&>(*actual_subset_info_)
-                               : static_cast<const LoadBalancerSubsetInfo&>(subset_info_),
-        std::move(child_lb_creator), priority_set_, nullptr, stats_, *scope_, runtime_, random_,
-        simTime());
+    initLbConfigAndLB(std::move(subset_info));
   }
 
   void zoneAwareInit(const std::vector<HostURLMetadataMap>& host_metadata_per_locality,
@@ -348,13 +468,7 @@ public:
             std::make_shared<ExcludedHostVector>(), HostsPerLocalityImpl::empty()),
         {}, {}, {}, 0, absl::nullopt);
 
-    auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
-        lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-        least_request_lb_config_, common_config_);
-
-    lb_ = std::make_shared<SubsetLoadBalancer>(subset_info_, std::move(child_lb_creator),
-                                               priority_set_, &local_priority_set_, stats_, *scope_,
-                                               runtime_, random_, simTime());
+    initLbConfigAndLB(nullptr, true);
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata) {
@@ -420,8 +534,8 @@ public:
       fallback_keys_subset_mapped.Add(std::string(it));
     }
 
-    return std::make_shared<SubsetSelectorImpl>(
-        selector_keys_mapped, fallback_policy, fallback_keys_subset_mapped, single_host_per_subset);
+    return std::make_shared<SubsetSelector>(selector_keys_mapped, fallback_policy,
+                                            fallback_keys_subset_mapped, single_host_per_subset);
   }
 
   SubsetSelectorPtr makeSelector(
@@ -530,11 +644,12 @@ public:
     }
   }
 
-  void doLbTypeTest(LoadBalancerType type) {
+  void doChildLbNameTest(const std::string& child_lb_name) {
     EXPECT_CALL(subset_info_, fallbackPolicy())
         .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
 
-    lb_type_ = type;
+    child_lb_name_ = child_lb_name;
+
     init({{"tcp://127.0.0.1:80", {{"version", "1.0"}}}});
 
     EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
@@ -543,6 +658,7 @@ public:
     modifyHosts({added_host}, {host_set_.hosts_.back()});
 
     EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
+    EXPECT_EQ(lb_->childLoadBalancerName(), child_lb_name);
   }
 
   MetadataConstSharedPtr buildMetadata(const std::string& version, bool is_default = false) const {
@@ -588,19 +704,17 @@ public:
     return v;
   }
 
-  LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
+  std::string child_lb_name_{"envoy.load_balancing_policies.round_robin"};
+  LoadBalancerConfigPtr child_lb_config_;
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   // Mock subset info is used for testing most logic.
-  NiceMock<MockLoadBalancerSubsetInfo> subset_info_;
-  // Actual subset info is used for testing actual subset config parsing and behavior.
-  std::unique_ptr<LoadBalancerSubsetInfoImpl> actual_subset_info_;
+  std::unique_ptr<NiceMock<MockLoadBalancerSubsetInfo>> mock_subset_info_ptr_{
+      std::make_unique<NiceMock<MockLoadBalancerSubsetInfo>>()};
+  NiceMock<MockLoadBalancerSubsetInfo>& subset_info_{*mock_subset_info_ptr_};
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  envoy::config::cluster::v3::Cluster::RingHashLbConfig ring_hash_lb_config_;
-  envoy::config::cluster::v3::Cluster::MaglevLbConfig maglev_lb_config_;
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config_;
-  envoy::config::cluster::v3::Cluster::RoundRobinLbConfig round_robin_lb_config_;
-  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
+  std::unique_ptr<SubsetLoadBalancerConfig> lb_config_;
+
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -1567,13 +1681,7 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
-  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
-      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_);
-  lb_ = std::make_shared<SubsetLoadBalancer>(
-      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
-      *stats_store_.rootScope(), runtime_, random_, simTime());
-
+  initLbConfigAndLB();
   TestLoadBalancerContext context_version({{"version", "1.0"}});
 
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_version));
@@ -1584,33 +1692,23 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
 // Optimally these would also be some type of TEST_P, but that is a little bit complicated as
 // modifyHosts() also needs params. Clean this up.
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRoundRobin) {
-  doLbTypeTest(LoadBalancerType::RoundRobin);
-  auto tester = SubsetLoadBalancerInternalStateTester(lb_);
-  tester.validateLbTypeConfigs();
+  doChildLbNameTest("envoy.load_balancing_policies.round_robin");
 }
 
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesLeastRequest) {
-  doLbTypeTest(LoadBalancerType::LeastRequest);
-  auto tester = SubsetLoadBalancerInternalStateTester(lb_);
-  tester.validateLbTypeConfigs();
+  doChildLbNameTest("envoy.load_balancing_policies.least_request");
 }
 
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRandom) {
-  doLbTypeTest(LoadBalancerType::Random);
-  auto tester = SubsetLoadBalancerInternalStateTester(lb_);
-  tester.validateLbTypeConfigs();
+  doChildLbNameTest("envoy.load_balancing_policies.random");
 }
 
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRingHash) {
-  doLbTypeTest(LoadBalancerType::RingHash);
-  auto tester = SubsetLoadBalancerInternalStateTester(lb_);
-  tester.validateLbTypeConfigs();
+  doChildLbNameTest("envoy.load_balancing_policies.ring_hash");
 }
 
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesMaglev) {
-  doLbTypeTest(LoadBalancerType::Maglev);
-  auto tester = SubsetLoadBalancerInternalStateTester(lb_);
-  tester.validateLbTypeConfigs();
+  doChildLbNameTest("envoy.load_balancing_policies.maglev");
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
@@ -1622,7 +1720,7 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
-  common_config_.mutable_healthy_panic_threshold()->set_value(40);
+  info_->lb_config_.mutable_healthy_panic_threshold()->set_value(40);
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 40))
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
@@ -2162,12 +2260,13 @@ TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {
   ProtobufWkt::Value num_value;
   num_value.set_number_value(100);
 
-  auto tester = SubsetLoadBalancerInternalStateTester(lb_);
-  tester.testDescribeMetadata("version=\"abc\"", {{"version", str_value}});
-  tester.testDescribeMetadata("number=100", {{"number", num_value}});
-  tester.testDescribeMetadata("x=\"abc\", y=100", {{"x", str_value}, {"y", num_value}});
-  tester.testDescribeMetadata("y=100, x=\"abc\"", {{"y", num_value}, {"x", str_value}});
-  tester.testDescribeMetadata("<no metadata>", {});
+  EXPECT_EQ("version=\"abc\"", SubsetLoadBalancer::describeMetadata({{"version", str_value}}));
+  EXPECT_EQ("number=100", SubsetLoadBalancer::describeMetadata({{"number", num_value}}));
+  EXPECT_EQ("x=\"abc\", y=100",
+            SubsetLoadBalancer::describeMetadata({{"x", str_value}, {"y", num_value}}));
+  EXPECT_EQ("y=100, x=\"abc\"",
+            SubsetLoadBalancer::describeMetadata({{"y", num_value}, {"x", str_value}}));
+  EXPECT_EQ("<no metadata>", SubsetLoadBalancer::describeMetadata({}));
 }
 
 TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
@@ -2187,12 +2286,7 @@ TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
       },
       host_set_, {1, 100});
 
-  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
-      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_);
-  lb_ = std::make_shared<SubsetLoadBalancer>(
-      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
-      *stats_store_.rootScope(), runtime_, random_, simTime());
+  initLbConfigAndLB();
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
@@ -2213,12 +2307,7 @@ TEST_F(SubsetLoadBalancerTest, DoesNotCheckHostHealth) {
 
   EXPECT_CALL(*mock_host, weight()).WillRepeatedly(Return(1));
 
-  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
-      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_);
-  lb_ = std::make_shared<SubsetLoadBalancer>(
-      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
-      *stats_store_.rootScope(), runtime_, random_, simTime());
+  initLbConfigAndLB();
 }
 
 TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
@@ -2239,13 +2328,13 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
       },
       host_set_, {1, 100});
 
-  common_config_.mutable_locality_weighted_lb_config();
-  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
-      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_);
-  lb_ = std::make_shared<SubsetLoadBalancer>(
-      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
-      *stats_store_.rootScope(), runtime_, random_, simTime());
+  auto* child_factory =
+      Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
+  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config;
+  rr_config.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
+  child_lb_config_ =
+      child_factory->loadConfig(rr_config, ProtobufMessage::getStrictValidationVisitor());
+  initLbConfigAndLB();
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
@@ -2278,13 +2367,14 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
       },
       host_set_, {50, 50});
 
-  common_config_.mutable_locality_weighted_lb_config();
-  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
-      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_);
-  lb_ = std::make_shared<SubsetLoadBalancer>(
-      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
-      *stats_store_.rootScope(), runtime_, random_, simTime());
+  auto* child_factory =
+      Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
+  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config;
+  rr_config.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
+  child_lb_config_ =
+      child_factory->loadConfig(rr_config, ProtobufMessage::getStrictValidationVisitor());
+  initLbConfigAndLB();
+
   TestLoadBalancerContext context({{"version", "1.1"}});
 
   // Since we scale the locality weights by number of hosts removed, we expect to see the second
@@ -2327,13 +2417,14 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
       },
       host_set_, {2, 2});
 
-  common_config_.mutable_locality_weighted_lb_config();
-  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
-      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_);
-  lb_ = std::make_shared<SubsetLoadBalancer>(
-      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
-      *stats_store_.rootScope(), runtime_, random_, simTime());
+  auto* child_factory =
+      Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
+  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config;
+  rr_config.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
+  child_lb_config_ =
+      child_factory->loadConfig(rr_config, ProtobufMessage::getStrictValidationVisitor());
+  initLbConfigAndLB();
+
   TestLoadBalancerContext context({{"version", "1.0"}});
 
   // We expect to see a 33/66 split because 2 * 1 / 2 = 1 and 2 * 3 / 4 = 1.5 -> 2
@@ -2363,12 +2454,7 @@ TEST_F(SubsetLoadBalancerTest, ScaleLocalityWeightsWithNoLocalityWeights) {
       },
       host_set_);
 
-  auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
-      lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
-      least_request_lb_config_, common_config_);
-  lb_ = std::make_shared<SubsetLoadBalancer>(
-      subset_info_, std::move(child_lb_creator), priority_set_, nullptr, stats_,
-      *stats_store_.rootScope(), runtime_, random_, simTime());
+  initLbConfigAndLB();
 }
 
 TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {
@@ -2519,9 +2605,7 @@ TEST_F(SubsetLoadBalancerTest, AllowRedundantKeysForSubset) {
   envoy::extensions::load_balancing_policies::subset::v3::Subset subset_proto_config;
   TestUtility::loadFromYaml(yaml, subset_proto_config);
 
-  actual_subset_info_ = std::make_unique<LoadBalancerSubsetInfoImpl>(subset_proto_config);
-  // Always be true for the LoadBalancerSubsetInfoImpl.
-  EXPECT_TRUE(actual_subset_info_->isEnabled());
+  auto actual_subset_info = std::make_unique<LoadBalancerSubsetInfoImpl>(subset_proto_config);
 
   // Add hosts initial hosts.
   init({{"tcp://127.0.0.1:80", {{"A", "A-V-0"}, {"B", "B-V-0"}, {"C", "C-V-0"}, {"D", "D-V-0"}}},
@@ -2531,7 +2615,7 @@ TEST_F(SubsetLoadBalancerTest, AllowRedundantKeysForSubset) {
         {"tcp://127.0.0.1:84", {{"A", "A-V-4"}, {"B", "B-V-4"}, {"C", "C-V-4"}, {"D", "D-V-4"}}},
         {"tcp://127.0.0.1:85", {{"version", "1.0"}, {"stage", "dev"}}},
         {"tcp://127.0.0.1:86", {{"version", "1.0"}, {"stage", "canary"}}}},
-       {}, true);
+       {}, std::move(actual_subset_info));
 
   TestLoadBalancerContext context_empty(
       std::initializer_list<std::map<std::string, std::string>::value_type>{});
@@ -3232,6 +3316,6 @@ TEST(LoadBalancerContextWrapperTest, LoadBalancingContextWrapperTest) {
   wrapper.overrideHostToSelect();
 }
 
-} // namespace SubsetLoadBalancerTest
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

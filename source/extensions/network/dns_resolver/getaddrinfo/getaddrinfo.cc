@@ -114,6 +114,8 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
     PendingQuerySharedPtr next_query;
     const bool reresolve =
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_reresolve_on_eai_again");
+    const bool treat_nodata_noname_as_success =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_nodata_noname_is_success");
     {
       absl::MutexLock guard(&mutex_);
       auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
@@ -155,8 +157,16 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         absl::MutexLock guard(&mutex_);
         pending_queries_.push_back(next_query);
         continue;
+      } else if (treat_nodata_noname_as_success &&
+                 (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA)) {
+        // Treat NONAME and NODATA as DNS records with no results.
+        // NODATA and NONAME are typically not transient failures, so we don't expect success if
+        // the DNS query is retried.
+        // NOTE: this is also how the c-ares resolver treats NONAME and NODATA:
+        // https://github.com/envoyproxy/envoy/blob/099d85925b32ce8bf06e241ee433375a0a3d751b/source/extensions/network/dns_resolver/cares/dns_impl.h#L109-L111.
+        ENVOY_LOG(debug, "getaddrinfo no results rc={}", gai_strerror(rc.return_value_));
+        response = std::make_pair(ResolutionStatus::Success, std::list<DnsResponse>());
       } else {
-        // TODO(mattklein123): Handle some errors differently such as `EAI_NODATA`.
         ENVOY_LOG(debug, "getaddrinfo failed with rc={} errno={}", gai_strerror(rc.return_value_),
                   errorDetails(rc.errno_));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
@@ -175,24 +185,6 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
 
   ENVOY_LOG(debug, "getaddrinfo resolver thread exiting");
 }
-
-// getaddrinfo DNS resolver factory
-class GetAddrInfoDnsResolverFactory : public DnsResolverFactory,
-                                      public Logger::Loggable<Logger::Id::dns> {
-public:
-  std::string name() const override { return {"envoy.network.dns_resolver.getaddrinfo"}; }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::extensions::network::dns_resolver::getaddrinfo::v3::
-                                         GetAddrInfoDnsResolverConfig()};
-  }
-
-  DnsResolverSharedPtr
-  createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
-                    const envoy::config::core::v3::TypedExtensionConfig&) const override {
-    return std::make_shared<GetAddrInfoDnsResolver>(dispatcher, api);
-  }
-};
 
 // Register the CaresDnsResolverFactory
 REGISTER_FACTORY(GetAddrInfoDnsResolverFactory, DnsResolverFactory);

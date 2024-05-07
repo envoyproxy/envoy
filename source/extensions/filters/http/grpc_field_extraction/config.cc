@@ -27,7 +27,7 @@ Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoT
   auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::make_unique<ExtractorFactoryImpl>(), context.serverFactoryContext().api());
   return [filter_config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<Filter>(*filter_config));
+    callbacks.addStreamDecoderFilter(std::make_shared<Filter>(filter_config));
   };
 }
 

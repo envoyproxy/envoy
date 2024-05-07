@@ -338,6 +338,15 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
         output.msg_[0].gso_size_ = *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg));
       }
 #endif
+      if (receive_ecn_ &&
+#ifdef __APPLE__
+          ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_RECVTOS) ||
+#else
+          ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_TOS) ||
+#endif // __APPLE__
+           (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_TCLASS))) {
+        output.msg_[0].tos_ = *(reinterpret_cast<uint8_t*>(CMSG_DATA(cmsg)));
+      }
     }
   }
 
@@ -415,10 +424,20 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(
             *cmsg, self_port, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
+        if (receive_ecn_ &&
+#ifdef __APPLE__
+            ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_RECVTOS) ||
+#else
+            ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_TOS) ||
+#endif // __APPLE__
+             (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_TCLASS))) {
+          output.msg_[i].tos_ = *(reinterpret_cast<uint8_t*>(CMSG_DATA(cmsg)));
+          continue;
+        }
         if (addr != nullptr) {
           // This is a IP packet info message.
           output.msg_[i].local_address_ = std::move(addr);
-          break;
+          continue;
         }
       }
     }
