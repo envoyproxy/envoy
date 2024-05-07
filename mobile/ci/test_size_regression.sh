@@ -22,6 +22,7 @@ fi
 PERC=$(bc <<< "scale=2; ($SIZE2 - $SIZE1)/$SIZE1 * 100")
 
 echo "The new binary is $PERC % different in size compared to main."
+echo "The old binary is $SIZE1 bytes."
 echo "The new binary is $SIZE2 bytes."
 
 if [ "$SIZE2" -gt $MAX_SIZE ]
