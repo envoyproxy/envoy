@@ -92,7 +92,8 @@ message ExtAuthz {
   // or cannot be reached. The default status is HTTP 403 Forbidden.
   type.v3.HttpStatus status_on_error = 7;
 
-  // When this is set to true, the filter will check the side stream response for invalid header &
+  // When this is set to true, the filter will check the :ref:`ext_authz response
+  // <envoy_v3_api_msg_service.auth.v3.CheckResponse>` for invalid header &
   // query parameter mutations. If the side stream response is invalid, it will send a local reply
   // to the downstream request with status HTTP 500 Internal Server Error.
   //
