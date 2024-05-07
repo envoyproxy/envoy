@@ -23,7 +23,6 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/health_check_host_monitor.h"
-#include "envoy/upstream/load_balancer_type.h"
 #include "envoy/upstream/locality.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"

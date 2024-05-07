@@ -22,16 +22,6 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
-  ON_CALL(*this, isEnabled()).WillByDefault(Return(false));
-  ON_CALL(*this, fallbackPolicy())
-      .WillByDefault(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
-  ON_CALL(*this, defaultSubset()).WillByDefault(ReturnRef(ProtobufWkt::Struct::default_instance()));
-  ON_CALL(*this, subsetSelectors()).WillByDefault(ReturnRef(subset_selectors_));
-}
-
-MockLoadBalancerSubsetInfo::~MockLoadBalancerSubsetInfo() = default;
-
 MockIdleTimeEnabledClusterInfo::MockIdleTimeEnabledClusterInfo() {
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(std::chrono::milliseconds(1000)));
 }

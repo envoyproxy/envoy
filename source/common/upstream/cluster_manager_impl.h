@@ -629,9 +629,8 @@ private:
       // Don't change the order of cluster_info_ and lb_factory_/lb_ as the the lb_factory_/lb_
       // may keep a reference to the cluster_info_.
       ClusterInfoConstSharedPtr cluster_info_;
-      // LB factory if applicable. Not all load balancer types have a factory. LB types that have
-      // a factory will create a new LB on every membership update. LB types that don't have a
-      // factory will create an LB on construction and use it forever.
+
+      // Factory to create active LB.
       LoadBalancerFactorySharedPtr lb_factory_;
       // Current active LB.
       LoadBalancerPtr lb_;
