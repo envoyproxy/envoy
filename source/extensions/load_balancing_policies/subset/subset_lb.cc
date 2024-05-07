@@ -204,6 +204,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets,
       [this](uint32_t priority, const HostVector&, const HostVector&) {
         refreshSubsets(priority);
         purgeEmptySubsets(subsets_);
+        return absl::OkStatus();
       });
 }
 

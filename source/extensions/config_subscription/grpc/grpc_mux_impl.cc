@@ -75,6 +75,7 @@ GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_
           grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(
               [this](absl::string_view resource_type_url) {
                 onDynamicContextUpdate(resource_type_url);
+                return absl::OkStatus();
               })) {
   THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("ads", local_info_));
   AllMuxes::get().insert(this);
