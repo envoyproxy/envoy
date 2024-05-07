@@ -35,8 +35,8 @@ WatcherImpl::~WatcherImpl() {
 absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events,
                                    Watcher::OnChangedCb cb) {
   absl::StatusOr<FileWatchPtr> watch_or_error = addWatch(path, events, cb, false);
-  RETURN_IF_NOT_OK(watch_or_error);
-  if (watch.value() == nullptr) {
+  RETURN_IF_STATUS_NOT_OK(watch_or_error);
+  if (watch_or_error.value() == nullptr) {
     return absl::InvalidArgumentError(absl::StrCat("invalid watch path ", path));
   }
   return absl::OkStatus();
@@ -55,7 +55,7 @@ absl::StatusOr<WatcherImpl::FileWatchPtr> WatcherImpl::addWatch(absl::string_vie
     }
 
     const auto result_or_error = file_system_.splitPathFromFilename(path);
-    RETURN_IF_STATUS_NOT_OK(result_or_error, throw);
+    RETURN_IF_STATUS_NOT_OK(result_or_error);
     watch_fd = open(std::string(result_or_error.value().directory_).c_str(), 0);
     if (watch_fd == -1) {
       return nullptr;
