@@ -5,11 +5,20 @@
 #include "absl/container/flat_hash_map.h"
 #include "library/common/http/header_utility.h"
 #include "library/jni/jni_utility.h"
+#include "library/jni/types/java_virtual_machine.h"
 
 // NOLINT(namespace-envoy)
 
 // This file contains JNI implementation used by
 // `test/java/io/envoyproxy/envoymobile/jni/JniUtilityTest.java` unit tests.
+
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
+  const auto result = Envoy::JNI::JavaVirtualMachine::initialize(vm);
+  if (result != JNI_OK) {
+    return result;
+  }
+  return Envoy::JNI::JavaVirtualMachine::getJNIVersion();
+}
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_protoJavaByteArrayConversion(JNIEnv* env, jclass,
