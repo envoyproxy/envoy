@@ -36,6 +36,12 @@ minor_behavior_changes:
     as successful queries with empty results, instead of as DNS failures. This change brings the
     getaddrinfo behavior in-line with the c-ares resolver behavior. This behavior can be reverted by
     setting the runtime guard ``envoy.reloadable_features.dns_nodata_noname_is_success`` to false.
+- area: access_log
+  change: |
+    The upstream connection address, rather than the upstream host address, will be used for the ``%UPSTREAM_REMOTE_ADDRESS%``,
+    ``%UPSTREAM_REMOTE_PORT%`` and ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%`` access log format specifiers.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.upstream_remote_address_use_connection`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -106,5 +112,9 @@ new_features:
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
+- area: access_log
+  change: |
+    added support for :ref:`%UPSTREAM_HOST_NAME% <config_access_log_format_upstream_host_name>` for the upstream host
+    identifier.
 
 deprecated:
