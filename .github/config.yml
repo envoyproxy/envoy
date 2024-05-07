@@ -28,51 +28,6 @@ checks:
     required: true
     on-run:
     - build-macos
-  prechecks:
-    name: Envoy/Prechecks
-    on-run:
-    - precheck-deps
-    required: true
-    # yamllint disable rule:line-length
-    advice:
-      general: |
-        ### Ensuring your commits are signed off
-
-        You can set up DCO using Envoy's git hooks.
-
-        ### Git hooks
-
-        To set this up, do the following:
-
-          ```console
-          $ ./support/bootstrap
-          ```
-
-          If you only want the DCO check you can do the following to disable the
-          other hooks
-
-          ```console
-          $ echo NO_VERIFY=1 > .env
-          ```
-      deps: |
-        ### Advice on updating dependencies
-
-        General information about Envoy's depdendencies [can be found here](https://github.com/envoyproxy/envoy/blob/main/DEPENDENCY_POLICY.md)
-      format: |
-        ### Advice on correct formatting
-
-        Envoy ensures a minimum standard for all files in the repository.
-
-        You are strongly advised to heed the following CI notice:
-
-          ```console
-            Please fix your editor to ensure:
-
-              - no trailing whitespace
-              - no preceding mixed tabs/spaces
-              - all files end with a newline
-          ```
-    # yamllint enable rule:line-length
   publish:
     name: >-
       Envoy/Publish and verify
@@ -95,18 +50,6 @@ run:
     - envoy/**/*
     - source/**/*
     - test/**/*
-  precheck-deps:
-    paths:
-    - .bazelrc
-    - .bazelversion
-    - .github/config.yml
-    - .github/dependabot.yml
-    - bazel/BUILD
-    - tools/dependency/*
-    - "**/*.bzl"
-    - "**/requirements.txt"
-    - "**/go.mod"
-    - "**/Dockerfile*"
   publish:
     paths:
     - .bazelrc
