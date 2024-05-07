@@ -1100,6 +1100,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutations) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("500", response_->headers().getStatusValue());
+  test_server_->waitForCounterEq("cluster.cluster_0.ext_authz.invalid", 1);
 
   cleanup();
 }
