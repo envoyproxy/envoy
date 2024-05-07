@@ -202,8 +202,7 @@ class InvalidMutationTest : public HttpFilterTestBase<testing::Test> {
 public:
   InvalidMutationTest() : invalid_value_(reinterpret_cast<const char*>(invalid_value_bytes_)) {}
 
-  void testResponse(
-      const Filters::Common::ExtAuthz::Response& response) {
+  void testResponse(const Filters::Common::ExtAuthz::Response& response) {
     InSequence s;
 
     initialize(R"(
@@ -238,8 +237,7 @@ public:
         }));
 
     // Send this test's response. It should get invalidated.
-    request_callbacks_->onComplete(
-        std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+    request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
     EXPECT_EQ(decoder_filter_callbacks_.details(), "ext_authz_invalid");
     EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
@@ -2691,8 +2689,8 @@ TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActions) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.response_headers_to_add_if_absent = {{"header-to-add-if-absent", "new-value"}};
-  response.response_headers_to_overwrite_if_exists =
-      {{"header-to-overwrite-if-exists", "new-value"}};
+  response.response_headers_to_overwrite_if_exists = {
+      {"header-to-overwrite-if-exists", "new-value"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2729,8 +2727,8 @@ TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActionsDoNotTakeEffect
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.response_headers_to_add_if_absent = {{"header-to-add-if-absent", "new-value"}};
-  response.response_headers_to_overwrite_if_exists =
-      {{"header-to-overwrite-if-exists", "new-value"}};
+  response.response_headers_to_overwrite_if_exists = {
+      {"header-to-overwrite-if-exists", "new-value"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2972,7 +2970,8 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   response.status_code = Http::Code::Forbidden;
   response.body = std::string{"foo"};
   response.headers_to_set = {{"foo", "bar"}, {"bar", "foo"}};
-  Filters::Common::ExtAuthz::ResponsePtr response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+  Filters::Common::ExtAuthz::ResponsePtr response_ptr =
+      std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
@@ -3027,9 +3026,13 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   response.body = std::string{"foo"};
-  response.headers_to_set = {{"foo", "bar"}, {"bar", "foo"}, {"set-cookie", "cookie1=value"},
-                             {"set-cookie", "cookie2=value"}, {"accept-encoding", "gzip,deflate"}};
-  Filters::Common::ExtAuthz::ResponsePtr response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+  response.headers_to_set = {{"foo", "bar"},
+                             {"bar", "foo"},
+                             {"set-cookie", "cookie1=value"},
+                             {"set-cookie", "cookie2=value"},
+                             {"accept-encoding", "gzip,deflate"}};
+  Filters::Common::ExtAuthz::ResponsePtr response_ptr =
+      std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
