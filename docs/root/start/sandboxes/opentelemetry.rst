@@ -113,14 +113,6 @@ In the ``Latency Samples`` of ``opentelemetry.proto.collector.trace.v1.TraceServ
 
 .. image:: /start/sandboxes/_static/opentelemetry-ui-traces.png
 
-.. seealso::
-
-   :ref:`Request tracing <arch_overview_tracing>`
-      Learn more about using Envoy's request tracing.
-
-   `OpenTelemetry <https://opentelemetry.io/>`_
-      OpenTelemetry tracing website.
-
 Step 5: View the access logs in the OpenTelemetry collector output
 ******************************************************************
 
@@ -196,56 +188,10 @@ And the matching access log:
 
 Notice how the log record's ``Trace ID`` and ``Span ID`` fields match the span's ``Trace ID`` and ``ID`` fields.
 
-Step 6: How to replicate this in your setup
-*******************************************
+.. seealso::
 
-The configuration is divided in two parts: setting up the reporting of tracing data over OpenTelemetry, and the reporting of access logs:
+   :ref:`Request tracing <arch_overview_tracing>`
+      Learn more about using Envoy's request tracing.
 
-Set up a cluster to report to the OpenTelemetry collector (or another endpoint that accepts OTLP v1):
-
-.. literalinclude:: _include/opentelemetry/envoy-front-proxy.yaml
-   :language: yaml
-   :lines: 109-125
-   :linenos:
-   :caption: Envoy configuration for a cluster representing an OTLP endpoint
-
-To enable the reporting of tracing data, add the following to the ``envoy.filters.network.http_connection_manager`` filter: 
-
-.. literalinclude:: _include/opentelemetry/envoy-front-proxy.yaml
-   :language: yaml
-   :lines: 15-28
-   :linenos:
-   :emphasize-lines: 5-14
-   :caption: Adding the ``envoy.tracers.opentelemetry`` tracing provider to an existing filter
-
-To enable the reporting of access logs as log records, add the following to the ``envoy.filters.network.http_connection_manager`` filter:
-
-.. literalinclude:: _include/opentelemetry/envoy-front-proxy.yaml
-   :language: yaml
-   :lines: 15-18,29-58
-   :linenos:
-   :emphasize-lines: 14
-   :caption: Setting up the reporting of access logs to the OTLP cluster
-
-In OpenTelemetry, the ``service.name`` resource attribute is the single, most important piece of metadata to add to an OpenTelemetry resource.
-OpenTelemetry resources are metadata dictionaries to describe which system emits the telemetry.
-The resource attributes, i.e., the key-value pairs that specify the resource metadata, are sent along with every piece of telemetry.
-The ``tracing`` provider has the ``service_name`` field to set up the ``service.name`` resource attribute:
-
-.. literalinclude:: _include/opentelemetry/envoy-front-proxy.yaml
-   :language: yaml
-   :lines: 19-28
-   :linenos:
-   :emphasize-lines: 10
-   :caption: Setting the ``service.name`` resource attribute for tracing data
-
-For access logs, however, you need to set up the ``service.name`` resource attribute using the ``resource_attributes`` configuration:
-
-.. literalinclude:: _include/opentelemetry/envoy-front-proxy.yaml
-   :language: yaml
-   :lines: 30-58
-   :linenos:
-   :emphasize-lines: 11-15
-   :caption: Adding the ``service.name`` resource attribute to access logs
-
-You should use the same value for the service name between tracing data and access logs.
+   `OpenTelemetry <https://opentelemetry.io/>`_
+      OpenTelemetry tracing website.
