@@ -81,6 +81,6 @@ new_features:
 deprecated:
 - area: tracing
   change: |
-    Disable opencensus by default, as it is no longer supported/maintained upstream
-    (see `https://opentelemetry.io/blog/2023/sunsetting-opencensus/`_). Users of this extension can use the OpenTelemetry
-    tracer instead, and the OpenTelemetry collector can be used to convert traces.
+    Disable OpenCensus by default, as it is
+    `no longer supported/maintained upstream <https://opentelemetry.io/blog/2023/sunsetting-opencensus/>`_.
+    This extension can be replaced with the OpenTelemetry tracer and collector.
