@@ -30,6 +30,7 @@ struct GrpcInitializeConfigOpts {
   bool failure_mode_allow = false;
   bool encode_raw_headers = false;
   uint64_t timeout_ms = 300'000; // 5 minutes.
+  bool validate_mutations = false;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -108,6 +109,7 @@ public:
 
       proto_config_.set_failure_mode_allow(opts.failure_mode_allow);
       proto_config_.set_failure_mode_allow_header_add(opts.failure_mode_allow);
+      proto_config_.set_validate_mutations(opts.validate_mutations);
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
 
       // Add labels and verify they are passed.
@@ -1068,6 +1070,31 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("403", response_->headers().getStatusValue()); // Unauthorized status.
+
+  cleanup();
+}
+
+// Test behavior when validate_mutations is true & side stream provides invalid mutations (should
+// respond downstream with HTTP 500 Internal Server Error).
+TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutations) {
+  GrpcInitializeConfigOpts opts;
+  opts.validate_mutations = true;
+  initializeConfig(opts);
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and request.
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+  sendExtAuthzResponse({{"invalid-\nheader-\nname", "blah"}}, {}, {}, {}, {}, {}, {}, {});
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
+  test_server_->waitForCounterEq("cluster.cluster_0.ext_authz.invalid", 1);
 
   cleanup();
 }

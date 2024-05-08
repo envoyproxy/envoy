@@ -48,6 +48,14 @@ bug_fixes:
   change: |
     Fix a RELEASE_ASSERT when using :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>`
     if the downstream request ``:authority`` was longer than 255 characters.
+- area: ext_authz
+  change: |
+    Added field
+    :ref:`validate_mutations <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.validate_mutations>`,
+    which, when set to true, adds header & query parameter mutation validation to the http ext_authz
+    filter. If an authz response contains invalid mutations, the filter responds to the downstream
+    request with HTTP 500 Internal Server Error. If you use ext_authz with an untrusted side stream,
+    it's recommended you set this to true.
 - area: http
   change: |
     Fix a crash when reloading the HTTP Connection Manager via ECDS.
