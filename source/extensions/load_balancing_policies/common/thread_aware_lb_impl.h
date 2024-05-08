@@ -8,7 +8,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {

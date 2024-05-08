@@ -2,7 +2,7 @@
 
 #include "envoy/upstream/retry.h"
 
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -2,6 +2,8 @@
 
 #include "envoy/common/optref.h"
 
+#include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
+
 #include "test/common/upstream/round_robin_load_balancer_fuzz.pb.validate.h"
 #include "test/common/upstream/zone_aware_load_balancer_fuzz_base.h"
 #include "test/fuzz/fuzz_runner.h"
