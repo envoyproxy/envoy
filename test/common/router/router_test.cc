@@ -2955,7 +2955,7 @@ public:
   RouterConnectFailureTest() {
     scoped_runtime_.mergeValues({{"envoy.restart_features.ensure_connection_retry", "true"}});
     // Recreate router filter.
-    router_ = std::make_unique<RouterTestFilter>(config_, config_.default_stats_);
+    router_ = std::make_unique<RouterTestFilter>(config_, config_->default_stats_);
     router_->setDecoderFilterCallbacks(callbacks_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
