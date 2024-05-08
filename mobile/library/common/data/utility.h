@@ -31,7 +31,7 @@ envoy_data toBridgeData(Buffer::Instance& data, uint32_t max_bytes = 0);
  * @param max_bytes, the maximum bytes to transform or 0 to copy all available data.
  * @return envoy_data, the bridge transformation of the Buffer::Instance param.
  */
-envoy_data toBridgeData(const Buffer::Instance& data, uint32_t max_bytes = 0);
+envoy_data toBridgeDataNoDrain(const Buffer::Instance& data, uint32_t max_bytes = 0);
 
 /**
  * Copy from string to envoy_data.

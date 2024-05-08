@@ -35,7 +35,7 @@ envoy_data toBridgeData(Buffer::Instance& data, uint32_t max_bytes) {
   return bridge_data;
 }
 
-envoy_data toBridgeData(const Buffer::Instance& data, uint32_t max_bytes) {
+envoy_data toBridgeDataNoDrain(const Buffer::Instance& data, uint32_t max_bytes) {
   updateMaxBytes(max_bytes, data);
   envoy_data bridge_data = copyToBridgeData(data, max_bytes);
   return bridge_data;
