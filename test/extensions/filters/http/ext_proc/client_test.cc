@@ -79,7 +79,9 @@ protected:
 };
 
 TEST_F(ExtProcStreamTest, OpenCloseStream) {
-  auto options = Http::AsyncClient::StreamOptions().setParentContext(stream_info_);
+  Http::AsyncClient::ParentContext parent_context;
+  parent_context.stream_info = &stream_info_;
+  auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
   auto stream = client_->start(*this, config_with_hash_key_, options);
   EXPECT_CALL(stream_, closeStream());
   EXPECT_CALL(stream_, resetStream());
@@ -87,7 +89,9 @@ TEST_F(ExtProcStreamTest, OpenCloseStream) {
 }
 
 TEST_F(ExtProcStreamTest, SendToStream) {
-  auto options = Http::AsyncClient::StreamOptions().setParentContext(stream_info_);
+  Http::AsyncClient::ParentContext parent_context;
+  parent_context.stream_info = &stream_info_;
+  auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
   auto stream = client_->start(*this, config_with_hash_key_, options);
   // Send something and ensure that we get it. Doesn't really matter what.
   EXPECT_CALL(stream_, sendMessageRaw_(_, false));
@@ -99,7 +103,9 @@ TEST_F(ExtProcStreamTest, SendToStream) {
 }
 
 TEST_F(ExtProcStreamTest, SendAndClose) {
-  auto options = Http::AsyncClient::StreamOptions().setParentContext(stream_info_);
+  Http::AsyncClient::ParentContext parent_context;
+  parent_context.stream_info = &stream_info_;
+  auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
   auto stream = client_->start(*this, config_with_hash_key_, options);
   EXPECT_CALL(stream_, sendMessageRaw_(_, true));
   ProcessingRequest req;
@@ -107,7 +113,9 @@ TEST_F(ExtProcStreamTest, SendAndClose) {
 }
 
 TEST_F(ExtProcStreamTest, ReceiveFromStream) {
-  auto options = Http::AsyncClient::StreamOptions().setParentContext(stream_info_);
+  Http::AsyncClient::ParentContext parent_context;
+  parent_context.stream_info = &stream_info_;
+  auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
   auto stream = client_->start(*this, config_with_hash_key_, options);
   ASSERT_NE(stream_callbacks_, nullptr);
   // Send something and ensure that we get it. Doesn't really matter what.
@@ -138,7 +146,9 @@ TEST_F(ExtProcStreamTest, ReceiveFromStream) {
 }
 
 TEST_F(ExtProcStreamTest, StreamClosed) {
-  auto options = Http::AsyncClient::StreamOptions().setParentContext(stream_info_);
+  Http::AsyncClient::ParentContext parent_context;
+  parent_context.stream_info = &stream_info_;
+  auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
   auto stream = client_->start(*this, config_with_hash_key_, options);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
@@ -152,7 +162,9 @@ TEST_F(ExtProcStreamTest, StreamClosed) {
 }
 
 TEST_F(ExtProcStreamTest, StreamError) {
-  auto options = Http::AsyncClient::StreamOptions().setParentContext(stream_info_);
+  Http::AsyncClient::ParentContext parent_context;
+  parent_context.stream_info = &stream_info_;
+  auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
   auto stream = client_->start(*this, config_with_hash_key_, options);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
