@@ -40,7 +40,7 @@ bool TextClustersChunkProcessor::nextChunk(Buffer::Instance& response) {
   }
   // TODO(demitriswan) See if these need to be updated here.
   UNREFERENCED_PARAMETER(response_headers_);
-  return idx_ < clusters_.size() ? true : false;
+  return idx_ < clusters_.size();
 }
 
 void TextClustersChunkProcessor::render(std::reference_wrapper<const Upstream::Cluster> cluster,
