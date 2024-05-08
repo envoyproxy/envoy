@@ -76,9 +76,9 @@ void TextClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
         all_stats.emplace_back(gauge_name, gauge.get().value());
       }
 
-      std::sort(all_stats.begin(), all_stats.end(), [](const std::pair<absl::string_view, uint64_t>& a, const std::pair<absl::string_view, uint64_t>& b) {
-       return a.first < b.first;
-      });
+      std::sort(all_stats.begin(), all_stats.end(),
+                [](const std::pair<absl::string_view, uint64_t>& a,
+                   const std::pair<absl::string_view, uint64_t>& b) { return a.first < b.first; });
 
       for (const auto& [stat_name, stat] : all_stats) {
         response.add(fmt::format("{}::{}::{}::{}\n", cluster_name, host_address, stat_name, stat));
