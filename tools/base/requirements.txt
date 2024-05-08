@@ -700,8 +700,8 @@ frozenlist==1.4.1 \
     # via
     #   aiohttp
     #   aiosignal
-gcs-oauth2-boto-plugin==3.0 \
-    --hash=sha256:f4120b08b7f8d32904674c98f07d4caf4083a58343c0c0fa0016e0f0254dfe31
+gcs-oauth2-boto-plugin==3.2 \
+    --hash=sha256:a46817f3abed2bc4f6b4b12b0de7c8bf5ff5f1822dc03c45fa1ae6ed7a455843
     # via gsutil
 gidgethub==5.3.0 \
     --hash=sha256:4dd92f2252d12756b13f9dd15cde322bfb0d625b6fb5d680da1567ec74b462c0 \
@@ -728,20 +728,23 @@ google-auth[aiohttp]==2.17.0 \
     --hash=sha256:45ba9b4b3e49406de3c5451697820694b2f6ce8a6b75bb187852fdae231dab94 \
     --hash=sha256:f51d26ebb3e5d723b9a7dbd310b6c88654ef1ad1fc35750d1fdba48ca4d82f52
     # via
+    #   gcs-oauth2-boto-plugin
     #   google-auth-httplib2
     #   gsutil
 google-auth-httplib2==0.2.0 \
     --hash=sha256:38aa7badf48f974f1eb9861794e9c0cb2a0511a4ec0679b1f886d108f5640e05 \
     --hash=sha256:b65a0a2123300dd71281a7bf6e64d65a0759287df52729bdd1ae2e47dc311a3d
-    # via gsutil
+    # via
+    #   gcs-oauth2-boto-plugin
+    #   gsutil
 google-reauth==0.1.1 \
     --hash=sha256:cb39074488d74c8853074dde47368bbf8f739d4a4338b89aab696c895b6d8368 \
     --hash=sha256:f9f6852a55c2c5453d581cd01f3d1278e86147c03d008409800390a834235892
     # via
     #   gcs-oauth2-boto-plugin
     #   gsutil
-gsutil==5.28 \
-    --hash=sha256:71370a111e1ad6f8da5e89f99f20dad7147eeeb88222ed9ac0bb6d8fe6a2135f
+gsutil==5.29 \
+    --hash=sha256:0ba61c0ca97a592a2ed9d6eeb74b20434831bc6ceba380138103b24d2d53b921
     # via -r requirements.in
 httplib2==0.20.4 \
     --hash=sha256:58a98e45b4b1a48273073f905d2961666ecf0fbac4250ea5b47aef259eb5c585 \
