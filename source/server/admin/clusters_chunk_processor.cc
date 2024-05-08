@@ -27,8 +27,8 @@ TextClustersChunkProcessor::TextClustersChunkProcessor(
     uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
     const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map)
     : chunk_limit_(chunk_limit), response_headers_(response_headers), idx_(0) {
-  for (const auto& pair : cluster_info_map) {
-    clusters_.push_back(pair.second);
+  for (const auto& [str, reference_wrapped_const_cluster] : cluster_info_map) {
+    clusters_.push_back(reference_wrapped_const_cluster);
   }
 }
 
