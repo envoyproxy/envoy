@@ -534,12 +534,13 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     absl::string_view tlv_value(reinterpret_cast<char const*>(buf + idx), tlv_value_length);
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
+      std::string metadata_key = key_value_pair->metadata_namespace().empty()
+                                     ? "envoy.filters.listener.proxy_protocol"
+                                     : key_value_pair->metadata_namespace();
       if (Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener")) {
         auto& typed_filter_metadata = (*cb_->dynamicMetadata().mutable_typed_filter_metadata());
-        std::string metadata_key = key_value_pair->metadata_namespace().empty()
-                                       ? "envoy.filters.listener.proxy_protocol"
-                                       : key_value_pair->metadata_namespace();
+
         const auto typed_proxy_filter_metadata = typed_filter_metadata.find(metadata_key);
         envoy::extensions::filters::listener::proxy_protocol::v3::TlvsMetadata tlvs_metadata;
         auto status = absl::OkStatus();
@@ -547,8 +548,9 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
           status = MessageUtil::unpackTo(typed_proxy_filter_metadata->second, tlvs_metadata);
         }
         if (!status.ok()) {
-          ENVOY_LOG(warn, "proxy_protocol: Failed to unpack typed metadata for TLV type ",
-                    tlv_type);
+          ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(1),
+                             "proxy_protocol: Failed to unpack typed metadata for TLV type ",
+                             tlv_type);
         } else {
           Protobuf::BytesValue tlv_byte_value;
           tlv_byte_value.set_value(tlv_value.data(), tlv_value.size());
@@ -564,11 +566,6 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
       // Sanitize any non utf8 characters.
       auto sanitised_tlv_value = MessageUtil::sanitizeUtf8String(tlv_value);
       metadata_value.set_string_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
-
-      std::string metadata_key = key_value_pair->metadata_namespace().empty()
-                                     ? "envoy.filters.listener.proxy_protocol"
-                                     : key_value_pair->metadata_namespace();
-
       ProtobufWkt::Struct metadata(
           (*cb_->dynamicMetadata().mutable_filter_metadata())[metadata_key]);
       metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
