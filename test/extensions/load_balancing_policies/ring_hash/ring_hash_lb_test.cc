@@ -106,6 +106,16 @@ INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashLoadBalancerTest,
                          ::testing::Values(true, false));
 INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::testing::Values(true));
 
+TEST_P(RingHashLoadBalancerTest, ChooseHostBeforeInit) {
+  lb_ = std::make_unique<RingHashLoadBalancer>(
+      priority_set_, stats_, *stats_store_.rootScope(), runtime_, random_,
+      config_.has_value()
+          ? makeOptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(config_.value())
+          : absl::nullopt,
+      common_config_);
+  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(nullptr));
+}
+
 // Given no hosts, expect chooseHost to return null.
 TEST_P(RingHashLoadBalancerTest, NoHost) {
   init();

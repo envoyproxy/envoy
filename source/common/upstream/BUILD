@@ -376,20 +376,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "thread_aware_lb_lib",
-    srcs = ["thread_aware_lb_impl.cc"],
-    hdrs = ["thread_aware_lb_impl.h"],
-    external_deps = ["abseil_synchronization"],
-    deps = [
-        ":load_balancer_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/config:metadata_lib",
-        "//source/common/config:well_known_names",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
     deps = [

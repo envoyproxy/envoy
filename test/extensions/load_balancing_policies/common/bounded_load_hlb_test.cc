@@ -2,7 +2,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "source/common/upstream/thread_aware_lb_impl.h"
+#include "source/extensions/load_balancing_policies/common/thread_aware_lb_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/mocks.h"
@@ -40,6 +40,10 @@ public:
 private:
   HostOverloadFactorPredicate host_overload_factor_;
   double hostOverloadFactor(const Host& host, double weight) const override {
+    if (host_overload_factor_ == nullptr) {
+      return ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::hostOverloadFactor(
+          host, weight);
+    }
     return host_overload_factor_(host, weight);
   }
 };
@@ -158,11 +162,36 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, NoHostEverOverloaded) {
   }
 };
 
+TEST_F(BoundedLoadHashingLoadBalancerTest, ActualHostOverloaded) {
+  // The random shuffle sequence of 5 elements with seed 2 is 2 1 0 4 3.
+
+  NormalizedHostWeightVector normalized_host_weights;
+  createHosts(5, normalized_host_weights);
+
+  NormalizedHostWeightVector ring(normalized_host_weights);
+  hlb_ = std::make_shared<TestHashingLoadBalancer>(ring);
+  // To use actual host overload factor.
+  lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
+                                                             nullptr);
+  HostConstSharedPtr host = lb_->chooseHost(2, 1);
+  EXPECT_NE(host, nullptr);
+  EXPECT_EQ(host->address()->asString(), "127.0.0.12:90");
+
+  // Mock the host to be overloaded.
+  host->cluster().trafficStats()->upstream_cx_active_.add(2);
+  host->stats().rq_active_.add(2);
+
+  // The host is overloaded, so the next host in the sequence is picked up.
+  host = lb_->chooseHost(2, 1);
+  EXPECT_NE(host, nullptr);
+  EXPECT_EQ(host->address()->asString(), "127.0.0.11:90");
+};
+
 // Works correctly for the case one host is overloaded.
 TEST_F(BoundedLoadHashingLoadBalancerTest, OneHostOverloaded) {
   // In this test host 2 is overloaded. The random shuffle sequence of 5
   // elements with seed 2 is 2 1 0 4 3. When the host picked up for
-  // hash 2 (which is 127.0.0.12) is overloaded, host 0 (127.0.0.10)
+  // hash 2 (which is 127.0.0.12) is overloaded, host 1 (127.0.0.11)
   // is picked up.
 
   // setup: 5 hosts, one of them is overloaded.

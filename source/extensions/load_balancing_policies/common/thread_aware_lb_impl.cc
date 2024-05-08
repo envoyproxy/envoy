@@ -1,4 +1,4 @@
-#include "source/common/upstream/thread_aware_lb_impl.h"
+#include "source/extensions/load_balancing_policies/common/thread_aware_lb_impl.h"
 
 #include <memory>
 #include <random>
