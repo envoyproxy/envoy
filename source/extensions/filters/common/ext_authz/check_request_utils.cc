@@ -154,10 +154,11 @@ void CheckRequestUtils::setHttpRequest(
     }
 
     const std::string key(e.key().getStringView());
-    if (allowed_headers_matcher != nullptr && !allowed_headers_matcher->matches(key)) {
+    if (disallowed_headers_matcher != nullptr && disallowed_headers_matcher->matches(key)) {
       return Envoy::Http::HeaderMap::Iterate::Continue;
     }
-    if (disallowed_headers_matcher != nullptr && disallowed_headers_matcher->matches(key)) {
+
+    if (allowed_headers_matcher != nullptr && !allowed_headers_matcher->matches(key)) {
       return Envoy::Http::HeaderMap::Iterate::Continue;
     }
 
