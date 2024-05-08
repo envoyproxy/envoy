@@ -115,6 +115,11 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
                   cluster_name_, uri_);
         return;
       }
+
+      context_->clusterManager().setInitializedCb([&]() -> void {
+        ENVOY_LOG_MISC(debug, "Cluster initialized, performing initial credential refresh");
+        refresh();
+      });
     });
 
     tls_ = ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(context_->threadLocal());
@@ -127,15 +132,6 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
         refresh();
       }
     });
-
-    if (useHttpAsyncClient()) {
-      // Register with init_manager, force the listener to wait for fetching (refresh).
-      init_target_ = std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void {
-        const Thread::LockGuard lock(lock_);
-        refresh();
-      });
-      context_->initManager().add(*init_target_);
-    }
   }
 }
 
@@ -157,11 +153,10 @@ std::chrono::seconds MetadataCredentialsProviderBase::getCacheDuration() {
 
 void MetadataCredentialsProviderBase::handleFetchDone() {
   if (useHttpAsyncClient() && context_) {
-    if (init_target_) {
-      init_target_->ready();
-      init_target_.reset();
-    }
     if (cache_duration_timer_ && !cache_duration_timer_->enabled()) {
+      // Receiver state handles the initial credential refresh scenario. If for some reason we are
+      // unable to perform credential refresh after cluster initialization has completed, we use a
+      // short timer to keep retrying. Once successful, we fall back to the normal cache duration.
       if (receiver_state_ == MetadataFetcher::MetadataReceiver::ReceiverState::Initializing) {
         cache_duration_timer_->enableTimer(initialization_timer_);
         // Timer begins at 2 seconds and doubles each time, to a maximum of 30 seconds. This avoids

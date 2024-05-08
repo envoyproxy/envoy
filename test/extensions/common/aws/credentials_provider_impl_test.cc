@@ -825,7 +825,6 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentSecure) {
   // Trigger refresh, which should then validate the previous two expectations
   timer_->invokeCallback();
 
-
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -841,7 +840,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentUnsecure) {
   // init_watcher ready is called.
   init_watcher_.expectReady();
 
-    // Cancel is called twice.
+  // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
 
   // Expect refresh timer to be started as a result of completing the init callback
@@ -871,7 +870,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentSecure) {
   // init_watcher ready is called.
   init_watcher_.expectReady();
 
-    // Cancel is called twice.
+  // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
 
   // Expect refresh timer to be started as a result of completing the init callback
@@ -902,8 +901,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentUnsecure) {
  )EOF"));
   // init_watcher ready is called.
   init_watcher_.expectReady();
-  
-    // Cancel is called twice.
+
+  // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
 
   // Expect refresh timer to be started as a result of completing the init callback
@@ -934,8 +933,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentSecure) {
  )EOF"));
   // init_watcher ready is called.
   init_watcher_.expectReady();
-  
-    // Cancel is called twice.
+
+  // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
 
   // Expect refresh timer to be started as a result of completing the init callback
@@ -949,7 +948,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentSecure) {
   EXPECT_CALL(*timer_, enableTimer(timer_duration, nullptr));
   // Trigger refresh, which should then validate the previous two expectations
   timer_->invokeCallback();
-  
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
