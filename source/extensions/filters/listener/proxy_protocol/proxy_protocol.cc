@@ -10,6 +10,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
+#include "envoy/data/core/v3/tlv_metadata.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
@@ -542,7 +543,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
         auto& typed_filter_metadata = (*cb_->dynamicMetadata().mutable_typed_filter_metadata());
 
         const auto typed_proxy_filter_metadata = typed_filter_metadata.find(metadata_key);
-        envoy::extensions::filters::listener::proxy_protocol::v3::TlvsMetadata tlvs_metadata;
+        envoy::data::core::v3::TlvsMetadata tlvs_metadata;
         auto status = absl::OkStatus();
         if (typed_proxy_filter_metadata != typed_filter_metadata.end()) {
           status = MessageUtil::unpackTo(typed_proxy_filter_metadata->second, tlvs_metadata);

@@ -5,6 +5,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
+#include "envoy/data/core/v3/tlv_metadata.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -1787,7 +1788,7 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEmitTypedAndUntypedM
   auto typed_metadata = server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata();
   EXPECT_EQ(1, typed_metadata.size());
   EXPECT_EQ(1, typed_metadata.count(ProxyProtocol));
-  envoy::extensions::filters::listener::proxy_protocol::v3::TlvsMetadata tlvs_metadata;
+  envoy::data::core::v3::TlvsMetadata tlvs_metadata;
   auto status = MessageUtil::unpackTo(typed_metadata[ProxyProtocol], tlvs_metadata);
   EXPECT_EQ(absl::OkStatus(), status);
   EXPECT_EQ(2, tlvs_metadata.typed_metadata().size());
@@ -1887,7 +1888,7 @@ TEST_P(ProxyProtocolTest,
   EXPECT_EQ(1, typed_metadata.size());
   EXPECT_EQ(1, typed_metadata.count(ProxyProtocol));
 
-  envoy::extensions::filters::listener::proxy_protocol::v3::TlvsMetadata tlvs_metadata;
+  envoy::data::core::v3::TlvsMetadata tlvs_metadata;
   auto status = MessageUtil::unpackTo(typed_metadata[ProxyProtocol], tlvs_metadata);
   EXPECT_EQ(absl::OkStatus(), status);
   EXPECT_EQ(2, tlvs_metadata.typed_metadata().size());

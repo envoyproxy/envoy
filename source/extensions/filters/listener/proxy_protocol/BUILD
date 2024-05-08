@@ -37,6 +37,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
     ],
 )
