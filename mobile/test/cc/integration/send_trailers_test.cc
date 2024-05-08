@@ -1,7 +1,6 @@
 #include "test/common/integration/engine_with_test_server.h"
 #include "test/common/integration/test_server.h"
 
-#include "absl/strings/str_format.h"
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
@@ -59,7 +58,7 @@ TEST(SendTrailersTest, Success) {
   headers->addCopy(Http::LowerCaseString(":method"), "GET");
   headers->addCopy(Http::LowerCaseString(":scheme"), "https");
   headers->addCopy(Http::LowerCaseString(":authority"),
-                   absl::StrFormat("localhost:%d", engine_with_test_server.testServer().getPort()));
+                   engine_with_test_server.testServer().getAddress());
   headers->addCopy(Http::LowerCaseString(":path"), "/");
   stream->sendHeaders(std::move(headers), false);
 

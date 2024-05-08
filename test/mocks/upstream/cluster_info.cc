@@ -22,16 +22,6 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
-  ON_CALL(*this, isEnabled()).WillByDefault(Return(false));
-  ON_CALL(*this, fallbackPolicy())
-      .WillByDefault(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
-  ON_CALL(*this, defaultSubset()).WillByDefault(ReturnRef(ProtobufWkt::Struct::default_instance()));
-  ON_CALL(*this, subsetSelectors()).WillByDefault(ReturnRef(subset_selectors_));
-}
-
-MockLoadBalancerSubsetInfo::~MockLoadBalancerSubsetInfo() = default;
-
 MockIdleTimeEnabledClusterInfo::MockIdleTimeEnabledClusterInfo() {
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(std::chrono::milliseconds(1000)));
 }
@@ -95,6 +85,9 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, edsServiceName()).WillByDefault(Invoke([this]() -> const std::string& {
     return eds_service_name_.has_value() ? eds_service_name_.value() : Envoy::EMPTY_STRING;
   }));
+  ON_CALL(*this, loadBalancerFactory()).WillByDefault(Invoke([this]() -> TypedLoadBalancerFactory& {
+    return *lb_factory_;
+  }));
   ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
   ON_CALL(*this, http2Options()).WillByDefault(ReturnRef(http2_options_));
   ON_CALL(*this, http3Options()).WillByDefault(ReturnRef(http3_options_));
@@ -128,33 +121,6 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke(
           [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
-  ON_CALL(*this, lbType()).WillByDefault(ReturnPointee(&lb_type_));
-  ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
-  ON_CALL(*this, lbRoundRobinConfig())
-      .WillByDefault(
-          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> {
-            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
-                lb_round_robin_config_.get());
-          }));
-  ON_CALL(*this, lbRingHashConfig())
-      .WillByDefault(
-          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> {
-            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-                lb_ring_hash_config_.get());
-          }));
-  ON_CALL(*this, lbMaglevConfig())
-      .WillByDefault(
-          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> {
-            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
-                lb_maglev_config_.get());
-          }));
-  ON_CALL(*this, lbOriginalDstConfig())
-      .WillByDefault(Invoke(
-          [this]() -> OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> {
-            return makeOptRefFromPtr<
-                const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
-                lb_original_dst_config_.get());
-          }));
   ON_CALL(*this, upstreamConfig())
       .WillByDefault(
           Invoke([this]() -> OptRef<const envoy::config::core::v3::TypedExtensionConfig> {

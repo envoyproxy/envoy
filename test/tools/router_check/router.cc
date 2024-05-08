@@ -252,7 +252,7 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
         nullptr, Network::Utility::getCanonicalIpv4LoopbackAddress());
     Envoy::StreamInfo::StreamInfoImpl stream_info(
         Envoy::Http::Protocol::Http11, factory_context_->mainThreadDispatcher().timeSource(),
-        connection_info_provider);
+        connection_info_provider, StreamInfo::FilterState::LifeSpan::FilterChain);
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ =
         config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);

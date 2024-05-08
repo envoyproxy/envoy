@@ -5,7 +5,7 @@ Envoy Json-To-Metadata Filter
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.json_to_metadata.v3.JsonToMetadata``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata>`
 
-This filter is configured with rules that will be matched against requests.
+This filter is configured with rules that will be matched against requests and responses.
 Each rule has either a series of selectors and can be triggered either when the json attribute
 is present or missing.
 
@@ -50,3 +50,7 @@ comes from the owning HTTP connection manager.
   rq_mismatched_content_type, Counter, Total requests that mismatch the content type
   rq_no_body, Counter, Total requests without content body
   rq_invalid_json_body, Counter, Total requests with invalid json body
+  resp_success, Counter, Total responses that succeed to parse the json body. Note that a pure string or number body is treated as a successful json body which increases this counter.
+  resp_mismatched_content_type, Counter, Total responses that mismatch the content type
+  resp_no_body, Counter, Total responses without content body
+  resp_invalid_json_body, Counter, Total responses with invalid json body

@@ -1265,7 +1265,12 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNoLb) {
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "cluster_0";
-  cluster1->info_->lb_type_ = LoadBalancerType::ClusterProvided;
+
+  ON_CALL(*cluster1->info_, loadBalancerFactory())
+      .WillByDefault(
+          ReturnRef(Config::Utility::getAndCheckFactoryByName<Upstream::TypedLoadBalancerFactory>(
+              "envoy.load_balancing_policies.cluster_provided")));
+
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Json(json)), EnvoyException,
@@ -1331,14 +1336,15 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
 
 class ClusterManagerImplThreadAwareLbTest : public ClusterManagerImplTest {
 public:
-  void doTest(LoadBalancerType lb_type) {
+  void doTest(const std::string& factory_name) {
     const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                           clustersJson({defaultStaticClusterJson("cluster_0")}));
 
     std::shared_ptr<MockClusterMockPrioritySet> cluster1(
         new NiceMock<MockClusterMockPrioritySet>());
     cluster1->info_->name_ = "cluster_0";
-    cluster1->info_->lb_type_ = lb_type;
+    cluster1->info_->lb_factory_ =
+        Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(factory_name);
 
     InSequence s;
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
@@ -1362,13 +1368,13 @@ public:
 // Test that the cluster manager correctly re-creates the worker local LB when there is a host
 // set change.
 TEST_F(ClusterManagerImplThreadAwareLbTest, RingHashLoadBalancerThreadAwareUpdate) {
-  doTest(LoadBalancerType::RingHash);
+  doTest("envoy.load_balancing_policies.ring_hash");
 }
 
 // Test that the cluster manager correctly re-creates the worker local LB when there is a host
 // set change.
 TEST_F(ClusterManagerImplThreadAwareLbTest, MaglevLoadBalancerThreadAwareUpdate) {
-  doTest(LoadBalancerType::Maglev);
+  doTest("envoy.load_balancing_policies.maglev");
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
@@ -1597,7 +1603,9 @@ TEST_P(ClusterManagerLifecycleTest, InitializeOrder) {
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
   cluster2->info_->name_ = "fake_cluster2";
-  cluster2->info_->lb_type_ = LoadBalancerType::RingHash;
+  cluster2->info_->lb_factory_ =
+      Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
+          "envoy.load_balancing_policies.ring_hash");
 
   // This part tests static init.
   InSequence s;

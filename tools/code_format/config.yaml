@@ -90,7 +90,7 @@ paths:
     - source/common/filter/config_discovery_impl.h
     - source/common/config/utility.h
     - source/common/matcher/map_matcher.h
-    - source/common/matcher/field_matcher.h
+    - source/common/matcher/matcher.h
     - source/extensions/common/matcher/trie_matcher.h
     - envoy/common/exception.h
     - source/common/upstream/upstream_impl.h
@@ -165,6 +165,7 @@ paths:
     - source/common/local_reply/local_reply.cc
     - source/common/tls/context_impl.cc
     - source/common/tls/context_config_impl.cc
+    - source/common/tls/ocsp/ocsp.cc
     - source/common/config/watched_directory.cc
     - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc

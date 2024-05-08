@@ -16,3 +16,17 @@ envoy_cc_library(
         "//source/common/upstream:load_balancer_factory_base_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "thread_aware_lb_lib",
+    srcs = ["thread_aware_lb_impl.cc"],
+    hdrs = ["thread_aware_lb_impl.h"],
+    external_deps = ["abseil_synchronization"],
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/upstream:load_balancer_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)

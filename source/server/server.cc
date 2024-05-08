@@ -262,9 +262,11 @@ void InstanceBase::updateServerStats() {
                                        parent_stats.parent_memory_allocated_);
   server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
   server_stats_->memory_physical_size_.set(Memory::Stats::totalPhysicalBytes());
-  server_stats_->parent_connections_.set(parent_stats.parent_connections_);
-  server_stats_->total_connections_.set(listener_manager_->numConnections() +
-                                        parent_stats.parent_connections_);
+  if (!options().hotRestartDisabled()) {
+    server_stats_->parent_connections_.set(parent_stats.parent_connections_);
+    server_stats_->total_connections_.set(listener_manager_->numConnections() +
+                                          parent_stats.parent_connections_);
+  }
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires().value_or(0));
 
@@ -531,7 +533,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
-  server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
+  if (!options().hotRestartDisabled()) {
+    server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
+  }
   InstanceBase::failHealthcheck(false);
 
   // Check if bootstrap has server version override set, if yes, we should use that as
@@ -606,7 +610,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   OptRef<Server::ConfigTracker> config_tracker;
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-  admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this,
+  admin_ = std::make_shared<AdminImpl>(initial_config.admin().profilePath(), *this,
                                        initial_config.admin().ignoreGlobalConnLimit());
 
   config_tracker = admin_->getConfigTracker();
@@ -862,13 +866,12 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 #ifdef ENVOY_ENABLE_YAML
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
 #endif
-  absl::Status creation_status;
-  auto loader = std::make_unique<Runtime::LoaderImpl>(
+  absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),
-      server.messageValidationContext().dynamicValidationVisitor(), server.api(), creation_status);
-  THROW_IF_NOT_OK(creation_status);
-  return loader;
+      server.messageValidationContext().dynamicValidationVisitor(), server.api());
+  THROW_IF_NOT_OK(loader.status());
+  return std::move(loader.value());
 }
 
 void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path) {
