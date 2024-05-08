@@ -159,8 +159,10 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   init_manager_.add(*sds_api.initTarget());
   initialize();
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
-  auto handle =
-      sds_api.addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  auto handle = sds_api.addUpdateCallback([&secret_callback]() {
+    secret_callback.onAddOrUpdateSecret();
+    return absl::OkStatus();
+  });
 
   std::string yaml =
       R"EOF(
@@ -220,7 +222,10 @@ protected:
         []() {}, mock_dispatcher_, *api_);
     init_manager_.add(*sds_api_->initTarget());
     initialize();
-    handle_ = sds_api_->addUpdateCallback([this]() { secret_callback_.onAddOrUpdateSecret(); });
+    handle_ = sds_api_->addUpdateCallback([this]() {
+      secret_callback_.onAddOrUpdateSecret();
+      return absl::OkStatus();
+    });
   }
 
   void onConfigUpdate(const std::string& cert_value, const std::string& key_value) {
@@ -291,7 +296,10 @@ protected:
         []() {}, mock_dispatcher_, *api_);
     init_manager_.add(*sds_api_->initTarget());
     initialize();
-    handle_ = sds_api_->addUpdateCallback([this]() { secret_callback_.onAddOrUpdateSecret(); });
+    handle_ = sds_api_->addUpdateCallback([this]() {
+      secret_callback_.onAddOrUpdateSecret();
+      return absl::OkStatus();
+    });
   }
 
   void onConfigUpdate(const std::string& trusted_ca_path, const std::string& trusted_ca_value,
@@ -576,8 +584,10 @@ TEST_F(SdsApiTest, DeltaUpdateSuccess) {
   init_manager_.add(*sds_api.initTarget());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
-  auto handle =
-      sds_api.addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  auto handle = sds_api.addUpdateCallback([&secret_callback]() {
+    secret_callback.onAddOrUpdateSecret();
+    return absl::OkStatus();
+  });
 
   std::string yaml =
       R"EOF(
@@ -619,8 +629,10 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   init_manager_.add(*sds_api.initTarget());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
-  auto handle =
-      sds_api.addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  auto handle = sds_api.addUpdateCallback([&secret_callback]() {
+    secret_callback.onAddOrUpdateSecret();
+    return absl::OkStatus();
+  });
 
   std::string yaml =
       R"EOF(
@@ -671,13 +683,16 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   init_manager_.add(*sds_api.initTarget());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
-  auto handle =
-      sds_api.addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  auto handle = sds_api.addUpdateCallback([&secret_callback]() {
+    secret_callback.onAddOrUpdateSecret();
+    return absl::OkStatus();
+  });
   NiceMock<MockCvcValidationCallback> validation_callback;
   auto validation_handle = sds_api.addValidationCallback(
       [&validation_callback](
           const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& cvc) {
         validation_callback.validateCvc(cvc);
+        return absl::OkStatus();
       });
 
   envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
@@ -765,13 +780,16 @@ TEST_F(SdsApiTest, GenericSecretSdsApiTest) {
   init_manager_.add(*sds_api.initTarget());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
-  auto handle =
-      sds_api.addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  auto handle = sds_api.addUpdateCallback([&secret_callback]() {
+    secret_callback.onAddOrUpdateSecret();
+    return absl::OkStatus();
+  });
   NiceMock<MockGenericSecretValidationCallback> validation_callback;
   auto validation_handle = sds_api.addValidationCallback(
       [&validation_callback](
           const envoy::extensions::transport_sockets::tls::v3::GenericSecret& secret) {
         validation_callback.validateGenericSecret(secret);
+        return absl::OkStatus();
       });
 
   std::string yaml =

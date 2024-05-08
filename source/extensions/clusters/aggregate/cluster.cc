@@ -50,6 +50,7 @@ void AggregateClusterLoadBalancer::addMemberUpdateCallbackForCluster(
             ENVOY_LOG(debug, "member update for cluster '{}' in aggregate cluster '{}'",
                       target_cluster_info->name(), parent_info_->name());
             refresh();
+            return absl::OkStatus();
           });
 }
 

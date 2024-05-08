@@ -108,7 +108,7 @@ void RdsRouteConfigSubscription::afterProviderUpdate() {
     vhds_subscription_.release();
   }
 
-  update_callback_manager_.runCallbacks();
+  THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
 }
 
 // Initialize a no-op InitManager in case the one in the factory_context has completed

@@ -69,7 +69,7 @@ void SdsApi::onWatchUpdate() {
     const uint64_t new_hash = next_hash;
     if (new_hash != files_hash_) {
       resolveSecret(files);
-      update_callback_manager_.runCallbacks();
+      THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
       files_hash_ = new_hash;
     }
   }
@@ -103,7 +103,7 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     const auto files = loadFiles();
     files_hash_ = getHashForFiles(files);
     resolveSecret(files);
-    update_callback_manager_.runCallbacks();
+    THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
 
     auto* watched_directory = getWatchedDirectory();
     // Either we have a watched path and can defer the watch monitoring to a
