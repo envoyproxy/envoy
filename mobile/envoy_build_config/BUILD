@@ -72,7 +72,10 @@ envoy_cc_library(
             "@envoy//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         ],
         "@envoy",
-    ),
+    ) + select({
+        "@envoy//bazel:apple": [],
+        "//conditions:default": ["@envoy//source/extensions/network/dns_resolver/cares:config"],
+    }),
 )
 
 envoy_cc_library(

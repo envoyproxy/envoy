@@ -272,9 +272,10 @@ void BoundGenericUpstream::onPoolFailureImpl(ConnectionPool::PoolFailureReason r
   downstream_connection_.close(Network::ConnectionCloseType::FlushWrite);
 }
 
-void BoundGenericUpstream::onDecodingSuccess(StreamFramePtr response) {
-  const uint64_t stream_id = response->frameFlags().streamFlags().streamId();
-  const bool end_stream = response->frameFlags().endStream();
+void BoundGenericUpstream::onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
+                                             absl::optional<StartTime> start_time) {
+  const uint64_t stream_id = response_header_frame->frameFlags().streamFlags().streamId();
+  const bool end_stream = response_header_frame->frameFlags().endStream();
 
   auto it = waiting_response_requests_.find(stream_id);
   if (it == waiting_response_requests_.end()) {
@@ -289,7 +290,27 @@ void BoundGenericUpstream::onDecodingSuccess(StreamFramePtr response) {
     waiting_response_requests_.erase(it);
   }
 
-  return cb->onDecodingSuccess(std::move(response));
+  return cb->onDecodingSuccess(std::move(response_header_frame), std::move(start_time));
+}
+
+void BoundGenericUpstream::onDecodingSuccess(ResponseCommonFramePtr response_common_frame) {
+  const uint64_t stream_id = response_common_frame->frameFlags().streamFlags().streamId();
+  const bool end_stream = response_common_frame->frameFlags().endStream();
+
+  auto it = waiting_response_requests_.find(stream_id);
+  if (it == waiting_response_requests_.end()) {
+    ENVOY_LOG(error, "generic proxy: id {} not found for frame", stream_id);
+    return;
+  }
+
+  auto cb = it->second;
+
+  // If the response is end, remove the callback from the map.
+  if (end_stream) {
+    waiting_response_requests_.erase(it);
+  }
+
+  return cb->onDecodingSuccess(std::move(response_common_frame));
 }
 
 void BoundGenericUpstream::onDecodingFailure(absl::string_view reason) {
@@ -340,10 +361,14 @@ void OwnedGenericUpstream::onPoolFailureImpl(ConnectionPool::PoolFailureReason r
   upstream_request_->onUpstreamFailure(reason, transport_failure_reason);
 }
 
-// ResponseDecoderCallback
-void OwnedGenericUpstream::onDecodingSuccess(StreamFramePtr response) {
+void OwnedGenericUpstream::onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
+                                             absl::optional<StartTime> start_time) {
   ASSERT(upstream_request_ != nullptr);
-  upstream_request_->onDecodingSuccess(std::move(response));
+  upstream_request_->onDecodingSuccess(std::move(response_header_frame), std::move(start_time));
+}
+void OwnedGenericUpstream::onDecodingSuccess(ResponseCommonFramePtr response_common_frame) {
+  ASSERT(upstream_request_ != nullptr);
+  upstream_request_->onDecodingSuccess(std::move(response_common_frame));
 }
 void OwnedGenericUpstream::onDecodingFailure(absl::string_view reason) {
   ASSERT(upstream_request_ != nullptr);
@@ -530,32 +555,46 @@ void UpstreamRequest::onUpstreamSuccess() {
   sendRequestFrameToUpstream();
 }
 
-void UpstreamRequest::onDecodingSuccess(StreamFramePtr response) {
-  const bool end_stream = response->frameFlags().endStream();
+void UpstreamRequest::onUpstreamResponseComplete(bool drain_close) {
+  clearStream(drain_close);
+  upstream_info_->upstreamTiming().onLastUpstreamRxByteReceived(parent_.time_source_);
+}
 
-  if (!response_stream_header_received_) {
-    // The first frame of response is received.
+void UpstreamRequest::onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
+                                        absl::optional<StartTime> start_time) {
+  if (response_stream_header_received_) {
+    ENVOY_LOG(error, "upstream request: multiple StreamResponse received");
+  }
+  response_stream_header_received_ = true;
+
+  if (start_time.has_value()) {
+    // Set the start time from the upstream codec.
+    upstream_info_->upstreamTiming().first_upstream_rx_byte_received_ =
+        start_time.value().start_time_monotonic;
+  } else {
+    // Codec does not provide the start time and use the current time as the start time.
     upstream_info_->upstreamTiming().onFirstUpstreamRxByteReceived(parent_.time_source_);
   }
-  if (end_stream) {
-    // The response is fully received.
-    upstream_info_->upstreamTiming().onLastUpstreamRxByteReceived(parent_.time_source_);
 
-    // The response is complete and clear the stream.
-    clearStream(response->frameFlags().streamFlags().drainClose());
+  if (response_header_frame->frameFlags().endStream()) {
+    onUpstreamResponseComplete(response_header_frame->frameFlags().streamFlags().drainClose());
   }
 
-  if (response_stream_header_received_) {
-    parent_.onResponseFrame(std::move(response));
-  } else {
-    StreamFramePtrHelper<StreamResponse> helper(std::move(response));
-    if (helper.typed_frame_ == nullptr) {
-      resetStream(StreamResetReason::ProtocolError, "first frame is not StreamResponse");
-      return;
-    }
-    response_stream_header_received_ = true;
-    parent_.onResponseStart(std::move(helper.typed_frame_));
+  parent_.onResponseStart(std::move(response_header_frame));
+}
+
+void UpstreamRequest::onDecodingSuccess(ResponseCommonFramePtr response_common_frame) {
+  if (!response_stream_header_received_) {
+    ENVOY_LOG(error, "upstream request: first frame is not StreamResponse");
+    resetStream(StreamResetReason::ProtocolError, {});
+    return;
   }
+
+  if (response_common_frame->frameFlags().endStream()) {
+    onUpstreamResponseComplete(response_common_frame->frameFlags().streamFlags().drainClose());
+  }
+
+  parent_.onResponseFrame(std::move(response_common_frame));
 }
 
 void UpstreamRequest::onDecodingFailure(absl::string_view reason) {
@@ -611,70 +650,110 @@ void UpstreamRequest::encodeBufferToUpstream(Buffer::Instance& buffer) {
   generic_upstream_->writeToConnection(buffer);
 }
 
-void RouterFilter::onResponseStart(ResponsePtr response) {
-  filter_complete_ = response->frameFlags().endStream();
-  callbacks_->onResponseStart(std::move(response));
+void RouterFilter::onResponseStart(ResponseHeaderFramePtr response_header_frame) {
+  if (response_header_frame->frameFlags().endStream()) {
+    onFilterComplete();
+  }
+  callbacks_->onResponseStart(std::move(response_header_frame));
 }
 
-void RouterFilter::onResponseFrame(StreamFramePtr frame) {
-  ASSERT(!filter_complete_, "response frame received after response complete");
-  filter_complete_ = frame->frameFlags().endStream();
-  callbacks_->onResponseFrame(std::move(frame));
+void RouterFilter::onResponseFrame(ResponseCommonFramePtr response_common_frame) {
+  if (response_common_frame->frameFlags().endStream()) {
+    onFilterComplete();
+  }
+  callbacks_->onResponseFrame(std::move(response_common_frame));
 }
 
 void RouterFilter::completeDirectly() {
-  filter_complete_ = true;
+  onFilterComplete();
   callbacks_->completeDirectly();
 }
 
 void RouterFilter::onUpstreamRequestReset(UpstreamRequest&, StreamResetReason reason,
                                           absl::string_view reason_detail) {
+  // If the RouterFilter is already completed (request is canceled or reset), ignore
+  // the upstream request reset.
   if (filter_complete_) {
     return;
   }
 
-  // TODO(wbpcode): To support retry policy.
+  // Retry is the upstream request is reset because of the connection failure or the
+  // protocol error.
+  if (couldRetry(reason)) {
+    kickOffNewUpstreamRequest();
+    return;
+  }
+
   resetStream(reason, reason_detail);
 }
 
-void RouterFilter::cleanUpstreamRequests() {
-  // Set filter_complete_ to true then the resetStream() of RouterFilter will not be called
-  // on the onUpstreamRequestReset() of RouterFilter.
+void RouterFilter::onFilterComplete() {
+  // Ensure this method is called only once strictly.
+  if (filter_complete_) {
+    return;
+  }
   filter_complete_ = true;
 
+  // Clean up all pending upstream requests.
   while (!upstream_requests_.empty()) {
     (*upstream_requests_.back()).resetStream(StreamResetReason::LocalReset, {});
   }
+
+  // Clean up the timer to avoid the timeout event.
+  if (timeout_timer_ != nullptr) {
+    timeout_timer_->disableTimer();
+    timeout_timer_.reset();
+  }
 }
 
-void RouterFilter::onDestroy() {
-  if (filter_complete_) {
+void RouterFilter::mayRequestStreamEnd(bool stream_end_stream) {
+  if (!stream_end_stream) {
     return;
   }
-  cleanUpstreamRequests();
+
+  request_stream_end_ = stream_end_stream;
+
+  const auto timeout = route_entry_->timeout();
+  if (timeout.count() > 0) {
+    timeout_timer_ = callbacks_->dispatcher().createTimer([this] { onTimeout(); });
+    timeout_timer_->enableTimer(timeout);
+  }
 }
+
+void RouterFilter::onTimeout() {
+  completeAndSendLocalReply(Status(StatusCode::kDeadlineExceeded, "timeout"), {},
+                            StreamInfo::CoreResponseFlag::UpstreamRequestTimeout);
+}
+
+void RouterFilter::onDestroy() { onFilterComplete(); }
 
 void RouterFilter::resetStream(StreamResetReason reason, absl::string_view reason_detail) {
+  // Ensure this method is called only once strictly and never called after
+  // onFilterComplete().
   if (filter_complete_) {
     return;
   }
-  filter_complete_ = true;
-
   const auto [view, flag] = resetReasonToViewAndFlag(reason);
+  completeAndSendLocalReply(Status(StatusCode::kUnavailable, view), reason_detail, flag);
+}
+
+void RouterFilter::completeAndSendLocalReply(absl::Status status, absl::string_view details,
+                                             absl::optional<StreamInfo::CoreResponseFlag> flag) {
   if (flag.has_value()) {
     callbacks_->streamInfo().setResponseFlag(flag.value());
   }
-  callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, view), reason_detail);
+  onFilterComplete();
+  callbacks_->sendLocalReply(std::move(status), details);
 }
 
 void RouterFilter::kickOffNewUpstreamRequest() {
+  num_retries_++;
+
   const auto& cluster_name = route_entry_->clusterName();
 
   auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
-    filter_complete_ = true;
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoClusterFound);
-    callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"));
+    completeAndSendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"), {});
     return;
   }
 
@@ -682,9 +761,8 @@ void RouterFilter::kickOffNewUpstreamRequest() {
   callbacks_->streamInfo().setUpstreamClusterInfo(cluster_);
 
   if (cluster_->maintenanceMode()) {
-    filter_complete_ = true;
     // No response flag for maintenance mode for now.
-    callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "cluster_maintain_mode"));
+    completeAndSendLocalReply(Status(StatusCode::kUnavailable, "cluster_maintain_mode"), {});
     return;
   }
 
@@ -704,9 +782,8 @@ void RouterFilter::kickOffNewUpstreamRequest() {
       // The upstream connection is not bound yet and create a new bound upstream connection.
       auto pool_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
       if (!pool_data.has_value()) {
-        filter_complete_ = true;
-        callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
-        callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"));
+        completeAndSendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"), {},
+                                  StreamInfo::CoreResponseFlag::NoHealthyUpstream);
         return;
       }
       auto new_bound_upstream = std::make_shared<BoundGenericUpstream>(
@@ -724,9 +801,8 @@ void RouterFilter::kickOffNewUpstreamRequest() {
     // Upstream connection binding is disabled and create a new upstream connection.
     auto pool_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
     if (!pool_data.has_value()) {
-      filter_complete_ = true;
-      callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
-      callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"));
+      completeAndSendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"), {},
+                                StreamInfo::CoreResponseFlag::NoHealthyUpstream);
       return;
     }
     generic_upstream = std::make_shared<OwnedGenericUpstream>(callbacks_->codecFactory(),
@@ -739,8 +815,9 @@ void RouterFilter::kickOffNewUpstreamRequest() {
   raw_upstream_request->startStream();
 }
 
-void RouterFilter::onStreamFrame(StreamFramePtr frame) {
-  request_stream_end_ = frame->frameFlags().endStream();
+void RouterFilter::onRequestCommonFrame(RequestCommonFramePtr frame) {
+  mayRequestStreamEnd(frame->frameFlags().endStream());
+
   request_stream_frames_.emplace_back(std::move(frame));
 
   if (upstream_requests_.empty()) {
@@ -754,18 +831,17 @@ FilterStatus RouterFilter::onStreamDecoded(StreamRequest& request) {
   ENVOY_LOG(debug, "Try route request to the upstream based on the route entry");
 
   setRouteEntry(callbacks_->routeEntry());
-  request_stream_end_ = request.frameFlags().endStream();
   request_stream_ = &request;
 
-  if (route_entry_ != nullptr) {
-    kickOffNewUpstreamRequest();
+  if (route_entry_ == nullptr) {
+    ENVOY_LOG(debug, "No route for current request and send local reply");
+    completeAndSendLocalReply(Status(StatusCode::kNotFound, "route_not_found"), {},
+                              StreamInfo::CoreResponseFlag::NoRouteFound);
     return FilterStatus::StopIteration;
   }
 
-  ENVOY_LOG(debug, "No route for current request and send local reply");
-  filter_complete_ = true;
-  callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
-  callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "route_not_found"));
+  mayRequestStreamEnd(request.frameFlags().endStream());
+  kickOffNewUpstreamRequest();
   return FilterStatus::StopIteration;
 }
 

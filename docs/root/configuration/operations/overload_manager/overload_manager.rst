@@ -170,6 +170,11 @@ The following core load shed points are supported:
       pressure, typically memory. This happens once geting data from the
       connection.
 
+  * - envoy.load_shed_points.http_downstream_filter_check
+    - Envoy will send local reply directly before creating an upstream request in
+      the router if Envoy is under resource pressure, typically memory. This change
+      makes load shed check availabe in HTTP decoder filters.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts

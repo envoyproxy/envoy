@@ -542,7 +542,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kScopedRoutes:
     if (!srds_factory || !scoped_routes_config_provider_manager_) {
-      throwEnvoyExceptionOrPanic("SRDS configured but not compiled in");
+      creation_status = absl::InvalidArgumentError("SRDS configured but not compiled in");
+      return;
     }
     scoped_routes_config_provider_ =
         srds_factory->createConfigProvider(config, context_.serverFactoryContext(), stats_prefix_,

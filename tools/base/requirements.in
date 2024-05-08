@@ -1,6 +1,7 @@
 abstracts>=0.0.12
 aio.api.bazel
 aio.api.github>=0.2.5
+aio.core>=0.10.2
 aiohttp>=3.8.1
 aioquic>=0.9.21
 cffi>=1.15.0
@@ -11,7 +12,7 @@ coloredlogs
 cryptography>=42.0.0
 dependatool>=0.2.2
 envoy.base.utils>=0.5.0
-envoy.code.check>=0.5.8
+envoy.code.check>=0.5.12
 envoy.dependency.check>=0.1.10
 envoy.distribution.release>=0.0.9
 envoy.distribution.repo>=0.0.8

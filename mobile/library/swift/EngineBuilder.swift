@@ -121,15 +121,8 @@ open class XdsBuilder: NSObject {
 @objcMembers
 open class EngineBuilder: NSObject {
   // swiftlint:disable:previous type_body_length
-  private let base: BaseConfiguration
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
   private var logLevel: LogLevel = .info
-
-  private enum BaseConfiguration {
-    case standard
-    case custom(String)
-  }
-
   private var connectTimeoutSeconds: UInt32 = 30
   private var dnsFailureRefreshSecondsBase: UInt32 = 2
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
@@ -151,6 +144,7 @@ open class EngineBuilder: NSObject {
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
+  private var upstreamTlsSni: String?
   private var respectSystemProxySettings: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
   private var forceIPv6: Bool = false
@@ -180,18 +174,8 @@ open class EngineBuilder: NSObject {
 
   // MARK: - Public
 
-  /// Initialize a new builder with standard HTTP library configuration.
-  public override init() {
-    self.base = .standard
-  }
-
-  /// Initialize a new builder with a custom full YAML configuration.
-  /// Setting other attributes in this builder will have no effect.
-  ///
-  /// - parameter yaml: Contents of a YAML file to use for configuration.
-  public init(yaml: String) {
-    self.base = .custom(yaml)
-  }
+  /// Initialize a new builder.
+  public override init() {}
 
   /// Set a log level to use with Envoy.
   ///
@@ -414,6 +398,17 @@ open class EngineBuilder: NSObject {
   public func enablePlatformCertificateValidation(
     _ enablePlatformCertificateValidation: Bool) -> Self {
     self.enablePlatformCertificateValidation = enablePlatformCertificateValidation
+    return self
+  }
+
+  /// Sets the SNI override on the upstream TLS socket context.
+  ///
+  /// - parameter sni: The SNI.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setUpstreamTlsSni(_ sni: String) -> Self {
+    self.upstreamTlsSni = sni
     return self
   }
 
@@ -699,12 +694,7 @@ open class EngineBuilder: NSObject {
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue))
     let config = self.makeConfig()
 
-    switch self.base {
-    case .custom(let yaml):
-      return EngineImpl(yaml: yaml, config: config, logLevel: self.logLevel, engine: engine)
-    case .standard:
-      return EngineImpl(config: config, logLevel: self.logLevel, engine: engine)
-    }
+    return EngineImpl(config: config, logLevel: self.logLevel, engine: engine)
   }
 
   // MARK: - Internal
@@ -767,6 +757,7 @@ open class EngineBuilder: NSObject {
       enforceTrustChainVerification: self.enforceTrustChainVerification,
       forceIPv6: self.forceIPv6,
       enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
+      upstreamTlsSni: self.upstreamTlsSni,
       respectSystemProxySettings: self.respectSystemProxySettings,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,

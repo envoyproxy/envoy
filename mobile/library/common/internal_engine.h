@@ -37,11 +37,9 @@ public:
   ~InternalEngine();
 
   /**
-   * Run the engine with the provided configuration.
-   * @param config, the Envoy bootstrap configuration to use.
-   * @param log_level, the log level.
+   * Run the engine with the provided options.
+   * @param options, the Envoy options, including the Bootstrap configuration and log level.
    */
-  envoy_status_t run(const std::string& config, const std::string& log_level);
   envoy_status_t run(std::shared_ptr<Envoy::OptionsImplBase> options);
 
   /**

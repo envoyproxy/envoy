@@ -11,7 +11,6 @@ final class EngineBuilderTests: XCTestCase {
   override func tearDown() {
     super.tearDown()
     MockEnvoyEngine.onRunWithConfig = nil
-    MockEnvoyEngine.onRunWithYAML = nil
   }
 
   func testSetRuntimeGuard() {
@@ -38,19 +37,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertEqual(builder.monitoringMode, .disabled)
     builder.setNetworkMonitoringMode(.reachability)
     XCTAssertEqual(builder.monitoringMode, .reachability)
-  }
-
-  func testCustomConfigYAMLUsesSpecifiedYAMLWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithYAML = { yaml, _, _ in
-      XCTAssertEqual("foobar", yaml)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder(yaml: "foobar")
-      .addEngineType(MockEnvoyEngine.self)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
   }
 
   func testAddingLogLevelAddsLogLevelWhenRunningEnvoy() {

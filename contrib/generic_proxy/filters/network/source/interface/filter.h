@@ -16,17 +16,17 @@ namespace GenericProxy {
 using ResponseUpdateFunction = std::function<void(Response&)>;
 
 /**
- * StreamFrameHandler to handle the frames from the stream (if exists).
+ * RequestFramesHandler to handle the frames from the stream (if exists).
  */
-class StreamFrameHandler {
+class RequestFramesHandler {
 public:
-  virtual ~StreamFrameHandler() = default;
+  virtual ~RequestFramesHandler() = default;
 
   /**
    * Handle the frame from the stream.
    * @param frame frame from the stream.
    */
-  virtual void onStreamFrame(StreamFramePtr frame) PURE;
+  virtual void onRequestCommonFrame(RequestCommonFramePtr frame) PURE;
 };
 
 /**
@@ -102,19 +102,19 @@ public:
 
   /**
    * Called when the upstream response frame is received. This should only be called once.
-   * @param response supplies the upstream response frame.
+   * @param frame supplies the upstream response frame.
    */
-  virtual void onResponseStart(StreamResponsePtr response) PURE;
+  virtual void onResponseStart(ResponseHeaderFramePtr frame) PURE;
 
   /**
-   * Called when the upstream response frame is received. This should only be called once.
+   * Called when the upstream response frame is received.
    * @param frame supplies the upstream frame.
    */
-  virtual void onResponseFrame(StreamFramePtr frame) PURE;
+  virtual void onResponseFrame(ResponseCommonFramePtr frame) PURE;
 
   /**
    * Register a request frames handler to used to handle the request frames (except the special
-   * StreamRequest frame).
+   * RequestHeaderFrame frame).
    * This handler will be Called when the filter chain is completed.
    * @param handler supplies the request frames handler.
    *
@@ -122,7 +122,7 @@ public:
    * the filter chain doesn't support to handle extra frames. We should remove this when the
    * filter chain supports to handle extra frames.
    */
-  virtual void setRequestFramesHandler(StreamFrameHandler& handler) PURE;
+  virtual void setRequestFramesHandler(RequestFramesHandler& handler) PURE;
 
   virtual void completeDirectly() PURE;
 };
@@ -141,7 +141,7 @@ public:
   virtual void onDestroy() PURE;
 
   virtual void setDecoderFilterCallbacks(DecoderFilterCallback& callbacks) PURE;
-  virtual FilterStatus onStreamDecoded(StreamRequest& request) PURE;
+  virtual FilterStatus onStreamDecoded(RequestHeaderFrame& request) PURE;
 };
 
 class EncoderFilter {
@@ -151,7 +151,7 @@ public:
   virtual void onDestroy() PURE;
 
   virtual void setEncoderFilterCallbacks(EncoderFilterCallback& callbacks) PURE;
-  virtual FilterStatus onStreamEncoded(StreamResponse& response) PURE;
+  virtual FilterStatus onStreamEncoded(ResponseHeaderFrame& response) PURE;
 };
 
 class StreamFilter : public DecoderFilter, public EncoderFilter {};

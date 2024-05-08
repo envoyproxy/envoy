@@ -201,6 +201,8 @@ public:
   void onShutdown(Request* req, int32_t result, bool injected) override;
   void onCancel(Request* req, int32_t result, bool injected) override;
 
+  Buffer::OwnedImpl& getReadBuffer() { return read_buf_; }
+
 protected:
   // Since the write of IoUringSocket is async, there may have write request is on the fly when
   // close the socket. This timeout is setting for a time to wait the write request done.

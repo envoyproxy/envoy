@@ -23,7 +23,8 @@ public:
                               absl::optional<int> domain = absl::nullopt)
       : IoSocketHandleBaseImpl(fd, socket_v6only, domain),
         udp_read_normalize_addresses_(
-            Runtime::runtimeFeatureEnabled("envoy.restart_features.udp_read_normalize_addresses")) {
+            Runtime::runtimeFeatureEnabled("envoy.restart_features.udp_read_normalize_addresses")),
+        receive_ecn_(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")) {
   }
 
   // Close underlying socket if close() hasn't been call yet.
@@ -94,6 +95,9 @@ protected:
                            CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t))};
 
   const bool udp_read_normalize_addresses_;
+
+  // Latches a copy of the runtime feature "envoy.reloadable_features.quic_receive_ecn".
+  const bool receive_ecn_;
 };
 } // namespace Network
 } // namespace Envoy

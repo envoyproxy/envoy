@@ -7,13 +7,17 @@
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/extensions/udp_packet_writer/default/config.h"
 
+#include "test/common/http/common.h"
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/common/mocks/common/mocks.h"
+#include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/autonomous_upstream.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_random_generator.h"
 
 #include "extension_registry.h"
 #include "library/common/data/utility.h"
+#include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
@@ -200,15 +204,13 @@ void ClientIntegrationTest::basicTest() {
     release_envoy_data(c_data);
   });
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
 
   envoy_data c_data = Data::Utility::toBridgeData(request_data);
   stream_->sendData(c_data);
 
-  Platform::RequestTrailersBuilder builder;
-  std::shared_ptr<Platform::RequestTrailers> trailers =
-      std::make_shared<Platform::RequestTrailers>(builder.build());
-  stream_->close(trailers);
+  stream_->close(Http::Utility::createRequestTrailerMapPtr());
 
   terminal_callback_.waitReady();
 
@@ -233,6 +235,15 @@ void ClientIntegrationTest::basicTest() {
 }
 
 TEST_P(ClientIntegrationTest, Basic) {
+  initialize();
+  basicTest();
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+  }
+}
+
+TEST_P(ClientIntegrationTest, BasicWithCares) {
+  builder_.setUseCares(true);
   initialize();
   basicTest();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
@@ -265,7 +276,8 @@ void ClientIntegrationTest::trickleTest() {
     cc_.on_data_calls++;
     release_envoy_data(c_data);
   });
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
   if (explicit_flow_control_) {
     // Allow reading up to 100 bytes
     stream_->readData(100);
@@ -273,10 +285,7 @@ void ClientIntegrationTest::trickleTest() {
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   envoy_data c_data = Data::Utility::toBridgeData(request_data);
   stream_->sendData(c_data);
-  Platform::RequestTrailersBuilder builder;
-  std::shared_ptr<Platform::RequestTrailers> trailers =
-      std::make_shared<Platform::RequestTrailers>(builder.build());
-  stream_->close(trailers);
+  stream_->close(Http::Utility::createRequestTrailerMapPtr());
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
                                                         upstream_connection_));
@@ -333,7 +342,8 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
       stream->readData(100);
       release_envoy_data(c_data);
     });
-    stream->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+    stream->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                        true);
     stream->readData(100);
     prototype_streams.push_back(stream_prototype);
     streams.push_back(stream);
@@ -392,7 +402,8 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
           RELEASE_ASSERT(0, "unexpected");
         });
 
-    stream->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+    stream->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                        true);
     prototype_streams.push_back(stream_prototype);
     streams.push_back(stream);
     if (i % 2 == 0) {
@@ -460,7 +471,8 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
     release_envoy_data(c_data);
   });
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
 
   terminal_callback_.waitReady();
 
@@ -496,15 +508,13 @@ TEST_P(ClientIntegrationTest, BasicHttps) {
     release_envoy_data(c_data);
   });
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
 
   envoy_data c_data = Data::Utility::toBridgeData(request_data);
   stream_->sendData(c_data);
 
-  Platform::RequestTrailersBuilder builder;
-  std::shared_ptr<Platform::RequestTrailers> trailers =
-      std::make_shared<Platform::RequestTrailers>(builder.build());
-  stream_->close(trailers);
+  stream_->close(Http::Utility::createRequestTrailerMapPtr());
 
   terminal_callback_.waitReady();
 
@@ -525,7 +535,8 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
           Http::TestResponseHeaderMapImpl({{":status", "503"}})));
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
   terminal_callback_.waitReady();
 
   ASSERT_EQ(cc_.on_error_calls, 0);
@@ -538,11 +549,37 @@ TEST_P(ClientIntegrationTest, InvalidDomain) {
   initialize();
 
   default_request_headers_.setHost("www.doesnotexist.com");
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
   terminal_callback_.waitReady();
 
   ASSERT_EQ(cc_.on_error_calls, 1);
   ASSERT_EQ(cc_.on_headers_calls, 0);
+}
+
+TEST_P(ClientIntegrationTest, InvalidDomainFakeResolver) {
+  upstream_tls_ = false; // Avoid cert verify errors.
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+
+  initialize();
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  default_request_headers_.setHost(
+      absl::StrCat("www.doesnotexist.com:", fake_upstreams_[0]->localAddress()->ip()->port()));
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  // Force the lookup to resolve to localhost.
+  Network::TestResolver::unblockResolve("localhost");
+  terminal_callback_.waitReady();
+
+  // Instead of an error we should get a 200 ok from the fake upstream.
+  ASSERT_EQ(cc_.on_error_calls, 0);
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
 }
 
 TEST_P(ClientIntegrationTest, BasicBeforeResponseHeaders) {
@@ -550,7 +587,8 @@ TEST_P(ClientIntegrationTest, BasicBeforeResponseHeaders) {
 
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
   terminal_callback_.waitReady();
 
   ASSERT_EQ(cc_.on_error_calls, 1);
@@ -564,7 +602,8 @@ TEST_P(ClientIntegrationTest, ResetAfterResponseHeaders) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
   terminal_callback_.waitReady();
 
   ASSERT_EQ(cc_.on_error_calls, 1);
@@ -578,7 +617,8 @@ TEST_P(ClientIntegrationTest, ResetAfterResponseHeadersExplicit) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
   // Read the body chunk. This releases the error.
   stream_->readData(100);
 
@@ -594,7 +634,8 @@ TEST_P(ClientIntegrationTest, ResetAfterHeaderOnlyResponse) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "0");
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
   terminal_callback_.waitReady();
 
   ASSERT_EQ(cc_.on_error_calls, 1);
@@ -607,7 +648,8 @@ TEST_P(ClientIntegrationTest, ResetBetweenDataChunks) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_DATA, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "2");
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
   terminal_callback_.waitReady();
 
   ASSERT_EQ(cc_.on_error_calls, 1);
@@ -620,7 +662,8 @@ TEST_P(ClientIntegrationTest, ResetAfterData) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_DATA, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
   terminal_callback_.waitReady();
 
   ASSERT_EQ(cc_.on_error_calls, 1);
@@ -642,7 +685,8 @@ TEST_P(ClientIntegrationTest, CancelAfterRequestHeadersSent) {
 
   default_request_headers_.addCopy(AutonomousStream::RESPOND_AFTER_REQUEST_HEADERS, "yes");
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
   stream_->cancel();
   terminal_callback_.waitReady();
   ASSERT_EQ(cc_.on_cancel_calls, 1);
@@ -652,7 +696,8 @@ TEST_P(ClientIntegrationTest, CancelAfterRequestComplete) {
   autonomous_upstream_ = false;
   initialize();
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
   stream_->cancel();
   terminal_callback_.waitReady();
   ASSERT_EQ(cc_.on_cancel_calls, 1);
@@ -672,7 +717,8 @@ TEST_P(ClientIntegrationTest, CancelDuringResponse) {
         return nullptr;
       });
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
                                                         upstream_connection_));
@@ -719,7 +765,8 @@ TEST_P(ClientIntegrationTest, BasicCancelWithCompleteStream) {
 
   initialize();
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
                                                         upstream_connection_));
@@ -752,7 +799,8 @@ TEST_P(ClientIntegrationTest, CancelWithPartialStream) {
         return nullptr;
       });
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
                                                         upstream_connection_));
@@ -790,14 +838,12 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
   autonomous_upstream_ = false;
   initialize();
 
-  default_request_headers_.header_map_->setFormatter(
-      std::make_unique<
-          Extensions::Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter>(
-          false, envoy::extensions::http::header_formatters::preserve_case::v3::
-                     PreserveCaseFormatterConfig::DEFAULT));
-
-  default_request_headers_.addCopy("FoO", "bar");
-  default_request_headers_.header_map_->formatter().value().get().processKey("FoO");
+  auto headers = Http::Utility::createRequestHeaderMapPtr();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  headers->setHost(fake_upstreams_[0]->localAddress()->asStringView());
+  Http::StatefulHeaderKeyFormatter& formatter = headers->formatter().value();
+  formatter.processKey("FoO");
+  headers->addCopy(Http::LowerCaseString("FoO"), "bar");
 
   stream_prototype_->setOnHeaders(
       [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel) {
@@ -807,7 +853,7 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
         EXPECT_TRUE((*headers)["My-ResponsE-Header"][0] == "foo");
         return nullptr;
       });
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::move(headers), true);
 
   Envoy::FakeRawConnectionPtr upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
@@ -836,7 +882,8 @@ TEST_P(ClientIntegrationTest, TimeoutOnRequestPath) {
   autonomous_upstream_ = false;
   initialize();
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
                                                         upstream_connection_));
@@ -862,7 +909,8 @@ TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
   autonomous_upstream_ = false;
   initialize();
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
                                                         upstream_connection_));
@@ -900,7 +948,8 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTraffic) {
         return nullptr;
       });
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
                                                         upstream_connection_));
@@ -938,7 +987,8 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
         return nullptr;
       });
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
                                                         upstream_connection_));
@@ -971,7 +1021,8 @@ TEST_P(ClientIntegrationTest, Proxying) {
                                         fake_upstreams_[0]->localAddress()->ip()->port());
   }
   // The initial request will do the DNS lookup.
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
   terminal_callback_.waitReady();
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_complete_calls, 1);
@@ -979,7 +1030,8 @@ TEST_P(ClientIntegrationTest, Proxying) {
 
   // The second request will use the cached DNS entry and should succeed as well.
   stream_ = (*stream_prototype_).start(explicit_flow_control_);
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
   terminal_callback_.waitReady();
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_complete_calls, 2);
@@ -999,7 +1051,8 @@ TEST_P(ClientIntegrationTest, DirectResponse) {
   default_request_headers_.setHost("127.0.0.1");
   default_request_headers_.setPath("/");
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
   terminal_callback_.waitReady();
   ASSERT_EQ(cc_.status, "404");
   ASSERT_EQ(cc_.on_headers_calls, 1);
