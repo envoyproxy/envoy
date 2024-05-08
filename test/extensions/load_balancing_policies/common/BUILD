@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -28,9 +29,9 @@ envoy_cc_test(
     name = "bounded_load_hlb_test",
     srcs = ["bounded_load_hlb_test.cc"],
     deps = [
-        ":utility_lib",
         "//source/common/upstream:upstream_includes",
         "//source/extensions/load_balancing_policies/common:thread_aware_lb_lib",
+        "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
