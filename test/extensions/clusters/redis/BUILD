@@ -70,7 +70,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
-        "//source/extensions/load_balancing_policies/common:thread_aware_lb_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/upstream:utility_lib",
