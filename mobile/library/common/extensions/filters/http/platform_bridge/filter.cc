@@ -1,12 +1,9 @@
 #include "library/common/extensions/filters/http/platform_bridge/filter.h"
 
-#include "envoy/server/filter_config.h"
-
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/scope_tracker.h"
-#include "source/common/common/utility.h"
 
 #include "library/common/api/external.h"
 #include "library/common/bridge/utility.h"
@@ -14,7 +11,6 @@
 #include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_type_definitions.h"
 #include "library/common/http/header_utility.h"
-#include "library/common/http/headers.h"
 #include "library/common/stream_info/extra_stream_info.h"
 
 namespace Envoy {
@@ -509,7 +505,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHead
 
   // Presence of internal error header indicates an error that should be surfaced as an
   // error callback (rather than an HTTP response).
-  const auto error_code_header = headers.get(Http::InternalHeaders::get().ErrorCode);
+  const auto error_code_header = headers.get(Http::LowerCaseString("x-internal-error-code"));
   if (error_code_header.empty()) {
     // No error, so delegate to base implementation for request and response path.
     return response_filter_base_->onHeaders(headers, end_stream);
@@ -524,7 +520,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHead
   RELEASE_ASSERT(parsed_code, "parse error reading error code");
 
   envoy_data error_message = envoy_nodata;
-  const auto error_message_header = headers.get(Http::InternalHeaders::get().ErrorMessage);
+  const auto error_message_header = headers.get(Http::LowerCaseString("x-internal-error-message"));
   if (!error_message_header.empty()) {
     error_message =
         Data::Utility::copyToBridgeData(error_message_header[0]->value().getStringView());
