@@ -172,7 +172,7 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
   };
   streamCallbacks.on_data_ = [context](const Envoy::Buffer::Instance &buffer, uint64_t length,
                                        bool end_stream, envoy_stream_intel stream_intel) {
-    envoy_data bridge_data = Envoy::Data::Utility::toBridgeData(buffer, length);
+    envoy_data bridge_data = Envoy::Data::Utility::toBridgeDataNoDrain(buffer, length);
     ios_on_data(bridge_data, end_stream, stream_intel, context);
   };
   streamCallbacks.on_trailers_ = [context](const Envoy::Http::ResponseTrailerMap &trailers,
