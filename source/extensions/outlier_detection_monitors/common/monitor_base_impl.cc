@@ -28,6 +28,11 @@ void Monitor::reportResult(const Error& error) {
     return;
   }
 
+  if (buckets_.empty()) {
+    return;
+  }
+
+  bool matched = false;
   // iterate over all error buckets
   for (auto& bucket : buckets_) {
     // if the bucket is not interested in this type of result/error
@@ -38,18 +43,23 @@ void Monitor::reportResult(const Error& error) {
 
     // check if the bucket "catches" the result.
     if (bucket->match(error)) {
-      // Count as error.
-      if (onError()) {
-        callback_(enforce_, name(), absl::nullopt);
-        // Reaching error was reported via callback.
-        // but the host may or may not be ejected based on enforce_ parameter.
-        // Reset the monitor's state, so a single new error does not
-        // immediately trigger error condition again.
-        onReset();
-      }
-    } else {
-      onSuccess();
+      matched = true;
+      break;
     }
+  }
+
+  if (matched) {
+    // Count as error.
+    if (onError()) {
+      callback_(enforce_, name(), absl::nullopt);
+      // Reaching error was reported via callback.
+      // but the host may or may not be ejected based on enforce_ parameter.
+      // Reset the monitor's state, so a single new error does not
+      // immediately trigger error condition again.
+      onReset();
+    }
+  } else {
+    onSuccess();
   }
 }
 

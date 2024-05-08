@@ -137,7 +137,7 @@ private:
 // Each monitor may implement different health detection algorithm.
 class Monitor {
 public:
-  Monitor(std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
+  Monitor(const std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
   Monitor() = delete;
   virtual ~Monitor() {}
   void addErrorBucket(ErrorsBucketPtr&& bucket); // {buckets_.push_back(std::move(bucket));}
