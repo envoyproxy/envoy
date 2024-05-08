@@ -1,6 +1,7 @@
 #include "clusters_chunk_processor.h"
 #include "source/server/admin/clusters_chunk_processor.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -66,14 +67,18 @@ void TextClustersChunkProcessor::render(std::reference_wrapper<const Upstream::C
   for (auto& host_set : unwrapped_cluster.prioritySet().hostSetsPerPriority()) {
     for (auto& host : host_set->hosts()) {
       const std::string& host_address = host->address()->asString();
-      std::map<absl::string_view, uint64_t> all_stats;
+      std::vector<std::pair<absl::string_view, uint64_t>> all_stats;
       for (const auto& [counter_name, counter] : host->counters()) {
-        all_stats[counter_name] = counter.get().value();
+        all_stats.emplace_back(counter_name, counter.get().value());
       }
 
       for (const auto& [gauge_name, gauge] : host->gauges()) {
-        all_stats[gauge_name] = gauge.get().value();
+        all_stats.emplace_back(gauge_name, gauge.get().value());
       }
+
+      std::sort(all_stats.begin(), all_stats.end(), [](const std::pair<absl::string_view, uint64_t>& a, const std::pair<absl::string_view, uint64_t>& b) {
+       return a.first < b.first;
+      });
 
       for (const auto& [stat_name, stat] : all_stats) {
         response.add(fmt::format("{}::{}::{}::{}\n", cluster_name, host_address, stat_name, stat));
