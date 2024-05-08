@@ -124,6 +124,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       runtime_handler_(server), listeners_handler_(server), server_cmd_handler_(server),
       server_info_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
+      // TODO(demitriswan) When C++20 is supported we might want to use designated initialization
+      // for readability.
       handlers_{
           makeHandler("/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false),
           makeHandler("/certs", "print certs on machine",
