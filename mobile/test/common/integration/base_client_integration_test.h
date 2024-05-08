@@ -51,6 +51,9 @@ protected:
     return reinterpret_cast<envoy_engine_t>(engine_->engine_);
   }
   virtual void initialize() override;
+  void createNewStream(Platform::StreamPrototypeSharedPtr& stream_prototype, callbacks_called& cc,
+                       Platform::StreamSharedPtr& stream_);
+
   void createEnvoy() override;
   void threadRoutine(absl::Notification& engine_running);
 
