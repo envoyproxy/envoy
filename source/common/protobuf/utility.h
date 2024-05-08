@@ -51,7 +51,7 @@
              DurationUtil::durationToMilliseconds((message).field_name()))                         \
        : absl::nullopt)
 
-// Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, throw an
+// Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, throw an
 // EnvoyException.
 #define PROTOBUF_GET_MS_REQUIRED(message, field_name)                                              \
   ([](const auto& msg) {                                                                           \
