@@ -22,9 +22,6 @@
 namespace Envoy {
 namespace Server {
 
-void setHealthFlag(Json::Streamer::Map* raw_host_ptr, Upstream::Host::HealthFlag flag,
-                   const Upstream::Host& host);
-
 TextClustersChunkProcessor::TextClustersChunkProcessor(
     uint64_t chunk_limit, Http::ResponseHeaderMap& response_headers,
     const Upstream::ClusterManager::ClusterInfoMap& cluster_info_map)
