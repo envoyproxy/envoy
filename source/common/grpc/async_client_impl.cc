@@ -242,8 +242,8 @@ void AsyncStreamImpl::notifyRemoteClose(Grpc::Status::GrpcStatus status,
   if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
-  callbacks_.onRemoteClose(status, message);
   current_span_->finishSpan();
+  callbacks_.onRemoteClose(status, message);
 }
 
 void AsyncStreamImpl::onComplete() {
