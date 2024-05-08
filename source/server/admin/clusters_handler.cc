@@ -1,6 +1,7 @@
 #include "source/server/admin/clusters_handler.h"
 
 #include "envoy/admin/v3/clusters.pb.h"
+#include "envoy/server/admin.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/macros.h"
@@ -44,6 +45,25 @@ void addCircuitBreakerSettingsAsJson(const envoy::config::core::v3::RoutingPrior
 
 } // namespace
 
+Admin::UrlHandler ClustersHandler::urlHandler() {
+  return {
+      /* prefix =*/"/clusters",
+      /* help_text =*/"upstream clusters status",
+      /* handler =*/MAKE_STREAMING_HANDLER(makeRequest),
+      /* removable =*/false,
+      /* mutates_server_state =*/false,
+      /* params =*/
+      {
+          {
+              /* type =*/Admin::ParamDescriptor::Type::Enum,
+              /* id =*/"format",
+              /* help =*/"The output format",
+              /* enum_choices =*/{"text", "json"},
+          },
+      },
+  };
+}
+
 ClustersHandler::ClustersHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
 Http::Code ClustersHandler::handlerClusters(Http::ResponseHeaderMap& response_headers,
@@ -60,7 +80,6 @@ Http::Code ClustersHandler::handlerClusters(Http::ResponseHeaderMap& response_he
   return Http::Code::OK;
 }
 
-// TODO(demitriswan) Implement this member function.
 Admin::RequestPtr ClustersHandler::makeRequest(AdminStream& admin_stream) {
   Buffer::OwnedImpl response;
   ClustersParams params;

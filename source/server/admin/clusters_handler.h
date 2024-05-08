@@ -31,9 +31,10 @@ public:
 
   Http::Code handlerClusters(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                              AdminStream&);
-  // TODO(demitriswan) Document this member function.
+  // Returns a RequestPtr implementation suitable for streaminmg its repsonse.
   Admin::RequestPtr makeRequest(AdminStream& admin_stream);
-
+  // Returns a UrlHandler suitable for AdminImpl.
+  Admin::UrlHandler urlHandler();
 private:
   void addOutlierInfo(const std::string& cluster_name,
                       const Upstream::Outlier::Detector* outlier_detector,

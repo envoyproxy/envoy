@@ -128,25 +128,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
           makeHandler("/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false),
           makeHandler("/certs", "print certs on machine",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false),
-          {
-              // Using designated initialization to improve readability of request routing
-              // configuration. See
-              // https://en.cppreference.com/w/cpp/language/aggregate_initialization#Designated_initializers.
-              .prefix_ = "/clusters",
-              .help_text_ = "upstream clusters status",
-              .handler_ = MAKE_STREAMING_HANDLER(clusters_handler_.makeRequest),
-              .removable_ = false,
-              .mutates_server_state_ = false,
-              .params_ =
-                  {
-                      {
-                          .type_ = Admin::ParamDescriptor::Type::Enum,
-                          .id_ = "format",
-                          .help_ = "The output format",
-                          .enum_choices_ = {"text", "json"},
-                      },
-                  },
-          },
+          clusters_handler_.urlHandler(),
           makeHandler(
               "/config_dump", "dump current Envoy configs (experimental)",
               MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false,
