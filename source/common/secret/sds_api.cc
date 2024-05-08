@@ -160,6 +160,10 @@ SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_reso
         trace,
         "Server sent a delta SDS update attempting to remove a resource (name: {}). Ignoring.",
         removed_resources[0]);
+
+    // Even if we ignore this resource, the owning resource (LDS/CDS) should still complete
+    // warming.
+    init_target_.ready();
     return absl::OkStatus();
   }
   return onConfigUpdate(added_resources, added_resources[0].get().version());

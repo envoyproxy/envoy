@@ -1248,6 +1248,15 @@ std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view 
   return encoded;
 }
 
+bool Utility::PercentEncoding::queryParameterIsUrlEncoded(absl::string_view value) {
+  for (char ch : value) {
+    if (shouldPercentEncodeChar(ch)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::string Utility::PercentEncoding::urlDecodeQueryParameter(absl::string_view encoded) {
   std::string decoded;
   decoded.reserve(encoded.size());
@@ -1429,16 +1438,10 @@ bool Utility::schemeIsValid(const absl::string_view scheme) {
 }
 
 bool Utility::schemeIsHttp(const absl::string_view scheme) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
-    return scheme == Headers::get().SchemeValues.Http;
-  }
   return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Http);
 }
 
 bool Utility::schemeIsHttps(const absl::string_view scheme) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
-    return scheme == Headers::get().SchemeValues.Https;
-  }
   return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Https);
 }
 

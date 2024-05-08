@@ -34,6 +34,7 @@
 #include "source/common/stats/symbol_table.h"
 
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
@@ -631,6 +632,9 @@ public:
 
 class MockGenericConnPool : public GenericConnPool {
 public:
+  MockGenericConnPool();
+  ~MockGenericConnPool() override;
+
   MOCK_METHOD(void, newStream, (GenericConnectionPoolCallbacks * request));
   MOCK_METHOD(bool, cancelAnyPendingStream, ());
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
@@ -639,6 +643,9 @@ public:
                Upstream::LoadBalancerContext*));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
   MOCK_METHOD(bool, valid, (), (const));
+
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
+      new NiceMock<Upstream::MockHostDescription>()};
 };
 
 class MockUpstreamToDownstream : public UpstreamToDownstream {

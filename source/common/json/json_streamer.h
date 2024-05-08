@@ -21,7 +21,7 @@ namespace Json {
  */
 class Streamer {
 public:
-  using Value = absl::variant<absl::string_view, double, uint64_t, int64_t>;
+  using Value = absl::variant<absl::string_view, double, uint64_t, int64_t, bool>;
 
   /**
    * @param response The buffer in which to stream output. Note: this buffer can
@@ -84,6 +84,14 @@ public:
      * isn't expecting a value. You must call Map::addKey prior to calling this.
      */
     void addString(absl::string_view str);
+
+    /**
+     * Adds a bool constant value to the current array or map. It's a programming
+     * error to call this method on a map or array that's not the top level.
+     * It's also a programming error to call this on map that isn't expecting
+     * a value. You must call Map::addKey prior to calling this.
+     */
+    void addBool(bool b);
 
   protected:
     /**
@@ -201,6 +209,7 @@ private:
   void addNumber(double d);
   void addNumber(uint64_t u);
   void addNumber(int64_t i);
+  void addBool(bool b);
 
   /**
    * Flushes out any pending fragments.

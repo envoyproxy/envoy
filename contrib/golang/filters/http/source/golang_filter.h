@@ -211,6 +211,7 @@ public:
 
   void onStreamComplete() override {}
 
+  CAPIStatus clearRouteCache();
   CAPIStatus continueStatus(GolangStatus status);
 
   CAPIStatus sendLocalReply(Http::Code response_code, std::string body_text,
@@ -263,8 +264,6 @@ private:
   void continueEncodeLocalReply(ProcessorState& state);
   void continueStatusInternal(GolangStatus status);
   void continueData(ProcessorState& state);
-
-  void onHeadersModified();
 
   void sendLocalReplyInternal(Http::Code response_code, absl::string_view body_text,
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,

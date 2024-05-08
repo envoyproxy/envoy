@@ -17,15 +17,25 @@ public final class HttpTestServerFactory {
   /** The instance of {@link HttpTestServer}. */
   public static class HttpTestServer {
     private final long handle; // Used by the native code.
+    private final String ipAddress;
     private final int port;
+    private final String address;
 
-    private HttpTestServer(long handle, int port) {
+    private HttpTestServer(long handle, String ipAddress, int port, String address) {
       this.handle = handle;
+      this.ipAddress = ipAddress;
       this.port = port;
+      this.address = address;
     }
+
+    /** Returns the server IP address. */
+    public String getIpAddress() { return ipAddress; }
 
     /** Returns the server port. */
     public int getPort() { return port; }
+
+    /** Returns the combination of IP address and port number. */
+    public String getAddress() { return address; }
 
     /** Shuts down the server. */
     public native void shutdown();
@@ -40,14 +50,20 @@ public final class HttpTestServerFactory {
    * @param type the value in {@link HttpTestServerFactory.Type}
    * @param headers the response headers
    * @param body the response body
+   * @param trailers the response headers
+   * @return the `HttpTestServer` instance
    */
-  public static native HttpTestServer start(int type, Map<String, String> headers, String body);
+  public static native HttpTestServer start(int type, Map<String, String> headers, String body,
+                                            Map<String, String> trailers);
 
   /**
-   * A convenience method to start the server with an empty response headers and body. This server
-   * will always return 200 HTTP status code.
+   * A convenience method to start the server with an empty response headers, body, and trailers.
+   * This server will always return 200 HTTP status code.
    *
    * @param type the value in {@link HttpTestServerFactory.Type}
+   * @return the `HttpTestServer` instance
    */
-  public static HttpTestServer start(int type) { return start(type, Collections.emptyMap(), ""); }
+  public static HttpTestServer start(int type) {
+    return start(type, Collections.emptyMap(), "", Collections.emptyMap());
+  }
 }

@@ -12,8 +12,6 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/load_balancer_impl.h"
-#include "source/extensions/load_balancing_policies/maglev/maglev_lb.h"
-#include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
 
 #include "absl/container/node_hash_set.h"
 
@@ -47,134 +45,25 @@ filterCriteriaBySelectors(const std::vector<SubsetSelectorPtr>& subset_selectors
 
 using HostPredicate = std::function<bool(const Host&)>;
 
-LegacyChildLoadBalancerCreatorImpl::LegacyChildLoadBalancerCreatorImpl(
-    LoadBalancerType lb_type,
-    OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config,
-    OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config,
-    OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
-    OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-    : lb_type_(lb_type),
-      lb_ring_hash_config_(
-          lb_ring_hash_config.has_value()
-              ? std::make_unique<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-                    lb_ring_hash_config.ref())
-              : nullptr),
-      lb_maglev_config_(
-          lb_maglev_config.has_value()
-              ? std::make_unique<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
-                    lb_maglev_config.ref())
-              : nullptr),
-      round_robin_config_(
-          round_robin_config.has_value()
-              ? std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
-                    round_robin_config.ref())
-              : nullptr),
-      least_request_config_(
-          least_request_config.has_value()
-              ? std::make_unique<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
-                    least_request_config.ref())
-              : nullptr),
-      common_config_(common_config) {}
-
-std::pair<Upstream::ThreadAwareLoadBalancerPtr, Upstream::LoadBalancerPtr>
-LegacyChildLoadBalancerCreatorImpl::createLoadBalancer(
-    const Upstream::PrioritySet& child_priority_set,
-    const Upstream::PrioritySet* local_priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-    Runtime::Loader& runtime, Random::RandomGenerator& random, TimeSource& time_source) {
-  switch (lb_type_) {
-  case Upstream::LoadBalancerType::LeastRequest: {
-    Upstream::LoadBalancerPtr lb = std::make_unique<Upstream::LeastRequestLoadBalancer>(
-        child_priority_set, local_priority_set, stats, runtime, random, common_config_,
-        lbLeastRequestConfig(), time_source);
-    return {nullptr, std::move(lb)};
-  }
-  case Upstream::LoadBalancerType::Random: {
-    Upstream::LoadBalancerPtr lb = std::make_unique<Upstream::RandomLoadBalancer>(
-        child_priority_set, local_priority_set, stats, runtime, random, common_config_);
-    return {nullptr, std::move(lb)};
-  }
-  case Upstream::LoadBalancerType::RoundRobin: {
-    Upstream::LoadBalancerPtr lb = std::make_unique<Upstream::RoundRobinLoadBalancer>(
-        child_priority_set, local_priority_set, stats, runtime, random, common_config_,
-        lbRoundRobinConfig(), time_source);
-    return {nullptr, std::move(lb)};
-  }
-  case Upstream::LoadBalancerType::RingHash: {
-    // TODO(mattklein123): The ring hash LB is thread aware, but currently the subset LB is not.
-    // We should make the subset LB thread aware since the calculations are costly, and then we
-    // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
-    Upstream::ThreadAwareLoadBalancerPtr lb = std::make_unique<Upstream::RingHashLoadBalancer>(
-        child_priority_set, stats, scope, runtime, random, lbRingHashConfig(), common_config_);
-    return {std::move(lb), nullptr};
-  }
-  case Upstream::LoadBalancerType::Maglev: {
-    // TODO(mattklein123): The Maglev LB is thread aware, but currently the subset LB is not.
-    // We should make the subset LB thread aware since the calculations are costly, and then we
-    // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
-
-    Upstream::ThreadAwareLoadBalancerPtr lb = std::make_unique<Upstream::MaglevLoadBalancer>(
-        child_priority_set, stats, scope, runtime, random, lbMaglevConfig(), common_config_);
-    return {std::move(lb), nullptr};
-  }
-  case Upstream::LoadBalancerType::OriginalDst:
-  case Upstream::LoadBalancerType::ClusterProvided:
-  case Upstream::LoadBalancerType::LoadBalancingPolicyConfig:
-    // These load balancer types can only be created when there is no subset configuration.
-    PANIC("not implemented");
-  }
-  return {nullptr, nullptr};
-}
-
-SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(
-    const SubsetLoadbalancingPolicyProto& subset_config,
-    ProtobufMessage::ValidationVisitor& visitor)
-    : subset_info_(subset_config) {
-
-  absl::InlinedVector<absl::string_view, 4> missing_policies;
-
-  for (const auto& policy : subset_config.subset_lb_policy().policies()) {
-    auto* factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(
-        policy.typed_extension_config(), /*is_optional=*/true);
-
-    if (factory != nullptr) {
-      // Load and validate the configuration.
-      auto sub_lb_proto_message = factory->createEmptyConfigProto();
-      Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
-                                             visitor, *sub_lb_proto_message);
-
-      sub_load_balancer_config_ = factory->loadConfig(*sub_lb_proto_message, visitor);
-      sub_load_balancer_factory_ = factory;
-      break;
-    }
-
-    missing_policies.push_back(policy.typed_extension_config().name());
-  }
-
-  if (sub_load_balancer_factory_ == nullptr) {
-    throw EnvoyException(fmt::format("cluster: didn't find a registered load balancer factory "
-                                     "implementation for subset lb with names from [{}]",
-                                     absl::StrJoin(missing_policies, ", ")));
-  }
-}
-
-SubsetLoadBalancer::SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets,
-                                       ChildLoadBalancerCreatorPtr child_lb,
+SubsetLoadBalancer::SubsetLoadBalancer(const SubsetLoadBalancerConfig& lb_config,
+                                       const Upstream::ClusterInfo& cluster_info,
                                        const PrioritySet& priority_set,
                                        const PrioritySet* local_priority_set, ClusterLbStats& stats,
                                        Stats::Scope& scope, Runtime::Loader& runtime,
                                        Random::RandomGenerator& random, TimeSource& time_source)
-    : stats_(stats), scope_(scope), runtime_(runtime), random_(random), time_source_(time_source),
-      fallback_policy_(subsets.fallbackPolicy()),
-      metadata_fallback_policy_(subsets.metadataFallbackPolicy()),
-      default_subset_metadata_(subsets.defaultSubset().fields().begin(),
-                               subsets.defaultSubset().fields().end()),
-      subset_selectors_(subsets.subsetSelectors()), original_priority_set_(priority_set),
-      original_local_priority_set_(local_priority_set), child_lb_creator_(std::move(child_lb)),
-      locality_weight_aware_(subsets.localityWeightAware()),
-      scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()),
-      allow_redundant_keys_(subsets.allowRedundantKeys()) {
-  ASSERT(subsets.isEnabled());
+    : lb_config_(lb_config), cluster_info_(cluster_info), stats_(stats), scope_(scope),
+      runtime_(runtime), random_(random), time_source_(time_source),
+      fallback_policy_(lb_config_.subsetInfo().fallbackPolicy()),
+      metadata_fallback_policy_(lb_config_.subsetInfo().metadataFallbackPolicy()),
+      default_subset_metadata_(lb_config_.subsetInfo().defaultSubset().fields().begin(),
+                               lb_config_.subsetInfo().defaultSubset().fields().end()),
+      subset_selectors_(lb_config_.subsetInfo().subsetSelectors()),
+      original_priority_set_(priority_set), original_local_priority_set_(local_priority_set),
+      locality_weight_aware_(lb_config_.subsetInfo().localityWeightAware()),
+      scale_locality_weight_(lb_config_.subsetInfo().scaleLocalityWeight()),
+      list_as_any_(lb_config_.subsetInfo().listAsAny()),
+      allow_redundant_keys_(lb_config_.subsetInfo().allowRedundantKeys()) {
+  ASSERT(lb_config_.subsetInfo().isEnabled());
 
   if (fallback_policy_ != envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK) {
     if (fallback_policy_ == envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
@@ -189,7 +78,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets,
     }
   }
 
-  if (subsets.panicModeAny()) {
+  if (lb_config_.subsetInfo().panicModeAny()) {
     initSubsetAnyOnce();
     panic_mode_subset_ = subset_any_;
   }
@@ -826,17 +715,12 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
   // Create at least one host set.
   getOrCreateHostSet(0);
 
-  auto lb_pair = subset_lb.child_lb_creator_->createLoadBalancer(
-      *this, original_local_priority_set_, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_,
-      subset_lb.random_, subset_lb.time_source_);
-
-  if (lb_pair.first != nullptr) {
-    thread_aware_lb_ = std::move(lb_pair.first);
-    thread_aware_lb_->initialize();
-    lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
-  } else {
-    lb_ = std::move(lb_pair.second);
-  }
+  thread_aware_lb_ =
+      subset_lb.lb_config_.createLoadBalancer(subset_lb.cluster_info_, *this, subset_lb.runtime_,
+                                              subset_lb.random_, subset_lb.time_source_);
+  ASSERT(thread_aware_lb_ != nullptr);
+  thread_aware_lb_->initialize();
+  lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
 
   triggerCallbacks();
 }

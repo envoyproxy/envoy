@@ -3,16 +3,14 @@
 #include <iostream>
 
 #include "source/common/api/api_impl.h"
-#include "source/common/common/random_generator.h"
 #include "source/common/common/thread.h"
-#include "source/common/event/real_time_system.h"
 #include "source/common/http/utility.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/exe/platform_impl.h"
-#include "source/exe/process_wide.h"
 
 #include "library/common/data/utility.h"
+#include "library/common/http/header_utility.h"
 
 namespace Envoy {
 
@@ -97,17 +95,19 @@ void Fetch::sendRequest(const absl::string_view url_string) {
 
   Platform::StreamSharedPtr stream = stream_prototype->start(/*explicit_flow_control=*/false);
 
-  Platform::RequestHeadersBuilder builder(Platform::RequestMethod::GET, std::string(url.scheme()),
-                                          std::string(url.hostAndPort()),
-                                          std::string(url.pathAndQueryParams()));
+  auto headers = Http::Utility::createRequestHeaderMapPtr();
+  headers->addCopy(Http::LowerCaseString(":method"), "GET");
+  headers->addCopy(Http::LowerCaseString(":scheme"), "https");
+  headers->addCopy(Http::LowerCaseString(":authority"), url.hostAndPort());
+  headers->addCopy(Http::LowerCaseString(":path"), url.pathAndQueryParams());
+  stream->sendHeaders(std::move(headers), true);
 
-  stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(builder.build()), true);
   request_finished.WaitForNotification();
 }
 
 void Fetch::runEngine(absl::Notification& engine_running) {
   Platform::EngineBuilder engine_builder;
-  engine_builder.addLogLevel(Envoy::Platform::LogLevel::debug);
+  engine_builder.setLogLevel(Logger::Logger::debug);
   engine_builder.setOnEngineRunning([&engine_running]() { engine_running.Notify(); });
 
   {

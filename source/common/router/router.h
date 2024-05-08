@@ -301,7 +301,7 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public Upstream::LoadBalancerContextBase,
                public RouterFilterInterface {
 public:
-  Filter(FilterConfig& config, FilterStats& stats)
+  Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
       : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
         ensure_connection_retry_(
@@ -467,7 +467,7 @@ public:
   void onStreamMaxDurationReached(UpstreamRequest& upstream_request) override;
   Http::StreamDecoderFilterCallbacks* callbacks() override { return callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
-  FilterConfig& config() override { return config_; }
+  FilterConfig& config() override { return *config_; }
   TimeoutData timeout() override { return timeout_; }
   absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const override {
     return dynamic_max_stream_duration_;
@@ -481,7 +481,7 @@ public:
   // Http::UpstreamCallbacks
   void onUpstreamConnectionEstablished() override;
 
-  TimeSource& timeSource() { return config_.timeSource(); }
+  TimeSource& timeSource() { return config_->timeSource(); }
   const Route* route() const { return route_.get(); }
   const FilterStats& stats() { return stats_; }
 
@@ -559,12 +559,12 @@ private:
   void handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                                    UpstreamRequest& upstream_request, bool end_stream,
                                    uint64_t grpc_to_http_status);
-  Http::Context& httpContext() { return config_.http_context_; }
+  Http::Context& httpContext() { return config_->http_context_; }
   bool checkDropOverload(Upstream::ThreadLocalCluster& cluster,
                          std::function<void(Http::ResponseHeaderMap&)>& modify_headers);
 
   RetryStatePtr retry_state_;
-  FilterConfig& config_;
+  const FilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};

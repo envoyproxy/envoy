@@ -74,12 +74,12 @@ class ClientImpl : public Client, public DecoderCallbacks, public Network::Conne
 public:
   static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                           EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                          const Config& config,
+                          const ConfigSharedPtr& config,
                           const RedisCommandStatsSharedPtr& redis_command_stats,
                           Stats::Scope& scope, bool is_transaction_client);
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
-             DecoderFactory& decoder_factory, const Config& config,
+             DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
              const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
              bool is_transaction_client);
   ~ClientImpl() override;
@@ -141,7 +141,7 @@ private:
   EncoderPtr encoder_;
   Buffer::OwnedImpl encoder_buffer_;
   DecoderPtr decoder_;
-  const Config& config_;
+  const ConfigSharedPtr config_;
   std::list<PendingRequest> pending_requests_;
   Event::TimerPtr connect_or_op_timer_;
   bool connected_{};
@@ -156,9 +156,10 @@ class ClientFactoryImpl : public ClientFactory {
 public:
   // RedisProxy::ConnPool::ClientFactoryImpl
   ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                   const Config& config, const RedisCommandStatsSharedPtr& redis_command_stats,
-                   Stats::Scope& scope, const std::string& auth_username,
-                   const std::string& auth_password, bool is_transaction_client) override;
+                   const ConfigSharedPtr& config,
+                   const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+                   const std::string& auth_username, const std::string& auth_password,
+                   bool is_transaction_client) override;
 
   static ClientFactoryImpl instance_;
 

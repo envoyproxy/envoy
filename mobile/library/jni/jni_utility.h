@@ -3,6 +3,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
+#include "envoy/http/header_map.h"
+
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -162,6 +165,67 @@ LocalRefUniquePtr<jobject> cppMapToJavaMap(JniHelper& jni_helper, const MapType&
  */
 absl::flat_hash_map<std::string, std::string> javaMapToCppMap(JniHelper& jni_helper,
                                                               jobject java_map);
+
+/**
+ * Converts from C++ `HeaderMap` to Java `Map<String, List<String>>`.
+ *
+ * Both `RequestHeaderMap` and `RequestTrailerMap` inherit from `HeaderMap`. So this function can be
+ * used for converting trailers, too.
+ */
+LocalRefUniquePtr<jobject> cppHeadersToJavaHeaders(JniHelper& jni_helper,
+                                                   const Http::HeaderMap& cpp_headers);
+
+/**
+ * Converts from Java `Map<String, List<String>>` to C++ `HeaderMap`.
+ *
+ * Both `RequestHeaderMap` and `RequestTrailerMap` inherit from `HeaderMap`. So this function can be
+ * used for converting trailers, too.
+ */
+void javaHeadersToCppHeaders(JniHelper& jni_helper, jobject java_headers,
+                             Http::HeaderMap& cpp_headers);
+
+/**
+ * Returns true if the specified `java_byte_buffer` is a direct ByteBuffer; false otherwise.
+ */
+bool isJavaDirectByteBuffer(JniHelper& jni_helper, jobject java_byte_buffer);
+
+/**
+ * Converts from Java direct `ByteBuffer` (off the JVM heap) to `Envoy::Buffer::Instance` up to the
+ * specified length.
+ *
+ * The function will avoid copying the data from the Java `ByteBuffer` into
+ * `Envoy::Buffer::Instance`.
+ */
+Buffer::InstancePtr javaDirectByteBufferToCppBufferInstance(JniHelper& jni_helper,
+                                                            jobject java_byte_buffer, jlong length);
+
+/**
+ * Converts from `Envoy::Buffer::Instance` to Java direct `ByteBuffer` (off the JVM heap).
+ *
+ * The function will avoid copying the data from `Envoy::Buffer::Instance` into the `ByteBuffer`.
+ */
+LocalRefUniquePtr<jobject>
+cppBufferInstanceToJavaDirectByteBuffer(JniHelper& jni_helper,
+                                        const Buffer::Instance& cpp_buffer_instance);
+
+/**
+ * Converts from Java non-direct `ByteBuffer` (on the JVM heap) to `Envoy::Buffer::Instance` up
+ * to the specified length.
+ *
+ * The function will copy the data from the Java `ByteBuffer` into `Envoy::Buffer::Instance`.
+ */
+Buffer::InstancePtr javaNonDirectByteBufferToCppBufferInstance(JniHelper& jni_helper,
+                                                               jobject java_byte_buffer,
+                                                               jlong length);
+
+/**
+ * Converts from `Envoy::Buffer::Instance` to Java non-direct `ByteBuffer` (off the JVM heap).
+ *
+ * The function will copy the data from `Envoy::Buffer::Instance` into the `ByteBuffer`.
+ */
+LocalRefUniquePtr<jobject>
+cppBufferInstanceToJavaNonDirectByteBuffer(JniHelper& jni_helper,
+                                           const Buffer::Instance& cpp_buffer_instance);
 
 } // namespace JNI
 } // namespace Envoy

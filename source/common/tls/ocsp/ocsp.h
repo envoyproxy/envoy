@@ -7,6 +7,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "openssl/bytestring.h"
@@ -180,7 +181,10 @@ struct OcspResponse {
  */
 class OcspResponseWrapper {
 public:
-  OcspResponseWrapper(std::vector<uint8_t> der_response, TimeSource& time_source);
+  OcspResponseWrapper(std::vector<uint8_t> der_response, TimeSource& time_source,
+                      std::unique_ptr<OcspResponse>&& response);
+  static absl::StatusOr<std::unique_ptr<OcspResponseWrapper>>
+  create(std::vector<uint8_t> der_response, TimeSource& time_source);
 
   /**
    * @return std::vector<uint8_t>& a reference to the underlying bytestring representation
@@ -251,7 +255,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed OcspResponse
    * element.
    */
-  static std::unique_ptr<OcspResponse> parseOcspResponse(CBS& cbs);
+  static absl::StatusOr<std::unique_ptr<OcspResponse>> parseOcspResponse(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` OcspResponseStatus element
@@ -259,7 +263,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * OcspResponseStatus element.
    */
-  static OcspResponseStatus parseResponseStatus(CBS& cbs);
+  static absl::StatusOr<OcspResponseStatus> parseResponseStatus(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` Response element
@@ -267,7 +271,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * structure that is a valid Response type.
    */
-  static ResponsePtr parseResponseBytes(CBS& cbs);
+  static absl::StatusOr<ResponsePtr> parseResponseBytes(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` BasicOcspResponse element
@@ -275,7 +279,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * BasicOcspResponse element.
    */
-  static std::unique_ptr<BasicOcspResponse> parseBasicOcspResponse(CBS& cbs);
+  static absl::StatusOr<std::unique_ptr<BasicOcspResponse>> parseBasicOcspResponse(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` ResponseData element
@@ -284,7 +288,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * ResponseData element.
    */
-  static ResponseData parseResponseData(CBS& cbs);
+  static absl::StatusOr<ResponseData> parseResponseData(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` SingleResponse element
@@ -293,16 +297,15 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * SingleResponse element.
    */
-  static SingleResponse parseSingleResponse(CBS& cbs);
+  static absl::StatusOr<SingleResponse> parseSingleResponse(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` CertId element
    * @returns CertId containing the information necessary to uniquely identify
-   * an SSL certificate.
-   * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
-   * CertId element.
+   * an SSL certificate or an error status if
+   * `cbs` does not contain a well-formed CertId element.
    */
-  static CertId parseCertId(CBS& cbs);
+  static absl::StatusOr<CertId> parseCertId(CBS& cbs);
 };
 
 } // namespace Ocsp

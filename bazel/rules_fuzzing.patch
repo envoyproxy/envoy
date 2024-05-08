@@ -1,8 +1,8 @@
 diff --git a/fuzzing/private/oss_fuzz/package.bzl b/fuzzing/private/oss_fuzz/package.bzl
-index 4f4e636..a1add46 100644
+index e5e9dc4..a3bb1b8 100644
 --- a/fuzzing/private/oss_fuzz/package.bzl
 +++ b/fuzzing/private/oss_fuzz/package.bzl
-@@ -79,7 +79,7 @@ def _oss_fuzz_package_impl(ctx):
+@@ -71,7 +71,7 @@ def _oss_fuzz_package_impl(ctx):
              if [[ -n "{options_path}" ]]; then
                  ln -s "$(pwd)/{options_path}" "$STAGING_DIR/{base_name}.options"
              fi
@@ -12,17 +12,18 @@ index 4f4e636..a1add46 100644
              base_name = ctx.attr.base_name,
              binary_path = binary_info.binary_file.path,
 diff --git a/fuzzing/tools/validate_dict.py b/fuzzing/tools/validate_dict.py
-index 52cbcb8..dac313a 100644
+index d561e68..24e3adc 100644
 --- a/fuzzing/tools/validate_dict.py
 +++ b/fuzzing/tools/validate_dict.py
-@@ -22,6 +22,10 @@ from absl import flags
- from fuzzing.tools.dict_validation import validate_line
- from sys import stderr
+@@ -19,6 +19,11 @@ Validates and merges a set of fuzzing dictionary files into a single output.
  
+ from absl import app
+ from absl import flags
++
 +import os
 +import sys
 +sys.path += [os.path.dirname(__file__)]
 +
- FLAGS = flags.FLAGS
+ from dict_validation import validate_line
+ from sys import stderr
  
- flags.DEFINE_list("dict_list", [],

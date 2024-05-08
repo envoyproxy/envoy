@@ -118,7 +118,10 @@ final class FilterResetIdleTests: XCTestCase {
     let port = String(EnvoyTestServer.getEnvoyPort())
 
     let engine = EngineBuilder()
-      .addLogLevel(.trace)
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .addStreamIdleTimeoutSeconds(1)
       .addPlatformFilter(
         name: filterName,

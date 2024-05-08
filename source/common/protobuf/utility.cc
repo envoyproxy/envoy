@@ -75,8 +75,8 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
       fmt::runtime(error),
       (runtime_overridden ? "runtime overrides to continue using now fatal-by-default " : ""));
 
-  validation_visitor.onDeprecatedField("type " + message.GetTypeName() + " " + with_overridden,
-                                       warn_only);
+  THROW_IF_NOT_OK(validation_visitor.onDeprecatedField(
+      "type " + message.GetTypeName() + " " + with_overridden, warn_only));
 }
 
 } // namespace
@@ -274,7 +274,7 @@ public:
         absl::StrAppend(&error_msg, n > 0 ? ", " : "", unknown_fields.field(n).number());
       }
       if (!error_msg.empty()) {
-        validation_visitor_.onUnknownField(
+        THROW_IF_NOT_OK(validation_visitor_.onUnknownField(
             fmt::format("type {}({}) with unknown field set {{{}}}", message.GetTypeName(),
                         !parents.empty()
                             ? absl::StrJoin(parents, "::",
@@ -282,7 +282,7 @@ public:
                                               absl::StrAppend(out, m->GetTypeName());
                                             })
                             : "root",
-                        error_msg));
+                        error_msg)));
       }
     }
   }
@@ -301,7 +301,8 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
                                  ? &validation_visitor.runtime().value().get()
                                  : nullptr;
   UnexpectedFieldProtoVisitor unexpected_field_visitor(validation_visitor, runtime);
-  ProtobufMessage::traverseMessage(unexpected_field_visitor, message, recurse_into_any);
+  THROW_IF_NOT_OK(
+      ProtobufMessage::traverseMessage(unexpected_field_visitor, message, recurse_into_any));
 }
 
 namespace {
@@ -328,7 +329,7 @@ public:
 
 void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
   PgvCheckVisitor visitor;
-  ProtobufMessage::traverseMessage(visitor, message, true);
+  THROW_IF_NOT_OK(ProtobufMessage::traverseMessage(visitor, message, true));
 }
 
 void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Message& message) {
@@ -851,6 +852,49 @@ void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& wit
       break;
     }
   }
+}
+
+void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
+                               ProtobufMessage::ValidationVisitor& validation_visitor,
+                               Api::Api& api) {
+  auto file_or_error = api.fileSystem().fileReadToEnd(path);
+  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  const std::string contents = file_or_error.value();
+  // If the filename ends with .pb, attempt to parse it as a binary proto.
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
+    // Attempt to parse the binary format.
+    if (message.ParseFromString(contents)) {
+      MessageUtil::checkForUnexpectedFields(message, validation_visitor);
+    }
+    // Ideally this would throw an error if ParseFromString fails for consistency
+    // but instead it will silently fail.
+    return;
+  }
+
+  // If the filename ends with .pb_text, attempt to parse it as a text proto.
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
+      return;
+    }
+#endif
+    throwEnvoyExceptionOrPanic("Unable to parse file \"" + path + "\" as a text protobuf (type " +
+                               message.GetTypeName() + ")");
+  }
+#ifdef ENVOY_ENABLE_YAML
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
+      absl::EndsWithIgnoreCase(path, FileExtensions::get().Yml)) {
+    // loadFromYaml throws an error if parsing fails.
+    loadFromYaml(contents, message, validation_visitor);
+  } else {
+    // loadFromJson does not consistently trow an error if parsing fails.
+    // Ideally we would handle that case here.
+    loadFromJson(contents, message, validation_visitor);
+  }
+#else
+  throwEnvoyExceptionOrPanic("Unable to parse file \"" + path + "\" (type " +
+                             message.GetTypeName() + ")");
+#endif
 }
 
 } // namespace Envoy

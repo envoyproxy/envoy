@@ -22,8 +22,12 @@ namespace PrivateKeyMethodProvider {
 namespace CryptoMb {
 
 // Testing interface
-ssl_private_key_result_t privateKeyCompleteForTest(CryptoMbPrivateKeyConnection* ops, uint8_t* out,
-                                                   size_t* out_len, size_t max_out);
+ssl_private_key_result_t ecdsaPrivateKeyCompleteForTest(CryptoMbPrivateKeyConnection* ops,
+                                                        uint8_t* out, size_t* out_len,
+                                                        size_t max_out);
+ssl_private_key_result_t rsaPrivateKeyCompleteForTest(CryptoMbPrivateKeyConnection* ops,
+                                                      uint8_t* out, size_t* out_len,
+                                                      size_t max_out);
 ssl_private_key_result_t ecdsaPrivateKeySignForTest(CryptoMbPrivateKeyConnection* ops, uint8_t* out,
                                                     size_t* out_len, size_t max_out,
                                                     uint16_t signature_algorithm, const uint8_t* in,
@@ -148,14 +152,14 @@ TEST_F(CryptoMbProviderEcdsaTest, TestEcdsaSigning) {
     // No processing done after first requests.
     // After the last request, the status is set only from the event loop which is not run. This
     // should still be "retry", the cryptographic result is present anyway.
-    res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, max_out_len_);
+    res_ = ecdsaPrivateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, max_out_len_);
     EXPECT_EQ(res_, ssl_private_key_retry);
   }
 
   // Timeout does not have to be triggered when queue is at maximum size.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
+  res_ = ecdsaPrivateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 }
@@ -179,14 +183,14 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaPkcs1Signing) {
     // No processing done after first requests.
     // After the last request, the status is set only from the event loop which is not run. This
     // should still be "retry", the cryptographic result is present anyway.
-    res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, max_out_len_);
+    res_ = rsaPrivateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, max_out_len_);
     EXPECT_EQ(res_, ssl_private_key_retry);
   }
 
   // Timeout does not have to be triggered when queue is at maximum size.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
+  res_ = rsaPrivateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 
@@ -217,14 +221,14 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaPssSigning) {
     // No processing done after first requests.
     // After the last request, the status is set only from the event loop which is not run. This
     // should still be "retry", the cryptographic result is present anyway.
-    res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, max_out_len_);
+    res_ = rsaPrivateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, max_out_len_);
     EXPECT_EQ(res_, ssl_private_key_retry);
   }
 
   // Timeout does not have to be triggered when queue is at maximum size.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
+  res_ = rsaPrivateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 
@@ -263,14 +267,14 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaDecrypt) {
     // No processing done after first requests.
     // After the last request, the status is set only from the event loop which is not run. This
     // should still be "retry", the cryptographic result is present anyway.
-    res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, max_out_len_);
+    res_ = rsaPrivateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, max_out_len_);
     EXPECT_EQ(res_, ssl_private_key_retry);
   }
 
   // Timeout does not have to be triggered when queue is at maximum size.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
+  res_ = rsaPrivateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 }
@@ -333,14 +337,14 @@ TEST_F(CryptoMbProviderEcdsaTest, TestEcdsaTimer) {
                                     SSL_SIGN_ECDSA_SECP256R1_SHA256, in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_retry);
 
-  res_ = privateKeyCompleteForTest(&op0, nullptr, nullptr, max_out_len_);
+  res_ = ecdsaPrivateKeyCompleteForTest(&op0, nullptr, nullptr, max_out_len_);
   // No processing done yet after first request
   EXPECT_EQ(res_, ssl_private_key_retry);
 
   time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(&op0, out_, &out_len_, max_out_len_);
+  res_ = ecdsaPrivateKeyCompleteForTest(&op0, out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 
@@ -354,14 +358,14 @@ TEST_F(CryptoMbProviderEcdsaTest, TestEcdsaTimer) {
                                     SSL_SIGN_ECDSA_SECP256R1_SHA256, in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_retry);
 
-  res_ = privateKeyCompleteForTest(&op1, nullptr, nullptr, max_out_len_);
+  res_ = ecdsaPrivateKeyCompleteForTest(&op1, nullptr, nullptr, max_out_len_);
   // No processing done yet after first request
   EXPECT_EQ(res_, ssl_private_key_retry);
 
   time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(&op1, out_, &out_len_, max_out_len_);
+  res_ = ecdsaPrivateKeyCompleteForTest(&op1, out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
 }
 
@@ -374,14 +378,14 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaTimer) {
                                   in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_retry);
 
-  res_ = privateKeyCompleteForTest(&op0, nullptr, nullptr, max_out_len_);
+  res_ = rsaPrivateKeyCompleteForTest(&op0, nullptr, nullptr, max_out_len_);
   // No processing done yet after first request
   EXPECT_EQ(res_, ssl_private_key_retry);
 
   time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(&op0, out_, &out_len_, max_out_len_);
+  res_ = rsaPrivateKeyCompleteForTest(&op0, out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 
@@ -395,14 +399,14 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaTimer) {
                                   in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_retry);
 
-  res_ = privateKeyCompleteForTest(&op1, nullptr, nullptr, max_out_len_);
+  res_ = rsaPrivateKeyCompleteForTest(&op1, nullptr, nullptr, max_out_len_);
   // No processing done yet after first request
   EXPECT_EQ(res_, ssl_private_key_retry);
 
   time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(&op1, out_, &out_len_, max_out_len_);
+  res_ = rsaPrivateKeyCompleteForTest(&op1, out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
 }
 
@@ -428,7 +432,7 @@ TEST_F(CryptoMbProviderEcdsaTest, TestEcdsaQueueSizeStatistics) {
                                    Event::Dispatcher::RunType::NonBlock);
 
     out_len_ = 0;
-    res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
+    res_ = ecdsaPrivateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
     EXPECT_EQ(res_, ssl_private_key_success);
     EXPECT_NE(out_len_, 0);
 
@@ -451,7 +455,7 @@ TEST_F(CryptoMbProviderEcdsaTest, TestEcdsaQueueSizeStatistics) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   out_len_ = 0;
-  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
+  res_ = ecdsaPrivateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 
@@ -483,7 +487,7 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaQueueSizeStatistics) {
                                    Event::Dispatcher::RunType::NonBlock);
 
     out_len_ = 0;
-    res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
+    res_ = rsaPrivateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
     EXPECT_EQ(res_, ssl_private_key_success);
     EXPECT_NE(out_len_, 0);
 
@@ -506,7 +510,7 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaQueueSizeStatistics) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   out_len_ = 0;
-  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
+  res_ = rsaPrivateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 
