@@ -442,12 +442,12 @@ struct StreamInfoImpl : public StreamInfo {
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
+  absl::InlinedVector<ResponseFlag, 4> response_flags_{};
 
 private:
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
-  absl::InlinedVector<ResponseFlag, 4> response_flags_{};
   absl::optional<uint32_t> attempt_count_;
   // TODO(agrawroh): Check if the owner of this storage outlives the StreamInfo. We should only copy
   // the string if it could outlive the StreamInfo.
