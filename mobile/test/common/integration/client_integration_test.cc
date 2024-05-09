@@ -79,14 +79,18 @@ public:
       builder_.enablePlatformCertificatesValidation(true);
       // Create a k-v store for DNS lookup which createEnvoy() will use to point
       // www.lyft.com -> fake H3 backend.
-      builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
-      builder_.enableDnsCache(true, /* save_interval_seconds */ 1);
+      add_fake_dns_ = true;
       upstream_tls_ = true;
       add_quic_hints_ = true;
     } else if (getCodecType() == Http::CodecType::HTTP2) {
       setUpstreamProtocol(Http::CodecType::HTTP2);
       builder_.enablePlatformCertificatesValidation(true);
       upstream_tls_ = true;
+    }
+
+    if (add_fake_dns_) {
+      builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
+      builder_.enableDnsCache(true, /* save_interval_seconds */ 1);
     }
 
     BaseClientIntegrationTest::initialize();
@@ -114,14 +118,14 @@ public:
   void createEnvoy() override {
     // Allow last minute addition of QUIC hints. This is done lazily as it must be done after
     // upstreams are created.
+    auto upstream_port = fake_upstreams_[0]->localAddress()->ip()->port();
     if (add_quic_hints_) {
-      auto address = fake_upstreams_[0]->localAddress();
-      auto upstream_port = fake_upstreams_[0]->localAddress()->ip()->port();
       // With canonical suffix, having a quic hint of foo.lyft.com will make
       // www.lyft.com being recognized as QUIC ready.
       builder_.addQuicCanonicalSuffix(".lyft.com");
       builder_.addQuicHint("foo.lyft.com", upstream_port);
-
+    }
+    if (add_fake_dns_) {
       // Force www.lyft.com to resolve to the fake upstream. It's the only domain
       // name the certs work for so we want that in the request, but we need to
       // fake resolution to not result in a request to the real www.lyft.com
@@ -172,6 +176,7 @@ public:
 protected:
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
   bool add_quic_hints_ = false;
+  bool add_fake_dns_ = false;
   static std::shared_ptr<TestKeyValueStore> test_key_value_store_;
   FakeHttpConnectionPtr upstream_connection_;
   FakeStreamPtr upstream_request_;
@@ -580,6 +585,76 @@ TEST_P(ClientIntegrationTest, InvalidDomainFakeResolver) {
   ASSERT_EQ(cc_.on_error_calls, 0);
   ASSERT_EQ(cc_.on_headers_calls, 1);
   ASSERT_EQ(cc_.status, "200");
+}
+
+TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
+  builder_.enableDrainPostDnsRefresh(true);
+  add_fake_dns_ = true;
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+
+  initialize();
+  if (version_ != Network::Address::IpVersion::v4) {
+    return; // This test relies on ipv4 loopback.
+  }
+
+  auto next_address = Network::Utility::parseInternetAddress(
+      "127.0.0.3", fake_upstreams_[0]->localAddress()->ip()->port());
+  // This will hopefully be miniminally flaky because of low use of 127.0.0.3
+  // but may need to be disabled.
+  createUpstream(next_address, upstreamConfig());
+  ASSERT_EQ(fake_upstreams_.size(), 3);
+
+  // Make the "original" upstream and reresolve upstream return different errors.
+  auto* au = reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get());
+  au->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl({{":status", "201"}})));
+  au = reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[2].get());
+  au->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl({{":status", "202"}})));
+
+  // Send a request. The original upstream should be used because of DNS block.
+  default_request_headers_.setHost(
+      absl::StrCat("www.lyft.com:", fake_upstreams_[0]->localAddress()->ip()->port()));
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.status, "201");
+  // No DNS queries, because of the initial cache load.
+  EXPECT_EQ(0, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
+  EXPECT_EQ(1, getCounterValue("dns_cache.base_dns_cache.cache_load"));
+
+  // Reset connectivity state. This should force a resolve but we will not
+  // unblock it.
+  {
+    absl::MutexLock l(&engine_lock_);
+    engine_->engine()->resetConnectivityState();
+  }
+
+  // Make sure the attempt happened.
+  ASSERT_TRUE(waitForCounterGe("dns_cache.base_dns_cache.dns_query_attempt", 1));
+  EXPECT_EQ(0, getCounterValue("dns_cache.base_dns_cache.dns_query_success"));
+  // The next request should go to the original upstream as there's been no drain.
+  createNewStream(stream_prototype_, cc_, stream_);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.status, "201");
+  // No DNS query should have finished.
+  EXPECT_EQ(0, getCounterValue("dns_cache.base_dns_cache.dns_query_success"));
+
+  // Force the lookup to resolve to localhost.
+  // Unblock the resolution and wait for it to succeed.
+  Network::TestResolver::unblockResolve("127.0.0.3");
+  ASSERT_TRUE(waitForCounterGe("dns_cache.base_dns_cache.dns_query_success", 1));
+
+  // Do one final request. It should go to the second upstream and return 202
+  createNewStream(stream_prototype_, cc_, stream_);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.status, "202");
 }
 
 TEST_P(ClientIntegrationTest, BasicBeforeResponseHeaders) {

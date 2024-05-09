@@ -148,7 +148,7 @@ TEST_F(InternalEngineTest, AccessEngineAfterInitialization) {
 
   absl::Notification getClusterManagerInvoked;
   // Running engine functions should work because the engine is running
-  EXPECT_EQ("runtime.load_success: 1\n", engine_->engine_->dumpStats());
+  EXPECT_THAT(engine_->engine_->dumpStats(), testing::HasSubstr("runtime.load_success: 1\n"));
 
   engine_->terminate();
   ASSERT_TRUE(engine_->isTerminated());
