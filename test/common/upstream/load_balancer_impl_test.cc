@@ -2846,6 +2846,18 @@ public:
 
 TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
 
+TEST_P(LeastRequestLoadBalancerTest, SingleHostAndPeek) {
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  // Host weight is 1 and peek.
+  {
+    EXPECT_CALL(random_, random()).WillOnce(Return(0));
+    EXPECT_EQ(nullptr, lb_.peekAnotherHost(nullptr));
+  }
+}
+
 TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
   hostSet().hosts_ = hostSet().healthy_hosts_;
