@@ -14,7 +14,7 @@ behavior_changes:
 - area: proxy_protocol
   change: |
     Populate typed metadata by default in proxy protocol listener. Typed metadata can be consumed as
-    :ref:`TlvsMetadata type <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.TlvsMetadata>`.
+    :ref:`TlvsMetadata type <envoy_v3_api_msg_data.core.v3.TlvsMetadata>`.
     This change can be temporarily disabled by setting the runtime flag
     ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` to ``false``.
 
