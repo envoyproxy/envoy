@@ -24,6 +24,7 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -74,6 +75,8 @@ public:
 
         status_on_error_(toErrorCode(config.status_on_error().code())),
         validate_mutations_(config.validate_mutations()), scope_(scope),
+        decoder_header_mutation_checker_(createDecoderHeaderMutationChecker(
+            config.decoder_header_mutation_rules(), factory_context.regexEngine())),
         runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
         filter_enabled_(config.has_filter_enabled()
                             ? absl::optional<Runtime::FractionalPercent>(
@@ -162,6 +165,12 @@ public:
 
   bool headersAsBytes() const { return encode_raw_headers_; }
 
+  Filters::Common::MutationRules::CheckResult
+  checkDecoderHeaderMutation(const Filters::Common::MutationRules::CheckOperation& operation,
+                             const Http::LowerCaseString& key, absl::string_view value) const {
+    return decoder_header_mutation_checker_.check(operation, key, value);
+  }
+
   Http::Code statusOnError() const { return status_on_error_; }
 
   bool validateMutations() const { return validate_mutations_; }
@@ -218,6 +227,20 @@ public:
   }
 
 private:
+  static Filters::Common::MutationRules::Checker createDecoderHeaderMutationChecker(
+      envoy::config::common::mutation_rules::v3::HeaderMutationRules rules,
+      Regex::Engine& regex_engine) {
+    // The mutation rules lib enables some restrictions by default. This could break existing users
+    // of ext_authz, so we override certain defaults when those rules are not set.
+    if (!rules.has_allow_all_routing()) {
+      rules.mutable_allow_all_routing()->set_value(true);
+    }
+    if (!rules.has_allow_envoy()) {
+      rules.mutable_allow_envoy()->set_value(true);
+    }
+    return Filters::Common::MutationRules::Checker(rules, regex_engine);
+  }
+
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
     if (code >= Http::Code::Continue && code <= Http::Code::NetworkAuthenticationRequired) {
@@ -252,6 +275,7 @@ private:
   const Http::Code status_on_error_;
   const bool validate_mutations_;
   Stats::Scope& scope_;
+  const Filters::Common::MutationRules::Checker decoder_header_mutation_checker_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;
@@ -372,6 +396,21 @@ public:
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
 private:
+  // Convenience function for the following:
+  //
+  // 1. If `validate_mutations` is set to true, validate header key and value & reject response if
+  // validation fails,
+  // 2. Check that mutation is allowed by `decoder_header_mutation_rules` config. Reject the
+  // response if configured to do so.
+  // 3. If the mutation passed checks (and mutation_func is not null), call
+  // mutation_func(key, value).
+  //
+  // Returns false if the response has been rejected.
+  bool checkAndApplyHeaderMutation(
+      Filters::Common::MutationRules::CheckOperation operation, absl::string_view key,
+      absl::string_view value,
+      const std::function<void(Http::LowerCaseString, absl::string_view)> mutation_func);
+
   // Called when the filter is configured to reject invalid responses & the authz response contains
   // invalid header or query parameters. Sends a local response with the configured rejection status
   // code.

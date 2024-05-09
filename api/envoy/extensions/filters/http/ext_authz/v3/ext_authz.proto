@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ext_authz.v3;
 
+import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
@@ -28,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -261,6 +262,18 @@ message ExtAuthz {
   // It's recommended you set this to true unless you already rely on the old behavior. False is the
   // default only for backwards compatibility.
   bool encode_raw_headers = 23;
+
+  // Rules for what modifications an ext_authz server may make to the request headers before
+  // continuing decoding / forwarding upstream.
+  //
+  // In ext_authz, some of the default values for this proto are overridden for backward
+  // compatibility. The following fields' default values are overridden:
+  // - ``allow_all_routing`` = true
+  // - ``allow_envoy`` = true
+  //
+  // Note that no matter what rules are set here, ext_authz can never remove or append
+  // pseudoheaders.
+  config.common.mutation_rules.v3.HeaderMutationRules decoder_header_mutation_rules = 26;
 }
 
 // Configuration for buffering the request data.
