@@ -7,10 +7,11 @@ permissions:
 
 on:
   pull_request_target:
+    branches-ignore:
+    - main
   push:
     branches:
-    - main
-    - release/v*
+    - patches/*
 
 concurrency:
   group: |
