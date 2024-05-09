@@ -1,5 +1,7 @@
 #pragma once
 
+#include <queue>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/event/file_event.h"
