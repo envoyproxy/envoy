@@ -66,8 +66,9 @@ protected:
   ABSL_MUST_USE_RESULT testing::AssertionResult waitForGaugeGe(const std::string& name,
                                                                uint64_t value);
 
+  EnvoyStreamCallbacks createDefaultStreamCallbacks();
+
   Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
-  envoy_http_callbacks bridge_callbacks_;
   ConditionalInitializer terminal_callback_;
   callbacks_called cc_{0, 0, 0, 0, 0, 0, 0, "", &terminal_callback_, {}};
   Http::TestRequestHeaderMapImpl default_request_headers_;

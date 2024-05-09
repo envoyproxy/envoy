@@ -23,6 +23,16 @@ envoy_map makeEnvoyMap(std::initializer_list<std::pair<std::string, std::string>
   return makeEnvoyMap<std::initializer_list<std::pair<std::string, std::string>>>(map);
 }
 
+envoy_error toBridgeError(const EnvoyError& error) {
+  envoy_error error_bridge{};
+  error_bridge.message = Data::Utility::copyToBridgeData(error.message);
+  error_bridge.error_code = error.error_code;
+  if (error.attempt_count.has_value()) {
+    error_bridge.attempt_count = *error.attempt_count;
+  }
+  return error_bridge;
+}
+
 } // namespace Utility
 } // namespace Bridge
 } // namespace Envoy

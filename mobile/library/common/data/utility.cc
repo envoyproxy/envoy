@@ -35,6 +35,12 @@ envoy_data toBridgeData(Buffer::Instance& data, uint32_t max_bytes) {
   return bridge_data;
 }
 
+envoy_data toBridgeDataNoDrain(const Buffer::Instance& data, uint32_t max_bytes) {
+  updateMaxBytes(max_bytes, data);
+  envoy_data bridge_data = copyToBridgeData(data, max_bytes);
+  return bridge_data;
+}
+
 envoy_data copyToBridgeData(absl::string_view str) {
   uint8_t* buffer = static_cast<uint8_t*>(safe_malloc(sizeof(uint8_t) * str.length()));
   memcpy(buffer, str.data(), str.length()); // NOLINT(safe-memcpy)
