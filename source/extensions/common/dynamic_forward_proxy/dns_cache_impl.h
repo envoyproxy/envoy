@@ -219,7 +219,8 @@ private:
                                       Network::DnsResolver::ResolutionStatus status);
   void runRemoveCallbacks(const std::string& host);
   void notifyThreads(const std::string& host, const DnsHostInfoImplSharedPtr& resolved_info);
-  void onReResolve(const std::string& host);
+  void onReResolveAlarm(const std::string& host);
+  void removeHost(const std::string& host, const PrimaryHostInfo& host_info);
   void onResolveTimeout(const std::string& host);
   PrimaryHostInfo& getPrimaryHost(const std::string& host);
 
