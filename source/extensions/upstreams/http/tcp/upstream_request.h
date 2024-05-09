@@ -26,6 +26,7 @@ public:
               Upstream::ResourcePriority priority, Upstream::LoadBalancerContext* ctx) {
     conn_pool_data_ = thread_local_cluster.tcpConnPool(priority, ctx);
   }
+  ~TcpConnPool() override { cancelAnyPendingStream(); }
   // Router::GenericConnPool
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
