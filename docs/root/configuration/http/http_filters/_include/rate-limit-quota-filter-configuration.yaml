@@ -24,16 +24,16 @@ static_resources:
           http_filters:
           - name: "envoy.filters.http.rate_limit_quota"
             typed_config:
-              "@type": type.googleapis.com/net.envoy.source.extensions.filters.http.metadata.RateLimitQuotaFilterConfig
-            rlqs_server:
-              envoy_grpc:
-                cluster_name: rate_limit_quota_service
+              "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig
+              rlqs_server:
+                envoy_grpc:
+                  cluster_name: rate_limit_quota_service
               domain: "acme-services"
-              matcher:
+              bucket_matchers:
                 matcher_list:
                   matchers:
                   - predicate:
-                    - single_predicate:
+                      single_predicate:
                         input:
                           name: request-headers
                           typed_config:
@@ -52,9 +52,10 @@ static_resources:
                                 string_value: "prod-rate-limit-quota"
                           reporting_interval: 60s
                           no_assignment_behavior:
-                            blanket_rule: ALLOW_ALL
+                            fallback_rate_limit:
+                              blanket_rule: ALLOW_ALL
                   - predicate:
-                    - single_predicate:
+                      single_predicate:
                         input:
                           name: request-headers
                           typed_config:
@@ -73,7 +74,8 @@ static_resources:
                                 string_value: "staging-rate-limit-quota"
                           reporting_interval: 60s
                           no_assignment_behavior:
-                            blanket_rule: DENY_ALL
+                            fallback_rate_limit:
+                              blanket_rule: DENY_ALL
                 # The "catch all" bucket settings
                 on_no_match:
                   action:
@@ -86,18 +88,20 @@ static_resources:
                             string_value: "default-rate-limit-quota"
                       reporting_interval: 60s
                       deny_response_settings:
-                        http_status_code: 429
+                        http_status:
+                          code: 429
                       no_assignment_behavior:
-                        blanket_rule: ALLOW_ALL
+                        fallback_rate_limit:
+                          blanket_rule: ALLOW_ALL
                       expired_assignment_behavior:
                         fallback_rate_limit:
                           requests_per_time_unit:
                             requests_per_time_unit: 1000
-                            time_unit: 1s
-          http_filters:
+                            time_unit: SECOND
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
   clusters:
   - name: cluster_0
     # Cluster for fake destination service which has typed metadata that contains the audience information.

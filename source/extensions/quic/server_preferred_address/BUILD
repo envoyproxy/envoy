@@ -23,6 +23,7 @@ envoy_cc_library(
     deps = [
         "//envoy/registry",
         "//source/common/quic:envoy_quic_server_preferred_address_config_factory_interface",
+        "//source/common/quic:envoy_quic_utils_lib",
         "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,

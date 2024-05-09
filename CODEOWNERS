@@ -269,7 +269,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @cpakulski
 /*/extensions/http/stateful_session/header @ramaraochavali @wbpcode @cpakulski
-/*/extensions/filters/http/stateful_session @wbpcode @cpakulski
+/*/extensions/filters/http/stateful_session @wbpcode @cpakulski @adisuissa
 # tracers
 /*/extensions/tracers/zipkin @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/dynamic_ot @wbpcode @Shikugawa @basvanbeek

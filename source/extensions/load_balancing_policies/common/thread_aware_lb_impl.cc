@@ -1,4 +1,4 @@
-#include "source/common/upstream/thread_aware_lb_impl.h"
+#include "source/extensions/load_balancing_policies/common/thread_aware_lb_impl.h"
 
 #include <memory>
 #include <random>
@@ -97,7 +97,10 @@ void ThreadAwareLoadBalancerBase::initialize() {
   // complicated initialization as the load balancer would need its own initialized callback. I
   // think the synchronous/asynchronous split is probably the best option.
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector&) -> void { refresh(); });
+      [this](uint32_t, const HostVector&, const HostVector&) -> absl::Status {
+        refresh();
+        return absl::OkStatus();
+      });
 
   refresh();
 }

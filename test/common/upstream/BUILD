@@ -463,18 +463,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "bounded_load_hlb_test",
-    srcs = ["bounded_load_hlb_test.cc"],
-    deps = [
-        ":utility_lib",
-        "//source/common/upstream:thread_aware_lb_lib",
-        "//source/common/upstream:upstream_includes",
-        "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-    ],
-)
-
 envoy_cc_benchmark_binary(
     name = "load_balancer_benchmark",
     srcs = ["load_balancer_benchmark.cc"],

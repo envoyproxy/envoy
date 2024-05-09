@@ -93,6 +93,8 @@ paths:
     - source/common/matcher/matcher.h
     - source/extensions/common/matcher/trie_matcher.h
     - envoy/common/exception.h
+    - source/common/upstream/upstream_impl.h
+    - source/common/config/context_provider_impl.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
     - source/common/listener_manager/listener_impl.cc
@@ -165,6 +167,8 @@ paths:
     - source/common/tls/context_config_impl.cc
     - source/common/tls/ocsp/ocsp.cc
     - source/common/config/watched_directory.cc
+    - source/server/drain_manager_impl.cc
+    - source/common/router/rds_impl.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:

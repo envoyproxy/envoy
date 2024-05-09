@@ -70,6 +70,7 @@ DSR
 DSS
 EBADF
 ECH
+ECT
 ENDIF
 ENOTCONN
 ENQ
@@ -301,9 +302,11 @@ NGHTTP
 NLOHMANN
 NOAUTH
 NOCHECKRESP
+NODATA
 NODELAY
 NOLINT
 NOLINTNEXTLINE
+NONAME
 NONBLOCK
 NONCES
 NOSORT
@@ -1374,6 +1377,7 @@ tokenized
 tokenizes
 tokenizing
 toolchain
+tos
 traceid
 traceparent
 tracestate
@@ -1417,6 +1421,7 @@ upcasts
 upstreams
 uptime
 upvalue
+uring
 urlencoded
 urls
 userdata
@@ -1503,3 +1508,5 @@ DLB
 PCIE
 EDNS
 CNAME
+NAT
+DNAT

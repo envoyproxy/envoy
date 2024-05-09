@@ -161,5 +161,13 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildZeroSoLingerOptions()
   return options;
 }
 
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpRecvTosOptions() {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_RECVTOS,
+      ENVOY_SOCKET_IPV6_RECVTCLASS, 1));
+  return options;
+}
+
 } // namespace Network
 } // namespace Envoy
