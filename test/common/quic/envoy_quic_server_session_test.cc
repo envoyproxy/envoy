@@ -164,7 +164,7 @@ public:
                 dispatcher_->timeSource(),
                 quic_connection_->connectionSocket()->connectionInfoProviderSharedPtr(),
                 StreamInfo::FilterState::LifeSpan::Connection),
-            connection_stats_),
+            connection_stats_, debug_visitor_factory_),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
@@ -185,6 +185,7 @@ public:
           return quic::WriteResult{quic::WRITE_STATUS_OK, static_cast<int>(buf_len)};
         }));
     ON_CALL(crypto_stream_helper_, CanAcceptClientHello(_, _, _, _, _)).WillByDefault(Return(true));
+    EXPECT_CALL(*debug_visitor_factory_.mock_debug_visitor_, OnConnectionClosed(_, _));
   }
 
   void SetUp() override {
@@ -247,6 +248,7 @@ public:
   }
 
 protected:
+  TestEnvoyQuicConnectionDebugVisitorFactory debug_visitor_factory_;
   Event::SimulatedTimeSystemHelper time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -433,6 +435,7 @@ TEST_F(EnvoyQuicServerSessionTest, ConnectionClose) {
                                        quic::NO_IETF_QUIC_ERROR, error_details,
                                        /* transport_close_frame_type = */ 0);
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+  EXPECT_CALL(*debug_visitor_factory_.mock_debug_visitor_, OnConnectionCloseFrame(_));
   quic_connection_->OnConnectionCloseFrame(frame);
   EXPECT_EQ(absl::StrCat(quic::QuicErrorCodeToString(error), " with details: ", error_details),
             envoy_quic_session_.transportFailureReason());
@@ -467,6 +470,7 @@ TEST_F(EnvoyQuicServerSessionTest, RemoteConnectionCloseWithActiveStream) {
                                        quic::QUIC_HANDSHAKE_TIMEOUT, quic::NO_IETF_QUIC_ERROR,
                                        "dummy details",
                                        /* transport_close_frame_type = */ 0);
+  EXPECT_CALL(*debug_visitor_factory_.mock_debug_visitor_, OnConnectionCloseFrame(_));
   quic_connection_->OnConnectionCloseFrame(frame);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_TRUE(stream->write_side_closed() && stream->reading_stopped());

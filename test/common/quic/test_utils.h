@@ -4,12 +4,14 @@
 
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
+#include "test/common/config/dummy_config.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -320,6 +322,42 @@ public:
   MOCK_METHOD(Extensions::TransportSockets::Tls::CertValidator::ExtraValidationContext,
               extraValidationContext, (), (const));
 };
+
+class MockQuicConnectionDebugVisitor : public quic::QuicConnectionDebugVisitor {
+public:
+  MockQuicConnectionDebugVisitor(quic::QuicSession* session) : session_(session) {}
+
+  MOCK_METHOD(void, OnConnectionClosed,
+              (const quic::QuicConnectionCloseFrame&, quic::ConnectionCloseSource), ());
+  MOCK_METHOD(void, OnConnectionCloseFrame, (const quic::QuicConnectionCloseFrame&), ());
+
+  quic::QuicSession* session_;
+};
+
+class TestEnvoyQuicConnectionDebugVisitorFactory
+    : public EnvoyQuicConnectionDebugVisitorFactoryInterface {
+public:
+  std::string name() const override { return "envoy.quic.mock_quic_connection_debug_visitor"; }
+
+  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<::test::common::config::DummyConfig>();
+  }
+  std::unique_ptr<quic::QuicConnectionDebugVisitor>
+  createQuicConnectionDebugVisitor(quic::QuicSession* session) override {
+    auto debug_visitor = std::make_unique<MockQuicConnectionDebugVisitor>(session);
+    mock_debug_visitor_ = debug_visitor.get();
+    return debug_visitor;
+  }
+
+  Envoy::ProcessContextOptRef processContext() const { return context_; }
+
+  MockQuicConnectionDebugVisitor* mock_debug_visitor_;
+};
+
+DECLARE_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactory);
+
+REGISTER_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactory,
+                 Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryInterface);
 
 } // namespace Quic
 } // namespace Envoy

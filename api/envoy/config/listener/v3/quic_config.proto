@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: QUIC listener config]
 
 // Configuration specific to the UDP QUIC listener.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
@@ -81,4 +81,9 @@ message QuicProtocolOptions {
   // Configure the server to send transport parameter `disable_active_migration <https://www.rfc-editor.org/rfc/rfc9000#section-18.2-4.30.1>`_.
   // Defaults to false (do not send this transport parameter).
   google.protobuf.BoolValue send_disable_active_migration = 10;
+
+  // Configure which implementation of ``quic::QuicConnectionDebugVisitor`` to be used for this listener.
+  // If not specified, no debug visitor will be attached to connections.
+  // [#extension-category: envoy.quic.connection_debug_visitor]
+  core.v3.TypedExtensionConfig connection_debug_visitor_config = 11;
 }
