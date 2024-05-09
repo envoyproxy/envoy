@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/credential_injector:credential_injector_lib",
         "//source/extensions/http/injected_credentials/generic:generic_lib",
+        "//source/extensions/http/injected_credentials/oauth2:client_credentials_lib",
         "//test/mocks/server:server_mocks",
     ],
 )
@@ -38,19 +39,6 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_extension_cc_test(
-    name = "credential_injector_integration_test",
-    size = "large",
-    srcs = ["credential_injector_integration_test.cc"],
-    extension_names = ["envoy.filters.http.credential_injector"],
-    deps = [
-        "//source/extensions/filters/http/credential_injector:config",
-        "//source/extensions/http/injected_credentials/generic:config",
-        "//test/integration:http_protocol_integration_lib",
         "//test/test_common:utility_lib",
     ],
 )
