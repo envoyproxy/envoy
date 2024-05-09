@@ -93,11 +93,13 @@ void TokenProvider::onGetAccessTokenSuccess(const std::string& access_token,
   auto token = absl::StrCat("Bearer ", access_token);
   ThreadLocalOauth2ClientCredentialsTokenSharedPtr value(
       new ThreadLocalOauth2ClientCredentialsToken(token));
+
+  tls_->set(
+      [value](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return value; });
+
   stats_.token_fetched_.inc();
   ENVOY_LOG(debug, "onGetAccessTokenSuccess: Token fetched successfully, expires in {} seconds.",
             expires_in.count());
-  tls_->set(
-      [value](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return value; });
   if (timer_->enabled()) {
     return;
   }
