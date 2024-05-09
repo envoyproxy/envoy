@@ -53,10 +53,7 @@ resources:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { test_server_.reset(); }
 
   virtual void checkClientSecretInRequest(absl::string_view client_secret) {
     std::string request_body = oauth2_request_->body().toString();
