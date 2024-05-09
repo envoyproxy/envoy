@@ -59,7 +59,7 @@ message ServerInfo {
   config.core.v3.Node node = 7;
 }
 
-// [#next-free-field: 40]
+// [#next-free-field: 41]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.CommandLineOptions";
@@ -100,6 +100,9 @@ message CommandLineOptions {
 
   // See :option:`--skip-hot-restart-on-no-parent` for details.
   bool skip_hot_restart_on_no_parent = 39;
+
+  // See :option:`--skip-hot-restart-parent-stats` for details.
+  bool skip_hot_restart_parent_stats = 40;
 
   // See :option:`--base-id-path` for details.
   string base_id_path = 32;
