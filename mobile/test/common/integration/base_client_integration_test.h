@@ -11,18 +11,18 @@
 namespace Envoy {
 
 // Maintains statistics and status data obtained from the Http::Client callbacks.
-typedef struct {
-  uint32_t on_headers_calls;
-  uint32_t on_data_calls;
-  uint32_t on_complete_calls;
-  uint32_t on_error_calls;
-  uint32_t on_cancel_calls;
-  uint64_t on_header_consumed_bytes_from_response;
-  uint64_t on_complete_received_byte_count;
-  std::string status;
-  ConditionalInitializer* terminal_callback;
-  envoy_final_stream_intel final_intel;
-} callbacks_called;
+struct CallbacksCalled {
+  uint32_t on_headers_calls_;
+  uint32_t on_data_calls_;
+  uint32_t on_complete_calls_;
+  uint32_t on_error_calls_;
+  uint32_t on_cancel_calls_;
+  uint64_t on_header_consumed_bytes_from_response_;
+  uint64_t on_complete_received_byte_count_;
+  std::string status_;
+  ConditionalInitializer* terminal_callback_;
+  envoy_final_stream_intel final_intel_;
+};
 
 // Based on Http::Utility::toRequestHeaders() but only used for these tests.
 Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers);
@@ -51,8 +51,7 @@ protected:
     return reinterpret_cast<envoy_engine_t>(engine_->engine_);
   }
   void initialize() override;
-  Platform::StreamSharedPtr createNewStream(Platform::StreamPrototypeSharedPtr& stream_prototype,
-                                            EnvoyStreamCallbacks&& stream_callbacks);
+  Platform::StreamSharedPtr createNewStream(EnvoyStreamCallbacks&& stream_callbacks);
 
   void createEnvoy() override;
   void threadRoutine(absl::Notification& engine_running);
@@ -70,7 +69,7 @@ protected:
 
   Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
   ConditionalInitializer terminal_callback_;
-  callbacks_called cc_{0, 0, 0, 0, 0, 0, 0, "", &terminal_callback_, {}};
+  CallbacksCalled cc_{0, 0, 0, 0, 0, 0, 0, "", &terminal_callback_, {}};
   Http::TestRequestHeaderMapImpl default_request_headers_;
   Event::DispatcherPtr full_dispatcher_;
   Platform::StreamPrototypeSharedPtr stream_prototype_;
