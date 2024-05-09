@@ -68,6 +68,8 @@ func init() {
 		if err == nil && dur >= time.Millisecond {
 			// protect against too frequent sync
 			interval = dur
+		} else {
+			api.LogErrorf("invalid env var ENVOY_GOLANG_LOG_LEVEL_SYNC_INTERVAL: %s", envInterval)
 		}
 	}
 
