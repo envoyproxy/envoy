@@ -5,6 +5,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
@@ -137,7 +138,8 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const bool prefer_gro) {
   if (local_addr == nullptr) {
     local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
   }
@@ -149,6 +151,12 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   }
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
+  }
+  if (prefer_gro && Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
+  }
   if (options != nullptr) {
     connection_socket->addOptions(options);
   }
@@ -296,6 +304,13 @@ void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
   const char* old_connection_id_ptr = old_connection_id.data();
   // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
   memcpy(new_connection_id_data, old_connection_id_ptr, 4); // NOLINT(safe-memcpy)
+}
+
+quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte) {
+  // Explicit Congestion Notification is encoded in the two least significant
+  // bits of the TOS byte of the IP header.
+  constexpr uint8_t kEcnMask = 0b00000011;
+  return static_cast<quic::QuicEcnCodepoint>(tos_byte & kEcnMask);
 }
 
 } // namespace Quic

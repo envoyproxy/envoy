@@ -317,6 +317,7 @@ LoadShedPointImpl::LoadShedPointImpl(const envoy::config::overload::v3::LoadShed
                                      Random::RandomGenerator& random_generator)
     : scale_percent_(makeGauge(stats_scope, config.name(), "scale_percent",
                                Stats::Gauge::ImportMode::NeverImport)),
+      shed_load_counter_(makeCounter(stats_scope, config.name(), "shed_load_count")),
       random_generator_(random_generator) {
   for (const auto& trigger_config : config.triggers()) {
     if (!triggers_.try_emplace(trigger_config.name(), createTriggerFromConfig(trigger_config))
@@ -354,10 +355,15 @@ bool LoadShedPointImpl::shouldShedLoad() {
   float unit_float_probability_shed_load = probability_shed_load_.load();
   // This should be ok as we're using unit float which saturates at 1.0f.
   if (unit_float_probability_shed_load == 1.0f) {
+    shed_load_counter_.inc();
     return true;
   }
 
-  return random_generator_.bernoulli(UnitFloat(unit_float_probability_shed_load));
+  if (random_generator_.bernoulli(UnitFloat(unit_float_probability_shed_load))) {
+    shed_load_counter_.inc();
+    return true;
+  }
+  return false;
 }
 
 OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,

@@ -46,7 +46,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/stream_info:stream_info_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/extensions/filters/udp/udp_proxy/router:router_lib",
         "//source/extensions/filters/udp/udp_proxy/session_filters:filter_config_interface",
         "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",

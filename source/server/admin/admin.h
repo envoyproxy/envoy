@@ -67,6 +67,7 @@ class AdminImpl : public Admin,
                   public Network::FilterChainFactory,
                   public Http::FilterChainFactory,
                   public Http::ConnectionManagerConfig,
+                  public std::enable_shared_from_this<AdminImpl>,
                   Logger::Loggable<Logger::Id::admin> {
 public:
   AdminImpl(const std::string& profile_path, Server::Instance& server,
@@ -216,9 +217,6 @@ public:
   void closeSocket() override;
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
-  GenRequestFn createRequestFunction() const {
-    return [this](AdminStream& admin_stream) -> RequestPtr { return makeRequest(admin_stream); };
-  }
   uint64_t maxRequestsPerConnection() const override { return 0; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
@@ -235,6 +233,7 @@ public:
     return nullptr;
 #endif
   }
+  bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
 
@@ -245,10 +244,7 @@ private:
   ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol);
 #endif
 
-  /**
-   * Creates a Request from the request in the admin stream.
-   */
-  RequestPtr makeRequest(AdminStream& admin_stream) const;
+  RequestPtr makeRequest(AdminStream& admin_stream) const override;
 
   /**
    * Creates a UrlHandler structure from a non-chunked callback.

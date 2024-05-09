@@ -39,9 +39,9 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
     hdrs = ["geoip_provider.h"],
-    external_deps = ["maxmind"],
     tags = ["skip_on_windows"],
     deps = [
+        "//bazel/foreign_cc:maxmind_linux_darwin",
         "//envoy/geoip:geoip_provider_driver_interface",
         "@envoy_api//envoy/extensions/geoip_providers/maxmind/v3:pkg_cc_proto",
     ],

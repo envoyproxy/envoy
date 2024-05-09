@@ -2,7 +2,6 @@
 
 #include <functional>
 
-#include "library/cc/log_level.h"
 #include "library/cc/stream_client.h"
 #include "library/common/types/c_types.h"
 

@@ -1,24 +1,26 @@
 package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
+import androidx.annotation.VisibleForTesting;
 
-class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
-  private long streamStartMs;
-  private long dnsStartMs;
-  private long dnsEndMs;
-  private long connectStartMs;
-  private long connectEndMs;
-  private long sslStartMs;
-  private long sslEndMs;
-  private long sendingStartMs;
-  private long sendingEndMs;
-  private long responseStartMs;
-  private long streamEndMs;
-  private boolean socketReused;
-  private long sentByteCount;
-  private long receivedByteCount;
-  private long responseFlags;
-  private long upstreamProtocol;
+// This class is made public for access in tests.
+public class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
+  private final long streamStartMs;
+  private final long dnsStartMs;
+  private final long dnsEndMs;
+  private final long connectStartMs;
+  private final long connectEndMs;
+  private final long sslStartMs;
+  private final long sslEndMs;
+  private final long sendingStartMs;
+  private final long sendingEndMs;
+  private final long responseStartMs;
+  private final long streamEndMs;
+  private final boolean socketReused;
+  private final long sentByteCount;
+  private final long receivedByteCount;
+  private final long responseFlags;
+  private final long upstreamProtocol;
 
   EnvoyFinalStreamIntelImpl(long[] values) {
     streamStartMs = values[0];
@@ -37,6 +39,11 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
     receivedByteCount = values[13];
     responseFlags = values[14];
     upstreamProtocol = values[15];
+  }
+
+  @VisibleForTesting
+  public static EnvoyFinalStreamIntelImpl createForTesting(long[] values) {
+    return new EnvoyFinalStreamIntelImpl(values);
   }
 
   @Override

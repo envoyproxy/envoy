@@ -12,11 +12,6 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/stats/histogram.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/stats/stats_matcher.h"
-#include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/assert.h"
@@ -24,7 +19,6 @@
 #include "source/common/common/hash.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/utility.h"
-#include "source/common/grpc/common.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -314,12 +308,12 @@ public:
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
     if (type == typed_struct_type) {
       xds::type::v3::TypedStruct typed_struct;
-      MessageUtil::unpackTo(typed_config, typed_struct);
+      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      MessageUtil::unpackTo(typed_config, typed_struct);
+      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     }
@@ -391,17 +385,6 @@ public:
    * Truncates the message to a length less than default GRPC trailers size limit (by default 8KiB).
    */
   static std::string truncateGrpcStatusMessage(absl::string_view error_message);
-
-  /**
-   * Create TagProducer instance. Check all tag names for conflicts to avoid
-   * unexpected tag name overwriting.
-   * @param bootstrap bootstrap proto.
-   * @param cli_tags tags that are provided by the cli
-   * @throws EnvoyException when the conflict of tag names is found.
-   */
-  static Stats::TagProducerPtr
-  createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                    const Stats::TagVector& cli_tags);
 
   /**
    * Obtain gRPC async client factory from a envoy::config::core::v3::ApiConfigSource.

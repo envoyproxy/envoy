@@ -534,10 +534,18 @@ public:
   virtual bool appendXForwardedPort() const PURE;
 
   /**
+   * @return whether to append the overload header to a local reply of a request which
+   * has been dropped due to Overload Manager.
+   */
+  virtual bool appendLocalOverload() const PURE;
+
+  /**
    * @return whether the HCM will insert ProxyProtocolFilterState into the filter state at the
    *         Connection Lifetime.
    */
   virtual bool addProxyProtocolConnectionState() const PURE;
 };
+
+using ConnectionManagerConfigSharedPtr = std::shared_ptr<ConnectionManagerConfig>;
 } // namespace Http
 } // namespace Envoy

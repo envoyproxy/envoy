@@ -77,6 +77,7 @@ public:
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override {}
   void readDisable(bool) override {}
   void resetStream() override;
+  void enableHalfClose() override {}
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
@@ -84,7 +85,7 @@ public:
   // Handles data received from the UDP Upstream.
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
-                     Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos) override;
   uint64_t maxDatagramSize() const override { return Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE; }
   void onDatagramsDropped(uint32_t dropped) override {
     // TODO(https://github.com/envoyproxy/envoy/issues/23564): Add statistics for CONNECT-UDP

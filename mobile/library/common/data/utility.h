@@ -24,6 +24,16 @@ Buffer::InstancePtr toInternalData(envoy_data data);
 envoy_data toBridgeData(Buffer::Instance& data, uint32_t max_bytes = 0);
 
 /**
+ * Transform from Buffer::Instance to envoy_data. The `Buffer::Instance` is not drained after
+ * converting it to `envoy_data`.
+ *
+ * @param data, the Buffer::Instance to transform.
+ * @param max_bytes, the maximum bytes to transform or 0 to copy all available data.
+ * @return envoy_data, the bridge transformation of the Buffer::Instance param.
+ */
+envoy_data toBridgeDataNoDrain(const Buffer::Instance& data, uint32_t max_bytes = 0);
+
+/**
  * Copy from string to envoy_data.
  * @param str, the string to copy.
  * @return envoy_data, the copy produced of the original string.

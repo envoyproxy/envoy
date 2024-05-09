@@ -34,6 +34,7 @@
 #include "source/common/stats/symbol_table.h"
 
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
@@ -87,6 +88,9 @@ public:
   };
   bool enabled() const override { return enabled_; };
   bool shadowEnabled() const override { return shadow_enabled_; };
+  const absl::optional<bool>& forwardNotMatchingPreflights() const override {
+    return forward_not_matching_preflights_;
+  };
 
   std::vector<Matchers::StringMatcherPtr> allow_origins_;
   std::string allow_methods_;
@@ -97,6 +101,7 @@ public:
   absl::optional<bool> allow_private_network_access_;
   bool enabled_{};
   bool shadow_enabled_{};
+  absl::optional<bool> forward_not_matching_preflights_;
 };
 
 class TestHedgePolicy : public HedgePolicy {
@@ -626,6 +631,9 @@ public:
 
 class MockGenericConnPool : public GenericConnPool {
 public:
+  MockGenericConnPool();
+  ~MockGenericConnPool() override;
+
   MOCK_METHOD(void, newStream, (GenericConnectionPoolCallbacks * request));
   MOCK_METHOD(bool, cancelAnyPendingStream, ());
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
@@ -634,6 +642,9 @@ public:
                Upstream::LoadBalancerContext*));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
   MOCK_METHOD(bool, valid, (), (const));
+
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
+      new NiceMock<Upstream::MockHostDescription>()};
 };
 
 class MockUpstreamToDownstream : public UpstreamToDownstream {

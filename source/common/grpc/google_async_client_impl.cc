@@ -82,7 +82,8 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              GoogleStubFactory& stub_factory,
                                              Stats::ScopeSharedPtr scope,
                                              const envoy::config::core::v3::GrpcService& config,
-                                             Api::Api& api, const StatNames& stat_names)
+                                             Server::Configuration::CommonFactoryContext& context,
+                                             const StatNames& stat_names)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       target_uri_(config.google_grpc().target_uri()), scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -94,7 +95,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
-  std::shared_ptr<grpc::Channel> channel = GoogleGrpcUtils::createChannel(config, api);
+  std::shared_ptr<grpc::Channel> channel = GoogleGrpcUtils::createChannel(config, context);
   // Get state with try_to_connect = true to try connection at channel creation.
   // This is for initializing gRPC channel at channel creation. This GetState(true) is used to poke
   // the gRPC lb at channel creation, it doesn't have any effect no matter it succeeds or fails. But
@@ -165,7 +166,8 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
     : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
       service_full_name_(service_full_name), method_name_(method_name), callbacks_(callbacks),
       options_(options), unused_stream_info_(Http::Protocol::Http2, dispatcher_.timeSource(),
-                                             Network::ConnectionInfoProviderSharedPtr{}) {}
+                                             Network::ConnectionInfoProviderSharedPtr{},
+                                             StreamInfo::FilterState::LifeSpan::FilterChain) {}
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
@@ -464,7 +466,12 @@ void GoogleAsyncRequestImpl::cancel() {
 
 void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   Tracing::HttpTraceContext trace_context(metadata);
-  current_span_->injectContext(trace_context, nullptr);
+  Tracing::UpstreamContext upstream_context(nullptr,                          // host_
+                                            nullptr,                          // cluster_
+                                            Tracing::ServiceType::GoogleGrpc, // service_type_
+                                            true                              // async_client_span_
+  );
+  current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

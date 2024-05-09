@@ -304,7 +304,7 @@ async def _wait_for_envoy_epoch(i: int):
             pass
         await asyncio.sleep(0.2)
     # Envoy instance with expected restart_epoch should have started up
-    assert expected_substring in response, f"server_info={response}"
+    assert expected_substring in response, f"expected_substring={expected_substring}, server_info={response}"
 
 
 class IntegrationTest(unittest.IsolatedAsyncioTestCase):
@@ -340,6 +340,51 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         await self.slow_upstream.stop()
         await self.fast_upstream.stop()
         return await super().asyncTearDown()
+
+    async def test_dead_parent_startup(self) -> None:
+        log.info("starting envoy")
+        envoy_process_1 = await asyncio.create_subprocess_exec(
+            *self.base_envoy_args,
+            "--restart-epoch",
+            "0",
+            "--use-dynamic-base-id",
+            "--base-id-path",
+            self.base_id_path,
+            "-c",
+            self.slow_config_path,
+        )
+        log.info(f"cert path = {IntegrationTest.server_cert}")
+        log.info("waiting for envoy ready")
+        await _wait_for_envoy_epoch(0)
+        base_id = int(self.base_id_path.read_text())
+        log.info("terminating first envoy process")
+        envoy_process_1.terminate()
+        await envoy_process_1.wait()
+
+        log.info("starting envoy with hot restart config but parent is dead")
+        envoy_process_2 = await asyncio.create_subprocess_exec(
+            *self.base_envoy_args,
+            "--restart-epoch",
+            "1",
+            "--base-id",
+            str(base_id),
+            "--skip-hot-restart-on-no-parent",
+            "-c",
+            self.fast_config_path,
+        )
+        log.info("waiting for envoy ready")
+        await _wait_for_envoy_epoch(1)
+        log.info("sending request to fast upstream")
+        request_url = f"http://{ENVOY_HOST}:{ENVOY_PORT}/"
+        response = _full_http_request(request_url)
+        self.assertEqual(
+            await response,
+            "fast instance",
+            "envoy server should be running despite failed hot restart",
+        )
+        log.info("shutting instance down")
+        envoy_process_2.terminate()
+        await envoy_process_2.wait()
 
     async def test_connection_handoffs(self) -> None:
         log.info("starting envoy")

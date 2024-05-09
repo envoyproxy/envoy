@@ -71,7 +71,7 @@ public:
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
   void injectContext(Tracing::TraceContext& trace_context,
-                     const Upstream::HostDescriptionConstSharedPtr&) override;
+                     const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
@@ -203,8 +203,7 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
 
 void Span::finishSpan() { span_.End(); }
 
-void Span::injectContext(Tracing::TraceContext& trace_context,
-                         const Upstream::HostDescriptionConstSharedPtr&) {
+void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   using OpenCensusConfig = envoy::config::trace::v3::OpenCensusConfig;
   const auto& ctx = span_.context();
   for (const auto& outgoing : oc_config_.outgoing_trace_context()) {
@@ -253,8 +252,8 @@ void Span::setSampled(bool sampled) { span_.AddAnnotation("setSampled", {{"sampl
 } // namespace
 
 Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
-               const LocalInfo::LocalInfo& localinfo, Api::Api& api)
-    : oc_config_(oc_config), local_info_(localinfo) {
+               Server::Configuration::CommonFactoryContext& context)
+    : oc_config_(oc_config), local_info_(context.localInfo()) {
   // To give user a chance to correct initially invalid configuration and try to apply it once again
   // without a need to restart Envoy, validation checks must be done prior to any side effects.
   if (oc_config.stackdriver_exporter_enabled() && oc_config.has_stackdriver_grpc_service() &&
@@ -289,7 +288,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
         // address will be used.
         stackdriver_service.mutable_google_grpc()->set_target_uri(GoogleStackdriverTraceAddress);
       }
-      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(stackdriver_service, api);
+      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(stackdriver_service, context);
       // TODO(bianpengyuan): add tests for trace_service_stub and initial_metadata options with mock
       // stubs.
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
@@ -322,7 +321,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
 #ifdef ENVOY_GOOGLE_GRPC
       const envoy::config::core::v3::GrpcService& ocagent_service =
           oc_config.ocagent_grpc_service();
-      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(ocagent_service, api);
+      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(ocagent_service, context);
       opts.trace_service_stub =
           ::opencensus::proto::agent::trace::v1::TraceService::NewStub(channel);
 #else

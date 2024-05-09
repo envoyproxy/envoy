@@ -61,7 +61,7 @@
     return DurationUtil::durationToMilliseconds(msg.field_name());                                 \
   }((message)))
 
-// Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, return the
+// Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, return the
 // default value.
 #define PROTOBUF_GET_SECONDS_OR_DEFAULT(message, field_name, default_value)                        \
   ((message).has_##field_name() ? DurationUtil::durationToSeconds((message).field_name())          \
@@ -224,7 +224,7 @@ public:
 
   // std::equals_to
   bool operator()(const Protobuf::Message& lhs, const Protobuf::Message& rhs) const {
-    return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
+    return Protobuf::util::MessageDifferencer::Equals(lhs, rhs);
   }
 
   class FileExtensionValues {
@@ -263,9 +263,17 @@ public:
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
+#endif
+
+  // This function attempts to load Envoy configuration from the specified file
+  // based on the file type.
+  // It handles .pb .pb_text .json .yaml and .yml files which are well
+  // structured based on the file type.
+  // It has somewhat inconsistent handling of invalid file contents,
+  // occasionally failing over to try another type of parsing, or silently
+  // failing instead of throwing an exception.
   static void loadFromFile(const std::string& path, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
-#endif
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
@@ -367,7 +375,7 @@ public:
    *
    * @throw EnvoyException if the message does not unpack.
    */
-  static void unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
+  static void unpackToOrThrow(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
 
   /**
    * Convert from google.protobuf.Any to a typed message. This should be used
@@ -378,8 +386,7 @@ public:
    *
    * @return absl::Status
    */
-  static absl::Status unpackToNoThrow(const ProtobufWkt::Any& any_message,
-                                      Protobuf::Message& message);
+  static absl::Status unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
 
   /**
    * Convert from google.protobuf.Any to bytes as std::string
@@ -390,12 +397,12 @@ public:
   static std::string anyToBytes(const ProtobufWkt::Any& any) {
     if (any.Is<ProtobufWkt::StringValue>()) {
       ProtobufWkt::StringValue s;
-      MessageUtil::unpackTo(any, s);
+      MessageUtil::unpackToOrThrow(any, s);
       return s.value();
     }
     if (any.Is<ProtobufWkt::BytesValue>()) {
       Protobuf::BytesValue b;
-      MessageUtil::unpackTo(any, b);
+      MessageUtil::unpackToOrThrow(any, b);
       return b.value();
     }
     return any.value();
@@ -409,7 +416,7 @@ public:
    */
   template <class MessageType>
   static inline void anyConvert(const ProtobufWkt::Any& message, MessageType& typed_message) {
-    unpackTo(message, typed_message);
+    unpackToOrThrow(message, typed_message);
   };
 
   template <class MessageType>
@@ -582,6 +589,13 @@ public:
    * the input string is valid UTF-8, it will be returned unmodified.
    */
   static std::string sanitizeUtf8String(absl::string_view str);
+
+  /**
+   * Return text proto representation of the `message`.
+   * @param message proto to print.
+   * @return text representation of the proto `message`.
+   */
+  static std::string toTextProto(const Protobuf::Message& message);
 };
 
 class ValueUtil {

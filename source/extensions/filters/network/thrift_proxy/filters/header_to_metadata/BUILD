@@ -27,6 +27,9 @@ envoy_cc_library(
     hdrs = ["header_to_metadata_filter.h"],
     deps = [
         "//envoy/server:filter_config_interface",
+        "//source/common/common:base64_lib",
+        "//source/common/common:matchers_lib",
+        "//source/common/network:utility_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/filters/header_to_metadata/v3:pkg_cc_proto",
     ],

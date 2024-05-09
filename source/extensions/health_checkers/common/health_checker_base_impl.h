@@ -104,6 +104,7 @@ protected:
   virtual envoy::data::core::v3::HealthCheckerType healthCheckerType() const PURE;
 
   const bool always_log_health_check_failures_;
+  const bool always_log_health_check_success_;
   const Cluster& cluster_;
   Event::Dispatcher& dispatcher_;
   const std::chrono::milliseconds timeout_;
@@ -138,7 +139,8 @@ private:
   std::chrono::milliseconds intervalWithJitter(uint64_t base_time_ms,
                                                std::chrono::milliseconds interval_jitter) const;
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
-  void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
+  void runCallbacks(HostSharedPtr host, HealthTransition changed_state,
+                    HealthState current_check_result);
   void setUnhealthyCrossThread(const HostSharedPtr& host,
                                HealthCheckHostMonitor::UnhealthyType type);
   static std::shared_ptr<const Network::TransportSocketOptionsImpl>

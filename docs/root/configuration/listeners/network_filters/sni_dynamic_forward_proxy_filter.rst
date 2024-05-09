@@ -10,7 +10,7 @@ SNI dynamic forward proxy
 Through the combination of :ref:`TLS inspector <config_listener_filters_tls_inspector>` listener filter,
 this network filter and the
 :ref:`dynamic forward proxy cluster <envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>`,
-Envoy supports SNI based dynamic forward proxy. The implementation works just like the
+Envoy supports `Server Name Indication <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ (SNI) based dynamic forward proxy. The implementation works just like the
 :ref:`HTTP dynamic forward proxy <arch_overview_http_dynamic_forward_proxy>`, but using the value in
 SNI as target host instead.
 

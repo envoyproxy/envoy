@@ -11,6 +11,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     repository = "@envoy",
     deps = [
+        "//library/common:engine_types_lib",
         "//library/common/bridge:utility_lib",
         "//library/common/buffer:bridge_fragment_lib",
         "//library/common/data:utility_lib",
@@ -59,16 +60,5 @@ envoy_cc_library(
         "@envoy//envoy/http:header_map_interface",
         "@envoy//source/common/http:header_map_lib",
         "@envoy//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
-    ],
-)
-
-envoy_cc_library(
-    name = "internal_headers_lib",
-    hdrs = ["headers.h"],
-    repository = "@envoy",
-    deps = [
-        "@envoy//envoy/http:header_map_interface",
-        "@envoy//source/common/singleton:const_singleton",
-        "@envoy//source/common/singleton:threadsafe_singleton",
     ],
 )

@@ -30,6 +30,7 @@ android_library(
 java_library(
     name = "envoy_base_engine_lib",
     srcs = [
+        "ByteBuffers.java",
         "EnvoyConfiguration.java",
         "EnvoyEngine.java",
         "EnvoyEngineImpl.java",
@@ -54,6 +55,7 @@ java_library(
     visibility = ["//visibility:public"],
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
+        "@maven//:androidx_annotation_annotation",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_protobuf_protobuf_javalite",
     ],

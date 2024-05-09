@@ -26,6 +26,13 @@ public:
   // which will eventually drain the HTTP/2 connection.
   const std::string H2ServerGoAwayOnDispatch =
       "envoy.load_shed_points.http2_server_go_away_on_dispatch";
+
+  // Envoy will close the connections before creating codec if Envoy is under pressure,
+  // typically memory. This happens once geting data from the connection.
+  const std::string HcmCodecCreation = "envoy.load_shed_points.hcm_ondata_creating_codec";
+
+  const std::string HttpDownstreamFilterCheck =
+      "envoy.load_shed_points.http_downstream_filter_check";
 };
 
 using LoadShedPointName = ConstSingleton<LoadShedPointNameValues>;

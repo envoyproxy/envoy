@@ -8,6 +8,7 @@
 #include <type_traits>
 
 #include "envoy/common/optref.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/non_copyable.h"
@@ -344,6 +345,9 @@ protected:
   const uint32_t max_headers_kb_ = UINT32_MAX;
   // This holds the max count of the headers in the HeaderMap.
   const uint32_t max_headers_count_ = UINT32_MAX;
+
+  // For benchmarking to access non-public methods to test staticLookup.
+  friend class StaticLookupBenchmarker;
 };
 
 /**
@@ -634,6 +638,11 @@ private:
   }
 
   HeaderEntryImpl* inline_headers_[];
+};
+
+class TunnelResponseHeadersOrTrailersImpl : public TunnelResponseHeadersOrTrailers {
+public:
+  ProtobufTypes::MessagePtr serializeAsProto() const override;
 };
 
 template <class T>

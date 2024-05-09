@@ -46,6 +46,11 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Quic {
 
+namespace {
+constexpr int kECT1 = 1; // This is an Explicit Congestion Notification
+                         // code point defined in RFC3168.
+} // namespace
+
 // A test quic listener that exits after processing one round of packets.
 class TestActiveQuicListener : public ActiveQuicListener {
   using ActiveQuicListener::ActiveQuicListener;
@@ -78,8 +83,9 @@ protected:
     return std::make_unique<TestActiveQuicListener>(
         runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
         listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
-        packets_to_read_to_connection_count_ratio, crypto_server_stream_factory,
-        proof_source_factory, std::move(cid_generator), testWorkerSelector);
+        packets_to_read_to_connection_count_ratio, /*receive_ecn=*/true,
+        crypto_server_stream_factory, proof_source_factory, std::move(cid_generator),
+        testWorkerSelector);
   }
 };
 
@@ -94,6 +100,8 @@ public:
   }
 
   static bool enabled(ActiveQuicListener& listener) { return listener.enabled_->enabled(); }
+
+  static Network::Socket& socket(ActiveQuicListener& listener) { return listener.listen_socket_; }
 };
 
 class ActiveQuicListenerFactoryPeer {
@@ -112,7 +120,8 @@ protected:
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
         connection_handler_(*dispatcher_, absl::nullopt),
         transport_socket_factory_(true, *store_.rootScope(),
-                                  std::make_unique<NiceMock<Ssl::MockServerContextConfig>>()),
+                                  std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
+                                  ssl_context_manager_, {}),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
@@ -122,6 +131,7 @@ protected:
   }
 
   void SetUp() override {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
     envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
     listen_socket_ =
@@ -243,6 +253,15 @@ protected:
     client_sockets_.push_back(
         std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_address_,
                                               nullptr, Network::SocketCreationOptions{}));
+    // Set outgoing ECN marks on client packets.
+    int level = IPPROTO_IP;
+    int optname = IP_TOS;
+    if (local_address_->ip()->version() == Network::Address::IpVersion::v6) {
+      level = IPPROTO_IPV6;
+      optname = IPV6_TCLASS;
+    }
+    int value = kECT1;
+    client_sockets_.back()->setSocketOption(level, optname, &value, sizeof(value));
     Buffer::OwnedImpl payload =
         generateChloPacketToSend(quic_version_, quic_config_, connection_id);
     Buffer::RawSliceVector slice = payload.getRawSlices();
@@ -328,6 +347,7 @@ protected:
   NiceMock<Network::MockUdpListenerConfig> udp_listener_config_;
   NiceMock<Network::MockListenerConfig> listener_config_;
   NiceMock<Network::MockUdpPacketWriterFactory> udp_packet_writer_factory_;
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   quic::QuicConfig quic_config_;
   Server::ConnectionHandlerImpl connection_handler_;
   std::unique_ptr<ActiveQuicListener> quic_listener_;
@@ -558,6 +578,38 @@ TEST_P(ActiveQuicListenerTest, QuicRejectsAllAndResumes) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
+}
+
+TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
+  initialize();
+  Network::Socket& socket = ActiveQuicListenerPeer::socket(*quic_listener_);
+  absl::optional<Network::Address::IpVersion> version = socket.ipVersion();
+  EXPECT_TRUE(version.has_value());
+  int optval;
+  socklen_t optlen = sizeof(optval);
+  Api::SysCallIntResult rv;
+  if (*version == Network::Address::IpVersion::v6) {
+    rv = socket.getSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, &optlen);
+  } else {
+    rv = socket.getSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, &optlen);
+  }
+  EXPECT_EQ(rv.return_value_, 0);
+  EXPECT_EQ(optval, 1);
+}
+
+TEST_P(ActiveQuicListenerTest, EcnReporting) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
+  initialize();
+  maybeConfigureMocks(/* connection_count = */ 1);
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  sendCHLO(connection_id);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  quic::QuicConnection* connection =
+      quic::test::QuicDispatcherPeer::GetFirstSessionIfAny(quic_dispatcher_)->connection();
+  EXPECT_EQ(connection->connection_id(), quic::test::TestConnectionId(1));
+  ASSERT(connection != nullptr);
+  const quic::QuicConnectionStats& stats = connection->GetStats();
+  EXPECT_EQ(stats.num_ecn_marks_received.ect1, 1);
 }
 
 class ActiveQuicListenerEmptyFlagConfigTest : public ActiveQuicListenerTest {

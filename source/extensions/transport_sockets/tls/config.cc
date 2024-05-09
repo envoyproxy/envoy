@@ -4,8 +4,8 @@
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/ssl_socket.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,14 +50,6 @@ ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {
 
 LEGACY_REGISTER_FACTORY(DownstreamSslSocketFactory,
                         Server::Configuration::DownstreamTransportSocketConfigFactory, "tls");
-
-Ssl::ContextManagerPtr SslContextManagerFactory::createContextManager(TimeSource& time_source) {
-  return std::make_unique<ContextManagerImpl>(time_source);
-}
-
-static Envoy::Registry::RegisterInternalFactory<SslContextManagerFactory,
-                                                Ssl::ContextManagerFactory>
-    ssl_manager_registered;
 
 } // namespace Tls
 } // namespace TransportSockets

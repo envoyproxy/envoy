@@ -19,8 +19,6 @@ using ProtoHeaderMutation =
     envoy::extensions::http::early_header_mutation::header_mutation::v3::HeaderMutation;
 
 TEST(FactoryTest, FactoryTest) {
-  ScopedInjectableLoader<Regex::Engine> engine{std::make_unique<Regex::GoogleReEngine>()};
-
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto* factory = Registry::FactoryRegistry<Envoy::Http::EarlyHeaderMutationFactory>::getFactory(

@@ -204,6 +204,12 @@ public:
   static std::string urlEncodeQueryParameter(absl::string_view value);
 
   /**
+   * Exactly the same as above, but returns false when it finds a character that should be %-encoded
+   * but is not.
+   */
+  static bool queryParameterIsUrlEncoded(absl::string_view value);
+
+  /**
    * Decodes string view that represents URL in x-www-form-urlencoded query parameter.
    * @param encoded supplies string to be decoded.
    * @return std::string decoded string compliant with https://datatracker.ietf.org/doc/html/rfc3986
@@ -674,11 +680,10 @@ struct AuthorityAttributes {
 AuthorityAttributes parseAuthority(absl::string_view host);
 
 /**
- * It validates RetryPolicy defined in core api. It should be called at the main thread as
- * it may throw exception.
+ * It validates RetryPolicy defined in core api. It will return an error status if invalid.
  * @param retry_policy core retry policy
  */
-void validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy);
+absl::Status validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy);
 
 /**
  * It returns RetryPolicy defined in core api to route api.

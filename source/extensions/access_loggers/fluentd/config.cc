@@ -45,14 +45,26 @@ FluentdAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
     throw EnvoyException(fmt::format("cluster '{}' was not found", proto_config.cluster()));
   }
 
+  if (proto_config.has_retry_options() && proto_config.retry_options().has_backoff_options()) {
+    status = BackOffStrategyUtils::validateBackOffStrategyConfig(
+        proto_config.retry_options().backoff_options(), DefaultBaseBackoffIntervalMs,
+        DefaultMaxBackoffIntervalFactor);
+    if (!status.ok()) {
+      throw EnvoyException(
+          "max_backoff_interval must be greater or equal to base_backoff_interval");
+    }
+  }
+
   // Supporting nested object serialization is more complex with MessagePack.
   // Using an already existing JSON formatter, and later converting the JSON string to a msgpack
   // payload.
   // TODO(ohadvano): Improve the formatting operation by creating a dedicated formatter that
   //                 will directly serialize the record to msgpack payload.
+  auto commands =
+      Formatter::SubstitutionFormatStringUtils::parseFormatters(proto_config.formatters(), context);
   Formatter::FormatterPtr json_formatter =
       Formatter::SubstitutionFormatStringUtils::createJsonFormatter(proto_config.record(), true,
-                                                                    false, false);
+                                                                    false, false, commands);
   FluentdFormatterPtr fluentd_formatter =
       std::make_unique<FluentdFormatterImpl>(std::move(json_formatter));
 
@@ -60,6 +72,7 @@ FluentdAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
       std::move(filter), std::move(fluentd_formatter),
       std::make_shared<FluentdAccessLogConfig>(proto_config),
       context.serverFactoryContext().threadLocal(),
+      context.serverFactoryContext().api().randomGenerator(),
       getAccessLoggerCacheSingleton(context.serverFactoryContext()));
 }
 

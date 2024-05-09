@@ -84,10 +84,10 @@ private:
 // external server via gRPC.
 class ServerFactoryContextFilter : public Http::PassThroughFilter, public FilterCallbacks {
 public:
-  ServerFactoryContextFilter(FilterConfigSharedPtr config,
+  ServerFactoryContextFilter(const envoy::config::core::v3::GrpcService& grpc_service,
                              Server::Configuration::ServerFactoryContext& context)
-      : filter_config_(std::move(config)), context_(context),
-        test_client_(std::make_unique<TestGrpcClient>(context_, filter_config_->grpc_service())) {}
+      : grpc_service_(grpc_service), context_(context),
+        test_client_(std::make_unique<TestGrpcClient>(context_, grpc_service_)) {}
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
@@ -113,13 +113,14 @@ public:
   void onDestroy() override { test_client_->close(); }
 
 private:
-  FilterConfigSharedPtr filter_config_;
+  envoy::config::core::v3::GrpcService grpc_service_;
   Server::Configuration::ServerFactoryContext& context_;
   std::unique_ptr<TestGrpcClient> test_client_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   bool filter_chain_continued_ = false;
 };
 
+// Downstream only filter factory.
 class ServerFactoryContextFilterFactory
     : public Extensions::HttpFilters::Common::FactoryBase<
           test::integration::filters::ServerFactoryContextFilterConfig> {
@@ -143,12 +144,54 @@ private:
             proto_config);
     return [&server_context, filter_config = std::move(filter_config)](
                Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(
-          std::make_shared<ServerFactoryContextFilter>(filter_config, server_context));
+      callbacks.addStreamFilter(std::make_shared<ServerFactoryContextFilter>(
+          filter_config->grpc_service(), server_context));
     };
   }
 };
 
 REGISTER_FACTORY(ServerFactoryContextFilterFactory,
                  Server::Configuration::NamedHttpFilterConfigFactory);
+
+// Dual filter factory.
+class ServerFactoryContextFilterFactoryDual
+    : public Extensions::HttpFilters::Common::DualFactoryBase<
+          test::integration::filters::ServerFactoryContextFilterConfigDual> {
+public:
+  ServerFactoryContextFilterFactoryDual() : DualFactoryBase("server-factory-context-filter-dual") {}
+
+private:
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+      const test::integration::filters::ServerFactoryContextFilterConfigDual& proto_config,
+      const std::string&, DualInfo,
+      Server::Configuration::ServerFactoryContext& server_context) override {
+    auto filter_config =
+        std::make_shared<test::integration::filters::ServerFactoryContextFilterConfigDual>(
+            proto_config);
+    return [&server_context, filter_config = std::move(filter_config)](
+               Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(std::make_shared<ServerFactoryContextFilter>(
+          filter_config->grpc_service(), server_context));
+    };
+  }
+
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const test::integration::filters::ServerFactoryContextFilterConfigDual& proto_config,
+      const std::string&, Server::Configuration::ServerFactoryContext& server_context) override {
+    auto filter_config =
+        std::make_shared<test::integration::filters::ServerFactoryContextFilterConfigDual>(
+            proto_config);
+    return [&server_context, filter_config = std::move(filter_config)](
+               Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(std::make_shared<ServerFactoryContextFilter>(
+          filter_config->grpc_service(), server_context));
+    };
+  }
+};
+
+using UpstreamServerFactoryContextFilterFactoryDual = ServerFactoryContextFilterFactoryDual;
+REGISTER_FACTORY(ServerFactoryContextFilterFactoryDual,
+                 Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamServerFactoryContextFilterFactoryDual,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 } // namespace Envoy

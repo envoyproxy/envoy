@@ -26,12 +26,7 @@ public:
     setUpstreamCount(3);
   }
 
-  void initializeConfig(bool legacy_api = false, bool disable_lagacy_api_conversion = false) {
-    if (disable_lagacy_api_conversion) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.convert_legacy_lb_config",
-                                        "false");
-    }
-
+  void initializeConfig(bool legacy_api = false) {
     config_helper_.addConfigModifier(
         [legacy_api](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
           auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
@@ -118,11 +113,6 @@ TEST_P(LeastRequestIntegrationTest, NormalLoadBalancing) {
 
 TEST_P(LeastRequestIntegrationTest, NormalLoadBalancingWithLegacyAPI) {
   initializeConfig(true);
-  runNormalLoadBalancing();
-}
-
-TEST_P(LeastRequestIntegrationTest, NormalLoadBalancingWithLegacyAPIAndDisableAPIConversion) {
-  initializeConfig(true, true);
   runNormalLoadBalancing();
 }
 
