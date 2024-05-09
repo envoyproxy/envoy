@@ -16,11 +16,12 @@ class CredentialInjectorFactoryBase : public NamedCredentialInjectorConfigFactor
 public:
   CredentialInjectorSharedPtr
   createCredentialInjectorFromProto(const Protobuf::Message& proto_config,
+                                    const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) override {
     return createCredentialInjectorFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config,
                                                              context.messageValidationVisitor()),
-        context);
+        stats_prefix, context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -34,7 +35,7 @@ protected:
 
 private:
   virtual CredentialInjectorSharedPtr
-  createCredentialInjectorFromProtoTyped(const ConfigProto&,
+  createCredentialInjectorFromProtoTyped(const ConfigProto&, const std::string&,
                                          Server::Configuration::FactoryContext&) PURE;
 
   const std::string name_;
