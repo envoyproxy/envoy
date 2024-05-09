@@ -21,14 +21,16 @@ const std::regex& getSystemTimeFormatNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 
-Envoy::Network::Address::InstanceConstSharedPtr
-getUpstreamRemoteAddress(const StreamInfo::StreamInfo& stream_info,
-                         bool use_upstream_remote_address) {
+Network::Address::InstanceConstSharedPtr
+getUpstreamRemoteAddress(const StreamInfo::StreamInfo& stream_info) {
   auto opt_ref = stream_info.upstreamInfo();
   if (!opt_ref.has_value()) {
     return nullptr;
   }
 
+  // TODO(wbpcode): remove this after the flag is removed.
+  const bool use_upstream_remote_address = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.upstream_remote_address_use_connection");
   if (!use_upstream_remote_address) {
     if (auto host = opt_ref->upstreamHost(); host != nullptr) {
       return host->address();
@@ -670,7 +672,7 @@ private:
   FieldExtractor field_extractor_;
 };
 
-// StreamInfo Envoy::Network::Address::InstanceConstSharedPtr field extractor.
+// StreamInfo Network::Address::InstanceConstSharedPtr field extractor.
 class StreamInfoAddressFormatterProvider : public StreamInfoFormatterProvider {
 public:
   using FieldExtractor =
@@ -1083,7 +1085,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> Envoy::Network::Address::InstanceConstSharedPtr {
+                      -> Network::Address::InstanceConstSharedPtr {
                     const auto opt_ref = stream_info.upstreamInfo();
                     if (!opt_ref.has_value()) {
                       return nullptr;
@@ -1130,7 +1132,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> Envoy::Network::Address::InstanceConstSharedPtr {
+                      -> Network::Address::InstanceConstSharedPtr {
                     if (stream_info.upstreamInfo().has_value()) {
                       return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
                     }
@@ -1142,7 +1144,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withoutPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> Envoy::Network::Address::InstanceConstSharedPtr {
+                      -> Network::Address::InstanceConstSharedPtr {
                     if (stream_info.upstreamInfo().has_value()) {
                       return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
                     }
@@ -1154,7 +1156,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::justPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> Envoy::Network::Address::InstanceConstSharedPtr {
+                      -> Network::Address::InstanceConstSharedPtr {
                     if (stream_info.upstreamInfo().has_value()) {
                       return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
                     }
@@ -1164,37 +1166,28 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
           {"UPSTREAM_REMOTE_ADDRESS",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, absl::optional<size_t>) {
-              const bool use_connection_address = Runtime::runtimeFeatureEnabled(
-                  "envoy.reloadable_features.upstream_remote_address_use_connection");
-
               return StreamInfoAddressFormatterProvider::withPort(
-                  [use_connection_address](const StreamInfo::StreamInfo& stream_info)
-                      -> Envoy::Network::Address::InstanceConstSharedPtr {
-                    return getUpstreamRemoteAddress(stream_info, use_connection_address);
+                  [](const StreamInfo::StreamInfo& stream_info)
+                      -> Network::Address::InstanceConstSharedPtr {
+                    return getUpstreamRemoteAddress(stream_info);
                   });
             }}},
           {"UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, absl::optional<size_t>) {
-              const bool use_connection_address = Runtime::runtimeFeatureEnabled(
-                  "envoy.reloadable_features.upstream_remote_address_use_connection");
-
               return StreamInfoAddressFormatterProvider::withoutPort(
-                  [use_connection_address](const StreamInfo::StreamInfo& stream_info)
-                      -> Envoy::Network::Address::InstanceConstSharedPtr {
-                    return getUpstreamRemoteAddress(stream_info, use_connection_address);
+                  [](const StreamInfo::StreamInfo& stream_info)
+                      -> Network::Address::InstanceConstSharedPtr {
+                    return getUpstreamRemoteAddress(stream_info);
                   });
             }}},
           {"UPSTREAM_REMOTE_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, absl::optional<size_t>) {
-              const bool use_connection_address = Runtime::runtimeFeatureEnabled(
-                  "envoy.reloadable_features.upstream_remote_address_use_connection");
-
               return StreamInfoAddressFormatterProvider::justPort(
-                  [use_connection_address](const StreamInfo::StreamInfo& stream_info)
-                      -> Envoy::Network::Address::InstanceConstSharedPtr {
-                    return getUpstreamRemoteAddress(stream_info, use_connection_address);
+                  [](const StreamInfo::StreamInfo& stream_info)
+                      -> Network::Address::InstanceConstSharedPtr {
+                    return getUpstreamRemoteAddress(stream_info);
                   });
             }}},
           {"UPSTREAM_REQUEST_ATTEMPT_COUNT",
