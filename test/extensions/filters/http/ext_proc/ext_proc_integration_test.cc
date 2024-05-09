@@ -652,7 +652,6 @@ TEST_P(ExtProcIntegrationTest, PropagateTracingHeaders) {
   EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("tracestate")).empty());
 
   verifyDownstreamResponse(*response, 200);
-
 }
 
 // Test the filter using the default configuration by connecting to
