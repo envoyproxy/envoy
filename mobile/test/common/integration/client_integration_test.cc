@@ -635,6 +635,7 @@ TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
   // Send a request. The original upstream should be used because of DNS block.
   default_request_headers_.setHost(
       absl::StrCat("www.lyft.com:", fake_upstreams_[0]->localAddress()->ip()->port()));
+  stream_ = createNewStream(stream_prototype_, createDefaultStreamCallbacks());
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   terminal_callback_.waitReady();
@@ -654,7 +655,7 @@ TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
   ASSERT_TRUE(waitForCounterGe("dns_cache.base_dns_cache.dns_query_attempt", 1));
   EXPECT_EQ(0, getCounterValue("dns_cache.base_dns_cache.dns_query_success"));
   // The next request should go to the original upstream as there's been no drain.
-  createNewStream(stream_prototype_, cc_, stream_);
+  stream_ = createNewStream(stream_prototype_, createDefaultStreamCallbacks());
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   terminal_callback_.waitReady();
@@ -668,7 +669,7 @@ TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
   ASSERT_TRUE(waitForCounterGe("dns_cache.base_dns_cache.dns_query_success", 1));
 
   // Do one final request. It should go to the second upstream and return 202
-  createNewStream(stream_prototype_, cc_, stream_);
+  stream_ = createNewStream(stream_prototype_, createDefaultStreamCallbacks());
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
   terminal_callback_.waitReady();
