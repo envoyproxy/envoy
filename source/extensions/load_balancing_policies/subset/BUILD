@@ -41,8 +41,8 @@ envoy_cc_extension(
     deps = [
         ":subset_lb_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:load_balancer_factory_base_lib",
-        "//source/common/upstream:load_balancer_lib",
     ],
 )
 
@@ -54,7 +54,7 @@ envoy_cc_extension(
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/config:utility_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/common/v3:pkg_cc_proto",

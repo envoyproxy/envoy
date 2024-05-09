@@ -22,12 +22,16 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/common/upstream/edf_scheduler.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 namespace Envoy {
 namespace Upstream {
 
-// Priority levels and localities are considered overprovisioned with this factor.
-static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
+inline bool tooManyPreconnects(size_t num_preconnect_picks, uint32_t healthy_hosts) {
+  // Currently we only allow the number of preconnected connections to equal the
+  // number of healthy hosts.
+  return num_preconnect_picks >= healthy_hosts;
+}
 
 class LoadBalancerConfigHelper {
 public:
@@ -208,37 +212,6 @@ protected:
 
 private:
   Common::CallbackHandlePtr priority_update_cb_;
-};
-
-class LoadBalancerContextBase : public LoadBalancerContext {
-public:
-  absl::optional<uint64_t> computeHashKey() override { return {}; }
-
-  const Network::Connection* downstreamConnection() const override { return nullptr; }
-
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
-
-  const StreamInfo::StreamInfo* requestStreamInfo() const override { return nullptr; }
-
-  const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
-
-  const HealthyAndDegradedLoad&
-  determinePriorityLoad(const PrioritySet&, const HealthyAndDegradedLoad& original_priority_load,
-                        const Upstream::RetryPriority::PriorityMappingFunc&) override {
-    return original_priority_load;
-  }
-
-  bool shouldSelectAnotherHost(const Host&) override { return false; }
-
-  uint32_t hostSelectionRetryCount() const override { return 1; }
-
-  Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override { return nullptr; }
-
-  Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
-    return nullptr;
-  }
-
-  absl::optional<OverrideHost> overrideHostToSelect() const override { return {}; }
 };
 
 /**
@@ -566,221 +539,6 @@ protected:
   TimeSource& time_source_;
   MonotonicTime latest_host_added_time_;
   const double slow_start_min_weight_percent_;
-};
-
-/**
- * A round robin load balancer. When in weighted mode, EDF scheduling is used. When in not
- * weighted mode, simple RR index selection is used.
- */
-class RoundRobinLoadBalancer : public EdfLoadBalancerBase {
-public:
-  RoundRobinLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
-      TimeSource& time_source)
-      : EdfLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random,
-            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
-                                                           100, 50),
-            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config),
-            round_robin_config.has_value()
-                ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(round_robin_config.ref())
-                : absl::nullopt,
-            time_source) {
-    initialize();
-  }
-
-  RoundRobinLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-      const envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin&
-          round_robin_config,
-      TimeSource& time_source)
-      : EdfLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random, healthy_panic_threshold,
-            LoadBalancerConfigHelper::localityLbConfigFromProto(round_robin_config),
-            LoadBalancerConfigHelper::slowStartConfigFromProto(round_robin_config), time_source) {
-    initialize();
-  }
-
-private:
-  void refreshHostSource(const HostsSource& source) override {
-    // insert() is used here on purpose so that we don't overwrite the index if the host source
-    // already exists. Note that host sources will never be removed, but given how uncommon this
-    // is it probably doesn't matter.
-    rr_indexes_.insert({source, seed_});
-    // If the list of hosts changes, the order of picks change. Discard the
-    // index.
-    peekahead_index_ = 0;
-  }
-  double hostWeight(const Host& host) const override {
-    if (!noHostsAreInSlowStart()) {
-      return applySlowStartFactor(host.weight(), host);
-    }
-    return host.weight();
-  }
-
-  HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
-                                        const HostsSource& source) override {
-    auto i = rr_indexes_.find(source);
-    if (i == rr_indexes_.end()) {
-      return nullptr;
-    }
-    return hosts_to_use[(i->second + (peekahead_index_)++) % hosts_to_use.size()];
-  }
-
-  HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
-                                        const HostsSource& source) override {
-    if (peekahead_index_ > 0) {
-      --peekahead_index_;
-    }
-    // To avoid storing the RR index in the base class, we end up using a second map here with
-    // host source as the key. This means that each LB decision will require two map lookups in
-    // the unweighted case. We might consider trying to optimize this in the future.
-    ASSERT(rr_indexes_.find(source) != rr_indexes_.end());
-    return hosts_to_use[rr_indexes_[source]++ % hosts_to_use.size()];
-  }
-
-  uint64_t peekahead_index_{};
-  absl::flat_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
-};
-
-/**
- * Weighted Least Request load balancer.
- *
- * In a normal setup when all hosts have the same weight it randomly picks up N healthy hosts
- * (where N is specified in the LB configuration) and compares number of active requests. Technique
- * is based on http://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf and is known as P2C
- * (power of two choices).
- *
- * When hosts have different weights, an RR EDF schedule is used. Host weight is scaled
- * by the number of active requests at pick/insert time. Thus, hosts will never fully drain as
- * they would in normal P2C, though they will get picked less and less often. In the future, we
- * can consider two alternate algorithms:
- * 1) Expand out all hosts by weight (using more memory) and do standard P2C.
- * 2) Use a weighted Maglev table, and perform P2C on two random hosts selected from the table.
- *    The benefit of the Maglev table is at the expense of resolution, memory usage is capped.
- *    Additionally, the Maglev table can be shared amongst all threads.
- */
-class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
-public:
-  LeastRequestLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config,
-      TimeSource& time_source)
-      : EdfLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random,
-            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
-                                                           100, 50),
-            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config),
-            least_request_config.has_value()
-                ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(
-                      least_request_config.ref())
-                : absl::nullopt,
-            time_source),
-        choice_count_(
-            least_request_config.has_value()
-                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.ref(), choice_count, 2)
-                : 2),
-        active_request_bias_runtime_(
-            least_request_config.has_value() && least_request_config->has_active_request_bias()
-                ? absl::optional<Runtime::Double>(
-                      {least_request_config->active_request_bias(), runtime})
-                : absl::nullopt) {
-    initialize();
-  }
-
-  LeastRequestLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-      const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest&
-          least_request_config,
-      TimeSource& time_source)
-      : EdfLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random, healthy_panic_threshold,
-            LoadBalancerConfigHelper::localityLbConfigFromProto(least_request_config),
-            LoadBalancerConfigHelper::slowStartConfigFromProto(least_request_config), time_source),
-        choice_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config, choice_count, 2)),
-        active_request_bias_runtime_(
-            least_request_config.has_active_request_bias()
-                ? absl::optional<Runtime::Double>(
-                      {least_request_config.active_request_bias(), runtime})
-                : absl::nullopt),
-        selection_method_(least_request_config.selection_method()) {
-    initialize();
-  }
-
-protected:
-  void refresh(uint32_t priority) override {
-    active_request_bias_ = active_request_bias_runtime_ != absl::nullopt
-                               ? active_request_bias_runtime_.value().value()
-                               : 1.0;
-
-    if (active_request_bias_ < 0.0 || std::isnan(active_request_bias_)) {
-      ENVOY_LOG_MISC(warn,
-                     "upstream: invalid active request bias supplied (runtime key {}), using 1.0",
-                     active_request_bias_runtime_->runtimeKey());
-      active_request_bias_ = 1.0;
-    }
-
-    EdfLoadBalancerBase::refresh(priority);
-  }
-
-private:
-  void refreshHostSource(const HostsSource&) override {}
-  double hostWeight(const Host& host) const override;
-  HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
-                                        const HostsSource& source) override;
-  HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
-                                        const HostsSource& source) override;
-  HostSharedPtr unweightedHostPickFullScan(const HostVector& hosts_to_use);
-  HostSharedPtr unweightedHostPickNChoices(const HostVector& hosts_to_use);
-
-  const uint32_t choice_count_;
-
-  // The exponent used to calculate host weights can be configured via runtime. We cache it for
-  // performance reasons and refresh it in `LeastRequestLoadBalancer::refresh(uint32_t priority)`
-  // whenever a `HostSet` is updated.
-  double active_request_bias_{};
-
-  const absl::optional<Runtime::Double> active_request_bias_runtime_;
-  const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::SelectionMethod
-      selection_method_{};
-};
-
-/**
- * Random load balancer that picks a random host out of all hosts.
- */
-class RandomLoadBalancer : public ZoneAwareLoadBalancerBase {
-public:
-  RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                     ClusterLbStats& stats, Runtime::Loader& runtime,
-                     Random::RandomGenerator& random,
-                     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random,
-            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
-                                                           100, 50),
-            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config)) {}
-
-  RandomLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-      const envoy::extensions::load_balancing_policies::random::v3::Random& random_config)
-      : ZoneAwareLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random, healthy_panic_threshold,
-            LoadBalancerConfigHelper::localityLbConfigFromProto(random_config)) {}
-
-  // Upstream::ZoneAwareLoadBalancerBase
-  HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
-  HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
-
-protected:
-  HostConstSharedPtr peekOrChoose(LoadBalancerContext* context, bool peek);
 };
 
 } // namespace Upstream
