@@ -223,6 +223,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
   rds_update_callback_handle_ = route_provider_->subscription().addUpdateCallback([this]() {
     // Subscribe to RDS update.
     parent_.onRdsConfigUpdate(scope_name_, route_provider_->configCast());
+    return absl::OkStatus();
   });
   parent_.stats_.active_scopes_.inc();
 }

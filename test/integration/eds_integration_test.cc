@@ -658,6 +658,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
     // We should see both hosts present in the member update callback.
     EXPECT_EQ(2, hosts_added.size());
     member_update_count++;
+    return absl::OkStatus();
   });
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;

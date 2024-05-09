@@ -23,7 +23,7 @@ public:
    * Callback type for when dynamic context changes. The argument provides the resource type URL for
    * the update.
    */
-  using UpdateNotificationCb = std::function<void(absl::string_view)>;
+  using UpdateNotificationCb = std::function<absl::Status(absl::string_view)>;
 
   virtual ~ContextProvider() = default;
 

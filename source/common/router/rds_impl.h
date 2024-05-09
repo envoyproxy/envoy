@@ -117,7 +117,8 @@ private:
                                     std::unique_ptr<Cleanup>& resume_rds) override;
   void afterProviderUpdate() override;
 
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addUpdateCallback(std::function<void()> callback) {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addUpdateCallback(std::function<absl::Status()> callback) {
     return update_callback_manager_.add(callback);
   }
 
