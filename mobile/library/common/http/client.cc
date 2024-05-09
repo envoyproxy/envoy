@@ -443,14 +443,14 @@ void Client::DirectStreamCallbacks::latchError() {
   if (info.responseCode().has_value()) {
     error_->error_code = Bridge::Utility::errorCodeFromLocalStatus(
         static_cast<Http::Code>(info.responseCode().value()));
-    error_msg_details.push_back(absl::StrCat("RC: ", info.responseCode().value()));
+    error_msg_details.push_back(absl::StrCat(info.responseCode().value()));
   } else if (StreamInfo::isStreamIdleTimeout(info)) {
     error_->error_code = ENVOY_REQUEST_TIMEOUT;
   } else {
     error_->error_code = ENVOY_STREAM_RESET;
   }
 
-  error_msg_details.push_back(absl::StrCat("EC: ", error_->error_code));
+  error_msg_details.push_back(absl::StrCat(error_->error_code));
   if (info.responseCodeDetails().has_value()) {
     error_msg_details.push_back(info.responseCodeDetails().value());
   }
