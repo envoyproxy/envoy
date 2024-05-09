@@ -62,14 +62,3 @@ envoy_cc_library(
         "@envoy//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
     ],
 )
-
-envoy_cc_library(
-    name = "internal_headers_lib",
-    hdrs = ["headers.h"],
-    repository = "@envoy",
-    deps = [
-        "@envoy//envoy/http:header_map_interface",
-        "@envoy//source/common/singleton:const_singleton",
-        "@envoy//source/common/singleton:threadsafe_singleton",
-    ],
-)

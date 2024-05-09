@@ -4,7 +4,6 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
-#include "library/cc/request_headers.h"
 #include "library/common/engine_types.h"
 #include "library/common/http/header_utility.h"
 
