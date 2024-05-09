@@ -170,6 +170,9 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     absl::string_view header_value;
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_raw_value")) {
       header_value = sh.header().raw_value();
+      if (header_value.empty()) {
+        header_value = sh.header().value();
+      }
     } else {
       header_value = sh.header().value();
     }
