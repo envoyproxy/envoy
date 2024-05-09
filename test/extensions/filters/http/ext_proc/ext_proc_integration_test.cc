@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/network/address.h"
@@ -55,6 +56,7 @@ struct ConfigOptions {
   bool http1_codec = false;
   bool add_metadata = false;
   bool downstream_filter = true;
+  bool add_tracing = false;
 };
 
 // These tests exercise the ext_proc filter through Envoy's integration test
@@ -201,6 +203,19 @@ protected:
     } else {
       setUpstreamProtocol(Http::CodecType::HTTP2);
       setDownstreamProtocol(Http::CodecType::HTTP2);
+    }
+
+    // Add tracing filter to the config.
+    if (config_option.add_tracing) {
+      config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+        envoy::config::trace::v3::OpenTelemetryConfig provider_config;
+        provider_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("tracer");
+        provider_config.set_service_name("envoy");
+
+        auto* tracing = cm.mutable_tracing()->mutable_provider();
+        tracing->set_name("envoy.tracers.opentelemetry");
+        tracing->mutable_typed_config()->PackFrom(provider_config);
+      });
     }
   }
 
@@ -607,6 +622,38 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
     GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
     Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
+
+// Test the filter with tracing enabled and check if the tracing headers are propagated
+// to the external processor and the upstream.
+TEST_P(ExtProcIntegrationTest, PropagateTracingHeaders) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Tracing header propagation is currently only supported for Envoy gRPC";
+  }
+
+  ConfigOptions config_option = {};
+  config_option.add_tracing = true;
+
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+
+  processor_stream_->startGrpcStream();
+
+  EXPECT_FALSE(processor_stream_->headers().get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_FALSE(processor_stream_->headers().get(Http::LowerCaseString("tracestate")).empty());
+
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+  handleUpstreamRequest();
+
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("tracestate")).empty());
+
+  verifyDownstreamResponse(*response, 200);
+
+}
 
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message

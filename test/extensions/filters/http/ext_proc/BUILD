@@ -142,6 +142,7 @@ envoy_extension_cc_test(
         "envoy.filters.http.ext_proc",
         # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
+        "envoy.tracers.opentelemetry",
     ],
     shard_count = 4,
     tags = [
@@ -154,6 +155,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc:config",
         "//source/extensions/filters/http/set_metadata:config",
         "//source/extensions/retry/host/previous_hosts:config",
+        "//source/extensions/tracers/opentelemetry:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
@@ -161,6 +163,7 @@ envoy_extension_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
