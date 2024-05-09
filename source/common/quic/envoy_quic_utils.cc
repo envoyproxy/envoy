@@ -120,7 +120,6 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
   case quic::QUIC_STREAM_CONNECT_ERROR:
     return Http::StreamResetReason::ConnectError;
   case quic::QUIC_STREAM_CANCELLED:
-  case quic::QUIC_STREAM_PEER_GOING_AWAY:
     return Http::StreamResetReason::Overflow;
   default:
     return Http::StreamResetReason::RemoteReset;
