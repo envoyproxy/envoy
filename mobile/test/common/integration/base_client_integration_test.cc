@@ -79,53 +79,56 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
 
 void BaseClientIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
+  {
+    absl::MutexLock l(&engine_lock_);
+    stream_prototype_ = engine_->streamClient()->newStreamPrototype();
+  }
 
   HttpTestUtility::addDefaultHeaders(default_request_headers_);
   default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
-
-  createNewStream(stream_prototype_, cc_, stream_);
 }
 
-void BaseClientIntegrationTest::createNewStream(
-    Platform::StreamPrototypeSharedPtr& stream_prototype, callbacks_called& cc,
-    Platform::StreamSharedPtr& stream) {
+EnvoyStreamCallbacks BaseClientIntegrationTest::createDefaultStreamCallbacks() {
+  EnvoyStreamCallbacks stream_callbacks;
+  stream_callbacks.on_headers_ = [this](const Http::ResponseHeaderMap& headers, bool,
+                                        envoy_stream_intel intel) {
+    cc_.on_headers_calls++;
+    cc_.status = absl::StrCat(headers.getStatusValue());
+    cc_.on_header_consumed_bytes_from_response = intel.consumed_bytes_from_response;
+  };
+  stream_callbacks.on_data_ = [this](const Buffer::Instance&, uint64_t /* length */,
+                                     bool /* end_stream */,
+                                     envoy_stream_intel) { cc_.on_data_calls++; };
+  stream_callbacks.on_complete_ = [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+    memcpy(&last_stream_final_intel_, &final_intel, sizeof(envoy_final_stream_intel));
+    if (expect_data_streams_) {
+      validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
+    }
+    cc_.on_complete_received_byte_count = final_intel.received_byte_count;
+    cc_.on_complete_calls++;
+    cc_.terminal_callback->setReady();
+  };
+  stream_callbacks.on_error_ = [this](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {
+    cc_.on_error_calls++;
+    cc_.terminal_callback->setReady();
+  };
+  stream_callbacks.on_cancel_ = [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+    EXPECT_NE(-1, final_intel.stream_start_ms);
+    cc_.on_cancel_calls++;
+    cc_.terminal_callback->setReady();
+  };
+  return stream_callbacks;
+}
+
+Platform::StreamSharedPtr
+BaseClientIntegrationTest::createNewStream(Platform::StreamPrototypeSharedPtr& stream_prototype,
+                                           EnvoyStreamCallbacks&& stream_callbacks) {
 
   {
     absl::MutexLock l(&engine_lock_);
     stream_prototype = engine_->streamClient()->newStreamPrototype();
   }
-
-  stream_prototype->setOnHeaders(
-      [&](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
-        cc.on_headers_calls++;
-        cc.status = absl::StrCat(headers->httpStatus());
-        cc.on_header_consumed_bytes_from_response = intel.consumed_bytes_from_response;
-      });
-  stream_prototype->setOnData([&](envoy_data c_data, bool) {
-    cc.on_data_calls++;
-    release_envoy_data(c_data);
-  });
-  stream_prototype->setOnComplete([&](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-    memcpy(&last_stream_final_intel_, &final_intel, sizeof(envoy_final_stream_intel));
-    if (expect_data_streams_) {
-      validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc.on_complete_calls == 0);
-    }
-    cc.on_complete_received_byte_count = final_intel.received_byte_count;
-    cc.on_complete_calls++;
-    cc.terminal_callback->setReady();
-  });
-  stream_prototype->setOnError(
-      [&](Platform::EnvoyErrorSharedPtr, envoy_stream_intel, envoy_final_stream_intel) {
-        cc.on_error_calls++;
-        cc.terminal_callback->setReady();
-      });
-  stream_prototype->setOnCancel([&](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-    EXPECT_NE(-1, final_intel.stream_start_ms);
-    cc.on_cancel_calls++;
-    cc.terminal_callback->setReady();
-  });
-
-  stream = (*stream_prototype).start(explicit_flow_control_);
+  return stream_prototype->start(std::move(stream_callbacks), explicit_flow_control_);
 }
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
@@ -232,38 +235,6 @@ testing::AssertionResult BaseClientIntegrationTest::waitForGaugeGe(const std::st
     }
   }
   return testing::AssertionSuccess();
-}
-
-EnvoyStreamCallbacks BaseClientIntegrationTest::createDefaultStreamCallbacks() {
-  EnvoyStreamCallbacks stream_callbacks;
-  stream_callbacks.on_headers_ = [this](const Http::ResponseHeaderMap& headers, bool,
-                                        envoy_stream_intel intel) {
-    cc_.on_headers_calls++;
-    cc_.status = absl::StrCat(headers.getStatusValue());
-    cc_.on_header_consumed_bytes_from_response = intel.consumed_bytes_from_response;
-  };
-  stream_callbacks.on_data_ = [this](const Buffer::Instance&, uint64_t /* length */,
-                                     bool /* end_stream */,
-                                     envoy_stream_intel) { cc_.on_data_calls++; };
-  stream_callbacks.on_complete_ = [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-    memcpy(&last_stream_final_intel_, &final_intel, sizeof(envoy_final_stream_intel));
-    if (expect_data_streams_) {
-      validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
-    }
-    cc_.on_complete_received_byte_count = final_intel.received_byte_count;
-    cc_.on_complete_calls++;
-    cc_.terminal_callback->setReady();
-  };
-  stream_callbacks.on_error_ = [this](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {
-    cc_.on_error_calls++;
-    cc_.terminal_callback->setReady();
-  };
-  stream_callbacks.on_cancel_ = [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-    EXPECT_NE(-1, final_intel.stream_start_ms);
-    cc_.on_cancel_calls++;
-    cc_.terminal_callback->setReady();
-  };
-  return stream_callbacks;
 }
 
 } // namespace Envoy

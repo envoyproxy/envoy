@@ -195,7 +195,7 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
 
   if (primary_host) {
     // This may mean a resolve is in-progress, or a resolve completed before we
-    // switched contexts to startCacheLoad.  Either way the caller will be informed.
+    // switched contexts to startCacheLoad. Either way the caller will be informed.
     ENVOY_LOG(debug, "main thread resolve for host '{}' skipped. Entry present", host);
     return;
   }
