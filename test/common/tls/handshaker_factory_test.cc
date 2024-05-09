@@ -14,7 +14,6 @@
 #include "test/mocks/network/connection.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -64,6 +63,10 @@ public:
 
   std::string name() const override { return kFactoryName; }
 
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ProtobufWkt::StringValue()};
+  }
+
   Ssl::HandshakerFactoryCb
   createHandshakerCb(const Protobuf::Message& message, Ssl::HandshakerFactoryContext& context,
                      ProtobufMessage::ValidationVisitor& validation_visitor) override {
@@ -95,12 +98,11 @@ protected:
       : context_manager_(std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
             server_factory_context_)),
         registered_factory_(handshaker_factory_) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
     // UpstreamTlsContext proto expects to use the newly-registered handshaker.
     envoy::config::core::v3::TypedExtensionConfig* custom_handshaker =
         tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();
     custom_handshaker->set_name(HandshakerFactoryImplForTest::kFactoryName);
+    custom_handshaker->mutable_typed_config()->PackFrom(ProtobufWkt::StringValue());
   }
 
   // Helper for downcasting a socket to a test socket so we can examine its
@@ -117,7 +119,6 @@ protected:
   HandshakerFactoryImplForTest handshaker_factory_;
   Registry::InjectFactory<Ssl::HandshakerFactory> registered_factory_;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context_;
-  TestScopedRuntime scoped_runtime_;
 };
 
 TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
@@ -217,6 +218,10 @@ public:
 
   std::string name() const override { return kFactoryName; }
 
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ProtobufWkt::BoolValue()};
+  }
+
   Ssl::HandshakerFactoryCb
   createHandshakerCb(const Protobuf::Message& message, Ssl::HandshakerFactoryContext& context,
                      ProtobufMessage::ValidationVisitor& validation_visitor) override {
@@ -250,10 +255,7 @@ class HandshakerFactoryDownstreamTest : public testing::Test {
 protected:
   HandshakerFactoryDownstreamTest()
       : context_manager_(std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
-            server_factory_context_)) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-  }
+            server_factory_context_)) {}
 
   // Helper for downcasting a socket to a test socket so we can examine its
   // SSL_CTX.
@@ -267,7 +269,6 @@ protected:
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_;
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context_;
-  TestScopedRuntime scoped_runtime_;
   Ssl::HandshakerCapabilities capabilities_;
 };
 
@@ -283,6 +284,7 @@ TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
   envoy::config::core::v3::TypedExtensionConfig* custom_handshaker =
       tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();
   custom_handshaker->set_name(HandshakerFactoryImplForDownstreamTest::kFactoryName);
+  custom_handshaker->mutable_typed_config()->PackFrom(ProtobufWkt::BoolValue());
 
   CustomProcessObjectForTest custom_process_object_for_test(
       /*cb=*/[](SSL_CTX* ssl_ctx) { SSL_CTX_set_options(ssl_ctx, SSL_OP_NO_TLSv1); });
