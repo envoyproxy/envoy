@@ -50,9 +50,9 @@ protected:
     absl::MutexLock l(&engine_lock_);
     return reinterpret_cast<envoy_engine_t>(engine_->engine_);
   }
-  virtual void initialize() override;
-  void createNewStream(Platform::StreamPrototypeSharedPtr& stream_prototype, callbacks_called& cc,
-                       Platform::StreamSharedPtr& stream_);
+  void initialize() override;
+  Platform::StreamSharedPtr createNewStream(Platform::StreamPrototypeSharedPtr& stream_prototype,
+                                            EnvoyStreamCallbacks&& stream_callbacks);
 
   void createEnvoy() override;
   void threadRoutine(absl::Notification& engine_running);
