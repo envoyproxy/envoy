@@ -117,6 +117,19 @@ protected:
 
 TEST_F(MonitorTest, NoBuckets) { monitor_->reportResult(ResultForTest()); }
 
+TEST_F(MonitorTest, SingleBucketNotMatchingType) {
+  addBucket1();
+
+  // None of the follow-up routines should be called.
+  EXPECT_CALL(*monitor_, onSuccess).Times(0);
+  EXPECT_CALL(*monitor_, onError).Times(0);
+  EXPECT_CALL(*monitor_, onReset).Times(0);
+
+  // Monitor is interested only in Results of ErrorType::TEST
+  // type and here ErrorType::LOCAL_ORIGIN is sent.
+  monitor_->reportResult(LocalOriginEvent(Result::ExtOriginRequestSuccess));
+}
+
 // Type of the reported "result" matches the type of the
 // bucket, but the bucket does not catch the reported result
 // and is therefore treated as positive result.

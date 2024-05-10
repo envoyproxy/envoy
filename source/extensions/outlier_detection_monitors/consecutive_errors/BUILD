@@ -12,6 +12,10 @@ envoy_cc_extension(
     name = "consecutive_errors_monitor_lib",
     srcs = ["consecutive_errors_monitor.cc"],
     hdrs = ["consecutive_errors_monitor.h"],
+    extra_visibility = [
+        "//source/common/upstream:__subpackages__",
+        "//test/common/upstream:__subpackages__",
+    ],
     deps = [
         "@envoy_api//envoy/extensions/outlier_detection_monitors/common/v3:pkg_cc_proto",
         #"//envoy/access_log:access_log_interface",

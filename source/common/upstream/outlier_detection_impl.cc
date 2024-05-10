@@ -206,10 +206,7 @@ void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> 
   put_result_func_(this, result, code);
 
   // Call extensions
-  // Check all other monitors
-  std::shared_ptr<DetectorImpl> detector = detector_.lock();
-  if (!detector) {
-    // It's possible for the cluster/detector to go away while we still have a host in use.
+  if (monitors_set_ == nullptr) {
     return;
   }
 

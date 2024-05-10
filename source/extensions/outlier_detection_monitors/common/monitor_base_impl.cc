@@ -32,7 +32,8 @@ void Monitor::reportResult(const Error& error) {
     return;
   }
 
-  bool matched = false;
+  bool matchedError = false;
+  bool matchedType = false;
   // iterate over all error buckets
   for (auto& bucket : buckets_) {
     // if the bucket is not interested in this type of result/error
@@ -41,14 +42,21 @@ void Monitor::reportResult(const Error& error) {
       continue;
     }
 
+    matchedType = true;
+
     // check if the bucket "catches" the result.
     if (bucket->match(error)) {
-      matched = true;
+      matchedError = true;
       break;
     }
   }
 
-  if (matched) {
+  // If none of buckets had the matching type, just bail out.
+  if (!matchedType) {
+    return;
+  }
+
+  if (matchedError) {
     // Count as error.
     if (onError()) {
       callback_(enforce_, name(), absl::nullopt);
