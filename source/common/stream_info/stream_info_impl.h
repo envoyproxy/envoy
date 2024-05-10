@@ -438,11 +438,11 @@ struct StreamInfoImpl : public StreamInfo {
   MonotonicTime start_time_monotonic_;
   absl::optional<MonotonicTime> final_time_;
   absl::optional<Http::Protocol> protocol_;
+  absl::InlinedVector<ResponseFlag, 4> response_flags_{};
   bool health_check_request_{};
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
-  absl::InlinedVector<ResponseFlag, 4> response_flags_{};
 
 private:
   absl::optional<uint32_t> response_code_;
