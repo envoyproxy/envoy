@@ -17,6 +17,7 @@ public:
   virtual void onReset() override;
 
 private:
+  // counter needs to be thread-safe, as it is accessed by many worker threads.
   std::atomic<uint32_t> counter_{0};
   uint32_t max_;
 };

@@ -23,11 +23,6 @@ bool LocalOriginEventsBucket::matches(
 }
 
 void Monitor::reportResult(const Error& error) {
-  // Ignore all results/errors until monitor is reset.
-  if (tripped_) {
-    return;
-  }
-
   if (buckets_.empty()) {
     return;
   }
@@ -71,16 +66,14 @@ void Monitor::reportResult(const Error& error) {
   }
 }
 
-// TODO: make it Monitor's method
-void processBucketsConfig(
-    Monitor& monitor,
+void Monitor::processBucketsConfig(
     const envoy::extensions::outlier_detection_monitors::common::v3::ErrorBuckets& config) {
   for (const auto& http_bucket : config.http_errors()) {
-    monitor.buckets_.push_back(std::make_unique<HTTPErrorCodesBucket>(http_bucket.range().start(),
-                                                                      http_bucket.range().end()));
+    addErrorBucket(std::make_unique<HTTPErrorCodesBucket>(http_bucket.range().start(),
+                                                          http_bucket.range().end()));
   }
   for (auto i = 0; i < config.local_origin_errors().size(); i++) {
-    monitor.buckets_.push_back(std::make_unique<LocalOriginEventsBucket>());
+    addErrorBucket(std::make_unique<LocalOriginEventsBucket>());
   }
 }
 } // namespace Outlier

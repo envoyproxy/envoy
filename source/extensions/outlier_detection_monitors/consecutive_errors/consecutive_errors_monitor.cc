@@ -1,13 +1,8 @@
 #include "source/extensions/outlier_detection_monitors/consecutive_errors/consecutive_errors_monitor.h"
 
-#include "envoy/extensions/outlier_detection_monitors/common/v3/error_types.pb.h"
-#include "envoy/extensions/outlier_detection_monitors/common/v3/error_types.pb.validate.h"
 #include "envoy/extensions/outlier_detection_monitors/consecutive_errors/v3/consecutive_errors.pb.h"
 #include "envoy/extensions/outlier_detection_monitors/consecutive_errors/v3/consecutive_errors.pb.validate.h"
 #include "envoy/registry/registry.h"
-
-// Possibly should be moved to another namespace and into another directory
-// source/extensions/outlier_detection/consecutive_errors/
 
 namespace Envoy {
 namespace Extensions {
@@ -39,11 +34,10 @@ private:
   MonitorPtr createMonitorFromProtoTyped(const envoy::extensions::outlier_detection_monitors::
                                              consecutive_errors::v3::ConsecutiveErrors& config,
                                          MonitorFactoryContext&) override {
-    // TODO: Create consecutive errors type of monitor.
     auto monitor = std::make_unique<ConsecutiveErrorsMonitor>(
         config.name(), config.enforcing().value(),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, threshold, 3));
-    processBucketsConfig(*monitor, config.error_buckets());
+    monitor->processBucketsConfig(config.error_buckets());
 
     return monitor;
   }

@@ -93,7 +93,7 @@ protected:
     auto bucket_raw_ptr = bucket.get();
 
     // Add bucket to the monitor.
-    monitor_->buckets_.push_back(std::move(bucket));
+    monitor_->addErrorBucket(std::move(bucket));
     return bucket_raw_ptr;
   }
 

@@ -24,17 +24,6 @@ namespace Outlier {
 
 using namespace Envoy::Upstream::Outlier;
 
-// Base class for monitors. It defines interface to:
-// - components reporting errors
-// - cluster manager which checks for health of the endpoints
-#if 0
-class ODMonitor {
-  // Define PURE functions as API between Envoy and outlier detection mechanism.
-};
-
-using ODMonitorPtr = std::unique_ptr<ODMonitor>;
-#endif
-
 // Types derived from TypedError are used to report the result of transaction to
 // an outlier detection monitor.
 template <Upstream::Outlier::ErrorType E> class TypedError : public Upstream::Outlier::Error {
@@ -46,7 +35,6 @@ class HttpCode : public TypedError<Upstream::Outlier::ErrorType::HTTP_CODE> {
 public:
   HttpCode(uint64_t code) : code_(code) {}
   HttpCode() = delete;
-  // ErrorType type() const override { return ErrorType::HTTP_CODE; }
   virtual ~HttpCode() {}
   uint64_t code() const { return code_; }
 
@@ -127,35 +115,31 @@ public:
   Monitor(const std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
   Monitor() = delete;
   virtual ~Monitor() {}
-  void addErrorBucket(ErrorsBucketPtr&& bucket); // {buckets_.push_back(std::move(bucket));}
   void reportResult(const Error&);
-  // TODO - make this private.
-  // absl::flat_hash_map<ErrorType, std::vector<ErrorsBucketPtr>> buckets_;
-  std::vector<ErrorsBucketPtr> buckets_;
+
+  // TODO: set it through a method
   std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback_;
 
-  bool tripped() const { return tripped_; }
-  void reset() {
-    tripped_ = false;
-    onReset();
-  }
+  void reset() { onReset(); }
   std::string name() const { return name_; }
+
+  void processBucketsConfig(
+      const envoy::extensions::outlier_detection_monitors::common::v3::ErrorBuckets& config);
+  void addErrorBucket(ErrorsBucketPtr&& bucket) { buckets_.push_back(std::move(bucket)); }
 
 protected:
   virtual bool onError() PURE;
   virtual void onSuccess() PURE;
   virtual void onReset() PURE;
+  // Default extra info is empty string. Descendant classes may overwrite it.
   virtual std::string getFailedExtraInfo() { return ""; }
 
-  bool tripped_{false};
   std::string name_;
   uint32_t enforce_{100};
+  std::vector<ErrorsBucketPtr> buckets_;
 };
 
 using MonitorPtr = std::unique_ptr<Monitor>;
-void processBucketsConfig(
-    Monitor& monitor,
-    const envoy::extensions::outlier_detection_monitors::common::v3::ErrorBuckets& config);
 
 class MonitorsSet {
 public:
@@ -166,7 +150,6 @@ private:
   std::vector<MonitorPtr> monitors_;
 };
 
-// (todo): maybe move it to config file
 class MonitorFactoryContext {
 public:
   MonitorFactoryContext(ProtobufMessage::ValidationVisitor& validation_visitor)
@@ -178,8 +161,6 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
-// This should go to something like source/extensions/outlier_detection/common
-// (todo): maybe move it to config file
 class MonitorFactory : public Config::TypedFactory {
 public:
   ~MonitorFactory() override = default;
@@ -190,7 +171,6 @@ public:
   std::string category() const override { return "envoy.outlier_detection_monitors"; }
 };
 
-// (todo): maybe move it to config file
 template <class ConfigProto> class MonitorFactoryBase : public MonitorFactory {
 public:
   MonitorPtr createMonitor(const Protobuf::Message& config,
@@ -200,7 +180,6 @@ public:
                                        context);
   }
 
-  // (todo): maybe move it to config file
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ConfigProto>();
   }
