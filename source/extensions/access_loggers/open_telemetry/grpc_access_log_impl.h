@@ -34,6 +34,8 @@ class GrpcAccessLoggerImpl
           // as an empty placeholder for the non-used addEntry method.
           // TODO(itamarkam): Don't cache OpenTelemetry loggers by type (HTTP/TCP).
           ProtobufWkt::Empty, opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
+          opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>,
+      public Grpc::AsyncRequestCallbacks<
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
 public:
   GrpcAccessLoggerImpl(
@@ -41,6 +43,14 @@ public:
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
           config,
       Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+
+  void onSuccess(Grpc::ResponsePtr<
+                     opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>&& resp,
+                 Tracing::Span&) override;
+
+  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+
+  void onFailure(Grpc::Status::GrpcStatus, const std::string&, Tracing::Span&) override;
 
 private:
   void initMessageRoot(
@@ -56,6 +66,10 @@ private:
   void clearMessage() override;
 
   opentelemetry::proto::logs::v1::ScopeLogs* root_;
+
+  uint64_t batched_log_entries_ = 0;
+
+  Common::GrpcAccessLoggerStats stats_;
 };
 
 class GrpcAccessLoggerCacheImpl
