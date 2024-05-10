@@ -34,8 +34,6 @@ class GrpcAccessLoggerImpl
           // as an empty placeholder for the non-used addEntry method.
           // TODO(itamarkam): Don't cache OpenTelemetry loggers by type (HTTP/TCP).
           ProtobufWkt::Empty, opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
-          opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>,
-      public Grpc::AsyncRequestCallbacks<
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
 public:
   GrpcAccessLoggerImpl(
@@ -43,14 +41,6 @@ public:
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
           config,
       Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
-
-  void onSuccess(Grpc::ResponsePtr<
-                     opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>&& resp,
-                 Tracing::Span&) override;
-
-  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
-
-  void onFailure(Grpc::Status::GrpcStatus, const std::string&, Tracing::Span&) override;
 
 private:
   void initMessageRoot(
@@ -65,11 +55,45 @@ private:
   void initMessage() override;
   void clearMessage() override;
 
+  class OTelLogRequestCallbacks
+      : public Grpc::AsyncRequestCallbacks<
+            opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>,
+        public Envoy::Event::DeferredDeletable {
+  public:
+    OTelLogRequestCallbacks(Envoy::Event::Dispatcher& dispatcher,
+                            Common::GrpcAccessLoggerStats& stats, uint32_t sending_log_entries)
+        : dispatcher_(dispatcher), stats_(stats), sending_log_entries_(sending_log_entries) {}
+
+    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+
+    void onSuccess(Grpc::ResponsePtr<
+                       opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>&& resp,
+                   Tracing::Span&) override {
+      int partial_rejected_log_entries = (resp && resp->has_partial_success())
+                                             ? resp->partial_success().rejected_log_records()
+                                             : 0;
+      stats_.logs_dropped_.add(partial_rejected_log_entries);
+      stats_.logs_written_.add(sending_log_entries_ - partial_rejected_log_entries);
+      deferredDelete();
+    }
+
+    void onFailure(Grpc::Status::GrpcStatus, const std::string&, Tracing::Span&) override {
+      stats_.logs_dropped_.add(sending_log_entries_);
+      deferredDelete();
+    }
+
+    void deferredDelete() {
+      dispatcher_.deferredDelete(std::unique_ptr<OTelLogRequestCallbacks>(this));
+    }
+
+    Envoy::Event::Dispatcher& dispatcher_;
+    Common::GrpcAccessLoggerStats& stats_;
+    uint32_t sending_log_entries_;
+  };
+
   opentelemetry::proto::logs::v1::ScopeLogs* root_;
-
-  uint64_t batched_log_entries_ = 0;
-
   Common::GrpcAccessLoggerStats stats_;
+  uint32_t batched_log_entries_ = 0;
 };
 
 class GrpcAccessLoggerCacheImpl

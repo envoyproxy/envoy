@@ -61,24 +61,27 @@ private:
 template <typename LogRequest, typename LogResponse>
 class UnaryGrpcAccessLogClient : public GrpcAccessLogClient<LogRequest, LogResponse> {
 public:
+  typedef std::function<Grpc::AsyncRequestCallbacks<LogResponse>*()> AsyncRequestCallbacksFactory;
+
   UnaryGrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                            const Protobuf::MethodDescriptor& service_method,
                            OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy,
-                           Grpc::AsyncRequestCallbacks<LogResponse>& request_callbacks)
+                           AsyncRequestCallbacksFactory callback_factory)
       : GrpcAccessLogClient<LogRequest, LogResponse>(client, service_method, retry_policy),
-        request_cb_(request_callbacks) {}
+        callbacks_factory_(callback_factory) {}
 
   bool isConnected() override { return false; }
 
   bool log(const LogRequest& request) override {
     GrpcAccessLogClient<LogRequest, LogResponse>::client_->send(
-        GrpcAccessLogClient<LogRequest, LogResponse>::service_method_, request, request_cb_,
-        Tracing::NullSpan::instance(), GrpcAccessLogClient<LogRequest, LogResponse>::opts_);
+        GrpcAccessLogClient<LogRequest, LogResponse>::service_method_, request,
+        *callbacks_factory_(), Tracing::NullSpan::instance(),
+        GrpcAccessLogClient<LogRequest, LogResponse>::opts_);
     return true;
   }
 
 private:
-  Grpc::AsyncRequestCallbacks<LogResponse>& request_cb_;
+  AsyncRequestCallbacksFactory callbacks_factory_;
 };
 
 template <typename LogRequest, typename LogResponse>
