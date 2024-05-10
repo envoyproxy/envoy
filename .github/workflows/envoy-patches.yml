@@ -64,7 +64,7 @@ jobs:
         PATCHES_PATH="${WORKSPACE_ROOT}/${PATCHES_DIRNAME}"
         echo "name=${PATCHES_DIRNAME}" >> "$GITHUB_OUTPUT"
         echo "path=${PATCHES_PATH}" >> "$GITHUB_OUTPUT"
-        bazel run --config=ci //tools/patches ${PATCHES_PATH}
+        bazel run --config=ci //tools/patches "${PWD}" ${PATCHES_PATH}
       id: patches
       name: Create patches
 
