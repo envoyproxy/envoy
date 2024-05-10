@@ -451,8 +451,9 @@ void Client::DirectStreamCallbacks::latchError() {
   }
 
   error_msg_details.push_back(absl::StrCat(error_->error_code));
-  if (info.responseCodeDetails().has_value()) {
-    error_msg_details.push_back(info.responseCodeDetails().value());
+  if (std::string resp_code_details = info.responseCodeDetails().value_or("");
+      !resp_code_details.empty()) {
+    error_msg_details.push_back(std::move(resp_code_details));
   }
   // The format of the error message propogated to callbacks is:
   //  {RESPONSE_CODE}|{ERROR_CODE}|{DETAILS}
