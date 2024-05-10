@@ -11,7 +11,6 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/upstream/load_balancer_impl.h"
 
 #include "absl/container/node_hash_set.h"
 
@@ -720,7 +719,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
       subset_lb.lb_config_.createLoadBalancer(subset_lb.cluster_info_, *this, subset_lb.runtime_,
                                               subset_lb.random_, subset_lb.time_source_);
   ASSERT(thread_aware_lb_ != nullptr);
-  thread_aware_lb_->initialize();
+  THROW_IF_NOT_OK(thread_aware_lb_->initialize());
   lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
 
   triggerCallbacks();

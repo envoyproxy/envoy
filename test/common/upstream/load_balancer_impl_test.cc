@@ -13,8 +13,11 @@
 
 #include "source/common/common/random_generator.h"
 #include "source/common/network/utility.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/least_request/least_request_lb.h"
+#include "source/extensions/load_balancing_policies/random/random_lb.h"
+#include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -2842,6 +2845,18 @@ public:
 };
 
 TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
+
+TEST_P(LeastRequestLoadBalancerTest, SingleHostAndPeek) {
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  // Host weight is 1 and peek.
+  {
+    EXPECT_CALL(random_, random()).WillOnce(Return(0));
+    EXPECT_EQ(nullptr, lb_.peekAnotherHost(nullptr));
+  }
+}
 
 TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};

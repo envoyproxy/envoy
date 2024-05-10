@@ -13,7 +13,6 @@
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/api/external.h"
-#include "library/common/bridge/utility.h"
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
@@ -148,7 +147,7 @@ TEST_F(InternalEngineTest, AccessEngineAfterInitialization) {
 
   absl::Notification getClusterManagerInvoked;
   // Running engine functions should work because the engine is running
-  EXPECT_EQ("runtime.load_success: 1\n", engine_->engine_->dumpStats());
+  EXPECT_THAT(engine_->engine_->dumpStats(), testing::HasSubstr("runtime.load_success: 1\n"));
 
   engine_->terminate();
   ASSERT_TRUE(engine_->isTerminated());
@@ -322,28 +321,18 @@ TEST_F(InternalEngineTest, BasicStream) {
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification on_complete_notification;
-  envoy_http_callbacks stream_cbs{
-      [](envoy_headers c_headers, bool, envoy_stream_intel, void*) -> void {
-        auto response_headers = toResponseHeaders(c_headers);
-        EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
-      } /* on_headers */,
-      [](envoy_data data, bool, envoy_stream_intel, void*) -> void {
-        data.release(data.context);
-      } /* on_data */,
-      nullptr /* on_metadata */,
-      [](envoy_headers, envoy_stream_intel, void*) -> void {} /* on_trailers */,
-      nullptr /* on_error */,
-      [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void {
-        auto* on_complete_notification = static_cast<absl::Notification*>(context);
-        on_complete_notification->Notify();
-      } /* on_complete */,
-      nullptr /* on_cancel */,
-      nullptr /* on_send_window_available*/,
-      &on_complete_notification /* context */};
+  EnvoyStreamCallbacks stream_callbacks;
+  stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers, bool /* end_stream */,
+                                     envoy_stream_intel) {
+    EXPECT_EQ(headers.Status()->value().getStringView(), "200");
+  };
+  stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
+    on_complete_notification.Notify();
+  };
 
   envoy_stream_t stream = engine->initStream();
 
-  engine->startStream(stream, stream_cbs, false);
+  engine->startStream(stream, std::move(stream_callbacks), false);
 
   engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getAddress()), false);
   engine->sendData(stream, std::make_unique<Buffer::OwnedImpl>("request body"), false);
@@ -370,23 +359,14 @@ TEST_F(InternalEngineTest, ResetStream) {
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification on_cancel_notification;
-  envoy_http_callbacks stream_cbs{
-      nullptr /* on_headers */,
-      nullptr /* on_data */,
-      nullptr /* on_metadata */,
-      nullptr /* on_trailers */,
-      nullptr /* on_error */,
-      nullptr /* on_complete */,
-      [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void {
-        auto* on_cancel_notification = static_cast<absl::Notification*>(context);
-        on_cancel_notification->Notify();
-      } /* on_cancel */,
-      nullptr /* on_send_window_available */,
-      &on_cancel_notification /* context */};
+  EnvoyStreamCallbacks stream_callbacks;
+  stream_callbacks.on_cancel_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
+    on_cancel_notification.Notify();
+  };
 
   envoy_stream_t stream = engine->initStream();
 
-  engine->startStream(stream, stream_cbs, false);
+  engine->startStream(stream, std::move(stream_callbacks), false);
 
   engine->cancelStream(stream);
 
@@ -464,29 +444,18 @@ protected:
     };
 
     CallbackContext context;
-    envoy_http_callbacks stream_cbs{
-        [](envoy_headers c_headers, bool, envoy_stream_intel, void* context) -> void {
-          release_envoy_map(c_headers);
-          // Gets the thread priority, so we can check that it's the same thread priority we set.
-          auto* callback_context = static_cast<CallbackContext*>(context);
-          callback_context->thread_priority = getpriority(PRIO_PROCESS, 0);
-        } /* on_headers */,
-        [](envoy_data data, bool, envoy_stream_intel, void*) -> void {
-          data.release(data.context);
-        } /* on_data */,
-        nullptr /* on_metadata */,
-        [](envoy_headers, envoy_stream_intel, void*) -> void {} /* on_trailers */,
-        nullptr /* on_error */,
-        [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void {
-          auto* callback_context = static_cast<CallbackContext*>(context);
-          callback_context->on_complete_notification.Notify();
-        } /* on_complete */,
-        nullptr /* on_cancel */,
-        nullptr /* on_send_window_available*/,
-        &context};
+    EnvoyStreamCallbacks stream_callbacks;
+    stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap&, bool /* end_stream */,
+                                       envoy_stream_intel) {
+      // Gets the thread priority, so we can check that it's the same thread priority we set.
+      context.thread_priority = getpriority(PRIO_PROCESS, 0);
+    };
+    stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
+      context.on_complete_notification.Notify();
+    };
 
     envoy_stream_t stream = engine->initStream();
-    engine->startStream(stream, stream_cbs, false);
+    engine->startStream(stream, std::move(stream_callbacks), false);
     engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getAddress()), false);
     engine->sendData(stream, std::make_unique<Buffer::OwnedImpl>("request body"), true);
 

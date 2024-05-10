@@ -43,11 +43,12 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
 envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
-                                           envoy_http_callbacks bridge_callbacks,
+                                           EnvoyStreamCallbacks&& stream_callbacks,
                                            bool explicit_flow_control) {
-  return dispatcher_->post([&, stream, bridge_callbacks, explicit_flow_control]() {
-    http_client_->startStream(stream, bridge_callbacks, explicit_flow_control);
-  });
+  return dispatcher_->post(
+      [&, stream, stream_callbacks = std::move(stream_callbacks), explicit_flow_control]() mutable {
+        http_client_->startStream(stream, std::move(stream_callbacks), explicit_flow_control);
+      });
 }
 
 envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,

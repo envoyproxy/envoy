@@ -31,7 +31,6 @@ envoy_cc_extension(
         "//library/common/bridge:utility_lib",
         "//library/common/data:utility_lib",
         "//library/common/http:header_utility_lib",
-        "//library/common/http:internal_headers_lib",
         "//library/common/stream_info:extra_stream_info_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/common:scope_tracker_interface",

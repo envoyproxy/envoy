@@ -1,5 +1,7 @@
 #pragma once
 
+#include <queue>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/event/file_event.h"
@@ -26,7 +28,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/stream_info/stream_info_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/router/router_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"

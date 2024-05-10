@@ -1,11 +1,11 @@
 #include <cstddef>
 #include <string>
-#include <utility>
 
 #include "source/common/protobuf/protobuf.h"
 
 #include "library/cc/engine_builder.h"
 #include "library/common/api/c_types.h"
+#include "library/common/bridge/utility.h"
 #include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/extensions/key_value/platform/c_types.h"
@@ -402,9 +402,6 @@ static envoy_filter_data_status jvm_http_filter_on_response_data(envoy_data data
                                     /*data*/ native_data,
                                     /*pending_headers*/ pending_headers};
 }
-
-static void jvm_on_metadata(envoy_headers /* metadata */, envoy_stream_intel /*stream_intel*/,
-                            void* /*context*/) {}
 
 static Envoy::JNI::LocalRefUniquePtr<jobjectArray> jvm_on_trailers(const char* method,
                                                                    envoy_headers trailers,
@@ -827,24 +824,58 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_startStream(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject j_context,
+    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject java_stream_callbacks,
     jboolean explicit_flow_control) {
-  // TODO: To be truly safe we may need stronger guarantees of operation ordering on this ref.
-  jobject retained_context = env->NewGlobalRef(j_context);
-  envoy_http_callbacks native_callbacks = {jvm_on_response_headers,
-                                           jvm_on_response_data,
-                                           jvm_on_metadata,
-                                           jvm_on_response_trailers,
-                                           jvm_on_error,
-                                           jvm_on_complete,
-                                           jvm_on_cancel,
-                                           jvm_on_send_window_available,
-                                           retained_context};
+  Envoy::JNI::JniHelper jni_helper(env);
+  auto java_stream_callbacks_global_ref = jni_helper.newGlobalRef(java_stream_callbacks).release();
   auto engine = reinterpret_cast<Envoy::InternalEngine*>(engine_handle);
+  Envoy::EnvoyStreamCallbacks stream_callbacks;
+  // TODO(fredyw): Rewrite the whole implementation to not use the bridge data structures.
+  stream_callbacks.on_headers_ =
+      [java_stream_callbacks_global_ref](const Envoy::Http::ResponseHeaderMap& headers,
+                                         bool end_stream, envoy_stream_intel stream_intel) {
+        envoy_headers bridge_headers = Envoy::Http::Utility::toBridgeHeaders(headers);
+        jvm_on_response_headers(bridge_headers, end_stream, stream_intel,
+                                java_stream_callbacks_global_ref);
+      };
+  stream_callbacks.on_data_ = [java_stream_callbacks_global_ref](
+                                  const Envoy::Buffer::Instance& buffer, uint64_t length,
+                                  bool end_stream, envoy_stream_intel stream_intel) {
+    envoy_data bridge_data = Envoy::Data::Utility::toBridgeDataNoDrain(buffer, length);
+    jvm_on_response_data(bridge_data, end_stream, stream_intel, java_stream_callbacks_global_ref);
+  };
+  stream_callbacks.on_trailers_ =
+      [java_stream_callbacks_global_ref](const Envoy::Http::ResponseTrailerMap& trailers,
+                                         envoy_stream_intel stream_intel) {
+        envoy_headers bridge_trailers = Envoy::Http::Utility::toBridgeHeaders(trailers);
+        jvm_on_response_trailers(bridge_trailers, stream_intel, java_stream_callbacks_global_ref);
+      };
+  stream_callbacks.on_complete_ =
+      [java_stream_callbacks_global_ref](envoy_stream_intel stream_intel,
+                                         envoy_final_stream_intel final_stream_intel) {
+        jvm_on_complete(stream_intel, final_stream_intel, java_stream_callbacks_global_ref);
+      };
+  stream_callbacks.on_error_ = [java_stream_callbacks_global_ref](
+                                   Envoy::EnvoyError error, envoy_stream_intel stream_intel,
+                                   envoy_final_stream_intel final_stream_intel) {
+    envoy_error bridge_error = Envoy::Bridge::Utility::toBridgeError(error);
+    jvm_on_error(bridge_error, stream_intel, final_stream_intel, java_stream_callbacks_global_ref);
+  };
+  stream_callbacks.on_cancel_ =
+      [java_stream_callbacks_global_ref](envoy_stream_intel stream_intel,
+                                         envoy_final_stream_intel final_stream_intel) {
+        jvm_on_cancel(stream_intel, final_stream_intel, java_stream_callbacks_global_ref);
+      };
+  stream_callbacks.on_send_window_available_ =
+      [java_stream_callbacks_global_ref](envoy_stream_intel stream_intel) {
+        jvm_on_send_window_available(stream_intel, java_stream_callbacks_global_ref);
+      };
+
   envoy_status_t result = engine->startStream(static_cast<envoy_stream_t>(stream_handle),
-                                              native_callbacks, explicit_flow_control);
+                                              std::move(stream_callbacks), explicit_flow_control);
   if (result != ENVOY_SUCCESS) {
-    env->DeleteGlobalRef(retained_context); // No callbacks are fired and we need to release
+    env->DeleteGlobalRef(
+        java_stream_callbacks_global_ref); // No callbacks are fired and we need to release
   }
   return result;
 }
