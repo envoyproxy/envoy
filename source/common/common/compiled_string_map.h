@@ -49,6 +49,9 @@ namespace Envoy {
  * for the string node.
  */
 template <class Value> class CompiledStringMap {
+  // While it is usual to take a string_view by value, in this
+  // performance-critical context with repeatedly passing the same
+  // value, passing it by reference benchmarks out slightly faster.
   using FindFn = std::function<Value(const absl::string_view&)>;
 
 public:
