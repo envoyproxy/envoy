@@ -198,8 +198,9 @@ public:
 
   void testServerAllowChunkedContentLength(uint32_t content_length, bool allow_chunked_length);
 
-  void testValueHasNullCharacter(absl::string_view value, absl::string_view expected_error_details,
-                                 absl::string_view expected_error_message);
+  void testRequestWithValueExpectFailure(absl::string_view value,
+                                         absl::string_view expected_error_details,
+                                         absl::string_view expected_error_message);
 
   // Send the request, and validate the received request headers.
   // Then send a response just to clean up.
@@ -2554,7 +2555,8 @@ public:
   Http::ClientConnectionPtr codec_;
 
   void testClientAllowChunkedContentLength(uint32_t content_length, bool allow_chunked_length);
-  void testValueHasNullCharacter(absl::string_view value, absl::string_view expected_error_message);
+  void testRequestWithValueExpectFailure(absl::string_view value,
+                                         absl::string_view expected_error_message);
 
 protected:
   Stats::TestUtil::TestStore store_;
@@ -4886,7 +4888,7 @@ TEST_P(Http1ClientConnectionImplTest, ObsFold) {
   // SPELLCHECKER(on)
 }
 
-void Http1ServerConnectionImplTest::testValueHasNullCharacter(
+void Http1ServerConnectionImplTest::testRequestWithValueExpectFailure(
     absl::string_view value, absl::string_view expected_error_details,
     absl::string_view expected_error_message) {
   initialize();
@@ -4908,11 +4910,11 @@ TEST_P(Http1ServerConnectionImplTest, ValueStartsWithNullCharacter) {
   const std::string value = absl::StrCat(kNullCharacter, "value starts with null character");
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    testValueHasNullCharacter(value, "http1.invalid_characters",
-                              "header value contains invalid chars");
+    testRequestWithValueExpectFailure(value, "http1.invalid_characters",
+                                      "header value contains invalid chars");
   } else {
-    testValueHasNullCharacter(value, "http1.invalid_characters",
-                              "header value contains invalid chars");
+    testRequestWithValueExpectFailure(value, "http1.invalid_characters",
+                                      "header value contains invalid chars");
   }
 }
 
@@ -4921,10 +4923,10 @@ TEST_P(Http1ServerConnectionImplTest, ValueWithNullCharacterInTheMiddle) {
       absl::StrCat("value has", kNullCharacter, "null character in the middle");
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    testValueHasNullCharacter(value, "http1.invalid_characters",
-                              "header value contains invalid chars");
+    testRequestWithValueExpectFailure(value, "http1.invalid_characters",
+                                      "header value contains invalid chars");
   } else {
-    testValueHasNullCharacter(value, "http1.codec_error", "HPE_INVALID_HEADER_TOKEN");
+    testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_INVALID_HEADER_TOKEN");
   }
 }
 
@@ -4932,14 +4934,14 @@ TEST_P(Http1ServerConnectionImplTest, ValueEndsWithNullCharacter) {
   const std::string value = absl::StrCat("value ends in null character", kNullCharacter);
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    testValueHasNullCharacter(value, "http1.invalid_characters",
-                              "header value contains invalid chars");
+    testRequestWithValueExpectFailure(value, "http1.invalid_characters",
+                                      "header value contains invalid chars");
   } else {
-    testValueHasNullCharacter(value, "http1.codec_error", "HPE_INVALID_HEADER_TOKEN");
+    testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_INVALID_HEADER_TOKEN");
   }
 }
 
-void Http1ClientConnectionImplTest::testValueHasNullCharacter(
+void Http1ClientConnectionImplTest::testRequestWithValueExpectFailure(
     absl::string_view value, absl::string_view expected_error_message) {
   initialize();
 
@@ -4960,9 +4962,9 @@ TEST_P(Http1ClientConnectionImplTest, ValueStartsWithNullCharacter) {
   const std::string value = absl::StrCat(kNullCharacter, "value starts with null character");
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    testValueHasNullCharacter(value, "header value contains invalid chars");
+    testRequestWithValueExpectFailure(value, "header value contains invalid chars");
   } else {
-    testValueHasNullCharacter(value, "header value contains invalid chars");
+    testRequestWithValueExpectFailure(value, "header value contains invalid chars");
   }
 }
 
@@ -4971,9 +4973,9 @@ TEST_P(Http1ClientConnectionImplTest, ValueWithNullCharacterInTheMiddle) {
       absl::StrCat("value has", kNullCharacter, "null character in the middle");
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    testValueHasNullCharacter(value, "header value contains invalid chars");
+    testRequestWithValueExpectFailure(value, "header value contains invalid chars");
   } else {
-    testValueHasNullCharacter(value, "HPE_INVALID_HEADER_TOKEN");
+    testRequestWithValueExpectFailure(value, "HPE_INVALID_HEADER_TOKEN");
   }
 }
 
@@ -4981,9 +4983,9 @@ TEST_P(Http1ClientConnectionImplTest, ValueEndsWithNullCharacter) {
   const std::string value = absl::StrCat("value ends in null character", kNullCharacter);
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    testValueHasNullCharacter(value, "header value contains invalid chars");
+    testRequestWithValueExpectFailure(value, "header value contains invalid chars");
   } else {
-    testValueHasNullCharacter(value, "HPE_INVALID_HEADER_TOKEN");
+    testRequestWithValueExpectFailure(value, "HPE_INVALID_HEADER_TOKEN");
   }
 }
 
