@@ -402,11 +402,9 @@ public:
     if (reflectable_message->GetDescriptor()->full_name() == "google.protobuf.Duration") {
       ProtobufWkt::Duration duration_message;
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
-      duration_message.MergeFrom(message);
+      duration_message.CheckTypeAndMergeFrom(message);
 #else
-      if (!duration_message.ParseFromString(message.value())) {
-        throwEnvoyExceptionOrPanic(fmt::format("Unable to parse duration: {}", message.value()));
-      }
+      duration_message.MergeFromCord(message.SerializeAsCord());
 #endif
       // Validate the value of the duration.
       absl::Status status = validateDurationUnifiedNoThrow(duration_message);
