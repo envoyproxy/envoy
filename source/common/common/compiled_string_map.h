@@ -74,24 +74,21 @@ public:
               [](const KV& a, const KV& b) { return a.first.size() < b.first.size(); });
     size_t longest = initial.back().first.size();
     table_.resize(longest + 1);
-    auto it = initial.begin();
-    // Initialize the subnodes for each length of key.
-    for (size_t i = 0; i <= longest; i++) {
-      // The range for the current length starts at the end of the range
-      // for the previous length.
-      auto start = it;
-      while (it != initial.end() && it->first.size() == i) {
-        it++;
-      }
-      if (it == start) {
-        // If there are zero nodes for this length, just leave the
-        // node's function pointer as a nullptr.
-        continue;
-      }
+    auto range_start = initial.begin();
+    // Populate the subnodes for each length of key that exists.
+    while (range_start != initial.end()) {
+      // Find the first key whose length differs from the current key length.
+      // Everything in between is keys with the same length.
+      auto range_end =
+          std::find_if(range_start, initial.end(), [l = range_start->first.size()](const KV& e) {
+            return e.first.size() != l;
+          });
       std::vector<KV> node_contents;
-      node_contents.reserve(it - start);
-      std::copy(start, it, std::back_inserter(node_contents));
-      table_[i] = createEqualLengthNode(node_contents);
+      // Populate a FindFn for the nodes in that range.
+      node_contents.reserve(range_end - range_start);
+      std::copy(range_start, range_end, std::back_inserter(node_contents));
+      table_[range_start->first.size()] = createEqualLengthNode(node_contents);
+      range_start = range_end;
     }
   }
 
@@ -134,21 +131,22 @@ private:
     std::sort(node_contents.begin(), node_contents.end(), [&best](const KV& a, const KV& b) {
       return a.first[best.index] < b.first[best.index];
     });
-    auto it = node_contents.begin();
-    for (int i = best.min; i <= best.max; i++) {
-      auto start = it;
-      while (it != node_contents.end() && it->first[best.index] == i) {
-        it++;
-      }
-      if (it != start) {
-        // Optimization was tried here, std::array<KV, 256> rather than
-        // a smaller-range vector with bounds, to keep locality and reduce
-        // comparisons. It didn't help.
-        std::vector<KV> next_contents;
-        next_contents.reserve(it - start);
-        std::copy(start, it, std::back_inserter(next_contents));
-        nodes[i - best.min] = createEqualLengthNode(next_contents);
-      }
+    auto range_start = node_contents.begin();
+    while (range_start != node_contents.end()) {
+      // Find the first key whose character at position [best.index] differs from the
+      // character of the current range.
+      // Everything in between is keys with the same character at this index.
+      auto range_end = std::find_if(range_start, node_contents.end(),
+                                    [index = best.index, c = range_start->first[best.index]](
+                                        const KV& e) { return e.first[index] != c; });
+      // Possible optimization was tried here, std::array<KV, 256> rather than
+      // a smaller-range vector with bounds, to keep locality and reduce
+      // comparisons. It didn't help.
+      std::vector<KV> next_contents;
+      next_contents.reserve(range_end - range_start);
+      std::copy(range_start, range_end, std::back_inserter(next_contents));
+      nodes[range_start->first[best.index] - best.min] = createEqualLengthNode(next_contents);
+      range_start = range_end;
     }
     return [nodes = std::move(nodes), min = best.min,
             index = best.index](const absl::string_view& key) -> Value {
