@@ -235,7 +235,7 @@ public:
 
   // Upstream::ThreadAwareLoadBalancer
   Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
-  void initialize() override{};
+  absl::Status initialize() override { return absl::OkStatus(); }
 
 private:
   Upstream::LoadBalancerFactorySharedPtr factory_;
