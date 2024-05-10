@@ -14,7 +14,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge/utility.h"
 #include "library/common/http/client.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/types/c_types.h"
@@ -36,8 +36,8 @@ ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
   ResponseHeaderMapPtr transformed_headers = ResponseHeaderMapImpl::create();
   for (envoy_map_size_t i = 0; i < headers.length; i++) {
     transformed_headers->addCopy(
-        LowerCaseString(Data::Utility::copyToString(headers.entries[i].key)),
-        Data::Utility::copyToString(headers.entries[i].value));
+        LowerCaseString(Bridge::Utility::copyToString(headers.entries[i].key)),
+        Bridge::Utility::copyToString(headers.entries[i].value));
   }
   // The C envoy_headers struct can be released now because the headers have been copied.
   release_envoy_headers(headers);

@@ -13,7 +13,7 @@
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/api/external.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 
@@ -70,8 +70,8 @@ std::unique_ptr<EngineCallbacks> createDefaultEngineCallbacks(EngineTestContext&
   std::map<std::string, std::string> new_map;
   for (envoy_map_size_t i = 0; i < map.length; i++) {
     envoy_map_entry header = map.entries[i];
-    const auto key = Data::Utility::copyToString(header.key);
-    const auto value = Data::Utility::copyToString(header.value);
+    const auto key = Bridge::Utility::copyToString(header.key);
+    const auto value = Bridge::Utility::copyToString(header.value);
     new_map.emplace(key, value);
   }
 
@@ -84,8 +84,8 @@ Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
   Http::ResponseHeaderMapPtr transformed_headers = Http::ResponseHeaderMapImpl::create();
   for (envoy_map_size_t i = 0; i < headers.length; i++) {
     transformed_headers->addCopy(
-        Http::LowerCaseString(Data::Utility::copyToString(headers.entries[i].key)),
-        Data::Utility::copyToString(headers.entries[i].value));
+        Http::LowerCaseString(Bridge::Utility::copyToString(headers.entries[i].key)),
+        Bridge::Utility::copyToString(headers.entries[i].value));
   }
   // The C envoy_headers struct can be released now because the headers have been copied.
   release_envoy_headers(headers);
