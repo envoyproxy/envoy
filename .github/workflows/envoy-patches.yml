@@ -1,0 +1,76 @@
+name: Envoy/patches
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        type: string
+        required: true
+        description: |
+          Name of the patch set (eg 2405).
+      prefix:
+        type: string
+        default: envoy-patches
+        required: true
+        description: |
+          Set prefix for generated archive.
+      suffix:
+        type: string
+        default:
+        description: |
+          Add a suffix to generated archive.
+      timestamp:
+        type: boolean
+        default: true
+        description: |
+          Timestamp the generated archive. Ignored if `suffix` is set.
+
+jobs:
+  ## Triggerable actions
+
+  create_patches:
+    runs-on: ubuntu-22.04
+    name: Create patches
+    steps:
+    - name: Checkout Setec repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.30
+      with:
+        config: |
+          path: setec
+
+    - name: Checkout Envoy branch
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.30
+      with:
+        config: |
+          fetch-depth: 0
+          path: envoy
+
+    - run: |
+        WORKSPACE_ROOT="${PWD}"
+        PATCHES_PREFIX="${{ inputs.prefix }}"
+        PATCHES_NAME="${{ inputs.name }}"
+        PATCHES_SUFFIX="${{ inputs.suffix }}"
+        PATCHES_DIRNAME="${PATCHES_PREFIX}-${PATCHES_NAME}"
+        cd setec
+        if [[ -n "$PATCHES_SUFFIX" ]]; then
+            PATCHES_DIRNAME="${PATCHES_DIRNAME}.${PATCHES_SUFFIX}"
+        elif [[ "${{ inputs.timestamp }}" == "true" ]]; then
+            PATCHES_SUFFIX="$(date +"%s")"
+            PATCHES_DIRNAME="${PATCHES_DIRNAME}.${PATCHES_SUFFIX}"
+        fi
+        PATCHES_PATH="${WORKSPACE_ROOT}/${PATCHES_DIRNAME}"
+        echo "name=${PATCHES_DIRNAME}" >> "$GITHUB_OUTPUT"
+        echo "path=${PATCHES_PATH}" >> "$GITHUB_OUTPUT"
+        bazel run --config=ci //tools/patches ${PATCHES_PATH}
+      id: patches
+      name: Create patches
+
+    - name: "Upload patches"
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808  # v4.3.3
+      with:
+        name: ${{ steps.patches.outputs.name }}
+        path: ${{ steps.patches.outputs.path }}
+        retention-days: 5

@@ -1,0 +1,16 @@
+
+## Applying these patches to Envoy ($PATCH_VERSION)
+
+The following instructions will patch the Envoy `$PATCH_BRANCH` branch
+at commit $PATCH_COMMIT.
+
+```console
+
+$ mkdir -p ./patches
+$ unzip $PATCHES_FILENAME -d ./patches
+$ git clone https://github.com/envoyproxy/envoy
+$ cd envoy
+$ git checkout "$PATCH_COMMIT"
+$ git am ../patches/${PATCH_VERSION}/*patch
+
+```
