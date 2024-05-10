@@ -3,7 +3,7 @@ syntax = "proto3";
 package test.common.upstream;
 
 import "validate/validate.proto";
-import "test/common/upstream/load_balancer_fuzz.proto";
+import "test/extensions/load_balancing_policies/common/load_balancer_fuzz.proto";
 
 message ZoneAwareLoadBalancerTestCase {
   test.common.upstream.LoadBalancerTestCase load_balancer_test_case = 1

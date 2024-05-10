@@ -2,8 +2,8 @@
 
 #include "source/extensions/load_balancing_policies/least_request/least_request_lb.h"
 
-#include "test/common/upstream/least_request_load_balancer_fuzz.pb.validate.h"
-#include "test/common/upstream/zone_aware_load_balancer_fuzz_base.h"
+#include "test/extensions/load_balancing_policies/common/zone_aware_load_balancer_fuzz_base.h"
+#include "test/extensions/load_balancing_policies/least_request/least_request_load_balancer_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/utility.h"
 

@@ -5,7 +5,7 @@ package test.common.upstream;
 
 import "validate/validate.proto";
 import "envoy/config/cluster/v3/cluster.proto";
-import "test/common/upstream/zone_aware_load_balancer_fuzz.proto";
+import "test/extensions/load_balancing_policies/common/zone_aware_load_balancer_fuzz.proto";
 
 message RoundRobinLoadBalancerTestCase {
   test.common.upstream.ZoneAwareLoadBalancerTestCase zone_aware_load_balancer_test_case = 1

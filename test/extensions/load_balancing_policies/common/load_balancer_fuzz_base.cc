@@ -1,4 +1,4 @@
-#include "test/common/upstream/load_balancer_fuzz_base.h"
+#include "test/extensions/load_balancing_policies/common/load_balancer_fuzz_base.h"
 
 #include "test/common/upstream/utility.h"
 
