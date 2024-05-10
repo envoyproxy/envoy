@@ -92,7 +92,7 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/redis:redis_cluster_lb",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",

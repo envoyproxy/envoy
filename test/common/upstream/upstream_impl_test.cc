@@ -517,7 +517,10 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
@@ -621,7 +624,10 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -1034,7 +1040,10 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -1155,11 +1164,13 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   // host multiple times.
   absl::node_hash_set<HostSharedPtr> removed_hosts;
   auto priority_update_cb2 = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
+      [&](uint32_t, const HostVector&, const HostVector& hosts_removed) {
         for (const auto& host : hosts_removed) {
           EXPECT_EQ(removed_hosts.end(), removed_hosts.find(host));
           removed_hosts.insert(host);
+          return absl::OkStatus();
         }
+        return absl::OkStatus();
       });
 
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1246,7 +1257,10 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -1442,7 +1456,10 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRate) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -3758,12 +3775,15 @@ TEST(PrioritySet, Extend) {
   uint32_t membership_changes = 0;
   uint32_t last_priority = 0;
   auto priority_update_cb = priority_set.addPriorityUpdateCb(
-      [&](uint32_t priority, const HostVector&, const HostVector&) -> void {
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
         last_priority = priority;
         ++priority_changes;
+        return absl::OkStatus();
       });
-  auto member_update_cb = priority_set.addMemberUpdateCb(
-      [&](const HostVector&, const HostVector&) -> void { ++membership_changes; });
+  auto member_update_cb = priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) {
+    ++membership_changes;
+    return absl::OkStatus();
+  });
 
   // The initial priority set starts with priority level 0.
   EXPECT_EQ(1, priority_set.hostSetsPerPriority().size());
@@ -3821,9 +3841,10 @@ TEST(PrioritySet, Extend) {
 
   // We're going to do a noop host change, so add a callback to assert that we're not announcing
   // any host changes.
-  auto member_update_cb2 = priority_set.addMemberUpdateCb(
-      [&](const HostVector& added, const HostVector& removed) -> void {
+  auto member_update_cb2 =
+      priority_set.addMemberUpdateCb([&](const HostVector& added, const HostVector& removed) {
         EXPECT_TRUE(added.empty() && removed.empty());
+        return absl::OkStatus();
       });
 
   TestBatchUpdateCb batch_update(hosts, hosts_per_locality);

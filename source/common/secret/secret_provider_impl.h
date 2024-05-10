@@ -22,12 +22,13 @@ public:
   }
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
-      std::function<void(const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&)>)
-      override {
+      std::function<absl::Status(
+          const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&)>) override {
     return nullptr;
   }
 
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addUpdateCallback(std::function<void()>) override {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addUpdateCallback(std::function<absl::Status()>) override {
     return nullptr;
   }
 
@@ -48,13 +49,14 @@ public:
   }
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
-      std::function<
-          void(const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>)
+      std::function<absl::Status(
+          const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>)
       override {
     return nullptr;
   }
 
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addUpdateCallback(std::function<void()>) override {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addUpdateCallback(std::function<absl::Status()>) override {
     return nullptr;
   }
 
@@ -74,12 +76,13 @@ public:
   }
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
-      std::function<void(
+      std::function<absl::Status(
           const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&)>) override {
     return nullptr;
   }
 
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addUpdateCallback(std::function<void()>) override {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addUpdateCallback(std::function<absl::Status()>) override {
     return nullptr;
   }
 
@@ -97,12 +100,13 @@ public:
   }
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
-      std::function<void(const envoy::extensions::transport_sockets::tls::v3::GenericSecret&)>)
-      override {
+      std::function<absl::Status(
+          const envoy::extensions::transport_sockets::tls::v3::GenericSecret&)>) override {
     return nullptr;
   }
 
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addUpdateCallback(std::function<void()>) override {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addUpdateCallback(std::function<absl::Status()>) override {
     return nullptr;
   }
 

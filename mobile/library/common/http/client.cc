@@ -7,8 +7,9 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "library/common/bridge/utility.h"
-#include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/system/system_helper.h"
@@ -31,16 +32,12 @@ constexpr auto SlowCallbackWarningThreshold = std::chrono::seconds(1);
 } // namespace
 
 Client::DirectStreamCallbacks::DirectStreamCallbacks(DirectStream& direct_stream,
-                                                     envoy_http_callbacks bridge_callbacks,
+                                                     EnvoyStreamCallbacks&& stream_callbacks,
                                                      Client& http_client)
-    : direct_stream_(direct_stream), bridge_callbacks_(bridge_callbacks), http_client_(http_client),
-      explicit_flow_control_(direct_stream_.explicit_flow_control_) {}
+    : direct_stream_(direct_stream), stream_callbacks_(std::move(stream_callbacks)),
+      http_client_(http_client), explicit_flow_control_(direct_stream_.explicit_flow_control_) {}
 
-Client::DirectStreamCallbacks::~DirectStreamCallbacks() {
-  if (error_.has_value()) {
-    release_envoy_error(error_.value());
-  }
-}
+Client::DirectStreamCallbacks::~DirectStreamCallbacks() {}
 
 void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& headers,
                                                   bool end_stream) {
@@ -80,8 +77,14 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_headers_callback_latency_, http_client_.timeSource());
 
-  bridge_callbacks_.on_headers(Utility::toBridgeHeaders(headers, alpn), end_stream, streamIntel(),
-                               bridge_callbacks_.context);
+  if (alpn.empty()) {
+    stream_callbacks_.on_headers_(headers, end_stream, streamIntel());
+  } else {
+    auto new_headers = ResponseHeaderMapImpl::create();
+    ResponseHeaderMapImpl::copyFrom(*new_headers, headers);
+    new_headers->addCopy(LowerCaseString("x-envoy-upstream-alpn"), alpn);
+    stream_callbacks_.on_headers_(*new_headers, end_stream, streamIntel());
+  }
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
@@ -166,8 +169,9 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
   // to resumeData. Set before on-data to handle reentrant callbacks.
   bytes_to_send_ = 0;
 
-  bridge_callbacks_.on_data(Data::Utility::toBridgeData(data, bytes_to_send), send_end_stream,
-                            streamIntel(), bridge_callbacks_.context);
+  stream_callbacks_.on_data_(data, bytes_to_send, send_end_stream, streamIntel());
+  // We can drain the data up to bytes_to_send since we are done with it.
+  data.drain(bytes_to_send);
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
@@ -207,8 +211,7 @@ void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMa
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_trailers_callback_latency_, http_client_.timeSource());
 
-  bridge_callbacks_.on_trailers(Utility::toBridgeHeaders(trailers), streamIntel(),
-                                bridge_callbacks_.context);
+  stream_callbacks_.on_trailers_(trailers, streamIntel());
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
@@ -283,7 +286,7 @@ void Client::DirectStreamCallbacks::onComplete() {
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_complete_callback_latency_, http_client_.timeSource());
 
-  bridge_callbacks_.on_complete(streamIntel(), finalStreamIntel(), bridge_callbacks_.context);
+  stream_callbacks_.on_complete_(streamIntel(), finalStreamIntel());
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
@@ -338,8 +341,7 @@ void Client::DirectStreamCallbacks::sendErrorToBridge() {
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_error_callback_latency_, http_client_.timeSource());
 
-  bridge_callbacks_.on_error(error_.value(), streamIntel(), finalStreamIntel(),
-                             bridge_callbacks_.context);
+  stream_callbacks_.on_error_(error_.value(), streamIntel(), finalStreamIntel());
   error_.reset();
 
   callback_time_ms->complete();
@@ -351,7 +353,7 @@ void Client::DirectStreamCallbacks::sendErrorToBridge() {
 
 void Client::DirectStreamCallbacks::onSendWindowAvailable() {
   ENVOY_LOG(debug, "[S{}] remote send window available", direct_stream_.stream_handle_);
-  bridge_callbacks_.on_send_window_available(streamIntel(), bridge_callbacks_.context);
+  stream_callbacks_.on_send_window_available_(streamIntel());
 }
 
 void Client::DirectStreamCallbacks::onCancel() {
@@ -367,7 +369,7 @@ void Client::DirectStreamCallbacks::onCancel() {
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_cancel_callback_latency_, http_client_.timeSource());
 
-  bridge_callbacks_.on_cancel(streamIntel(), finalStreamIntel(), bridge_callbacks_.context);
+  stream_callbacks_.on_cancel_(streamIntel(), finalStreamIntel());
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
@@ -427,30 +429,37 @@ void Client::DirectStreamCallbacks::latchError() {
   if (error_.has_value()) {
     return; // Only latch error once.
   }
-  error_ = envoy_error();
+  error_ = EnvoyError{};
 
   OptRef<RequestDecoder> request_decoder = direct_stream_.requestDecoder();
   if (!request_decoder) {
-    error_->message = envoy_nodata;
+    error_->message = "";
     return;
   }
   const auto& info = request_decoder->streamInfo();
 
+  std::vector<std::string> error_msg_details;
   if (info.responseCode().has_value()) {
     error_->error_code = Bridge::Utility::errorCodeFromLocalStatus(
         static_cast<Http::Code>(info.responseCode().value()));
+    error_msg_details.push_back(absl::StrCat("RESPONSE_CODE: ", info.responseCode().value()));
   } else if (StreamInfo::isStreamIdleTimeout(info)) {
     error_->error_code = ENVOY_REQUEST_TIMEOUT;
   } else {
     error_->error_code = ENVOY_STREAM_RESET;
   }
 
-  if (info.responseCodeDetails().has_value()) {
-    error_->message = Data::Utility::copyToBridgeData(info.responseCodeDetails().value());
-  } else {
-    error_->message = envoy_nodata;
+  error_msg_details.push_back(absl::StrCat("ERROR_CODE: ", error_->error_code));
+  if (std::string resp_code_details = info.responseCodeDetails().value_or("");
+      !resp_code_details.empty()) {
+    error_msg_details.push_back(absl::StrCat("DETAILS: ", std::move(resp_code_details)));
   }
-
+  // The format of the error message propogated to callbacks is:
+  //  RESPONSE_CODE: {RESPONSE_CODE}|ERROR_CODE: {ERROR_CODE}|DETAILS: {DETAILS}
+  // Where RESPONSE_CODE is the HTTP response code from StreamInfo::responseCode().
+  // ERROR_CODE is of the envoy_error_code_t enum type, and gets mapped from RESPONSE_CODE.
+  // DETAILS is the contents of StreamInfo::responseCodeDetails().
+  error_->message = absl::StrJoin(std::move(error_msg_details), "|");
   error_->attempt_count = info.attemptCount().value_or(0);
 }
 
@@ -515,13 +524,13 @@ void Client::DirectStream::dumpState(std::ostream&, int indent_level) const {
   ENVOY_LOG(error, "\n{}", ss.str());
 }
 
-void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks bridge_callbacks,
+void Client::startStream(envoy_stream_t new_stream_handle, EnvoyStreamCallbacks&& stream_callbacks,
                          bool explicit_flow_control) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream{new DirectStream(new_stream_handle, *this)};
   direct_stream->explicit_flow_control_ = explicit_flow_control;
   direct_stream->callbacks_ =
-      std::make_unique<DirectStreamCallbacks>(*direct_stream, bridge_callbacks, *this);
+      std::make_unique<DirectStreamCallbacks>(*direct_stream, std::move(stream_callbacks), *this);
 
   // Note: streams created by Envoy Mobile are tagged as is_internally_created. This means that
   // the Http::ConnectionManager _will not_ sanitize headers when creating a stream.

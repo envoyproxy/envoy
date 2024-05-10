@@ -3,7 +3,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -23,11 +23,11 @@ Http::LocalErrorStatus statusForOnLocalReply(const StreamDecoderFilter::LocalRep
 void toEnvoyHeaders(HeaderMap& envoy_result_headers, envoy_headers headers) {
   Envoy::Http::StatefulHeaderKeyFormatter& formatter = envoy_result_headers.formatter().value();
   for (envoy_map_size_t i = 0; i < headers.length; i++) {
-    std::string key = Data::Utility::copyToString(headers.entries[i].key);
+    std::string key = Bridge::Utility::copyToString(headers.entries[i].key);
     // Make sure the formatter knows the original case.
     formatter.processKey(key);
     envoy_result_headers.addCopy(LowerCaseString(key),
-                                 Data::Utility::copyToString(headers.entries[i].value));
+                                 Bridge::Utility::copyToString(headers.entries[i].value));
   }
   // The C envoy_headers struct can be released now because the headers have been copied.
   release_envoy_headers(headers);
@@ -66,8 +66,8 @@ envoy_headers toBridgeHeaders(const HeaderMap& header_map, absl::string_view alp
           const Envoy::Http::StatefulHeaderKeyFormatter& formatter = header_map.formatter().value();
           key_val = formatter.format(key_val);
         }
-        envoy_data key = Data::Utility::copyToBridgeData(key_val);
-        envoy_data value = Data::Utility::copyToBridgeData(header.value().getStringView());
+        envoy_data key = Bridge::Utility::copyToBridgeData(key_val);
+        envoy_data value = Bridge::Utility::copyToBridgeData(header.value().getStringView());
 
         transformed_headers.entries[transformed_headers.length] = {key, value};
         transformed_headers.length++;
@@ -75,8 +75,8 @@ envoy_headers toBridgeHeaders(const HeaderMap& header_map, absl::string_view alp
         return HeaderMap::Iterate::Continue;
       });
   if (!alpn.empty()) {
-    envoy_data key = Data::Utility::copyToBridgeData("x-envoy-upstream-alpn");
-    envoy_data value = Data::Utility::copyToBridgeData(alpn);
+    envoy_data key = Bridge::Utility::copyToBridgeData("x-envoy-upstream-alpn");
+    envoy_data value = Bridge::Utility::copyToBridgeData(alpn);
     transformed_headers.entries[transformed_headers.length] = {key, value};
     transformed_headers.length++;
   }

@@ -11,9 +11,9 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     repository = "@envoy",
     deps = [
+        "//library/common:engine_types_lib",
         "//library/common/bridge:utility_lib",
         "//library/common/buffer:bridge_fragment_lib",
-        "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/extensions/filters/http/local_error:local_error_filter_lib",
         "//library/common/extensions/filters/http/network_configuration:network_configuration_filter_lib",
@@ -52,23 +52,12 @@ envoy_cc_library(
     hdrs = ["header_utility.h"],
     repository = "@envoy",
     deps = [
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/buffer:buffer_interface",
         "@envoy//envoy/http:filter_interface",
         "@envoy//envoy/http:header_map_interface",
         "@envoy//source/common/http:header_map_lib",
         "@envoy//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
-    ],
-)
-
-envoy_cc_library(
-    name = "internal_headers_lib",
-    hdrs = ["headers.h"],
-    repository = "@envoy",
-    deps = [
-        "@envoy//envoy/http:header_map_interface",
-        "@envoy//source/common/singleton:const_singleton",
-        "@envoy//source/common/singleton:threadsafe_singleton",
     ],
 )

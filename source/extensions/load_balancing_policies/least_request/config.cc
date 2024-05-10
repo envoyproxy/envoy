@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.h"
 
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/load_balancing_policies/least_request/least_request_lb.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -82,7 +82,7 @@ envoy_cc_library(
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
         ":host_utility_lib",
-        ":load_balancer_lib",
+        ":load_balancer_context_base_lib",
         ":load_stats_reporter_lib",
         ":od_cds_api_lib",
         "//envoy/api:api_interface",
@@ -258,24 +258,10 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "load_balancer_lib",
-    srcs = ["load_balancer_impl.cc"],
-    hdrs = ["load_balancer_impl.h"],
+    name = "load_balancer_context_base_lib",
+    hdrs = ["load_balancer_context_base.h"],
     deps = [
-        ":scheduler_lib",
-        "//envoy/common:random_generator_interface",
-        "//envoy/runtime:runtime_interface",
-        "//envoy/stats:stats_interface",
         "//envoy/upstream:load_balancer_interface",
-        "//envoy/upstream:upstream_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/protobuf:utility_lib",
-        "//source/common/runtime:runtime_protos_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/least_request/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/random/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto",
     ],
 )
 
@@ -283,7 +269,7 @@ envoy_cc_library(
     name = "load_balancer_factory_base_lib",
     hdrs = ["load_balancer_factory_base.h"],
     deps = [
-        ":load_balancer_lib",
+        "//envoy/upstream:load_balancer_interface",
     ],
 )
 
@@ -442,8 +428,9 @@ envoy_cc_library(
     ],
     external_deps = ["abseil_synchronization"],
     deps = [
-        ":load_balancer_lib",
+        ":load_balancer_context_base_lib",
         ":resource_manager_lib",
+        ":scheduler_lib",
         ":upstream_factory_context_lib",
         "//envoy/event:timer_interface",
         "//envoy/local_info:local_info_interface",
@@ -516,7 +503,7 @@ envoy_cc_library(
     name = "cluster_factory_includes",
     hdrs = ["cluster_factory_impl.h"],
     deps = [
-        ":load_balancer_lib",
+        ":load_balancer_context_base_lib",
         ":outlier_detection_lib",
         ":resource_manager_lib",
         ":upstream_includes",

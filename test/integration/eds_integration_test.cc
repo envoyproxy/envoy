@@ -5,7 +5,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/type/v3/http.pb.h"
 
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
@@ -658,6 +658,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
     // We should see both hosts present in the member update callback.
     EXPECT_EQ(2, hosts_added.size());
     member_update_count++;
+    return absl::OkStatus();
   });
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;

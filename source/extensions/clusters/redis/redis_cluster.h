@@ -50,7 +50,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/upstream_impl.h"
