@@ -105,7 +105,7 @@ public:
   GrpcAccessLogger(
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
       Event::Dispatcher& dispatcher, Stats::Scope& scope,
-      std::optional<std::string> access_log_prefix,
+      absl::optional<std::string> access_log_prefix,
       std::unique_ptr<GrpcAccessLogClient<LogRequest, LogResponse>> client)
       : client_(std::move(client)), buffer_flush_interval_msec_(PROTOBUF_GET_MS_OR_DEFAULT(
                                         config, buffer_flush_interval, 1000)),
