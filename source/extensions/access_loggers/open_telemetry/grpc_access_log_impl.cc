@@ -48,7 +48,8 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
               *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                   "opentelemetry.proto.collector.logs.v1.LogsService.Export"),
               GrpcCommon::optionalRetryPolicy(config.common_config()), genOTelCallbacksFactory())),
-      stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, GRPC_LOG_STATS_PREFIX))}) {
+      stats_({ALL_GRPC_ACCESS_LOGGER_STATS(
+          POOL_COUNTER_PREFIX(scope, absl::StrCat(GRPC_LOG_STATS_PREFIX, config.stat_prefix())))}) {
   initMessageRoot(config, local_info);
 }
 
