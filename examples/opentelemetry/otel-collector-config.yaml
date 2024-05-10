@@ -22,19 +22,23 @@ processors:
 
 exporters:
   debug:
+  file/spans:
+    path: ./tmp/spans.json
+  file/logs:
+    path: ./tmp/logs.json
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [debug]
+      processors: [memory_limiter]
+      exporters: [debug, file/spans]
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter]
       exporters: [debug]
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [debug]
+      processors: [memory_limiter]
+      exporters: [debug, file/logs]
   extensions: [memory_ballast, zpages, health_check]

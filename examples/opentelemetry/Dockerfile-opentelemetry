@@ -3,7 +3,7 @@ RUN apk --update add curl
 
 FROM otel/opentelemetry-collector:latest@sha256:9e36620d6c2c193fcdb4a2a4d3c7b7a2cc15dd9d35dcf643727f90a1c43352e4
 COPY --from=otelc_curl / /
-COPY ./otel-collector-config.yaml /etc/otel-collector-config.yaml
+COPY ./otel-collector-config.yaml /etc/otelcol/config.yaml
 USER 0
-RUN chmod o+r /etc/otel-collector-config.yaml
+RUN chmod o+r /etc/otelcol/config.yaml
 USER nobody

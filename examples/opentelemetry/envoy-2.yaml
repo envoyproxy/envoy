@@ -69,8 +69,7 @@ static_resources:
                   value:
                     string_value: *service_name # Should match `service_name` in tracing section
               body:
-                string_value: |
-                  "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+                string_value: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
               attributes:
                 values:
                 - key: "url.path"
