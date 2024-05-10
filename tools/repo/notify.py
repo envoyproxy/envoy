@@ -33,6 +33,7 @@ ENVOY_REPO = "envoyproxy/envoy"
 CALENDAR = "https://calendar.google.com/calendar/ical/d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com/public/basic.ics"
 
 ISSUE_LINK = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+label%3Atriage"
+PR_LINK = "https://github.com/envoyproxy/envoy/pulls?q=is%3Apr+is%3Aopen+no%3Aassignee+draft%3Afalse+-author%3Aapp%2Fdependabot"
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
 
 
@@ -268,7 +269,9 @@ class RepoNotifier(runner.Runner):
                 channel='#envoy-maintainer-oncall', text=(f"Oncall now <@{oncall_handle}>"))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
-                text=(f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}"))
+                text=(
+                    f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}\n<{PR_LINK}|{PR_LINK}>"
+                ))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
                 text=(f"*Stalled PRs* (PRs with review out-SLO, please address)\n{stalled}"))
