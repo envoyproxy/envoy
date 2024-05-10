@@ -129,7 +129,7 @@ template <> HeaderMapImpl::StaticLookupTable<RequestHeaderMap>::StaticLookupTabl
       Headers::get().HostLegacy.get(), [handle](HeaderMapImpl& h) -> StaticLookupResponse {
         return {&h.inlineHeaders()[handle.value().it_->second], &handle.value().it_->first};
       });
-  compile(input);
+  compile(std::move(input));
 }
 
 template <> HeaderMapImpl::StaticLookupTable<RequestTrailerMap>::StaticLookupTable() {
