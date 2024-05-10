@@ -101,20 +101,13 @@ using ErrorsBucketPtr = std::unique_ptr<ErrorsBucket>;
 // Class defines a range of consecutive HTTP codes.
 class HTTPErrorCodesBucket : public TypedErrorsBucket<Upstream::Outlier::ErrorType::HTTP_CODE> {
 public:
-  // ErrorType type() const override { return ErrorType::HTTP_CODE; }
   HTTPErrorCodesBucket() = delete;
-  HTTPErrorCodesBucket(const std::string& name, uint64_t start, uint64_t end)
-      : name_(name), start_(start), end_(end) {}
-  const std::string& name() const { return name_; }
-  bool contains(uint64_t code) { return ((code >= start_) && (code <= end_)); }
+  HTTPErrorCodesBucket(uint64_t start, uint64_t end) : start_(start), end_(end) {}
   bool matches(const TypedError<Upstream::Outlier::ErrorType::HTTP_CODE>&) const override;
-  // bool matches(const HttpCode&) const override;
 
   virtual ~HTTPErrorCodesBucket() {}
 
 private:
-  // TODO: can I move name_ to base class
-  std::string name_;
   uint64_t start_, end_;
 };
 
@@ -122,14 +115,8 @@ private:
 class LocalOriginEventsBucket
     : public TypedErrorsBucket<Upstream::Outlier::ErrorType::LOCAL_ORIGIN> {
 public:
-  LocalOriginEventsBucket() = delete;
-  LocalOriginEventsBucket(const std::string& name) : name_(name) {}
-  const std::string& name() const { return name_; }
+  LocalOriginEventsBucket() = default;
   bool matches(const TypedError<Upstream::Outlier::ErrorType::LOCAL_ORIGIN>&) const override;
-
-private:
-  // TODO: can I move name_ to base class
-  std::string name_;
 };
 
 // Class groups error buckets. Buckets may be of different types.

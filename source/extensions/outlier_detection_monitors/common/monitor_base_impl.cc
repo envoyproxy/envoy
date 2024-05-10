@@ -71,15 +71,16 @@ void Monitor::reportResult(const Error& error) {
   }
 }
 
+// TODO: make it Monitor's method
 void processBucketsConfig(
     Monitor& monitor,
     const envoy::extensions::outlier_detection_monitors::common::v3::ErrorBuckets& config) {
   for (const auto& http_bucket : config.http_errors()) {
-    monitor.buckets_.push_back(std::make_unique<HTTPErrorCodesBucket>(
-        "not-needed", http_bucket.range().start(), http_bucket.range().end()));
+    monitor.buckets_.push_back(std::make_unique<HTTPErrorCodesBucket>(http_bucket.range().start(),
+                                                                      http_bucket.range().end()));
   }
-  if (config.local_origin_errors().size() > 0) {
-    monitor.buckets_.push_back(std::make_unique<LocalOriginEventsBucket>("not-needed"));
+  for (auto i = 0; i < config.local_origin_errors().size(); i++) {
+    monitor.buckets_.push_back(std::make_unique<LocalOriginEventsBucket>());
   }
 }
 } // namespace Outlier

@@ -23,7 +23,7 @@ TEST(MonitorBaseTest, HTTPCodeError) {
 }
 
 TEST(MonitorBaseTest, HTTPCodeErrorBucket) {
-  HTTPErrorCodesBucket bucket("not-needed", 400, 404);
+  HTTPErrorCodesBucket bucket(400, 404);
   ASSERT_TRUE(bucket.matchType(HttpCode(200)));
   ASSERT_FALSE(bucket.match(HttpCode(200)));
   ASSERT_FALSE(bucket.match(HttpCode(500)));
@@ -46,7 +46,7 @@ TEST(MonitorBaseTest, LocalOriginError) {
 TEST(MonitorBaseTest, LocalOriginErrorBucket) {
   // Local origin bucket should "catch" all events except ones indicating
   // success.
-  LocalOriginEventsBucket bucket("not-needed");
+  LocalOriginEventsBucket bucket;
 
   // Check that event and bucket have matching types.
   ASSERT_TRUE(bucket.matchType(LocalOriginEvent(Result::ExtOriginRequestSuccess)));
@@ -72,19 +72,12 @@ public:
 
 class TestBucket : public TypedErrorsBucket<Upstream::Outlier::ErrorType::TEST> {
 public:
-  TestBucket() = delete;
-  TestBucket(const std::string& name) : name_(name) {}
-  const std::string& name() const { return name_; }
-  // bool matches(const TypedError<Upstream::Outlier::ErrorType::LOCAL_ORIGIN>&) const override;
-
-private:
-  // TODO: can I move name_ to base class
-  std::string name_;
+  TestBucket() = default;
 };
 
 class MockBucket : public TestBucket {
 public:
-  MockBucket(const std::string& name) : TestBucket(name) {}
+  MockBucket() = default;
   MOCK_METHOD(bool, matches, (const TypedError<Upstream::Outlier::ErrorType::TEST>&), (const));
 };
 
@@ -95,7 +88,7 @@ protected:
   }
 
   MockBucket* addBucket() {
-    auto bucket = std::make_unique<MockBucket>(std::string(bucket_name_));
+    auto bucket = std::make_unique<MockBucket>();
     // Store the underlying pointer to the bucket.
     auto bucket_raw_ptr = bucket.get();
 
@@ -108,7 +101,6 @@ protected:
   void addBucket2() { bucket2_ = addBucket(); }
 
   static constexpr absl::string_view monitor_name_ = "mock-monitor";
-  static constexpr absl::string_view bucket_name_ = "test-bucket1";
   static constexpr uint32_t enforcing_ = 43;
   MockBucket* bucket1_;
   MockBucket* bucket2_;
@@ -219,7 +211,6 @@ TEST_F(MonitorTest, TwoBucketsFirstMatching) {
   EXPECT_CALL(*bucket1_, matches(_)).WillOnce(Return(true));
   // Matching the second bucket should be skipped.
   EXPECT_CALL(*bucket2_, matches(_)).Times(0);
-  ;
   EXPECT_CALL(*monitor_, onError).WillOnce(Return(false));
 
   monitor_->reportResult(ResultForTest());
