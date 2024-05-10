@@ -87,7 +87,7 @@ public:
     size_t longest = initial.back().first.size();
     table_.resize(longest + 1);
     auto range_start = initial.begin();
-    // Populate the subnodes for each length of key that exists.
+    // Populate the sub-nodes for each length of key that exists.
     while (range_start != initial.end()) {
       // Find the first key whose length differs from the current key length.
       // Everything in between is keys with the same length.
@@ -145,6 +145,7 @@ private:
       return a.first[best.index] < b.first[best.index];
     });
     auto range_start = node_contents.begin();
+    // Populate the sub-nodes for each character-branch.
     while (range_start != node_contents.end()) {
       // Find the first key whose character at position [best.index] differs from the
       // character of the current range.
