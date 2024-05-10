@@ -443,17 +443,17 @@ void Client::DirectStreamCallbacks::latchError() {
   if (info.responseCode().has_value()) {
     error_->error_code = Bridge::Utility::errorCodeFromLocalStatus(
         static_cast<Http::Code>(info.responseCode().value()));
-    error_msg_details.push_back(absl::StrCat(info.responseCode().value()));
+    error_msg_details.push_back(absl::StrCat("RESPONSE_CODE: ", info.responseCode().value()));
   } else if (StreamInfo::isStreamIdleTimeout(info)) {
     error_->error_code = ENVOY_REQUEST_TIMEOUT;
   } else {
     error_->error_code = ENVOY_STREAM_RESET;
   }
 
-  error_msg_details.push_back(absl::StrCat(error_->error_code));
+  error_msg_details.push_back(absl::StrCat("ERROR_CODE: ", error_->error_code));
   if (std::string resp_code_details = info.responseCodeDetails().value_or("");
       !resp_code_details.empty()) {
-    error_msg_details.push_back(std::move(resp_code_details));
+    error_msg_details.push_back(absl::StrCat("DETAILS: ", std::move(resp_code_details)));
   }
   // The format of the error message propogated to callbacks is:
   //  {RESPONSE_CODE}|{ERROR_CODE}|{DETAILS}

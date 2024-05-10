@@ -445,7 +445,8 @@ TEST_P(ClientTest, EnvoyLocalError) {
   stream_callbacks.on_error_ = [&](EnvoyError error, envoy_stream_intel,
                                    envoy_final_stream_intel) -> void {
     EXPECT_EQ(error.error_code, ENVOY_CONNECTION_FAILURE);
-    EXPECT_THAT(error.message, ContainsRegex("503|2|failed miserably"));
+    EXPECT_THAT(error.message,
+                ContainsRegex("RESPONSE_CODE: 503|ERROR_CODE: 2|DETAILS: failed miserably"));
     EXPECT_EQ(error.attempt_count, 123);
     callbacks_called.on_error_calls_++;
   };
@@ -520,7 +521,7 @@ TEST_P(ClientTest, RemoteResetAfterStreamStart) {
   stream_callbacks.on_error_ = [&](EnvoyError error, envoy_stream_intel,
                                    envoy_final_stream_intel) -> void {
     EXPECT_EQ(error.error_code, ENVOY_STREAM_RESET);
-    EXPECT_THAT(error.message, ContainsRegex("1"));
+    EXPECT_THAT(error.message, ContainsRegex("ERROR_CODE: 1"));
     EXPECT_EQ(error.attempt_count, 0);
     callbacks_called.on_error_calls_++;
   };
