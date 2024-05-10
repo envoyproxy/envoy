@@ -42,6 +42,8 @@ create_patches_for_version () {
              PATCH_COMMIT="$last_commit" \
              PATCH_VERSION="$version" \
                  envsubst < "$PATCH_README_TPL" > "$patch_readme"
+    echo "-----------------------"
+    cat "$patch_readme"
     echo
     popd > /dev/null
 }
