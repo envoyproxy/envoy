@@ -456,7 +456,7 @@ void Client::DirectStreamCallbacks::latchError() {
     error_msg_details.push_back(absl::StrCat("DETAILS: ", std::move(resp_code_details)));
   }
   // The format of the error message propogated to callbacks is:
-  //  {RESPONSE_CODE}|{ERROR_CODE}|{DETAILS}
+  //  RESPONSE_CODE: {RESPONSE_CODE}|ERROR_CODE: {ERROR_CODE}|DETAILS: {DETAILS}
   // Where RESPONSE_CODE is the HTTP response code from StreamInfo::responseCode().
   // ERROR_CODE is of the envoy_error_code_t enum type, and gets mapped from RESPONSE_CODE.
   // DETAILS is the contents of StreamInfo::responseCodeDetails().
