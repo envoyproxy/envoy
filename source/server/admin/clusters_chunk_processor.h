@@ -60,10 +60,9 @@ private:
  * herein. See the Envoy::Json::Streamer implementation for details.
  */
 struct ClustersJsonContext {
-  ClustersJsonContext(std::unique_ptr<Json::Streamer> streamer,
-                      std::reference_wrapper<Buffer::Instance> buffer,
+  ClustersJsonContext(std::unique_ptr<Json::Streamer> streamer, Buffer::Instance& buffer,
                       Json::Streamer::MapPtr root_map, Json::Streamer::ArrayPtr clusters)
-      : streamer_(std::move(streamer)), buffer_(buffer.get()), root_map_(std::move(root_map)),
+      : streamer_(std::move(streamer)), buffer_(buffer), root_map_(std::move(root_map)),
         clusters_(std::move(clusters)) {}
   std::unique_ptr<Json::Streamer> streamer_;
   Buffer::Instance& buffer_;
