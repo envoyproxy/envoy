@@ -64,7 +64,7 @@ create_patches () {
 
 get_version () {
     pushd "${WORKSPACE_ROOT}/envoy" > /dev/null || exit 1
-    git show envoy/main:VERSION.txt
+    git show origin/envoy/main:VERSION.txt
     popd > /dev/null
 }
 
