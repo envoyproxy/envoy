@@ -11,7 +11,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     repository = "@envoy",
     deps = [
-        "//library/common/thread:lock_guard_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/event:deferred_deletable",
         "@envoy//envoy/event:dispatcher_interface",
