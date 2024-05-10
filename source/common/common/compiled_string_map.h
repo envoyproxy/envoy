@@ -46,7 +46,7 @@ template <class Value> class CompiledStringMap {
   using FindFn = std::function<Value(const absl::string_view&)>;
 
 public:
-  using KV = std::pair<std::string, Value>;
+  using KV = std::pair<absl::string_view, Value>;
   /**
    * Returns the value with a matching key, or the default value
    * (typically nullptr) if the key was not present.
@@ -62,38 +62,48 @@ public:
    * Construct the lookup table. This is a somewhat slow multi-pass
    * operation - using this structure is not recommended unless the
    * table is initialize-once, use-many.
-   * @param initial a vector of key->value pairs.
+   * @param initial a vector of key->value pairs. This is taken by value because
+   *                we're going to modify it. If the caller still wants the original
+   *                then it can be copied in, if not it can be moved in.
    */
   void compile(std::vector<KV> initial) {
     if (initial.empty()) {
       return;
     }
-    size_t longest = 0;
-    for (const KV& pair : initial) {
-      longest = std::max(pair.first.size(), longest);
-    }
-    table_.resize(longest + 1);
     std::sort(initial.begin(), initial.end(),
               [](const KV& a, const KV& b) { return a.first.size() < b.first.size(); });
+    size_t longest = initial.back().first.size();
+    table_.resize(longest + 1);
     auto it = initial.begin();
+    // Initialize the subnodes for each length of key.
     for (size_t i = 0; i <= longest; i++) {
+      // The range for the current length starts at the end of the range
+      // for the previous length.
       auto start = it;
       while (it != initial.end() && it->first.size() == i) {
         it++;
       }
-      if (it != start) {
-        std::vector<KV> node_contents;
-        node_contents.reserve(it - start);
-        std::copy(start, it, std::back_inserter(node_contents));
-        table_[i] = createEqualLengthNode(node_contents);
+      if (it == start) {
+        // If there are zero nodes for this length, just leave the
+        // node's function pointer as a nullptr.
+        continue;
       }
+      std::vector<KV> node_contents;
+      node_contents.reserve(it - start);
+      std::copy(start, it, std::back_inserter(node_contents));
+      table_[i] = createEqualLengthNode(node_contents);
     }
   }
 
 private:
+  /*
+   * @param node_contents the set of key-value pairs that will
+   */
   static FindFn createEqualLengthNode(std::vector<KV> node_contents) {
     if (node_contents.size() == 1) {
-      return [pair = node_contents[0]](const absl::string_view& key) -> Value {
+      return [pair = std::make_pair<std::string, Value>(std::string{node_contents[0].first},
+                                                        std::move(node_contents[0].second))](
+                 const absl::string_view& key) -> Value {
         if (key != pair.first) {
           return {};
         }

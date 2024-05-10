@@ -157,10 +157,9 @@ protected:
       std::vector<KV> input;
       input.reserve(size_);
       for (const auto& header : headers) {
-        input.emplace_back(std::string{header.first.get()},
-                           [&header](HeaderMapImpl& h) -> StaticLookupResponse {
-                             return {&h.inlineHeaders()[header.second], &header.first};
-                           });
+        input.emplace_back(header.first.get(), [&header](HeaderMapImpl& h) -> StaticLookupResponse {
+          return {&h.inlineHeaders()[header.second], &header.first};
+        });
       }
       return input;
     }
