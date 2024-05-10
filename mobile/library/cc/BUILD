@@ -82,7 +82,7 @@ envoy_cc_library(
         "//library/common:engine_types_lib",
         "//library/common:internal_engine_lib_no_stamp",
         "//library/common/api:c_types",
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
         "//library/common/extensions/key_value/platform:config",
         "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/http:header_map_lib",

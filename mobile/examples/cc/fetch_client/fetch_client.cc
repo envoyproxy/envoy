@@ -11,7 +11,7 @@
 
 #include "library/cc/engine_builder.h"
 #include "library/cc/stream.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/types/c_types.h"
 

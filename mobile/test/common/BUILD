@@ -22,7 +22,7 @@ envoy_cc_test(
     deps = [
         "//library/cc:engine_builder_lib",
         "//library/common:internal_engine_lib_no_stamp",
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
         "//test/common/integration:test_server_lib",
