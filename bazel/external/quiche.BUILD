@@ -2363,8 +2363,14 @@ envoy_quic_cc_library(
 
 envoy_quic_cc_library(
     name = "quic_core_connection_lib",
-    srcs = ["quiche/quic/core/quic_connection.cc"],
-    hdrs = ["quiche/quic/core/quic_connection.h"],
+    srcs = [
+        "quiche/quic/core/quic_connection.cc",
+        "quiche/quic/core/quic_connection_alarms.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/quic_connection.h",
+        "quiche/quic/core/quic_connection_alarms.h",
+    ],
     deps = [
         ":quic_core_alarm_factory_lib",
         ":quic_core_alarm_lib",
