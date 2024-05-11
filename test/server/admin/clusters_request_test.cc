@@ -22,6 +22,7 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 using testing::Const;
 using testing::NiceMock;
@@ -488,5 +489,6 @@ TEST(Json, VerifyArrayPtrDestructionTerminatesJsonArray) {
   EXPECT_EQ(request_buffer.toString(), "[1,2]");
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

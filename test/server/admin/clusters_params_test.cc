@@ -5,6 +5,7 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 struct ParamsCase {
   std::string url_;
@@ -37,5 +38,6 @@ INSTANTIATE_TEST_SUITE_P(
         {"localhost:1337/clusters?format=json", ClustersParams::Format::Json, Http::Code::OK},
     }));
 
+} // namespace
 } // namespace Server
 } // namespace Envoy
