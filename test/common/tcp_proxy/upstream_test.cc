@@ -609,11 +609,8 @@ TEST_F(CombinedUpstreamTest, InvalidUpgradeWithNon200) {
 
 TEST_F(CombinedUpstreamTest, ReadDisable) {
   this->setup();
-  // EXPECT_CALL(*this->mock_router_upstream_request_, onAboveWriteBufferHighWatermark());
   EXPECT_TRUE(this->upstream_->readDisable(true));
 
-  //   EXPECT_CALL(*this->mock_router_upstream_request_,
-  //   onAboveWriteBufferHighWatermark()).Times(0);
   EXPECT_TRUE(this->upstream_->readDisable(false));
 
   // New upstream with no encoder.
@@ -629,7 +626,6 @@ TEST_F(CombinedUpstreamTest, AddBytesSentCallbackForCoverage) {
 
 TEST_F(CombinedUpstreamTest, DownstreamDisconnect) {
   this->setup();
-  // EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
   EXPECT_CALL(this->callbacks_, onEvent(_)).Times(0);
   EXPECT_TRUE(this->upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose) == nullptr);
 }
@@ -668,7 +664,6 @@ TEST_F(CombinedUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
 }
 TEST_F(CombinedUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->setup();
-  // EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
   this->upstream_->doneWriting();
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
@@ -680,7 +675,6 @@ TEST_F(CombinedUpstreamTest, UpstreamTrailersDontPropagateFinDownstreamWhenFeatu
       {{"envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers",
         "false"}});
   this->setup();
-  // EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
   upstream_->doneWriting();
   EXPECT_CALL(callbacks_, onUpstreamData(_, _)).Times(0);
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
