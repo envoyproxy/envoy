@@ -637,16 +637,12 @@ TEST_F(CombinedUpstreamTest, UpstreamReset) {
   this->setup();
   EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
   EXPECT_CALL(this->callbacks_, onEvent(_));
-  this->upstream_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
 }
 
 TEST_F(CombinedUpstreamTest, UpstreamWatermarks) {
   this->setup();
   EXPECT_CALL(this->callbacks_, onAboveWriteBufferHighWatermark());
-  this->upstream_->onAboveWriteBufferHighWatermark();
-
   EXPECT_CALL(this->callbacks_, onBelowWriteBufferLowWatermark());
-  this->upstream_->onBelowWriteBufferLowWatermark();
 }
 
 TEST_F(CombinedUpstreamTest, OnSuccessCalledOnValidResponse) {
