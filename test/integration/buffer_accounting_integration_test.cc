@@ -641,6 +641,24 @@ public:
         });
   }
 
+  void runTest() {
+    config_helper_.setBufferLimits(16384, 131072);
+    initialize();
+
+    write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+
+    tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+
+    write_matcher_->setWriteReturnsEgain();
+    ASSERT_TRUE(tcp_client_->write(std::string(524288, 'a'), false));
+    test_server_->waitForCounterEq("tcp.tcp_stats.downstream_flow_control_paused_reading_total", 1);
+    tcp_client_->close();
+  }
+
 protected:
   IntegrationTcpClientPtr tcp_client_;
 };
@@ -654,20 +672,13 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(TcpTunnelingWatermarkIntegrationTest, MultipleReadDisableCallsIncrementsStatsOnce) {
   config_helper_.setBufferLimits(16384, 131072);
-  initialize();
+  runTest();
+}
 
-  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
-
-  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-
-  write_matcher_->setWriteReturnsEgain();
-  ASSERT_TRUE(tcp_client_->write(std::string(524288, 'a'), false));
-  test_server_->waitForCounterEq("tcp.tcp_stats.downstream_flow_control_paused_reading_total", 1);
-  tcp_client_->close();
+TEST_P(TcpTunnelingWatermarkIntegrationTest,
+       MultipleReadDisableCallsIncrementsStatsOnceWithUpstreamFilters) {
+  config_helper_.addRuntimeOverride(Runtime::upstream_http_filters_with_tcp_proxy, "true");
+  runTest();
 }
 
 class Http2OverloadManagerIntegrationTest : public Http2BufferWatermarksTest,
