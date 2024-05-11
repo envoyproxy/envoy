@@ -13,8 +13,8 @@ public:
   ~MockUpstreamRequest() override;
   MOCK_METHOD(void, acceptHeadersFromRouter, (bool end_stream), (override));
   MOCK_METHOD(void, acceptDataFromRouter, (Buffer::Instance & data, bool end_stream), (override));
-  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, (), (override));
-  MOCK_METHOD(void, resetStream, (), (override));
+  // MOCK_METHOD(void, onAboveWriteBufferHighWatermark, (), (override));
+  // MOCK_METHOD(void, resetStream, (), (override));
 };
 
 } // namespace Router
