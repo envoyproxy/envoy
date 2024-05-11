@@ -1,6 +1,6 @@
 #include "library/jni/android_network_utility.h"
 
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 #include "library/jni/jni_support.h"
 #include "library/jni/jni_utility.h"
 #include "library/jni/types/exception.h"

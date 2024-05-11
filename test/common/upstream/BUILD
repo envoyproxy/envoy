@@ -272,9 +272,12 @@ envoy_cc_test(
         ":utility_lib",
         "//source/common/common:random_generator_lib",
         "//source/common/network:utility_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/load_balancing_policies/least_request:config",
+        "//source/extensions/load_balancing_policies/random:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks:common_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
@@ -297,7 +300,7 @@ envoy_cc_test_library(
     deps = [
         ":load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//test/fuzz:random_lib",
         "//test/mocks:common_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -336,6 +339,7 @@ envoy_cc_fuzz_test(
         ":load_balancer_fuzz_proto_cc_proto",
         ":random_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
+        "//source/extensions/load_balancing_policies/random:config",
     ],
 )
 
@@ -347,9 +351,12 @@ envoy_cc_test(
         "//source/common/common:random_generator_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/load_balancing_policies/least_request:config",
+        "//source/extensions/load_balancing_policies/random:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_set_mocks",
@@ -463,18 +470,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "bounded_load_hlb_test",
-    srcs = ["bounded_load_hlb_test.cc"],
-    deps = [
-        ":utility_lib",
-        "//source/common/upstream:thread_aware_lb_lib",
-        "//source/common/upstream:upstream_includes",
-        "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-    ],
-)
-
 envoy_cc_benchmark_binary(
     name = "load_balancer_benchmark",
     srcs = ["load_balancer_benchmark.cc"],
@@ -485,8 +480,11 @@ envoy_cc_benchmark_binary(
         "//source/common/common:random_generator_lib",
         "//source/common/memory:stats_lib",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/load_balancing_policies/least_request:config",
         "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:printers_lib",
@@ -719,6 +717,7 @@ envoy_cc_test_library(
     deps = [
         ":load_balancer_fuzz_lib",
         ":zone_aware_load_balancer_fuzz_proto_cc_proto",
+        "//source/extensions/load_balancing_policies/common:load_balancer_lib",
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:priority_set_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -742,6 +741,7 @@ envoy_cc_fuzz_test(
         ":round_robin_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
         ":zone_aware_load_balancer_fuzz_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/fuzz:utility_lib",
     ],
 )
@@ -763,6 +763,7 @@ envoy_cc_fuzz_test(
         ":least_request_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
         ":zone_aware_load_balancer_fuzz_lib",
+        "//source/extensions/load_balancing_policies/least_request:config",
     ],
 )
 

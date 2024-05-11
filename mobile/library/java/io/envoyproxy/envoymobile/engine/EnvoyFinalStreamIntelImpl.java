@@ -3,7 +3,7 @@ package io.envoyproxy.envoymobile.engine;
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
 import androidx.annotation.VisibleForTesting;
 
-@VisibleForTesting
+// This class is made public for access in tests.
 public class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
   private final long streamStartMs;
   private final long dnsStartMs;

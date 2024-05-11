@@ -15,7 +15,6 @@
 #if defined(__APPLE__)
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
 #endif
-
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
@@ -148,6 +147,13 @@ EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
   network_thread_priority_ = thread_priority;
   return *this;
 }
+
+#if !defined(__APPLE__)
+EngineBuilder& EngineBuilder::setUseCares(bool use_cares) {
+  use_cares_ = use_cares;
+  return *this;
+}
+#endif
 
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
@@ -322,6 +328,11 @@ EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) 
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setUseGroIfAvailable(bool use_gro_if_available) {
+  use_gro_if_available_ = use_gro_if_available;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on) {
   enable_drain_post_dns_refresh_ = drain_post_dns_refresh_on;
   return *this;
@@ -358,6 +369,11 @@ EngineBuilder& EngineBuilder::setXds(XdsBuilder xds_builder) {
   return *this;
 }
 #endif
+
+EngineBuilder& EngineBuilder::setUpstreamTlsSni(std::string sni) {
+  upstream_tls_sni_ = std::move(sni);
+  return *this;
+}
 
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
@@ -407,9 +423,6 @@ EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
 #endif
 
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
-  // The yaml utilities have non-relevant thread asserts.
-  Thread::SkipAsserts skip;
-
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
       std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
@@ -470,17 +483,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   if (enable_http3_) {
 #ifdef ENVOY_ENABLE_QUIC
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig cache_config;
-    cache_config.mutable_alternate_protocols_cache_options()->set_name(
-        "default_alternate_protocols_cache");
-    for (const auto& [host, port] : quic_hints_) {
-      auto* entry =
-          cache_config.mutable_alternate_protocols_cache_options()->add_prepopulated_entries();
-      entry->set_hostname(host);
-      entry->set_port(port);
-    }
-    for (const auto& suffix : quic_suffixes_) {
-      cache_config.mutable_alternate_protocols_cache_options()->add_canonical_suffixes(suffix);
-    }
     auto* cache_filter = hcm->add_http_filters();
     cache_filter->set_name("alternate_protocols_cache");
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
@@ -577,8 +579,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 #else
   envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
       resolver_config;
-  dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-      "envoy.network.dns_resolver.getaddrinfo");
+  if (use_cares_) {
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.cares");
+  } else {
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.getaddrinfo");
+  }
 #endif
   dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
       resolver_config);
@@ -612,6 +619,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Basic TLS config.
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_socket;
+  if (!upstream_tls_sni_.empty()) {
+    tls_socket.set_sni(upstream_tls_sni_);
+  }
   tls_socket.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
   auto* validation = tls_socket.mutable_common_tls_context()->mutable_validation_context();
@@ -833,6 +843,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   list->add_patterns()->set_prefix("http.hcm.decompressor.");
   list->add_patterns()->set_prefix("pulse.");
   list->add_patterns()->set_prefix("runtime.load_success");
+  list->add_patterns()->set_prefix("dns_cache");
   list->add_patterns()->mutable_safe_regex()->set_regex(
       "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
       "total)");
@@ -877,6 +888,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         guard_and_value.second);
   }
   (*reloadable_features.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
+  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(
+      use_gro_if_available_);
   ProtobufWkt::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
   // TODO(abeyad): This runtime flag is set because https://github.com/envoyproxy/envoy/pull/32370

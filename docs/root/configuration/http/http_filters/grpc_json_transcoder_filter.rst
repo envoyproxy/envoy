@@ -104,3 +104,5 @@ gRPC or RESTful JSON requests to localhost:51051.
 
 .. literalinclude:: _include/grpc-transcoder-filter.yaml
     :language: yaml
+    :linenos:
+    :caption: :download:`grpc-transcoder-filter.yaml <_include/grpc-transcoder-filter.yaml>`

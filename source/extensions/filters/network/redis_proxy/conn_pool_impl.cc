@@ -37,20 +37,7 @@ const Common::Redis::RespValue& getRequest(const RespVariant& request) {
 static uint16_t default_port = 6379;
 
 bool isClusterProvidedLb(const Upstream::ClusterInfo& info) {
-  const auto lb_type = info.lbType();
-  bool cluster_provided_lb = lb_type == Upstream::LoadBalancerType::ClusterProvided;
-  if (lb_type == Upstream::LoadBalancerType::LoadBalancingPolicyConfig) {
-    auto* typed_lb_factory = info.loadBalancerFactory();
-    if (typed_lb_factory == nullptr) {
-      // This should never happen because if there is no valid factory, the cluster should
-      // have been rejected during config load and this code should never be reached.
-      IS_ENVOY_BUG("ClusterInfo should contain a valid factory");
-      return false;
-    }
-    cluster_provided_lb =
-        typed_lb_factory->name() == "envoy.load_balancing_policies.cluster_provided";
-  }
-  return cluster_provided_lb;
+  return info.loadBalancerFactory().name() == "envoy.load_balancing_policies.cluster_provided";
 }
 
 } // namespace
@@ -161,9 +148,10 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
       [this](const std::vector<Upstream::HostSharedPtr>& hosts_added,
-             const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> void {
+             const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> absl::Status {
         onHostsAdded(hosts_added);
         onHostsRemoved(hosts_removed);
+        return absl::OkStatus();
       });
 
   ASSERT(host_address_map_.empty());

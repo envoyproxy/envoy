@@ -43,20 +43,20 @@ static_resources:
         auto_config:
           http2_protocol_options: {}
         http_filters:
-          - name: envoy.filters.http.aws_request_signing
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
-              service_name: vpc-lattice-svcs
-              region: '*'
-              signing_algorithm: AWS_SIGV4A
-              use_unsigned_payload: true
-              match_excluded_headers:
-              - prefix: x-envoy
-              - prefix: x-forwarded
-              - exact: x-amzn-trace-id
-          - name: envoy.filters.http.upstream_codec
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec
+        - name: envoy.filters.http.aws_request_signing
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
+            service_name: vpc-lattice-svcs
+            region: '*'
+            signing_algorithm: AWS_SIGV4A
+            use_unsigned_payload: true
+            match_excluded_headers:
+            - prefix: x-envoy
+            - prefix: x-forwarded
+            - exact: x-amzn-trace-id
+        - name: envoy.filters.http.upstream_codec
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:

@@ -65,6 +65,10 @@
 #include "source/common/tls/cert_validator/default_validator.h"
 #endif
 
+#if !defined(__APPLE__)
+#include "source/extensions/network/dns_resolver/cares/dns_impl.h"
+#endif
+
 namespace Envoy {
 
 void ExtensionRegistry::registerFactories() {
@@ -156,6 +160,9 @@ void ExtensionRegistry::registerFactories() {
   // Envoy Mobile uses the GetAddrInfo resolver for DNS lookups on android by default.
   // This could be compiled out for iOS.
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
+#if !defined(__APPLE__)
+  Network::forceRegisterCaresDnsResolverFactory();
+#endif
 
   Network::Address::forceRegisterIpResolver();
 
