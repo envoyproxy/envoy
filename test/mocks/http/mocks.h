@@ -599,6 +599,8 @@ public:
     ON_CALL(*this, preserveExternalRequestId()).WillByDefault(testing::Return(false));
     ON_CALL(*this, alwaysSetRequestIdInResponse()).WillByDefault(testing::Return(false));
     ON_CALL(*this, schemeToSet()).WillByDefault(testing::ReturnRef(scheme_));
+    ON_CALL(*this, shouldSchemeMatchUpstream())
+        .WillByDefault(testing::ReturnPointee(&scheme_match_upstream_));
     ON_CALL(*this, addProxyProtocolConnectionState()).WillByDefault(testing::Return(true));
   }
 
@@ -640,6 +642,7 @@ public:
   MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
               (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, schemeToSet, (), (const));
+  MOCK_METHOD(bool, shouldSchemeMatchUpstream, (), (const));
   MOCK_METHOD(ConnectionManagerStats&, stats, ());
   MOCK_METHOD(ConnectionManagerTracingStats&, tracingStats, ());
   MOCK_METHOD(bool, useRemoteAddress, (), (const));
@@ -688,6 +691,7 @@ public:
       std::make_unique<DefaultInternalAddressConfig>();
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_;
   absl::optional<std::string> scheme_;
+  bool scheme_match_upstream_;
 };
 
 class MockReceivedSettings : public ReceivedSettings {

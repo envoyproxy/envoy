@@ -5806,15 +5806,28 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
 TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   TestScopedRuntime scoped_runtime;
 
-  // With no scheme and x-forwarded-proto, set scheme based on encryption level
+  // With upstream scheme, set scheme based on upstream encryption level
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false);
+    FilterUtility::setUpstreamScheme(headers, false, false, true);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, false, true, true);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // With no scheme and x-forwarded-proto, set scheme based on downstream
+  // encryption level
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, false, false, false);
+    EXPECT_EQ("http", headers.get_(":scheme"));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, true, false, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
@@ -5822,7 +5835,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto("foo");
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, true, false, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
@@ -5830,7 +5843,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, true, false, false);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
 
@@ -5839,7 +5852,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
     Http::TestRequestHeaderMapImpl headers;
     headers.setScheme(Http::Headers::get().SchemeValues.Https);
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
-    FilterUtility::setUpstreamScheme(headers, false);
+    FilterUtility::setUpstreamScheme(headers, false, false, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 }
