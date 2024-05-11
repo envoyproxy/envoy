@@ -122,6 +122,11 @@ public:
   OTelSpanKind spankind() const { return span_.kind(); }
 
   /**
+   * @return the operation name set on the span
+   */
+  std::string name() const { return span_.name(); }
+
+  /**
    * Sets the span's id.
    */
   void setId(const absl::string_view& span_id_hex) {
