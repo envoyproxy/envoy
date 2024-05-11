@@ -71,7 +71,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: localhost
+                address: http
                 port_value: 8080
   - name: datadog_agent
     connect_timeout: 1s
@@ -84,7 +84,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: localhost
+                address: dd-agent
                 port_value: 8126
 
 admin:

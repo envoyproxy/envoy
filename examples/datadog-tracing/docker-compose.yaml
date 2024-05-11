@@ -1,6 +1,15 @@
 version: "3.2"
 
 services:
+  envoy:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+    depends_on:
+    - dd-agent
+    - http
+    ports:
+    - "${PORT_PROXY:-10000}:1337"
 
   # `agent` is the Datadog Agent to which traces are sent.
   # `agent` needs an API key set in the environment as the
@@ -14,6 +23,7 @@ services:
     environment:
     - DOCKER_HOST
     - DD_API_KEY
+    - DD_SITE
     - DD_APM_ENABLED=true
     - DD_LOG_LEVEL=ERROR
     ports:
