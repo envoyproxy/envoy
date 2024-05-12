@@ -733,7 +733,7 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucket) {
   int fill_one_token_in_ms = fill_interval_sec / tokens_per_fill * 1000;
   for (int i = 0; i < 10; ++i) {
     // We advance time by 2s so that token bucket can be refilled.
-    if (i == 4 || i = 6) {
+    if (i == 4 || i == 6) {
       simTime().advanceTimeAndRun(std::chrono::milliseconds(fill_one_token_in_ms), *dispatcher_,
                                   Envoy::Event::Dispatcher::RunType::NonBlock);
     }
