@@ -248,6 +248,8 @@ void CheckRequestUtils::createHttpCheck(
   // *cb->connection(), callbacks->streamInfo() and callbacks->decodingBuffer() are not qualified as
   // const.
   auto* cb = const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
+  const std::string server_name(cb->connection()->requestedServerName());
+
   setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false,
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), EMPTY_STRING, true,
@@ -256,8 +258,14 @@ void CheckRequestUtils::createHttpCheck(
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
                         encode_raw_headers, allowed_headers_matcher, disallowed_headers_matcher);
 
-  if (include_tls_session && cb->connection()->ssl() != nullptr) {
-    setTLSSession(*attrs->mutable_tls_session(), cb->connection()->ssl());
+  if (include_tls_session) {
+    // Try to get the SNI from the TLS session. If not available there then try the
+    // data from the TLS inspector (i.e. the server name)
+    if (cb->connection()->ssl() != nullptr) {
+      setTLSSession(*attrs->mutable_tls_session(), cb->connection()->ssl());
+    } else {
+      attrs->mutable_tls_session()->set_sni(server_name);
+    }
   }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
   // Fill in the context extensions and metadata context.
@@ -280,8 +288,15 @@ void CheckRequestUtils::createTcpCheck(
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), server_name, true,
                      include_peer_certificate);
-  if (include_tls_session && cb->connection().ssl() != nullptr) {
-    setTLSSession(*attrs->mutable_tls_session(), cb->connection().ssl());
+
+  if (include_tls_session) {
+    // Try to get the SNI from the TLS session. If not available there then try the
+    // data from the TLS inspector (i.e. the server name)
+    if (cb->connection().ssl() != nullptr) {
+      setTLSSession(*attrs->mutable_tls_session(), cb->connection().ssl());
+    } else {
+      attrs->mutable_tls_session()->set_sni(server_name);
+    }
   }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
 }
