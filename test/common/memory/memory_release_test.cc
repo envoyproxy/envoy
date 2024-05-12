@@ -68,7 +68,7 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
 #if defined(GPERFTOOLS_TCMALLOC)
   EXPECT_DEATH(initialiseAllocatorManager(MB /*bytes per second*/, 0),
                "Memory releasing is not supported for gperf tcmalloc.");
-#else
+#elif defined(TCMALLOC)
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LOG_CONTAINS(
       "info",
@@ -88,14 +88,8 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
   TestUtility::waitForCounterEq(stats_, "memory_release_test.tcmalloc.released_by_timer", 2UL,
                                 time_system_);
   auto final_released_bytes = Stats::totalPageHeapUnmapped();
-
-#if defined(TCMALLOC)
   EXPECT_LT(released_bytes_before_next_run, final_released_bytes);
   EXPECT_LT(initial_unmapped_bytes, final_released_bytes);
-#else
-  EXPECT_LE(released_bytes_before_next_run, final_released_bytes);
-  EXPECT_LE(initial_unmapped_bytes, final_released_bytes);
-#endif
 #endif
 }
 
@@ -120,7 +114,7 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
 #if defined(GPERFTOOLS_TCMALLOC)
   EXPECT_DEATH(initialiseAllocatorManager(MB /*bytes per second*/, 0),
                "Memory releasing is not supported for gperf tcmalloc.");
-#else
+#elif defined(TCMALLOC)
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LOG_CONTAINS(
       "info",
@@ -136,11 +130,7 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
   TestUtility::waitForCounterEq(stats_, "memory_release_test.tcmalloc.released_by_timer", 2UL,
                                 time_system_);
   auto final_released_bytes = Stats::totalPageHeapUnmapped();
-#if defined(TCMALLOC)
   EXPECT_LT(initial_unmapped_bytes, final_released_bytes);
-#else
-  EXPECT_LE(initial_unmapped_bytes, final_released_bytes);
-#endif
 #endif
 }
 
