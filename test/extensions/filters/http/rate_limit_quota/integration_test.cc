@@ -722,7 +722,7 @@ TEST_P(RateLimitQuotaIntegrationTest, DISABLED_MultiRequestWithTokenBucketThrott
   }
 }
 
-TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithThrottling) {
+TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucket) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
@@ -731,10 +731,9 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithThrottling) {
   int tokens_per_fill = 30;
   int fill_interval_sec = 60;
   int fill_one_token_in_ms = fill_interval_sec / tokens_per_fill * 1000;
-  for (int i = 0; i < 8; ++i) {
-    // We advance time by 2s for 3rd and 5th requests so that token bucket can
-    // be refilled.
-    if (i == 2 || i == 4) {
+  for (int i = 0; i < 10; ++i) {
+    // We advance time by 2s so that token bucket can be refilled.
+    if (i == 4 || i = 6) {
       simTime().advanceTimeAndRun(std::chrono::milliseconds(fill_one_token_in_ms), *dispatcher_,
                                   Envoy::Event::Dispatcher::RunType::NonBlock);
     }
