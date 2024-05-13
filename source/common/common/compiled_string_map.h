@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/pure.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -54,7 +56,7 @@ template <class Value> class CompiledStringMap {
     // While it is usual to take a string_view by value, in this
     // performance-critical context with repeatedly passing the same
     // value, passing it by reference benchmarks out slightly faster.
-    virtual Value find(const absl::string_view& key);
+    virtual Value find(const absl::string_view& key) PURE;
     virtual ~Node() = default;
   };
 
@@ -101,7 +103,7 @@ public:
    * (typically nullptr) if the key was not present.
    * @param key the key to look up.
    */
-  Value find(const absl::string_view& key) const {
+  Value find(absl::string_view key) const {
     const size_t key_size = key.size();
     if (key_size >= table_.size() || table_[key_size] == nullptr) {
       return {};
