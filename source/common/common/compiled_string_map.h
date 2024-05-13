@@ -64,7 +64,9 @@ template <class Value> class CompiledStringMap {
   public:
     LeafNode(absl::string_view key, Value&& value) : key_(key), value_(std::move(value)) {}
     Value find(const absl::string_view& key) override {
-      if (key != key_) {
+      // String comparison unnecessarily checks size equality first, we can skip
+      // to memcmp here because we already know the sizes are equal.
+      if (memcmp(&key[0], &key_[0], key.size())) {
         return {};
       }
       return value_;
