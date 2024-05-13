@@ -62,10 +62,11 @@ public:
    * @param key the key to look up.
    */
   Value find(const absl::string_view& key) const {
-    if (key.size() >= table_.size() || table_[key.size()] == nullptr) {
+    const size_t key_size = key.size();
+    if (key_size >= table_.size() || table_[key_size] == nullptr) {
       return {};
     }
-    return table_[key.size()](key);
+    return table_[key_size](key);
   };
   /**
    * Construct the lookup table. This can be a somewhat slow multi-pass
