@@ -1099,7 +1099,7 @@ TEST_P(DnsImplTest, CallbackException) {
             resolveWithException<std::string>("1.2.3.4", DnsLookupFamily::V4Only, std::string()));
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
                             "unknown");
-  checkStats(3 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+  checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 }
 
