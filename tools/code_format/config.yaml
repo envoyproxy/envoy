@@ -137,7 +137,7 @@ paths:
     - source/common/filesystem/kqueue/watcher_impl.cc
     - source/common/filesystem/win32/directory_iterator_impl.cc
     - source/common/common/utility.cc
-    - source/common/common/regex.cc
+    - source/common/common/regex.h
     - source/common/common/matchers.cc
     - source/exe/stripped_main_base.cc
     - source/server/options_impl.cc

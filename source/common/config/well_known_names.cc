@@ -31,8 +31,8 @@ std::string expandRegex(const std::string& regex) {
 }
 
 const Regex::CompiledGoogleReMatcher& validTagValueRegex() {
-  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, absl::StrCat("^", TAG_VALUE_REGEX, "$"),
-                         false);
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcherNoSafetyChecks,
+                         absl::StrCat("^", TAG_VALUE_REGEX, "$"));
 }
 
 } // namespace
