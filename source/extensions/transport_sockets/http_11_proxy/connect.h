@@ -81,6 +81,8 @@ public:
   }
   Http::Http1::CallbackResult onHeadersComplete() override {
     headers_complete_ = true;
+    status_200_ = parser().getStatus() != Http::Http1::ParserStatus::Error &&
+                  parser().statusCode() == Http::Code::OK;
     parser_.pause();
     return Http::Http1::CallbackResult::Success;
   }
@@ -91,10 +93,12 @@ public:
   void onChunkHeader(bool) override {}
 
   bool headersComplete() const { return headers_complete_; }
+  bool status200() const { return status_200_; }
   Http::Http1::BalsaParser& parser() { return parser_; }
 
 private:
   bool headers_complete_ = false;
+  bool status_200_ = false;
   Http::Http1::BalsaParser parser_;
 };
 
