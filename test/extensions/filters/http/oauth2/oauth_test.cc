@@ -431,6 +431,27 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenNetworkError) {
   }));
 }
 
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenUnhealthyUpstream) {
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "503"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            // if there is no healthy upstream, the request fails immediately
+            cb->onSuccess(request_, std::move(mock_response));
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  EXPECT_CALL(*mock_callbacks_, onRefreshAccessTokenFailure());
+  client_->asyncRefreshAccessToken("a", "b", "c");
+}
+
 TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenNetworkErrorDoubleCallStateInvalid) {
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(
