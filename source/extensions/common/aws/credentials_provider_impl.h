@@ -45,6 +45,16 @@ public:
   Credentials getCredentials() override;
 };
 
+class ConfigCredentialsProvider : public CredentialsProvider,
+                                  public Logger::Loggable<Logger::Id::aws> {
+public:
+  ConfigCredentialsProvider(const Credentials& credentials) : credentials_(credentials) {}
+  Credentials getCredentials() override;
+
+private:
+  Credentials credentials_;
+};
+
 class CachedCredentialsProviderBase : public CredentialsProvider,
                                       public Logger::Loggable<Logger::Id::aws> {
 public:

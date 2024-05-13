@@ -93,6 +93,19 @@ MATCHER_P(WithAttribute, expectedCluster, "") {
                             result_listener);
 }
 
+class ConfigCredentialsProviderTest : public testing::Test {
+public:
+  ~ConfigCredentialsProviderTest() override {}
+};
+
+TEST_F(ConfigCredentialsProviderTest, ConfigShouldBeHonored) {
+  auto provider = ConfigCredentialsProvider(Credentials{"akid", "secret", "token"});
+  const auto credentials = provider.getCredentials();
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
+}
+
 class EvironmentCredentialsProviderTest : public testing::Test {
 public:
   ~EvironmentCredentialsProviderTest() override {
