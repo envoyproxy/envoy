@@ -49,10 +49,50 @@ namespace Envoy {
  * for the string node.
  */
 template <class Value> class CompiledStringMap {
-  // While it is usual to take a string_view by value, in this
-  // performance-critical context with repeatedly passing the same
-  // value, passing it by reference benchmarks out slightly faster.
-  using FindFn = std::function<Value(const absl::string_view&)>;
+  class Node {
+  public:
+    // While it is usual to take a string_view by value, in this
+    // performance-critical context with repeatedly passing the same
+    // value, passing it by reference benchmarks out slightly faster.
+    virtual Value find(const absl::string_view& key);
+    virtual ~Node() = default;
+  };
+
+  class LeafNode : public Node {
+  public:
+    LeafNode(absl::string_view key, Value&& value) : key_(key), value_(std::move(value)) {}
+    Value find(const absl::string_view& key) override {
+      if (key != key_) {
+        return {};
+      }
+      return value_;
+    }
+
+  private:
+    const std::string key_;
+    const Value value_;
+  };
+
+  class BranchNode : public Node {
+  public:
+    BranchNode(size_t index, uint8_t min, std::vector<std::unique_ptr<Node>>&& branches)
+        : index_(index), min_(min), branches_(std::move(branches)) {}
+    Value find(const absl::string_view& key) override {
+      uint8_t k = static_cast<uint8_t>(key[index_]);
+      // Possible optimization was tried here, populating empty nodes with
+      // a function that returns {} to reduce branching vs checking for null
+      // nodes. Checking for null nodes benchmarked faster.
+      if (k < min_ || k >= min_ + branches_.size() || branches_[k - min_] == nullptr) {
+        return {};
+      }
+      return branches_[k - min_]->find(key);
+    }
+
+  private:
+    const size_t index_;
+    const uint8_t min_;
+    const std::vector<std::unique_ptr<Node>> branches_;
+  };
 
 public:
   using KV = std::pair<absl::string_view, Value>;
@@ -66,7 +106,7 @@ public:
     if (key_size >= table_.size() || table_[key_size] == nullptr) {
       return {};
     }
-    return table_[key_size](key);
+    return table_[key_size]->find(key);
   };
   /**
    * Construct the lookup table. This can be a somewhat slow multi-pass
@@ -110,16 +150,9 @@ private:
    * @param node_contents the set of key-value pairs that will be children of
    *                      this node.
    */
-  static FindFn createEqualLengthNode(std::vector<KV> node_contents) {
+  static std::unique_ptr<Node> createEqualLengthNode(std::vector<KV> node_contents) {
     if (node_contents.size() == 1) {
-      return [pair = std::make_pair<std::string, Value>(std::string{node_contents[0].first},
-                                                        std::move(node_contents[0].second))](
-                 const absl::string_view& key) -> Value {
-        if (key != pair.first) {
-          return {};
-        }
-        return pair.second;
-      };
+      return std::make_unique<LeafNode>(node_contents[0].first, std::move(node_contents[0].second));
     }
     struct IndexSplitInfo {
       uint8_t index, min, max, count;
@@ -140,7 +173,7 @@ private:
         best = info;
       }
     }
-    std::vector<FindFn> nodes;
+    std::vector<std::unique_ptr<Node>> nodes;
     nodes.resize(best.max - best.min + 1);
     std::sort(node_contents.begin(), node_contents.end(), [&best](const KV& a, const KV& b) {
       return a.first[best.index] < b.first[best.index];
@@ -163,19 +196,9 @@ private:
       nodes[range_start->first[best.index] - best.min] = createEqualLengthNode(next_contents);
       range_start = range_end;
     }
-    return [nodes = std::move(nodes), min = best.min,
-            index = best.index](const absl::string_view& key) -> Value {
-      uint8_t k = static_cast<uint8_t>(key[index]);
-      // Possible optimization was tried here, populating empty nodes with
-      // a function that returns {} to reduce branching vs checking for null
-      // nodes. Checking for null nodes benchmarked faster.
-      if (k < min || k >= min + nodes.size() || nodes[k - min] == nullptr) {
-        return {};
-      }
-      return nodes[k - min](key);
-    };
+    return std::make_unique<BranchNode>(best.index, best.min, std::move(nodes));
   }
-  std::vector<FindFn> table_;
+  std::vector<std::unique_ptr<Node>> table_;
 };
 
 } // namespace Envoy
