@@ -91,6 +91,9 @@ bug_fixes:
   change: |
     Fix BalsaParser resetting state too early, guarded by default-true
     ``envoy.reloadable_features.http1_balsa_delay_reset``.
+- area: oauth
+  change: |
+    The id token cookie now expires at the same time the id token itself expires, instead of when the access token expires.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
