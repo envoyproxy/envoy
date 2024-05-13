@@ -5001,7 +5001,6 @@ TEST_P(Http1ServerConnectionImplTest, ValueStartsWithLF) {
   const absl::string_view expected_value = "value starts with line feed";
   testRequestWithValueExpectSuccess(value, expected_value);
 }
-}
 
 TEST_P(Http1ServerConnectionImplTest, ValueWithLFInTheMiddle) {
   const absl::string_view value = "value has \n line feed in the middle";
