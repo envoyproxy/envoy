@@ -7,8 +7,9 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "library/common/bridge/utility.h"
-#include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/system/system_helper.h"
@@ -437,16 +438,28 @@ void Client::DirectStreamCallbacks::latchError() {
   }
   const auto& info = request_decoder->streamInfo();
 
+  std::vector<std::string> error_msg_details;
   if (info.responseCode().has_value()) {
     error_->error_code = Bridge::Utility::errorCodeFromLocalStatus(
         static_cast<Http::Code>(info.responseCode().value()));
+    error_msg_details.push_back(absl::StrCat("RESPONSE_CODE: ", info.responseCode().value()));
   } else if (StreamInfo::isStreamIdleTimeout(info)) {
     error_->error_code = ENVOY_REQUEST_TIMEOUT;
   } else {
     error_->error_code = ENVOY_STREAM_RESET;
   }
 
-  error_->message = info.responseCodeDetails().value_or("");
+  error_msg_details.push_back(absl::StrCat("ERROR_CODE: ", error_->error_code));
+  if (std::string resp_code_details = info.responseCodeDetails().value_or("");
+      !resp_code_details.empty()) {
+    error_msg_details.push_back(absl::StrCat("DETAILS: ", std::move(resp_code_details)));
+  }
+  // The format of the error message propogated to callbacks is:
+  //  RESPONSE_CODE: {RESPONSE_CODE}|ERROR_CODE: {ERROR_CODE}|DETAILS: {DETAILS}
+  // Where RESPONSE_CODE is the HTTP response code from StreamInfo::responseCode().
+  // ERROR_CODE is of the envoy_error_code_t enum type, and gets mapped from RESPONSE_CODE.
+  // DETAILS is the contents of StreamInfo::responseCodeDetails().
+  error_->message = absl::StrJoin(std::move(error_msg_details), "|");
   error_->attempt_count = info.attemptCount().value_or(0);
 }
 

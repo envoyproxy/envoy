@@ -8,7 +8,7 @@
 
 #include "gtest/gtest.h"
 #include "library/common/api/external.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge/utility.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/network/proxy_api.h"

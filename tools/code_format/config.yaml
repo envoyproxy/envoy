@@ -100,7 +100,6 @@ paths:
     - source/common/listener_manager/listener_impl.cc
     - source/common/listener_manager/listener_manager_impl.cc
     - source/common/listener_manager/filter_chain_manager_impl.cc
-    - source/common/upstream/thread_aware_lb_impl.cc
     - source/common/upstream/subset_lb_config.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
@@ -138,7 +137,7 @@ paths:
     - source/common/filesystem/kqueue/watcher_impl.cc
     - source/common/filesystem/win32/directory_iterator_impl.cc
     - source/common/common/utility.cc
-    - source/common/common/regex.cc
+    - source/common/common/regex.h
     - source/common/common/matchers.cc
     - source/exe/stripped_main_base.cc
     - source/server/options_impl.cc

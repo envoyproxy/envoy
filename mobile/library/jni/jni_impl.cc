@@ -6,7 +6,6 @@
 #include "library/cc/engine_builder.h"
 #include "library/common/api/c_types.h"
 #include "library/common/bridge/utility.h"
-#include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/extensions/key_value/platform/c_types.h"
 #include "library/common/http/header_utility.h"
@@ -841,7 +840,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   stream_callbacks.on_data_ = [java_stream_callbacks_global_ref](
                                   const Envoy::Buffer::Instance& buffer, uint64_t length,
                                   bool end_stream, envoy_stream_intel stream_intel) {
-    envoy_data bridge_data = Envoy::Data::Utility::toBridgeDataNoDrain(buffer, length);
+    envoy_data bridge_data = Envoy::Bridge::Utility::toBridgeDataNoDrain(buffer, length);
     jvm_on_response_data(bridge_data, end_stream, stream_intel, java_stream_callbacks_global_ref);
   };
   stream_callbacks.on_trailers_ =
