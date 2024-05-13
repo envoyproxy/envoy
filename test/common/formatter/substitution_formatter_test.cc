@@ -1857,7 +1857,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
     EXPECT_CALL(*connection_info, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("san")));
@@ -1868,7 +1868,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san1", "san2"};
     EXPECT_CALL(*connection_info, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("san1,san2", upstream_format.formatWithContext({}, stream_info));
   }
   {
@@ -1877,7 +1877,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, uriSanPeerCertificate())
         .WillRepeatedly(Return(std::vector<std::string>()));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
@@ -1897,7 +1897,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
     EXPECT_CALL(*connection_info, dnsSansPeerCertificate()).WillRepeatedly(Return(sans));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("san")));
@@ -1908,7 +1908,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san1", "san2"};
     EXPECT_CALL(*connection_info, dnsSansPeerCertificate()).WillRepeatedly(Return(sans));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("san1,san2", upstream_format.formatWithContext({}, stream_info));
   }
   {
@@ -1917,7 +1917,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, dnsSansPeerCertificate())
         .WillRepeatedly(Return(std::vector<std::string>()));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
@@ -1937,7 +1937,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
     EXPECT_CALL(*connection_info, ipSansPeerCertificate()).WillRepeatedly(Return(sans));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("san")));
@@ -1948,7 +1948,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san1", "san2"};
     EXPECT_CALL(*connection_info, ipSansPeerCertificate()).WillRepeatedly(Return(sans));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("san1,san2", upstream_format.formatWithContext({}, stream_info));
   }
   {
@@ -1957,7 +1957,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, ipSansPeerCertificate())
         .WillRepeatedly(Return(std::vector<std::string>()));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
@@ -1976,7 +1976,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
     EXPECT_CALL(*connection_info, dnsSansLocalCertificate()).WillRepeatedly(Return(sans));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("san")));
@@ -1987,7 +1987,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san1", "san2"};
     EXPECT_CALL(*connection_info, dnsSansLocalCertificate()).WillRepeatedly(Return(sans));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("san1,san2", upstream_format.formatWithContext({}, stream_info));
   }
   {
@@ -1996,7 +1996,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, dnsSansLocalCertificate())
         .WillRepeatedly(Return(std::vector<std::string>()));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
@@ -2015,7 +2015,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
     EXPECT_CALL(*connection_info, uriSanLocalCertificate()).WillRepeatedly(Return(sans));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("san")));
@@ -2026,7 +2026,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san1", "san2"};
     EXPECT_CALL(*connection_info, uriSanLocalCertificate()).WillRepeatedly(Return(sans));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("san1,san2", upstream_format.formatWithContext({}, stream_info));
   }
   {
@@ -2035,7 +2035,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, uriSanLocalCertificate())
         .WillRepeatedly(Return(std::vector<std::string>()));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
@@ -2054,7 +2054,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
     EXPECT_CALL(*connection_info, ipSansLocalCertificate()).WillRepeatedly(Return(sans));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("san")));
@@ -2065,7 +2065,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san1", "san2"};
     EXPECT_CALL(*connection_info, ipSansLocalCertificate()).WillRepeatedly(Return(sans));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("san1,san2", upstream_format.formatWithContext({}, stream_info));
   }
   {
@@ -2074,7 +2074,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, ipSansLocalCertificate())
         .WillRepeatedly(Return(std::vector<std::string>()));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
