@@ -75,7 +75,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       "", "skip-hot-restart-parent-stats",
       "When hot restarting, by default the child instance copies stats from the parent"
       " instance periodically during the draining period. This can potentially be an"
-      " expensive operation; set this to true to just use new stats.",
+      " expensive operation; set this to true to reset all stats in child process.",
       cmd, false);
   TCLAP::ValueArg<std::string> base_id_path(
       "", "base-id-path", "Path to which the base ID is written", false, "", "string", cmd);
