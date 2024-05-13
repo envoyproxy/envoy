@@ -160,8 +160,9 @@ func (h *requestOrResponseHeaderMapImpl) GetAllHeaders() map[string][]string {
 	defer h.mutex.Unlock()
 	h.initHeaders()
 	copied_headers := make(map[string][]string)
-	for key, values := range h.headers {
-		copied_headers[key] = values
+	for key, value := range h.headers {
+		copied_headers[key] = make([]string, len(value))
+		copy(copied_headers[key], value)
 	}
 	return copied_headers
 }
@@ -334,8 +335,9 @@ func (h *requestOrResponseTrailerMapImpl) GetAllHeaders() map[string][]string {
 	defer h.mutex.Unlock()
 	h.initTrailers()
 	copied_headers := make(map[string][]string)
-	for key, values := range h.headers {
-		copied_headers[key] = values
+	for key, value := range h.headers {
+		copied_headers[key] = make([]string, len(value))
+		copy(copied_headers[key], value)
 	}
 	return copied_headers
 }
