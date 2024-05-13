@@ -102,6 +102,9 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
 
 new_features:
+- area: hot_restart
+  change: |
+    Added new command-line flag :option:`--skip-hot-restart-parent-stats`.
 - area: matching
   change: |
     Added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`
