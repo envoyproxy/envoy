@@ -127,7 +127,7 @@ typed_config:
     ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", &prefix_data));
     EXPECT_EQ(absl::StrCat("CONNECT ", hostname, ":443 HTTP/1.1\r\n\r\n"), prefix_data);
 
-    std::string content_length = include_content_length ? "Content-Length: 0\r\n" : "";
+    absl::string_view content_length = include_content_length ? "Content-Length: 0\r\n" : "";
     // Ship the CONNECT response.
     fake_upstream_connection_->writeRawData(
         absl::StrCat("HTTP/1.1 200 OK\r\n", content_length, "\r\n"));

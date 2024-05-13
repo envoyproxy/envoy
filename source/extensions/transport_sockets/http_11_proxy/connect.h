@@ -81,6 +81,7 @@ public:
   }
   Http::Http1::CallbackResult onHeadersComplete() override {
     headers_complete_ = true;
+    // Latch this to work around https://github.com/envoyproxy/envoy/issues/34096
     status_200_ = parser().getStatus() != Http::Http1::ParserStatus::Error &&
                   parser().statusCode() == Http::Code::OK;
     parser_.pause();
