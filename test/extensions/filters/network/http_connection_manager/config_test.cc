@@ -1173,6 +1173,34 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamFalse) {
   ASSERT_FALSE(config.shouldSchemeMatchUpstream());
 }
 
+// Validated that when configured and scheme_to_overwrite is set, we use scheme_to_overwrite.
+TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamAndSchemeToOverwriteIsSet) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  scheme_header_transformation:
+    scheme_to_overwrite: https
+    match_upstream: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  EXPECT_EQ(config.schemeToSet(), "https");
+  ASSERT_FALSE(config.shouldSchemeMatchUpstream());
+}
+
 // Validated that by default we don't normalize paths
 // unless set build flag path_normalization_by_default=true
 TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
