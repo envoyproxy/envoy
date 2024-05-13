@@ -495,7 +495,7 @@ private:
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   const std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_{};
   const absl::optional<std::string> scheme_{};
-  const bool scheme_match_upstream_ = true;
+  const bool scheme_match_upstream_ = false;
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
