@@ -644,7 +644,7 @@ TEST_F(AppleDnsImplFakeApiTest, InvalidFileEvent) {
 
   EXPECT_NE(nullptr, query);
 
-  EXPECT_DEATH(file_ready_cb_(2), "invalid FileReadyType event=2");
+  EXPECT_DEATH(file_ready_cb_(2).IgnoreError(), "invalid FileReadyType event=2");
 }
 
 TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResult) {
@@ -683,7 +683,7 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResult) {
   // Error in processing will cause the connection to the DNS server to be reset.
   EXPECT_CALL(dns_service_, dnsServiceProcessResult(_)).WillOnce(Return(kDNSServiceErr_Unknown));
 
-  file_ready_cb_(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_ready_cb_(Event::FileReadyType::Read).ok());
 
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "dns.apple.processing_failure")->value());
 }

@@ -100,7 +100,6 @@ paths:
     - source/common/listener_manager/listener_impl.cc
     - source/common/listener_manager/listener_manager_impl.cc
     - source/common/listener_manager/filter_chain_manager_impl.cc
-    - source/common/upstream/subset_lb_config.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/upstream/default_local_address_selector_factory.cc
@@ -133,8 +132,6 @@ paths:
     - source/common/router/scoped_config_impl.cc
     - source/common/router/header_parser.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc
-    - source/common/filesystem/inotify/watcher_impl.cc
-    - source/common/filesystem/kqueue/watcher_impl.cc
     - source/common/filesystem/win32/directory_iterator_impl.cc
     - source/common/common/utility.cc
     - source/common/common/regex.h
@@ -168,6 +165,8 @@ paths:
     - source/common/config/watched_directory.cc
     - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
+    - source/common/io/io_uring_worker_impl.cc
+    - source/common/event/file_event_impl.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:

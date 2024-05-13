@@ -54,7 +54,7 @@ void VclEvent::mergeInjectedEventsAndRunCb() {
     injected_activation_events_ = 0;
     activation_cb_->cancel();
   }
-  cb_(events);
+  THROW_IF_NOT_OK(cb_(events));
 }
 
 void VclEvent::unregisterEventIfEmulatedEdge(uint32_t) {}

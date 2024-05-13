@@ -3,6 +3,7 @@
 #include <list>
 
 #include "envoy/api/io_error.h"
+#include "envoy/common/exception.h"
 #include "envoy/network/io_handle.h"
 
 #include "source/common/common/logger.h"
@@ -75,7 +76,7 @@ public:
 
   absl::optional<std::string> interfaceName() override { return absl::nullopt; }
 
-  void cb(uint32_t events) { cb_(events); }
+  void cb(uint32_t events) { THROW_IF_NOT_OK(cb_(events)); }
   void setCb(Event::FileReadyCb cb) { cb_ = cb; }
   void updateEvents(uint32_t events);
   uint32_t sh() const { return sh_; }
