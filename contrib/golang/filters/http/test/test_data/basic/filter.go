@@ -3,11 +3,13 @@ package main
 import (
 	"fmt"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
+	"golang.org/x/exp/slices"
 )
 
 type filter struct {
@@ -20,6 +22,7 @@ type filter struct {
 	method          string
 	path            string
 	host            string
+	all_headers     map[string][]string
 
 	// for bad api call testing
 	header api.RequestHeaderMap
@@ -180,6 +183,22 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		}
 		return true
 	})
+
+	header.RangeWithCopy(func(key, value string) bool {
+		_, ok := f.all_headers[key]
+		if ok {
+			if slices.Contains(f.all_headers[key], val) {
+				return false
+			}
+		}
+		f.all_headers[key] = append(f.all_headers[key], val)
+		return true
+	})
+
+	header_map := header.GetAllHeaders()
+	if reflect.DeepEqual(f.all_headers, header_map) != true {
+		return f.fail("GetAllHeaders returned incorrect data, expected:\n%v\n got:\n%v", f.all_headers, header_map)
+	}
 
 	origin, found := header.Get("x-test-header-0")
 	hdrs := header.Values("x-test-header-0")
