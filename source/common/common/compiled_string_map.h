@@ -92,8 +92,8 @@ public:
       // Find the first key whose length differs from the current key length.
       // Everything in between is keys with the same length.
       auto range_end =
-          std::find_if(range_start, initial.end(), [l = range_start->first.size()](const KV& e) {
-            return e.first.size() != l;
+          std::find_if(range_start, initial.end(), [len = range_start->first.size()](const KV& e) {
+            return e.first.size() != len;
           });
       std::vector<KV> node_contents;
       // Populate a FindFn for the nodes in that range.
