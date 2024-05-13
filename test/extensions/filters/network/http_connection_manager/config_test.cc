@@ -1199,6 +1199,9 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamAndSchemeToOverwriteI
   ASSERT_TRUE(creation_status_.ok());
   EXPECT_EQ(config.schemeToSet(), "https");
   ASSERT_FALSE(config.shouldSchemeMatchUpstream());
+  EXPECT_LOG_CONTAINS("warn",
+                      "match_upstream and scheme_to_overwrite both set, using scheme_to_overwrite",
+                      createHttpConnectionManagerConfig(yaml_string));
 }
 
 // Validated that by default we don't normalize paths
