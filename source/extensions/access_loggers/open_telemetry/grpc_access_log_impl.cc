@@ -50,8 +50,8 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
               GrpcCommon::optionalRetryPolicy(config.common_config()),
               [this, &dispatcher]() {
                 // It will be deleted in the callbacks.
-                auto* callback = new OTelLogRequestCallbacks(dispatcher, this->stats_,
-                                                             this->batched_log_entries_);
+                auto* callback = new OTelLogRequestCallbacks(
+                    dispatcher, this->stats_, this->batched_log_entries_, this->destructing_);
                 this->batched_log_entries_ = 0;
                 return callback;
               })),
