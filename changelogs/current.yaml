@@ -64,6 +64,9 @@ bug_fixes:
 - area: http
   change: |
     Fix a crash when reloading the HTTP Connection Manager via ECDS.
+  change: |
+    Fix BalsaParser resetting state too early, guarded by default-true
+    ``envoy.reloadable_features.http1_balsa_delay_reset``.
 - area: cares
   change: |
     Upgraded c-ares library to 1.20.1 and added fix to c-ares DNS implementation to additionally check for ``ARES_EREFUSED``,
