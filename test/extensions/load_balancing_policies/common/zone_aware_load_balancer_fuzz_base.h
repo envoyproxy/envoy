@@ -2,10 +2,9 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "test/extensions/load_balancing_policies/common/load_balancer_fuzz_base.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
-
-#include "load_balancer_fuzz_base.h"
 
 namespace Envoy {
 namespace Upstream {

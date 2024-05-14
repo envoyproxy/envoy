@@ -1,4 +1,4 @@
-#include "zone_aware_load_balancer_fuzz_base.h"
+#include "test/extensions/load_balancing_policies/common/zone_aware_load_balancer_fuzz_base.h"
 
 #include "test/mocks/upstream/host_set.h"
 
