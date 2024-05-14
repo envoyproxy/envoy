@@ -11,7 +11,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/network/connection_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 
 #include "contrib/envoy/extensions/filters/network/golang/v3alpha/golang.pb.h"

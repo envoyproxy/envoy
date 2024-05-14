@@ -6,7 +6,6 @@ import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -22,11 +21,12 @@ class SetLoggerTest {
     val countDownLatch = CountDownLatch(1)
     val logEventLatch = CountDownLatch(1)
     val engine =
-      EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .addNativeFilter(
           "test_logger",
-          "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger\"}"
+          "[type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger] {}"
         )
         .setLogger { _, msg ->
           if (msg.contains("starting main dispatch loop")) {
@@ -56,16 +56,16 @@ class SetLoggerTest {
     val countDownLatch = CountDownLatch(1)
     val logEventLatch = CountDownLatch(1)
     val engine =
-      EngineBuilder(Standard())
+      EngineBuilder()
         .setEventTracker { event ->
           if (event["log_name"] == "event_name") {
             logEventLatch.countDown()
           }
         }
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .addNativeFilter(
           "test_logger",
-          "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger\"}"
+          "[type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger] {}"
         )
         .setOnEngineRunning { countDownLatch.countDown() }
         .build()

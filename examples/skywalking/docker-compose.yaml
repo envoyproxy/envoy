@@ -97,7 +97,9 @@ services:
       SW_STORAGE: elasticsearch
       SW_STORAGE_ES_CLUSTER_NODES: elasticsearch:9200
     healthcheck:
-      test: ["CMD-SHELL", "/skywalking/bin/swctl health"]
+      test:
+      - CMD-SHELL
+      - /skywalking/bin/swctl health
       interval: 10s
       timeout: 120s
       retries: 10
@@ -109,7 +111,11 @@ services:
       context: .
       dockerfile: Dockerfile-skywalking-ui
     healthcheck:
-      test: ["CMD-SHELL", 'curl --silent --fail http://localhost:8080/graphql -X POST -H "Content-Type:application/json" -d "{ \"query\": \"query version { version }\"}" || exit 1']
+      test:
+      - CMD-SHELL
+      - >-
+        curl --silent --fail http://localhost:8080/graphql -X POST -H "Content-Type:application/json"
+        -d "{ \"query\": \"query version { version }\"}" || exit 1
       interval: 5s
       timeout: 10s
       retries: 10

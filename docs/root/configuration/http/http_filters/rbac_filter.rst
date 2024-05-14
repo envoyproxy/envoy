@@ -33,6 +33,18 @@ The RBAC filter outputs statistics in the ``http.<stat_prefix>.rbac.`` namespace
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` comes from the
 owning HTTP connection manager.
 
+For the rule statistics ``allowed`` and ``denied``,
+the :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
+can be used to add an extra prefix to output the statistics in the ``http.<stat_prefix>.rbac.<rules_stat_prefix>.`` namespace.
+
+For the shadow rule statistics ``shadow_allowed`` and ``shadow_denied``,
+the :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules_stat_prefix>`
+
+For rules-based RBAC filters configured using :ref:`rules <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules>`, the filter outputs additional statistics for per-rule
+granularity in the ``http.<stat_prefix>.rbac.policy`` namespace. Similarly, :ref:`shadow_rules <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules>` are
+in the ``http.<stat_prefix>.rbac.<shadow_rules_stat_prefix>.policy`` namespace. The additional stats can be enabled with
+:ref:`track_per_rule_stats <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.track_per_rule_stats>`.
+
 For the shadow rule statistics ``shadow_allowed`` and ``shadow_denied``, the :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules_stat_prefix>`
 can be used to add an extra prefix to output the statistics in the ``http.<stat_prefix>.rbac.<shadow_rules_stat_prefix>.`` namespace.
 

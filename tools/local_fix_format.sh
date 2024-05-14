@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Runs the Envoy format fixers on the current changes. By default, this runs on
 # changes that are not yet committed. You can also specify:

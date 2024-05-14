@@ -106,19 +106,25 @@ GeoipProvider::GeoipProvider(Event::Dispatcher& dispatcher, Api::Api& api,
       [this]() -> void {
         ENVOY_LOG_MISC(debug, "Started mmdb_reload_routine");
         if (config_->cityDbPath()) {
-          mmdb_watcher_->addWatch(
+          THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
               config_->cityDbPath().value(), Filesystem::Watcher::Events::Modified,
-              [this](uint32_t) { onMaxmindDbUpdate(config_->cityDbPath().value(), CITY_DB_TYPE); });
+              [this](uint32_t) {
+                return onMaxmindDbUpdate(config_->cityDbPath().value(), CITY_DB_TYPE);
+              }));
         }
         if (config_->ispDbPath()) {
-          mmdb_watcher_->addWatch(
+          THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
               config_->ispDbPath().value(), Filesystem::Watcher::Events::Modified,
-              [this](uint32_t) { onMaxmindDbUpdate(config_->ispDbPath().value(), ISP_DB_TYPE); });
+              [this](uint32_t) {
+                return onMaxmindDbUpdate(config_->ispDbPath().value(), ISP_DB_TYPE);
+              }));
         }
         if (config_->anonDbPath()) {
-          mmdb_watcher_->addWatch(
+          THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
               config_->anonDbPath().value(), Filesystem::Watcher::Events::Modified,
-              [this](uint32_t) { onMaxmindDbUpdate(config_->anonDbPath().value(), ANON_DB_TYPE); });
+              [this](uint32_t) {
+                return onMaxmindDbUpdate(config_->anonDbPath().value(), ANON_DB_TYPE);
+              }));
         }
         mmdb_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
       },
@@ -298,8 +304,8 @@ void GeoipProvider::mmdbReload(MaxmindDbSharedPtr& old_db, const MaxmindDbShared
   }
 }
 
-void GeoipProvider::onMaxmindDbUpdate(const std::string& db_path,
-                                      const absl::string_view& db_type) {
+absl::Status GeoipProvider::onMaxmindDbUpdate(const std::string& db_path,
+                                              const absl::string_view& db_type) {
   MaxmindDbSharedPtr reloaded_db = initMaxmindDb(db_path, db_type, true /* reload */);
   if (db_type == CITY_DB_TYPE) {
     mmdbReload(city_db_, reloaded_db, city_db_mutex_, CITY_DB_TYPE);
@@ -309,7 +315,9 @@ void GeoipProvider::onMaxmindDbUpdate(const std::string& db_path,
     mmdbReload(anon_db_, reloaded_db, anon_db_mutex_, ANON_DB_TYPE);
   } else {
     ENVOY_LOG(error, "Unsupported maxmind db type {}", db_type);
+    return absl::InvalidArgumentError(fmt::format("Unsupported maxmind db type {}", db_type));
   }
+  return absl::OkStatus();
 }
 
 template <class... Params>

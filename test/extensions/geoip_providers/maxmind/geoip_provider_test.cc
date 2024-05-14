@@ -102,6 +102,7 @@ public:
           .WillRepeatedly(
               Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
                 on_changed_cbs_.emplace_back(cb);
+                return absl::OkStatus();
               }));
       return mock_watcher;
     }));
@@ -361,7 +362,7 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
   EXPECT_EQ("Boxford", city_it->second);
   TestEnvironment::renameFile(city_db_path, city_db_path + "1");
   TestEnvironment::renameFile(reloaded_city_db_path, city_db_path);
-  on_changed_cbs_[0](Filesystem::Watcher::Events::Modified);
+  EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::Modified).ok());
   expectReloadStats("city_db", 1, 0);
   captured_lookup_response_.clear();
   EXPECT_EQ(0, captured_lookup_response_.size());
@@ -455,7 +456,7 @@ TEST_P(MmdbReloadImplTest, MmdbReloaded) {
   std::string reloaded_db_file_path = TestEnvironment::substitute(test_case.reloaded_db_file_path_);
   TestEnvironment::renameFile(source_db_file_path, source_db_file_path + "1");
   TestEnvironment::renameFile(reloaded_db_file_path, source_db_file_path);
-  on_changed_cbs_[0](Filesystem::Watcher::Events::Modified);
+  EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::Modified).ok());
   expectReloadStats(test_case.db_type_, 1, 0);
   captured_lookup_response_.clear();
   remote_address = Network::Utility::parseInternetAddress(test_case.ip_);

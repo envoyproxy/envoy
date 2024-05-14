@@ -36,6 +36,8 @@ const std::string toString(envoy::type::matcher::v3::StringMatcher::MatchPattern
     return "safe_regex";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
     return "contains";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kCustom:
+    return "custom";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
     return "match_pattern_not_set";
   }
@@ -250,7 +252,7 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
         nullptr, Network::Utility::getCanonicalIpv4LoopbackAddress());
     Envoy::StreamInfo::StreamInfoImpl stream_info(
         Envoy::Http::Protocol::Http11, factory_context_->mainThreadDispatcher().timeSource(),
-        connection_info_provider);
+        connection_info_provider, StreamInfo::FilterState::LifeSpan::FilterChain);
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ =
         config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);
@@ -528,7 +530,7 @@ bool RouterCheckTool::matchHeaderField(
     const HeaderMap& header_map, const envoy::config::route::v3::HeaderMatcher& header,
     const std::string test_type,
     envoy::RouterCheckToolSchema::HeaderMatchFailure& header_match_failure) {
-  Envoy::Http::HeaderUtility::HeaderData expected_header_data{header};
+  Envoy::Http::HeaderUtility::HeaderData expected_header_data{header, *factory_context_};
   if (Envoy::Http::HeaderUtility::matchHeaders(header_map, expected_header_data)) {
     return true;
   }

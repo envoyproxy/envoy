@@ -59,10 +59,10 @@ class AsyncRequestSharedImpl;
 class AsyncClientImpl final : public AsyncClient {
 public:
   AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster, Stats::Store& stats_store,
-                  Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info,
-                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                  Random::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer,
-                  Http::Context& http_context, Router::Context& router_context);
+                  Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
+                  Server::Configuration::CommonFactoryContext& factory_context,
+                  Router::ShadowWriterPtr&& shadow_writer, Http::Context& http_context,
+                  Router::Context& router_context);
   ~AsyncClientImpl() override;
 
   // Http::AsyncClient
@@ -71,13 +71,13 @@ public:
   Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
   OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
                                const AsyncClient::RequestOptions& options) override;
-  Singleton::Manager& singleton_manager_;
+  Server::Configuration::CommonFactoryContext& factory_context_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
 private:
   template <typename T> T* internalStartRequest(T* async_request);
-  Router::FilterConfig config_;
+  const Router::FilterConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
 
@@ -151,6 +151,7 @@ protected:
   absl::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
   // Callback to listen for low/high/overflow watermark events.
   absl::optional<std::reference_wrapper<DecoderFilterWatermarkCallbacks>> watermark_callbacks_;
+  bool complete_{};
 
 private:
   void cleanup();
@@ -253,6 +254,7 @@ private:
   upstreamOverrideHost() const override {
     return absl::nullopt;
   }
+  bool shouldLoadShed() const override { return false; }
   absl::string_view filterConfigName() const override { return ""; }
   RequestHeaderMapOptRef requestHeaders() override { return makeOptRefFromPtr(request_headers_); }
   RequestTrailerMapOptRef requestTrailers() override {

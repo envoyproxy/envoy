@@ -241,7 +241,9 @@ private:
       auto input_matcher = createInputMatcher(field_predicate.single_predicate());
 
       return [data_input, input_matcher]() {
-        return std::make_unique<SingleFieldMatcher<DataType>>(data_input(), input_matcher());
+        return THROW_OR_RETURN_VALUE(
+            SingleFieldMatcher<DataType>::create(data_input(), input_matcher()),
+            std::unique_ptr<SingleFieldMatcher<DataType>>);
       };
     }
     case (PredicateType::kOrMatcher):
@@ -339,9 +341,9 @@ private:
   InputMatcherFactoryCb createInputMatcher(const SinglePredicateType& predicate) {
     switch (predicate.matcher_case()) {
     case SinglePredicateType::kValueMatch:
-      return [value_match = predicate.value_match()]() {
+      return [&context = server_factory_context_, value_match = predicate.value_match()]() {
         return std::make_unique<StringInputMatcher<std::decay_t<decltype(value_match)>>>(
-            value_match);
+            value_match, context);
       };
     case SinglePredicateType::kCustomMatch: {
       auto& factory =

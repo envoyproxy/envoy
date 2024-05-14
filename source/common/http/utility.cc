@@ -1248,6 +1248,15 @@ std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view 
   return encoded;
 }
 
+bool Utility::PercentEncoding::queryParameterIsUrlEncoded(absl::string_view value) {
+  for (char ch : value) {
+    if (shouldPercentEncodeChar(ch)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::string Utility::PercentEncoding::urlDecodeQueryParameter(absl::string_view encoded) {
   std::string decoded;
   decoded.reserve(encoded.size());
@@ -1330,7 +1339,8 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   return {is_ip_address, host_to_resolve, port};
 }
 
-void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy) {
+absl::Status
+Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy) {
   if (retry_policy.has_retry_back_off()) {
     const auto& core_back_off = retry_policy.retry_back_off();
 
@@ -1339,9 +1349,11 @@ void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy
         PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
 
     if (max_interval_ms < base_interval_ms) {
-      throwEnvoyExceptionOrPanic("max_interval must be greater than or equal to the base_interval");
+      return absl::InvalidArgumentError(
+          "max_interval must be greater than or equal to the base_interval");
     }
   }
+  return absl::OkStatus();
 }
 
 envoy::config::route::v3::RetryPolicy
@@ -1378,9 +1390,30 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
       Protobuf::util::TimeUtil::MillisecondsToDuration(max_interval_ms));
 
   // set all the other fields with appropriate values.
-  route_retry_policy.set_retry_on(retry_on);
+  if (!retry_on.empty()) {
+    route_retry_policy.set_retry_on(retry_on);
+  } else {
+    route_retry_policy.set_retry_on(retry_policy.retry_on());
+  }
   route_retry_policy.mutable_per_try_timeout()->CopyFrom(
       route_retry_policy.retry_back_off().max_interval());
+
+  if (retry_policy.has_retry_priority()) {
+    route_retry_policy.mutable_retry_priority()->set_name(retry_policy.retry_priority().name());
+    route_retry_policy.mutable_retry_priority()->mutable_typed_config()->MergeFrom(
+        retry_policy.retry_priority().typed_config());
+  }
+
+  if (!retry_policy.retry_host_predicate().empty()) {
+    for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
+      auto* route_host_predicate = route_retry_policy.mutable_retry_host_predicate()->Add();
+      route_host_predicate->set_name(host_predicate.name());
+      route_host_predicate->mutable_typed_config()->MergeFrom(host_predicate.typed_config());
+    }
+  }
+
+  route_retry_policy.set_host_selection_retry_max_attempts(
+      retry_policy.host_selection_retry_max_attempts());
 
   return route_retry_policy;
 }
@@ -1405,16 +1438,10 @@ bool Utility::schemeIsValid(const absl::string_view scheme) {
 }
 
 bool Utility::schemeIsHttp(const absl::string_view scheme) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
-    return scheme == Headers::get().SchemeValues.Http;
-  }
   return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Http);
 }
 
 bool Utility::schemeIsHttps(const absl::string_view scheme) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
-    return scheme == Headers::get().SchemeValues.Https;
-  }
   return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Https);
 }
 

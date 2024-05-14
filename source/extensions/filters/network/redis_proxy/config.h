@@ -27,11 +27,11 @@ public:
   }
 
   std::string authUsername(Api::Api& api) const {
-    return Config::DataSource::read(auth_username_, true, api);
+    return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_username_, true, api), std::string);
   }
 
   std::string authPassword(Api::Api& api) const {
-    return Config::DataSource::read(auth_password_, true, api);
+    return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_password_, true, api), std::string);
   }
 
   static const std::string authUsername(const Upstream::ClusterInfoConstSharedPtr info,
@@ -74,7 +74,7 @@ private:
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 
-  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr> createProtocolOptionsTyped(
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions&
           proto_config,
       Server::Configuration::ProtocolOptionsFactoryContext&) override {

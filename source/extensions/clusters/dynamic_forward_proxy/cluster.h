@@ -153,7 +153,7 @@ private:
     Upstream::LoadBalancerFactorySharedPtr factory() override {
       return std::make_shared<LoadBalancerFactory>(cluster_);
     }
-    void initialize() override {}
+    absl::Status initialize() override { return absl::OkStatus(); }
 
   private:
     Cluster& cluster_;
@@ -161,7 +161,8 @@ private:
 
   void
   addOrUpdateHost(absl::string_view host,
-                  const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info)
+                  const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
+                  std::unique_ptr<Upstream::HostVector>& hosts_added)
       ABSL_LOCKS_EXCLUDED(host_map_lock_);
 
   void updatePriorityState(const Upstream::HostVector& hosts_added,

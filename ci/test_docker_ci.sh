@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Run this with `./ci/test_docker_ci.sh`.
 #

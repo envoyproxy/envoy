@@ -24,7 +24,7 @@ class TestStatsdServer {
       Thread(
         fun() {
           val buffer = ByteArray(256)
-          while (shutdownLatch.getCount() != 0L) {
+          while (shutdownLatch.count != 0L) {
             val packet = DatagramPacket(buffer, buffer.size)
             try {
               socket.receive(packet)
@@ -38,7 +38,7 @@ class TestStatsdServer {
 
             // TODO(snowp): Parse (or use a parser) so we can extract out individual metric names
             // better.
-            val received = String(packet.getData(), packet.getOffset(), packet.getLength())
+            val received = String(packet.data, packet.offset, packet.length)
             val maybeMatch = matchCriteria.get()
             if (maybeMatch != null && maybeMatch.invoke(received)) {
               matchCriteria.set(null)

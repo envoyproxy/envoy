@@ -68,6 +68,18 @@ private:
 #define ENVOY_SOCKET_IPV6_FREEBIND Network::SocketOptionName()
 #endif
 
+#ifdef IP_RECVTOS
+#define ENVOY_SOCKET_IP_RECVTOS ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, IP_RECVTOS)
+#else
+#define ENVOY_SOCKET_IP_RECVTOS Network::SocketOptionName()
+#endif
+
+#ifdef IPV6_RECVTCLASS
+#define ENVOY_SOCKET_IPV6_RECVTCLASS ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_RECVTCLASS)
+#else
+#define ENVOY_SOCKET_IPV6_RECVTCLASS Network::SocketOptionName()
+#endif
+
 #ifdef SO_KEEPALIVE
 #define ENVOY_SOCKET_SO_KEEPALIVE ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_KEEPALIVE)
 #else
@@ -542,6 +554,13 @@ public:
    * @return the socket options stored earlier with addOption() and addOptions() calls, if any.
    */
   virtual const OptionsSharedPtr& options() const PURE;
+
+  /**
+   * @return a ParentDrainedCallbackRegistrar for UDP listen sockets during hot restart.
+   */
+  virtual OptRef<class ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() const {
+    return absl::nullopt;
+  }
 };
 
 using SocketPtr = std::unique_ptr<Socket>;

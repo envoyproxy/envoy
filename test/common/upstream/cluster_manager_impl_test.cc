@@ -105,20 +105,18 @@ class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
 public:
   using TestClusterManagerImpl::TestClusterManagerImpl;
 
-  MockedUpdatedClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                  ClusterManagerFactory& factory, Stats::Store& stats,
-                                  ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                                  const LocalInfo::LocalInfo& local_info,
-                                  AccessLog::AccessLogManager& log_manager,
-                                  Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                                  ProtobufMessage::ValidationContext& validation_context,
-                                  Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
-                                  MockLocalHostsRemoved& local_hosts_removed,
-                                  Http::Context& http_context, Grpc::Context& grpc_context,
-                                  Router::Context& router_context, Server::Instance& server)
-      : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
-                               main_thread_dispatcher, admin, validation_context, api, http_context,
-                               grpc_context, router_context, server),
+  MockedUpdatedClusterManagerImpl(
+      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+      Server::Configuration::CommonFactoryContext& factory_context, Stats::Store& stats,
+      ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+      Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+      MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,
+      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
+      Server::Instance& server)
+      : TestClusterManagerImpl(bootstrap, factory, factory_context, stats, tls, runtime, local_info,
+                               log_manager, main_thread_dispatcher, admin, validation_context, api,
+                               http_context, grpc_context, router_context, server),
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:
@@ -161,6 +159,7 @@ public:
 class UpdateOverrideClusterManagerImpl : public TestClusterManagerImpl {
 public:
   UpdateOverrideClusterManagerImpl(const Bootstrap& bootstrap, ClusterManagerFactory& factory,
+                                   Server::Configuration::CommonFactoryContext& factory_context,
                                    Stats::Store& stats, ThreadLocal::Instance& tls,
                                    Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                                    AccessLog::AccessLogManager& log_manager,
@@ -169,9 +168,9 @@ public:
                                    Api::Api& api, Http::Context& http_context,
                                    Grpc::Context& grpc_context, Router::Context& router_context,
                                    Server::Instance& server)
-      : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
-                               main_thread_dispatcher, admin, validation_context, api, http_context,
-                               grpc_context, router_context, server) {}
+      : TestClusterManagerImpl(bootstrap, factory, factory_context, stats, tls, runtime, local_info,
+                               log_manager, main_thread_dispatcher, admin, validation_context, api,
+                               http_context, grpc_context, router_context, server) {}
 
 protected:
   void postThreadLocalClusterUpdate(ClusterManagerCluster& cluster,
@@ -208,9 +207,10 @@ public:
 
   virtual void create(const Bootstrap& bootstrap) {
     cluster_manager_ = TestClusterManagerImpl::createAndInit(
-        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, http_context_, grpc_context_, router_context_, server_);
+        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
+        factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
+        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_,
+        server_);
     cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
       THROW_IF_NOT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
     });
@@ -275,19 +275,20 @@ public:
     const auto& bootstrap = parseBootstrapFromV3Yaml(yaml);
 
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
-        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
-        router_context_, server_);
-    THROW_IF_NOT_OK(cluster_manager_->init(bootstrap));
+        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
+        factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
+        validation_context_, *factory_.api_, local_cluster_update_, local_hosts_removed_,
+        http_context_, grpc_context_, router_context_, server_);
+    THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
   }
 
   void createWithUpdateOverrideClusterManager(const Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<UpdateOverrideClusterManagerImpl>(
-        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, http_context_, grpc_context_, router_context_, server_);
-    THROW_IF_NOT_OK(cluster_manager_->init(bootstrap));
+        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
+        factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
+        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_,
+        server_);
+    THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -1264,7 +1265,12 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNoLb) {
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "cluster_0";
-  cluster1->info_->lb_type_ = LoadBalancerType::ClusterProvided;
+
+  ON_CALL(*cluster1->info_, loadBalancerFactory())
+      .WillByDefault(
+          ReturnRef(Config::Utility::getAndCheckFactoryByName<Upstream::TypedLoadBalancerFactory>(
+              "envoy.load_balancing_policies.cluster_provided")));
+
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Json(json)), EnvoyException,
@@ -1330,14 +1336,15 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
 
 class ClusterManagerImplThreadAwareLbTest : public ClusterManagerImplTest {
 public:
-  void doTest(LoadBalancerType lb_type) {
+  void doTest(const std::string& factory_name) {
     const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                           clustersJson({defaultStaticClusterJson("cluster_0")}));
 
     std::shared_ptr<MockClusterMockPrioritySet> cluster1(
         new NiceMock<MockClusterMockPrioritySet>());
     cluster1->info_->name_ = "cluster_0";
-    cluster1->info_->lb_type_ = lb_type;
+    cluster1->info_->lb_factory_ =
+        Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(factory_name);
 
     InSequence s;
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
@@ -1361,13 +1368,13 @@ public:
 // Test that the cluster manager correctly re-creates the worker local LB when there is a host
 // set change.
 TEST_F(ClusterManagerImplThreadAwareLbTest, RingHashLoadBalancerThreadAwareUpdate) {
-  doTest(LoadBalancerType::RingHash);
+  doTest("envoy.load_balancing_policies.ring_hash");
 }
 
 // Test that the cluster manager correctly re-creates the worker local LB when there is a host
 // set change.
 TEST_F(ClusterManagerImplThreadAwareLbTest, MaglevLoadBalancerThreadAwareUpdate) {
-  doTest(LoadBalancerType::Maglev);
+  doTest("envoy.load_balancing_policies.maglev");
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
@@ -1596,7 +1603,9 @@ TEST_P(ClusterManagerLifecycleTest, InitializeOrder) {
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
   cluster2->info_->name_ = "fake_cluster2";
-  cluster2->info_->lb_type_ = LoadBalancerType::RingHash;
+  cluster2->info_->lb_factory_ =
+      Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
+          "envoy.load_balancing_policies.ring_hash");
 
   // This part tests static init.
   InSequence s;
@@ -1816,8 +1825,9 @@ TEST_P(ClusterManagerLifecycleTest, DynamicRemoveWithLocalCluster) {
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
   auto priority_update_cb = foo->prioritySet().addPriorityUpdateCb(
-      [&membership_updated](uint32_t, const HostVector&, const HostVector&) -> void {
+      [&membership_updated](uint32_t, const HostVector&, const HostVector&) {
         membership_updated.ready();
+        return absl::OkStatus();
       });
 
   // Remove the new cluster.
@@ -2445,7 +2455,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
         ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
 
     outlier_detector.runCallbacks(test_host);
-    health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+    health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
     EXPECT_CALL(*cp1,
                 drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
@@ -2463,12 +2473,12 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
   EXPECT_CALL(*cp2,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Unhealthy);
 
   test_host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
   test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Healthy);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
@@ -2522,7 +2532,7 @@ TEST_P(ClusterManagerLifecycleTest,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   EXPECT_CALL(*cp2, closeConnections());
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Unhealthy);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
@@ -2566,7 +2576,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsAndDeletePoolOnHealthFai
       ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
 
   outlier_detector.runCallbacks(test_host);
-  health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+  health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
   EXPECT_CALL(*cp1,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections))
@@ -2615,7 +2625,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionPoolsOnHealthFailure) {
         ->tcpConnPool(ResourcePriority::Default, nullptr);
 
     outlier_detector.runCallbacks(test_host);
-    health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+    health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
     EXPECT_CALL(*cp1,
                 drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
@@ -2633,12 +2643,12 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionPoolsOnHealthFailure) {
   EXPECT_CALL(*cp2,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Unhealthy);
 
   test_host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
   test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Healthy);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
@@ -2691,7 +2701,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
     conn_info1 = cluster_manager_->getThreadLocalCluster("some_cluster")->tcpConn(nullptr);
 
     outlier_detector.runCallbacks(test_host);
-    health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+    health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
     EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -2711,12 +2721,12 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
   EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*connection2, close(Network::ConnectionCloseType::NoFlush, _));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Unhealthy);
 
   test_host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
   test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Healthy);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
@@ -2764,7 +2774,7 @@ TEST_P(ClusterManagerLifecycleTest, DoNotCloseTcpConnectionsOnHealthFailure) {
   conn_info1 = cluster_manager_->getThreadLocalCluster("some_cluster")->tcpConn(nullptr);
 
   outlier_detector.runCallbacks(test_host);
-  health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+  health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
   EXPECT_CALL(*connection1, close(_)).Times(0);
   test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);

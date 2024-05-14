@@ -93,13 +93,11 @@ makeScopedRouteInfos(ProtobufTypes::ConstMessagePtrVector&& config_protos,
         MessageUtil::downcastAndValidate<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             *config_proto, factory_context.messageValidationContext().staticValidationVisitor());
     if (!scoped_route_config.route_configuration_name().empty()) {
-      throwEnvoyExceptionOrPanic(
-          "Fetching routes via RDS (route_configuration_name) is not supported "
-          "with inline scoped routes.");
+      throw EnvoyException("Fetching routes via RDS (route_configuration_name) is not supported "
+                           "with inline scoped routes.");
     }
     if (!scoped_route_config.has_route_configuration()) {
-      throwEnvoyExceptionOrPanic(
-          "You must specify a route_configuration with inline scoped routes.");
+      throw EnvoyException("You must specify a route_configuration with inline scoped routes.");
     }
     RouteConfigProviderPtr route_config_provider =
         config_provider_manager.routeConfigProviderManager().createStaticRouteConfigProvider(
@@ -225,6 +223,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
   rds_update_callback_handle_ = route_provider_->subscription().addUpdateCallback([this]() {
     // Subscribe to RDS update.
     parent_.onRdsConfigUpdate(scope_name_, route_provider_->configCast());
+    return absl::OkStatus();
   });
   parent_.stats_.active_scopes_.inc();
 }
@@ -635,6 +634,8 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createStaticConfigProvider(
       std::move(config_protos), typed_optarg.scoped_routes_name_, factory_context, *this,
       typed_optarg.rds_config_source_);
 }
+
+REGISTER_FACTORY(SrdsFactoryDefault, SrdsFactory);
 
 } // namespace Router
 } // namespace Envoy

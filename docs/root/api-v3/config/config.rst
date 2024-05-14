@@ -27,6 +27,7 @@ Extensions
   http/header_validators
   http/original_ip_detection
   http/stateful_session
+  injected_credentials/injected_credentials
   geoip_provider/geoip_provider
   trace/trace
   internal_redirect/internal_redirect
@@ -40,6 +41,7 @@ Extensions
   resource_monitor/resource_monitor
   retry/retry
   stat_sinks/stat_sinks
+  string_matcher/string_matcher
   transport_socket/transport_socket
   upstream/upstream
   wasm/wasm

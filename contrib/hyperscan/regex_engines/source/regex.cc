@@ -8,7 +8,8 @@ namespace Hyperscan {
 HyperscanEngine::HyperscanEngine(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls)
     : dispatcher_(dispatcher), tls_(tls) {}
 
-Envoy::Regex::CompiledMatcherPtr HyperscanEngine::matcher(const std::string& regex) const {
+absl::StatusOr<Envoy::Regex::CompiledMatcherPtr>
+HyperscanEngine::matcher(const std::string& regex) const {
   std::vector<const char*> expressions{regex.c_str()};
   std::vector<unsigned int> flags{HS_FLAG_UTF8};
   std::vector<unsigned int> ids{0};

@@ -140,10 +140,10 @@ public:
    * @param validation_visitor message validation visitor instance.
    * @param api reference to the Api object
    */
-  static void loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                  const Options& options,
-                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                  Api::Api& api);
+  static absl::Status loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                          const Options& options,
+                                          ProtobufMessage::ValidationVisitor& validation_visitor,
+                                          Api::Api& api);
 };
 
 /**
@@ -197,6 +197,7 @@ public:
   ProcessContextOptRef processContext() override { return server_.processContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
+  Regex::Engine& regexEngine() override { return server_.regexEngine(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
@@ -292,6 +293,7 @@ public:
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
+  Regex::Engine& regexEngine() override { return *regex_engine_; }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
@@ -325,10 +327,10 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
-  // This does most of the work of initialization, but can throw errors caught
+  // This does most of the work of initialization, but can throw or return errors caught
   // by initialize().
-  void initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
-                         ComponentFactory& component_factory);
+  absl::Status initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
+                                 ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
@@ -377,7 +379,7 @@ private:
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Event::DispatcherPtr dispatcher_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
-  std::unique_ptr<Admin> admin_;
+  std::shared_ptr<Admin> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::unique_ptr<Runtime::Loader> runtime_;

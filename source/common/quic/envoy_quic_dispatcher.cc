@@ -92,7 +92,8 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), self_address, peer_address, std::string(parsed_chlo.sni), "h3");
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
-      dispatcher_.timeSource(), connection_socket->connectionInfoProviderSharedPtr());
+      dispatcher_.timeSource(), connection_socket->connectionInfoProviderSharedPtr(),
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   auto listener_filter_manager = std::make_unique<QuicListenerFilterManagerImpl>(
       dispatcher_, *connection_socket, *stream_info);
@@ -184,7 +185,7 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
       // from the map as well.
       connection.close(Network::ConnectionCloseType::NoFlush);
       if (!delete_sessions_immediately &&
-          dynamic_cast<QuicFilterManagerConnectionImpl&>(connection).fix_quic_lifetime_issues()) {
+          dynamic_cast<QuicFilterManagerConnectionImpl&>(connection).fixQuicLifetimeIssues()) {
         // If `envoy.reloadable_features.quic_fix_filter_manager_uaf` is true, the closed sessions
         // need to be deleted right away to consistently handle quic lifetimes. Because upon
         // returning the filter chain configs will be destroyed, and no longer safe to be accessed.

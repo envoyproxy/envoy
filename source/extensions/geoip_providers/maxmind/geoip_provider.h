@@ -94,7 +94,7 @@ public:
   GeoipProvider(Event::Dispatcher& dispatcher, Api::Api& api, Singleton::InstanceSharedPtr owner,
                 GeoipProviderConfigSharedPtr config);
 
-  ~GeoipProvider();
+  ~GeoipProvider() override;
 
   // Envoy::Geolocation::Driver
   void lookup(Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&&) const override;
@@ -122,7 +122,7 @@ private:
                      absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInAnonDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
-  void onMaxmindDbUpdate(const std::string& db_path, const absl::string_view& db_type);
+  absl::Status onMaxmindDbUpdate(const std::string& db_path, const absl::string_view& db_type);
   void mmdbReload(MaxmindDbSharedPtr& old_db, const MaxmindDbSharedPtr reloaded_db, absl::Mutex& mu,
                   const absl::string_view& db_type)
       ABSL_LOCKS_EXCLUDED(city_db_mutex_, isp_db_mutex_, anon_db_mutex_);

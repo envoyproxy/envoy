@@ -148,7 +148,7 @@ public:
       if (parent_.expect_gro_) {
         EXPECT_CALL(*socket_->io_handle_, supportsUdpGro());
       }
-      EXPECT_CALL(*socket_->io_handle_, supportsMmsg()).Times(2u);
+      EXPECT_CALL(*socket_->io_handle_, supportsMmsg()).Times(1u);
       // Return the datagram.
       EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
           .WillOnce(
@@ -179,7 +179,6 @@ public:
               }
             }));
         // Return an EAGAIN result.
-        EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
         EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
             .WillOnce(Return(ByMove(
                 Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError()))));
@@ -825,6 +824,51 @@ matcher:
   // Remove the cluster we do care about. This should purge all sessions.
   cluster_update_callbacks_->onClusterRemoval("fake_cluster");
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+}
+
+// Test updates to existing cluster (e.g. priority set changes, etc).
+TEST_F(UdpProxyFilterTest, ClusterDynamicInfoMapUpdate) {
+  InSequence s;
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF"),
+        false);
+
+  // Initial ThreadLocalCluster, scoped lifetime
+  // mimics replacement of old ThreadLocalCluster via postThreadLocalClusterUpdate.
+  {
+    NiceMock<Upstream::MockThreadLocalCluster> other_thread_local_cluster;
+    other_thread_local_cluster.cluster_.info_->name_ = "fake_cluster";
+    Upstream::ThreadLocalClusterCommand command =
+        [&other_thread_local_cluster]() -> Upstream::ThreadLocalCluster& {
+      return other_thread_local_cluster;
+    };
+    cluster_update_callbacks_->onClusterAddOrUpdate(other_thread_local_cluster.info()->name(),
+                                                    command);
+  }
+
+  // Push new cluster (getter), we expect this to result in new ClusterInfos object in map.
+  {
+    Upstream::ThreadLocalClusterCommand command = [this]() -> Upstream::ThreadLocalCluster& {
+      return factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_;
+    };
+    cluster_update_callbacks_->onClusterAddOrUpdate(
+        factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.info()
+            ->name(),
+        command);
+  }
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
 }
 
 // Hitting the maximum per-cluster connection/session circuit breaker.

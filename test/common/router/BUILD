@@ -211,6 +211,7 @@ envoy_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
@@ -276,6 +277,8 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["route_fuzz_test.cc"],
     corpus = ":route_corpus",
+    # The :config_impl_test_static target does not build with coverage
+    tags = ["nocoverage"],
     deps = [
         ":route_fuzz_proto_cc_proto",
         "//source/common/router:config_lib",
@@ -367,6 +370,7 @@ envoy_cc_test_library(
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:host_mocks",

@@ -10,14 +10,35 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/win32_socket_handle_impl.h"
 
+#if defined(__linux__) && !defined(__ANDROID_API__)
+#include "source/common/network/io_uring_socket_handle_impl.h"
+#endif
+
 namespace Envoy {
 namespace Network {
 
-IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
-                                                            absl::optional<int> domain) {
+namespace {
+[[maybe_unused]] bool hasIoUringWorkerFactory(Io::IoUringWorkerFactory* io_uring_worker_factory) {
+  return io_uring_worker_factory != nullptr && io_uring_worker_factory->currentThreadRegistered() &&
+         io_uring_worker_factory->getIoUringWorker() != absl::nullopt;
+}
+} // namespace
+
+IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
+    int socket_fd, bool socket_v6only, absl::optional<int> domain,
+    [[maybe_unused]] Io::IoUringWorkerFactory* io_uring_worker_factory) {
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
+#if defined(__linux__) && !defined(__ANDROID_API__)
+  // Only create IoUringSocketHandleImpl when the IoUringWorkerFactory has been created and it has
+  // been registered in the TLS, initialized. There are cases that test may create threads before
+  // IoUringWorkerFactory has been added to the TLS and got initialized.
+  if (hasIoUringWorkerFactory(io_uring_worker_factory)) {
+    return std::make_unique<IoUringSocketHandleImpl>(*io_uring_worker_factory, socket_fd,
+                                                     socket_v6only, domain);
+  }
+#endif
   return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
 }
 
@@ -68,15 +89,31 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 
   const Api::SysCallSocketResult result =
       Api::OsSysCallsSingleton::get().socket(domain, flags, protocol);
-  RELEASE_ASSERT(SOCKET_VALID(result.return_value_),
-                 fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
+  if (!SOCKET_VALID(result.return_value_)) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.restart_features.allow_client_socket_creation_failure")) {
+      IS_ENVOY_BUG(fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
+      return nullptr;
+    } else {
+      RELEASE_ASSERT(!SOCKET_VALID(result.return_value_),
+                     fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
+    }
+  }
   IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, domain);
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
   const int rc = io_handle->setBlocking(false).return_value_;
-  RELEASE_ASSERT(!SOCKET_FAILURE(rc),
-                 fmt::format("Unable to set socket non-blocking: got error: {}", rc));
+  if (SOCKET_FAILURE(result.return_value_)) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.restart_features.allow_client_socket_creation_failure")) {
+      IS_ENVOY_BUG(fmt::format("Unable to set socket non-blocking: got error: {}", rc));
+      return nullptr;
+    } else {
+      RELEASE_ASSERT(SOCKET_FAILURE(rc),
+                     fmt::format("Unable to set socket non-blocking: got error: {}", rc));
+    }
+  }
 #endif
 
   return io_handle;
@@ -93,7 +130,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
 
   IoHandlePtr io_handle =
       SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only, options);
-  if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6 &&
+  if (io_handle && addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6 &&
       !Address::forceV6()) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
     const Api::SysCallIntResult result = io_handle->setOption(

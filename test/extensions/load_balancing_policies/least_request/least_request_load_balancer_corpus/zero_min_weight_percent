@@ -1,0 +1,26 @@
+zone_aware_load_balancer_test_case {
+  load_balancer_test_case {
+    common_lb_config {
+    }
+    setup_priority_levels {
+      num_hosts_in_priority_level: 48
+      random_bytestring: 0
+    }
+    seed_for_prng: 5
+  }
+  random_bytestring_for_weights: "\377q\377q"
+}
+least_request_lb_config {
+  slow_start_config {
+    slow_start_window {
+      seconds: 8
+    }
+    aggression {
+      default_value: 3.928881679110406e-27
+      runtime_key: "google.protobuf.UInt32Value"
+    }
+    min_weight_percent {
+    }
+  }
+}
+random_bytestring_for_requests: "#"

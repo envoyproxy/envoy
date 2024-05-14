@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_benchmark_test",
     "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
@@ -191,6 +190,7 @@ envoy_cc_test_library(
         "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
     ],
@@ -223,6 +223,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
@@ -264,76 +265,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "load_balancer_impl_test",
-    srcs = ["load_balancer_impl_test.cc"],
+    name = "load_balancer_context_base_test",
+    srcs = ["load_balancer_context_base_test.cc"],
     deps = [
-        ":utility_lib",
-        "//source/common/common:random_generator_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:load_balancer_lib",
-        "//source/common/upstream:upstream_includes",
-        "//source/common/upstream:upstream_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:cluster_info_mocks",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//test/mocks/upstream:host_mocks",
-        "//test/mocks/upstream:host_set_mocks",
-        "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
-        "//test/test_common:logging_lib",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:test_runtime_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "load_balancer_fuzz_lib",
-    srcs = ["load_balancer_fuzz_base.cc"],
-    hdrs = ["load_balancer_fuzz_base.h"],
-    deps = [
-        ":load_balancer_fuzz_proto_cc_proto",
-        ":utility_lib",
-        "//source/common/upstream:load_balancer_lib",
-        "//test/fuzz:random_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:cluster_info_mocks",
-        "//test/mocks/upstream:host_set_mocks",
-        "//test/mocks/upstream:load_balancer_context_mock",
-        "//test/mocks/upstream:priority_set_mocks",
-        "//test/test_common:simulated_time_system_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_proto_library(
-    name = "load_balancer_fuzz_proto",
-    srcs = ["load_balancer_fuzz.proto"],
-    deps = [
-        "//test/fuzz:common_proto",
-        "@envoy_api//envoy/config/cluster/v3:pkg",
-    ],
-)
-
-envoy_proto_library(
-    name = "random_load_balancer_fuzz_proto",
-    srcs = ["random_load_balancer_fuzz.proto"],
-    deps = [
-        "//test/common/upstream:load_balancer_fuzz_proto",
-    ],
-)
-
-envoy_cc_fuzz_test(
-    name = "random_load_balancer_fuzz_test",
-    srcs = ["random_load_balancer_fuzz_test.cc"],
-    corpus = "random_load_balancer_corpus",
-    deps = [
-        ":load_balancer_fuzz_lib",
-        ":load_balancer_fuzz_proto_cc_proto",
-        ":random_load_balancer_fuzz_proto_cc_proto",
-        ":utility_lib",
     ],
 )
 
@@ -345,9 +282,12 @@ envoy_cc_test(
         "//source/common/common:random_generator_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/load_balancing_policies/least_request:config",
+        "//source/extensions/load_balancing_policies/random:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_set_mocks",
@@ -381,13 +321,13 @@ envoy_cc_test(
     name = "hds_test",
     srcs = ["hds_test.cc"],
     deps = [
+        "//source/common/tls:context_lib",
         "//source/common/upstream:health_discovery_service_lib",
         "//source/common/upstream:transport_socket_match_lib",
         "//source/extensions/health_checkers/grpc:health_checker_lib",
         "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/health_checkers/tcp:health_checker_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
@@ -462,44 +402,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "bounded_load_hlb_test",
-    srcs = ["bounded_load_hlb_test.cc"],
-    deps = [
-        ":utility_lib",
-        "//source/common/upstream:thread_aware_lb_lib",
-        "//source/common/upstream:upstream_includes",
-        "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_benchmark_binary(
-    name = "load_balancer_benchmark",
-    srcs = ["load_balancer_benchmark.cc"],
-    external_deps = [
-        "benchmark",
-    ],
-    deps = [
-        "//source/common/common:random_generator_lib",
-        "//source/common/memory:stats_lib",
-        "//source/common/upstream:upstream_lib",
-        "//source/extensions/load_balancing_policies/maglev:config",
-        "//source/extensions/load_balancing_policies/ring_hash:config",
-        "//test/common/upstream:utility_lib",
-        "//test/mocks/upstream:cluster_info_mocks",
-        "//test/test_common:printers_lib",
-        "//test/test_common:simulated_time_system_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_benchmark_test(
-    name = "load_balancer_benchmark_test",
-    timeout = "long",
-    benchmark_binary = "load_balancer_benchmark",
-)
-
-envoy_cc_test(
     name = "transport_socket_matcher_test",
     srcs = ["transport_socket_matcher_test.cc"],
     deps = [
@@ -521,7 +423,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_impl_test",
     srcs = ["upstream_impl_test.cc"],
-    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
+    data = ["//test/common/tls/test_data:certs"],
     deps = [
         ":utility_lib",
         ":test_local_address_selector",
@@ -607,10 +509,10 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/tls:context_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/integration/clusters:custom_static_cluster",
         "//test/mocks/access_log:access_log_mocks",
@@ -699,67 +601,6 @@ envoy_cc_fuzz_test(
         ":health_check_fuzz_lib",
         ":health_check_fuzz_proto_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_proto_library(
-    name = "zone_aware_load_balancer_fuzz_proto",
-    srcs = ["zone_aware_load_balancer_fuzz.proto"],
-    deps = [
-        "//test/common/upstream:load_balancer_fuzz_proto",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "zone_aware_load_balancer_fuzz_lib",
-    srcs = ["zone_aware_load_balancer_fuzz_base.cc"],
-    hdrs = ["zone_aware_load_balancer_fuzz_base.h"],
-    deps = [
-        ":load_balancer_fuzz_lib",
-        ":zone_aware_load_balancer_fuzz_proto_cc_proto",
-        "//test/mocks/upstream:host_set_mocks",
-        "//test/mocks/upstream:priority_set_mocks",
-    ],
-)
-
-envoy_proto_library(
-    name = "round_robin_load_balancer_fuzz_proto",
-    srcs = ["round_robin_load_balancer_fuzz.proto"],
-    deps = [
-        "//test/common/upstream:zone_aware_load_balancer_fuzz_proto",
-        "@envoy_api//envoy/config/cluster/v3:pkg",
-    ],
-)
-
-envoy_cc_fuzz_test(
-    name = "round_robin_load_balancer_fuzz_test",
-    srcs = ["round_robin_load_balancer_fuzz_test.cc"],
-    corpus = "round_robin_load_balancer_corpus",
-    deps = [
-        ":round_robin_load_balancer_fuzz_proto_cc_proto",
-        ":utility_lib",
-        ":zone_aware_load_balancer_fuzz_lib",
-        "//test/fuzz:utility_lib",
-    ],
-)
-
-envoy_proto_library(
-    name = "least_request_load_balancer_fuzz_proto",
-    srcs = ["least_request_load_balancer_fuzz.proto"],
-    deps = [
-        "//test/common/upstream:zone_aware_load_balancer_fuzz_proto",
-        "@envoy_api//envoy/config/cluster/v3:pkg",
-    ],
-)
-
-envoy_cc_fuzz_test(
-    name = "least_request_load_balancer_fuzz_test",
-    srcs = ["least_request_load_balancer_fuzz_test.cc"],
-    corpus = "least_request_load_balancer_corpus",
-    deps = [
-        ":least_request_load_balancer_fuzz_proto_cc_proto",
-        ":utility_lib",
-        ":zone_aware_load_balancer_fuzz_lib",
     ],
 )
 

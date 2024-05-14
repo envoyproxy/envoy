@@ -33,14 +33,11 @@ NS_ASSUME_NONNULL_BEGIN
  @param logger Logging interface.
  @param eventTracker Event tracking interface.
  @param networkMonitoringMode Configure how the engines observe network reachability.
- @param respectSystemProxySettings Whether to respect system proxy settings when performing
- network requests.
  */
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
                                  logger:(nullable void (^)(NSInteger, NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
-                  networkMonitoringMode:(int)networkMonitoringMode
-             respectSystemProxySettings:(BOOL)respectSystemProxySettings;
+                  networkMonitoringMode:(int)networkMonitoringMode;
 /**
  Run the Envoy engine with the provided configuration and log level.
 
@@ -49,18 +46,6 @@ NS_ASSUME_NONNULL_BEGIN
  @return A status indicating if the action was successful.
  */
 - (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel;
-
-/**
- Run the Envoy engine with the provided yaml string and log level.
-
- @param yaml The configuration yaml with which to start Envoy.
- @param config The EnvoyConfiguration used to start Envoy.
- @param logLevel The log level to use when starting Envoy.
- @return A status indicating if the action was successful.
- */
-- (int)runWithYAML:(NSString *)yaml
-            config:(EnvoyConfiguration *)config
-          logLevel:(NSString *)logLevel;
 
 /**
  Opens a new HTTP stream attached to this engine.
@@ -96,8 +81,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 // Concrete implementation of the `EnvoyEngine` interface.
 @interface EnvoyEngineImpl : NSObject <EnvoyEngine>
-
-@property (nonatomic, copy, nullable) void (^onEngineRunning)();
 
 @end
 

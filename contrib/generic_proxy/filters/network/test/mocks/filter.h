@@ -12,11 +12,11 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-class MockStreamFrameHandler : public StreamFrameHandler {
+class MockRequestFramesHandler : public RequestFramesHandler {
 public:
-  MockStreamFrameHandler();
+  MockRequestFramesHandler();
 
-  MOCK_METHOD(void, onStreamFrame, (StreamFramePtr frame));
+  MOCK_METHOD(void, onRequestCommonFrame, (RequestCommonFramePtr));
 };
 
 class MockDecoderFilter : public DecoderFilter {
@@ -92,7 +92,7 @@ public:
 template <class Base> class MockStreamFilterCallbacks : public Base {
 public:
   MOCK_METHOD(Envoy::Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(const CodecFactory&, downstreamCodec, ());
+  MOCK_METHOD(const CodecFactory&, codecFactory, ());
   MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (), (const));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
@@ -108,9 +108,9 @@ public:
 
   MOCK_METHOD(void, sendLocalReply, (Status, absl::string_view, ResponseUpdateFunction));
   MOCK_METHOD(void, continueDecoding, ());
-  MOCK_METHOD(void, onResponseStart, (StreamResponsePtr response));
-  MOCK_METHOD(void, onResponseFrame, (StreamFramePtr frame));
-  MOCK_METHOD(void, setRequestFramesHandler, (StreamFrameHandler & handler));
+  MOCK_METHOD(void, onResponseStart, (ResponseHeaderFramePtr));
+  MOCK_METHOD(void, onResponseFrame, (ResponseCommonFramePtr));
+  MOCK_METHOD(void, setRequestFramesHandler, (RequestFramesHandler&));
   MOCK_METHOD(void, completeDirectly, ());
 };
 

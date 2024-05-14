@@ -8,7 +8,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -58,9 +57,6 @@ public:
   }
 
   void initializeProviderFactory() {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
     Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(*dummy_factory_);
   }
 
@@ -101,7 +97,7 @@ TEST_F(GeoipFilterTest, NoXffSuccessfulLookup) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
   captured_cb_(Geolocation::LookupResult{{"x-geo-city", "dummy-city"}});
   EXPECT_CALL(filter_callbacks_, continueDecoding());
@@ -120,6 +116,8 @@ TEST_F(GeoipFilterTest, UseXffSuccessfulLookup) {
       xff_num_trusted_hops: 1
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -134,7 +132,7 @@ TEST_F(GeoipFilterTest, UseXffSuccessfulLookup) {
           DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
                   captured_cb_(Geolocation::LookupResult{{"x-geo-region", "dummy-region"}});
                 })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -150,6 +148,8 @@ TEST_F(GeoipFilterTest, GeoHeadersOverridenForIncomingRequest) {
   const std::string external_request_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -167,7 +167,7 @@ TEST_F(GeoipFilterTest, GeoHeadersOverridenForIncomingRequest) {
                               captured_cb_(Geolocation::LookupResult{
                                   {"x-geo-city", "dummy-city"}, {"x-geo-region", "dummy-region"}});
                             })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -184,6 +184,8 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
   const std::string external_request_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -214,7 +216,7 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
                                                             {"x-geo-anon-tor", "true"},
                                                             {"x-geo-anon-proxy", "true"}});
                             })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -239,6 +241,8 @@ TEST_F(GeoipFilterTest, GeoHeaderNotAppendedOnEmptyLookup) {
   const std::string external_request_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -252,7 +256,7 @@ TEST_F(GeoipFilterTest, GeoHeaderNotAppendedOnEmptyLookup) {
                               captured_cb_(Geolocation::LookupResult{
                                   {"x-geo-city", ""}, {"x-geo-region", "dummy-region"}});
                             })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -268,6 +272,8 @@ TEST_F(GeoipFilterTest, NoCrashIfFilterDestroyedBeforeCallbackCalled) {
   const std::string external_request_yaml = R"EOF(
       provider:
           name: "envoy.geoip_providers.dummy"
+          typed_config:
+            "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
   )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -279,7 +285,7 @@ TEST_F(GeoipFilterTest, NoCrashIfFilterDestroyedBeforeCallbackCalled) {
       .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
                               captured_cb_(Geolocation::LookupResult{{"x-geo-city", "dummy-city"}});
                             })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
   filter_.reset();
   dispatcher_->run(Event::Dispatcher::RunType::Block);

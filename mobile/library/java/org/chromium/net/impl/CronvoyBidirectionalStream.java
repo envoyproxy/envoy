@@ -13,7 +13,6 @@ import org.chromium.net.BidirectionalStream;
 import org.chromium.net.CallbackException;
 import org.chromium.net.CronetException;
 import org.chromium.net.ExperimentalBidirectionalStream;
-import org.chromium.net.NetworkException;
 import org.chromium.net.RequestFinishedInfo;
 import org.chromium.net.UrlResponseInfo;
 import org.chromium.net.impl.Annotations.RequestPriority;
@@ -27,8 +26,8 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -255,7 +254,6 @@ public final class CronvoyBidirectionalStream
           case NextAction.TAKE_NO_MORE_ACTIONS:
             // Very unlikely: just before this switch statement and after the previous one, an EM
             // onError callback occurred, or there was a USER_CANCEL event.
-            return;
           }
         }
       } catch (Exception e) {
@@ -649,7 +647,8 @@ public final class CronvoyBidirectionalStream
     });
   }
 
-  private void onErrorReceived(int errorCode, EnvoyFinalStreamIntel finalStreamIntel) {
+  private void onErrorReceived(int errorCode, String message,
+                               EnvoyFinalStreamIntel finalStreamIntel) {
     if (mResponseInfo != null) {
       mResponseInfo.setReceivedByteCount(finalStreamIntel.getReceivedByteCount());
     }
@@ -658,12 +657,17 @@ public final class CronvoyBidirectionalStream
     int javaError = mapNetErrorToCronetApiErrorCode(netError);
 
     if (isQuicException(javaError)) {
+      // `message` is populated from StreamInfo::responseCodeDetails(), so `message` is used to
+      // populate the error details in the exception.
       mException.set(new CronvoyQuicExceptionImpl("Exception in BidirectionalStream: " + netError,
                                                   javaError, netError.getErrorCode(),
-                                                  Errors.QUIC_INTERNAL_ERROR));
+                                                  Errors.QUIC_INTERNAL_ERROR, message));
     } else {
+      // `message` is populated from StreamInfo::responseCodeDetails(), so `message` is used to
+      // populate the error details in the exception.
       mException.set(new CronvoyBidirectionalStreamNetworkException(
-          "Exception in BidirectionalStream: " + netError, javaError, netError.getErrorCode()));
+          "Exception in BidirectionalStream: " + netError, javaError, netError.getErrorCode(),
+          message));
     }
 
     failWithException();
@@ -765,8 +769,8 @@ public final class CronvoyBidirectionalStream
     }
     // proxy and caching are not supported.
     CronvoyUrlResponseInfoImpl responseInfo =
-        new CronvoyUrlResponseInfoImpl(Arrays.asList(mInitialUrl), httpStatusCode, "", headers,
-                                       false, negotiatedProtocol, null, receivedByteCount);
+        new CronvoyUrlResponseInfoImpl(Collections.singletonList(mInitialUrl), httpStatusCode, "",
+                                       headers, false, negotiatedProtocol, null, receivedByteCount);
     return responseInfo;
   }
 
@@ -1037,7 +1041,7 @@ public final class CronvoyBidirectionalStream
     mEnvoyFinalStreamIntel = finalStreamIntel;
     switch (mState.nextAction(Event.ON_ERROR)) {
     case NextAction.NOTIFY_USER_NETWORK_ERROR:
-      onErrorReceived(errorCode, finalStreamIntel);
+      onErrorReceived(errorCode, message, finalStreamIntel);
       break;
     case NextAction.NOTIFY_USER_FAILED:
       // There was already an error in-progress - the network error came too late and is ignored.

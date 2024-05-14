@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # This test is semi-automatic. It builds envoy-static with
 # ENVOY_ADMIN_BROWSER_TEST set, then runs the binary in a mode where

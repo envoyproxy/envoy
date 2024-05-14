@@ -50,6 +50,7 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
           grpc_mux_content.local_info_.contextProvider().addDynamicContextUpdateCallback(
               [this](absl::string_view resource_type_url) {
                 onDynamicContextUpdate(resource_type_url);
+                return absl::OkStatus();
               })),
       config_validators_(std::move(grpc_mux_content.config_validators_)),
       xds_config_tracker_(grpc_mux_content.xds_config_tracker_),
@@ -415,6 +416,9 @@ public:
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
          XdsResourcesDelegateOptRef, bool use_eds_resources_cache) override {
+    absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
+        Utility::parseRateLimitSettings(ads_config);
+    THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::move(async_client),
         /*dispatcher_=*/dispatcher,
@@ -422,7 +426,7 @@ public:
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
         /*local_info_=*/local_info,
-        /*rate_limit_settings_=*/Utility::parseRateLimitSettings(ads_config),
+        /*rate_limit_settings_=*/rate_limit_settings_or_error.value(),
         /*scope_=*/scope,
         /*config_validators_=*/std::move(config_validators),
         /*xds_resources_delegate_=*/absl::nullopt,
@@ -450,6 +454,9 @@ public:
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
          XdsResourcesDelegateOptRef, bool use_eds_resources_cache) override {
+    absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
+        Utility::parseRateLimitSettings(ads_config);
+    THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::move(async_client),
         /*dispatcher_=*/dispatcher,
@@ -457,7 +464,7 @@ public:
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
         /*local_info_=*/local_info,
-        /*rate_limit_settings_=*/Utility::parseRateLimitSettings(ads_config),
+        /*rate_limit_settings_=*/rate_limit_settings_or_error.value(),
         /*scope_=*/scope,
         /*config_validators_=*/std::move(config_validators),
         /*xds_resources_delegate_=*/absl::nullopt,

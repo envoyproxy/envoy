@@ -1046,13 +1046,13 @@ TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("bar", {}, "");
   grpc_mux_->start();
   // Unknown type, shouldn't do anything.
-  local_info_.context_provider_.update_cb_handler_.runCallbacks("baz");
+  ASSERT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz").ok());
   // Update to foo type should resend Node.
   expectSendMessage("foo", {"x", "y"}, "", true);
-  local_info_.context_provider_.update_cb_handler_.runCallbacks("foo");
+  ASSERT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("foo").ok());
   // Update to bar type should resend Node.
   expectSendMessage("bar", {}, "", true);
-  local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
+  ASSERT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar").ok());
   // only destruction of foo watch is going to result in an unsubscribe message.
   // bar watch is empty and its destruction doesn't change it resource list.
   expectSendMessage("foo", {}, "", false);
@@ -1299,6 +1299,42 @@ TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
 }
 
 TEST_F(NullGrpcMuxImplTest, NoEdsResourcesCache) { EXPECT_EQ({}, null_mux_->edsResourcesCache()); }
+
+TEST(UnifiedSotwGrpcMuxFactoryTest, InvalidRateLimit) {
+  auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(
+      "envoy.config_mux.sotw_grpc_mux_factory");
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Stats::MockStore> store;
+  Stats::MockScope& scope{store.mockScope()};
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  envoy::config::core::v3::ApiConfigSource ads_config;
+  ads_config.mutable_rate_limit_settings()->mutable_max_tokens()->set_value(100);
+  ads_config.mutable_rate_limit_settings()->mutable_fill_rate()->set_value(
+      std::numeric_limits<double>::quiet_NaN());
+  EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), dispatcher, random, scope,
+                               ads_config, local_info, nullptr, nullptr, absl::nullopt,
+                               absl::nullopt, false),
+               EnvoyException);
+}
+
+TEST(UnifiedDeltaGrpcMuxFactoryTest, InvalidRateLimit) {
+  auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(
+      "envoy.config_mux.delta_grpc_mux_factory");
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Stats::MockStore> store;
+  Stats::MockScope& scope{store.mockScope()};
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  envoy::config::core::v3::ApiConfigSource ads_config;
+  ads_config.mutable_rate_limit_settings()->mutable_max_tokens()->set_value(100);
+  ads_config.mutable_rate_limit_settings()->mutable_fill_rate()->set_value(
+      std::numeric_limits<double>::quiet_NaN());
+  EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), dispatcher, random, scope,
+                               ads_config, local_info, nullptr, nullptr, absl::nullopt,
+                               absl::nullopt, false),
+               EnvoyException);
+}
 
 } // namespace
 } // namespace XdsMux

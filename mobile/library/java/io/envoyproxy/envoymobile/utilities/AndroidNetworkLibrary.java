@@ -13,12 +13,8 @@ import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.Socket;
 import java.net.SocketAddress;
-import java.net.SocketException;
 import java.net.SocketImpl;
-import java.net.URLConnection;
 import java.net.Socket;
 
 import java.security.KeyStoreException;

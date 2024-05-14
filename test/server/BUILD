@@ -280,7 +280,6 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
@@ -360,18 +359,6 @@ envoy_cc_test(
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "ssl_context_manager_test",
-    srcs = ["ssl_context_manager_test.cc"],
-    deps = [
-        "//source/server:ssl_context_manager_lib",
-        "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:utility_lib",
     ],
 )
 

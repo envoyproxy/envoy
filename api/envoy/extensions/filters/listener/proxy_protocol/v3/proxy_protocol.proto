@@ -70,4 +70,19 @@ message ProxyProtocol {
   //   :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`,
   //   which controls pass-through for the upstream.
   config.core.v3.ProxyProtocolPassThroughTLVs pass_through_tlvs = 3;
+
+  // The PROXY protocol versions that won't be matched. Useful to limit the scope and attack surface of the filter.
+  //
+  // When the filter receives PROXY protocol data that is disallowed, it will reject the connection.
+  // By default, the filter will match all PROXY protocol versions.
+  // See https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details.
+  //
+  // .. attention::
+  //
+  //   When used in conjunction with the :ref:`allow_requests_without_proxy_protocol <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>`,
+  //   the filter will not attempt to match signatures for the disallowed versions.
+  //   For example, when ``disallowed_versions=V2``, ``allow_requests_without_proxy_protocol=true``,
+  //   and an incoming request matches the V2 signature, the filter will allow the request through without any modification.
+  //   The filter treats this request as if it did not have any PROXY protocol information.
+  repeated config.core.v3.ProxyProtocolConfig.Version disallowed_versions = 4;
 }

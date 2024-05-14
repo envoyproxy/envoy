@@ -6,6 +6,7 @@ ABI
 ACK
 ACL
 AES
+AJAX
 AllMuxes
 ALPN
 ALS
@@ -26,6 +27,9 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+ECN
+ECS
+EKS
 NID
 NIST
 bm
@@ -66,6 +70,7 @@ DSR
 DSS
 EBADF
 ECH
+ECT
 ENDIF
 ENOTCONN
 ENQ
@@ -176,6 +181,7 @@ FIRSTHDR
 FQDN
 FREEBIND
 curr
+doo
 eslint
 freeifaddrs
 FUZZER
@@ -258,6 +264,7 @@ LEV
 LF
 LHS
 hls
+hoo
 iframe
 ilp
 ingressed
@@ -295,9 +302,11 @@ NGHTTP
 NLOHMANN
 NOAUTH
 NOCHECKRESP
+NODATA
 NODELAY
 NOLINT
 NOLINTNEXTLINE
+NONAME
 NONBLOCK
 NONCES
 NOSORT
@@ -312,6 +321,7 @@ ODCDS
 middlewildcard
 monostate
 mpd
+mutators
 na
 oghttp
 OID
@@ -353,6 +363,7 @@ QUIC
 QoS
 qat
 qatzip
+qatzstd
 RAII
 RANLUX
 RBAC
@@ -469,7 +480,6 @@ VM
 VPN
 WAITFORONE
 WASM
-WAVM
 WIP
 WKT
 WRONGPASS
@@ -769,6 +779,8 @@ fixdate
 fixup
 flatbuffer
 flatc
+fluentd
+Fluentd
 fmt
 fmtlib
 fn
@@ -879,6 +891,7 @@ iteratively
 javascript
 jitter
 jittered
+joinable
 js
 kafka
 keepalive
@@ -965,6 +978,7 @@ moveable
 msec
 msg
 msghdr
+msgpack
 multi
 multicast
 multikill
@@ -1174,6 +1188,7 @@ reparse
 repeatability
 reperform
 repicked
+replayable
 repo
 reproducibility
 requirepass
@@ -1321,6 +1336,7 @@ suf
 superclass
 superroot
 superset
+supportability
 svc
 symlink
 symlinked
@@ -1361,6 +1377,7 @@ tokenized
 tokenizes
 tokenizing
 toolchain
+tos
 traceid
 traceparent
 tracestate
@@ -1404,6 +1421,7 @@ upcasts
 upstreams
 uptime
 upvalue
+uring
 urlencoded
 urls
 userdata
@@ -1463,6 +1481,7 @@ xxhash
 xxs
 xyz
 xyzwebservices
+yml
 zag
 zig
 zipkin
@@ -1489,3 +1508,5 @@ DLB
 PCIE
 EDNS
 CNAME
+NAT
+DNAT

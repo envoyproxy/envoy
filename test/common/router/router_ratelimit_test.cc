@@ -292,8 +292,10 @@ virtual_hosts:
 class RateLimitPolicyEntryTest : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
-    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromV3Yaml(yaml),
-                                                                   factory_context_);
+    absl::Status creation_status;
+    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(
+        parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
+    THROW_IF_NOT_OK(creation_status);
     descriptors_.clear();
     local_descriptors_.clear();
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
@@ -314,8 +316,10 @@ public:
 class RateLimitPolicyEntryIpv6Test : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
-    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromV3Yaml(yaml),
-                                                                   factory_context_);
+    absl::Status creation_status;
+    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(
+        parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
+    THROW_IF_NOT_OK(creation_status);
     descriptors_.clear();
     local_descriptors_.clear();
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);

@@ -995,8 +995,12 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   auto& handler = grpc_call_request_[token];
   handler.context_ = this;
   handler.token_ = token;
-  auto grpc_client = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+  auto client_or_error = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
       service_proto, *wasm()->scope_, true /* skip_cluster_check */);
+  if (!client_or_error.status().ok()) {
+    return WasmResult::BadArgument;
+  }
+  auto grpc_client = client_or_error.value();
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1040,8 +1044,12 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   auto& handler = grpc_stream_[token];
   handler.context_ = this;
   handler.token_ = token;
-  auto grpc_client = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+  auto client_or_error = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
       service_proto, *wasm()->scope_, true /* skip_cluster_check */);
+  if (!client_or_error.status().ok()) {
+    return WasmResult::BadArgument;
+  }
+  auto grpc_client = client_or_error.value();
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1683,8 +1691,16 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
       if (local_reply_sent_) {
         return;
       }
+      // C++, Rust and other SDKs use -1 (InvalidCode) as the default value if gRPC code is not set,
+      // which should be mapped to nullopt in Envoy to prevent it from sending a grpc-status trailer
+      // at all.
+      absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = absl::nullopt;
+      if (grpc_status >= Grpc::Status::WellKnownGrpcStatus::Ok &&
+          grpc_status <= Grpc::Status::WellKnownGrpcStatus::MaximumKnown) {
+        grpc_status_code = Grpc::Status::WellKnownGrpcStatus(grpc_status);
+      }
       decoder_callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(response_code), body_text,
-                                         modify_headers, grpc_status, details);
+                                         modify_headers, grpc_status_code, details);
       local_reply_sent_ = true;
     });
   }

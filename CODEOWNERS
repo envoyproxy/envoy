@@ -60,7 +60,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # sni_dynamic_forward_proxy extension
 /*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @lizan
 # tracers.datadog extension
-/*/extensions/tracers/datadog @cgilmour @dgoffredo @dmehala @mattklein123
+/*/extensions/tracers/datadog @dmehala @mattklein123
 # tracers.xray extension
 /*/extensions/tracers/xray @suniltheta @mattklein123
 # tracers.skywalking extension
@@ -249,15 +249,16 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/rbac @yangminzhu @yanavlasov
 /*/extensions/filters/common/rbac @yangminzhu @yanavlasov
 # tap
-/*/extensions/filters/http/tap @mattklein123 @daixiang0
-/*/extensions/common/tap @mattklein123 @daixiang0
-/*/extensions/transport_sockets/tap @mattklein123 @daixiang0
+/*/extensions/filters/http/tap @mattklein123 @xu1zhou
+/*/extensions/common/tap @mattklein123 @xu1zhou
+/*/extensions/transport_sockets/tap @mattklein123 @xu1zhou
 # local rate limit
 /*/extensions/filters/network/local_ratelimit @mattklein123 @wbpcode
 /*/extensions/filters/listener/local_ratelimit @mattklein123 @JuniorHsu
 # proxy protocol
 /*/extensions/filters/listener/proxy_protocol @ggreenway @soulxu
 # access loggers
+/*/extensions/access_loggers/fluentd @ohadvano @wbpcode
 /*/extensions/access_loggers/grpc @wbpcode @cpakulski @giantcroc @gyohuangxin
 # stats
 /*/extensions/stat_sinks/statsd @mattklein123 @suniltheta
@@ -268,7 +269,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @cpakulski
 /*/extensions/http/stateful_session/header @ramaraochavali @wbpcode @cpakulski
-/*/extensions/filters/http/stateful_session @wbpcode @cpakulski
+/*/extensions/filters/http/stateful_session @wbpcode @cpakulski @adisuissa
 # tracers
 /*/extensions/tracers/zipkin @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/dynamic_ot @wbpcode @Shikugawa @basvanbeek
@@ -323,6 +324,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
 # Network matching extensions
 /*/extensions/matching/network/ @kyessenov @mattklein123
+# String matching extensions
+/*/extensions/string_matcher/ @ggreenway @UNOWNED
 # Header mutation
 /*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
 # Health checkers
@@ -336,8 +339,16 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/geoip_providers/common @nezdolik @ravenblackx
 # Maxmind geolocation provider
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx
+# Match delegate extension
+/*/extensions/filters/http/match_delegate @wbpcode @jstraceski @tyxia
 
 /*/extensions/health_checkers/common @zuercher @botengyao
+
+# HTTP credential injector
+/*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov
+/*/extensions/http/injected_credentials/common @zhaohuabing @kyessenov
+/*/extensions/http/injected_credentials/generic @zhaohuabing @kyessenov
+/*/extensions/http/injected_credentials/oauth2 @vikaschoudhary16 @wbpcode
 
 # Lua cluster specifier
 /*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
@@ -362,7 +373,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/path/uri_template_lib/proto @alyssawilk @yanjunxiang-google
 
 # mobile
-/mobile/ @RyanTheOptimist @alyssawilk @abeyad
+/mobile/ @RyanTheOptimist @alyssawilk @abeyad @fredyw
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
@@ -384,4 +395,4 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /contrib/language/ @realtimetodie @realtimetodie
 /contrib/dlb @mattklein123 @daixiang0
 /contrib/qat/ @giantcroc @soulxu
-/contrib/generic_proxy/ @wbpcode @soulxu @zhaohuabing @rojkov @htuch
+/contrib/generic_proxy/ @wbpcode @UNOWNED

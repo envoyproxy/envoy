@@ -28,7 +28,8 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
   }
 
   switch (histogram_buckets_mode_) {
-  case Utility::HistogramBucketsMode::NoBuckets:
+  case Utility::HistogramBucketsMode::Unset:
+  case Utility::HistogramBucketsMode::Summary:
     response.addFragments({name, ": ", histogram.quantileSummary(), "\n"});
     break;
   case Utility::HistogramBucketsMode::Cumulative:
@@ -153,7 +154,8 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
   }
 
   switch (histogram_buckets_mode_) {
-  case Utility::HistogramBucketsMode::NoBuckets: {
+  case Utility::HistogramBucketsMode::Unset:
+  case Utility::HistogramBucketsMode::Summary: {
     Json::Streamer::MapPtr map = json_->histogram_array_->addMap();
     map->addEntries({{"name", name}});
     map->addKey("values");
@@ -219,7 +221,8 @@ void StatsJsonRender::renderHistogramStart() {
     json_->histogram_map2_->addKey("details");
     json_->histogram_array_ = json_->histogram_map2_->addArray();
     break;
-  case Utility::HistogramBucketsMode::NoBuckets:
+  case Utility::HistogramBucketsMode::Unset:
+  case Utility::HistogramBucketsMode::Summary:
     json_->histogram_map2_ = json_->histogram_map1_->addMap();
     json_->histogram_map2_->addKey("supported_quantiles");
     { populateSupportedPercentiles(*json_->histogram_map2_->addArray()); }

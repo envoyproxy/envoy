@@ -85,12 +85,12 @@ public:
        Tracer& parent_tracer, OTelSpanKind span_kind);
 
   // Tracing::Span functions
-  void setOperation(absl::string_view /*operation*/) override{};
+  void setOperation(absl::string_view /*operation*/) override;
   void setTag(absl::string_view /*name*/, absl::string_view /*value*/) override;
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override{};
   void finishSpan() override;
   void injectContext(Envoy::Tracing::TraceContext& /*trace_context*/,
-                     const Upstream::HostDescriptionConstSharedPtr&) override;
+                     const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
 
@@ -122,6 +122,11 @@ public:
   OTelSpanKind spankind() const { return span_.kind(); }
 
   /**
+   * @return the operation name set on the span
+   */
+  std::string name() const { return span_.name(); }
+
+  /**
    * Sets the span's id.
    */
   void setId(const absl::string_view& span_id_hex) {
@@ -145,6 +150,11 @@ public:
   void setTracestate(const absl::string_view& tracestate) {
     span_.set_trace_state(std::string{tracestate});
   }
+
+  /**
+   * Sets a span attribute.
+   */
+  void setAttribute(absl::string_view name, const OTelAttribute& value);
 
   /**
    * Method to access the span for testing.

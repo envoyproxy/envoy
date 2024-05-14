@@ -161,14 +161,15 @@ private:
  */
 template <class ProtoType> class CorsPolicyImplBase : public CorsPolicy {
 public:
-  CorsPolicyImplBase(const ProtoType& config, Runtime::Loader& loader)
-      : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
+  CorsPolicyImplBase(const ProtoType& config,
+                     Server::Configuration::CommonFactoryContext& factory_context)
+      : config_(config), loader_(factory_context.runtime()), allow_methods_(config.allow_methods()),
         allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
         max_age_(config.max_age()) {
     for (const auto& string_match : config.allow_origin_string_match()) {
       allow_origins_.push_back(
           std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              string_match));
+              string_match, factory_context));
     }
     if (config.has_allow_credentials()) {
       allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
@@ -176,6 +177,11 @@ public:
     if (config.has_allow_private_network_access()) {
       allow_private_network_access_ =
           PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
+    }
+
+    if (config.has_forward_not_matching_preflights()) {
+      forward_not_matching_preflights_ =
+          PROTOBUF_GET_WRAPPED_REQUIRED(config, forward_not_matching_preflights);
     }
   }
 
@@ -207,6 +213,9 @@ public:
     }
     return false;
   };
+  const absl::optional<bool>& forwardNotMatchingPreflights() const override {
+    return forward_not_matching_preflights_;
+  }
 
 private:
   const ProtoType config_;
@@ -218,6 +227,7 @@ private:
   const std::string max_age_;
   absl::optional<bool> allow_credentials_{};
   absl::optional<bool> allow_private_network_access_{};
+  absl::optional<bool> forward_not_matching_preflights_{};
 };
 using CorsPolicyImpl = CorsPolicyImplBase<envoy::config::route::v3::CorsPolicy>;
 
@@ -320,7 +330,8 @@ private:
 
   struct VirtualClusterEntry : public StatNameProvider, public VirtualClusterBase {
     VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
-                        Stats::Scope& scope, const VirtualClusterStatNames& stat_names);
+                        Stats::Scope& scope, Server::Configuration::CommonFactoryContext& context,
+                        const VirtualClusterStatNames& stat_names);
     std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
@@ -400,7 +411,8 @@ class RetryPolicyImpl : public RetryPolicy {
 public:
   RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
                   ProtobufMessage::ValidationVisitor& validation_visitor,
-                  Upstream::RetryExtensionFactoryContext& factory_context);
+                  Upstream::RetryExtensionFactoryContext& factory_context,
+                  Server::Configuration::CommonFactoryContext& common_context);
   RetryPolicyImpl() = default;
 
   // Router::RetryPolicy
@@ -474,6 +486,7 @@ public:
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
   bool traceSampled() const override { return trace_sampled_; }
+  bool disableShadowHostSuffixAppend() const override { return disable_shadow_host_suffix_append_; }
 
 private:
   const std::string cluster_;
@@ -481,6 +494,7 @@ private:
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
   bool trace_sampled_;
+  const bool disable_shadow_host_suffix_append_;
 };
 
 /**
@@ -607,15 +621,16 @@ class RouteEntryImplBase : public RouteEntryAndRoute,
                            public PathMatchCriterion,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            Logger::Loggable<Logger::Id::router> {
-public:
+protected:
   /**
-   * @throw EnvoyException with reason if the route configuration contains any errors
+   * @throw EnvoyException or sets creation_status if the route configuration contains any errors
    */
   RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                      const envoy::config::route::v3::Route& route,
                      Server::Configuration::ServerFactoryContext& factory_context,
-                     ProtobufMessage::ValidationVisitor& validator);
+                     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
 
+public:
   bool isDirectResponse() const { return direct_response_code_.has_value(); }
 
   bool isRedirect() const {
@@ -632,7 +647,8 @@ public:
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                   uint64_t random_value) const;
-  void validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
+  absl::Status
+  validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -1226,11 +1242,6 @@ private:
  */
 class UriTemplateMatcherRouteEntryImpl : public RouteEntryImplBase {
 public:
-  UriTemplateMatcherRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
-                                   const envoy::config::route::v3::Route& route,
-                                   Server::Configuration::ServerFactoryContext& factory_context,
-                                   ProtobufMessage::ValidationVisitor& validator);
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return uri_template_; }
   PathMatchType matchType() const override { return PathMatchType::Template; }
@@ -1249,6 +1260,14 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
+  friend class RouteCreator;
+
+  UriTemplateMatcherRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
+                                   const envoy::config::route::v3::Route& route,
+                                   Server::Configuration::ServerFactoryContext& factory_context,
+                                   ProtobufMessage::ValidationVisitor& validator,
+                                   absl::Status& creation_status);
+
   const std::string uri_template_;
 };
 
@@ -1257,11 +1276,6 @@ private:
  */
 class PrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
-                       const envoy::config::route::v3::Route& route,
-                       Server::Configuration::ServerFactoryContext& factory_context,
-                       ProtobufMessage::ValidationVisitor& validator);
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
     return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().prefix() : EMPTY_STRING;
@@ -1282,6 +1296,13 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
+  friend class RouteCreator;
+  PrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
+                       const envoy::config::route::v3::Route& route,
+                       Server::Configuration::ServerFactoryContext& factory_context,
+                       ProtobufMessage::ValidationVisitor& validator,
+                       absl::Status& creation_status);
+
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1290,11 +1311,6 @@ private:
  */
 class PathRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
-                     const envoy::config::route::v3::Route& route,
-                     Server::Configuration::ServerFactoryContext& factory_context,
-                     ProtobufMessage::ValidationVisitor& validator);
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
     return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().exact() : EMPTY_STRING;
@@ -1315,6 +1331,12 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
+  friend class RouteCreator;
+  PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
+                     const envoy::config::route::v3::Route& route,
+                     Server::Configuration::ServerFactoryContext& factory_context,
+                     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
+
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1323,11 +1345,6 @@ private:
  */
 class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
-  RegexRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
-                      const envoy::config::route::v3::Route& route,
-                      Server::Configuration::ServerFactoryContext& factory_context,
-                      ProtobufMessage::ValidationVisitor& validator);
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
     return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().safe_regex().regex()
@@ -1349,6 +1366,12 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
+  friend class RouteCreator;
+  RegexRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
+                      const envoy::config::route::v3::Route& route,
+                      Server::Configuration::ServerFactoryContext& factory_context,
+                      ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
+
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1357,11 +1380,6 @@ private:
  */
 class ConnectRouteEntryImpl : public RouteEntryImplBase {
 public:
-  ConnectRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
-                        const envoy::config::route::v3::Route& route,
-                        Server::Configuration::ServerFactoryContext& factory_context,
-                        ProtobufMessage::ValidationVisitor& validator);
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return EMPTY_STRING; }
   PathMatchType matchType() const override { return PathMatchType::None; }
@@ -1379,6 +1397,14 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
   bool supportsPathlessHeaders() const override { return true; }
+
+private:
+  friend class RouteCreator;
+  ConnectRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
+                        const envoy::config::route::v3::Route& route,
+                        Server::Configuration::ServerFactoryContext& factory_context,
+                        ProtobufMessage::ValidationVisitor& validator,
+                        absl::Status& creation_status);
 };
 
 /**
@@ -1386,11 +1412,6 @@ public:
  */
 class PathSeparatedPrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PathSeparatedPrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
-                                    const envoy::config::route::v3::Route& route,
-                                    Server::Configuration::ServerFactoryContext& factory_context,
-                                    ProtobufMessage::ValidationVisitor& validator);
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
     return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().prefix() : EMPTY_STRING;
@@ -1411,6 +1432,13 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
+  friend class RouteCreator;
+  PathSeparatedPrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
+                                    const envoy::config::route::v3::Route& route,
+                                    Server::Configuration::ServerFactoryContext& factory_context,
+                                    ProtobufMessage::ValidationVisitor& validator,
+                                    absl::Status& creation_status);
+
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 

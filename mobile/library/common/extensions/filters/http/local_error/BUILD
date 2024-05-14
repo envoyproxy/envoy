@@ -22,7 +22,6 @@ envoy_cc_extension(
     deps = [
         ":filter_cc_proto",
         "//library/common/http:header_utility_lib",
-        "//library/common/http:internal_headers_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/http:codes_interface",
         "@envoy//envoy/http:filter_interface",

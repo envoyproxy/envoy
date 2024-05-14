@@ -164,13 +164,13 @@ TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("bar", {}, "");
   grpc_mux_->start();
   // Unknown type, shouldn't do anything.
-  local_info_.context_provider_.update_cb_handler_.runCallbacks("baz");
+  EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz").ok());
   // Update to foo type should resend Node.
   expectSendMessage("foo", {"x", "y"}, "", true);
-  local_info_.context_provider_.update_cb_handler_.runCallbacks("foo");
+  EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("foo").ok());
   // Update to bar type should resend Node.
   expectSendMessage("bar", {}, "", true);
-  local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
+  EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar").ok());
   // Adding a new foo resource to the watch shouldn't send Node.
   expectSendMessage("foo", {"z", "x", "y"}, "");
   auto foo_z_sub = grpc_mux_->addWatch("foo", {"z"}, callbacks_, resource_decoder_, {});
@@ -1384,6 +1384,24 @@ TEST_F(NullGrpcMuxImplTest, OnDiscoveryResponseImplemented) {
   Stats::TestUtil::TestStore stats;
   ControlPlaneStats cp_stats{Utility::generateControlPlaneStats(*stats.rootScope())};
   EXPECT_NO_THROW(null_mux_.onDiscoveryResponse(std::move(response), cp_stats));
+}
+
+TEST(GrpcMuxFactoryTest, InvalidRateLimit) {
+  auto* factory =
+      Config::Utility::getFactoryByName<Config::MuxFactory>("envoy.config_mux.grpc_mux_factory");
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Stats::MockStore> store;
+  Stats::MockScope& scope{store.mockScope()};
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  envoy::config::core::v3::ApiConfigSource ads_config;
+  ads_config.mutable_rate_limit_settings()->mutable_max_tokens()->set_value(100);
+  ads_config.mutable_rate_limit_settings()->mutable_fill_rate()->set_value(
+      std::numeric_limits<double>::quiet_NaN());
+  EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), dispatcher, random, scope,
+                               ads_config, local_info, nullptr, nullptr, absl::nullopt,
+                               absl::nullopt, false),
+               EnvoyException);
 }
 
 } // namespace

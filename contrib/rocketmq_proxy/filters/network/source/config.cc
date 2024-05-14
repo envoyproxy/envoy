@@ -24,7 +24,7 @@ Network::FilterFactoryCb RocketmqProxyFilterConfigFactory::createFilterFactoryFr
   std::shared_ptr<ConfigImpl> filter_config = std::make_shared<ConfigImpl>(proto_config, context);
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
-        *filter_config, context.serverFactoryContext().mainThreadDispatcher().timeSource()));
+        filter_config, context.serverFactoryContext().mainThreadDispatcher().timeSource()));
   };
 }
 
@@ -35,7 +35,8 @@ ConfigImpl::ConfigImpl(const RocketmqProxyConfig& config,
                        Server::Configuration::FactoryContext& context)
     : context_(context), stats_prefix_(fmt::format("rocketmq.{}.", config.stat_prefix())),
       stats_(RocketmqFilterStats::generateStats(stats_prefix_, context_.scope())),
-      route_matcher_(new Router::RouteMatcher(config.route_config())),
+      route_matcher_(
+          new Router::RouteMatcher(config.route_config(), context.serverFactoryContext())),
       develop_mode_(config.develop_mode()),
       transient_object_life_span_(PROTOBUF_GET_MS_OR_DEFAULT(config, transient_object_life_span,
                                                              TransientObjectLifeSpan)) {}

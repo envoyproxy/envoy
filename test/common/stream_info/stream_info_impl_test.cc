@@ -44,7 +44,8 @@ protected:
         sizeof(stream_info) == 840 || sizeof(stream_info) == 856 || sizeof(stream_info) == 888 ||
         sizeof(stream_info) == 776 || sizeof(stream_info) == 728 || sizeof(stream_info) == 744 ||
         sizeof(stream_info) == 680 || sizeof(stream_info) == 696 || sizeof(stream_info) == 688 ||
-        sizeof(stream_info) == 736 || sizeof(stream_info) == 728 || sizeof(stream_info) == 712)
+        sizeof(stream_info) == 736 || sizeof(stream_info) == 728 || sizeof(stream_info) == 712 ||
+        sizeof(stream_info) == 704)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -54,7 +55,8 @@ protected:
 
 TEST_F(StreamInfoImplTest, TimingTest) {
   MonotonicTime pre_start = test_time_.timeSystem().monotonicTime();
-  StreamInfoImpl info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfoImpl info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                      FilterState::LifeSpan::FilterChain);
   info.setUpstreamInfo(std::make_shared<UpstreamInfoImpl>());
   UpstreamTiming& upstream_timing = info.upstreamInfo()->upstreamTiming();
   MonotonicTime post_start = test_time_.timeSystem().monotonicTime();
@@ -112,7 +114,8 @@ TEST_F(StreamInfoImplTest, TimingTest) {
 }
 
 TEST_F(StreamInfoImplTest, BytesTest) {
-  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                             FilterState::LifeSpan::FilterChain);
 
   const uint64_t bytes_sent = 7;
   const uint64_t bytes_received = 12;
@@ -185,12 +188,15 @@ enum LegacyResponseFlag {
   DnsResolutionFailed = 0x4000000,
   // Drop certain percentage of overloaded traffic.
   DropOverLoad = 0x8000000,
+  // Downstream remote codec level reset was received on the stream.
+  DownstreamRemoteReset = 0x10000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DropOverLoad,
+  LastFlag = DownstreamRemoteReset,
 };
 
 TEST_F(StreamInfoImplTest, LegacyResponseFlagTest) {
-  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                             FilterState::LifeSpan::FilterChain);
 
   absl::flat_hash_map<LegacyResponseFlag, CoreResponseFlag> flags = {
       {LegacyResponseFlag::FailedLocalHealthCheck, CoreResponseFlag::FailedLocalHealthCheck},
@@ -227,6 +233,7 @@ TEST_F(StreamInfoImplTest, LegacyResponseFlagTest) {
       {LegacyResponseFlag::OverloadManager, CoreResponseFlag::OverloadManager},
       {LegacyResponseFlag::DnsResolutionFailed, CoreResponseFlag::DnsResolutionFailed},
       {LegacyResponseFlag::DropOverLoad, CoreResponseFlag::DropOverLoad},
+      {LegacyResponseFlag::DownstreamRemoteReset, CoreResponseFlag::DownstreamRemoteReset},
   };
 
   for (auto& flag : flags) {
@@ -240,7 +247,8 @@ TEST_F(StreamInfoImplTest, LegacyResponseFlagTest) {
 }
 
 TEST_F(StreamInfoImplTest, ResponseFlagTest) {
-  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                             FilterState::LifeSpan::FilterChain);
 
   EXPECT_FALSE(stream_info.hasAnyResponseFlag());
   for (auto& flag : ResponseFlagUtils::responseFlagsVec()) {
@@ -258,12 +266,13 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
               stream_info.responseFlags()[i].value());
   }
 
-  EXPECT_EQ(0xFFFFFFF, stream_info.legacyResponseFlags());
+  EXPECT_EQ(0x1FFFFFFF, stream_info.legacyResponseFlags());
 }
 
 TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
   {
-    StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+    StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                               FilterState::LifeSpan::FilterChain);
 
     EXPECT_EQ(nullptr, stream_info.upstreamInfo());
     EXPECT_EQ(Http::Protocol::Http2, stream_info.protocol().value());
@@ -349,7 +358,8 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 }
 
 TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
-  StreamInfoImpl s1(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfoImpl s1(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                    FilterState::LifeSpan::FilterChain);
 
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
@@ -364,7 +374,8 @@ TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
 #endif
 #endif
 
-  StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
+  StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr,
+                    FilterState::LifeSpan::FilterChain);
   s2.setFromForRecreateStream(s1);
   EXPECT_EQ(s1.startTime(), s2.startTime());
   EXPECT_EQ(s1.startTimeMonotonic(), s2.startTimeMonotonic());
@@ -379,7 +390,8 @@ TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
 }
 
 TEST_F(StreamInfoImplTest, SetFrom) {
-  StreamInfoImpl s1(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfoImpl s1(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                    FilterState::LifeSpan::FilterChain);
 
   // setFromForRecreateStream
   s1.addBytesReceived(1);
@@ -421,7 +433,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
 #endif
 #endif
 
-  StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
+  StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr,
+                    FilterState::LifeSpan::FilterChain);
   Http::TestRequestHeaderMapImpl headers2;
   s2.setFrom(s1, &headers2);
 
@@ -470,7 +483,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
 }
 
 TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
-  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                             FilterState::LifeSpan::FilterChain);
 
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   stream_info.setDynamicMetadata("com.test", MessageUtil::keyValueStruct("test_key", "test_value"));
@@ -499,7 +513,8 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
 }
 
 TEST_F(StreamInfoImplTest, DumpStateTest) {
-  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                             FilterState::LifeSpan::FilterChain);
   std::string prefix = "";
 
   for (int i = 0; i < 7; ++i) {
@@ -513,7 +528,8 @@ TEST_F(StreamInfoImplTest, DumpStateTest) {
 }
 
 TEST_F(StreamInfoImplTest, RequestHeadersTest) {
-  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                             FilterState::LifeSpan::FilterChain);
   EXPECT_FALSE(stream_info.getRequestHeaders());
 
   Http::TestRequestHeaderMapImpl headers;
@@ -522,12 +538,12 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
 }
 
 TEST_F(StreamInfoImplTest, DefaultStreamIdProvider) {
-  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
+  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr, FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(false, stream_info.getStreamIdProvider().has_value());
 }
 
 TEST_F(StreamInfoImplTest, StreamIdProvider) {
-  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
+  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr, FilterState::LifeSpan::FilterChain);
   stream_info.setStreamIdProvider(
       std::make_shared<StreamIdProviderImpl>("a121e9e1-feae-4136-9e0e-6fac343d56c9"));
 
@@ -538,7 +554,7 @@ TEST_F(StreamInfoImplTest, StreamIdProvider) {
 }
 
 TEST_F(StreamInfoImplTest, Details) {
-  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
+  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr, FilterState::LifeSpan::FilterChain);
   EXPECT_FALSE(stream_info.responseCodeDetails().has_value());
   stream_info.setResponseCodeDetails("two_words");
   ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
@@ -546,7 +562,7 @@ TEST_F(StreamInfoImplTest, Details) {
 }
 
 TEST_F(StreamInfoImplTest, DownstreamTransportFailureReason) {
-  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
+  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr, FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(stream_info.downstreamTransportFailureReason().empty());
   stream_info.setDownstreamTransportFailureReason("TLS error");
   EXPECT_FALSE(stream_info.downstreamTransportFailureReason().empty());
