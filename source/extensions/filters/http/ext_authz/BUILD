@@ -28,6 +28,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:utility_lib",
         "//source/common/router:config_lib",
+        "//source/common/runtime:runtime_protos_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

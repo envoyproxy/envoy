@@ -50,7 +50,7 @@ public:
 
 class AwsLambdaFilterTest : public ::testing::Test {
 public:
-  AwsLambdaFilterTest() {}
+  AwsLambdaFilterTest() = default;
 
   void setupFilter(const FilterSettingsSharedPtr& settings, bool upstream) {
     filter_ = std::make_unique<Filter>(settings, stats_, upstream);
@@ -90,6 +90,67 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
   Http::TestRequestHeaderMapImpl headers;
   const auto result = filter_->decodeHeaders(headers, false /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, result);
+}
+
+/**
+ * Signing failure in decodeHeaders passthrough
+ */
+TEST_F(AwsLambdaFilterTest, SigningFailureDecodeHeadersPassthrough) {
+  auto filter_settings_ =
+      setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "");
+  EXPECT_CALL(*(filter_settings_->signer_),
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
+        return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
+      }));
+
+  Http::TestRequestHeaderMapImpl input_headers;
+  const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
+}
+
+/**
+ * Signing failure in decodeHeaders no passthrough
+ */
+TEST_F(AwsLambdaFilterTest, SigningFailureDecodeHeadersNoPassthrough) {
+  auto filter_settings_ =
+      setupDownstreamFilter(InvocationMode::Synchronous, false /*passthrough*/, "");
+  EXPECT_CALL(*(filter_settings_->signer_), sign(An<Http::RequestHeaderMap&>(),
+                                                 An<const std::string&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
+                          const absl::string_view) -> absl::Status {
+        return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
+      }));
+  Http::TestRequestHeaderMapImpl headers;
+  headers.setHost("any_host");
+  headers.setPath("/");
+  headers.setMethod("POST");
+  const auto result = filter_->decodeHeaders(headers, true);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
+}
+
+/**
+ * Signing failure in decodeData
+ */
+TEST_F(AwsLambdaFilterTest, SigningFailureDecodeData) {
+
+  auto filter_settings =
+      setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "");
+  Http::TestRequestHeaderMapImpl headers;
+  filter_->decodeHeaders(headers, false /*end_stream*/);
+  Buffer::OwnedImpl buffer;
+
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
+  EXPECT_CALL(*(filter_settings->signer_), sign(An<Http::RequestHeaderMap&>(),
+                                                An<const std::string&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
+                          const absl::string_view) -> absl::Status {
+        return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
+      }));
+
+  const auto data_result = filter_->decodeData(buffer, true /*end_stream*/);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, data_result);
 }
 
 /**

@@ -28,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 24]
+// [#next-free-field: 25]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -91,6 +91,21 @@ message ExtAuthz {
   // Sets the HTTP status that is returned to the client when the authorization server returns an error
   // or cannot be reached. The default status is HTTP 403 Forbidden.
   type.v3.HttpStatus status_on_error = 7;
+
+  // When this is set to true, the filter will check the :ref:`ext_authz response
+  // <envoy_v3_api_msg_service.auth.v3.CheckResponse>` for invalid header &
+  // query parameter mutations. If the side stream response is invalid, it will send a local reply
+  // to the downstream request with status HTTP 500 Internal Server Error.
+  //
+  // Note that headers_to_remove & query_parameters_to_remove are validated, but invalid elements in
+  // those fields should not affect any headers & thus will not cause the filter to send a local
+  // reply.
+  //
+  // When set to false, any invalid mutations will be visible to the rest of envoy and may cause
+  // unexpected behavior.
+  //
+  // If you are using ext_authz with an untrusted ext_authz server, you should set this to true.
+  bool validate_mutations = 24;
 
   // Specifies a list of metadata namespaces whose values, if present, will be passed to the
   // ext_authz service. The :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`

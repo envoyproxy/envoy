@@ -2,7 +2,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "source/common/network/address_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 #include "test/config/utility.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"

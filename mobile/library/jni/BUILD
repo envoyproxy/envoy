@@ -43,7 +43,9 @@ envoy_cc_library(
         "//library/jni/import:jni_import_lib",
         "//library/jni/types:jni_env_lib",
         "//library/jni/types:jni_exception_lib",
+        "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/common:assert_lib",
+        "@envoy//source/common/http:header_map_lib",
         "@envoy//source/common/protobuf",
     ],
 )
@@ -78,6 +80,7 @@ envoy_cc_library(
         "//library/cc:engine_builder_lib",
         "//library/common:internal_engine_lib",
         "//library/common/api:c_types",
+        "//library/common/bridge:utility_lib",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/extensions/key_value/platform:config",
         "//library/common/types:managed_types_lib",
@@ -101,7 +104,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":jni_utility_lib",
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/types:c_types_lib",
         "//library/jni/import:jni_import_lib",
@@ -201,7 +204,7 @@ envoy_cc_library(
         "@envoy//bazel:android": [
             ":jni_support_lib",
             ":jni_utility_lib",
-            "//library/common/data:utility_lib",
+            "//library/common/bridge:utility_lib",
             "//library/jni/import:jni_import_lib",
         ],
         "//conditions:default": [],

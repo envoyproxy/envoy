@@ -63,7 +63,6 @@ envoy_extension_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:cluster_factory_lib",
-        "//source/common/upstream:thread_aware_lb_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/redis:redis_cluster",
         "//source/extensions/clusters/redis:redis_cluster_lb",

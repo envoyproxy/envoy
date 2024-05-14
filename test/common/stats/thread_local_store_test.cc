@@ -788,7 +788,8 @@ TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsFixedValue) {
   tag_specifier->set_tag_name("foo");
   tag_specifier->set_fixed_value("bar");
 
-  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  const Stats::TagVector tags_vector;
+  store_->setTagProducer(TagProducerImpl::createTagProducer(stats_config, tags_vector).value());
 
   StatNamePool pool(symbol_table_);
   StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
@@ -810,7 +811,8 @@ TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexValueNoMatch) {
   tag_specifier->set_tag_name("foo");
   tag_specifier->set_regex("bar");
 
-  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  const Stats::TagVector tags_vector;
+  store_->setTagProducer(TagProducerImpl::createTagProducer(stats_config, tags_vector).value());
 
   StatNamePool pool(symbol_table_);
   StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
@@ -829,7 +831,8 @@ TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexValueWithMatch) {
   tag_specifier->set_tag_name("foo_tag");
   tag_specifier->set_regex("^foo.(.+)");
 
-  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  const Stats::TagVector tags_vector;
+  store_->setTagProducer(TagProducerImpl::createTagProducer(stats_config, tags_vector).value());
 
   StatNamePool pool(symbol_table_);
   StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
@@ -846,7 +849,8 @@ TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexBuiltinExpression) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   envoy::config::metrics::v3::StatsConfig stats_config;
-  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  const Stats::TagVector tags_vector;
+  store_->setTagProducer(TagProducerImpl::createTagProducer(stats_config, tags_vector).value());
 
   StatNamePool pool(symbol_table_);
   StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
@@ -1508,7 +1512,8 @@ protected:
 
     // Use a tag producer that will produce tags.
     envoy::config::metrics::v3::StatsConfig stats_config;
-    store_.setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+    const Stats::TagVector tags_vector;
+    store_.setTagProducer(TagProducerImpl::createTagProducer(stats_config, tags_vector).value());
   }
 
   ~StatsThreadLocalStoreTestNoFixture() override {
@@ -2177,11 +2182,11 @@ protected:
       layer->set_name("admin");
       layer->mutable_admin_layer();
     }
-    absl::Status creation_status;
-    loader_ = std::make_unique<Runtime::LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_,
-                                                    *store_, generator_, validation_visitor_, *api_,
-                                                    creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
+        Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, *store_,
+                                    generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
+    loader_ = std::move(loader.value());
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;

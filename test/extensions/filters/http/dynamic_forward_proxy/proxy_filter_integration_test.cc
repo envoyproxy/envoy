@@ -6,8 +6,10 @@
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/ssl_socket.h"
 
+#include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/registry.h"
 
 using testing::HasSubstr;
 
@@ -361,6 +363,69 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
         "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF");
 }
 
+TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
+  autonomous_upstream_ = true;
+  initializeWithArgs(1024, 1024, "", "");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost(
+      fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+}
+
+TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  std::string resolver_config = R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
+
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  upstream_tls_ = false;
+  autonomous_upstream_ = true;
+  initializeWithArgs(1024, 1024, "", resolver_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost(
+      fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+
+  // Kick off the first request.
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  // Wait fo the query to kick off
+  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
+  // Start the next request before unblocking the resolve.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  Network::TestResolver::unblockResolve();
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+}
+
 // Currently if the first DNS resolution fails, the filter will continue with
 // a null address. Make sure this mode fails gracefully.
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) { requestWithUnknownDomainTest(); }
@@ -600,6 +665,24 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   checkSimpleRequestSuccess(0, 0, response.get());
+}
+
+TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithTooLongSni) {
+  upstream_tls_ = true;
+  initializeWithArgs(1024, 1024, "x-host");
+  std::string too_long_sni(300, 'a');
+  ASSERT_EQ(too_long_sni.size(), 300); // Validate that the expected constructor was run.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "localhost"},
+                                                       {"x-host", too_long_sni}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  // TODO(ggreenway): validate (in access logs probably) that failure reason is set appropriately.
 }
 
 // Verify that auto-SAN verification fails with an incorrect certificate.

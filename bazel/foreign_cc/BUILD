@@ -373,7 +373,9 @@ envoy_cmake(
     cache_entries = {
         # interp by default
         # if want to gain more performance advantage with JIT or AOT
-        # please refer to https://github.com/proxy-wasm/proxy-wasm-cpp-host
+        # please refer to
+        # - enable jit and aot. https://github.com/proxy-wasm/proxy-wasm-cpp-host/pull/378
+        # - support precompiled wasm. https://github.com/proxy-wasm/proxy-wasm-cpp-host/pull/380
         "WAMR_BUILD_AOT": "0",
         "WAMR_BUILD_FAST_INTERP": "1",
         "WAMR_BUILD_INTERP": "1",
@@ -384,11 +386,20 @@ envoy_cmake(
         # MVP
         "WAMR_BUILD_BULK_MEMORY": "1",
         "WAMR_BUILD_REF_TYPES": "1",
+        # only for jit and aot
         "WAMR_BUILD_SIMD": "0",
         "WAMR_BUILD_TAIL_CALL": "1",
         # others
         "WAMR_BUILD_WASM_CACHE": "0",
         "WAMR_BUILD_MULTI_MODULE": "0",
+        # enable below to enhance development experience
+        # name section
+        "WAMR_BUILD_CUSTOM_NAME_SECTION": "0",
+        "WAMR_BUILD_LOAD_CUSTOM_SECTION": "0",
+        # output call stack if meet a trap
+        "WAMR_BUILD_DUMP_CALL_STACK": "0",
+        # linux perf. only for jit and aot
+        "WAMR_BUILD_LINUX_PERF": "0",
     },
     lib_source = "@com_github_wamr//:all",
     out_static_libs = ["libvmlib.a"],

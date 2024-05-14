@@ -45,7 +45,7 @@ public:
   void init() {
     factory_ = std::make_shared<RedisClusterLoadBalancerFactory>(random_);
     lb_ = std::make_unique<RedisClusterThreadAwareLoadBalancer>(factory_);
-    lb_->initialize();
+    EXPECT_TRUE(lb_->initialize().ok());
     factory_->onHostHealthUpdate();
   }
 

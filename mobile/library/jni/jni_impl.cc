@@ -1,14 +1,14 @@
 #include <cstddef>
 #include <string>
-#include <utility>
 
 #include "source/common/protobuf/protobuf.h"
 
 #include "library/cc/engine_builder.h"
 #include "library/common/api/c_types.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/extensions/key_value/platform/c_types.h"
+#include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 #include "library/common/types/managed_envoy_headers.h"
 #include "library/jni/android_network_utility.h"
@@ -36,27 +36,23 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jc
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(
-    JNIEnv* env, jclass, jobject on_start_context, jobject envoy_logger_context,
-    jobject event_tracker_context) {
+    JNIEnv* env, jclass, jobject on_engine_running, jobject envoy_logger,
+    jobject envoy_event_tracker) {
   //================================================================================================
   // EngineCallbacks
   //================================================================================================
   std::unique_ptr<Envoy::EngineCallbacks> callbacks = std::make_unique<Envoy::EngineCallbacks>();
-  if (on_start_context != nullptr) {
-    jobject retained_on_start_context =
-        env->NewGlobalRef(on_start_context); // Required to keep context in memory
-    callbacks->on_engine_running_ = [retained_on_start_context] {
+  if (on_engine_running != nullptr) {
+    jobject on_engine_running_global_ref = env->NewGlobalRef(on_engine_running);
+    callbacks->on_engine_running_ = [on_engine_running_global_ref] {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
       Envoy::JNI::LocalRefUniquePtr<jclass> java_on_engine_running_class =
-          jni_helper.getObjectClass(retained_on_start_context);
+          jni_helper.getObjectClass(on_engine_running_global_ref);
       jmethodID java_on_engine_running_method_id = jni_helper.getMethodId(
           java_on_engine_running_class.get(), "invokeOnEngineRunning", "()Ljava/lang/Object;");
-      Envoy::JNI::LocalRefUniquePtr<jobject> unused =
-          jni_helper.callObjectMethod(retained_on_start_context, java_on_engine_running_method_id);
-
-      // TODO(goaway): This isn't re-used by other engine callbacks, so it's safe to delete here.
-      // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
-      jni_helper.getEnv()->DeleteGlobalRef(retained_on_start_context);
+      Envoy::JNI::LocalRefUniquePtr<jobject> unused = jni_helper.callObjectMethod(
+          on_engine_running_global_ref, java_on_engine_running_method_id);
+      jni_helper.getEnv()->DeleteGlobalRef(on_engine_running_global_ref);
     };
     callbacks->on_exit_ = [] {
       // Note that this is not dispatched because the thread that
@@ -70,23 +66,23 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   // EnvoyLogger
   //================================================================================================
   std::unique_ptr<Envoy::EnvoyLogger> logger = std::make_unique<Envoy::EnvoyLogger>();
-  if (envoy_logger_context != nullptr) {
-    const jobject retained_logger_context = env->NewGlobalRef(envoy_logger_context);
-    logger->on_log_ = [retained_logger_context](Envoy::Logger::Logger::Levels level,
+  if (envoy_logger != nullptr) {
+    const jobject envoy_logger_global_ref = env->NewGlobalRef(envoy_logger);
+    logger->on_log_ = [envoy_logger_global_ref](Envoy::Logger::Logger::Levels level,
                                                 const std::string& message) {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
       Envoy::JNI::LocalRefUniquePtr<jstring> java_message =
-          jni_helper.newStringUtf(message.c_str());
+          Envoy::JNI::cppStringToJavaString(jni_helper, message);
       jint java_level = static_cast<jint>(level);
       Envoy::JNI::LocalRefUniquePtr<jclass> java_envoy_logger_class =
-          jni_helper.getObjectClass(retained_logger_context);
+          jni_helper.getObjectClass(envoy_logger_global_ref);
       jmethodID java_log_method_id =
           jni_helper.getMethodId(java_envoy_logger_class.get(), "log", "(ILjava/lang/String;)V");
-      jni_helper.callVoidMethod(retained_logger_context, java_log_method_id, java_level,
+      jni_helper.callVoidMethod(envoy_logger_global_ref, java_log_method_id, java_level,
                                 java_message.get());
     };
-    logger->on_exit_ = [retained_logger_context] {
-      Envoy::JNI::getEnv()->DeleteGlobalRef(retained_logger_context);
+    logger->on_exit_ = [envoy_logger_global_ref] {
+      Envoy::JNI::getEnv()->DeleteGlobalRef(envoy_logger_global_ref);
     };
   }
   //================================================================================================
@@ -94,57 +90,51 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   //================================================================================================
   std::unique_ptr<Envoy::EnvoyEventTracker> event_tracker =
       std::make_unique<Envoy::EnvoyEventTracker>();
-  if (event_tracker_context != nullptr) {
-    const jobject retained_event_tracker_context = env->NewGlobalRef(event_tracker_context);
-    event_tracker->on_track_ = [retained_event_tracker_context](
+  if (envoy_event_tracker != nullptr) {
+    const jobject event_tracker_global_ref = env->NewGlobalRef(envoy_event_tracker);
+    event_tracker->on_track_ = [event_tracker_global_ref](
                                    const absl::flat_hash_map<std::string, std::string>& events) {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
       Envoy::JNI::LocalRefUniquePtr<jobject> java_events =
           Envoy::JNI::cppMapToJavaMap(jni_helper, events);
       Envoy::JNI::LocalRefUniquePtr<jclass> java_envoy_event_tracker_class =
-          jni_helper.getObjectClass(retained_event_tracker_context);
+          jni_helper.getObjectClass(event_tracker_global_ref);
       jmethodID java_track_method_id = jni_helper.getMethodId(java_envoy_event_tracker_class.get(),
                                                               "track", "(Ljava/util/Map;)V");
-      jni_helper.callVoidMethod(retained_event_tracker_context, java_track_method_id,
-                                java_events.get());
+      jni_helper.callVoidMethod(event_tracker_global_ref, java_track_method_id, java_events.get());
     };
-    event_tracker->on_exit_ = [retained_event_tracker_context] {
-      Envoy::JNI::getEnv()->DeleteGlobalRef(retained_event_tracker_context);
+    event_tracker->on_exit_ = [event_tracker_global_ref] {
+      Envoy::JNI::getEnv()->DeleteGlobalRef(event_tracker_global_ref);
     };
   }
 
-  return reinterpret_cast<intptr_t>(
+  return reinterpret_cast<jlong>(
       new Envoy::InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker)));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(
-    JNIEnv* env, jclass, jlong engine, jstring config, jlong bootstrap_ptr, jstring log_level) {
+    JNIEnv* env, jclass, jlong engine, jlong bootstrap_ptr, jstring log_level) {
   Envoy::JNI::JniHelper jni_helper(env);
-  Envoy::JNI::StringUtfUniquePtr java_string_config = jni_helper.getStringUtfChars(config, nullptr);
   Envoy::JNI::StringUtfUniquePtr java_log_level = jni_helper.getStringUtfChars(log_level, nullptr);
   // This should be either 0 (null) or a pointer generated by createBootstrap.
   // As documented in JniLibrary.java, take ownership.
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap(
       reinterpret_cast<envoy::config::bootstrap::v3::Bootstrap*>(bootstrap_ptr));
 
-  jint result;
-  if (!bootstrap) {
-    result = reinterpret_cast<Envoy::InternalEngine*>(engine)->run(java_string_config.get(),
-                                                                   java_log_level.get());
-  } else {
-    auto options = std::make_unique<Envoy::OptionsImplBase>();
-    options->setConfigProto(std::move(bootstrap));
-    ENVOY_BUG(options->setLogLevel(java_log_level.get()).ok(), "invalid log level");
-    options->setConcurrency(1);
-    result = reinterpret_cast<Envoy::InternalEngine*>(engine)->run(std::move(options));
-  }
+  auto options = std::make_unique<Envoy::OptionsImplBase>();
+  options->setConfigProto(std::move(bootstrap));
+  ENVOY_BUG(options->setLogLevel(java_log_level.get()).ok(), "invalid log level");
+  options->setConcurrency(1);
+  jint result = reinterpret_cast<Envoy::InternalEngine*>(engine)->run(std::move(options));
 
   return result;
 }
 
 extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_terminateEngine(
     JNIEnv* /*env*/, jclass, jlong engine_handle) {
-  reinterpret_cast<Envoy::InternalEngine*>(engine_handle)->terminate();
+  Envoy::InternalEngine* internal_engine = reinterpret_cast<Envoy::InternalEngine*>(engine_handle);
+  internal_engine->terminate();
+  delete internal_engine;
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordCounterInc(
@@ -411,9 +401,6 @@ static envoy_filter_data_status jvm_http_filter_on_response_data(envoy_data data
                                     /*data*/ native_data,
                                     /*pending_headers*/ pending_headers};
 }
-
-static void jvm_on_metadata(envoy_headers /* metadata */, envoy_stream_intel /*stream_intel*/,
-                            void* /*context*/) {}
 
 static Envoy::JNI::LocalRefUniquePtr<jobjectArray> jvm_on_trailers(const char* method,
                                                                    envoy_headers trailers,
@@ -836,24 +823,58 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_startStream(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject j_context,
+    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject java_stream_callbacks,
     jboolean explicit_flow_control) {
-  // TODO: To be truly safe we may need stronger guarantees of operation ordering on this ref.
-  jobject retained_context = env->NewGlobalRef(j_context);
-  envoy_http_callbacks native_callbacks = {jvm_on_response_headers,
-                                           jvm_on_response_data,
-                                           jvm_on_metadata,
-                                           jvm_on_response_trailers,
-                                           jvm_on_error,
-                                           jvm_on_complete,
-                                           jvm_on_cancel,
-                                           jvm_on_send_window_available,
-                                           retained_context};
+  Envoy::JNI::JniHelper jni_helper(env);
+  auto java_stream_callbacks_global_ref = jni_helper.newGlobalRef(java_stream_callbacks).release();
   auto engine = reinterpret_cast<Envoy::InternalEngine*>(engine_handle);
+  Envoy::EnvoyStreamCallbacks stream_callbacks;
+  // TODO(fredyw): Rewrite the whole implementation to not use the bridge data structures.
+  stream_callbacks.on_headers_ =
+      [java_stream_callbacks_global_ref](const Envoy::Http::ResponseHeaderMap& headers,
+                                         bool end_stream, envoy_stream_intel stream_intel) {
+        envoy_headers bridge_headers = Envoy::Http::Utility::toBridgeHeaders(headers);
+        jvm_on_response_headers(bridge_headers, end_stream, stream_intel,
+                                java_stream_callbacks_global_ref);
+      };
+  stream_callbacks.on_data_ = [java_stream_callbacks_global_ref](
+                                  const Envoy::Buffer::Instance& buffer, uint64_t length,
+                                  bool end_stream, envoy_stream_intel stream_intel) {
+    envoy_data bridge_data = Envoy::Bridge::Utility::toBridgeDataNoDrain(buffer, length);
+    jvm_on_response_data(bridge_data, end_stream, stream_intel, java_stream_callbacks_global_ref);
+  };
+  stream_callbacks.on_trailers_ =
+      [java_stream_callbacks_global_ref](const Envoy::Http::ResponseTrailerMap& trailers,
+                                         envoy_stream_intel stream_intel) {
+        envoy_headers bridge_trailers = Envoy::Http::Utility::toBridgeHeaders(trailers);
+        jvm_on_response_trailers(bridge_trailers, stream_intel, java_stream_callbacks_global_ref);
+      };
+  stream_callbacks.on_complete_ =
+      [java_stream_callbacks_global_ref](envoy_stream_intel stream_intel,
+                                         envoy_final_stream_intel final_stream_intel) {
+        jvm_on_complete(stream_intel, final_stream_intel, java_stream_callbacks_global_ref);
+      };
+  stream_callbacks.on_error_ = [java_stream_callbacks_global_ref](
+                                   Envoy::EnvoyError error, envoy_stream_intel stream_intel,
+                                   envoy_final_stream_intel final_stream_intel) {
+    envoy_error bridge_error = Envoy::Bridge::Utility::toBridgeError(error);
+    jvm_on_error(bridge_error, stream_intel, final_stream_intel, java_stream_callbacks_global_ref);
+  };
+  stream_callbacks.on_cancel_ =
+      [java_stream_callbacks_global_ref](envoy_stream_intel stream_intel,
+                                         envoy_final_stream_intel final_stream_intel) {
+        jvm_on_cancel(stream_intel, final_stream_intel, java_stream_callbacks_global_ref);
+      };
+  stream_callbacks.on_send_window_available_ =
+      [java_stream_callbacks_global_ref](envoy_stream_intel stream_intel) {
+        jvm_on_send_window_available(stream_intel, java_stream_callbacks_global_ref);
+      };
+
   envoy_status_t result = engine->startStream(static_cast<envoy_stream_t>(stream_handle),
-                                              native_callbacks, explicit_flow_control);
+                                              std::move(stream_callbacks), explicit_flow_control);
   if (result != ENVOY_SUCCESS) {
-    env->DeleteGlobalRef(retained_context); // No callbacks are fired and we need to release
+    env->DeleteGlobalRef(
+        java_stream_callbacks_global_ref); // No callbacks are fired and we need to release
   }
   return result;
 }
@@ -956,49 +977,42 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
       ->readData(static_cast<envoy_stream_t>(stream_handle), byte_count);
 }
 
-// The Java counterpart guarantees to invoke this method with a non-null direct ByteBuffer where the
-// provided length is between 0 and ByteBuffer.capacity(), inclusively.
+// This function can accept either direct (off the JVM heap) ByteBuffer or non-direct (on the JVM
+// heap) ByteBuffer.
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendData(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject data, jint length,
+    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject byte_buffer, jint length,
     jboolean end_stream) {
   Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::Buffer::InstancePtr cpp_buffer_instance;
+  if (Envoy::JNI::isJavaDirectByteBuffer(jni_helper, byte_buffer)) {
+    cpp_buffer_instance =
+        Envoy::JNI::javaDirectByteBufferToCppBufferInstance(jni_helper, byte_buffer, length);
+  } else {
+    cpp_buffer_instance =
+        Envoy::JNI::javaNonDirectByteBufferToCppBufferInstance(jni_helper, byte_buffer, length);
+  }
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendData(static_cast<envoy_stream_t>(stream_handle),
-                 Envoy::JNI::javaByteBufferToEnvoyData(jni_helper, data, length), end_stream);
-}
-
-// The Java counterpart guarantees to invoke this method with a non-null jbyteArray where the
-// provided length is between 0 and the size of the jbyteArray, inclusively. And given that this
-// jbyteArray comes from a ByteBuffer, it is also guaranteed that its length will not be greater
-// than 2^31 - this is why the length type is jint.
-extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendDataByteArray(JNIEnv* env, jclass,
-                                                                   jlong engine_handle,
-                                                                   jlong stream_handle,
-                                                                   jbyteArray data, jint length,
-                                                                   jboolean end_stream) {
-  Envoy::JNI::JniHelper jni_helper(env);
-  return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendData(static_cast<envoy_stream_t>(stream_handle),
-                 Envoy::JNI::javaByteArrayToEnvoyData(jni_helper, data, length), end_stream);
+      ->sendData(static_cast<envoy_stream_t>(stream_handle), std::move(cpp_buffer_instance),
+                 end_stream);
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendHeaders(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobjectArray headers,
+    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject headers,
     jboolean end_stream) {
   Envoy::JNI::JniHelper jni_helper(env);
+  auto cpp_headers = Envoy::Http::Utility::createRequestHeaderMapPtr();
+  Envoy::JNI::javaHeadersToCppHeaders(jni_helper, headers, *cpp_headers);
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendHeaders(static_cast<envoy_stream_t>(stream_handle),
-                    Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, headers),
-                    end_stream);
+      ->sendHeaders(static_cast<envoy_stream_t>(stream_handle), std::move(cpp_headers), end_stream);
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendTrailers(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobjectArray trailers) {
+    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject trailers) {
   Envoy::JNI::JniHelper jni_helper(env);
+  auto cpp_trailers = Envoy::Http::Utility::createRequestTrailerMapPtr();
+  Envoy::JNI::javaHeadersToCppHeaders(jni_helper, trailers, *cpp_trailers);
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendTrailers(static_cast<envoy_stream_t>(stream_handle),
-                     Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, trailers));
+      ->sendTrailers(static_cast<envoy_stream_t>(stream_handle), std::move(cpp_trailers));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetStream(
@@ -1108,18 +1122,19 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
                       jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames,
                       jboolean enable_dns_cache, jlong dns_cache_save_interval_seconds,
                       jboolean enable_drain_post_dns_refresh, jboolean enable_http3,
-                      jstring http3_connection_options, jstring http3_client_connection_options,
-                      jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
-                      jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-                      jboolean enable_port_migration, jboolean enable_socket_tagging,
-                      jboolean enable_interface_binding,
+                      jboolean use_cares, jboolean use_gro, jstring http3_connection_options,
+                      jstring http3_client_connection_options, jobjectArray quic_hints,
+                      jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
+                      jboolean enable_brotli_decompression, jboolean enable_port_migration,
+                      jboolean enable_socket_tagging, jboolean enable_interface_binding,
                       jlong h2_connection_keepalive_idle_interval_milliseconds,
                       jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
                       jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds,
                       jstring app_version, jstring app_id, jboolean trust_chain_verification,
                       jobjectArray filter_chain, jboolean enable_platform_certificates_validation,
-                      jobjectArray runtime_guards, jstring node_id, jstring node_region,
-                      jstring node_zone, jstring node_sub_zone, jbyteArray serialized_node_metadata,
+                      jstring upstream_tls_sni, jobjectArray runtime_guards, jstring node_id,
+                      jstring node_region, jstring node_zone, jstring node_sub_zone,
+                      jbyteArray serialized_node_metadata,
                       Envoy::Platform::EngineBuilder& builder) {
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
@@ -1160,10 +1175,13 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   builder.enablePortMigration(enable_port_migration);
 
 #endif
+  builder.setUseCares(use_cares == JNI_TRUE);
+  builder.setUseGroIfAvailable(use_gro == JNI_TRUE);
   builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
   builder.enableDrainPostDnsRefresh(enable_drain_post_dns_refresh == JNI_TRUE);
   builder.enforceTrustChainVerification(trust_chain_verification == JNI_TRUE);
   builder.enablePlatformCertificatesValidation(enable_platform_certificates_validation == JNI_TRUE);
+  builder.setUpstreamTlsSni(Envoy::JNI::javaStringToCppString(jni_helper, upstream_tls_sni));
   builder.setForceAlwaysUsev6(true);
 
   auto guards = javaObjectArrayToStringPairVector(jni_helper, runtime_guards);
@@ -1215,7 +1233,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
     jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
-    jboolean enable_http3, jstring http3_connection_options,
+    jboolean enable_http3, jboolean use_cares, jboolean use_gro, jstring http3_connection_options,
     jstring http3_client_connection_options, jobjectArray quic_hints,
     jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
     jboolean enable_brotli_decompression, jboolean enable_port_migration,
@@ -1224,28 +1242,28 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
-    jboolean enable_platform_certificates_validation, jobjectArray runtime_guards,
-    jstring rtds_resource_name, jlong rtds_timeout_seconds, jstring xds_address, jlong xds_port,
-    jobjectArray xds_grpc_initial_metadata, jstring xds_root_certs, jstring node_id,
-    jstring node_region, jstring node_zone, jstring node_sub_zone,
-    jbyteArray serialized_node_metadata, jstring cds_resources_locator, jlong cds_timeout_seconds,
-    jboolean enable_cds) {
+    jboolean enable_platform_certificates_validation, jstring upstream_tls_sni,
+    jobjectArray runtime_guards, jstring rtds_resource_name, jlong rtds_timeout_seconds,
+    jstring xds_address, jlong xds_port, jobjectArray xds_grpc_initial_metadata,
+    jstring xds_root_certs, jstring node_id, jstring node_region, jstring node_zone,
+    jstring node_sub_zone, jbyteArray serialized_node_metadata, jstring cds_resources_locator,
+    jlong cds_timeout_seconds, jboolean enable_cds) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::Platform::EngineBuilder builder;
 
-  configureBuilder(jni_helper, connect_timeout_seconds, dns_refresh_seconds,
-                   dns_failure_refresh_seconds_base, dns_failure_refresh_seconds_max,
-                   dns_query_timeout_seconds, dns_min_refresh_seconds, dns_preresolve_hostnames,
-                   enable_dns_cache, dns_cache_save_interval_seconds, enable_drain_post_dns_refresh,
-                   enable_http3, http3_connection_options, http3_client_connection_options,
-                   quic_hints, quic_canonical_suffixes, enable_gzip_decompression,
-                   enable_brotli_decompression, enable_port_migration, enable_socket_tagging,
-                   enable_interface_binding, h2_connection_keepalive_idle_interval_milliseconds,
-                   h2_connection_keepalive_timeout_seconds, max_connections_per_host,
-                   stream_idle_timeout_seconds, per_try_idle_timeout_seconds, app_version, app_id,
-                   trust_chain_verification, filter_chain, enable_platform_certificates_validation,
-                   runtime_guards, node_id, node_region, node_zone, node_sub_zone,
-                   serialized_node_metadata, builder);
+  configureBuilder(
+      jni_helper, connect_timeout_seconds, dns_refresh_seconds, dns_failure_refresh_seconds_base,
+      dns_failure_refresh_seconds_max, dns_query_timeout_seconds, dns_min_refresh_seconds,
+      dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds,
+      enable_drain_post_dns_refresh, enable_http3, use_cares, use_gro, http3_connection_options,
+      http3_client_connection_options, quic_hints, quic_canonical_suffixes,
+      enable_gzip_decompression, enable_brotli_decompression, enable_port_migration,
+      enable_socket_tagging, enable_interface_binding,
+      h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
+      max_connections_per_host, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
+      app_version, app_id, trust_chain_verification, filter_chain,
+      enable_platform_certificates_validation, upstream_tls_sni, runtime_guards, node_id,
+      node_region, node_zone, node_sub_zone, serialized_node_metadata, builder);
 
   std::string native_xds_address = Envoy::JNI::javaStringToCppString(jni_helper, xds_address);
   if (!native_xds_address.empty()) {
@@ -1298,7 +1316,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setPreferredNetwork(JNIEnv* /*e
                                                                      jclass, // class
                                                                      jlong engine, jint network) {
   return reinterpret_cast<Envoy::InternalEngine*>(engine)->setPreferredNetwork(
-      static_cast<envoy_network_t>(network));
+      static_cast<Envoy::NetworkType>(network));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_setProxySettings(

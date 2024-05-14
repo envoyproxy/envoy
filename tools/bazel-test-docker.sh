@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Run a single Bazel test target under a privileged docker. Usage:
 #
