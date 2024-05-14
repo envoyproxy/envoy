@@ -73,7 +73,7 @@ message RBAC {
   bool track_per_rule_stats = 7;
 
   // If specified, RBAC denies will use the given value as the response code. Defaults to 403 Forbidden.
-  uint32 deny_status = 8 [(validate.rules).uint32 = {ignore_empty: true lt: 600 gte: 200}];
+  uint32 deny_status = 8 [(validate.rules).uint32 = {lt: 600 gte: 200 ignore_empty: true}];
 }
 
 message RBACPerRoute {
