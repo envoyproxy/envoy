@@ -223,10 +223,10 @@ TEST_F(CheckRequestUtilsTest, TcpPeerCertificate) {
 // Verify that createTcpCheck populates the tls session details correctly.
 TEST_F(CheckRequestUtilsTest, TcpTlsSession) {
   envoy::service::auth::v3::CheckRequest request;
-  EXPECT_CALL(net_callbacks_, connection()).Times(5).WillRepeatedly(ReturnRef(connection_));
+  EXPECT_CALL(net_callbacks_, connection()).Times(4).WillRepeatedly(ReturnRef(connection_));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
-  EXPECT_CALL(Const(connection_), ssl()).Times(4).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(Const(connection_), ssl()).Times(3).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
@@ -691,11 +691,11 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerCertificate) {
 // Verify that the SNI is populated correctly.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
   EXPECT_CALL(callbacks_, connection())
-      .Times(4)
+      .Times(3)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
-  EXPECT_CALL(Const(connection_), ssl()).Times(4).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(Const(connection_), ssl()).Times(3).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
   EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));
@@ -715,11 +715,11 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
 // Verify that the SNI is populated correctly.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   EXPECT_CALL(callbacks_, connection())
-      .Times(4)
+      .Times(3)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
-  EXPECT_CALL(Const(connection_), ssl()).Times(4).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(Const(connection_), ssl()).Times(3).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
   EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));
