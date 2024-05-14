@@ -5,7 +5,6 @@
 #include "source/common/http/http1/parser.h"
 
 #include "absl/base/attributes.h"
-#include "absl/types/optional.h"
 #include "quiche/balsa/balsa_enums.h"
 #include "quiche/balsa/balsa_frame.h"
 #include "quiche/balsa/balsa_headers.h"
@@ -77,12 +76,9 @@ private:
   const bool allow_custom_methods_ = false;
   bool first_byte_processed_ = false;
   bool headers_done_ = false;
+  // True until the first byte of the second message arrives.
+  bool first_message_ = true;
   ParserStatus status_ = ParserStatus::Ok;
-  // When parsing responses, the status code of the last message with fully
-  // parsed headers is saved in `saved_status_code_`. This is so that
-  // `statusCode()` can return the correct value even after `framer_` is reset
-  // in `MessageDone()`.
-  absl::optional<Http::Code> saved_status_code_;
   // An error message, often seemingly arbitrary to match http-parser behavior.
   absl::string_view error_message_;
 };
