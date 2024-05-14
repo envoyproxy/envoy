@@ -19,4 +19,3 @@ envoy_extension_cc_test(
         "//source/extensions/outlier_detection_monitors/common:outlier_detection_monitors_lib",
     ],
 )
-

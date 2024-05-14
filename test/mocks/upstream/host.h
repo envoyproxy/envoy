@@ -30,16 +30,15 @@ public:
   MOCK_METHOD(uint32_t, numEjections, ());
   MOCK_METHOD(void, putHttpResponseCode, (uint64_t code));
   MOCK_METHOD(void, putResult, (Result result, absl::optional<uint64_t> code));
-  MOCK_METHOD(void, putResult, (ErrorPtr));
   MOCK_METHOD(void, putResponseTime, (std::chrono::milliseconds time));
   MOCK_METHOD(const absl::optional<MonotonicTime>&, lastEjectionTime, ());
   MOCK_METHOD(const absl::optional<MonotonicTime>&, lastUnejectionTime, ());
   MOCK_METHOD(double, successRate, (DetectorHostMonitor::SuccessRateMonitorType type), (const));
   MOCK_METHOD(void, successRate,
               (DetectorHostMonitor::SuccessRateMonitorType type, double new_success_rate));
-  MOCK_METHOD(std::string ,getFailedMonitorName, (), (const));
-  MOCK_METHOD(std::string, getFailedMonitorExtraInfo, (), (const));
-  MOCK_METHOD(uint32_t, getFailedMonitorEnforce, (), (const));
+  MOCK_METHOD(std::string, getFailedExtensionMonitorName, (), (const));
+  MOCK_METHOD(std::string, getFailedExtensionMonitorExtraInfo, (), (const));
+  MOCK_METHOD(uint32_t, getFailedExtensionMonitorEnforce, (), (const));
 };
 
 class MockEventLogger : public EventLogger {

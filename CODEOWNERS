@@ -347,6 +347,9 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Lua cluster specifier
 /*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
 
+# Outlier detection monitors
+/*/extensions/extensions/outlier_detection_monitors @cpakulski @?cpakulski?
+
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED

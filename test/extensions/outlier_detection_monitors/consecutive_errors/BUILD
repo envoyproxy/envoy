@@ -16,7 +16,6 @@ envoy_extension_cc_test(
     srcs = ["consecutive_errors_monitor_test.cc"],
     extension_names = ["envoy.outlier_detection_monitors"],
     deps = [
-        #"//source/extensions/outlier_detection_monitors/common:outlier_detection_monitors_lib",
         "//source/extensions/outlier_detection_monitors/consecutive_errors:consecutive_errors_monitor_lib",
     ],
 )

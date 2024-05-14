@@ -140,6 +140,7 @@ categories:
 - envoy.router.cluster_specifier_plugin
 - envoy.tracers.opentelemetry.resource_detectors
 - envoy.tracers.opentelemetry.samplers
+- envoy.outlier_detection_monitors
 
 status_values:
 - name: stable

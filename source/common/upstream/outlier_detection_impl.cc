@@ -94,12 +94,12 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     consecutive_gateway_failure_ = 0;
   }
 
-  if (monitors_set_ == nullptr) {
+  if (getExtensionMonitors() == nullptr) {
     return;
   }
   // Wrap reported HTTP code into outlier detection extension's wrapper and forward
   // it to configured extensions.
-  for (auto& monitor : monitors_set_->monitors()) {
+  for (auto& monitor : getExtensionMonitors()->monitors()) {
     monitor->reportResult(Extensions::Outlier::HttpCode(response_code));
   }
 }
@@ -206,13 +206,14 @@ void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> 
   put_result_func_(this, result, code);
 
   // Call extensions
-  if (monitors_set_ == nullptr) {
+  if (getExtensionMonitors() == nullptr) {
     return;
   }
 
-  // Returned shared object is safe to operate on. If an other thread decrements the ownership count
-  // during the configuration update the shared pointer stays safe to operate on.
-  for (auto& monitor : monitors_set_->monitors()) {
+  // Pass the local origin event to all registered extension monitors.
+  // Only monitors "interested" in local origin event will process the result.
+  // Those not "interested" will ignore the call.
+  for (auto& monitor : getExtensionMonitors()->monitors()) {
     monitor->reportResult(Extensions::Outlier::LocalOriginEvent(result));
   }
 }
@@ -306,7 +307,8 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
   extensions_config_ = config.monitors();
 }
 
-std::unique_ptr<Extensions::Outlier::MonitorsSet> DetectorConfig::createMonitorExtensions() {
+std::unique_ptr<Extensions::Outlier::MonitorsSet> DetectorConfig::createMonitorExtensions(
+    std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) {
   // Create outlier detection extensions.
   if (extensions_config_.empty()) {
     return nullptr;
@@ -319,7 +321,9 @@ std::unique_ptr<Extensions::Outlier::MonitorsSet> DetectorConfig::createMonitorE
         Config::Utility::getAndCheckFactory<Extensions::Outlier::MonitorFactory>(monitor);
     auto config = Config::Utility::translateToFactoryConfig(
         monitor, validation_visitor_ /*.staticValidationVisitor()*/, factory);
-    monitors_set->addMonitor(factory.createMonitor(*config, context));
+    auto extension = factory.createMonitor(*config, context);
+    extension->setCallback(callback);
+    monitors_set->addMonitor(std::move(extension));
   }
 
   return monitors_set;
@@ -408,14 +412,9 @@ void DetectorImpl::initialize(Cluster& cluster) {
 void DetectorImpl::addHostMonitor(HostSharedPtr host) {
   ASSERT(host_monitors_.count(host) == 0);
   DetectorHostMonitorImpl* monitor = new DetectorHostMonitorImpl(shared_from_this(), host);
-  // TODO: change monitors_set_ to monitor_extensions.
-  // Move callback as parameter to createMonitorExtensions
-  monitor->monitors_set_ = config_.createMonitorExtensions();
-  if (monitor->monitors_set_ != nullptr) {
-    for (auto& extension : monitor->monitors_set_->monitors()) {
-      extension->callback_ = monitor->getCallback();
-    }
-  }
+
+  monitor->setExtensionsMonitors(config_.createMonitorExtensions(monitor->getCallback()));
+
   host_monitors_[host] = monitor;
   host->setOutlierDetector(DetectorHostMonitorPtr{monitor});
 }
@@ -453,9 +452,8 @@ void DetectorImpl::unejectHost(HostSharedPtr host) {
   host_monitors_[host]->resetConsecutiveLocalOriginFailure();
   host_monitors_[host]->uneject(time_source_.monotonicTime());
 
-  // TODO: maybe std::for_each or similar.
-  if (host_monitors_[host]->monitors_set_ != nullptr) {
-    for (auto& extension : host_monitors_[host]->monitors_set_->monitors()) {
+  if (host_monitors_[host]->getExtensionMonitors() != nullptr) {
+    for (auto& extension : host_monitors_[host]->getExtensionMonitors()->monitors()) {
       extension->reset();
     }
   }
@@ -493,9 +491,10 @@ bool DetectorImpl::enforceEjection(HostSharedPtr host,
     return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageLocalOriginRuntime,
                                               config_.enforcingFailurePercentageLocalOrigin());
   case envoy::data::cluster::v3::EXTENSION:
-    return runtime_.snapshot().featureEnabled(std::string(EnforcingExtensionRuntime) + "." +
-                                                  host->outlierDetector().getFailedMonitorName(),
-                                              host->outlierDetector().getFailedMonitorEnforce());
+    return runtime_.snapshot().featureEnabled(
+        std::string(EnforcingExtensionRuntime) + "." +
+            host->outlierDetector().getFailedExtensionMonitorName(),
+        host->outlierDetector().getFailedExtensionMonitorEnforce());
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
@@ -532,7 +531,6 @@ void DetectorImpl::updateEnforcedEjectionStats(envoy::data::cluster::v3::Outlier
 }
 
 void DetectorImpl::updateDetectedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type) {
-  // TODO: add counter to count total detected ejections.
   switch (type) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::data::cluster::v3::SUCCESS_RATE:
@@ -557,6 +555,7 @@ void DetectorImpl::updateDetectedEjectionStats(envoy::data::cluster::v3::Outlier
     stats_.ejections_detected_local_origin_failure_percentage_.inc();
     break;
   case envoy::data::cluster::v3::EXTENSION:
+    // TODO(cpakulski) add counter to count total detected ejections by extensions.
     break;
   }
 }
@@ -888,7 +887,6 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
 
   event.set_enforced(enforced);
 
-  // TODO: change this to switch.
   if ((type == envoy::data::cluster::v3::SUCCESS_RATE) ||
       (type == envoy::data::cluster::v3::SUCCESS_RATE_LOCAL_ORIGIN)) {
     const DetectorHostMonitor::SuccessRateMonitorType monitor_type =
@@ -911,9 +909,9 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
         host->outlierDetector().successRate(monitor_type));
   } else if (type == envoy::data::cluster::v3::EXTENSION) {
     event.mutable_eject_extension_event()->set_monitor_name(
-        host->outlierDetector().getFailedMonitorName());
+        host->outlierDetector().getFailedExtensionMonitorName());
     event.mutable_eject_extension_event()->set_extra_info(
-        host->outlierDetector().getFailedMonitorExtraInfo());
+        host->outlierDetector().getFailedExtensionMonitorExtraInfo());
   } else {
     event.mutable_eject_consecutive_event();
   }

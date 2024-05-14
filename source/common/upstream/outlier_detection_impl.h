@@ -139,7 +139,6 @@ public:
   uint32_t numEjections() override { return num_ejections_; }
   void putHttpResponseCode(uint64_t response_code) override;
   void putResult(Result result, absl::optional<uint64_t> code) override;
-  void putResult(ErrorPtr) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return last_ejection_time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override {
@@ -160,15 +159,15 @@ public:
   double successRate(SuccessRateMonitorType type) const override {
     return getSRMonitor(type).getSuccessRate();
   }
-  std::string getFailedMonitorName() const override { return failed_monitor_name_; }
-  std::string getFailedMonitorExtraInfo() const override { return failed_extra_info_; }
-  uint32_t getFailedMonitorEnforce() const override { return failed_monitor_enforce_; }
+  std::string getFailedExtensionMonitorName() const override { return failed_monitor_name_; }
+  std::string getFailedExtensionMonitorExtraInfo() const override { return failed_extra_info_; }
+  uint32_t getFailedExtensionMonitorEnforce() const override { return failed_monitor_enforce_; }
   void updateCurrentSuccessRateBucket();
   void successRate(SuccessRateMonitorType type, double new_success_rate) {
     getSRMonitor(type).setSuccessRate(new_success_rate);
   }
 
-  std::function<void(uint32_t, std::string, std::optional<std::string>)> getCallback();
+  std::function<void(uint32_t, std::string, absl::optional<std::string>)> getCallback();
 
   // handlers for reporting local origin errors
   void localOriginFailure();
@@ -180,7 +179,14 @@ public:
   void setJitter(const std::chrono::milliseconds jitter) { jitter_ = jitter; }
   std::chrono::milliseconds getJitter() const { return jitter_; }
 
-  // private:
+  const std::unique_ptr<Extensions::Outlier::MonitorsSet>& getExtensionMonitors() const {
+    return monitors_set_;
+  }
+  void setExtensionsMonitors(std::unique_ptr<Extensions::Outlier::MonitorsSet>&& monitors_set) {
+    monitors_set_ = std::move(monitors_set);
+  }
+
+private:
   std::weak_ptr<DetectorImpl> detector_;
   std::weak_ptr<Host> host_;
   absl::optional<MonotonicTime> last_ejection_time_;
@@ -215,9 +221,10 @@ public:
       put_result_func_;
 
   // Set of extension monitors.
-  // TODO: do method and enable private
   std::unique_ptr<Extensions::Outlier::MonitorsSet> monitors_set_;
-  // TODO: maybe somehow indicate which monitor failed and extract data from there.
+  // The following fields are reported when extension monitor is "tripped" and
+  // reports that a host where the extension monitor was attached should be
+  // ejected.
   std::string failed_monitor_name_;
   uint32_t failed_monitor_enforce_;
   std::string failed_extra_info_;
@@ -300,7 +307,6 @@ constexpr absl::string_view EnforcingExtensionRuntime = "outlier_detection.enfor
  */
 class DetectorConfig {
 public:
-  // DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config);
   DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config,
                  ProtobufMessage::ValidationVisitor& validation_visitor);
 
@@ -335,7 +341,8 @@ public:
   bool successfulActiveHealthCheckUnejectHost() const {
     return successful_active_health_check_uneject_host_;
   }
-  std::unique_ptr<Extensions::Outlier::MonitorsSet> createMonitorExtensions();
+  std::unique_ptr<Extensions::Outlier::MonitorsSet> createMonitorExtensions(
+      std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback);
 
 private:
   const uint64_t interval_ms_;
@@ -387,10 +394,8 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   // Store extensions config. It will be used when monitors are created and extensions
   // must be attached.
-  ::google::protobuf::RepeatedPtrField<::envoy::config::core::v3::TypedExtensionConfig>
+  Envoy::Protobuf::RepeatedPtrField<::envoy::config::core::v3::TypedExtensionConfig>
       extensions_config_;
-  // const envoy::config::cluster::v3::Extensions::outlier_detection_monitors::common::v3::Monitors
-  // extensions_config_;
 };
 
 /**

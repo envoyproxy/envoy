@@ -12,8 +12,8 @@ namespace Envoy {
 
 // Types of errors reported to outlier detectors.
 // Each type may have a different syntax and content.
-// TODO - maybe use enums from protobufs.
-enum class Upstream::Outlier::ErrorType {
+// TODO (cpakulski) - maybe use enums from protobufs.
+enum class Upstream::Outlier::ExtResultType {
   TEST, // Used in unit tests.
   HTTP_CODE,
   LOCAL_ORIGIN,
@@ -24,14 +24,15 @@ namespace Outlier {
 
 using namespace Envoy::Upstream::Outlier;
 
-// Types derived from TypedError are used to report the result of transaction to
+// Types derived from TypedExtResult are used to report the result of transaction to
 // an outlier detection monitor.
-template <Upstream::Outlier::ErrorType E> class TypedError : public Upstream::Outlier::Error {
+template <Upstream::Outlier::ExtResultType E>
+class TypedExtResult : public Upstream::Outlier::ExtResult {
 protected:
-  TypedError() : Upstream::Outlier::Error(E) {}
+  TypedExtResult() : Upstream::Outlier::ExtResult(E) {}
 };
 
-class HttpCode : public TypedError<Upstream::Outlier::ErrorType::HTTP_CODE> {
+class HttpCode : public TypedExtResult<Upstream::Outlier::ExtResultType::HTTP_CODE> {
 public:
   HttpCode(uint64_t code) : code_(code) {}
   HttpCode() = delete;
@@ -44,7 +45,7 @@ private:
 
 // LocalOriginEvent is used to report errors like resets, timeouts but also
 // successful connection attempts.
-class LocalOriginEvent : public TypedError<Upstream::Outlier::ErrorType::LOCAL_ORIGIN> {
+class LocalOriginEvent : public TypedExtResult<Upstream::Outlier::ExtResultType::LOCAL_ORIGIN> {
 public:
   LocalOriginEvent(Result result) : result_(result) {}
   LocalOriginEvent() = delete;
@@ -58,42 +59,35 @@ private:
 // "catch" reported Error (TypedError);
 class ErrorsBucket {
 public:
-  virtual bool matchType(const ErrorPtr&) PURE;
-  virtual bool matchType(const Error&) PURE;
-  virtual bool match(const ErrorPtr&) PURE;
-  virtual bool match(const Error&) PURE;
+  virtual bool matchType(const ExtResult&) PURE;
+  virtual bool match(const ExtResult&) PURE;
   virtual ~ErrorsBucket() {}
 };
 
-template <Upstream::Outlier::ErrorType E> class TypedErrorsBucket : public ErrorsBucket {
+template <Upstream::Outlier::ExtResultType E> class TypedErrorsBucket : public ErrorsBucket {
 public:
-  bool matchType(const ErrorPtr& error) override { return (error->type() == E); }
-  bool matchType(const Error& error) override { return (error.type() == E); }
+  bool matchType(const ExtResult& result) override { return (result.type() == E); }
 
-  bool match(const ErrorPtr& error) override {
-    return matches(static_cast<TypedError<E>&>(*error));
-  }
-
-  bool match(const Error& error) override {
-    return matches(static_cast<const TypedError<E>&>(error));
+  bool match(const ExtResult& result) override {
+    return matches(static_cast<const TypedExtResult<E>&>(result));
   }
 
   virtual ~TypedErrorsBucket() {}
 
 private:
-  virtual bool matches(const TypedError<E>&) const PURE;
+  virtual bool matches(const TypedExtResult<E>&) const PURE;
 };
 
 using ErrorsBucketPtr = std::unique_ptr<ErrorsBucket>;
 
 // Class defines a range of consecutive HTTP codes.
-class HTTPErrorCodesBucket : public TypedErrorsBucket<Upstream::Outlier::ErrorType::HTTP_CODE> {
+class HTTPCodesBucket : public TypedErrorsBucket<Upstream::Outlier::ExtResultType::HTTP_CODE> {
 public:
-  HTTPErrorCodesBucket() = delete;
-  HTTPErrorCodesBucket(uint64_t start, uint64_t end) : start_(start), end_(end) {}
-  bool matches(const TypedError<Upstream::Outlier::ErrorType::HTTP_CODE>&) const override;
+  HTTPCodesBucket() = delete;
+  HTTPCodesBucket(uint64_t start, uint64_t end) : start_(start), end_(end) {}
+  bool matches(const TypedExtResult<Upstream::Outlier::ExtResultType::HTTP_CODE>&) const override;
 
-  virtual ~HTTPErrorCodesBucket() {}
+  virtual ~HTTPCodesBucket() {}
 
 private:
   uint64_t start_, end_;
@@ -101,10 +95,11 @@ private:
 
 // Class defines a "bucket" which catches LocalOriginEvent.
 class LocalOriginEventsBucket
-    : public TypedErrorsBucket<Upstream::Outlier::ErrorType::LOCAL_ORIGIN> {
+    : public TypedErrorsBucket<Upstream::Outlier::ExtResultType::LOCAL_ORIGIN> {
 public:
   LocalOriginEventsBucket() = default;
-  bool matches(const TypedError<Upstream::Outlier::ErrorType::LOCAL_ORIGIN>&) const override;
+  bool
+  matches(const TypedExtResult<Upstream::Outlier::ExtResultType::LOCAL_ORIGIN>&) const override;
 };
 
 // Class groups error buckets. Buckets may be of different types.
@@ -115,10 +110,12 @@ public:
   Monitor(const std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
   Monitor() = delete;
   virtual ~Monitor() {}
-  void reportResult(const Error&);
+  void reportResult(const ExtResult&);
 
-  // TODO: set it through a method
-  std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback_;
+  void
+  setCallback(std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) {
+    callback_ = callback;
+  }
 
   void reset() { onReset(); }
   std::string name() const { return name_; }
@@ -137,6 +134,7 @@ protected:
   std::string name_;
   uint32_t enforce_{100};
   std::vector<ErrorsBucketPtr> buckets_;
+  std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback_;
 };
 
 using MonitorPtr = std::unique_ptr<Monitor>;

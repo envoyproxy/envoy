@@ -47,33 +47,25 @@ enum class Result {
   ExtOriginRequestSuccess // Request was completed successfully.
 };
 
+// Types of outlier detection extension results which can be reported.
+enum class ExtResultType;
+
 /*
- * Forward declaration of a class carrying a result of a transaction with upstream entity
+ * Class carries result of a transaction with upstream entity
  * or generated internally by Envoy.
- * Different categories of errors will be derived from that base class.
+ * Different categories of results will be derived from that base class.
  * Those categories of results are fed only into Outlier Detection extensions.
  */
-class Error;
-// void PrintTo(const Error&, std::ostream *);
-
-// Types of results which can be reported.
-enum class ErrorType; // {
-                      // HTTP_CODE,
-                      // LOCAL_ORIGIN,
-                      // DATABASE,
-//};
-
-class Error {
+class ExtResult {
 public:
-  Error() = delete;
-  Error(ErrorType type) : type_(type) {}
-  virtual ErrorType type() const { return type_; };
-  virtual ~Error() = default;
+  ExtResult() = delete;
+  ExtResult(ExtResultType type) : type_(type) {}
+  virtual ExtResultType type() const { return type_; };
+  virtual ~ExtResult() = default;
 
 private:
-  ErrorType type_;
+  ExtResultType type_;
 };
-using ErrorPtr = std::unique_ptr<Error>;
 
 /**
  * Monitor for per host data. Proxy filters should send pertinent data when available.
@@ -108,8 +100,6 @@ public:
    */
   void putResult(Result result) { putResult(result, absl::nullopt); }
 
-  virtual void putResult(ErrorPtr) PURE;
-
   /**
    * Add a response time for a host (in this case response time is generic and might be used for
    * different operations including HTTP, Mongo, Redis, etc.).
@@ -141,9 +131,21 @@ public:
    */
   virtual double successRate(SuccessRateMonitorType type) const PURE;
 
-  virtual std::string getFailedMonitorName() const PURE;
-  virtual std::string getFailedMonitorExtraInfo() const PURE;
-  virtual uint32_t getFailedMonitorEnforce() const PURE;
+  /* Returns name of failed extension monitor.
+     Returns empty string if failure was not in extensions.
+  */
+  virtual std::string getFailedExtensionMonitorName() const PURE;
+
+  /* Returns extra info which extension monitor wants to add to
+     event logger.
+     Returns empty string if failure was not in extensions.
+  */
+  virtual std::string getFailedExtensionMonitorExtraInfo() const PURE;
+
+  /* Returns ejection enforcing parameter configured in extension
+     monitor which failed.
+  */
+  virtual uint32_t getFailedExtensionMonitorEnforce() const PURE;
 };
 
 using DetectorHostMonitorPtr = std::unique_ptr<DetectorHostMonitor>;
