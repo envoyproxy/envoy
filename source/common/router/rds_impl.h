@@ -49,23 +49,6 @@ namespace Router {
 class ScopedRdsConfigSubscription;
 
 /**
- * Route configuration provider utilities.
- */
-class RouteConfigProviderUtil {
-public:
-  /**
-   * @return RouteConfigProviderSharedPtr a new route configuration provider based on the supplied
-   * proto configuration. Notes the provider object could be shared among multiple listeners.
-   */
-  static RouteConfigProviderSharedPtr create(
-      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-          config,
-      Server::Configuration::ServerFactoryContext& factory_context,
-      ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
-      const std::string& stat_prefix, RouteConfigProviderManager& route_config_provider_manager);
-};
-
-/**
  * Implementation of RouteConfigProvider that holds a static route configuration.
  */
 class StaticRouteConfigProviderImpl : public RouteConfigProvider {
@@ -173,37 +156,6 @@ private:
 };
 
 using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProviderImpl>;
-
-using ProtoTraitsImpl =
-    Rds::Common::ProtoTraitsImpl<envoy::config::route::v3::RouteConfiguration, 1>;
-
-class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
-                                       public Singleton::Instance {
-public:
-  RouteConfigProviderManagerImpl(OptRef<Server::Admin> admin);
-
-  std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
-  dumpRouteConfigs(const Matchers::StringMatcher& name_matcher) const {
-    return manager_.dumpRouteConfigs(name_matcher);
-  }
-
-  // RouteConfigProviderManager
-  RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
-      const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
-      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-      Init::Manager& init_manager) override;
-
-  RouteConfigProviderPtr
-  createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
-                                  Server::Configuration::ServerFactoryContext& factory_context,
-                                  ProtobufMessage::ValidationVisitor& validator) override;
-
-private:
-  ProtoTraitsImpl proto_traits_;
-  Rds::RouteConfigProviderManager manager_;
-};
-
-using RouteConfigProviderManagerImplPtr = std::unique_ptr<RouteConfigProviderManagerImpl>;
 
 } // namespace Router
 } // namespace Envoy
