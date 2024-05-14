@@ -1,11 +1,11 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 
 #include "source/common/http/http1/parser.h"
 
 #include "absl/base/attributes.h"
+#include "absl/types/optional.h"
 #include "quiche/balsa/balsa_enums.h"
 #include "quiche/balsa/balsa_frame.h"
 #include "quiche/balsa/balsa_headers.h"
@@ -82,7 +82,7 @@ private:
   // parsed headers is saved in `saved_status_code_`. This is so that
   // `statusCode()` can return the correct value even after `framer_` is reset
   // in `MessageDone()`.
-  std::optional<Http::Code> saved_status_code_;
+  absl::optional<Http::Code> saved_status_code_;
   // An error message, often seemingly arbitrary to match http-parser behavior.
   absl::string_view error_message_;
 };
