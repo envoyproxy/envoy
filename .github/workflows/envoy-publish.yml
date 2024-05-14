@@ -55,7 +55,7 @@ jobs:
       ENVOY_CI_SYNC_APP_ID: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_CI_SYNC_APP_ID || '' }}
       ENVOY_CI_SYNC_APP_KEY: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_CI_SYNC_APP_KEY || '' }}
       ENVOY_CI_PUBLISH_APP_ID: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_CI_PUBLISH_APP_ID || '' }}
-      ENVOY_CI_PUBLISH_APP_KEY:  ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_CI_PUBLISH_APP_KEY || '' }}
+      ENVOY_CI_PUBLISH_APP_KEY: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_CI_PUBLISH_APP_KEY || '' }}
     permissions:
       contents: read
       packages: read

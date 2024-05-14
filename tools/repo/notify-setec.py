@@ -6,8 +6,6 @@
 
 import datetime
 import html
-import icalendar
-import json
 import os
 import sys
 from datetime import datetime as dt
@@ -26,6 +24,7 @@ ENVOY_REPO = "envoyproxy/envoy-setec"
 
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
 
+
 class RepoNotifier(runner.Runner):
 
     @property
@@ -34,7 +33,10 @@ class RepoNotifier(runner.Runner):
 
     @cached_property
     def github(self):
-        return github.GithubAPI(self.session, "", oauth_token=self.github_token)
+        return github.GithubAPI(
+            self.session,
+            "",
+            oauth_token=self.github_token)
 
     @cached_property
     def github_token(self):
@@ -43,7 +45,7 @@ class RepoNotifier(runner.Runner):
     @async_property
     async def issues(self):
         async for issue in self.repo.getiter("issues"):
-            skip = not "issue" in issue["html_url"]
+            skip = "issue" not in issue["html_url"]
             if skip:
                 self.log.notice(f"Skipping {issue['title']} {issue['url']}")
                 continue
@@ -83,27 +85,32 @@ class RepoNotifier(runner.Runner):
     @async_property(cache=True)
     async def tracked_issues(self):
         # A dict of assignee : outstanding_issue to be sent to slack
-        # A placeholder for unassigned issuess, to be sent to #assignee eventually
+        # A placeholder for unassigned issuess, to be sent to #assignee
+        # eventually
         assignee_and_issues = dict(unassigned=[])
         # Out-SLO issues to be sent to #envoy-setec
         stalled_issues = []
 
         async for issue in self.issues:
-            updated_at = dt.fromisoformat(issue["updated_at"].replace('Z', '+00:00'))
             age = dt.now(datetime.timezone.utc) - dt.fromisoformat(
                 issue["updated_at"].replace('Z', '+00:00'))
             message = self.pr_message(age, issue)
-            is_approved = "patch:approved" in [label["name"] for label in issue["labels"]];
+            is_approved = (
+                "patch:approved"
+                in [label["name"] for label in issue["labels"]])
 
             # If the PR has been out-SLO for over a day, inform on-call
-            if age > self.slo_max + datetime.timedelta(hours=36) and not is_approved:
+            stalled = (
+                age > self.slo_max + datetime.timedelta(hours=36)
+                and not is_approved)
+            if stalled:
                 stalled_issues.append(message)
 
             has_assignee = False
             for assignee in issue["assignees"]:
                 has_assignee = True
-                assignee_and_issues[assignee["login"]] = assignee_and_issues.get(
-                    assignee["login"], [])
+                assignee_and_issues[assignee["login"]] = (
+                    assignee_and_issues.get(assignee["login"], []))
                 assignee_and_issues[assignee["login"]].append(message)
 
             # If there was no assignee, track it as unassigned.
@@ -134,10 +141,16 @@ class RepoNotifier(runner.Runner):
             stalled = "\n".join(await self.stalled_issues)
             await self.send_message(
                 channel='#envoy-security-team',
-                text=(f"*'Unassigned' Issues* (Issues with no maintainer assigned)\n{unassigned}"))
+                text=(
+                    "*'Unassigned' Issues* "
+                    "(Issues with no maintainer assigned)\n"
+                    f"{unassigned}"))
             await self.send_message(
                 channel='#envoy-security-team',
-                text=(f"*Stalled Issues* (Issues with review out-SLO, please address)\n{stalled}"))
+                text=(
+                    f"*Stalled Issues* "
+                    "(Issues with review out-SLO, please address)\n"
+                    f"{stalled}"))
         except SlackApiError as e:
             self.log.error(f"Unexpected error {e.response['error']}")
 
@@ -147,12 +160,15 @@ class RepoNotifier(runner.Runner):
         hours = age.seconds // 3600
         markup = ("*" if age > self.slo_max else "")
         return (
-            f"<{pull['html_url']}|{html.escape(pull['title'])}> has been waiting "
+            f"<{pull['html_url']}|{html.escape(pull['title'])}> "
+            "has been waiting "
             f"{markup}{days} days {hours} hours{markup}")
 
     async def run(self):
         if not self.github_token:
-            self.log.error("Missing GITHUB_TOKEN: please check github workflow configuration")
+            self.log.error(
+                "Missing GITHUB_TOKEN: "
+                "please check github workflow configuration")
             return 1
 
         if not self.slack_bot_token and not self.dry_run:

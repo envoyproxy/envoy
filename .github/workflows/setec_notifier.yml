@@ -13,7 +13,7 @@ jobs:
       contents: read  # to fetch code (actions/checkout)
       statuses: read  # for notify-setec
       pull-requests: read  # for notify-setec
-      issues: read # for notify-setec
+      issues: read  # for notify-setec
     name: PR Notifier
     runs-on: ubuntu-22.04
     if: >-

@@ -1,16 +1,16 @@
-#/usr/bin/env bash -e
+#!/usr/bin/env bash
 
-set -o pipefail
+set -eo pipefail
 
 WORKSPACE="${1}"
 WORKSPACE_ROOT="$(realpath "${WORKSPACE}/..")"
 PATCHES_PATH="${2}"
-PATCH_README_TPL="$(realpath ${PATCH_README_TPL})"
+PATCH_README_TPL="$(realpath "${PATCH_README_TPL}")"
 ENVOY_VERSION_COUNT=4
 
 create_patches_for_version () {
     # Create patches and README for a version
-    local version="$1" envoy_patch_branch patch_branch patch_dir patch_readme mirror_branch
+    local version="$1" patch_branch patch_dir patch_readme mirror_branch
 
     pushd "${WORKSPACE_ROOT}/envoy" > /dev/null || exit 1
     patch_dir="${PATCHES_PATH}/${version}"
@@ -27,7 +27,7 @@ create_patches_for_version () {
 
     last_commit="$(git log -n1 "origin/${mirror_branch}" --pretty=format:"%H")"
     patch_commit="$(git log -n1 "origin/${patch_branch}" --pretty=format:"%H")"
-    patch_count="$(git rev-list --count ${last_commit}..${patch_commit})"
+    patch_count="$(git rev-list --count "${last_commit}".."${patch_commit}")"
 
     echo "PATCH (${version}) from ${last_commit} -> ${patch_commit} (${patch_count} commits)"
 
@@ -52,8 +52,8 @@ create_patches () {
     local current_version current_minor first_minor version
     current_version="${1}"
     current_minor="$(echo "${current_version}" | cut -d. -f2)"
-    current_minor="$((${current_minor}-1))"
-    first_minor="$((${current_minor}-${ENVOY_VERSION_COUNT}+1))"
+    current_minor="$((current_minor-1))"
+    first_minor="$((current_minor-ENVOY_VERSION_COUNT+1))"
 
     # Iterate patch versions
     for (( minor="${first_minor}"; minor<="${current_minor}"; minor++ )); do

@@ -114,3 +114,20 @@ squash the fix to the relevant patch commit as this will make it easier to resol
 conflict, and retain clean patches for applying on release.
 
 For this reason the patch branches are rebased/force pushed and should be regarded as volatile.
+
+### Linting `main` branch
+
+The `main` branch is linted using Envoy's `envoy.code.check`.
+
+This runs the following checks:
+
+- glint (general file sanity)
+- yamllint (yaml formatting/linting)
+- flake8 (python formatting/linting)
+
+You can run the linter locally with:
+
+```console
+$ pip install envoy.code.check
+$ envoy.code.check . -c glint python_flake8 yamllint
+```
