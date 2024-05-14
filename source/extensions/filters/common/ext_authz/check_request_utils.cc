@@ -222,7 +222,7 @@ void CheckRequestUtils::setAttrContextRequest(
 }
 
 void setTLSSession(envoy::service::auth::v3::AttributeContext::TLSSession& session,
-                   OptRef<const Network::Connection> connection) {
+                   OptRef<const Envoy::Network::Connection> connection) {
   if (connection.has_value()) {
     const Ssl::ConnectionInfoConstSharedPtr ssl_info = connection->ssl();
     if (ssl_info != nullptr && !ssl_info->sni().empty()) {
