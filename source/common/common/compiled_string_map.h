@@ -104,6 +104,8 @@ template <class Value> class CompiledStringMap {
   };
 
 public:
+  // The caller owns the string-views during `compile`. Ownership of the passed in
+  // Values is transferred to the CompiledStringMap.
   using KV = std::pair<absl::string_view, Value>;
   /**
    * Returns the value with a matching key, or the default value
