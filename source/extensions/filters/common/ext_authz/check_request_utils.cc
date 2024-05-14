@@ -224,15 +224,13 @@ void CheckRequestUtils::setAttrContextRequest(
 void CheckRequestUtils::setTLSSession(
     envoy::service::auth::v3::AttributeContext::TLSSession& session,
     const Envoy::Network::Connection& connection) {
-  if (connection.has_value()) {
-    const Ssl::ConnectionInfoConstSharedPtr ssl_info = connection.ssl();
-    if (ssl_info != nullptr && !ssl_info->sni().empty()) {
-      const std::string server_name(ssl_info->sni());
-      session.set_sni(server_name);
-    } else if (!connection.requestedServerName().empty()) {
-      const std::string server_name(connection.requestedServerName());
-      session.set_sni(server_name);
-    }
+  const Ssl::ConnectionInfoConstSharedPtr ssl_info = connection.ssl();
+  if (ssl_info != nullptr && !ssl_info->sni().empty()) {
+    const std::string server_name(ssl_info->sni());
+    session.set_sni(server_name);
+  } else if (!connection.requestedServerName().empty()) {
+    const std::string server_name(connection.requestedServerName());
+    session.set_sni(server_name);
   }
 }
 
@@ -264,7 +262,7 @@ void CheckRequestUtils::createHttpCheck(
                         encode_raw_headers, allowed_headers_matcher, disallowed_headers_matcher);
 
   if (include_tls_session) {
-    setTLSSession(*attrs->mutable_tls_session(), cb->connection()->ref());
+    setTLSSession(*attrs->mutable_tls_session(), *cb->connection());
   }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
   // Fill in the context extensions and metadata context.
