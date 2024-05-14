@@ -221,12 +221,17 @@ void CheckRequestUtils::setAttrContextRequest(
                  disallowed_headers_matcher);
 }
 
-void CheckRequestUtils::setTLSSession(
-    envoy::service::auth::v3::AttributeContext::TLSSession& session,
-    const Ssl::ConnectionInfoConstSharedPtr ssl_info) {
-  if (!ssl_info->sni().empty()) {
-    const std::string server_name(ssl_info->sni());
-    session.set_sni(server_name);
+void setTLSSession(envoy::service::auth::v3::AttributeContext::TLSSession& session,
+                   OptRef<const Network::Connection> connection) {
+  if (connection.has_value()) {
+    const Ssl::ConnectionInfoConstSharedPtr ssl_info = connection->ssl();
+    if (ssl_info != nullptr && !ssl_info->sni().empty()) {
+      const std::string server_name(ssl_info->sni());
+      session.set_sni(server_name);
+    } else if (!connection->requestedServerName().empty()) {
+      const std::string server_name(connection->requestedServerName());
+      session.set_sni(server_name);
+    }
   }
 }
 
@@ -248,7 +253,6 @@ void CheckRequestUtils::createHttpCheck(
   // *cb->connection(), callbacks->streamInfo() and callbacks->decodingBuffer() are not qualified as
   // const.
   auto* cb = const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
-  const std::string server_name(cb->connection()->requestedServerName());
 
   setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false,
                      include_peer_certificate);
@@ -259,13 +263,7 @@ void CheckRequestUtils::createHttpCheck(
                         encode_raw_headers, allowed_headers_matcher, disallowed_headers_matcher);
 
   if (include_tls_session) {
-    // Try to get the SNI from the TLS session. If not available there then try the
-    // data from the TLS inspector (i.e. the server name)
-    if (cb->connection()->ssl() != nullptr) {
-      setTLSSession(*attrs->mutable_tls_session(), cb->connection()->ssl());
-    } else {
-      attrs->mutable_tls_session()->set_sni(server_name);
-    }
+    setTLSSession(*attrs->mutable_tls_session(), cb->connection());
   }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
   // Fill in the context extensions and metadata context.
@@ -290,13 +288,7 @@ void CheckRequestUtils::createTcpCheck(
                      include_peer_certificate);
 
   if (include_tls_session) {
-    // Try to get the SNI from the TLS session. If not available there then try the
-    // data from the TLS inspector (i.e. the server name)
-    if (cb->connection().ssl() != nullptr) {
-      setTLSSession(*attrs->mutable_tls_session(), cb->connection().ssl());
-    } else {
-      attrs->mutable_tls_session()->set_sni(server_name);
-    }
+    setTLSSession(*attrs->mutable_tls_session(), makeOptRef(cb->connection()));
   }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
 }
