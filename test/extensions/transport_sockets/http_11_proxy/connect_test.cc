@@ -440,6 +440,18 @@ TEST(ParseTest, CoverResponseBody) {
   parser.parser().execute(body.c_str(), body.length());
 }
 
+// Regression test for #34096.
+TEST(ParseTest, ContentLengthZero) {
+  constexpr absl::string_view headers = "HTTP/1.0 200 OK\r\ncontent-length: 0\r\n\r\n";
+
+  SelfContainedParser parser;
+  parser.parser().execute(headers.data(), headers.length());
+  EXPECT_TRUE(parser.headersComplete());
+
+  EXPECT_NE(parser.parser().getStatus(), Http::Http1::ParserStatus::Error);
+  EXPECT_EQ(parser.parser().statusCode(), Http::Code::OK);
+}
+
 } // namespace
 } // namespace Http11Connect
 } // namespace TransportSockets

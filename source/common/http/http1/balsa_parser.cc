@@ -182,6 +182,7 @@ size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
   if (len > 0 && !first_byte_processed_) {
+    saved_status_code_.reset();
     if (message_type_ == MessageType::Request && !allow_custom_methods_ &&
         !isFirstCharacterOfValidMethod(*slice)) {
       status_ = ParserStatus::Error;
@@ -232,7 +233,7 @@ CallbackResult BalsaParser::pause() {
 ParserStatus BalsaParser::getStatus() const { return status_; }
 
 Http::Code BalsaParser::statusCode() const {
-  return static_cast<Http::Code>(headers_.parsed_response_code());
+  return saved_status_code_.value_or(static_cast<Http::Code>(0));
 }
 
 bool BalsaParser::isHttp11() const {
@@ -339,6 +340,9 @@ void BalsaParser::HeaderDone() {
     return;
   }
   headers_done_ = true;
+  if (message_type_ == MessageType::Response) {
+    saved_status_code_ = static_cast<Http::Code>(headers_.parsed_response_code());
+  }
   CallbackResult result = connection_->onHeadersComplete();
   status_ = convertResult(result);
   if (result == CallbackResult::NoBody || result == CallbackResult::NoBodyData) {
