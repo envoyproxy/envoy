@@ -3,14 +3,13 @@
 #include "source/common/common/assert.h"
 
 #include "fmt/format.h"
-#include "library/jni/types/env.h"
 #include "library/jni/types/string.h"
 
 namespace Envoy {
 namespace JNI {
 
 bool Exception::checkAndClear(const std::string& details) {
-  auto env = Env::get();
+  auto env = JniHelper::getThreadLocalEnv();
   if (env->ExceptionCheck() == JNI_TRUE) {
     jthrowable throwable = env->ExceptionOccurred();
     env->ExceptionClear();
