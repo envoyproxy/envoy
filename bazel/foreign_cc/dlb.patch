@@ -2,9 +2,9 @@
  Makefile    |    2 -
  1 files changed, 0(+), 2 deletions(-)
 
-diff --git a/dlb/dlb/libdlb/libdlb/dlb/libdlb/Makefile b/dlb/libdlb/Makefile
+diff --git a/dlb/libdlb/Makefile b/dlb/libdlb/Makefile
 index 0ff7c00..d2429ea 100644
---- a/dlb/dlb/libdlb/libdlb/dlb/libdlb/Makefile
+--- a/dlb/libdlb/Makefile
 +++ b/dlb/libdlb/Makefile
 @@ -54,8 +54,6 @@ lib: $(LIB) $(SLIB)
  
