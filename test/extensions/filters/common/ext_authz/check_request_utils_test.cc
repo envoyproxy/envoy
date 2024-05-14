@@ -247,7 +247,9 @@ TEST_F(CheckRequestUtilsTest, TcpTlsSessionNoSessionSni) {
   EXPECT_CALL(net_callbacks_, connection()).Times(4).WillRepeatedly(ReturnRef(connection_));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
-  EXPECT_CALL(connection_, requestedServerName()).WillOnce(Return(requested_server_name_));
+  EXPECT_CALL(connection_, requestedServerName())
+      .Time(2)
+      .WillRepeatedly(Return(requested_server_name_));
   EXPECT_CALL(Const(connection_), ssl()).Times(3).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
@@ -258,7 +260,7 @@ TEST_F(CheckRequestUtilsTest, TcpTlsSessionNoSessionSni) {
   CheckRequestUtils::createTcpCheck(&net_callbacks_, request, false, true,
                                     Protobuf::Map<std::string, std::string>());
   EXPECT_TRUE(request.attributes().has_tls_session());
-  EXPECT_EQ(sni_, request.attributes().tls_session().sni());
+  EXPECT_EQ(requested_server_name_, request.attributes().tls_session().sni());
 }
 
 // Verify that createHttpCheck's dependencies are invoked when it's called.
