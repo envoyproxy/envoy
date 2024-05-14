@@ -63,9 +63,10 @@ message Config {
   // Other providers are ignored
   string credentials_profile = 5;
 
-  // Specifies the credentials to be used. This parameter is optional.
-  // If set, it will override other providers and takes precedence, the provider chain is limited
-  // to the configuration credentials provider. Other providers are ignored
+  // Specifies the credentials to be used. This parameter is optional and if it is set,
+  // it will override other providers and will take precedence over credentials_profile.
+  // The provider chain is limited to the configuration credentials provider.
+  // Default providers chain specified in documentation will be ignored.
   Credentials credentials = 6 [(validate.rules).message = {required: false}];
 }
 
