@@ -49,31 +49,6 @@ namespace Router {
 class ScopedRdsConfigSubscription;
 
 /**
- * Implementation of RouteConfigProvider that holds a static route configuration.
- */
-class StaticRouteConfigProviderImpl : public RouteConfigProvider {
-public:
-  StaticRouteConfigProviderImpl(const envoy::config::route::v3::RouteConfiguration& config,
-                                Rds::ConfigTraits& config_traits,
-                                Server::Configuration::ServerFactoryContext& factory_context,
-                                Rds::RouteConfigProviderManager& route_config_provider_manager);
-  ~StaticRouteConfigProviderImpl() override;
-
-  // Router::RouteConfigProvider
-  Rds::ConfigConstSharedPtr config() const override { return base_.config(); }
-  const absl::optional<ConfigInfo>& configInfo() const override { return base_.configInfo(); }
-  SystemTime lastUpdated() const override { return base_.lastUpdated(); }
-  absl::Status onConfigUpdate() override { return base_.onConfigUpdate(); }
-  ConfigConstSharedPtr configCast() const override;
-  void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
-                                 std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
-
-private:
-  Rds::StaticRouteConfigProviderImpl base_;
-  Rds::RouteConfigProviderManager& route_config_provider_manager_;
-};
-
-/**
  * A class that fetches the route configuration dynamically using the RDS API and updates them to
  * RDS config providers.
  */

@@ -19,6 +19,7 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
+#include "source/common/router/static_route_provider_impl.h"
 
 namespace Envoy {
 namespace Router {

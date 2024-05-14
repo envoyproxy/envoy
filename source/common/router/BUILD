@@ -180,10 +180,12 @@ envoy_cc_library(
     srcs = [
         "rds_impl.cc",
         "route_provider_manager.cc",
+        "static_route_provider_impl.cc",
     ],
     hdrs = [
         "rds_impl.h",
         "route_provider_manager.h",
+        "static_route_provider_impl.h",
     ],
     deps = [
         ":config_lib",

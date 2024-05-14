@@ -22,22 +22,6 @@
 namespace Envoy {
 namespace Router {
 
-StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
-    const envoy::config::route::v3::RouteConfiguration& config, Rds::ConfigTraits& config_traits,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    Rds::RouteConfigProviderManager& route_config_provider_manager)
-    : base_(config, config_traits, factory_context, route_config_provider_manager),
-      route_config_provider_manager_(route_config_provider_manager) {}
-
-StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
-  route_config_provider_manager_.eraseStaticProvider(this);
-}
-
-ConfigConstSharedPtr StaticRouteConfigProviderImpl::configCast() const {
-  ASSERT(dynamic_cast<const Config*>(StaticRouteConfigProviderImpl::config().get()));
-  return std::static_pointer_cast<const Config>(StaticRouteConfigProviderImpl::config());
-}
-
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     RouteConfigUpdatePtr&& config_update,
