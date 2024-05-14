@@ -68,7 +68,7 @@ template <class Value> class CompiledStringMap {
       // to memcmp here because we already know the sizes are equal.
       // Since this is a super-hot path we don't even ASSERT here, to avoid adding
       // slowdown in debug builds.
-      if (memcmp(&key[0], &key_[0], key.size())) {
+      if (memcmp(key.data(), key_.data(), key.size())) {
         return {};
       }
       return value_;
