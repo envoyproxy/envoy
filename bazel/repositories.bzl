@@ -1378,6 +1378,7 @@ filegroup(
 """,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
+        patch_cmds = ["cp dlb/driver/dlb2/uapi/linux/dlb2_user.h dlb/libdlb/"],
     )
 
 def _rules_fuzzing():
