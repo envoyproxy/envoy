@@ -143,7 +143,7 @@ public:
       std::vector<KV> node_contents;
       // Populate a FindFn for the nodes in that range.
       node_contents.reserve(range_end - range_start);
-      std::copy(range_start, range_end, std::back_inserter(node_contents));
+      std::move(range_start, range_end, std::back_inserter(node_contents));
       table_[range_start->first.size()] = createEqualLengthNode(node_contents);
       range_start = range_end;
     }
@@ -177,6 +177,9 @@ private:
         best = info;
       }
     }
+    // Possible optimization was tried here, std::array<std::unique_ptr<Node>, 256>
+    // rather than a smaller-range vector with bounds, to keep locality and reduce
+    // comparisons. It didn't help.
     std::vector<std::unique_ptr<Node>> nodes;
     nodes.resize(best.max - best.min + 1);
     std::sort(node_contents.begin(), node_contents.end(), [&best](const KV& a, const KV& b) {
@@ -191,12 +194,9 @@ private:
       auto range_end = std::find_if(range_start, node_contents.end(),
                                     [index = best.index, c = range_start->first[best.index]](
                                         const KV& e) { return e.first[index] != c; });
-      // Possible optimization was tried here, std::array<KV, 256> rather than
-      // a smaller-range vector with bounds, to keep locality and reduce
-      // comparisons. It didn't help.
       std::vector<KV> next_contents;
       next_contents.reserve(range_end - range_start);
-      std::copy(range_start, range_end, std::back_inserter(next_contents));
+      std::move(range_start, range_end, std::back_inserter(next_contents));
       nodes[range_start->first[best.index] - best.min] = createEqualLengthNode(next_contents);
       range_start = range_end;
     }
