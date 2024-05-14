@@ -1,6 +1,6 @@
 # Script for keeping track of setec issues.
 #
-# bazel run //tools/repo:notify-setec
+# bazel run //tools/repo:notify-setec [-- --dry-run]
 #
 # The tool can be used in `--dry_run` mode and show what it would post to slack
 
@@ -23,6 +23,27 @@ from aio.run import runner
 ENVOY_REPO = "envoyproxy/envoy-setec"
 
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
+
+GITHUB_TO_SLACK = {
+    'adisuissa': 'UT17EMMTP',
+    'alyssawilk': 'U78RP48V9',
+    'ggreenway': 'U78MBV869',
+    'htuch': 'U78E7055Z',
+    'jmarantz': 'U80HPLBPG',
+    'KBaichoo': 'U016ZPU8KBK',
+    'keith': 'UGS5P90CF',
+    'kyessenov': 'U7KTRAA8M',
+    'lizan': 'U79E51EQ6',
+    'mattklein123': 'U5CALEVSL',
+    'nezdolik': 'UDYUWRL13',
+    'phlax': 'U017PLM0GNQ',
+    'ravenblackx': 'U02MJHFEX35',
+    'RyanTheOptimist': 'U01SW3JC8GP',
+    'soulxu': 'U01GNQ3B8AY',
+    'wbpcode': 'U017KF5C0Q6',
+    'yanavlasov': 'UJHLR5KFS',
+    'zuercher': 'U78J72Q82',
+}
 
 
 class RepoNotifier(runner.Runner):
@@ -47,9 +68,16 @@ class RepoNotifier(runner.Runner):
         async for issue in self.repo.getiter("issues"):
             skip = "issue" not in issue["html_url"]
             if skip:
-                self.log.notice(f"Skipping {issue['title']} {issue['url']}")
                 continue
             yield issue
+
+    @async_property
+    async def pulls(self):
+        async for pull in self.repo.getiter("pulls"):
+            skip = "pull" not in pull["html_url"]
+            if skip:
+                continue
+            yield pull
 
     @cached_property
     def repo(self):
@@ -73,14 +101,26 @@ class RepoNotifier(runner.Runner):
 
     # Allow for 1w for updates.
     # This can be tightened for cve issues near release time.
-    @cached_property
-    def slo_max(self):
-        hours = 168
+    def weekend_offset(self, time):
+        """on Monday, allow for an extra 48h."""
+        hours = time + (48 if datetime.date.today().weekday() == 0 else 0)
         return datetime.timedelta(hours=hours)
 
     @async_property(cache=True)
     async def stalled_issues(self):
         return (await self.tracked_issues)["stalled_issues"]
+
+    @async_property(cache=True)
+    async def stalled_cve_issues(self):
+        return (await self.tracked_issues)["stalled_cve_issues"]
+
+    async def get_pr(self, issue_num):
+        self.log.notice(f"LOOKING FOR OR FOR {issue_num}")
+        async for pr in self.pulls:
+            if pr["body"] and str(issue_num) in pr["body"]:
+                self.log.notice(f"FOUND {issue_num}")
+                return pr
+        return None
 
     @async_property(cache=True)
     async def tracked_issues(self):
@@ -90,20 +130,34 @@ class RepoNotifier(runner.Runner):
         assignee_and_issues = dict(unassigned=[])
         # Out-SLO issues to be sent to #envoy-setec
         stalled_issues = []
+        stalled_cve_issues = []
 
         async for issue in self.issues:
             age = dt.now(datetime.timezone.utc) - dt.fromisoformat(
                 issue["updated_at"].replace('Z', '+00:00'))
             message = self.pr_message(age, issue)
+
             is_approved = (
                 "patch:approved"
                 in [label["name"] for label in issue["labels"]])
+            is_cve = (
+                "cve/next"
+                in [label["name"] for label in issue["labels"]])
+            # If an CVE issue/PR hasn't been updated in a day, notify.
+            if is_cve and not is_approved:
+                pr = await self.get_pr(issue["number"])
+                # If there's a pull associated with this CVE, check that for
+                # updates instead of the issue.
+                if pr:
+                    age = dt.now(datetime.timezone.utc) - dt.fromisoformat(
+                      pr["updated_at"].replace('Z', '+00:00'))
+                if age > self.weekend_offset(24):
+                    # If there's no PR, poll for issue updates.
+                    stalled_cve_issues.append(message)
 
-            # If the PR has been out-SLO for over a day, inform on-call
-            stalled = (
-                age > self.slo_max + datetime.timedelta(hours=36)
-                and not is_approved)
-            if stalled:
+            # If an non-CVE issue hasn't been updated in a week, notify.
+            if (not is_cve and age > self.weekend_offset(167) and
+               issue["assignees"]):
                 stalled_issues.append(message)
 
             has_assignee = False
@@ -119,7 +173,8 @@ class RepoNotifier(runner.Runner):
 
         return dict(
             assignee_and_issues=assignee_and_issues,
-            stalled_issues=stalled_issues)
+            stalled_issues=stalled_issues,
+            stalled_cve_issues=stalled_cve_issues)
 
     @async_property(cache=True)
     async def unassigned_issues(self):
@@ -139,30 +194,47 @@ class RepoNotifier(runner.Runner):
         try:
             unassigned = "\n".join(await self.unassigned_issues)
             stalled = "\n".join(await self.stalled_issues)
-            await self.send_message(
-                channel='#envoy-security-team',
-                text=(
-                    "*'Unassigned' Issues* "
-                    "(Issues with no maintainer assigned)\n"
-                    f"{unassigned}"))
-            await self.send_message(
-                channel='#envoy-security-team',
-                text=(
-                    f"*Stalled Issues* "
-                    "(Issues with review out-SLO, please address)\n"
-                    f"{stalled}"))
+            stalled_cve = "\n".join(await self.stalled_cve_issues)
+            if unassigned:
+                await self.send_message(
+                    channel='#envoy-security-team',
+                    text=(
+                        "*'Unassigned' Issues* "
+                        "(Issues with no one assigned)\n"
+                        f"{unassigned}"))
+            if stalled:
+                await self.send_message(
+                    channel='#envoy-security-team',
+                    text=(
+                        f"*Stalled Issues* "
+                        "(Issues with review out-SLO, please address)\n"
+                        f"{stalled}"))
+            if stalled_cve:
+                await self.send_message(
+                    channel='#envoy-security-team',
+                    text=(
+                        f"*Stalled CVE Issues* "
+                        "(Issues with review out-SLO, please address)\n"
+                        f"{stalled_cve}"))
         except SlackApiError as e:
             self.log.error(f"Unexpected error {e.response['error']}")
 
-    def pr_message(self, age, pull):
+    def pr_message(self, age, issue):
         """Generate a pr message, bolding the time if it's out-SLO."""
+        assignee_string = ""
+        for assignee in issue["assignees"]:
+            github_login = assignee["login"]
+            handle = GITHUB_TO_SLACK.get(github_login)
+            if handle:
+                assignee_string += f"<@{handle}> "
+            else:
+                assignee_string += "github_login "
+
         days = age.days
         hours = age.seconds // 3600
-        markup = ("*" if age > self.slo_max else "")
         return (
-            f"<{pull['html_url']}|{html.escape(pull['title'])}> "
-            "has been waiting "
-            f"{markup}{days} days {hours} hours{markup}")
+            f"<{issue['html_url']}|{html.escape(issue['title'])}> has been "
+            f"waiting {days} days {hours} hours Assignees [{assignee_string}]")
 
     async def run(self):
         if not self.github_token:
