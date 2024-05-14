@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
-	"golang.org/x/exp/slices"
 )
 
 type filter struct {
@@ -185,12 +184,6 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	})
 
 	header.RangeWithCopy(func(key, value string) bool {
-		_, ok := f.all_headers[key]
-		if ok {
-			if slices.Contains(f.all_headers[key], val) {
-				return false
-			}
-		}
 		f.all_headers[key] = append(f.all_headers[key], val)
 		return true
 	})
