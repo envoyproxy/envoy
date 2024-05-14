@@ -76,7 +76,7 @@ enum Action {
   UNEJECT = 1;
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message OutlierDetectionEvent {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.cluster.v2alpha.OutlierDetectionEvent";
