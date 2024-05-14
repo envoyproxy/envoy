@@ -10,6 +10,7 @@ import "xds/type/matcher/v3/matcher.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.rbac.v3";
 option java_outer_classname = "RbacProto";
@@ -22,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.rbac]
 
 // RBAC filter config.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message RBAC {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rbac.v2.RBAC";
@@ -70,6 +71,9 @@ message RBAC {
 
   // If track_per_rule_stats is true, counters will be published for each rule and shadow rule.
   bool track_per_rule_stats = 7;
+
+  // If specified, RBAC denies will use the given value as the response code. Defaults to 403 Forbidden.
+  uint32 deny_status = 8 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 }
 
 message RBACPerRoute {

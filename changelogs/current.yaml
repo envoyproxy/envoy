@@ -127,6 +127,11 @@ new_features:
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
+- area: rbac
+  change: |
+    Added :ref:`deny_status
+    <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC.deny_status>`
+    to allow the HTTP status code for the RBAC denial response to be configured.
 
 deprecated:
 - area: tracing

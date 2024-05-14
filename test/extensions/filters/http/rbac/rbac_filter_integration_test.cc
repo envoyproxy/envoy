@@ -41,6 +41,24 @@ typed_config:
           - any: true
 )EOF";
 
+const std::string RBAC_CONFIG_WITH_DENY_ACTION_CUSTOM_STATUS = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  deny_status: 407
+  rules:
+    action: DENY
+    policies:
+      "deny policy":
+        permissions:
+          - header:
+              name: ":method"
+              string_match:
+                exact: "GET"
+        principals:
+          - any: true
+)EOF";
+
 const std::string RBAC_CONFIG_WITH_PREFIX_MATCH = R"EOF(
 name: rbac
 typed_config:
@@ -557,6 +575,30 @@ TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
+  // Note the whitespace in the policy id is replaced by '_'.
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[deny_policy]"));
+}
+
+TEST_P(RBACIntegrationTest, DeniedWithDenyActionCustomStatus) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(RBAC_CONFIG_WITH_DENY_ACTION_CUSTOM_STATUS);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "sni.lyft.com"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("407", response->headers().getStatusValue());
   // Note the whitespace in the policy id is replaced by '_'.
   EXPECT_THAT(waitForAccessLog(access_log_name_),
               testing::HasSubstr("rbac_access_denied_matched_policy[deny_policy]"));

@@ -56,6 +56,13 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
   return absl::InvalidArgumentError(fmt::format("RBAC HTTP filter cannot match on '{}'", type_url));
 }
 
+Http::Code getDenyStatus(uint32_t deny_status) {
+  if (deny_status == 0) {
+    return Http::Code::Forbidden;
+  }
+  return static_cast<Http::Code>(deny_status);
+}
+
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope,
@@ -65,6 +72,7 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
       per_rule_stats_(proto_config.track_per_rule_stats()),
+      deny_status_(getDenyStatus(proto_config.deny_status())),
       engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
                                                   action_validation_visitor_)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(
@@ -183,7 +191,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       return Http::FilterHeadersStatus::Continue;
     } else {
       ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
-      callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
+      callbacks_->sendLocalReply(config_->denyStatus(), "RBAC: access denied", nullptr,
                                  absl::nullopt,
                                  Filters::Common::RBAC::responseDetail(log_policy_id));
       config_->stats().denied_.inc();

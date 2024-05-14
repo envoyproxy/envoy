@@ -36,8 +36,10 @@ enum class LogResult { Yes, No, Undecided };
 class RoleBasedAccessControlFilterTest : public testing::Test {
 public:
   void setupPolicy(envoy::config::rbac::v3::RBAC::Action action,
-                   std::string rules_stat_prefix = "") {
+                   std::string rules_stat_prefix = "",
+                   uint32_t deny_status = 0) {
     envoy::extensions::filters::http::rbac::v3::RBAC config;
+    config.set_deny_status(deny_status);
 
     envoy::config::rbac::v3::Policy policy;
     auto policy_rules = policy.add_permissions()->mutable_or_rules();
@@ -397,6 +399,39 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "403"},
+      {"content-length", "19"},
+      {"content-type", "text/plain"},
+  };
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, true));
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+  EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
+  EXPECT_EQ("test.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("test.rbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_allowed",
+            config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
+
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
+  EXPECT_EQ("allowed",
+            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
+  EXPECT_EQ(
+      "bar",
+      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
+  EXPECT_EQ("rbac_access_denied_matched_policy[none]", callbacks_.details());
+  checkAccessLogMetadata(LogResult::Undecided);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, DeniedCustomStatus) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW, "", 407);
+
+  setDestinationPort(456);
+  setMetadata();
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "407"},
       {"content-length", "19"},
       {"content-type", "text/plain"},
   };
