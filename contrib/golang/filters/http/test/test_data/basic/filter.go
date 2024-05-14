@@ -183,13 +183,15 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		return true
 	})
 
+	f.all_headers = make(map[string][]string)
+
 	header.RangeWithCopy(func(key, value string) bool {
 		f.all_headers[key] = append(f.all_headers[key], val)
 		return true
 	})
 
 	header_map := header.GetAllHeaders()
-	if reflect.DeepEqual(f.all_headers, header_map) != true {
+	if !reflect.DeepEqual(f.all_headers, header_map) {
 		return f.fail("GetAllHeaders returned incorrect data, expected:\n%v\n got:\n%v", f.all_headers, header_map)
 	}
 
