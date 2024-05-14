@@ -4970,7 +4970,11 @@ TEST_P(Http1ServerConnectionImplTest, ValueStartsWithCR) {
     const absl::string_view expected_value = "value starts with carriage return";
     testRequestWithValueExpectSuccess(value, expected_value);
   } else {
+#ifdef ENVOY_ENABLE_UHV
+    testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_INVALID_HEADER_TOKEN");
+#else
     testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_STRICT");
+#endif
   }
 }
 
@@ -5091,7 +5095,11 @@ TEST_P(Http1ClientConnectionImplTest, ValueStartsWithCR) {
     const absl::string_view expected_value = "value starts with carriage return";
     testRequestWithValueExpectSuccess(value, expected_value);
   } else {
+#ifdef ENVOY_ENABLE_UHV
+    testRequestWithValueExpectFailure(value, "HPE_INVALID_HEADER_TOKEN");
+#else
     testRequestWithValueExpectFailure(value, "HPE_STRICT");
+#endif
   }
 }
 
