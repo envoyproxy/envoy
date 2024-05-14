@@ -42,8 +42,6 @@ public:
           config,
       Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
 
-  ~GrpcAccessLoggerImpl() { *destructing_ = true; }
-
 private:
   void initMessageRoot(
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
@@ -59,50 +57,50 @@ private:
 
   class OTelLogRequestCallbacks
       : public Grpc::AsyncRequestCallbacks<
-            opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>,
-        public Envoy::Event::DeferredDeletable {
+            opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
   public:
     OTelLogRequestCallbacks(Envoy::Event::Dispatcher& dispatcher,
-                            Common::GrpcAccessLoggerStats& stats, uint32_t sending_log_entries,
-                            std::shared_ptr<bool> destructing)
-        : dispatcher_(dispatcher), stats_(stats), sending_log_entries_(sending_log_entries),
-          destructing_(destructing) {}
+                            Common::GrpcAccessLoggerStats& stats, uint32_t sending_log_entries)
+        : dispatcher_(dispatcher), stats_(stats), sending_log_entries_(sending_log_entries) {}
 
     void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
 
     void onSuccess(Grpc::ResponsePtr<
                        opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>&& resp,
                    Tracing::Span&) override {
-      if (!*destructing_) {
-        int partial_rejected_log_entries = (resp && resp->has_partial_success())
-                                               ? resp->partial_success().rejected_log_records()
-                                               : 0;
-        stats_.logs_dropped_.add(partial_rejected_log_entries);
-        stats_.logs_written_.add(sending_log_entries_ - partial_rejected_log_entries);
-      }
-      deferredDelete();
+      int partial_rejected_log_entries = (resp && resp->has_partial_success())
+                                             ? resp->partial_success().rejected_log_records()
+                                             : 0;
+      stats_.logs_dropped_.add(partial_rejected_log_entries);
+      stats_.logs_written_.add(sending_log_entries_ - partial_rejected_log_entries);
+      RELEASE_ASSERT(deletion_, "`setDeletion` has not been called for initialization.");
+      deletion_();
     }
 
     void onFailure(Grpc::Status::GrpcStatus, const std::string&, Tracing::Span&) override {
-      if (!*destructing_) {
-        stats_.logs_dropped_.add(sending_log_entries_);
-      }
-      deferredDelete();
+      stats_.logs_dropped_.add(sending_log_entries_);
+      RELEASE_ASSERT(deletion_, "`setDeletion` has not been called for initialization.");
+      deletion_();
     }
 
-    void deferredDelete() {
-      dispatcher_.deferredDelete(std::unique_ptr<OTelLogRequestCallbacks>(this));
-    }
+    void setDeletion(std::function<void()> deletion) { deletion_ = deletion; }
 
     Envoy::Event::Dispatcher& dispatcher_;
     Common::GrpcAccessLoggerStats& stats_;
     uint32_t sending_log_entries_;
-    std::shared_ptr<bool> destructing_;
+    std::function<void()> deletion_;
   };
 
   opentelemetry::proto::logs::v1::ScopeLogs* root_;
   Common::GrpcAccessLoggerStats stats_;
-  std::shared_ptr<bool> destructing_ = std::make_shared<bool>(false);
+
+  // Hold the ownership of `OTelLogRequestCallbacks` and `OTelLogRequestCallbacks.deletion_` called
+  // in the callback time will be responsible to remove itself from map for deletion. If
+  // `GrpcAccessLoggerImpl` get deleted, it will cancel all the requests on the flight. Therefore,
+  // we guarantee the GrpcAccessLoggerImpl is always alive when `OTelLogRequestCallbacks`'s
+  // callbacks get called.
+  absl::flat_hash_map<OTelLogRequestCallbacks*, std::unique_ptr<OTelLogRequestCallbacks>>
+      callbacks_;
   uint32_t batched_log_entries_ = 0;
 };
 

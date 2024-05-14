@@ -128,7 +128,6 @@ TEST_F(GrpcAccessLoggerImplTest, Log) {
   )EOF");
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
   logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
   EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
                 .value()
@@ -168,7 +167,6 @@ TEST_F(GrpcAccessLoggerImplTest, LogWithStats) {
   grpc_access_logger_impl_test_helper_.expectSentMessage(expected_message_yaml);
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
-  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(2);
   logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
   EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
                 .value()

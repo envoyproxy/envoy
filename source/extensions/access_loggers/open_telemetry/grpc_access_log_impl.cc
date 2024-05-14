@@ -49,11 +49,13 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
                   "opentelemetry.proto.collector.logs.v1.LogsService.Export"),
               GrpcCommon::optionalRetryPolicy(config.common_config()),
               [this, &dispatcher]() {
-                // It will be deleted in the callbacks.
-                auto* callback = new OTelLogRequestCallbacks(
-                    dispatcher, this->stats_, this->batched_log_entries_, this->destructing_);
+                OTelLogRequestCallbacks* ptr = new OTelLogRequestCallbacks(
+                    dispatcher, this->stats_, this->batched_log_entries_);
                 this->batched_log_entries_ = 0;
-                return callback;
+
+                this->callbacks_.emplace(ptr, ptr);
+                ptr->setDeletion([this, ptr]() { this->callbacks_.erase(ptr); });
+                return ptr;
               })),
       stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, GRPC_LOG_STATS_PREFIX))}) {
   initMessageRoot(config, local_info);
