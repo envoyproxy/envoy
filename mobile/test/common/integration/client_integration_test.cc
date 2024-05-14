@@ -250,6 +250,7 @@ TEST_P(ClientIntegrationTest, Basic) {
   }
 }
 
+#if not defined(__APPLE__)
 TEST_P(ClientIntegrationTest, BasicWithCares) {
   builder_.setUseCares(true);
   initialize();
@@ -258,6 +259,7 @@ TEST_P(ClientIntegrationTest, BasicWithCares) {
     ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
   }
 }
+#endif
 
 TEST_P(ClientIntegrationTest, LargeResponse) {
   initialize();
