@@ -35,8 +35,7 @@ enum class LogResult { Yes, No, Undecided };
 
 class RoleBasedAccessControlFilterTest : public testing::Test {
 public:
-  void setupPolicy(envoy::config::rbac::v3::RBAC::Action action,
-                   std::string rules_stat_prefix = "",
+  void setupPolicy(envoy::config::rbac::v3::RBAC::Action action, std::string rules_stat_prefix = "",
                    uint32_t deny_status = 0) {
     envoy::extensions::filters::http::rbac::v3::RBAC config;
     config.set_deny_status(deny_status);

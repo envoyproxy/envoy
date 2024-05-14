@@ -130,7 +130,7 @@ new_features:
 - area: rbac
   change: |
     Added :ref:`deny_status
-    <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC.deny_status>`
+    <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.deny_status>`
     to allow the HTTP status code for the RBAC denial response to be configured.
 
 deprecated:

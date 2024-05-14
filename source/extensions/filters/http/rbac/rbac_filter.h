@@ -65,9 +65,7 @@ public:
     return shadow_rules_stat_prefix_ +
            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField;
   }
-  Http::Code denyStatus() const {
-    return deny_status_;
-  }
+  Http::Code denyStatus() const { return deny_status_; }
 
   const Filters::Common::RBAC::RoleBasedAccessControlEngine*
   engine(const Http::StreamFilterCallbacks* callbacks,
