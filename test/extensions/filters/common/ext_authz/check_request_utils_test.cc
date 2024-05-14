@@ -242,7 +242,7 @@ TEST_F(CheckRequestUtilsTest, TcpTlsSession) {
 
 // Verify that createTcpCheck populates the tls session details correctly from the connection when
 // TLS session information isn't present
-TEST_F(CheckRequestUtilsTest, TcpTlsSession) {
+TEST_F(CheckRequestUtilsTest, TcpTlsSessionNoSessionSni) {
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(net_callbacks_, connection()).Times(4).WillRepeatedly(ReturnRef(connection_));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
