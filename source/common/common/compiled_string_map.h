@@ -66,6 +66,8 @@ template <class Value> class CompiledStringMap {
     Value find(const absl::string_view& key) override {
       // String comparison unnecessarily checks size equality first, we can skip
       // to memcmp here because we already know the sizes are equal.
+      // Since this is a super-hot path we don't even ASSERT here, to avoid adding
+      // slowdown in debug builds.
       if (memcmp(&key[0], &key_[0], key.size())) {
         return {};
       }
@@ -95,6 +97,9 @@ template <class Value> class CompiledStringMap {
   private:
     const size_t index_;
     const uint8_t min_;
+    // Possible optimization was tried here, using std::array<std::unique_ptr<Node>, 256>
+    // rather than a smaller-range vector with bounds, to keep locality and reduce
+    // comparisons. It didn't help.
     const std::vector<std::unique_ptr<Node>> branches_;
   };
 
@@ -150,17 +155,25 @@ public:
   }
 
 private:
-  /*
-   * @param node_contents the set of key-value pairs that will be children of
-   *                      this node.
+  /**
+   * Details of a node branch point; the index into the string at which
+   * characters should be looked up, the lowest valued character in the
+   * branch, the highest valued character in the branch, and how many
+   * branches there are.
    */
-  static std::unique_ptr<Node> createEqualLengthNode(std::vector<KV> node_contents) {
-    if (node_contents.size() == 1) {
-      return std::make_unique<LeafNode>(node_contents[0].first, std::move(node_contents[0].second));
-    }
-    struct IndexSplitInfo {
-      uint8_t index, min, max, count;
-    } best{0, 0, 0, 0};
+  struct IndexSplitInfo {
+    uint8_t index_, min_, max_, count_;
+    size_t size() { return max_ - min_ + 1; }
+    size_t offsetOf(uint8_t c) { return c - min_; }
+  };
+
+  /**
+   * @param node_contents the key-value pairs to be branched upon.
+   * @return details of the index on which the node should branch
+   *         - the index which produces the most child branches.
+   */
+  static IndexSplitInfo findBestSplitPoint(const std::vector<KV>& node_contents) {
+    IndexSplitInfo best{0, 0, 0, 0};
     for (size_t i = 0; i < node_contents[0].first.size(); i++) {
       std::array<bool, 256> hits{};
       IndexSplitInfo info{static_cast<uint8_t>(i), 255, 0, 0};
@@ -168,39 +181,51 @@ private:
         uint8_t v = node_contents[j].first[i];
         if (!hits[v]) {
           hits[v] = true;
-          info.count++;
-          info.min = std::min(v, info.min);
-          info.max = std::max(v, info.max);
+          info.count_++;
+          info.min_ = std::min(v, info.min_);
+          info.max_ = std::max(v, info.max_);
         }
       }
-      if (info.count > best.count) {
+      if (info.count_ > best.count_) {
         best = info;
       }
     }
-    // Possible optimization was tried here, std::array<std::unique_ptr<Node>, 256>
-    // rather than a smaller-range vector with bounds, to keep locality and reduce
-    // comparisons. It didn't help.
+    return best;
+  }
+
+  /*
+   * @param node_contents the set of key-value pairs that will be children of
+   *                      this node.
+   * @return the recursively generated tree node that leads to all of node_contents.
+   *         If there is only one entry in node_contents then a LeafNode, otherwise a BranchNode.
+   */
+  static std::unique_ptr<Node> createEqualLengthNode(std::vector<KV> node_contents) {
+    if (node_contents.size() == 1) {
+      return std::make_unique<LeafNode>(node_contents[0].first, std::move(node_contents[0].second));
+    }
+    IndexSplitInfo best = findBestSplitPoint(node_contents);
     std::vector<std::unique_ptr<Node>> nodes;
-    nodes.resize(best.max - best.min + 1);
-    std::sort(node_contents.begin(), node_contents.end(), [&best](const KV& a, const KV& b) {
-      return a.first[best.index] < b.first[best.index];
-    });
+    nodes.resize(best.size());
+    std::sort(node_contents.begin(), node_contents.end(),
+              [index = best.index_](const KV& a, const KV& b) {
+                return a.first[index] < b.first[index];
+              });
     auto range_start = node_contents.begin();
     // Populate the sub-nodes for each character-branch.
     while (range_start != node_contents.end()) {
-      // Find the first key whose character at position [best.index] differs from the
+      // Find the first key whose character at position [best.index_] differs from the
       // character of the current range.
-      // Everything in between is keys with the same character at this index.
+      // Everything in the range has keys with the same character at this index.
       auto range_end = std::find_if(range_start, node_contents.end(),
-                                    [index = best.index, c = range_start->first[best.index]](
+                                    [index = best.index_, c = range_start->first[best.index_]](
                                         const KV& e) { return e.first[index] != c; });
       std::vector<KV> next_contents;
       next_contents.reserve(range_end - range_start);
       std::move(range_start, range_end, std::back_inserter(next_contents));
-      nodes[range_start->first[best.index] - best.min] = createEqualLengthNode(next_contents);
+      nodes[best.offsetOf(range_start->first[best.index_])] = createEqualLengthNode(next_contents);
       range_start = range_end;
     }
-    return std::make_unique<BranchNode>(best.index, best.min, std::move(nodes));
+    return std::make_unique<BranchNode>(best.index_, best.min_, std::move(nodes));
   }
   std::vector<std::unique_ptr<Node>> table_;
 };
