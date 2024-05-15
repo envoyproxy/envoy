@@ -767,6 +767,9 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNIEqualServe
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).Times(3).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(connection_, requestedServerName())
+      .Times(2)
+      .WillRepeatedly(Return(requested_server_name_));
   EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
   EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));
