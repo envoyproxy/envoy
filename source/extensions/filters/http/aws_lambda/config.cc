@@ -46,10 +46,9 @@ AwsLambdaFilterFactory::getCredentialsProvider(
               "credentials are set from filter configuration, default credentials providers chain "
               "will be ignored and only this credentials will be used");
     const auto& config_credentials = proto_config.credentials();
-    auto credentials = Extensions::Common::Aws::Credentials(config_credentials.access_key_id(),
-                                                            config_credentials.secret_access_key(),
-                                                            config_credentials.session_token());
-    return std::make_shared<Extensions::Common::Aws::ConfigCredentialsProvider>(credentials);
+    return std::make_shared<Extensions::Common::Aws::ConfigCredentialsProvider>(
+        config_credentials.access_key_id(), config_credentials.secret_access_key(),
+        config_credentials.session_token());
   }
   if (!proto_config.credentials_profile().empty()) {
     ENVOY_LOG(debug,

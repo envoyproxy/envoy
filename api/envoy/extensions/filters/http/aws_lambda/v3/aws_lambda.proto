@@ -70,6 +70,9 @@ message Config {
   // The provider chain is limited to the configuration credentials provider.
   // If this field is provided, then the default providers chain specified in documentation will be ignored.
   // (See :ref:`default credentials providers <config_http_filters_aws_lambda_credentials>`)
+  //
+  // .. warning::
+  //   Distributing the AWS credentials via this configuration should not be done in production.
   Credentials credentials = 6 [(validate.rules).message = {required: false}];
 }
 
@@ -82,7 +85,7 @@ message Credentials {
   string secret_access_key = 2 [(validate.rules).string = {min_len: 1}];
 
   // AWS session token
-  string session_token = 3 [(validate.rules).string = {min_len: 1}];
+  string session_token = 3;
 }
 
 // Per-route configuration for AWS Lambda. This can be useful when invoking a different Lambda function or a different
