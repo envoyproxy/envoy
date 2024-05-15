@@ -169,13 +169,11 @@ envoy_cc_library(
         "client_context_impl.cc",
         "context_impl.cc",
         "context_manager_impl.cc",
-        "server_context_impl.cc",
     ],
     hdrs = [
         "client_context_impl.h",
         "context_impl.h",
         "context_manager_impl.h",
-        "server_context_impl.h",
     ],
     external_deps = [
         "abseil_node_hash_set",
@@ -211,6 +209,22 @@ envoy_cc_library(
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "server_context_lib",
+    srcs = [
+        "server_context_impl.cc",
+    ],
+    hdrs = [
+        "server_context_impl.h",
+    ],
+    deps = [
+        ":context_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+    alwayslink = 1,  # has factory registration
 )
 
 envoy_cc_library(

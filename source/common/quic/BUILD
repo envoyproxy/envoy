@@ -488,6 +488,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/tls:context_config_lib",
+        "//source/common/tls:server_context_lib",
         "//source/common/tls:server_ssl_socket_lib",
         "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
