@@ -437,26 +437,26 @@ struct StreamInfoImpl : public StreamInfo {
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
   absl::optional<MonotonicTime> final_time_;
-
   absl::optional<Http::Protocol> protocol_;
 
 private:
   absl::optional<uint32_t> response_code_;
-
-public:
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
+
+public:
   absl::InlinedVector<ResponseFlag, 4> response_flags_{};
   bool health_check_request_{};
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
+
+private:
   absl::optional<uint32_t> attempt_count_;
   // TODO(agrawroh): Check if the owner of this storage outlives the StreamInfo. We should only copy
   // the string if it could outlive the StreamInfo.
   absl::optional<std::string> virtual_cluster_name_;
 
-private:
   static Network::ConnectionInfoProviderSharedPtr emptyDownstreamAddressProvider() {
     MUTABLE_CONSTRUCT_ON_FIRST_USE(
         Network::ConnectionInfoProviderSharedPtr,
