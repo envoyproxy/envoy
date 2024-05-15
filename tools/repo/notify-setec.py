@@ -7,11 +7,13 @@
 import datetime
 import html
 import os
+import pathlib
 import sys
 from datetime import datetime as dt
 from functools import cached_property
 
 import aiohttp
+import yaml
 
 from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.errors import SlackApiError
@@ -23,27 +25,6 @@ from aio.run import runner
 ENVOY_REPO = "envoyproxy/envoy-setec"
 
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
-
-GITHUB_TO_SLACK = {
-    'adisuissa': 'UT17EMMTP',
-    'alyssawilk': 'U78RP48V9',
-    'ggreenway': 'U78MBV869',
-    'htuch': 'U78E7055Z',
-    'jmarantz': 'U80HPLBPG',
-    'KBaichoo': 'U016ZPU8KBK',
-    'keith': 'UGS5P90CF',
-    'kyessenov': 'U7KTRAA8M',
-    'lizan': 'U79E51EQ6',
-    'mattklein123': 'U5CALEVSL',
-    'nezdolik': 'UDYUWRL13',
-    'phlax': 'U017PLM0GNQ',
-    'ravenblackx': 'U02MJHFEX35',
-    'RyanTheOptimist': 'U01SW3JC8GP',
-    'soulxu': 'U01GNQ3B8AY',
-    'wbpcode': 'U017KF5C0Q6',
-    'yanavlasov': 'UJHLR5KFS',
-    'zuercher': 'U78J72Q82',
-}
 
 
 class RepoNotifier(runner.Runner):
@@ -71,6 +52,14 @@ class RepoNotifier(runner.Runner):
                 continue
             yield issue
 
+    @cached_property
+    def maintainers(self):
+        return {
+            k: v["slack"]
+            for k, v
+            in self.reviewers.items()
+            if v.get("maintainer")}
+
     @async_property
     async def pulls(self):
         async for pull in self.repo.getiter("pulls"):
@@ -82,6 +71,10 @@ class RepoNotifier(runner.Runner):
     @cached_property
     def repo(self):
         return self.github[ENVOY_REPO]
+
+    @cached_property
+    def reviewers(self):
+        return yaml.safe_load(pathlib.Path(self.args.reviewers).read_text())
 
     @cached_property
     def session(self):
@@ -182,6 +175,7 @@ class RepoNotifier(runner.Runner):
 
     def add_arguments(self, parser) -> None:
         super().add_arguments(parser)
+        parser.add_argument('reviewers', help="YAML reviewer config")
         parser.add_argument(
             '--dry_run',
             action="store_true",
@@ -224,7 +218,7 @@ class RepoNotifier(runner.Runner):
         assignee_string = ""
         for assignee in issue["assignees"]:
             github_login = assignee["login"]
-            handle = GITHUB_TO_SLACK.get(github_login)
+            handle = self.maintainers.get(github_login)
             if handle:
                 assignee_string += f"<@{handle}> "
             else:
