@@ -734,7 +734,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   envoy::service::auth::v3::AttributeContext_TLSSession want_tls_session;
   want_tls_session.set_sni(sni_);
-  EXPECT_CALL(*ssl_, sni()).Times(3).WillRepeatedly(ReturnRef(want_tls_session.sni()));
+  EXPECT_CALL(*ssl_, sni()).Times(2).WillRepeatedly(ReturnRef(want_tls_session.sni()));
 
   callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
 }
@@ -757,7 +757,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   envoy::service::auth::v3::AttributeContext_TLSSession want_tls_session;
-  EXPECT_CALL(*ssl_, sni()).Times(2).WillRepeatedly(ReturnRef(want_tls_session.sni()));
+  EXPECT_CALL(*ssl_, sni()).WillOnce(ReturnRef(want_tls_session.sni()));
 
   callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
 }
@@ -784,7 +784,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNIEqualServe
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   envoy::service::auth::v3::AttributeContext_TLSSession want_tls_session;
-  EXPECT_CALL(*ssl_, sni()).Times(2).WillRepeatedly(ReturnRef(want_tls_session.sni()));
+  EXPECT_CALL(*ssl_, sni()).WillOnce(ReturnRef(want_tls_session.sni()));
 
   callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
 }
