@@ -70,9 +70,9 @@ public:
     ON_CALL(lb_context_, downstreamConnection()).WillByDefault(Return(&connection_));
 
     member_update_cb_ = cluster_->prioritySet().addMemberUpdateCb(
-        [this](const Upstream::HostVector& hosts_added,
-               const Upstream::HostVector& hosts_removed) -> void {
+        [this](const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed) {
           onMemberUpdateCb(hosts_added, hosts_removed);
+          return absl::OkStatus();
         });
 
     absl::flat_hash_map<std::string, Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr>

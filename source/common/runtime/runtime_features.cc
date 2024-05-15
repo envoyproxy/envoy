@@ -76,6 +76,7 @@ RUNTIME_GUARD(envoy_reloadable_features_oauth_use_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_status_mapping_more_core_response_flags);
 RUNTIME_GUARD(envoy_reloadable_features_quic_fix_filter_manager_uaf);
+RUNTIME_GUARD(envoy_reloadable_features_quic_receive_ecn);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
@@ -87,6 +88,7 @@ RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_ssl_transport_failure_reason_format);
 RUNTIME_GUARD(envoy_reloadable_features_stateful_session_encode_ttl_in_cookie);
 RUNTIME_GUARD(envoy_reloadable_features_stop_decode_metadata_on_local_reply);
+RUNTIME_GUARD(envoy_reloadable_features_strict_duration_validation);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_tunneling_send_downstream_fin_on_upstream_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_allow_negative_field_ids);
@@ -150,8 +152,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
 // TODO(#33474) removed it once GRO packet dropping is fixed.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_prefer_quic_client_udp_gro);
-// TODO(martinduke): Delay enabling this guard until all receive_ecn PRs are in place.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_receive_ecn);
+// TODO(alyssar) evaluate and either make this a config knob or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_null_addresses);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.

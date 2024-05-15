@@ -5,7 +5,7 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 namespace Envoy {
 namespace Extensions {

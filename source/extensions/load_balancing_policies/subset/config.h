@@ -13,7 +13,7 @@ namespace LoadBalancingPolices {
 namespace Subset {
 
 class SubsetLbFactory
-    : public Upstream::TypedLoadBalancerFactoryBase<Upstream::SubsetLoadbalancingPolicyProto> {
+    : public Upstream::TypedLoadBalancerFactoryBase<Upstream::SubsetLbConfigProto> {
 public:
   SubsetLbFactory() : TypedLoadBalancerFactoryBase("envoy.load_balancing_policies.subset") {}
 

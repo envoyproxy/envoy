@@ -46,6 +46,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mUseCares = false;
+  private boolean mUseGro = false;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
@@ -60,6 +61,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private final boolean mEnablePlatformCertificatesValidation = true;
+  private String mUpstreamTlsSni = "";
   private final String mNodeId = "";
   private final String mNodeRegion = "";
   private final String mNodeZone = "";
@@ -93,6 +95,18 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     mUseCares = enable;
     return this;
   }
+
+  /**
+   * Specify whether to use UDP GRO for upstream QUIC/HTTP3 sockets, if GRO is available on the
+   * system.
+   *
+   * @param enable If true, use UDP GRO.
+   */
+  public NativeCronvoyEngineBuilderImpl setUseGro(boolean enable) {
+    mUseGro = enable;
+    return this;
+  }
+
   /**
    * Set the DNS query timeout, in seconds, which ensures that DNS queries succeed or fail
    * within that time range. See the DnsCacheConfig.dns_query_timeout proto field for details.
@@ -150,6 +164,16 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
+   * Sets the upstream TLS socket's SNI override. If empty, no SNI override will be configured.
+   *
+   * @param sni The SNI to override on the upstream HTTP/3 or HTTP/2 TLS socket.
+   */
+  public NativeCronvoyEngineBuilderImpl setUpstreamTlsSni(String sni) {
+    mUpstreamTlsSni = sni;
+    return this;
+  }
+
+  /**
    * Indicates to skip the TLS certificate verification.
    *
    * @return the builder to facilitate chaining.
@@ -200,14 +224,14 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, quicConnectionOptions(),
+        mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mUseGro, quicConnectionOptions(),
         quicClientConnectionOptions(), quicHints(), quicCanonicalSuffixes(),
         mEnableGzipDecompression, brotliEnabled(), portMigrationEnabled(), mEnableSocketTag,
         mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
         platformFilterChain, stringAccessors, keyValueStores, mRuntimeGuards,
-        mEnablePlatformCertificatesValidation,
+        mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
         /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
         /*xdsPort=*/0, /*xdsGrpcInitialMetadata=*/Collections.emptyMap(),
         /*xdsSslRootCerts=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone,

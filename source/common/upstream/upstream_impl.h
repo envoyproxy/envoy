@@ -57,7 +57,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/shared_pool/shared_pool.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/edf_scheduler.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
@@ -70,6 +71,9 @@
 
 namespace Envoy {
 namespace Upstream {
+
+// Priority levels and localities are considered overprovisioned with this factor.
+static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
 
 using ClusterProto = envoy::config::cluster::v3::Cluster;
 
@@ -587,7 +591,7 @@ public:
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
-    member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed);
+    THROW_IF_NOT_OK(member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed));
   }
 
 private:
@@ -708,11 +712,11 @@ protected:
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
-    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+    THROW_IF_NOT_OK(member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed));
   }
   virtual void runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
                                            const HostVector& hosts_removed) {
-    priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+    THROW_IF_NOT_OK(priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed));
   }
   // This vector will generally have at least one member, for priority level 0.
   // It will expand as host sets are added but currently does not shrink to

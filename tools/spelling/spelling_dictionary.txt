@@ -70,6 +70,7 @@ DSR
 DSS
 EBADF
 ECH
+ECT
 ENDIF
 ENOTCONN
 ENQ
@@ -1420,6 +1421,7 @@ upcasts
 upstreams
 uptime
 upvalue
+uring
 urlencoded
 urls
 userdata
@@ -1506,3 +1508,5 @@ DLB
 PCIE
 EDNS
 CNAME
+NAT
+DNAT

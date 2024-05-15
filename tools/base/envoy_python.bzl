@@ -6,8 +6,8 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
 ENVOY_PYTOOL_NAMESPACE = [
     ":py-init",
-    "//:py-init",
-    "//tools:py-init",
+    "@envoy//:py-init",
+    "@envoy//tools:py-init",
 ]
 
 def envoy_pytool_binary(

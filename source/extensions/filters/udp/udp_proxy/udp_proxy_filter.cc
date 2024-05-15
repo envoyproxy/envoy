@@ -103,6 +103,7 @@ UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
                 host_to_sessions_.erase(host_sessions_it);
               }
             }
+            return absl::OkStatus();
           })) {}
 
 UdpProxyFilter::ClusterInfo::~ClusterInfo() {

@@ -43,7 +43,7 @@ class ReusableFuzzerUtil {
 public:
   // Validate input, then create a filter using the input.config() & the provided client.
   absl::StatusOr<std::unique_ptr<Filter>>
-  setup(const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input,
+  setup(const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCaseBase& input,
         Filters::Common::ExtAuthz::ClientPtr client);
 
 private:

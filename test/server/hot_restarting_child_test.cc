@@ -91,8 +91,8 @@ public:
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(4);
     EXPECT_CALL(os_sys_calls_, close(_)).Times(4);
     fake_parent_ = std::make_unique<FakeHotRestartingParent>(os_sys_calls_, 0, 0, socket_path_);
-    hot_restarting_child_ =
-        std::make_unique<HotRestartingChild>(0, 1, socket_path_, 0, skipHotRestartOnNoParent());
+    hot_restarting_child_ = std::make_unique<HotRestartingChild>(
+        0, 1, socket_path_, 0, skipHotRestartOnNoParent(), skipParentStats());
     if (skipHotRestartOnNoParent()) {
       if (hotRestartIsSkipped()) {
         // A message is attempted to be sent to the parent and returns ECONNREFUSED.
@@ -121,6 +121,7 @@ public:
   std::unique_ptr<HotRestartingChild> hot_restarting_child_;
   virtual bool skipHotRestartOnNoParent() const { return false; }
   virtual bool hotRestartIsSkipped() const { return false; }
+  virtual bool skipParentStats() const { return false; }
 };
 
 class HotRestartingChildWithSkipTest : public HotRestartingChildTest {

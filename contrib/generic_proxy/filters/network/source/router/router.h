@@ -8,7 +8,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/stream_info/stream_info_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 #include "contrib/envoy/extensions/filters/network/generic_proxy/router/v3/router.pb.h"
 #include "contrib/envoy/extensions/filters/network/generic_proxy/router/v3/router.pb.validate.h"
