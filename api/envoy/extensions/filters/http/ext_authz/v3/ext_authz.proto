@@ -28,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 25]
+// [#next-free-field: 26]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -219,7 +219,16 @@ message ExtAuthz {
   //  <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` setting),
   //  consequently the value of *Content-Length* of the authorization request reflects the size of
   //  its payload size.
+  //
+  // .. note::
+  //
+  //  3. This can be overridden by the field ``disallowed_headers`` below. That is, if a header
+  //  matches for both ``allowed_headers`` and ``disallowed_headers``, the header will NOT be sent.
   type.matcher.v3.ListStringMatcher allowed_headers = 17;
+
+  // If set, specifically disallow any header in this list to be forwarded to the external
+  // authentication server. This overrides the above ``allowed_headers`` if a header matches both.
+  type.matcher.v3.ListStringMatcher disallowed_headers = 25;
 
   // Specifies if the TLS session level details like SNI are sent to the external service.
   //

@@ -10,3 +10,4 @@ source/server/options_impl.cc
 source/extensions/access_loggers/common/file_access_log_impl.h
 source/common/router/scoped_rds.h
 source/extensions/load_balancing_policies/subset/subset_lb.h
+source/extensions/transport_sockets/tls/downstream_config.h

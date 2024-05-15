@@ -8,7 +8,9 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_impl.h"
+#include "source/common/tls/server_context_impl.h"
 
 namespace Envoy {
 namespace Extensions {

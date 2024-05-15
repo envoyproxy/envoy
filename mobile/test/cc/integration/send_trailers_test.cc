@@ -28,10 +28,10 @@ TEST(SendTrailersTest, Success) {
       .addNativeFilter("envoy.filters.http.assertion", std::string(ASSERTION_FILTER_TEXT_PROTO))
 #endif
       .setOnEngineRunning([&]() { engine_running.Notify(); });
-  EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
+  EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS,
+                                               /* headers= */ {}, /* body= */ "body",
+                                               /* trailers= */ {{"trailer-key", "trailer-value"}});
   engine_running.WaitForNotification();
-
-  engine_with_test_server.testServer().setResponse({}, "body", {{"trailer-key", "trailer-value"}});
 
   std::string actual_status_code;
   std::string actual_trailer_value;

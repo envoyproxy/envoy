@@ -39,13 +39,13 @@ public:
   void shutdown();
 
   /** Gets the server address. The server address is a combination of IP address and port number. */
-  std::string getAddress();
+  std::string getAddress() const;
 
   /** Gets the server IP address. */
-  std::string getIpAddress();
+  std::string getIpAddress() const;
 
   /** Returns the server port number. */
-  int getPort();
+  int getPort() const;
 
   /**
    * Sets headers and data for the test server to return on all future requests.

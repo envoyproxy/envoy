@@ -73,7 +73,7 @@ void NetworkConfigurationFilter::onProxyResolutionComplete(
 
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
-  ENVOY_LOG(trace, "NetworkConfigurationFilter::decodeHeaders", request_headers);
+  ENVOY_LOG(trace, "NetworkConfigurationFilter::decodeHeaders: {}", request_headers);
 
   const auto authority = request_headers.getHostValue();
   if (authority.empty()) {

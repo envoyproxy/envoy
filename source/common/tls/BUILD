@@ -126,12 +126,16 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_lib",
     srcs = [
+        "client_context_impl.cc",
         "context_impl.cc",
         "context_manager_impl.cc",
+        "server_context_impl.cc",
     ],
     hdrs = [
+        "client_context_impl.h",
         "context_impl.h",
         "context_manager_impl.h",
+        "server_context_impl.h",
     ],
     external_deps = [
         "abseil_node_hash_set",
