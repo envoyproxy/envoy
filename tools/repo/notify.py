@@ -33,7 +33,7 @@ ENVOY_REPO = "envoyproxy/envoy"
 CALENDAR = "https://calendar.google.com/calendar/ical/d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com/public/basic.ics"
 
 ISSUE_LINK = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+label%3Atriage"
-PR_LINK = "https://github.com/envoyproxy/envoy/pulls?q=is%3Apr+is%3Aopen+no%3Aassignee+draft%3Afalse+-author%3Aapp%2Fdependabot"
+PR_LINK = "https://github.com/envoyproxy/envoy/pulls?q=is%3Apr+draft%3Afalse+-author%3Aapp%2Fdependabot"
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
 
 
@@ -158,6 +158,14 @@ class RepoNotifier(runner.Runner):
     def opsgenie_to_slack(self):
         return {v["opsgenie"]: v["slack"] for v in self.reviewers.values() if "opsgenie" in v}
 
+    @cached_property
+    def pr_link(self):
+        exclude_maintainers = "".join(
+            f"+-assignee%3A{assignee}"
+            for assignee
+            in self.maintainers)
+        return f"{PR_LINK}{exclude_maintainers}"
+
     @async_property(cache=True)
     async def tracked_prs(self):
         # A dict of maintainer : outstanding_pr_string to be sent to slack
@@ -270,7 +278,7 @@ class RepoNotifier(runner.Runner):
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
                 text=(
-                    f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}\n<{PR_LINK}|{PR_LINK}>"
+                    f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}\n<{self.pr_link}|{self.pr_link}>"
                 ))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
