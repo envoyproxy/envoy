@@ -91,6 +91,12 @@ public:
   virtual bool skipHotRestartOnNoParent() const PURE;
 
   /**
+   * @return bool don't get stats from the parent. If there are a lot of stats, getting them
+   *         from the parent instance can be slow and require a lot of memory.
+   */
+  virtual bool skipHotRestartParentStats() const PURE;
+
+  /**
    * @return const std::string& the dynamic base id output file.
    */
   virtual const std::string& baseIdPath() const PURE;

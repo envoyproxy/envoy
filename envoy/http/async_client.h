@@ -9,6 +9,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/tracer.h"
 
@@ -19,7 +20,8 @@
 namespace Envoy {
 namespace Router {
 class FilterConfig;
-}
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+} // namespace Router
 namespace Http {
 
 /**
@@ -249,6 +251,10 @@ public:
       send_xff = v;
       return *this;
     }
+    StreamOptions& setSendInternal(bool v) {
+      send_internal = v;
+      return *this;
+    }
     StreamOptions& setHashPolicy(
         const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>& v) {
       hash_policy = v;
@@ -263,6 +269,12 @@ public:
     // and then used by the subset load balancer.
     StreamOptions& setMetadata(const envoy::config::core::v3::Metadata& m) {
       metadata = m;
+      return *this;
+    }
+
+    // Set FilterState on async stream allowing upstream filters to access it.
+    StreamOptions& setFilterState(Envoy::StreamInfo::FilterStateSharedPtr fs) {
+      filter_state = fs;
       return *this;
     }
 
@@ -294,7 +306,7 @@ public:
       retry_policy = absl::nullopt;
       return *this;
     }
-    StreamOptions& setFilterConfig(Router::FilterConfig& config) {
+    StreamOptions& setFilterConfig(const Router::FilterConfigSharedPtr& config) {
       filter_config_ = config;
       return *this;
     }
@@ -304,10 +316,15 @@ public:
       return *this;
     }
 
+    StreamOptions& setIsShadowSuffixDisabled(bool d) {
+      is_shadow_suffixed_disabled = d;
+      return *this;
+    }
+
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
-             send_xff == src.send_xff;
+             send_xff == src.send_xff && send_internal == src.send_internal;
     }
 
     // The timeout supplies the stream timeout, measured since when the frame with
@@ -323,6 +340,9 @@ public:
     // If true, x-forwarded-for header will be added.
     bool send_xff{true};
 
+    // If true, x-envoy-internal header will be added.
+    bool send_internal{true};
+
     // Provides the hash policy for hashing load balancing strategies.
     Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy> hash_policy;
 
@@ -330,6 +350,7 @@ public:
     ParentContext parent_context;
 
     envoy::config::core::v3::Metadata metadata;
+    Envoy::StreamInfo::FilterStateSharedPtr filter_state;
 
     // Buffer memory account for tracking bytes.
     Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
@@ -339,9 +360,11 @@ public:
     absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
     const Router::RetryPolicy* parsed_retry_policy{nullptr};
 
-    OptRef<Router::FilterConfig> filter_config_;
+    Router::FilterConfigSharedPtr filter_config_;
 
     bool is_shadow{false};
+
+    bool is_shadow_suffixed_disabled{false};
   };
 
   /**
@@ -364,6 +387,10 @@ public:
       StreamOptions::setSendXff(v);
       return *this;
     }
+    RequestOptions& setSendInternal(bool v) {
+      StreamOptions::setSendInternal(v);
+      return *this;
+    }
     RequestOptions& setHashPolicy(
         const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>& v) {
       StreamOptions::setHashPolicy(v);
@@ -377,6 +404,10 @@ public:
       StreamOptions::setMetadata(m);
       return *this;
     }
+    RequestOptions& setFilterState(Envoy::StreamInfo::FilterStateSharedPtr fs) {
+      StreamOptions::setFilterState(fs);
+      return *this;
+    }
     RequestOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
       StreamOptions::setRetryPolicy(p);
       return *this;
@@ -387,6 +418,10 @@ public:
     }
     RequestOptions& setIsShadow(bool s) {
       StreamOptions::setIsShadow(s);
+      return *this;
+    }
+    RequestOptions& setIsShadowSuffixDisabled(bool d) {
+      StreamOptions::setIsShadowSuffixDisabled(d);
       return *this;
     }
     RequestOptions& setParentSpan(Tracing::Span& parent_span) {

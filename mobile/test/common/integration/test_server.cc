@@ -358,7 +358,8 @@ layered_runtime {
 
 TestServer::TestServer()
     : api_(Api::createApiForTest(stats_store_, time_system_)),
-      version_(Network::Address::IpVersion::v4), upstream_config_(time_system_), port_(0) {
+      version_(TestEnvironment::getIpVersionsForTest()[0]), upstream_config_(time_system_),
+      port_(0) {
   std::string runfiles_error;
   runfiles_ = std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles>{
       bazel::tools::cpp::runfiles::Runfiles::CreateForTest(&runfiles_error)};
@@ -457,7 +458,17 @@ void TestServer::shutdown() {
   test_server_.reset();
 }
 
-int TestServer::getPort() {
+std::string TestServer::getAddress() const {
+  ASSERT(upstream_);
+  return upstream_->localAddress()->asString();
+}
+
+std::string TestServer::getIpAddress() const {
+  ASSERT(upstream_);
+  return upstream_->localAddress()->ip()->addressAsString();
+}
+
+int TestServer::getPort() const {
   ASSERT(upstream_ || test_server_);
   if (upstream_) {
     return upstream_->localAddress()->ip()->port();

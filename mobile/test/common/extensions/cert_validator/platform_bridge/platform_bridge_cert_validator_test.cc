@@ -22,7 +22,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge/utility.h"
 #include "library/common/extensions/cert_validator/platform_bridge/config.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"

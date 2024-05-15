@@ -37,11 +37,9 @@ public:
   ~InternalEngine();
 
   /**
-   * Run the engine with the provided configuration.
-   * @param config, the Envoy bootstrap configuration to use.
-   * @param log_level, the log level.
+   * Run the engine with the provided options.
+   * @param options, the Envoy options, including the Bootstrap configuration and log level.
    */
-  envoy_status_t run(const std::string& config, const std::string& log_level);
   envoy_status_t run(std::shared_ptr<Envoy::OptionsImplBase> options);
 
   /**
@@ -64,7 +62,7 @@ public:
   // These functions are wrappers around http client functions, which hand off
   // to http client functions of the same name after doing a dispatcher post
   // (thread context switch)
-  envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
+  envoy_status_t startStream(envoy_stream_t stream, EnvoyStreamCallbacks&& stream_callbacks,
                              bool explicit_flow_control);
 
   /**

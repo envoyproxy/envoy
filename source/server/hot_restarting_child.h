@@ -43,7 +43,8 @@ public:
   };
 
   HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
-                     mode_t socket_mode, bool skip_hot_restart_on_no_parent);
+                     mode_t socket_mode, bool skip_hot_restart_on_no_parent,
+                     bool skip_parent_stats);
   ~HotRestartingChild() override = default;
 
   void initialize(Event::Dispatcher& dispatcher);
@@ -76,6 +77,7 @@ private:
   bool parent_terminated_;
   bool parent_drained_ ABSL_GUARDED_BY(registry_mu_);
   const bool skip_hot_restart_on_no_parent_;
+  const bool skip_parent_stats_;
   sockaddr_un parent_address_;
   sockaddr_un parent_address_udp_forwarding_;
   std::unique_ptr<Stats::StatMerger> stat_merger_{};

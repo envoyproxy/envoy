@@ -136,7 +136,6 @@ public:
   EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
   EngineBuilder& addDnsMinRefreshSeconds(int dns_min_refresh_seconds);
   EngineBuilder& addMaxConnectionsPerHost(int max_connections_per_host);
-  EngineBuilder& useDnsSystemResolver(bool use_system_resolver);
   EngineBuilder& addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       int h2_connection_keepalive_idle_interval_milliseconds);
   EngineBuilder&
@@ -161,7 +160,10 @@ public:
 #endif
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
+  // Sets whether to use GRO for upstream UDP sockets (QUIC/HTTP3).
+  EngineBuilder& setUseGroIfAvailable(bool use_gro_if_available);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
+  EngineBuilder& setUpstreamTlsSni(std::string sni);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
   // Sets the node.id field in the Bootstrap configuration.
   EngineBuilder& setNodeId(std::string node_id);
@@ -204,6 +206,9 @@ public:
   // If/when we move Android system proxy registration to the C++ Engine Builder, we will make this
   // API available on all platforms.
   EngineBuilder& respectSystemProxySettings(bool value);
+#else
+  // Only android supports c_ares
+  EngineBuilder& setUseCares(bool use_cares);
 #endif
 
   // This is separated from build() for the sake of testability
@@ -230,7 +235,6 @@ private:
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
   int dns_query_timeout_seconds_ = 5;
-  bool use_system_resolver_ = true;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;
   std::string app_version_ = "unspecified";
@@ -254,7 +258,11 @@ private:
   bool enable_interface_binding_ = false;
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
+  std::string upstream_tls_sni_;
   bool enable_http3_ = true;
+#if !defined(__APPLE__)
+  bool use_cares_ = false;
+#endif
   std::string http3_connection_options_ = "";
   std::string http3_client_connection_options_ = "";
   std::vector<std::pair<std::string, int>> quic_hints_;
@@ -273,6 +281,7 @@ private:
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
+  bool use_gro_if_available_ = false;
 
 #ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;

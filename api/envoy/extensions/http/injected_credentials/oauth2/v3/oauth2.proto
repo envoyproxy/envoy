@@ -5,6 +5,8 @@ package envoy.extensions.http.injected_credentials.oauth2.v3;
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
+import "google/protobuf/duration.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -18,7 +20,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: OAuth2 Credential]
-// [#not-implemented-hide:]
 // [#extension: envoy.http.injected_credentials.oauth2]
 
 // OAuth2 extension can be used to retrieve an OAuth2 access token from an authorization server and inject it into the
@@ -67,4 +68,9 @@ message OAuth2 {
     // Refer to [RFC 6749: The OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749#section-4.4) for details.
     ClientCredentials client_credentials = 3;
   }
+
+  // The interval between two successive retries to fetch token from Identity Provider. Default is 2 secs.
+  // The interval must be at least 1 second.
+  google.protobuf.Duration token_fetch_retry_interval = 4
+      [(validate.rules).duration = {gte {seconds: 1}}];
 }

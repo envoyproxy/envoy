@@ -153,6 +153,40 @@ TEST_F(GetAddrInfoDnsImplTest, Failure) {
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
+TEST_F(GetAddrInfoDnsImplTest, NoData) {
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
+
+  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+      .WillOnce(Return(Api::SysCallIntResult{EAI_NODATA, 0}));
+  resolver_->resolve(
+      "localhost", DnsLookupFamily::All,
+      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_TRUE(response.empty());
+
+        dispatcher_->exit();
+      });
+
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+}
+
+TEST_F(GetAddrInfoDnsImplTest, NoName) {
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
+
+  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+      .WillOnce(Return(Api::SysCallIntResult{EAI_NONAME, 0}));
+  resolver_->resolve(
+      "localhost", DnsLookupFamily::All,
+      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_TRUE(response.empty());
+
+        dispatcher_->exit();
+      });
+
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+}
+
 TEST_F(GetAddrInfoDnsImplTest, TryAgainAndSuccess) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
 

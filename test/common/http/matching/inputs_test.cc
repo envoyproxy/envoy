@@ -25,10 +25,11 @@ std::shared_ptr<Network::ConnectionInfoSetterImpl> connectionInfoProvider() {
 }
 
 StreamInfo::StreamInfoImpl createStreamInfo() {
-  CONSTRUCT_ON_FIRST_USE(StreamInfo::StreamInfoImpl,
-                         StreamInfo::StreamInfoImpl(Http::Protocol::Http2,
-                                                    Event::GlobalTimeSystem().timeSystem(),
-                                                    connectionInfoProvider()));
+  CONSTRUCT_ON_FIRST_USE(
+      StreamInfo::StreamInfoImpl,
+      StreamInfo::StreamInfoImpl(Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(),
+                                 connectionInfoProvider(),
+                                 StreamInfo::FilterState::LifeSpan::FilterChain));
 }
 
 TEST(MatchingData, HttpRequestHeadersDataInput) {

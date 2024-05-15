@@ -13,7 +13,7 @@ namespace Network {
 
 class DrainDecision {
 public:
-  using DrainCloseCb = std::function<void(std::chrono::milliseconds)>;
+  using DrainCloseCb = std::function<absl::Status(std::chrono::milliseconds)>;
 
   virtual ~DrainDecision() = default;
 

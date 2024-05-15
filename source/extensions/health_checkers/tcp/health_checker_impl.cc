@@ -25,6 +25,7 @@
 #include "source/common/router/router.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/upstream/host_utility.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -56,7 +57,11 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
         auto bytes_or_error = PayloadMatcher::loadProtoBytes(send_repeated);
         THROW_IF_STATUS_NOT_OK(bytes_or_error, throw);
         return bytes_or_error.value();
-      }()) {
+      }()),
+      proxy_protocol_config_(config.tcp_health_check().has_proxy_protocol_config()
+                                 ? std::make_unique<envoy::config::core::v3::ProxyProtocolConfig>(
+                                       config.tcp_health_check().proxy_protocol_config())
+                                 : nullptr) {
   auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.tcp_health_check().receive());
   THROW_IF_STATUS_NOT_OK(bytes_or_error, throw);
   receive_bytes_ = bytes_or_error.value();
@@ -141,12 +146,28 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
     client_->noDelay(true);
   }
 
+  Buffer::OwnedImpl data;
+  bool should_write_data = false;
+
+  if (parent_.proxy_protocol_config_ != nullptr) {
+    if (parent_.proxy_protocol_config_->version() ==
+        envoy::config::core::v3::ProxyProtocolConfig::V1) {
+      auto src_addr = client_->connectionInfoProvider().localAddress()->ip();
+      auto dst_addr = client_->connectionInfoProvider().remoteAddress()->ip();
+      Extensions::Common::ProxyProtocol::generateV1Header(*src_addr, *dst_addr, data);
+    } else if (parent_.proxy_protocol_config_->version() ==
+               envoy::config::core::v3::ProxyProtocolConfig::V2) {
+      Extensions::Common::ProxyProtocol::generateV2LocalHeader(data);
+    }
+    should_write_data = true;
+  }
   if (!parent_.send_bytes_.empty()) {
-    Buffer::OwnedImpl data;
     for (const std::vector<uint8_t>& segment : parent_.send_bytes_) {
       data.add(segment.data(), segment.size());
     }
-
+    should_write_data = true;
+  }
+  if (should_write_data) {
     client_->write(data, false);
   }
 }

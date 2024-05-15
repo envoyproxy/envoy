@@ -537,12 +537,17 @@ bool isJavaDirectByteBuffer(JniHelper& jni_helper, jobject java_byte_buffer) {
 Buffer::InstancePtr javaDirectByteBufferToCppBufferInstance(JniHelper& jni_helper,
                                                             jobject java_byte_buffer,
                                                             jlong length) {
-  void* java_byte_buffer_address = jni_helper.getDirectBufferAddress(java_byte_buffer);
   RELEASE_ASSERT(java_byte_buffer != nullptr,
                  "The ByteBuffer argument is not a direct ByteBuffer.");
+  // Because the direct ByteBuffer is allocated in the JVM, we need to tell the JVM to not garbage
+  // collect it by wrapping with a GlobalRef.
+  auto java_byte_buffer_global_ref = jni_helper.newGlobalRef(java_byte_buffer).release();
+  void* java_byte_buffer_address = jni_helper.getDirectBufferAddress(java_byte_buffer_global_ref);
   Buffer::BufferFragmentImpl* byte_buffer_fragment = new Buffer::BufferFragmentImpl(
       java_byte_buffer_address, static_cast<size_t>(length),
-      [](const void*, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+      [java_byte_buffer_global_ref](const void*, size_t,
+                                    const Buffer::BufferFragmentImpl* this_fragment) {
+        getEnv()->DeleteGlobalRef(java_byte_buffer_global_ref);
         delete this_fragment;
       });
   Buffer::InstancePtr cpp_buffer_instance = std::make_unique<Buffer::OwnedImpl>();

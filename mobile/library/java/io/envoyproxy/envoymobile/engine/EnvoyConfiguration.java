@@ -36,6 +36,8 @@ public class EnvoyConfiguration {
   public final Integer dnsCacheSaveIntervalSeconds;
   public final Boolean enableDrainPostDnsRefresh;
   public final Boolean enableHttp3;
+  public final Boolean useCares;
+  public final Boolean useGro;
   public final String http3ConnectionOptions;
   public final String http3ClientConnectionOptions;
   public final Map<String, String> quicHints;
@@ -59,6 +61,7 @@ public class EnvoyConfiguration {
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
   public final Map<String, String> runtimeGuards;
   public final Boolean enablePlatformCertificatesValidation;
+  public final String upstreamTlsSni;
   public final String rtdsResourceName;
   public final Integer rtdsTimeoutSeconds;
   public final String xdsAddress;
@@ -100,6 +103,9 @@ public class EnvoyConfiguration {
    *     DNS refresh.
    * @param enableHttp3                                   whether to enable experimental support for
    *     HTTP/3 (QUIC).
+   * @param useCares                                      whether to use the c_ares library for DNS
+   * @param useGro                                        whether to use UDP GRO on upstream QUIC
+   *     connections, if available.
    * @param http3ConnectionOptions                        connection options to be used in HTTP/3.
    * @param http3ClientConnectionOptions                  client connection options to be used in
    *     HTTP/3.
@@ -132,7 +138,8 @@ public class EnvoyConfiguration {
    * @param stringAccessors                               platform string accessors to register.
    * @param keyValueStores                                platform key-value store implementations.
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
-   * @param rtdsResourceName                                 the RTDS layer name for this client.
+   * @param upstreamTlsSni                                the upstream TLS socket SNI override.
+   * @param rtdsResourceName                              the RTDS layer name for this client.
    * @param rtdsTimeoutSeconds                            the timeout for RTDS fetches.
    * @param xdsAddress                                    the address for the xDS management server.
    * @param xdsPort                                       the port for the xDS server.
@@ -156,19 +163,19 @@ public class EnvoyConfiguration {
       int connectTimeoutSeconds, int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
       int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds,
       List<String> dnsPreresolveHostnames, boolean enableDNSCache, int dnsCacheSaveIntervalSeconds,
-      boolean enableDrainPostDnsRefresh, boolean enableHttp3, String http3ConnectionOptions,
-      String http3ClientConnectionOptions, Map<String, Integer> quicHints,
-      List<String> quicCanonicalSuffixes, boolean enableGzipDecompression,
-      boolean enableBrotliDecompression, boolean enablePortMigration, boolean enableSocketTagging,
-      boolean enableInterfaceBinding, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      int h2ConnectionKeepaliveTimeoutSeconds, int maxConnectionsPerHost,
-      int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
-      TrustChainVerification trustChainVerification,
+      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares, boolean useGro,
+      String http3ConnectionOptions, String http3ClientConnectionOptions,
+      Map<String, Integer> quicHints, List<String> quicCanonicalSuffixes,
+      boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      boolean enablePortMigration, boolean enableSocketTagging, boolean enableInterfaceBinding,
+      int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
+      int maxConnectionsPerHost, int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds,
+      String appVersion, String appId, TrustChainVerification trustChainVerification,
       List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, Map<String, Boolean> runtimeGuards,
-      boolean enablePlatformCertificatesValidation, String rtdsResourceName,
+      boolean enablePlatformCertificatesValidation, String upstreamTlsSni, String rtdsResourceName,
       Integer rtdsTimeoutSeconds, String xdsAddress, Integer xdsPort,
       Map<String, String> xdsGrpcInitialMetadata, String xdsRootCerts, String nodeId,
       String nodeRegion, String nodeZone, String nodeSubZone, Struct nodeMetadata,
@@ -185,6 +192,8 @@ public class EnvoyConfiguration {
     this.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
+    this.useCares = useCares;
+    this.useGro = useGro;
     this.http3ConnectionOptions = http3ConnectionOptions;
     this.http3ClientConnectionOptions = http3ClientConnectionOptions;
     this.quicHints = new HashMap<>();
@@ -225,6 +234,7 @@ public class EnvoyConfiguration {
       this.runtimeGuards.put(guardAndValue.getKey(), String.valueOf(guardAndValue.getValue()));
     }
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
+    this.upstreamTlsSni = upstreamTlsSni;
     this.rtdsResourceName = rtdsResourceName;
     this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
     this.xdsAddress = xdsAddress;
@@ -258,14 +268,15 @@ public class EnvoyConfiguration {
         connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dnsPreresolve,
         enableDNSCache, dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
-        http3ConnectionOptions, http3ClientConnectionOptions, quicHints, quicSuffixes,
-        enableGzipDecompression, enableBrotliDecompression, enablePortMigration,
+        useCares, useGro, http3ConnectionOptions, http3ClientConnectionOptions, quicHints,
+        quicSuffixes, enableGzipDecompression, enableBrotliDecompression, enablePortMigration,
         enableSocketTagging, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
         h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
-        enablePlatformCertificatesValidation, runtimeGuards, rtdsResourceName, rtdsTimeoutSeconds,
-        xdsAddress, xdsPort, xdsGrpcInitialMetadata, xdsRootCerts, nodeId, nodeRegion, nodeZone,
-        nodeSubZone, nodeMetadata.toByteArray(), cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
+        enablePlatformCertificatesValidation, upstreamTlsSni, runtimeGuards, rtdsResourceName,
+        rtdsTimeoutSeconds, xdsAddress, xdsPort, xdsGrpcInitialMetadata, xdsRootCerts, nodeId,
+        nodeRegion, nodeZone, nodeSubZone, nodeMetadata.toByteArray(), cdsResourcesLocator,
+        cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {
