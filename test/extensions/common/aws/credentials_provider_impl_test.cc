@@ -22,12 +22,13 @@
 
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::_;
+using testing::DoAll;
 using testing::Eq;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-// using testing::Throw;
+using testing::ReturnNew;
 
 namespace Envoy {
 namespace Extensions {
@@ -2317,6 +2318,30 @@ TEST_F(WebIdentityCredentialsProviderTest, LibcurlEnabled) {
 
   // Below line is not testing anything, will just avoid asan failure with memory leak.
   metadata_fetcher_.reset(raw_metadata_fetcher_);
+}
+
+TEST_F(WebIdentityCredentialsProviderTest, VerifyClusterAddHandlersFire) {
+  Upstream::ClusterUpdateCallbacks* cb_{};
+  testing::NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+
+  ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(main_thread_dispatcher_));
+
+  EXPECT_CALL(cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
+      .WillOnce(
+          DoAll(SaveArgAddress(&cb_), ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
+
+  setupProvider();
+
+  // Trigger onClusterAddOrUpdate with an invalid_cluster name - this should just exit
+  NiceMock<Upstream::MockThreadLocalCluster> test_cluster{};
+  Upstream::ThreadLocalClusterCommand command = [&test_cluster]() -> Upstream::ThreadLocalCluster& {
+    return test_cluster;
+  };
+  cb_->onClusterAddOrUpdate("invalid_cluster", command);
+
+  // Trigger onClusterAddOrUpdate with the correct cluster name - this should trigger a post
+  EXPECT_CALL(main_thread_dispatcher_, post(_));
+  cb_->onClusterAddOrUpdate("credentials_provider_cluster", command);
 }
 
 class DefaultCredentialsProviderChainTest : public testing::Test {
