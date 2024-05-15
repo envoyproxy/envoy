@@ -1,7 +1,5 @@
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 
-#include <__chrono/duration.h>
-
 #include <chrono>
 #include <fstream>
 #include <memory>

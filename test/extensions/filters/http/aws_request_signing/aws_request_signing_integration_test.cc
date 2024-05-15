@@ -52,12 +52,23 @@ public:
     TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "akid", 1);
     TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1);
     TestEnvironment::setEnvVar("AWS_SESSION_TOKEN", "token", 1);
+    TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
+    TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
+    TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
+    TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds",
+                               1);
+    TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
   }
 
   ~AwsRequestSigningIntegrationTest() override {
     TestEnvironment::unsetEnvVar("AWS_ACCESS_KEY_ID");
     TestEnvironment::unsetEnvVar("AWS_SECRET_ACCESS_KEY");
     TestEnvironment::unsetEnvVar("AWS_SESSION_TOKEN");
+    TestEnvironment::unsetEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE");
+    TestEnvironment::unsetEnvVar("AWS_ROLE_ARN");
+    TestEnvironment::unsetEnvVar("AWS_ROLE_SESSION_NAME");
+    TestEnvironment::unsetEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI");
+    TestEnvironment::unsetEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN");
   }
 
   void createUpstreams() override {
