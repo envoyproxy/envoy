@@ -2,7 +2,6 @@
 
 #include "library/common/bridge//utility.h"
 #include "library/jni/jni_utility.h"
-#include "library/jni/types/exception.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -88,13 +87,15 @@ static void jvmVerifyX509CertChain(const std::vector<std::string>& cert_chain,
   JniHelper jni_helper(JniHelper::getThreadLocalEnv());
   LocalRefUniquePtr<jobject> result =
       callJvmVerifyX509CertChain(jni_helper, cert_chain, auth_type, hostname);
-  if (Exception::checkAndClear()) {
+  if (jni_helper.exceptionCheck()) {
     *status = CertVerifyStatus::NotYetValid;
+    jni_helper.exceptionCleared();
   } else {
     extractCertVerifyResult(jni_helper, result.get(), status, is_issued_by_known_root,
                             verified_chain);
-    if (Exception::checkAndClear()) {
+    if (jni_helper.exceptionCheck()) {
       *status = CertVerifyStatus::Failed;
+      jni_helper.exceptionCleared();
     }
   }
 }
@@ -102,7 +103,7 @@ static void jvmVerifyX509CertChain(const std::vector<std::string>& cert_chain,
 } // namespace
 
 // `auth_type` and `host` are expected to be UTF-8 encoded.
-LocalRefUniquePtr<jobject> callJvmVerifyX509CertChain(Envoy::JNI::JniHelper& jni_helper,
+LocalRefUniquePtr<jobject> callJvmVerifyX509CertChain(JniHelper& jni_helper,
                                                       const std::vector<std::string>& cert_chain,
                                                       std::string auth_type,
                                                       absl::string_view hostname) {

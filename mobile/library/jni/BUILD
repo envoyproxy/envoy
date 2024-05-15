@@ -19,7 +19,6 @@ envoy_cc_library(
         "//library/common/types:c_types_lib",
         "//library/common/types:managed_types_lib",
         "//library/common/types:matcher_data_lib",
-        "//library/jni/types:jni_exception_lib",
         "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/common:assert_lib",
         "@envoy//source/common/http:header_map_lib",
@@ -65,7 +64,6 @@ envoy_cc_library(
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/extensions/key_value/platform:config",
         "//library/common/types:managed_types_lib",
-        "//library/jni/types:jni_exception_lib",
         "@envoy//source/common/protobuf",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
@@ -88,7 +86,6 @@ envoy_cc_library(
         "//library/common/bridge:utility_lib",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/types:c_types_lib",
-        "//library/jni/types:jni_exception_lib",
         "@envoy//bazel:boringssl",
     ],
 )
