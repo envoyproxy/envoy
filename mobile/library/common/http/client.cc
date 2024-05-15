@@ -14,6 +14,8 @@
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/system/system_helper.h"
 
+ABSL_FLAG(bool, envoy_reloadable_features_report_available_data, false, ""); // NOLINT
+
 namespace Envoy {
 namespace Http {
 
@@ -127,6 +129,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
     // Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
     // and having local data of 2M + kernel-buffer-limit for HTTP/1.1
     response_data_->setWatermarks(2 * 1024 * 1024);
+    maybeEnableDataAvailableTimer();
   }
 
   // Send data if in default flow control mode, or if resumeData has been called in explicit
@@ -145,6 +148,22 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
     response_data_->move(data);
   } else if (error_.has_value()) {
     sendErrorToBridge();
+  }
+}
+
+void Client::DirectStreamCallbacks::maybeEnableDataAvailableTimer() {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_available_data")) {
+    // Drain must have been called for us to get to the point we've received
+    // data from a server.
+    data_available_timer_ =
+        http_client_.dispatcher_.createTimerPostDrain([this]() { reportDataAvailable(); });
+    data_available_timer_->enableTimer(std::chrono::seconds(1), nullptr);
+  }
+}
+
+void Client::DirectStreamCallbacks::reportDataAvailable() {
+  if (response_data_ && response_data_->length() != 0) {
+    stream_callbacks_.on_data_available_(streamIntel(), response_data_->length());
   }
 }
 
@@ -293,6 +312,7 @@ void Client::DirectStreamCallbacks::onComplete() {
   if (elapsed > SlowCallbackWarningThreshold) {
     ENVOY_LOG_EVENT(warn, "slow_on_complete_cb", "{}ms", elapsed.count());
   }
+  data_available_timer_.reset();
 }
 
 void Client::DirectStreamCallbacks::onError() {

@@ -74,6 +74,17 @@ public interface EnvoyHTTPCallbacks {
   void onSendWindowAvailable(EnvoyStreamIntel streamIntel);
 
   /**
+   * Periodically called to signal there is buffer space available to read
+   *
+   * This is only ever called when the library is in explicit flow control mode and
+   * envoy.reloadable_features.report_available_data is true
+   *
+   * @param streamIntel,  contains internal HTTP stream metrics, context, and other details.
+   * @param bytes_available, contains the bytes available for reading.
+   */
+  void onDataAvailable(EnvoyStreamIntel streamIntel, int bytes_available);
+
+  /**
    * Called once after the final data for the stream has been received.
    *
    * @param streamIntel,  contains internal HTTP stream metrics, context, and other details.

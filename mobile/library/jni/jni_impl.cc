@@ -722,6 +722,24 @@ static void jvm_on_send_window_available(envoy_stream_intel stream_intel, void* 
       jni_helper.callObjectMethod(j_context, jmid_onSendWindowAvailable, j_stream_intel.get());
 }
 
+static void jvm_on_data_available(envoy_stream_intel stream_intel, uint32_t bytes_available,
+                                  void* context) {
+  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
+  jobject j_context = static_cast<jobject>(context);
+
+  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmObserverContext =
+      jni_helper.getObjectClass(j_context);
+  jmethodID jmid_onDataAvailable = jni_helper.getMethodId(
+      jcls_JvmObserverContext.get(), "onDataAvailable", "([J)Ljava/lang/Object;");
+
+  Envoy::JNI::LocalRefUniquePtr<jlongArray> j_stream_intel =
+      Envoy::JNI::envoyStreamIntelToJavaLongArray(jni_helper, stream_intel);
+
+  jint jbytes_available = static_cast<jlong>(bytes_available);
+  Envoy::JNI::LocalRefUniquePtr<jobject> unused = jni_helper.callObjectMethod(
+      j_context, jmid_onDataAvailable, j_stream_intel.get(), jbytes_available);
+}
+
 // JvmKeyValueStoreContext
 static envoy_data jvm_kv_store_read(envoy_data key, const void* context) {
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
@@ -863,6 +881,11 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   stream_callbacks.on_send_window_available_ =
       [java_stream_callbacks_global_ref](envoy_stream_intel stream_intel) {
         jvm_on_send_window_available(stream_intel, java_stream_callbacks_global_ref);
+      };
+  stream_callbacks.on_data_available_ =
+      [java_stream_callbacks_global_ref](envoy_stream_intel stream_intel,
+                                         uint32_t bytes_available) {
+        jvm_on_data_available(stream_intel, bytes_available, java_stream_callbacks_global_ref);
       };
 
   envoy_status_t result = engine->startStream(static_cast<envoy_stream_t>(stream_handle),

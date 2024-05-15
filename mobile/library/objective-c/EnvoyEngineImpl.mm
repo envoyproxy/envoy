@@ -71,6 +71,7 @@ static const void *ios_http_filter_init(const void *context) {
     if (filter.onError == nil) {
       c_filter->on_error = NULL;
     }
+    c_filter->on_data_available = NULL;
 
     return CFBridgingRetain(filter);
   }
@@ -457,6 +458,7 @@ static envoy_data ios_get_string(const void *context) {
   // api->on_complete = ios_http_filter_on_complete;
   api->on_cancel = ios_http_filter_on_cancel;
   api->on_error = ios_http_filter_on_error;
+  api->on_data_available = NULL;
   api->release_filter = ios_http_filter_release;
   api->static_context = CFBridgingRetain(filterFactory);
   api->instance_context = NULL;

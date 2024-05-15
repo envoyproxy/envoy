@@ -133,6 +133,18 @@ struct EnvoyStreamCallbacks {
    */
   absl::AnyInvocable<void(envoy_stream_intel)> on_send_window_available_ = [](envoy_stream_intel) {
   };
+
+  /**
+   * The callback which notifies periodically when there is data available.
+   * This only fires when flow control is on and
+   * envoy.reloadable_features.report_available_data is true. It is meant to be temporary.
+   *
+   * The callback function pases the following parameters.
+   * - stream_intel: contains internal stream metrics.
+   * - bytes_available: the response bytes available.
+   */
+  absl::AnyInvocable<void(envoy_stream_intel, uint32_t)> on_data_available_ = [](envoy_stream_intel,
+                                                                                 uint32_t) {};
 };
 
 /** Networks classified by the physical link. */

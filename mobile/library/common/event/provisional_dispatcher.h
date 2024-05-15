@@ -25,6 +25,9 @@ public:
   void popTrackedObject(const ScopeTrackedObject* expected_object) override;
   bool trackedObjectStackIsEmpty() const override;
 
+  // Create a timer. This should only be called after drain has been called.
+  TimerPtr createTimerPostDrain(TimerCb cb);
+
   /**
    * Drains all queued callbacks to the real dispatcher. Must be called after the underlying
    * dispatcher is running. Further posts will be transparently passed through.

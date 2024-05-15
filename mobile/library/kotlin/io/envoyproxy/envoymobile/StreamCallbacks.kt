@@ -21,6 +21,7 @@ internal class StreamCallbacks {
   var onCancel: ((finalStreamIntel: FinalStreamIntel) -> Unit)? = null
   var onError: ((error: EnvoyError, finalStreamIntel: FinalStreamIntel) -> Unit)? = null
   var onSendWindowAvailable: ((streamIntel: StreamIntel) -> Unit)? = null
+  var onDataAvailable: ((streamIntel: StreamIntel, bytesAvailable: Int) -> Unit)? = null
   var onComplete: ((finalStreamIntel: FinalStreamIntel) -> Unit)? = null
 }
 
@@ -71,6 +72,10 @@ internal class EnvoyHTTPCallbacksAdapter(
 
   override fun onSendWindowAvailable(streamIntel: EnvoyStreamIntel) {
     callbacks.onSendWindowAvailable?.invoke(StreamIntel(streamIntel))
+  }
+
+  override fun onDataAvailable(streamIntel: EnvoyStreamIntel, bytes_available: Int) {
+    callbacks.onDataAvailable?.invoke(StreamIntel(streamIntel), bytes_available)
   }
 
   override fun onComplete(streamIntel: EnvoyStreamIntel, finalStreamIntel: EnvoyFinalStreamIntel) {

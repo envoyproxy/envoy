@@ -5,6 +5,12 @@
 namespace Envoy {
 namespace Event {
 
+TimerPtr ProvisionalDispatcher::createTimerPostDrain(TimerCb cb) {
+  Thread::LockGuard lock(state_lock_);
+  ASSERT(drained_);
+  return event_dispatcher_->createTimer(cb);
+}
+
 void ProvisionalDispatcher::drain(Event::Dispatcher& event_dispatcher) {
   // TODO(goaway): Must be called from the Event::Dispatcher's thread, but we can't assert here
   // because of behavioral oddities in Event::Dispatcher: event_dispatcher_->isThreadSafe() will

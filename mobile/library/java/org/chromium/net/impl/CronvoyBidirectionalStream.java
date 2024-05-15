@@ -956,6 +956,11 @@ public final class CronvoyBidirectionalStream
   }
 
   @Override
+  public void onDataAvailable(EnvoyStreamIntel streamIntel, int bytes_available) {
+    // TODO(abeyad) plumb through to YT
+  }
+
+  @Override
   public void onHeaders(Map<String, List<String>> headers, boolean endStream,
                         EnvoyStreamIntel streamIntel) {
     List<String> statuses = headers.get(":status");
