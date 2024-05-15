@@ -1,10 +1,8 @@
 #include "library/jni/android_network_utility.h"
 
 #include "library/common/bridge//utility.h"
-#include "library/jni/jni_support.h"
 #include "library/jni/jni_utility.h"
 #include "library/jni/types/exception.h"
-#include "library/jni/types/java_virtual_machine.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -87,7 +85,7 @@ static void jvmVerifyX509CertChain(const std::vector<std::string>& cert_chain,
                                    std::string auth_type, absl::string_view hostname,
                                    CertVerifyStatus* status, bool* is_issued_by_known_root,
                                    std::vector<std::string>* verified_chain) {
-  JniHelper jni_helper(getEnv());
+  JniHelper jni_helper(JniHelper::getThreadLocalEnv());
   LocalRefUniquePtr<jobject> result =
       callJvmVerifyX509CertChain(jni_helper, cert_chain, auth_type, hostname);
   if (Exception::checkAndClear()) {
@@ -166,7 +164,7 @@ envoy_cert_validation_result verifyX509CertChain(const std::vector<std::string>&
   }
 }
 
-void jvmDetachThread() { JavaVirtualMachine::detachCurrentThread(); }
+void jvmDetachThread() { JniHelper::detachCurrentThread(); }
 
 } // namespace JNI
 } // namespace Envoy

@@ -11,14 +11,10 @@
 #include "absl/container/flat_hash_map.h"
 #include "library/common/types/c_types.h"
 #include "library/common/types/managed_envoy_headers.h"
-#include "library/jni/import/jni_import.h"
 #include "library/jni/jni_helper.h"
 
 namespace Envoy {
 namespace JNI {
-
-// TODO(Augustyniak): Replace the usages of this global method with Envoy::JNI::Env::get()
-JNIEnv* getEnv();
 
 void setClassLoader(jobject class_loader);
 
