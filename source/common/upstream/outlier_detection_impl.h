@@ -167,7 +167,8 @@ public:
     getSRMonitor(type).setSuccessRate(new_success_rate);
   }
 
-  std::function<void(uint32_t, std::string, absl::optional<std::string>)> getCallback();
+  std::function<void(uint32_t, std::string, absl::optional<std::string>)>
+  getOnFailedExtensioMonitorCallback();
 
   // handlers for reporting local origin errors
   void localOriginFailure();

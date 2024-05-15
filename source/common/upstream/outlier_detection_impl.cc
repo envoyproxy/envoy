@@ -104,7 +104,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   }
 }
 std::function<void(uint32_t, std::string, absl::optional<std::string>)>
-DetectorHostMonitorImpl::getCallback() {
+DetectorHostMonitorImpl::getOnFailedExtensioMonitorCallback() {
   return [this](uint32_t enforce, std::string failed_monitor_name,
                 absl::optional<std::string> extra_info) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
@@ -416,7 +416,8 @@ void DetectorImpl::addHostMonitor(HostSharedPtr host) {
   ASSERT(host_monitors_.count(host) == 0);
   DetectorHostMonitorImpl* monitor = new DetectorHostMonitorImpl(shared_from_this(), host);
 
-  monitor->setExtensionsMonitors(config_.createMonitorExtensions(monitor->getCallback()));
+  monitor->setExtensionsMonitors(
+      config_.createMonitorExtensions(monitor->getOnFailedExtensioMonitorCallback()));
 
   host_monitors_[host] = monitor;
   host->setOutlierDetector(DetectorHostMonitorPtr{monitor});
