@@ -30,7 +30,7 @@ public:
    */
   virtual FilterBasePtr<Context>
   createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-               Server::Configuration::FactoryContext& context) PURE;
+               Server::Configuration::GenericFactoryContext& context) PURE;
 
   std::string category() const override { return category_; }
 

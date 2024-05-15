@@ -35,7 +35,7 @@ public:
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
   static FilterPtr fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                             Server::Configuration::FactoryContext& context);
+                             Server::Configuration::GenericFactoryContext& context);
 };
 
 /**
@@ -87,7 +87,7 @@ class OperatorFilter : public Filter {
 public:
   OperatorFilter(
       const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
-      Server::Configuration::FactoryContext& context);
+      Server::Configuration::GenericFactoryContext& context);
 
 protected:
   std::vector<FilterPtr> filters_;
@@ -99,7 +99,7 @@ protected:
 class AndFilter : public OperatorFilter {
 public:
   AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
-            Server::Configuration::FactoryContext& context);
+            Server::Configuration::GenericFactoryContext& context);
 
   // AccessLog::Filter
   bool evaluate(const Formatter::HttpFormatterContext& context,
@@ -112,7 +112,7 @@ public:
 class OrFilter : public OperatorFilter {
 public:
   OrFilter(const envoy::config::accesslog::v3::OrFilter& config,
-           Server::Configuration::FactoryContext& context);
+           Server::Configuration::GenericFactoryContext& context);
 
   // AccessLog::Filter
   bool evaluate(const Formatter::HttpFormatterContext& context,
