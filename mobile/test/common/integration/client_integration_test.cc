@@ -825,9 +825,11 @@ TEST_P(ClientIntegrationTest, ResetAfterResponseHeadersExplicit) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
 
+
   stream_ = createNewStream(createDefaultStreamCallbacks());
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
+
   // Read the body chunk. This releases the error.
   stream_->readData(100);
 
@@ -867,6 +869,7 @@ TEST_P(ClientIntegrationTest, ResetBetweenDataChunks) {
 }
 
 TEST_P(ClientIntegrationTest, ResetAfterDataExplicit) {
+  builder_.addRuntimeGuard("report_available_data", true);
   explicit_flow_control_ = true;
 
   autonomous_allow_incomplete_streams_ = true;
@@ -875,10 +878,18 @@ TEST_P(ClientIntegrationTest, ResetAfterDataExplicit) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_DATA, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
 
+  ConditionalInitializer data_available;
   auto callbacks = createDefaultStreamCallbacks();
+  callbacks.on_data_available_ = [&data_available](uint32_t bytes_available, envoy_stream_intel) {
+    EXPECT_EQ(10, bytes_available);
+    data_available.setReady();
+  };
+
   stream_ = createNewStream(std::move(callbacks));
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
+  // Wait to make sure the data available alarm fires.
+  data_available.waitReady();
 
   // Allow passing up the data and error
   stream_->readData(100);

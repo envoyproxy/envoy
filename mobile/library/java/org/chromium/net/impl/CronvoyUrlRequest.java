@@ -991,6 +991,11 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
     }
 
     @Override
+    public void onDataAvailable(int bytes_available, EnvoyStreamIntel streamIntel) {
+      // TODO(abeyad) plumb through to YT
+    }
+
+    @Override
     public void onComplete(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel) {
       if (isAbandoned()) {
         return;

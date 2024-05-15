@@ -154,6 +154,12 @@ private:
     void onError();
     void onSendWindowAvailable();
 
+    // If configured, sets an alarm to report when data is available.
+    void maybeEnableDataAvailableTimer();
+
+    // Report to the app if data is available.
+    void reportDataAvailable();
+
     // ResponseEncoder
     void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -207,6 +213,8 @@ private:
     absl::optional<EnvoyError> error_;
     bool success_{};
 
+    // Send data alerts up if envoy.reloadable_features.report_available_data is true.
+    Event::TimerPtr data_available_timer_;
     // Buffered response data when in explicit flow control mode.
     Buffer::InstancePtr response_data_;
     ResponseTrailerMapPtr response_trailers_;

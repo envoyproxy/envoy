@@ -14,6 +14,8 @@
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/system/system_helper.h"
 
+ABSL_FLAG(bool, envoy_reloadable_features_report_available_data, false, ""); // NOLINT
+
 namespace Envoy {
 namespace Http {
 
@@ -127,6 +129,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
     // Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
     // and having local data of 2M + kernel-buffer-limit for HTTP/1.1
     response_data_->setWatermarks(2 * 1024 * 1024);
+    maybeEnableDataAvailableTimer();
   }
 
   // Send data if in default flow control mode, or if resumeData has been called in explicit
@@ -145,6 +148,25 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
         direct_stream_.stream_handle_, data.length(), data.length() + response_data_->length());
     response_data_->move(data);
   }
+}
+
+void Client::DirectStreamCallbacks::maybeEnableDataAvailableTimer() {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_available_data")) {
+    // This is only called once, when the response data buffer is creatd.
+    ASSERT(!data_available_timer_);
+    // Drain must have been called for us to get to the point we've received
+    // data from a server.
+    data_available_timer_ =
+        http_client_.dispatcher_.createTimerPostDrain([this]() { reportDataAvailable(); });
+    data_available_timer_->enableTimer(std::chrono::milliseconds(5));
+  }
+}
+
+void Client::DirectStreamCallbacks::reportDataAvailable() {
+  if (response_data_ && response_data_->length() != 0) {
+    stream_callbacks_.on_data_available_(response_data_->length(), streamIntel());
+  }
+  data_available_timer_->enableTimer(std::chrono::milliseconds(5));
 }
 
 void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, bool end_stream) {
@@ -293,6 +315,7 @@ void Client::DirectStreamCallbacks::onComplete() {
   if (elapsed > SlowCallbackWarningThreshold) {
     ENVOY_LOG_EVENT(warn, "slow_on_complete_cb", "{}ms", elapsed.count());
   }
+  data_available_timer_.reset();
 }
 
 void Client::DirectStreamCallbacks::onError() {
@@ -341,6 +364,7 @@ void Client::DirectStreamCallbacks::sendErrorToBridge() {
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_error_callback_latency_, http_client_.timeSource());
 
+  data_available_timer_.reset();
   stream_callbacks_.on_error_(error_.value(), streamIntel(), finalStreamIntel());
   error_.reset();
 
@@ -369,6 +393,7 @@ void Client::DirectStreamCallbacks::onCancel() {
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_cancel_callback_latency_, http_client_.timeSource());
 
+  data_available_timer_.reset();
   stream_callbacks_.on_cancel_(streamIntel(), finalStreamIntel());
 
   callback_time_ms->complete();
