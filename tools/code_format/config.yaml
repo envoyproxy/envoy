@@ -163,8 +163,8 @@ paths:
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
     - source/common/tls/context_impl.cc
+    - source/common/tls/server_context_impl.cc
     - source/common/tls/context_config_impl.cc
-    - source/common/tls/ocsp/ocsp.cc
     - source/common/config/watched_directory.cc
     - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
@@ -413,3 +413,4 @@ visibility_excludes:
 - source/extensions/load_balancing_policies/random/
 - source/extensions/load_balancing_policies/cluster_provided/
 - source/extensions/filters/http/match_delegate/
+- source/extensions/transport_sockets/tls/

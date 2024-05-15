@@ -29,7 +29,7 @@ jobs:
         if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
             ARGS+=(--dry_run)
         fi
-        bazel run //tools/repo:notify -- "${ARGS[@]}"
+        bazel run --config=ci //tools/repo:notify -- "${ARGS[@]}"
       env:
         SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

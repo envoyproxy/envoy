@@ -43,7 +43,7 @@ envoy_cc_library(
         "@envoy//source/extensions/request_id/uuid:config",
         "@envoy//source/extensions/transport_sockets/http_11_proxy:upstream_config",
         "@envoy//source/extensions/transport_sockets/raw_buffer:config",
-        "@envoy//source/extensions/transport_sockets/tls:config",
+        "@envoy//source/extensions/transport_sockets/tls:upstream_config",
         "@envoy//source/extensions/upstreams/http/generic:config",
         "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:config",
         "@envoy_mobile//library/common/extensions/filters/http/local_error:config",

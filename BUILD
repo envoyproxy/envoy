@@ -16,6 +16,7 @@ exports_files([
     "CODEOWNERS",
     "OWNERS.md",
     ".github/config.yml",
+    "reviewers.yaml",
 ])
 
 alias(

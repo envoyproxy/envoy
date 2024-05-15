@@ -214,7 +214,6 @@ cc_library(
     deps = [
         "//library/common/http:header_utility_lib",
         "//library/jni:jni_utility_lib",
-        "//library/jni/types:jni_javavm_lib",
         "@envoy//test/test_common:utility_lib",
     ],
     alwayslink = True,

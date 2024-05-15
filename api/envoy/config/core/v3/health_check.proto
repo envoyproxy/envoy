@@ -5,6 +5,7 @@ package envoy.config.core.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/event_service_config.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http.proto";
 import "envoy/type/v3/range.proto";
@@ -177,6 +178,13 @@ message HealthCheck {
     // payload block must be found, and in the order specified, but not
     // necessarily contiguous.
     repeated Payload receive = 2;
+
+    // When setting this value, it tries to attempt health check request with ProxyProtocol.
+    // When ``send`` is presented, they are sent after preceding ProxyProtocol header.
+    // Only ProxyProtocol header is sent when ``send`` is not presented.
+    // It allows to use both ProxyProtocol V1 and V2. In V1, it presents L3/L4. In V2, it includes
+    // LOCAL command and doesn't include L3/L4.
+    ProxyProtocolConfig proxy_protocol_config = 3;
   }
 
   message RedisHealthCheck {

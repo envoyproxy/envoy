@@ -50,10 +50,11 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
 // drained and terminated.
 HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
                                        const std::string& socket_path, mode_t socket_mode,
-                                       bool skip_hot_restart_on_no_parent)
+                                       bool skip_hot_restart_on_no_parent, bool skip_parent_stats)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch),
       parent_terminated_(restart_epoch == 0), parent_drained_(restart_epoch == 0),
-      skip_hot_restart_on_no_parent_(skip_hot_restart_on_no_parent) {
+      skip_hot_restart_on_no_parent_(skip_hot_restart_on_no_parent),
+      skip_parent_stats_(skip_parent_stats) {
   main_rpc_stream_.initDomainSocketAddress(&parent_address_);
   std::string socket_path_udp = socket_path + "_udp";
   udp_forwarding_rpc_stream_.initDomainSocketAddress(&parent_address_udp_forwarding_);
@@ -144,7 +145,7 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
 }
 
 std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
-  if (parent_terminated_) {
+  if (parent_terminated_ || skip_parent_stats_) {
     return nullptr;
   }
 

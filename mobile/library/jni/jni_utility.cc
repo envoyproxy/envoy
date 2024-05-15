@@ -7,8 +7,6 @@
 #include "source/common/common/assert.h"
 
 #include "library/common/types/matcher_data.h"
-#include "library/jni/jni_support.h"
-#include "library/jni/types/env.h"
 
 namespace Envoy {
 namespace JNI {
@@ -24,7 +22,7 @@ jobject getClassLoader() {
 }
 
 LocalRefUniquePtr<jclass> findClass(const char* class_name) {
-  JniHelper jni_helper(getEnv());
+  JniHelper jni_helper(JniHelper::getThreadLocalEnv());
   LocalRefUniquePtr<jclass> class_loader = jni_helper.findClass("java/lang/ClassLoader");
   jmethodID find_class_method = jni_helper.getMethodId(class_loader.get(), "loadClass",
                                                        "(Ljava/lang/String;)Ljava/lang/Class;");
@@ -34,10 +32,8 @@ LocalRefUniquePtr<jclass> findClass(const char* class_name) {
   return clazz;
 }
 
-JNIEnv* getEnv() { return Envoy::JNI::Env::get(); }
-
 void jniDeleteGlobalRef(void* context) {
-  JNIEnv* env = getEnv();
+  JNIEnv* env = JniHelper::getThreadLocalEnv();
   jobject ref = static_cast<jobject>(context);
   env->DeleteGlobalRef(ref);
 }
@@ -547,7 +543,7 @@ Buffer::InstancePtr javaDirectByteBufferToCppBufferInstance(JniHelper& jni_helpe
       java_byte_buffer_address, static_cast<size_t>(length),
       [java_byte_buffer_global_ref](const void*, size_t,
                                     const Buffer::BufferFragmentImpl* this_fragment) {
-        getEnv()->DeleteGlobalRef(java_byte_buffer_global_ref);
+        JniHelper::getThreadLocalEnv()->DeleteGlobalRef(java_byte_buffer_global_ref);
         delete this_fragment;
       });
   Buffer::InstancePtr cpp_buffer_instance = std::make_unique<Buffer::OwnedImpl>();

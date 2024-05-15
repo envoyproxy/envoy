@@ -563,8 +563,13 @@ UDP
 .. _config_access_log_format_upstream_host:
 
 %UPSTREAM_HOST%
-  Upstream host URL (e.g., tcp://ip:port for TCP connections). Identical to the :ref:`UPSTREAM_REMOTE_ADDRESS
-  <config_access_log_format_upstream_remote_address>` value.
+  Main address of upstream host (e.g., ip:port for TCP connections).
+
+.. _config_access_log_format_upstream_host_name:
+
+%UPSTREAM_HOST_NAME%
+  Upstream host name (e.g., DNS name). If no DNS name is available, the main address of the upstream host
+  (e.g., ip:port for TCP connections) will be used.
 
 %UPSTREAM_CLUSTER%
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
@@ -586,7 +591,8 @@ UDP
 
 %UPSTREAM_REMOTE_ADDRESS%
   Remote address of the upstream connection. If the address is an IP address it includes both
-  address and port. Identical to the :ref:`UPSTREAM_HOST <config_access_log_format_upstream_host>` value.
+  address and port. Identical to the :ref:`UPSTREAM_HOST <config_access_log_format_upstream_host>` value if the upstream
+  host only has one address and connection is established successfully.
 
 %UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
   Remote address of the upstream connection, without any port component.
