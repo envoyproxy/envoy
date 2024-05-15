@@ -65,7 +65,7 @@ message GrpcService {
     // [#not-implemented-hide:]
     // If true, x-forwarded-for header will be added to Envoy-gRPC request header.
     // Default to true.
-    google.protobuf.BoolValue add_xff_headerr = 6;
+    google.protobuf.BoolValue add_xff_header = 6;
   }
 
   // [#next-free-field: 9]
