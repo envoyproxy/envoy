@@ -47,20 +47,22 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
               client,
               *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                   "opentelemetry.proto.collector.logs.v1.LogsService.Export"),
-              GrpcCommon::optionalRetryPolicy(config.common_config()),
-              [this, &dispatcher]() {
-                OTelLogRequestCallbacks* ptr = new OTelLogRequestCallbacks(
-                    dispatcher, this->stats_, this->batched_log_entries_);
-                this->batched_log_entries_ = 0;
-
-                this->callbacks_.emplace(ptr, ptr);
-                ptr->setDeletion([this, ptr]() { this->callbacks_.erase(ptr); });
-                return ptr;
-              })),
+              GrpcCommon::optionalRetryPolicy(config.common_config()), genOTelCallbacksFactory())),
       stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, GRPC_LOG_STATS_PREFIX))}) {
   initMessageRoot(config, local_info);
 }
 
+std::function<GrpcAccessLoggerImpl::OTelLogRequestCallbacks*()>
+GrpcAccessLoggerImpl::genOTelCallbacksFactory() {
+  return [this]() {
+    OTelLogRequestCallbacks* ptr = new OTelLogRequestCallbacks(
+        this->stats_, this->batched_log_entries_,
+        [this](OTelLogRequestCallbacks* p) { this->callbacks_.erase(p); });
+    this->batched_log_entries_ = 0;
+    this->callbacks_.emplace(ptr, ptr);
+    return ptr;
+  };
+}
 // See comment about the structure of repeated fields in the header file.
 void GrpcAccessLoggerImpl::initMessageRoot(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
