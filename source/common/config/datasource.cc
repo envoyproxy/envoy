@@ -100,14 +100,16 @@ absl::string_view DataSourceProvider::data() const {
   return absl::get<DynamicData>(data_).data();
 }
 
-absl::StatusOr<DataSourceProvider>
-DataSourceProvider::create(const ProtoDataSource& source, OptRef<const ProtoWatchedDirectory> watch,
-                           Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls,
-                           Api::Api& api, bool allow_empty, uint64_t max_size) {
+absl::StatusOr<DataSourceProvider> DataSourceProvider::create(const ProtoDataSource& source,
+                                                              Event::Dispatcher& main_dispatcher,
+                                                              ThreadLocal::SlotAllocator& tls,
+                                                              Api::Api& api, bool allow_empty,
+                                                              uint64_t max_size) {
   auto initial_data_or_error = read(source, allow_empty, api, max_size);
   RETURN_IF_STATUS_NOT_OK(initial_data_or_error);
 
-  if (!watch || source.specifier_case() != envoy::config::core::v3::DataSource::kFilename) {
+  if (!source.has_watched_directory() ||
+      source.specifier_case() != envoy::config::core::v3::DataSource::kFilename) {
     return DataSourceProvider(std::move(initial_data_or_error).value());
   }
 
@@ -123,7 +125,7 @@ DataSourceProvider::create(const ProtoDataSource& source, OptRef<const ProtoWatc
   // TODO(wbpcode): use Config::WatchedDirectory instead of directly creating a watcher
   // if the Config::WatchedDirectory is exception-free in the future.
   auto watcher_status = watcher->addWatch(
-      absl::StrCat(watch->path(), "/"), Filesystem::Watcher::Events::MovedTo,
+      absl::StrCat(source.watched_directory().path(), "/"), Filesystem::Watcher::Events::MovedTo,
       [slot_ptr = slot.get(), &api, filename, allow_empty, max_size](uint32_t) -> absl::Status {
         auto new_data_or_error = readFile(filename, api, allow_empty, max_size);
         if (!new_data_or_error.ok()) {

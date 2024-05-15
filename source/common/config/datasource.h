@@ -88,7 +88,6 @@ public:
   /**
    * Create a DataSourceProvider from a DataSource.
    * @param source data source.
-   * @param watch optional watched directory.
    * @param main_dispatcher reference to the main dispatcher.
    * @param tls reference to the thread local slot allocator.
    * @param api reference to the Api.
@@ -100,7 +99,6 @@ public:
    * requirements (allow_empty, max_size), the provider will keep the old content.
    */
   static absl::StatusOr<DataSourceProvider> create(const ProtoDataSource& source,
-                                                   OptRef<const ProtoWatchedDirectory> watch,
                                                    Event::Dispatcher& main_dispatcher,
                                                    ThreadLocal::SlotAllocator& tls, Api::Api& api,
                                                    bool allow_empty, uint64_t max_size = 0);

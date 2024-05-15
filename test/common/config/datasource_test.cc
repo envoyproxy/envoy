@@ -158,9 +158,8 @@ TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
 
 TEST(DataSourceProviderTest, NonFileDataSourceTest) {
   envoy::config::core::v3::DataSource config;
-  envoy::config::core::v3::WatchedDirectory watched_directory;
   TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
-  watched_directory.set_path(TestEnvironment::temporaryPath("envoy_test"));
+  config.mutable_watched_directory()->set_path(TestEnvironment::temporaryPath("envoy_test"));
 
   const std::string yaml = R"EOF(
     inline_string: "Hello, world!"
@@ -174,8 +173,8 @@ TEST(DataSourceProviderTest, NonFileDataSourceTest) {
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   NiceMock<ThreadLocal::MockInstance> tls;
 
-  auto provider_or_error = DataSource::DataSourceProvider::create(config, watched_directory,
-                                                                  *dispatcher, tls, *api, false, 0);
+  auto provider_or_error =
+      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
   EXPECT_EQ(provider_or_error.value().data(), "Hello, world!");
 }
 
@@ -215,8 +214,8 @@ TEST(DataSourceProviderTest, FileDataSourceButNoWatch) {
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   NiceMock<ThreadLocal::MockInstance> tls;
 
-  auto provider_or_error = DataSource::DataSourceProvider::create(config, absl::nullopt,
-                                                                  *dispatcher, tls, *api, false, 0);
+  auto provider_or_error =
+      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
   EXPECT_EQ(provider_or_error.value().data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
@@ -242,9 +241,8 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatch) {
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
 
   envoy::config::core::v3::DataSource config;
-  envoy::config::core::v3::WatchedDirectory watched_directory;
   TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
-  watched_directory.set_path(TestEnvironment::temporaryPath("envoy_test"));
+  config.mutable_watched_directory()->set_path(TestEnvironment::temporaryPath("envoy_test"));
 
   const std::string yaml = fmt::format(R"EOF(
     filename: "{}"
@@ -274,8 +272,8 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatch) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   // Create a provider with watch.
-  auto provider_or_error = DataSource::DataSourceProvider::create(config, watched_directory,
-                                                                  *dispatcher, tls, *api, false, 0);
+  auto provider_or_error =
+      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
   EXPECT_EQ(provider_or_error.value().data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
@@ -301,9 +299,8 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatchButUpdateError) {
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
 
   envoy::config::core::v3::DataSource config;
-  envoy::config::core::v3::WatchedDirectory watched_directory;
   TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
-  watched_directory.set_path(TestEnvironment::temporaryPath("envoy_test"));
+  config.mutable_watched_directory()->set_path(TestEnvironment::temporaryPath("envoy_test"));
 
   const std::string yaml = fmt::format(R"EOF(
     filename: "{}"
@@ -334,8 +331,8 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatchButUpdateError) {
 
   // Create a provider with watch. The max size is set to 15, so the updated content will be
   // ignored.
-  auto provider_or_error = DataSource::DataSourceProvider::create(
-      config, watched_directory, *dispatcher, tls, *api, false, 15);
+  auto provider_or_error =
+      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 15);
   EXPECT_EQ(provider_or_error.value().data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
