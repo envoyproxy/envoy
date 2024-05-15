@@ -101,3 +101,19 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "operation_name_test",
+    srcs = ["operation_name_test.cc"],
+    extension_names = ["envoy.tracers.opentelemetry"],
+    deps = [
+        "//source/extensions/tracers/opentelemetry:config",
+        "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
+        "//test/mocks/server:tracer_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

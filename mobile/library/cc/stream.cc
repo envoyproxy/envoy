@@ -1,6 +1,6 @@
 #include "stream.h"
 
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 #include "library/common/types/c_types.h"

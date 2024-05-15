@@ -155,7 +155,7 @@ absl::Status FilterConfigSubscription::onConfigUpdate(
     Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
         filter_config_providers_,
         [](DynamicFilterConfigProviderImplBase* provider, std::shared_ptr<Cleanup> cleanup) {
-          provider->onConfigRemoved([cleanup] {});
+          THROW_IF_NOT_OK(provider->onConfigRemoved([cleanup] {}));
         },
         [me = shared_from_this()]() { me->updateComplete(); });
   } else if (!added_resources.empty()) {
@@ -244,7 +244,7 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
 
   // Apply the default config if none has been applied.
   if (!last_config_valid) {
-    provider.applyDefaultConfiguration();
+    THROW_IF_NOT_OK(provider.applyDefaultConfiguration());
   }
 }
 

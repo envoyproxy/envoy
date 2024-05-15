@@ -26,7 +26,6 @@ envoy_cc_library(
         ":engine_common_lib",
         ":engine_types_lib",
         "//library/common/bridge:utility_lib",
-        "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",

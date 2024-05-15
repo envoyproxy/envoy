@@ -25,7 +25,7 @@ envoy_cc_extension(
     deps = [
         ":platform_cc_proto",
         "//library/common/api:external_api_lib",
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
         "@envoy//envoy/common:key_value_store_interface",
         "@envoy//envoy/event:dispatcher_interface",
         "@envoy//envoy/filesystem:filesystem_interface",
