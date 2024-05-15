@@ -56,8 +56,11 @@ std::function<GrpcAccessLoggerImpl::OTelLogRequestCallbacks*()>
 GrpcAccessLoggerImpl::genOTelCallbacksFactory() {
   return [this]() {
     OTelLogRequestCallbacks* ptr = new OTelLogRequestCallbacks(
-        this->stats_, this->batched_log_entries_,
-        [this](OTelLogRequestCallbacks* p) { this->callbacks_.erase(p); });
+        this->stats_, this->batched_log_entries_, [this](OTelLogRequestCallbacks* p) {
+          if (this->callbacks_.contains(p)) {
+            this->callbacks_.erase(p);
+          }
+        });
     this->batched_log_entries_ = 0;
     this->callbacks_.emplace(ptr, ptr);
     return ptr;
