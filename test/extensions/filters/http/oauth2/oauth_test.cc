@@ -295,7 +295,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenUnhealthyUpstream) {
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             // if there is no healthy upstream, the request fails immediately
-            cb->onSuccess(request_, std::move(mock_response));
+            cb.onSuccess(request_, std::move(mock_response));
             return &request_;
           }));
 
@@ -443,7 +443,7 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenUnhealthyUpstream) {
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             // if there is no healthy upstream, the request fails immediately
-            cb->onSuccess(request_, std::move(mock_response));
+            cb.onSuccess(request_, std::move(mock_response));
             return &request_;
           }));
 
