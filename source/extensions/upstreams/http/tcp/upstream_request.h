@@ -27,8 +27,8 @@ public:
     conn_pool_data_ = thread_local_cluster.tcpConnPool(priority, ctx);
   }
   ~TcpConnPool() override {
-    cancelAnyPendingStream();
     ENVOY_BUG(upstream_handle_ == nullptr, "upstream_handle not null");
+    cancelAnyPendingStream();
   }
   // Router::GenericConnPool
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
