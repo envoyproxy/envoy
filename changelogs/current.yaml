@@ -46,6 +46,12 @@ minor_behavior_changes:
     as successful queries with empty results, instead of as DNS failures. This change brings the
     getaddrinfo behavior in-line with the c-ares resolver behavior. This behavior can be reverted by
     setting the runtime guard ``envoy.reloadable_features.dns_nodata_noname_is_success`` to false.
+- area: access_log
+  change: |
+    The upstream connection address, rather than the upstream host address, will be used for the ``%UPSTREAM_REMOTE_ADDRESS%``,
+    ``%UPSTREAM_REMOTE_PORT%`` and ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%`` access log format specifiers.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.upstream_remote_address_use_connection`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -81,6 +87,10 @@ bug_fixes:
   change: |
     Handle ``append_action`` from :ref:`external authorization service <envoy_v3_api_msg_service.auth.v3.CheckResponse>`
     that was ignored.
+- area: http
+  change: |
+    Fix BalsaParser resetting state too early, guarded by default-true
+    ``envoy.reloadable_features.http1_balsa_delay_reset``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -143,6 +153,10 @@ new_features:
     The ``aws_lambda`` filter now supports the
     :ref:`credentials <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.credentials>` parameter.
     This enables setting credential from the filter configuration.
+- area: access_log
+  change: |
+    added support for :ref:`%UPSTREAM_HOST_NAME% <config_access_log_format_upstream_host_name>` for the upstream host
+    identifier.
 - area: healthcheck
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting

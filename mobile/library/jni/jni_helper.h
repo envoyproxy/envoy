@@ -1,8 +1,8 @@
 #pragma once
 
-#include <memory>
+#include <jni.h>
 
-#include "library/jni/import/jni_import.h"
+#include <memory>
 
 namespace Envoy {
 namespace JNI {
@@ -137,6 +137,30 @@ using PrimitiveArrayCriticalUniquePtr =
 class JniHelper {
 public:
   explicit JniHelper(JNIEnv* env) : env_(env) {}
+
+  /** Gets the JNI version supported. */
+  static jint getVersion();
+
+  /** Initializes the `JavaVM`. This is typically set in `JNI_OnLoad`. */
+  static void initialize(JavaVM* java_vm);
+
+  /** Gets the `JavaVM`. The `initialize(JavaVM*) must be called first. */
+  static JavaVM* getJavaVm();
+
+  /** Detaches the current thread from the `JavaVM`. */
+  static void detachCurrentThread();
+
+  /**
+   * Gets the thread-local `JNIEnv`. This is useful for getting the `JNIEnv` between threads.
+   * If the thread-local `JNIEnv` does not exist, this function will attach the current thread to
+   * the JavaVM. Care must be taken to ensure `detachCurrentThread()` is called before the thread
+   * exists to avoid a resource leak.
+   *
+   * See https://developer.android.com/training/articles/perf-jni#threads
+   *
+   * The `initialize(JavaVM*)` must be called first or else `JNIEnv` will return a `nullptr`.
+   */
+  static JNIEnv* getThreadLocalEnv();
 
   /** Gets the underlying `JNIEnv`. */
   JNIEnv* getEnv();
