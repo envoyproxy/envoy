@@ -272,7 +272,7 @@ message ExtAuthz {
   // - ``allow_envoy`` = true
   //
   // Note that no matter what rules are set here, ext_authz can never remove or append
-  // pseudoheaders.
+  // pseudo headers.
   config.common.mutation_rules.v3.HeaderMutationRules decoder_header_mutation_rules = 26;
 }
 

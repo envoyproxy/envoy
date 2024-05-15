@@ -742,7 +742,7 @@ public:
         {"x-append-bat", "append-foo"},
         {"x-append-bat", "append-bar"},
         {"x-envoy-auth-headers-to-remove", "remove-me"},
-        // Try to remove this header that should not be removeable
+        // Try to remove this header that should not be able to be removed.
         {"x-envoy-auth-headers-to-remove", "disallow-mutation-downstream-req"},
     };
     ext_authz_request_->encodeHeaders(response_headers, true);
@@ -832,8 +832,8 @@ public:
     EXPECT_TRUE(upstream_request_->headers()
                     .get(Http::LowerCaseString{"x-envoy-auth-headers-to-remove"})
                     .empty());
-    // The sidestream tried to add this header that violates the disallow_expression header mutation
-    // rule. Make sure it did not get added.
+    // The side stream tried to add this header that violates the disallow_expression header
+    // mutation rule. Make sure it did not get added.
     EXPECT_TRUE(upstream_request_->headers()
                     .get(Http::LowerCaseString{"authz-add-disallow-mutation"})
                     .empty());
