@@ -183,6 +183,12 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		return true
 	})
 
+	test_header_key := "test-header-copy"
+
+	old_value := "old-value"
+
+	header.Set(test_header_key, old_value)
+
 	f.all_headers = make(map[string][]string)
 
 	header.RangeWithCopy(func(key, value string) bool {
@@ -194,6 +200,14 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 
 	if !reflect.DeepEqual(f.all_headers, header_map) {
 		return f.fail("GetAllHeaders returned incorrect data, expected:\n%v\n got:\n%v", f.all_headers, header_map)
+	}
+
+	new_value := "new-value"
+
+	header.Set(test_header_key, new_value)
+
+	if !reflect.DeepEqual(header_map[test_header_key], []string{old_value}) {
+		return f.fail("GetAllHeaders output changed - expected '%v', got '%v'", old_value, header_map[test_header_key])
 	}
 
 	origin, found := header.Get("x-test-header-0")
