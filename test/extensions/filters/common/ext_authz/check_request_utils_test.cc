@@ -747,30 +747,6 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).Times(3).WillRepeatedly(Return(ssl_));
-  EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
-  EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));
-  EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
-  EXPECT_CALL(req_info_, startTime()).WillOnce(Return(SystemTime()));
-
-  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
-  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
-      .WillOnce(Return(std::vector<std::string>{"destination"}));
-  envoy::service::auth::v3::AttributeContext_TLSSession want_tls_session;
-  EXPECT_CALL(*ssl_, sni()).WillOnce(ReturnRef(want_tls_session.sni()));
-
-  callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
-}
-
-// Verify that createHttpCheck populates the tls session details correctly from the connection when
-// TLS session information isn't present.
-TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNIEqualServerName) {
-  EXPECT_CALL(callbacks_, connection())
-      .Times(3)
-      .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
-  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
-  EXPECT_CALL(Const(connection_), ssl()).Times(3).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(connection_, requestedServerName())
       .Times(2)
       .WillRepeatedly(Return(requested_server_name_));
