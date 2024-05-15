@@ -16,6 +16,12 @@ behavior_changes:
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
     requests and responses. This behavior can be reverted by setting the feature to false.
+- area: proxy_protocol
+  change: |
+    Populate typed metadata by default in proxy protocol listener. Typed metadata can be consumed as
+    :ref:`TlvsMetadata type <envoy_v3_api_msg_data.core.v3.TlvsMetadata>`.
+    This change can be temporarily disabled by setting the runtime flag
+    ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

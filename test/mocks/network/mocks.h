@@ -424,6 +424,7 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, continueFilterChain, (bool));
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
+  MOCK_METHOD(void, setDynamicTypedMetadata, (const std::string&, const ProtobufWkt::Any& value));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(StreamInfo::FilterState&, filterState, (), ());
