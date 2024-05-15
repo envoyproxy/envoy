@@ -45,7 +45,7 @@ void jniDeleteGlobalRef(void* context);
 void jniDeleteConstGlobalRef(const void* context);
 
 /** Converts `java.lang.Integer` to C++ `int`. */
-int javaIntegerTotInt(JniHelper& jni_helper, jobject boxed_integer);
+int javaIntegerToCppInt(JniHelper& jni_helper, jobject boxed_integer);
 
 /** Converts from Java byte array to `envoy_data`. */
 envoy_data javaByteArrayToEnvoyData(JniHelper& jni_helper, jbyteArray j_data);
@@ -67,12 +67,6 @@ LocalRefUniquePtr<jlongArray> envoyStreamIntelToJavaLongArray(JniHelper& jni_hel
 LocalRefUniquePtr<jlongArray>
 envoyFinalStreamIntelToJavaLongArray(JniHelper& jni_helper,
                                      envoy_final_stream_intel final_stream_intel);
-
-/** Converts from Java `Map` to `envoy_map`. */
-LocalRefUniquePtr<jobject> envoyMapToJavaMap(JniHelper& jni_helper, envoy_map map);
-
-/** Converts from `envoy_data` to Java `String`. */
-LocalRefUniquePtr<jstring> envoyDataToJavaString(JniHelper& jni_helper, envoy_data data);
 
 /** Converts from Java `ByteBuffer` to `envoy_data`. */
 envoy_data javaByteBufferToEnvoyData(JniHelper& jni_helper, jobject j_data);
