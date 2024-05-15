@@ -130,7 +130,7 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
   }
 }
 
-Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
+Http::Utility::QueryParamsMulti buildAuthorizationQueryParams(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) {
   auto query_params =
       Http::Utility::QueryParamsMulti::parseQueryString(proto_config.authorization_endpoint());
@@ -190,7 +190,7 @@ FilterConfig::FilterConfig(
     const std::string& stats_prefix)
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
-      authorization_query_params_(buildAutorizationQueryParams(proto_config)),
+      authorization_query_params_(buildAuthorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher(), context),

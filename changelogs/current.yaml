@@ -78,17 +78,17 @@ bug_fixes:
     that was ignored.
 - area: oauth
   change: |
-    Always set token cookies in response regardless of :ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>`
-    config option.
+    Always set token cookies in response regardless of :ref:`forward_bearer_token
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>` config option.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: http
   change: |
-    Removed ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` runtime flag and lagacy code paths.
+    Removed ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` runtime flag and legacy code paths.
 - area: http
   change: |
-    Removed ``envoy.reloadable_features.proxy_status_upstream_request_timeout`` runtime flag and lagacy code paths.
+    Removed ``envoy.reloadable_features.proxy_status_upstream_request_timeout`` runtime flag and legacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.handle_uppercase_scheme`` runtime flag and legacy code paths.
@@ -97,10 +97,10 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.detect_and_raise_rst_tcp_connection`` runtime flag and legacy code paths.
 - area: http
   change: |
-    Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and lagacy code paths.
+    Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and legacy code paths.
 - area: upstream
   change: |
-    Removed ``envoy.reloadable_features.convert_legacy_lb_config`` runtime flag and lagacy code paths.
+    Removed ``envoy.reloadable_features.convert_legacy_lb_config`` runtime flag and legacy code paths.
 - area: router
   change: |
     Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
