@@ -198,6 +198,7 @@ func envoyGoFilterOnUpstreamConnectionReady(wrapper unsafe.Pointer, connID uint6
 		writeFunc: cgoAPI.UpstreamWrite,
 		closeFunc: cgoAPI.UpstreamClose,
 		infoFunc:  cgoAPI.UpstreamInfo,
+		connEnableHalfCloseFunc: cgoAPI.UpstreamConnEnableHalfClose,
 	}
 	// switch filter from idMap to wrapperMap
 	filter := UpstreamFilters.GetFilterByConnID(connID)

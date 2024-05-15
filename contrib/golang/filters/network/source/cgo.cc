@@ -130,6 +130,15 @@ void* envoyGoFilterUpstreamConnect(void* library_id, void* addr, uint64_t conn_i
   return static_cast<void*>(wrapper);
 }
 
+CAPIStatus envoyGoFilterUpstreamConnEnableHalfClose(void* u, int enable_half_close) {
+  auto* wrapper = reinterpret_cast<UpstreamConnWrapper*>(u);
+  UpstreamConnPtr& conn_ptr = wrapper->conn_ptr_;
+
+  conn_ptr->enableHalfClose(static_cast<bool>(enable_half_close));
+
+  return CAPIOK;
+}
+
 CAPIStatus envoyGoFilterUpstreamWrite(void* u, void* buffer_ptr, int buffer_len, int end_stream) {
   auto* wrapper = reinterpret_cast<UpstreamConnWrapper*>(u);
   UpstreamConnPtr& conn_ptr = wrapper->conn_ptr_;
