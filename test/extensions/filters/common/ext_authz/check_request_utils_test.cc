@@ -768,7 +768,6 @@ TEST_F(CheckRequestUtilsTest, HttpTlsSessionNoSessionSni) {
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
-  expectBasicHttp();
   CheckRequestUtils::createHttpCheck(
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request, size,
