@@ -758,10 +758,9 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
 }
 
-// Verify that createHttpCheck populates the tls session details correctly from the connection when
-// TLS session information isn't present.
 TEST_F(CheckRequestUtilsTest, HttpTlsSessionNoSessionSni) {
-  envoy::service::auth::v3::CheckRequest request_;
+  const uint64_t size = 0;
+  envoy::service::auth::v3::CheckRequest request;
 
   // A client supplied EnvoyAuthPartialBody header should be ignored.
   Http::TestRequestHeaderMapImpl request_headers{{Headers::get().EnvoyAuthPartialBody.get(), "1"}};
@@ -772,9 +771,10 @@ TEST_F(CheckRequestUtilsTest, HttpTlsSessionNoSessionSni) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
-      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request, size,
       /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
       /*include_tls_session=*/true, Protobuf::Map<std::string, std::string>(), nullptr);
+  envoy::service::auth::v3::AttributeContext_TLSSession want_tls_session;
   EXPECT_CALL(*ssl_, sni()).WillOnce(ReturnRef(want_tls_session.sni()));
   EXPECT_TRUE(request.attributes().has_tls_session());
   EXPECT_EQ(requested_server_name_, request.attributes().tls_session().sni());
