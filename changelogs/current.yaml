@@ -91,6 +91,11 @@ bug_fixes:
   change: |
     Fix BalsaParser resetting state too early, guarded by default-true
     ``envoy.reloadable_features.http1_balsa_delay_reset``.
+- area: ext_authz
+  change: |
+    Set the SNI value from the requested server name if it isn't available on the connection/socket. This applies when
+    ``include_tls_session`` is true. The requested server name is set on a connection when filters such as the TLS
+    inspector are used.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

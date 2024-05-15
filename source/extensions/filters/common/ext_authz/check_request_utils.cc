@@ -223,9 +223,13 @@ void CheckRequestUtils::setAttrContextRequest(
 
 void CheckRequestUtils::setTLSSession(
     envoy::service::auth::v3::AttributeContext::TLSSession& session,
-    const Ssl::ConnectionInfoConstSharedPtr ssl_info) {
-  if (!ssl_info->sni().empty()) {
+    const Envoy::Network::Connection& connection) {
+  const Ssl::ConnectionInfoConstSharedPtr ssl_info = connection.ssl();
+  if (ssl_info != nullptr && !ssl_info->sni().empty()) {
     const std::string server_name(ssl_info->sni());
+    session.set_sni(server_name);
+  } else if (!connection.requestedServerName().empty()) {
+    const std::string server_name(connection.requestedServerName());
     session.set_sni(server_name);
   }
 }
@@ -248,6 +252,7 @@ void CheckRequestUtils::createHttpCheck(
   // *cb->connection(), callbacks->streamInfo() and callbacks->decodingBuffer() are not qualified as
   // const.
   auto* cb = const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
+
   setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false,
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), EMPTY_STRING, true,
@@ -256,8 +261,8 @@ void CheckRequestUtils::createHttpCheck(
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
                         encode_raw_headers, allowed_headers_matcher, disallowed_headers_matcher);
 
-  if (include_tls_session && cb->connection()->ssl() != nullptr) {
-    setTLSSession(*attrs->mutable_tls_session(), cb->connection()->ssl());
+  if (include_tls_session) {
+    setTLSSession(*attrs->mutable_tls_session(), *cb->connection());
   }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
   // Fill in the context extensions and metadata context.
@@ -280,8 +285,9 @@ void CheckRequestUtils::createTcpCheck(
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), server_name, true,
                      include_peer_certificate);
-  if (include_tls_session && cb->connection().ssl() != nullptr) {
-    setTLSSession(*attrs->mutable_tls_session(), cb->connection().ssl());
+
+  if (include_tls_session) {
+    setTLSSession(*attrs->mutable_tls_session(), cb->connection());
   }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
 }
