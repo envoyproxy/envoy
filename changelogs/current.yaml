@@ -76,6 +76,10 @@ bug_fixes:
   change: |
     Handle ``append_action`` from :ref:`external authorization service <envoy_v3_api_msg_service.auth.v3.CheckResponse>`
     that was ignored.
+- area: oauth
+  change: |
+    Always set token cookies in response regardless of :ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>`
+    config option.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

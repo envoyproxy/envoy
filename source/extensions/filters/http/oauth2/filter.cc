@@ -553,12 +553,8 @@ std::string OAuth2Filter::getEncodedToken() const {
   auto token_secret = config_->tokenSecret();
   std::vector<uint8_t> token_secret_vec(token_secret.begin(), token_secret.end());
   std::string encoded_token;
-  if (config_->forwardBearerToken()) {
-    encoded_token =
-        encodeHmac(token_secret_vec, host_, new_expires_, access_token_, id_token_, refresh_token_);
-  } else {
-    encoded_token = encodeHmac(token_secret_vec, host_, new_expires_);
-  }
+  encoded_token =
+      encodeHmac(token_secret_vec, host_, new_expires_, access_token_, id_token_, refresh_token_);
   return encoded_token;
 }
 
@@ -690,30 +686,26 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
       Http::Headers::get().SetCookie,
       absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_, cookie_tail_http_only));
 
-  // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
-  // auth server.
-  if (config_->forwardBearerToken()) {
-    std::string cookie_attribute_httponly =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_make_token_cookie_httponly")
-            ? cookie_tail_http_only
-            : cookie_tail;
+  std::string cookie_attribute_httponly =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_make_token_cookie_httponly")
+          ? cookie_tail_http_only
+          : cookie_tail;
+  headers.addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_attribute_httponly));
+  if (!id_token_.empty()) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_attribute_httponly));
-    if (!id_token_.empty()) {
-      headers.addReferenceKey(
-          Http::Headers::get().SetCookie,
-          absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_attribute_httponly));
-    }
+        absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_attribute_httponly));
+  }
 
-    if (!refresh_token_.empty()) {
-      const std::string refresh_token_cookie_tail_http_only =
-          fmt::format(CookieTailHttpOnlyFormatString, expires_refresh_token_in_);
+  if (!refresh_token_.empty()) {
+    const std::string refresh_token_cookie_tail_http_only =
+        fmt::format(CookieTailHttpOnlyFormatString, expires_refresh_token_in_);
 
-      headers.addReferenceKey(Http::Headers::get().SetCookie,
-                              absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
-                                           refresh_token_cookie_tail_http_only));
-    }
+    headers.addReferenceKey(Http::Headers::get().SetCookie,
+                            absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
+                                         refresh_token_cookie_tail_http_only));
   }
 }
 
