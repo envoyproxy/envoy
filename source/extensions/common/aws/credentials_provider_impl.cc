@@ -114,10 +114,6 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       initialization_timer_(initialization_timer),
       debug_name_(absl::StrCat("Fetching aws credentials from cluster=", cluster_name)) {
   if (context_) {
-    tls_ = ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(context_->threadLocal());
-    tls_->set([this](Envoy::Event::Dispatcher&) {
-      return std::make_shared<ThreadLocalCredentialsCache>(*this);
-    });
 
     // Async credential refresh timer
     cache_duration_timer_ =
@@ -131,6 +127,11 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
                   cluster_name_, uri_);
         return;
       }
+      tls_ =
+          ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(context_->threadLocal());
+      tls_->set([this](Envoy::Event::Dispatcher&) {
+        return std::make_shared<ThreadLocalCredentialsCache>(*this);
+      });
     });
   }
 }
