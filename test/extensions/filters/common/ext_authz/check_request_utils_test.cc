@@ -73,7 +73,7 @@ public:
         &callbacks_, request_headers, std::move(context_extensions), std::move(metadata_context),
         envoy::config::core::v3::Metadata(), request, /*max_request_bytes=*/0,
         /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, include_peer_certificate,
-        want_tls_session != nullptr, labels, nullptr);
+        want_tls_session != nullptr, labels, nullptr, nullptr);
 
     EXPECT_EQ("source", request.attributes().source().principal());
     EXPECT_EQ("destination", request.attributes().destination().principal());
@@ -112,13 +112,23 @@ public:
     return buffer;
   }
 
-  MatcherSharedPtr createRequestHeaderMatchers() {
+  MatcherSharedPtr createRequestHeaderAllowlist() {
     NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_autz_proto_;
-    ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("foo");
-    ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("hello");
-    ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("duplicate");
+    ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("allowed");
+    ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("allowed-dupe");
+    ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("allowed-and-disallowed");
     return CheckRequestUtils::toRequestMatchers(ext_autz_proto_.allowed_headers(), false,
+                                                factory_context);
+  }
+
+  MatcherSharedPtr createRequestHeaderDenylist() {
+    NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_autz_proto_;
+    ext_autz_proto_.mutable_disallowed_headers()->add_patterns()->set_exact("disallowed");
+    ext_autz_proto_.mutable_disallowed_headers()->add_patterns()->set_exact(
+        "allowed-and-disallowed");
+    return CheckRequestUtils::toRequestMatchers(ext_autz_proto_.disallowed_headers(), false,
                                                 factory_context);
   }
 
@@ -249,7 +259,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
-      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
+      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_FALSE(request_.attributes().request().http().has_header_map());
@@ -278,7 +288,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithDuplicateHeaders) {
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
-      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
+      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_FALSE(request_.attributes().request().http().has_header_map());
@@ -290,13 +300,15 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithDuplicateHeaders) {
 
 // Verify that check request only contains allowlisted headers,
 // and that duplicate headers are merged.
-TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderMatchers) {
+TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderAllowlist) {
   const uint64_t size = 0;
   envoy::service::auth::v3::CheckRequest request_;
 
   Http::TestRequestHeaderMapImpl request_headers{
-      {"foo", "bar"},       {"hello", "there"},        {"duplicate", "one"},
-      {"duplicate", "two"}, {"not-this-one", "sorry"},
+      {"allowed", "allowed value"},
+      {"allowed-dupe", "one"},
+      {"allowed-dupe", "two"},
+      {"not-allowed", "not explicitly allowed"},
   };
 
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
@@ -309,14 +321,99 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderMatchers) {
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
       /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(),
-      createRequestHeaderMatchers());
+      createRequestHeaderAllowlist(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_FALSE(request_.attributes().request().http().has_header_map());
-  EXPECT_EQ("one,two", request_.attributes().request().http().headers().at("duplicate"));
-  EXPECT_EQ("bar", request_.attributes().request().http().headers().at("foo"));
-  EXPECT_EQ("there", request_.attributes().request().http().headers().at("hello"));
-  EXPECT_FALSE(request_.attributes().request().http().headers().contains("not-this-one"));
+
+  EXPECT_TRUE(request_.attributes().request().http().headers().contains("allowed"));
+  EXPECT_EQ("allowed value", request_.attributes().request().http().headers().at("allowed"));
+
+  // No denylist was used.
+  EXPECT_TRUE(request_.attributes().request().http().headers().contains("allowed-dupe"));
+  EXPECT_EQ("one,two", request_.attributes().request().http().headers().at("allowed-dupe"));
+
+  EXPECT_FALSE(request_.attributes().request().http().headers().contains("not-allowed"));
+}
+
+// Verify that check request only contains allowlisted headers,
+// and that duplicate headers are merged.
+TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderDenylist) {
+  const uint64_t size = 0;
+  envoy::service::auth::v3::CheckRequest request_;
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"not-disallowed", "not disallowed value"},
+      {"not-disallowed-dupe", "one"},
+      {"not-disallowed-dupe", "two"},
+      {"disallowed", "disallowed value"},
+  };
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+  expectBasicHttp();
+
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
+      /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
+      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr,
+      createRequestHeaderDenylist());
+  ASSERT_EQ(size, request_.attributes().request().http().body().size());
+  EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+  EXPECT_FALSE(request_.attributes().request().http().has_header_map());
+
+  ASSERT_TRUE(request_.attributes().request().http().headers().contains("not-disallowed-dupe"));
+  EXPECT_EQ("one,two", request_.attributes().request().http().headers().at("not-disallowed-dupe"));
+
+  ASSERT_TRUE(request_.attributes().request().http().headers().contains("not-disallowed"));
+  EXPECT_EQ("not disallowed value",
+            request_.attributes().request().http().headers().at("not-disallowed"));
+
+  EXPECT_FALSE(request_.attributes().request().http().headers().contains("disallowed"));
+}
+
+// Verify that check request only contains allowlisted headers,
+// and that duplicate headers are merged.
+TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderAllowlistAndDenylist) {
+  const uint64_t size = 0;
+  envoy::service::auth::v3::CheckRequest request_;
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"allowed", "allowed value"},
+      {"allowed-dupe", "one"},
+      {"allowed-dupe", "two"},
+      {"disallowed", "disallowed value"},
+      {"allowed-and-disallowed", "allowed and disallowed value"},
+      {"not-allowed-or-disallowed", "not allowed or disallowed value"},
+  };
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+  expectBasicHttp();
+
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
+      /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
+      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(),
+      createRequestHeaderAllowlist(), createRequestHeaderDenylist());
+  ASSERT_EQ(size, request_.attributes().request().http().body().size());
+  EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+  EXPECT_FALSE(request_.attributes().request().http().has_header_map());
+
+  ASSERT_TRUE(request_.attributes().request().http().headers().contains("allowed"));
+  EXPECT_EQ("allowed value", request_.attributes().request().http().headers().at("allowed"));
+
+  ASSERT_TRUE(request_.attributes().request().http().headers().contains("allowed-dupe"));
+  EXPECT_EQ("one,two", request_.attributes().request().http().headers().at("allowed-dupe"));
+
+  EXPECT_FALSE(request_.attributes().request().http().headers().contains("disallowed"));
+  EXPECT_FALSE(request_.attributes().request().http().headers().contains("allowed-and-disallowed"));
+  EXPECT_FALSE(
+      request_.attributes().request().http().headers().contains("not-allowed-or-disallowed"));
 }
 
 // Verify that check request object has only a portion of the request data.
@@ -333,7 +430,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
-      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
+      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_FALSE(request_.attributes().request().http().has_header_map());
@@ -355,7 +452,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_,
       buffer_->length(), /*pack_as_bytes=*/false, /*encode_raw_headers=*/false,
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
-      Protobuf::Map<std::string, std::string>(), nullptr);
+      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
@@ -390,7 +487,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBodyPackAsBytes) {
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_,
       buffer_->length(), /*pack_as_bytes=*/true, /*encode_raw_headers=*/false,
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
-      Protobuf::Map<std::string, std::string>(), nullptr);
+      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
 
   // TODO(dio): Find a way to test this without using function from testing::internal namespace.
   testing::internal::CaptureStderr();
@@ -432,7 +529,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithHeadersAsBytes) {
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request,
       buffer_->length(), /*pack_as_bytes=*/false, /*encode_raw_headers=*/true,
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
-      Protobuf::Map<std::string, std::string>(), nullptr);
+      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
 
   // Headers field should be empty since ext_authz should populate header_map INSTEAD.
   EXPECT_EQ(0, request.attributes().request().http().headers().size());
@@ -466,7 +563,7 @@ TEST_F(CheckRequestUtilsTest, HeadersAsBytesNoConcatentation) {
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request,
       buffer_->length(), /*pack_as_bytes=*/false, /*encode_raw_headers=*/true,
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
-      Protobuf::Map<std::string, std::string>(), nullptr);
+      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
 
   EXPECT_EQ(0, request.attributes().request().http().headers().size());
   ASSERT_TRUE(request.attributes().request().http().has_header_map());
@@ -497,7 +594,7 @@ TEST_F(CheckRequestUtilsTest, HeadersAsBytesExistingPartialBodyHeader) {
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request,
       buffer_->length(), /*pack_as_bytes=*/false, /*encode_raw_headers=*/true,
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
-      Protobuf::Map<std::string, std::string>(), nullptr);
+      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
 
   EXPECT_EQ(0, request.attributes().request().http().headers().size());
   ASSERT_TRUE(request.attributes().request().http().has_header_map());
