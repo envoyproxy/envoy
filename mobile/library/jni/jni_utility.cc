@@ -570,5 +570,14 @@ cppBufferInstanceToJavaNonDirectByteBuffer(JniHelper& jni_helper,
                                            java_byte_buffer_wrap_method_id, java_byte_array.get());
 }
 
+std::string getJavaExceptionMessage(JniHelper& jni_helper, jthrowable throwable) {
+  auto java_throwable_class = jni_helper.findClass("java/lang/Throwable");
+  auto java_get_message_method_id =
+      jni_helper.getMethodId(java_throwable_class.get(), "getMessage", "()Ljava/lang/String;");
+  auto java_exception_message =
+      jni_helper.callObjectMethod<jstring>(throwable, java_get_message_method_id);
+  return javaStringToCppString(jni_helper, java_exception_message.get());
+}
+
 } // namespace JNI
 } // namespace Envoy
