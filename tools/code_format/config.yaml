@@ -165,7 +165,6 @@ paths:
     - source/common/tls/context_impl.cc
     - source/common/tls/server_context_impl.cc
     - source/common/tls/context_config_impl.cc
-    - source/common/tls/ocsp/ocsp.cc
     - source/common/config/watched_directory.cc
     - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
