@@ -11,6 +11,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -433,6 +434,9 @@ TEST(ParseTest, TestValidResponse) {
 // The SelfContainedParser is only intended for header parsing but for coverage,
 // test a request with a body.
 TEST(ParseTest, CoverResponseBodyHttp10) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_balsa_delay_reset", "true"}});
+
   std::string headers = "HTTP/1.0 200 OK\r\ncontent-length: 2\r\n\r\n";
   std::string body = "ab";
 
@@ -450,6 +454,9 @@ TEST(ParseTest, CoverResponseBodyHttp10) {
 }
 
 TEST(ParseTest, CoverResponseBodyHttp11) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_balsa_delay_reset", "true"}});
+
   std::string headers = "HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n";
   std::string body = "ab";
 
@@ -468,6 +475,9 @@ TEST(ParseTest, CoverResponseBodyHttp11) {
 
 // Regression tests for #34096.
 TEST(ParseTest, ContentLengthZeroHttp10) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_balsa_delay_reset", "true"}});
+
   constexpr absl::string_view headers = "HTTP/1.0 200 OK\r\ncontent-length: 0\r\n\r\n";
 
   SelfContainedParser parser;
@@ -483,6 +493,9 @@ TEST(ParseTest, ContentLengthZeroHttp10) {
 }
 
 TEST(ParseTest, ContentLengthZeroHttp11) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_balsa_delay_reset", "true"}});
+
   constexpr absl::string_view headers = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n";
 
   SelfContainedParser parser;

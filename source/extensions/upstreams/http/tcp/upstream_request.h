@@ -26,19 +26,16 @@ public:
               Upstream::ResourcePriority priority, Upstream::LoadBalancerContext* ctx) {
     conn_pool_data_ = thread_local_cluster.tcpConnPool(priority, ctx);
   }
+  ~TcpConnPool() override {
+    ENVOY_BUG(upstream_handle_ == nullptr, "upstream_handle not null");
+    resetUpstreamHandleIfSet();
+  }
   // Router::GenericConnPool
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
     upstream_handle_ = conn_pool_data_.value().newConnection(*this);
   }
-  bool cancelAnyPendingStream() override {
-    if (upstream_handle_) {
-      upstream_handle_->cancel(Envoy::Tcp::ConnectionPool::CancelPolicy::Default);
-      upstream_handle_ = nullptr;
-      return true;
-    }
-    return false;
-  }
+  bool cancelAnyPendingStream() override { return resetUpstreamHandleIfSet(); }
   Upstream::HostDescriptionConstSharedPtr host() const override {
     return conn_pool_data_.value().host();
   }
@@ -56,6 +53,15 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
+  bool resetUpstreamHandleIfSet() {
+    if (upstream_handle_) {
+      upstream_handle_->cancel(Envoy::Tcp::ConnectionPool::CancelPolicy::Default);
+      upstream_handle_ = nullptr;
+      return true;
+    }
+    return false;
+  }
+
   absl::optional<Envoy::Upstream::TcpPoolData> conn_pool_data_;
   Envoy::Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};

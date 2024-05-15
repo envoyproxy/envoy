@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "library/jni/import/jni_import.h"
+#include "library/jni/jni_helper.h"
 
 namespace Envoy {
 namespace JNI {

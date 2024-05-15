@@ -7,6 +7,11 @@
 // This file contains JNI implementation used by
 // `test/java/io/envoyproxy/envoymobile/jni/JniHelperTest.java` unit tests.
 
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
+  Envoy::JNI::JniHelper::initialize(vm);
+  return Envoy::JNI::JniHelper::getVersion();
+}
+
 extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getFieldId(
     JNIEnv* env, jclass, jclass clazz, jstring name, jstring signature) {
   Envoy::JNI::JniHelper jni_helper(env);

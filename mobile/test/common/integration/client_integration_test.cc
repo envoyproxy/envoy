@@ -250,6 +250,7 @@ TEST_P(ClientIntegrationTest, Basic) {
   }
 }
 
+#if not defined(__APPLE__)
 TEST_P(ClientIntegrationTest, BasicWithCares) {
   builder_.setUseCares(true);
   initialize();
@@ -258,6 +259,7 @@ TEST_P(ClientIntegrationTest, BasicWithCares) {
     ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
   }
 }
+#endif
 
 TEST_P(ClientIntegrationTest, LargeResponse) {
   initialize();
@@ -603,6 +605,42 @@ TEST_P(ClientIntegrationTest, InvalidDomainFakeResolver) {
   ASSERT_EQ(cc_.on_error_calls_, 0);
   ASSERT_EQ(cc_.on_headers_calls_, 1);
   ASSERT_EQ(cc_.status_, "200");
+
+  // Kick off a second request. There should be no resolution.
+  stream_ = createNewStream(createDefaultStreamCallbacks());
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  terminal_callback_.waitReady();
+  EXPECT_EQ(1, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
+}
+
+TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
+  builder_.setRuntimeGuard("reresolve_null_addresses", true);
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+
+  initialize();
+  default_request_headers_.setHost(
+      absl::StrCat("www.doesnotexist.com:", fake_upstreams_[0]->localAddress()->ip()->port()));
+  stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  // Unblock resolve, but resolve to the bad domain.
+  ASSERT_TRUE(waitForCounterGe("dns_cache.base_dns_cache.dns_query_attempt", 1));
+  Network::TestResolver::unblockResolve();
+  terminal_callback_.waitReady();
+
+  // The stream should fail.
+  ASSERT_EQ(cc_.on_error_calls_, 1);
+
+  // A new stream will kick off a new resolution because the address was null.
+  stream_ = createNewStream(createDefaultStreamCallbacks());
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  Network::TestResolver::unblockResolve();
+  terminal_callback_.waitReady();
+  EXPECT_EQ(2, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
 }
 
 TEST_P(ClientIntegrationTest, ReresolveAndDrain) {

@@ -64,7 +64,7 @@ absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
   for (const auto& resolver : resolvers) {
     // This should be an IP address (i.e. not a pipe).
     if (resolver->ip() == nullptr) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("DNS resolver '{}' is not an IP address", resolver->asString()));
     }
     // Note that the ip()->port() may be zero if the port is not fully specified by the
@@ -309,18 +309,16 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
       callback_(pending_response_.status_, std::move(pending_response_.address_list_));
     }
     END_TRY
-    catch (const EnvoyException& e) {
-      ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
-      dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-    }
-    catch (const std::exception& e) {
-      ENVOY_LOG(critical, "std::exception in c-ares callback: {}", e.what());
-      dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-    }
-    catch (...) {
-      ENVOY_LOG(critical, "Unknown exception in c-ares callback");
-      dispatcher_.post([] { throw EnvoyException("unknown"); });
-    }
+    MULTI_CATCH(
+        const EnvoyException& e,
+        {
+          ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
+          dispatcher_.post([s = std::string(e.what())] { throwEnvoyExceptionOrPanic(s); });
+        },
+        {
+          ENVOY_LOG(critical, "Unknown exception in c-ares callback");
+          dispatcher_.post([] { throwEnvoyExceptionOrPanic("unknown"); });
+        });
   } else {
     ENVOY_LOG_EVENT(debug, "cares_dns_callback_cancelled",
                     "dns resolution callback for {} not issued. Cancelled with reason={}",
