@@ -458,17 +458,17 @@ void TestServer::shutdown() {
   test_server_.reset();
 }
 
-std::string TestServer::getAddress() {
+std::string TestServer::getAddress() const {
   ASSERT(upstream_);
   return upstream_->localAddress()->asString();
 }
 
-std::string TestServer::getIpAddress() {
+std::string TestServer::getIpAddress() const {
   ASSERT(upstream_);
   return upstream_->localAddress()->ip()->addressAsString();
 }
 
-int TestServer::getPort() {
+int TestServer::getPort() const {
   ASSERT(upstream_ || test_server_);
   if (upstream_) {
     return upstream_->localAddress()->ip()->port();

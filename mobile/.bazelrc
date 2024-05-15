@@ -253,7 +253,6 @@ build:mobile-remote-ci-cc --config=mobile-remote-ci
 # Temporary revert to C++17 for mobile NDK builds.
 build:mobile-remote-ci-cc --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 build:mobile-remote-ci-cc --define=envoy_full_protos=disabled
-build:mobile-remote-ci-cc --build_tests_only
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
 
 build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci-cc
@@ -273,7 +272,6 @@ build:mobile-remote-ci-macos-swift --@envoy//bazel:http3=False
 
 build:mobile-remote-ci-core --config=mobile-remote-ci
 build:mobile-remote-ci-core --define=envoy_full_protos=disabled
-build:mobile-remote-ci-core --build_tests_only
 test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
 test:mobile-remote-ci-core --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 

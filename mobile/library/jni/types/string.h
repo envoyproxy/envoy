@@ -1,8 +1,6 @@
 #pragma once
 
-#include "absl/strings/string_view.h"
-#include "library/jni/import/jni_import.h"
-#include "library/jni/types/env.h"
+#include "library/jni/jni_helper.h"
 
 namespace Envoy {
 namespace JNI {
@@ -20,7 +18,7 @@ public:
    * the string in modified UTF-8 encoding.
    */
   explicit String(jstring jni_string)
-      : env_(Env::get()), jni_string_(jni_string),
+      : env_(JniHelper::getThreadLocalEnv()), jni_string_(jni_string),
         string_(env_->GetStringUTFChars(jni_string, nullptr)) {}
 
   ~String() {
