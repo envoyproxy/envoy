@@ -220,9 +220,7 @@ ContextConfigImpl::ContextConfigImpl(
       } else {
         auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
             *certificate_validation_context_provider_->secret(), api_);
-        if (!config_or_status.status().ok()) {
-          throwEnvoyExceptionOrPanic(std::string(config_or_status.status().message()));
-        }
+        THROW_IF_STATUS_NOT_OK(config_or_status, throw);
         validation_context_config_ = std::move(config_or_status.value());
       }
     }
