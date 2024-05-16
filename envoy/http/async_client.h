@@ -337,8 +337,9 @@ public:
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
-             send_xff == src.send_xff && send_internal == src.send_internal && parent_span_ == src.parent_span_ &&
-             child_span_name_ == src.child_span_name_ && sampled_ == src.sampled_;
+             send_xff == src.send_xff && send_internal == src.send_internal &&
+             parent_span_ == src.parent_span_ && child_span_name_ == src.child_span_name_ &&
+             sampled_ == src.sampled_;
     }
 
     // The timeout supplies the stream timeout, measured since when the frame with
