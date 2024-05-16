@@ -719,10 +719,10 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
   // auth server.
   if (config_->forwardBearerToken()) {
-    const char* cookie_tail_format_string =
+    const auto cookie_tail_format_string = fmt::runtime(
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_make_token_cookie_httponly")
             ? CookieTailHttpOnlyFormatString
-            : CookieTailFormatString;
+            : CookieTailFormatString);
 
     std::string access_token_cookie_tail = fmt::format(cookie_tail_format_string, max_age);
     headers.addReferenceKey(
