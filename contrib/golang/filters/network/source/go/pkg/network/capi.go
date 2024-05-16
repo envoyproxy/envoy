@@ -95,6 +95,10 @@ func (c *cgoApiImpl) UpstreamConnect(libraryID string, addr string, connID uint6
 	return unsafe.Pointer(C.envoyGoFilterUpstreamConnect(unsafe.Pointer(&libraryID), unsafe.Pointer(&addr), C.uint64_t(connID)))
 }
 
+func (c *cgoApiImpl) UpstreamConnEnableHalfClose(f unsafe.Pointer, enableHalfClose int) {
+	C.envoyGoFilterUpstreamConnEnableHalfClose(f, C.int(enableHalfClose))
+}
+
 func (c *cgoApiImpl) UpstreamWrite(f unsafe.Pointer, bufferPtr unsafe.Pointer, bufferLen int, endStream int) {
 	C.envoyGoFilterUpstreamWrite(f, bufferPtr, C.int(bufferLen), C.int(endStream))
 }

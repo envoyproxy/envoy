@@ -194,10 +194,11 @@ func envoyGoFilterOnSemaDec(wrapper unsafe.Pointer) {
 //export envoyGoFilterOnUpstreamConnectionReady
 func envoyGoFilterOnUpstreamConnectionReady(wrapper unsafe.Pointer, connID uint64) {
 	cb := &connectionCallback{
-		wrapper:   wrapper,
-		writeFunc: cgoAPI.UpstreamWrite,
-		closeFunc: cgoAPI.UpstreamClose,
-		infoFunc:  cgoAPI.UpstreamInfo,
+		wrapper:                 wrapper,
+		writeFunc:               cgoAPI.UpstreamWrite,
+		closeFunc:               cgoAPI.UpstreamClose,
+		infoFunc:                cgoAPI.UpstreamInfo,
+		connEnableHalfCloseFunc: cgoAPI.UpstreamConnEnableHalfClose,
 	}
 	// switch filter from idMap to wrapperMap
 	filter := UpstreamFilters.GetFilterByConnID(connID)

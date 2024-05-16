@@ -81,6 +81,8 @@ type NetworkCAPI interface {
 
 	// UpstreamConnect creates an envoy upstream connection to address
 	UpstreamConnect(libraryID string, addr string, connID uint64) unsafe.Pointer
+	// UpstreamConnEnableHalfClose upstream conn EnableHalfClose
+	UpstreamConnEnableHalfClose(f unsafe.Pointer, enableHalfClose int)
 	// UpstreamWrite writes buffer data into upstream connection.
 	UpstreamWrite(f unsafe.Pointer, bufferPtr unsafe.Pointer, bufferLen int, endStream int)
 	// UpstreamClose closes the upstream connection
