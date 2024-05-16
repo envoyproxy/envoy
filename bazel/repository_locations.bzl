@@ -102,11 +102,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "envoy-build-tools",
         project_desc = "Common build tools shared by the Envoy/UDPA ecosystem",
         project_url = "https://github.com/envoyproxy/envoy-build-tools",
-        version = "32570f74e1e36d2711f5f0a156b9623cdfa4b384",
-        sha256 = "962e398567306e3230eb2457c5eabec26616667379bfba566894a7bd334416d4",
+        version = "1f9b2b6a44021816ce87a2cc33e9e1629d14f800",
+        sha256 = "87137fa02dc22a5bd3ce7bdbf78494985932d2b73e1fa47d3bf92a1cef117ce7",
         strip_prefix = "envoy-build-tools-{version}",
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
-        release_date = "2024-03-11",
+        release_date = "2024-05-16",
         use_category = ["build"],
         license = "Apache-2.0",
         license_url = "https://github.com/envoyproxy/envoy-build-tools/blob/{version}/LICENSE",
@@ -1302,12 +1302,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         #  - .github/workflows/codeql-daily.yml
         #  - .github/workflows/codeql-push.yml
         #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
-        version = "14.0.0",
-        sha256 = "27ab7fcfb21d108093c0be766a9ed5fe18c04e4f74f936069711a312c8ae0377",
+        version = "16.0.0",
+        sha256 = "a43610aba06538324f4143626c392d51883042685a33d22b629afd8658ea344e",
         # Only allow peeking at fuzzer related files for now.
         strip_prefix = "compiler-rt-{version}.src",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
-        release_date = "2022-03-23",
+        release_date = "2023-03-17",
         use_category = ["test_only"],
         cpe = "cpe:2.3:a:llvm:compiler-rt:*",
         license = "Apache-2.0",
