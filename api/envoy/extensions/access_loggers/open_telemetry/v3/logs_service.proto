@@ -47,7 +47,7 @@ message OpenTelemetryAccessLogConfig {
   // Example: ``attributes { values { key: "user_agent" value { string_value: "%REQ(USER-AGENT)%" } } }``.
   opentelemetry.proto.common.v1.KeyValueList attributes = 3;
 
-  // Optional prefix to use on OpenTelemetry access logger stats. If empty, the stats will be rooted at
+  // Optional. Additional prefix to use on OpenTelemetry access logger stats. If empty, the stats will be rooted at
   // ``access_logs.open_telemetry_access_log.``. If non-empty, stats will be rooted at
   // ``access_logs.open_telemetry_access_log.<stat_prefix>.``.
   string stat_prefix = 6;
