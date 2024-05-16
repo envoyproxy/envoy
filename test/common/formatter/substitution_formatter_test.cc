@@ -2156,15 +2156,23 @@ TEST(SubstitutionFormatterTest, TraceIDFormatter) {
   EXPECT_CALL(active_span, getTraceIdAsHex())
       .WillRepeatedly(Return("ae0046f9075194306d7de2931bd38ce3"));
 
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer, body,
-                                         AccessLogType::NotSet, &active_span);
-
   {
+    HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
+                                           body, AccessLogType::NotSet, &active_span);
     TraceIDFormatter formatter{};
     EXPECT_EQ("ae0046f9075194306d7de2931bd38ce3",
               formatter.formatWithContext(formatter_context, stream_info));
     EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("ae0046f9075194306d7de2931bd38ce3")));
+  }
+
+  {
+    HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
+                                           body);
+    TraceIDFormatter formatter{};
+    EXPECT_EQ(absl::nullopt, formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
   }
 }
 

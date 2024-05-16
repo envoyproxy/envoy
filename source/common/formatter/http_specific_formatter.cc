@@ -199,13 +199,21 @@ HeadersByteSizeFormatter::formatValueWithContext(const HttpFormatterContext& con
 
 ProtobufWkt::Value TraceIDFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                                             const StreamInfo::StreamInfo&) const {
-  return ValueUtil::stringValue(context.activeSpan().getTraceIdAsHex());
+  auto trace_id = context.activeSpan().getTraceIdAsHex();
+  if (trace_id.empty()) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  return ValueUtil::stringValue(trace_id);
 }
 
 absl::optional<std::string>
 TraceIDFormatter::formatWithContext(const HttpFormatterContext& context,
                                     const StreamInfo::StreamInfo&) const {
-  return context.activeSpan().getTraceIdAsHex();
+  auto trace_id = context.activeSpan().getTraceIdAsHex();
+  if (trace_id.empty()) {
+    return absl::nullopt;
+  }
+  return trace_id;
 }
 
 GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view format) {
