@@ -187,7 +187,7 @@ TEST_F(RouteEntryImplTest, RoutePerFilterConfigWithUnknownType) {
         value: { "key_0": "value_0" }
   )EOF";
 
-  // The configuraton will be rejected because the extension cannot be found.
+  // The configuration will be rejected because the extension cannot be found.
   EXPECT_THROW_WITH_MESSAGE(
       { initialize(yaml_config); }, EnvoyException,
       "Didn't find a registered implementation for 'envoy.filters.generic.mock_filter' with type "
