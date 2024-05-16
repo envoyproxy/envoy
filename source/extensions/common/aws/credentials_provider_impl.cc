@@ -111,7 +111,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       cache_duration_(getCacheDuration()), receiver_state_(receiver_state),
       initialization_timer_(initialization_timer),
       debug_name_(absl::StrCat("Fetching aws credentials from cluster=", cluster_name)) {
-  if (context_) {
+  if (context_ && useHttpAsyncClient()) {
 
     // Async credential refresh timer
     cache_duration_timer_ =
