@@ -59,8 +59,12 @@ public:
   Network::ConnectionSocket& socket() override { return socket_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   void continueFilterChain(bool /*success*/) override { IS_ENVOY_BUG("Should not be used."); }
+  void useOriginalDst(bool /*use_original_dst*/) override { IS_ENVOY_BUG("Should not be used."); }
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
     stream_info_.setDynamicMetadata(name, value);
+  }
+  void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) override {
+    stream_info_.setDynamicTypedMetadata(name, value);
   }
   envoy::config::core::v3::Metadata& dynamicMetadata() override {
     return stream_info_.dynamicMetadata();

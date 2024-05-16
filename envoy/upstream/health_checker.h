@@ -39,9 +39,10 @@ public:
    * @param host supplies the host that was just health checked.
    * @param changed_state supplies whether the health check resulted in a host moving from healthy
    *                       to not healthy or vice versa.
+   * @param state result of the current check.
    */
-  using HostStatusCb =
-      std::function<void(const HostSharedPtr& host, HealthTransition changed_state)>;
+  using HostStatusCb = std::function<void(const HostSharedPtr& host, HealthTransition changed_state,
+                                          HealthState current_check_result)>;
 
   /**
    * Install a callback that will be invoked every time a health check round is completed for

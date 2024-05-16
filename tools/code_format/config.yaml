@@ -90,17 +90,16 @@ paths:
     - source/common/filter/config_discovery_impl.h
     - source/common/config/utility.h
     - source/common/matcher/map_matcher.h
-    - source/common/matcher/field_matcher.h
-    - source/common/protobuf/visitor_helper.h
+    - source/common/matcher/matcher.h
     - source/extensions/common/matcher/trie_matcher.h
     - envoy/common/exception.h
+    - source/common/upstream/upstream_impl.h
+    - source/common/config/context_provider_impl.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
     - source/common/listener_manager/listener_impl.cc
     - source/common/listener_manager/listener_manager_impl.cc
     - source/common/listener_manager/filter_chain_manager_impl.cc
-    - source/common/upstream/thread_aware_lb_impl.cc
-    - source/common/upstream/subset_lb_config.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/upstream/default_local_address_selector_factory.cc
@@ -109,22 +108,17 @@ paths:
     - source/common/network/address_impl.cc
     - source/common/network/utility.cc
     - source/common/network/dns_resolver/dns_factory_util.cc
-    - source/common/ssl/tls_certificate_config_impl.cc
     - source/common/formatter/http_specific_formatter.cc
     - source/common/formatter/stream_info_formatter.h
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
-    - source/common/formatter/substitution_format_utility.cc
     - source/common/formatter/substitution_format_string.h
     - source/common/stats/tag_extractor_impl.cc
-    - source/common/stats/tag_producer_impl.cc
     - source/common/http/http2/codec_impl.cc
     - source/common/http/hash_policy.cc
     - source/common/http/conn_manager_utility.cc
     - source/common/protobuf/yaml_utility.cc
-    - source/common/protobuf/visitor.cc
     - source/common/protobuf/utility.cc
-    - source/common/protobuf/message_validator_impl.cc
     - source/common/quic/quic_server_transport_socket_factory.cc
     - source/common/secret/secret_manager_impl.cc
     - source/common/grpc/google_grpc_utils.cc
@@ -138,11 +132,9 @@ paths:
     - source/common/router/scoped_config_impl.cc
     - source/common/router/header_parser.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc
-    - source/common/filesystem/inotify/watcher_impl.cc
-    - source/common/filesystem/kqueue/watcher_impl.cc
     - source/common/filesystem/win32/directory_iterator_impl.cc
     - source/common/common/utility.cc
-    - source/common/common/regex.cc
+    - source/common/common/regex.h
     - source/common/common/matchers.cc
     - source/exe/stripped_main_base.cc
     - source/server/options_impl.cc
@@ -168,8 +160,13 @@ paths:
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
     - source/common/tls/context_impl.cc
+    - source/common/tls/server_context_impl.cc
     - source/common/tls/context_config_impl.cc
     - source/common/config/watched_directory.cc
+    - source/server/drain_manager_impl.cc
+    - source/common/router/rds_impl.cc
+    - source/common/io/io_uring_worker_impl.cc
+    - source/common/event/file_event_impl.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:
@@ -414,3 +411,5 @@ visibility_excludes:
 - source/extensions/load_balancing_policies/least_request/
 - source/extensions/load_balancing_policies/random/
 - source/extensions/load_balancing_policies/cluster_provided/
+- source/extensions/filters/http/match_delegate/
+- source/extensions/transport_sockets/tls/

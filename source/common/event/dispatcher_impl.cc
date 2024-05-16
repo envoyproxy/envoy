@@ -178,7 +178,7 @@ FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTri
       *this, fd,
       [this, cb](uint32_t events) {
         touchWatchdog();
-        cb(events);
+        return cb(events);
       },
       trigger, events)};
 }

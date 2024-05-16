@@ -22,8 +22,7 @@ public:
   void setTag(absl::string_view, absl::string_view) override {}
   void log(SystemTime, const std::string&) override {}
   void finishSpan() override {}
-  void injectContext(Tracing::TraceContext&,
-                     const Upstream::HostDescriptionConstSharedPtr&) override {}
+  void injectContext(Tracing::TraceContext&, const UpstreamContext&) override {}
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; }

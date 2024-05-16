@@ -219,13 +219,18 @@ public:
     return *factories_by_type;
   }
 
+  static bool& allowDuplicates() {
+    static bool* allow_duplicates = new bool(false);
+    return *allow_duplicates;
+  }
+
   /**
    * instead_value are used when passed name was deprecated.
    */
   static void registerFactory(Base& factory, absl::string_view name,
                               absl::string_view instead_value = "") {
     auto result = factories().emplace(std::make_pair(name, &factory));
-    if (!result.second) {
+    if (!result.second && !allowDuplicates()) {
       ExceptionUtil::throwEnvoyException(
           fmt::format("Double registration for name: '{}'", factory.name()));
     }

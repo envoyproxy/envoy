@@ -321,6 +321,7 @@ public:
   MOCK_METHOD(void, setUpstreamOverrideHost, (Upstream::LoadBalancerContext::OverrideHost));
   MOCK_METHOD(absl::optional<Upstream::LoadBalancerContext::OverrideHost>, upstreamOverrideHost, (),
               (const));
+  MOCK_METHOD(bool, shouldLoadShed, (), (const));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};

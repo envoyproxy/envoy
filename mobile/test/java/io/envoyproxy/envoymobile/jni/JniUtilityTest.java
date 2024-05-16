@@ -8,7 +8,10 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RunWith(RobolectricTestRunner.class)
@@ -21,6 +24,14 @@ public class JniUtilityTest {
   public static native byte[] protoJavaByteArrayConversion(byte[] source);
   public static native String javaCppStringConversion(String string);
   public static native Map<String, String> javaCppMapConversion(Map<String, String> map);
+  public static native Map<String, List<String>>
+  javaCppHeadersConversion(Map<String, List<String>> headers);
+  public static native boolean isJavaDirectByteBuffer(ByteBuffer byteBuffer);
+  public static native ByteBuffer javaCppDirectByteBufferConversion(ByteBuffer byteBuffer,
+                                                                    long length);
+  public static native ByteBuffer javaCppNonDirectByteBufferConversion(ByteBuffer byteBuffer,
+                                                                       long length);
+  public static native String getJavaExceptionMessage(Throwable throwable);
 
   @Test
   public void testProtoJavaByteArrayConversion() throws Exception {
@@ -41,11 +52,102 @@ public class JniUtilityTest {
   }
 
   @Test
-  public void testCppStringMapToJavaStringMap() {
+  public void testJavaCppMapConversion() {
     Map<String, String> map = new HashMap<>();
     map.put("key1", "value1");
     map.put("key2", "value2");
     map.put("key3", "value3");
     assertThat(javaCppMapConversion(map)).isEqualTo(map);
+  }
+
+  @Test
+  public void testJavaCppHeadersConversion() {
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("lowercase_key_1", Arrays.asList("value1", "value2"));
+    headers.put("UPPERCASE_KEY_2", Arrays.asList("value1"));
+    headers.put("Mixed_Case_Key_3", Arrays.asList("value1"));
+    assertThat(javaCppHeadersConversion(headers)).isEqualTo(headers);
+  }
+
+  @Test
+  public void testIsJavaDirectByteBuffer() {
+    assertThat(isJavaDirectByteBuffer(ByteBuffer.allocate(3))).isFalse();
+    assertThat(isJavaDirectByteBuffer(ByteBuffer.allocateDirect(3))).isTrue();
+  }
+
+  @Test
+  public void testJavaCppDirectByteBufferFullLengthConversion() {
+    ByteBuffer inByteBuffer = ByteBuffer.allocateDirect(5);
+    inByteBuffer.put((byte)'h');
+    inByteBuffer.put((byte)'e');
+    inByteBuffer.put((byte)'l');
+    inByteBuffer.put((byte)'l');
+    inByteBuffer.put((byte)'o');
+    inByteBuffer.flip();
+
+    ByteBuffer outByteBuffer =
+        javaCppDirectByteBufferConversion(inByteBuffer, inByteBuffer.capacity());
+    assertThat(outByteBuffer.isDirect()).isTrue();
+    assertThat(outByteBuffer).isEqualTo(inByteBuffer);
+    assertThat(outByteBuffer.capacity()).isEqualTo(5);
+    byte[] outBytes = new byte[5];
+    outByteBuffer.get(outBytes);
+    assertThat(outBytes).isEqualTo(new byte[] {'h', 'e', 'l', 'l', 'o'});
+  }
+
+  @Test
+  public void testJavaCppDirectByteBufferNotFullLengthConversion() {
+    ByteBuffer inByteBuffer = ByteBuffer.allocateDirect(5);
+    inByteBuffer.put((byte)'h');
+    inByteBuffer.put((byte)'e');
+    inByteBuffer.put((byte)'l');
+    inByteBuffer.put((byte)'l');
+    inByteBuffer.put((byte)'o');
+    inByteBuffer.flip();
+
+    ByteBuffer outByteBuffer = javaCppDirectByteBufferConversion(inByteBuffer, 3);
+    assertThat(outByteBuffer.isDirect()).isTrue();
+    assertThat(outByteBuffer.capacity()).isEqualTo(3);
+    byte[] outBytes = new byte[3];
+    outByteBuffer.get(outBytes);
+    assertThat(outBytes).isEqualTo(new byte[] {'h', 'e', 'l'});
+  }
+
+  @Test
+  public void testJavaCppNonDirectByteBufferFullLengthConversion() {
+    ByteBuffer inByteBuffer = ByteBuffer.allocate(5);
+    inByteBuffer.put((byte)'h');
+    inByteBuffer.put((byte)'e');
+    inByteBuffer.put((byte)'l');
+    inByteBuffer.put((byte)'l');
+    inByteBuffer.put((byte)'o');
+    inByteBuffer.flip();
+
+    ByteBuffer outByteBuffer =
+        javaCppNonDirectByteBufferConversion(inByteBuffer, inByteBuffer.capacity());
+    assertThat(outByteBuffer.isDirect()).isFalse();
+    assertThat(outByteBuffer).isEqualTo(inByteBuffer);
+    assertThat(outByteBuffer.array()).isEqualTo(new byte[] {'h', 'e', 'l', 'l', 'o'});
+  }
+
+  @Test
+  public void testJavaCppNonDirectByteBufferNotFullLengthConversion() {
+    ByteBuffer inByteBuffer = ByteBuffer.allocate(5);
+    inByteBuffer.put((byte)'h');
+    inByteBuffer.put((byte)'e');
+    inByteBuffer.put((byte)'l');
+    inByteBuffer.put((byte)'l');
+    inByteBuffer.put((byte)'o');
+    inByteBuffer.flip();
+
+    ByteBuffer outByteBuffer = javaCppNonDirectByteBufferConversion(inByteBuffer, 3);
+    assertThat(outByteBuffer.isDirect()).isFalse();
+    assertThat(outByteBuffer.array()).isEqualTo(new byte[] {'h', 'e', 'l'});
+  }
+
+  @Test
+  public void testGetJavaExceptionMessage() {
+    assertThat(getJavaExceptionMessage(new RuntimeException("Test exception")))
+        .isEqualTo("Test exception");
   }
 }

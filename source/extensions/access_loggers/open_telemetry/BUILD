@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/protobuf",
         "//source/extensions/access_loggers/common:grpc_access_logger",
+        "//source/extensions/access_loggers/common:grpc_access_logger_clients_lib",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
         "@opentelemetry_proto//:logs_cc_proto",

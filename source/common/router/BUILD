@@ -74,6 +74,7 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:retry_factory_lib",
         "//source/extensions/early_data:default_early_data_policy_lib",
+        "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/path/match/uri_template:config",
         "//source/extensions/path/rewrite/uri_template:config",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
@@ -176,8 +177,16 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "rds_lib",
-    srcs = ["rds_impl.cc"],
-    hdrs = ["rds_impl.h"],
+    srcs = [
+        "rds_impl.cc",
+        "route_provider_manager.cc",
+        "static_route_provider_impl.cc",
+    ],
+    hdrs = [
+        "rds_impl.h",
+        "route_provider_manager.h",
+        "static_route_provider_impl.h",
+    ],
     deps = [
         ":config_lib",
         "//envoy/config:subscription_interface",
@@ -335,7 +344,7 @@ envoy_cc_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_factory_context_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/http/common:factory_base_lib",

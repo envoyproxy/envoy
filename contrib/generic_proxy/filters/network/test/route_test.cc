@@ -155,6 +155,19 @@ TEST_F(RouteEntryImplTest, RoutePerFilterConfig) {
 };
 
 /**
+ * Test the method that get timeout from the route entry.
+ */
+TEST_F(RouteEntryImplTest, RouteTimeout) {
+  const std::string yaml_config = R"EOF(
+    cluster: cluster_0
+    timeout: 10s
+  )EOF";
+  initialize(yaml_config);
+
+  EXPECT_EQ(10000, route_->timeout().count());
+};
+
+/**
  * Test the method that get route level per filter config from the route entry. In this case,
  * unexpected type is used to find the filter factory and finally an exception is thrown.
  */
@@ -174,7 +187,7 @@ TEST_F(RouteEntryImplTest, RoutePerFilterConfigWithUnknownType) {
         value: { "key_0": "value_0" }
   )EOF";
 
-  // The configuraton will be rejected because the extension cannot be found.
+  // The configuration will be rejected because the extension cannot be found.
   EXPECT_THROW_WITH_MESSAGE(
       { initialize(yaml_config); }, EnvoyException,
       "Didn't find a registered implementation for 'envoy.filters.generic.mock_filter' with type "

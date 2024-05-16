@@ -6,7 +6,7 @@
 
 #include "source/common/event/libevent.h"
 #include "source/common/tls/context_config_impl.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 #include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"

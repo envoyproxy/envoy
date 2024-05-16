@@ -120,15 +120,17 @@ typed_config:
     }
   }
 
-  void stripConnectUpgradeAndRespond() {
+  void stripConnectUpgradeAndRespond(bool include_content_length = false) {
     // Strip the CONNECT upgrade.
     std::string prefix_data;
     const std::string hostname(default_request_headers_.getHostValue());
     ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", &prefix_data));
     EXPECT_EQ(absl::StrCat("CONNECT ", hostname, ":443 HTTP/1.1\r\n\r\n"), prefix_data);
 
+    absl::string_view content_length = include_content_length ? "Content-Length: 0\r\n" : "";
     // Ship the CONNECT response.
-    fake_upstream_connection_->writeRawData("HTTP/1.1 200 OK\r\n\r\n");
+    fake_upstream_connection_->writeRawData(
+        absl::StrCat("HTTP/1.1 200 OK\r\n", content_length, "\r\n"));
   }
   bool use_alpn_ = false;
   bool try_http3_ = false;
@@ -450,7 +452,8 @@ TEST_P(Http11ConnectHttpIntegrationTest, DfpNoProxyAddress) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("dns_resolution_failure"));
 }
 
-TEST_P(Http11ConnectHttpIntegrationTest, DfpWithProxyAddress) {
+// Regression tests https://github.com/envoyproxy/envoy/issues/34096
+TEST_P(Http11ConnectHttpIntegrationTest, DfpWithProxyAddressAndContentLength) {
   addDfpConfig();
 
   initialize();
@@ -470,7 +473,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, DfpWithProxyAddress) {
   // The request should be sent to fake upstream 1, as DNS lookup is bypassed due to the
   // connect-proxy header.
   ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  stripConnectUpgradeAndRespond();
+  stripConnectUpgradeAndRespond(true);
 
   ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));

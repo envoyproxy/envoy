@@ -43,7 +43,7 @@ private:
 
 TEST(ResponseRewriterImplUnitTest, ShouldRewriteBuffer) {
   // given
-  ResponseRewriterImpl testee{MockBrokerFilterConfig{}};
+  ResponseRewriterImpl testee{std::make_shared<MockBrokerFilterConfig>()};
 
   auto response1 = std::make_shared<FakeResponse>(7);
   auto response2 = std::make_shared<FakeResponse>(13);
@@ -80,13 +80,13 @@ TEST(ResponseRewriterImplUnitTest, ShouldRewriteMetadataResponse) {
   std::vector<MetadataResponseBroker> brokers = {b1, b2, b3};
   MetadataResponse mr = {brokers, {}};
 
-  MockBrokerFilterConfig config;
+  auto config = std::make_shared<MockBrokerFilterConfig>();
   absl::optional<HostAndPort> r1 = {{"nh1", 4444}};
-  EXPECT_CALL(config, findBrokerAddressOverride(b1.node_id_)).WillOnce(Return(r1));
+  EXPECT_CALL(*config, findBrokerAddressOverride(b1.node_id_)).WillOnce(Return(r1));
   absl::optional<HostAndPort> r2 = absl::nullopt;
-  EXPECT_CALL(config, findBrokerAddressOverride(b2.node_id_)).WillOnce(Return(r2));
+  EXPECT_CALL(*config, findBrokerAddressOverride(b2.node_id_)).WillOnce(Return(r2));
   absl::optional<HostAndPort> r3 = {{"nh3", 6666}};
-  EXPECT_CALL(config, findBrokerAddressOverride(b3.node_id_)).WillOnce(Return(r3));
+  EXPECT_CALL(*config, findBrokerAddressOverride(b3.node_id_)).WillOnce(Return(r3));
   ResponseRewriterImpl testee{config};
 
   // when
@@ -107,15 +107,15 @@ TEST(ResponseRewriterImplUnitTest, ShouldRewriteFindCoordinatorResponse) {
   Coordinator c3 = {"k3", 3, "ch3", 4444, 0, {}, {}};
   fcr.coordinators_ = {c1, c2, c3};
 
-  MockBrokerFilterConfig config;
+  auto config = std::make_shared<MockBrokerFilterConfig>();
   absl::optional<HostAndPort> fcrhp = {{"nh1", 4444}};
-  EXPECT_CALL(config, findBrokerAddressOverride(fcr.node_id_)).WillOnce(Return(fcrhp));
+  EXPECT_CALL(*config, findBrokerAddressOverride(fcr.node_id_)).WillOnce(Return(fcrhp));
   absl::optional<HostAndPort> cr1 = {{"nh1", 4444}};
-  EXPECT_CALL(config, findBrokerAddressOverride(c1.node_id_)).WillOnce(Return(cr1));
+  EXPECT_CALL(*config, findBrokerAddressOverride(c1.node_id_)).WillOnce(Return(cr1));
   absl::optional<HostAndPort> cr2 = absl::nullopt;
-  EXPECT_CALL(config, findBrokerAddressOverride(c2.node_id_)).WillOnce(Return(cr2));
+  EXPECT_CALL(*config, findBrokerAddressOverride(c2.node_id_)).WillOnce(Return(cr2));
   absl::optional<HostAndPort> cr3 = {{"nh3", 6666}};
-  EXPECT_CALL(config, findBrokerAddressOverride(c3.node_id_)).WillOnce(Return(cr3));
+  EXPECT_CALL(*config, findBrokerAddressOverride(c3.node_id_)).WillOnce(Return(cr3));
   ResponseRewriterImpl testee{config};
 
   // when
@@ -136,13 +136,13 @@ TEST(ResponseRewriterImplUnitTest, ShouldRewriteDescribeClusterResponse) {
   std::vector<DescribeClusterBroker> brokers = {b1, b2, b3};
   DescribeClusterResponse dcr = {0, 0, absl::nullopt, "", 0, brokers, 0, {}};
 
-  MockBrokerFilterConfig config;
+  auto config = std::make_shared<MockBrokerFilterConfig>();
   absl::optional<HostAndPort> cr1 = {{"nh1", 4444}};
-  EXPECT_CALL(config, findBrokerAddressOverride(b1.broker_id_)).WillOnce(Return(cr1));
+  EXPECT_CALL(*config, findBrokerAddressOverride(b1.broker_id_)).WillOnce(Return(cr1));
   absl::optional<HostAndPort> cr2 = absl::nullopt;
-  EXPECT_CALL(config, findBrokerAddressOverride(b2.broker_id_)).WillOnce(Return(cr2));
+  EXPECT_CALL(*config, findBrokerAddressOverride(b2.broker_id_)).WillOnce(Return(cr2));
   absl::optional<HostAndPort> cr3 = {{"nh3", 6666}};
-  EXPECT_CALL(config, findBrokerAddressOverride(b3.broker_id_)).WillOnce(Return(cr3));
+  EXPECT_CALL(*config, findBrokerAddressOverride(b3.broker_id_)).WillOnce(Return(cr3));
   ResponseRewriterImpl testee{config};
 
   // when
@@ -155,13 +155,13 @@ TEST(ResponseRewriterImplUnitTest, ShouldRewriteDescribeClusterResponse) {
 }
 
 TEST(ResponseRewriterUnitTest, ShouldCreateProperRewriter) {
-  MockBrokerFilterConfig c1;
-  EXPECT_CALL(c1, needsResponseRewrite()).WillOnce(Return(true));
+  auto c1 = std::make_shared<MockBrokerFilterConfig>();
+  EXPECT_CALL(*c1, needsResponseRewrite()).WillOnce(Return(true));
   ResponseRewriterSharedPtr r1 = createRewriter(c1);
   ASSERT_NE(std::dynamic_pointer_cast<ResponseRewriterImpl>(r1), nullptr);
 
-  MockBrokerFilterConfig c2;
-  EXPECT_CALL(c2, needsResponseRewrite()).WillOnce(Return(false));
+  auto c2 = std::make_shared<MockBrokerFilterConfig>();
+  EXPECT_CALL(*c2, needsResponseRewrite()).WillOnce(Return(false));
   ResponseRewriterSharedPtr r2 = createRewriter(c2);
   ASSERT_NE(std::dynamic_pointer_cast<DoNothingRewriter>(r2), nullptr);
 }

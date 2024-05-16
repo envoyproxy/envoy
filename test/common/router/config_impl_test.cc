@@ -9260,9 +9260,6 @@ virtual_hosts:
 // Verifies that we're creating a new instance of the retry plugins on each call instead of
 // always returning the same one.
 TEST_F(RouteConfigurationV2, RetryPluginsAreNotReused) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: regex
@@ -9276,8 +9273,12 @@ virtual_hosts:
           retry_policy:
             retry_host_predicate:
             - name: envoy.test_host_predicate
+              typed_config:
+                "@type": type.googleapis.com/google.protobuf.Struct
             retry_priority:
               name: envoy.test_retry_priority
+              typed_config:
+                "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
 
   Upstream::MockRetryPriority priority{{}, {}};
@@ -10392,6 +10393,26 @@ virtual_hosts:
       config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
   EXPECT_TRUE(internal_redirect_policy.enabled());
   EXPECT_EQ(2, internal_redirect_policy.responseHeadersToCopy().size());
+}
+
+TEST_F(RouteConfigurationV2, InternalRedirectPolicyAcceptsResponseHeadersToCopyInvalid) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy:
+            response_headers_to_copy: ["x-foo", ":authority"]
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      ":-prefixed headers or Hosts may not be specified here.");
 }
 
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {

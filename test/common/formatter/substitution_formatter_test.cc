@@ -209,6 +209,35 @@ TEST(SubstitutionFormatUtilsTest, protocolToStringOrDefault) {
   EXPECT_EQ("-", SubstitutionFormatUtils::protocolToStringOrDefault({}));
 }
 
+TEST(SubstitutionFormatUtilsTest, truncate) {
+  std::string str;
+
+  str = "abcd";
+  SubstitutionFormatUtils::truncate(str, {});
+  EXPECT_EQ("abcd", str);
+
+  str = "abcd";
+  SubstitutionFormatUtils::truncate(str, 0);
+  EXPECT_EQ("", str);
+
+  str = "abcd";
+  SubstitutionFormatUtils::truncate(str, 2);
+  EXPECT_EQ("ab", str);
+
+  str = "abcd";
+  SubstitutionFormatUtils::truncate(str, 100);
+  EXPECT_EQ("abcd", str);
+}
+
+TEST(SubstitutionFormatUtilsTest, truncateStringView) {
+  std::string str = "abcd";
+
+  EXPECT_EQ("abcd", SubstitutionFormatUtils::truncateStringView(str, {}));
+  EXPECT_EQ("", SubstitutionFormatUtils::truncateStringView(str, 0));
+  EXPECT_EQ("ab", SubstitutionFormatUtils::truncateStringView(str, 2));
+  EXPECT_EQ("abcd", SubstitutionFormatUtils::truncateStringView(str, 100));
+}
+
 TEST(SubstitutionFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
   StreamInfo::MockStreamInfo stream_info;
@@ -230,7 +259,8 @@ TEST(SubstitutionFormatterTest, plainNumberFormatter) {
 TEST(SubstitutionFormatterTest, inFlightDuration) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
-  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr};
+  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
 
   {
     time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(100)));
@@ -252,7 +282,12 @@ TEST(SubstitutionFormatterTest, inFlightDuration) {
 TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
 
+  // Used to replace the default one in the upstream info.
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.upstreamInfo()->setUpstreamHost(mock_host);
+
   MockTimeSystem time_system;
   auto& upstream_timing = stream_info.upstream_info_->upstreamTiming();
 
@@ -619,29 +654,112 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter upstream_format("UPSTREAM_HOST");
+    StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAME");
+
+    // Hostname is used.
+    mock_host->hostname_ = "upstream_host_xxx";
+    EXPECT_EQ("upstream_host_xxx", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("upstream_host_xxx")));
+
+    // Hostname is not used then the main address is used.
+    mock_host->hostname_.clear();
     EXPECT_EQ("10.0.0.1:443", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
   }
 
+  auto test_upstream_remote_address =
+      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("10.0.0.2", 80)};
+  auto default_upstream_remote_address = stream_info.upstreamInfo()->upstreamRemoteAddress();
+
   {
-    StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS");
+    StreamInfoFormatter upstream_format("UPSTREAM_HOST");
     EXPECT_EQ("10.0.0.1:443", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
+
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+
+    // Reset the state.
+    stream_info.upstreamInfo()->setUpstreamHost(mock_host);
   }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS");
+
+    // Has valid upstream remote address and it will be used as priority.
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(test_upstream_remote_address);
+    EXPECT_EQ("10.0.0.2:80", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("10.0.0.2:80")));
+
+    // Upstream remote address is not available.
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(nullptr);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+
+    // Reset to default one.
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(default_upstream_remote_address);
+  }
+
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.upstream_remote_address_use_connection", "false"}});
+
+    StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS");
+
+    // Has valid upstream remote address but it would not be used because of the runtime feature.
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(test_upstream_remote_address);
+    EXPECT_EQ("10.0.0.1:443", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
+
+    // Reset to default one.
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(default_upstream_remote_address);
+  }
+
   {
     StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT");
-    EXPECT_EQ("10.0.0.1", upstream_format.formatWithContext({}, stream_info));
+
+    // Has valid upstream remote address and it will be used as priority.
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(test_upstream_remote_address);
+    EXPECT_EQ("10.0.0.2", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                ProtoEq(ValueUtil::stringValue("10.0.0.1")));
+                ProtoEq(ValueUtil::stringValue("10.0.0.2")));
+
+    // Upstream remote address is not available.
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(nullptr);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+
+    // Reset to default one.
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(default_upstream_remote_address);
   }
+
   {
     StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_PORT");
-    EXPECT_EQ("443", upstream_format.formatWithContext({}, stream_info));
+
+    // Has valid upstream remote address and it will be used as priority.
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(test_upstream_remote_address);
+    EXPECT_EQ("80", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                ProtoEq(ValueUtil::numberValue(443)));
+                ProtoEq(ValueUtil::numberValue(80)));
+
+    // Upstream remote address is not available.
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(nullptr);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+
+    // Reset to default one.
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(default_upstream_remote_address);
   }
 
   {
@@ -661,14 +779,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
     EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
-    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
-    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-
-  {
-    StreamInfoFormatter upstream_format("UPSTREAM_HOST");
-    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
@@ -4362,9 +4472,9 @@ TEST(SubstitutionFormatParser, SyntaxVerifierFail) {
       };
 
   for (const auto& test_case : test_cases) {
-    EXPECT_THROW(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
-                                                    std::get<1>(test_case), std::get<2>(test_case)),
-                 EnvoyException);
+    EXPECT_FALSE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                    std::get<1>(test_case), std::get<2>(test_case))
+                     .ok());
   }
 }
 
@@ -4393,8 +4503,9 @@ TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
            absl::nullopt}};
 
   for (const auto& test_case : test_cases) {
-    EXPECT_NO_THROW(CommandSyntaxChecker::verifySyntax(
-        std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)));
+    EXPECT_TRUE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                   std::get<1>(test_case), std::get<2>(test_case))
+                    .ok());
   }
 }
 } // namespace

@@ -60,7 +60,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # sni_dynamic_forward_proxy extension
 /*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @lizan
 # tracers.datadog extension
-/*/extensions/tracers/datadog @cgilmour @dgoffredo @dmehala @mattklein123
+/*/extensions/tracers/datadog @dmehala @mattklein123
 # tracers.xray extension
 /*/extensions/tracers/xray @suniltheta @mattklein123
 # tracers.skywalking extension
@@ -269,7 +269,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @cpakulski
 /*/extensions/http/stateful_session/header @ramaraochavali @wbpcode @cpakulski
-/*/extensions/filters/http/stateful_session @wbpcode @cpakulski
+/*/extensions/filters/http/stateful_session @wbpcode @cpakulski @adisuissa
 # tracers
 /*/extensions/tracers/zipkin @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/dynamic_ot @wbpcode @Shikugawa @basvanbeek
@@ -339,8 +339,16 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/geoip_providers/common @nezdolik @ravenblackx
 # Maxmind geolocation provider
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx
+# Match delegate extension
+/*/extensions/filters/http/match_delegate @wbpcode @jstraceski @tyxia
 
 /*/extensions/health_checkers/common @zuercher @botengyao
+
+# HTTP credential injector
+/*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov
+/*/extensions/http/injected_credentials/common @zhaohuabing @kyessenov
+/*/extensions/http/injected_credentials/generic @zhaohuabing @kyessenov
+/*/extensions/http/injected_credentials/oauth2 @vikaschoudhary16 @wbpcode
 
 # Lua cluster specifier
 /*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
