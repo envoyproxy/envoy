@@ -792,18 +792,25 @@ TEST_P(ClientIntegrationTest, ResetBetweenDataChunks) {
   ASSERT_EQ(cc_.on_error_calls_, 1);
 }
 
-TEST_P(ClientIntegrationTest, ResetAfterData) {
+TEST_P(ClientIntegrationTest, ResetAfterDataExplicit) {
+  explicit_flow_control_ = true;
+
   autonomous_allow_incomplete_streams_ = true;
   initialize();
 
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_DATA, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
 
-  stream_ = createNewStream(createDefaultStreamCallbacks());
+  auto callbacks = createDefaultStreamCallbacks();
+  stream_ = createNewStream(std::move(callbacks));
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
+
+  // Allow passing up the data and error
+  stream_->readData(100);
   terminal_callback_.waitReady();
 
+  ASSERT_EQ(cc_.on_data_calls_, 1);
   ASSERT_EQ(cc_.on_error_calls_, 1);
 }
 
