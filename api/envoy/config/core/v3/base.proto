@@ -442,7 +442,7 @@ message DataSource {
   //   edited in place.
   //
   // .. note::
-  //   Not all usage cases of ``DataSource`` support watching directories. It depends on the
+  //   Not all use cases of ``DataSource`` support watching directories. It depends on the
   //   specific usage of the ``DataSource``. See the documentation of the parent message for
   //   details.
   WatchedDirectory watched_directory = 5;
