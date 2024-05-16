@@ -49,7 +49,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
   private final boolean mEnableInterfaceBinding = false;
-  private final boolean mEnableProxying = false;
+  private boolean mEnableProxying = false;
   private final int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 1;
   private final int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private final int mMaxConnectionsPerHost = 7;
@@ -96,6 +96,16 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
+   * Enable Android system proxying.
+   *
+   * @param enable If true, enable Android proxying; otherwise, don't.
+   */
+  public NativeCronvoyEngineBuilderImpl setEnableProxying(boolean enable) {
+    mEnableProxying = enable;
+    return this;
+  }
+
+  /**
    * Indicates to skip the TLS certificate verification.
    *
    * @return the builder to facilitate chaining.
@@ -103,16 +113,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   @VisibleForTesting
   public CronvoyEngineBuilderImpl setMockCertVerifierForTesting() {
     mTrustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED;
-    return this;
-  }
-
-  /**
-   * Enable Android system proxying.
-   *
-   * @param enable If true, enable Android proxying; otherwise, don't.
-   */
-  public CronvoyEngineBuilderImpl setEnableProxying(boolean enable) {
-    mEnableProxying = enable;
     return this;
   }
 
