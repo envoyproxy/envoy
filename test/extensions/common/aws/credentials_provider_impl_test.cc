@@ -28,7 +28,6 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-using testing::ReturnNew;
 
 namespace Envoy {
 namespace Extensions {
@@ -1962,6 +1961,9 @@ public:
   Init::TargetHandlePtr init_target_handle_;
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
+  Upstream::ClusterUpdateCallbacks* cb_{};
+  testing::NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<Upstream::MockThreadLocalCluster> test_cluster{};
 };
 
 TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocument) {
@@ -2321,27 +2323,23 @@ TEST_F(WebIdentityCredentialsProviderTest, LibcurlEnabled) {
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, VerifyClusterAddHandlersFire) {
-  Upstream::ClusterUpdateCallbacks* cb_{};
-  testing::NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
 
   ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(main_thread_dispatcher_));
-
   EXPECT_CALL(cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
-      .WillOnce(
-          DoAll(SaveArgAddress(&cb_), ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
+      .WillOnce(DoAll(SaveArgAddress(&cb_), Return(nullptr)));
 
   setupProvider();
 
-  // Trigger onClusterAddOrUpdate with an invalid_cluster name - this should just exit
-  NiceMock<Upstream::MockThreadLocalCluster> test_cluster{};
-  Upstream::ThreadLocalClusterCommand command = [&test_cluster]() -> Upstream::ThreadLocalCluster& {
-    return test_cluster;
-  };
+  Upstream::ThreadLocalClusterCommand command =
+      [&test_cluster = test_cluster]() -> Upstream::ThreadLocalCluster& { return test_cluster; };
+
   cb_->onClusterAddOrUpdate("invalid_cluster", command);
 
   // Trigger onClusterAddOrUpdate with the correct cluster name - this should trigger a post
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   cb_->onClusterAddOrUpdate("credentials_provider_cluster", command);
+
+  delete raw_metadata_fetcher_;
 }
 
 class DefaultCredentialsProviderChainTest : public testing::Test {
