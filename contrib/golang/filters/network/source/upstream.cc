@@ -104,8 +104,8 @@ void UpstreamConn::enableHalfClose(bool enabled) {
   }
   ASSERT(conn_ != nullptr);
   conn_->connection().enableHalfClose(enabled);
-  ENVOY_CONN_LOG(debug, "set enableHalfClose to addr: {}, enabled: {}, actualEnabled: {}", conn_->connection(),
-                 addr_, enabled, conn_->connection().isHalfCloseEnabled());
+  ENVOY_CONN_LOG(debug, "set enableHalfClose to addr: {}, enabled: {}, actualEnabled: {}",
+                 conn_->connection(), addr_, enabled, conn_->connection().isHalfCloseEnabled());
 }
 
 void UpstreamConn::write(Buffer::Instance& buf, bool end_stream) {
