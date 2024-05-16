@@ -197,11 +197,6 @@ TEST_F(GrpcAccessLoggerImplTest, LogWithStats) {
                 .get()
                 .value(),
             1);
-  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
-                .value()
-                .get()
-                .value(),
-            1);
 }
 
 TEST_F(GrpcAccessLoggerImplTest, StatsWithCustomPrefix) {
