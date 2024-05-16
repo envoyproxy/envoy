@@ -35,7 +35,7 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
 } // namespace
 
 // In case credentials from config or credentials_profile are set in the configuration, instead of
-// using the default providers chain, it will use the credentials from config as first option then
+// using the default providers chain, it will use the credentials from config (if provided), then
 // credentials file provider with the configured profile. All other providers will be ignored.
 Extensions::Common::Aws::CredentialsProviderSharedPtr
 AwsLambdaFilterFactory::getCredentialsProvider(

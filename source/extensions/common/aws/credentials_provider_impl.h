@@ -45,6 +45,12 @@ public:
   Credentials getCredentials() override;
 };
 
+/**
+ * Returns AWS credentials from static filter configuration.
+ *
+ * Adheres to conventions specified in:
+ * https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html
+ */
 class ConfigCredentialsProvider : public CredentialsProvider,
                                   public Logger::Loggable<Logger::Id::aws> {
 public:
@@ -55,7 +61,7 @@ public:
   Credentials getCredentials() override;
 
 private:
-  Credentials credentials_;
+  const Credentials credentials_;
 };
 
 class CachedCredentialsProviderBase : public CredentialsProvider,

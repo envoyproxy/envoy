@@ -231,6 +231,36 @@ credentials:
   cb(filter_callbacks);
 }
 
+TEST(AwsLambdaFilterConfigTest, ValidConfigWithCredentialsOptionalSessionTokenCreatesFilter) {
+  const std::string yaml = R"EOF(
+arn: "arn:aws:lambda:region:424242:function:fun"
+payload_passthrough: true
+invocation_mode: asynchronous
+credentials:
+  access_key_id: config_kid
+  secret_access_key: config_Key
+)EOF";
+
+  LambdaConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsLambdaFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
+    auto filter = std::static_pointer_cast<Filter>(stream_filter);
+    const auto& settings = filter->settingsForTest();
+
+    return settings.payloadPassthrough() &&
+           settings.invocationMode() == InvocationMode::Asynchronous;
+  };
+  EXPECT_CALL(filter_callbacks, addStreamFilter(Truly(has_expected_settings)));
+  cb(filter_callbacks);
+}
+
 TEST(AwsLambdaFilterConfigTest, GetProviderShoudPrioritizeCredentialsOverOtherOptions) {
   const std::string yaml = R"EOF(
 arn: "arn:aws:lambda:region:424242:function:fun"
@@ -261,7 +291,7 @@ credentials:
       provider));
 }
 
-TEST(AwsLambdaFilterConfigTest, GetProviderShoudPrioritizeProfileIfNoCredentials) {
+TEST(AwsLambdaFilterConfigTest, GetProviderShouldPrioritizeProfileIfNoCredentials) {
   const std::string yaml = R"EOF(
 arn: "arn:aws:lambda:region:424242:function:fun"
 payload_passthrough: true
