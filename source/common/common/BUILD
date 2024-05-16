@@ -476,6 +476,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "compiled_string_map_lib",
     hdrs = ["compiled_string_map.h"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        "//envoy/common:pure_lib",
+        "//source/common/common:assert_lib",
+    ],
 )
 
 envoy_cc_library(

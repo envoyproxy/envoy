@@ -7,6 +7,9 @@
 
 #include "envoy/common/pure.h"
 
+#include "source/common/common/assert.h"
+
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -49,6 +52,12 @@ namespace Envoy {
  * Down the n branch is the leaf node (only `x-prefix-banana` remains) - at
  * this point a regular string-compare checks if the key is an exact match
  * for the string node.
+ *
+ * Unlike a regular trie, this structure must contain the full keys in the leaf
+ * nodes, which could potentially make it larger due to, e.g. containing
+ * `x-envoy-` multiple times where a regular trie only has one 'branch' for
+ * that. However, it also contains fewer nodes due to not having a node for
+ * every character.
  */
 template <class Value> class CompiledStringMap {
   class Node {
@@ -84,7 +93,7 @@ template <class Value> class CompiledStringMap {
     BranchNode(size_t index, uint8_t min, std::vector<std::unique_ptr<Node>>&& branches)
         : index_(index), min_(min), branches_(std::move(branches)) {}
     Value find(const absl::string_view& key) override {
-      uint8_t k = static_cast<uint8_t>(key[index_]);
+      const uint8_t k = static_cast<uint8_t>(key[index_]);
       // Possible optimization was tried here, populating empty nodes with
       // a function that returns {} to reduce branching vs checking for null
       // nodes. Checking for null nodes benchmarked faster.
@@ -114,6 +123,9 @@ public:
    */
   Value find(absl::string_view key) const {
     const size_t key_size = key.size();
+    // Theoretically we could also bottom-cap the size range, but the
+    // cost of the extra comparison and operation would almost certainly
+    // outweight the benefit of omitting 4 or 5 entries.
     if (key_size >= table_.size() || table_[key_size] == nullptr) {
       return {};
     }
@@ -122,29 +134,32 @@ public:
   /**
    * Construct the lookup table. This can be a somewhat slow multi-pass
    * operation if the input table is large.
-   * @param initial a vector of key->value pairs. This is taken by value because
-   *                we're going to modify it. If the caller still wants the original
-   *                then it can be copied in, if not it can be moved in.
-   *                Note that the keys are string_views - the base string data must
-   *                exist for the duration of compile(). The leaf nodes take copies
-   *                of the key strings, so the string_views can be invalidated once
-   *                compile has completed.
+   * @param contents a vector of key->value pairs. This is taken by value because
+   *                 we're going to modify it. If the caller still wants the original
+   *                 then it can be copied in, if not it can be moved in.
+   *                 Note that the keys are string_views - the base string data must
+   *                 exist for the duration of compile(). The leaf nodes take copies
+   *                 of the key strings, so the string_views can be invalidated once
+   *                 compile has completed.
    */
-  void compile(std::vector<KV> initial) {
-    if (initial.empty()) {
+  void compile(std::vector<KV> contents) {
+    if (contents.empty()) {
       return;
     }
-    std::sort(initial.begin(), initial.end(),
+    std::sort(contents.begin(), contents.end(),
               [](const KV& a, const KV& b) { return a.first.size() < b.first.size(); });
-    size_t longest = initial.back().first.size();
+    const size_t longest = contents.back().first.size();
+    // A key length of 0 is possible, and also we don't want to have to
+    // subtract [min length] every time we index, so the table size must
+    // be one larger than the longest key.
     table_.resize(longest + 1);
-    auto range_start = initial.begin();
+    auto range_start = contents.begin();
     // Populate the sub-nodes for each length of key that exists.
-    while (range_start != initial.end()) {
+    while (range_start != contents.end()) {
       // Find the first key whose length differs from the current key length.
       // Everything in between is keys with the same length.
-      auto range_end =
-          std::find_if(range_start, initial.end(), [len = range_start->first.size()](const KV& e) {
+      const auto range_end =
+          std::find_if(range_start, contents.end(), [len = range_start->first.size()](const KV& e) {
             return e.first.size() != len;
           });
       std::vector<KV> node_contents;
@@ -164,9 +179,16 @@ private:
    * branches there are.
    */
   struct IndexSplitInfo {
-    uint8_t index_, min_, max_, count_;
-    size_t size() { return max_ - min_ + 1; }
-    size_t offsetOf(uint8_t c) { return c - min_; }
+    // The index to the character being considered for this split.
+    size_t index_;
+    // The smallest character value that appears at this index.
+    uint8_t min_;
+    // The largest character value that appears at this index.
+    uint8_t max_;
+    // The number of distinct characters that appear at this index.
+    uint8_t count_;
+    size_t size() const { return max_ - min_ + 1; }
+    size_t offsetOf(uint8_t c) const { return c - min_; }
   };
 
   /**
@@ -175,12 +197,14 @@ private:
    *         - the index which produces the most child branches.
    */
   static IndexSplitInfo findBestSplitPoint(const std::vector<KV>& node_contents) {
+    ASSERT(node_contents.size() > 1);
     IndexSplitInfo best{0, 0, 0, 0};
-    for (size_t i = 0; i < node_contents[0].first.size(); i++) {
+    const size_t key_length = node_contents[0].first.size();
+    for (size_t i = 0; i < key_length; i++) {
       std::array<bool, 256> hits{};
       IndexSplitInfo info{static_cast<uint8_t>(i), 255, 0, 0};
-      for (size_t j = 0; j < node_contents.size(); j++) {
-        uint8_t v = node_contents[j].first[i];
+      for (const KV& pair : node_contents) {
+        uint8_t v = pair.first[i];
         if (!hits[v]) {
           hits[v] = true;
           info.count_++;
@@ -192,6 +216,7 @@ private:
         best = info;
       }
     }
+    ASSERT(best.count_ > 1, absl::StrCat("duplicate key: ", node_contents[0].first));
     return best;
   }
 
@@ -205,7 +230,10 @@ private:
     if (node_contents.size() == 1) {
       return std::make_unique<LeafNode>(node_contents[0].first, std::move(node_contents[0].second));
     }
-    IndexSplitInfo best = findBestSplitPoint(node_contents);
+    // best contains the index at which this node should be split,
+    // and the smallest and largest character values that occur at
+    // that index across all the keys in node_contents.
+    const IndexSplitInfo best = findBestSplitPoint(node_contents);
     std::vector<std::unique_ptr<Node>> nodes;
     nodes.resize(best.size());
     std::sort(node_contents.begin(), node_contents.end(),
