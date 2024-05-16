@@ -3,7 +3,7 @@
 #include <list>
 #include <memory>
 
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 #include "library/common/system/system_helper.h"
 
 namespace Envoy {

@@ -180,11 +180,43 @@ public:
     }
   }
 
-  void notifyDecodingSuccess(StreamFramePtr&& response) {
+  void notifyDecodingSuccess(ResponseHeaderFramePtr&& response,
+                             absl::optional<StartTime> start_time = {}) {
     ASSERT(!filter_->upstreamRequestsForTest().empty());
 
     auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-    auto stream_frame = std::make_shared<StreamFramePtr>(std::move(response));
+    auto stream_frame = std::make_shared<ResponseHeaderFramePtr>(std::move(response));
+
+    EXPECT_CALL(*mock_client_codec_, decode(BufferStringEqual("test_1"), _))
+        .WillOnce(Invoke(
+            [this, resp = std::move(stream_frame), start_time](Buffer::Instance& buffer, bool) {
+              buffer.drain(buffer.length());
+
+              const bool end_stream = (*resp)->frameFlags().endStream();
+              int pending_request_size = 0;
+              if (config_->bindUpstreamConnection()) {
+                pending_request_size =
+                    boundUpstreamConnection()->waitingResponseRequestsForTest().size();
+              }
+
+              client_cb_->onDecodingSuccess(std::move(*resp), start_time);
+
+              if (config_->bindUpstreamConnection()) {
+                EXPECT_EQ(pending_request_size - (end_stream ? 1 : 0),
+                          boundUpstreamConnection()->waitingResponseRequestsForTest().size());
+              }
+            }));
+
+    Buffer::OwnedImpl test_buffer;
+    test_buffer.add("test_1");
+
+    upstream_request->generic_upstream_->onUpstreamData(test_buffer, false);
+  }
+  void notifyDecodingSuccess(ResponseCommonFramePtr&& response) {
+    ASSERT(!filter_->upstreamRequestsForTest().empty());
+
+    auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
+    auto stream_frame = std::make_shared<ResponseCommonFramePtr>(std::move(response));
 
     EXPECT_CALL(*mock_client_codec_, decode(BufferStringEqual("test_1"), _))
         .WillOnce(Invoke([this, resp = std::move(stream_frame)](Buffer::Instance& buffer, bool) {
@@ -795,6 +827,56 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponse) {
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithStartTime) {
+  setup();
+  kickOffNewUpstreamRequest();
+
+  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
+
+  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+      .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
+        Buffer::OwnedImpl buffer;
+        buffer.add("hello");
+        // Expect response.
+        callback.onEncodingSuccess(buffer, true);
+      }));
+
+  if (with_tracing_) {
+    // Inject tracing context.
+    EXPECT_CALL(*child_span_, injectContext(_, _));
+  }
+
+  notifyPoolReady();
+
+  EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
+
+  if (with_tracing_) {
+    EXPECT_CALL(*child_span_, setTag(_, _)).Times(testing::AnyNumber());
+    EXPECT_CALL(*child_span_, finishSpan());
+  }
+
+  EXPECT_CALL(mock_filter_callback_, onResponseStart(_)).WillOnce(Invoke([this](ResponsePtr) {
+    // When the response is sent to callback, the upstream request should be removed.
+    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+  }));
+
+  StartTime start_time;
+  start_time.start_time =
+      std::chrono::time_point<std::chrono::system_clock>(std::chrono::milliseconds(111111111));
+  start_time.start_time_monotonic =
+      std::chrono::time_point<std::chrono::steady_clock>(std::chrono::milliseconds(222222222));
+  auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  notifyDecodingSuccess(std::move(response), start_time);
+
+  EXPECT_EQ(222222222LL, std::chrono::duration_cast<std::chrono::milliseconds>(
+                             mock_stream_info_.upstream_info_->upstreamTiming()
+                                 .first_upstream_rx_byte_received_->time_since_epoch())
+                             .count());
+
+  // Mock downstream closing.
+  mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseAndTimeout) {
   setup();
 
@@ -900,11 +982,11 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
     EXPECT_CALL(*child_span_, injectContext(_, _));
   }
 
-  auto frame_1 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  auto frame_1 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   frame_1->stream_frame_flags_ = FrameFlags(StreamFlags(0, false, false, true), false);
 
   // This only store the frame and does nothing else because the pool is not ready yet.
-  filter_->onStreamFrame(std::move(frame_1));
+  filter_->onRequestCommonFrame(std::move(frame_1));
 
   EXPECT_CALL(*mock_client_codec_, encode(_, _))
       .Times(2)
@@ -928,10 +1010,10 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
       }));
 
   // End stream is set to true by default.
-  auto frame_2 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  auto frame_2 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   // This will trigger the last frame to be sent directly because connection is ready and other
   // frames are already sent.
-  filter_->onStreamFrame(std::move(frame_2));
+  filter_->onRequestCommonFrame(std::move(frame_2));
 
   if (with_tracing_) {
     EXPECT_CALL(*child_span_, setTag(_, _)).Times(testing::AnyNumber());
@@ -941,7 +1023,7 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
   EXPECT_CALL(mock_filter_callback_, onResponseStart(_));
   EXPECT_CALL(mock_filter_callback_, onResponseFrame(_))
       .Times(2)
-      .WillRepeatedly(Invoke([this](StreamFramePtr frame) {
+      .WillRepeatedly(Invoke([this](ResponseCommonFramePtr frame) {
         // When the entire response is sent to callback, the upstream request should be removed.
         if (frame->frameFlags().endStream()) {
           EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
@@ -954,12 +1036,12 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
   response->stream_frame_flags_ = FrameFlags(StreamFlags(0, false, false, false), false);
   notifyDecodingSuccess(std::move(response));
 
-  auto response_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  auto response_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   response_frame_1->stream_frame_flags_ = FrameFlags(StreamFlags(0, false, false, false), false);
   notifyDecodingSuccess(std::move(response_frame_1));
 
   // End stream is set to true by default.
-  auto response_frame_2 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  auto response_frame_2 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   notifyDecodingSuccess(std::move(response_frame_2));
 
   // Mock downstream closing.

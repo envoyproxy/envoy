@@ -56,7 +56,7 @@ TEST(KafkaCodecTest, KafkaRequestCallbacksTest) {
   KafkaRequestCallbacks request_callbacks(callbacks);
 
   {
-    EXPECT_CALL(callbacks, onDecodingSuccess(_));
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
 
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
@@ -79,7 +79,7 @@ TEST(KafkaCodecTest, KafkaResponseCallbacksTest) {
   KafkaResponseCallbacks response_callbacks(callbacks);
 
   {
-    EXPECT_CALL(callbacks, onDecodingSuccess(_));
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
 
     auto response =
         std::make_shared<NetworkFilters::Kafka::Response<NetworkFilters::Kafka::FetchResponse>>(
@@ -120,8 +120,8 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
 
   {
     // Test decode() method.
-    EXPECT_CALL(callbacks, onDecodingSuccess(_))
-        .WillOnce(testing::Invoke([](StreamFramePtr request) {
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _))
+        .WillOnce(testing::Invoke([](RequestHeaderFramePtr request, absl::optional<StartTime>) {
           EXPECT_EQ(dynamic_cast<KafkaRequestFrame*>(request.get())
                         ->request_->request_header_.correlation_id_,
                     3);
@@ -153,7 +153,7 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
     KafkaRequestFrame request_frame(request);
 
-    // Do nothiing.
+    // Do nothing.
     server_codec.encode(request_frame, encoding_callbacks);
   }
 
@@ -207,8 +207,8 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
 
   {
     // Test decode() method.
-    EXPECT_CALL(callbacks, onDecodingSuccess(_))
-        .WillOnce(testing::Invoke([](StreamFramePtr response) {
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _))
+        .WillOnce(testing::Invoke([](ResponseHeaderFramePtr response, absl::optional<StartTime>) {
           EXPECT_EQ(dynamic_cast<KafkaResponseFrame*>(response.get())
                         ->response_->metadata_.correlation_id_,
                     3);
@@ -242,7 +242,7 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
             NetworkFilters::Kafka::FetchResponse({}, {}));
     KafkaResponseFrame response_frame(response);
 
-    // Do nothiing.
+    // Do nothing.
     client_codec.encode(response_frame, encoding_callbacks);
   }
 

@@ -5,6 +5,7 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/grpc/common.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
 
@@ -48,18 +49,29 @@ public:
     }
   }
 
-  void expectSentMessage(const std::string& expected_message_yaml) {
+  void expectSentMessage(
+      const std::string& expected_message_yaml,
+      Grpc::Status::GrpcStatus response_status = Grpc::Status::WellKnownGrpcStatus::Ok,
+      uint32_t rejected_log_records = 0) {
     opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest expected_message;
     TestUtility::loadFromYaml(expected_message_yaml, expected_message);
     EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
-        .WillOnce(Invoke([expected_message](absl::string_view, absl::string_view,
-                                            Buffer::InstancePtr&& request,
-                                            Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                                            const Http::AsyncClient::RequestOptions&) {
+        .WillOnce(Invoke([expected_message, response_status, rejected_log_records](
+                             absl::string_view, absl::string_view, Buffer::InstancePtr&& request,
+                             Grpc::RawAsyncRequestCallbacks& callback, Tracing::Span& span,
+                             const Http::AsyncClient::RequestOptions&) {
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
+
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
           EXPECT_EQ(message.DebugString(), expected_message.DebugString());
+          if (response_status != Grpc::Status::WellKnownGrpcStatus::Ok) {
+            callback.onFailure(response_status, "err", span);
+          } else {
+            opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse resp;
+            resp.mutable_partial_success()->set_rejected_log_records(rejected_log_records);
+            callback.onSuccessRaw(Grpc::Common::serializeMessage(resp), span);
+          }
           return nullptr; // We don't care about the returned request.
         }));
   }
@@ -84,7 +96,7 @@ public:
   }
 
   Grpc::MockAsyncClient* async_client_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   LocalInfo::MockLocalInfo local_info_;
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* timer_;
@@ -117,8 +129,69 @@ TEST_F(GrpcAccessLoggerImplTest, Log) {
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
   logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
   // TCP logging shouldn't do anything.
   logger_->log(ProtobufWkt::Empty());
+  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
+}
+
+TEST_F(GrpcAccessLoggerImplTest, LogWithStats) {
+  std::string expected_message_yaml = R"EOF(
+  resource_logs:
+    resource:
+      attributes:
+        - key: "log_name"
+          value:
+            string_value: "test_log_name"
+        - key: "zone_name"
+          value:
+            string_value: "zone_name"
+        - key: "cluster_name"
+          value:
+            string_value: "cluster_name"
+        - key: "node_name"
+          value:
+            string_value: "node_name"
+    scope_logs:
+      - log_records:
+          - severity_text: "test-severity-text"
+  )EOF";
+  grpc_access_logger_impl_test_helper_.expectSentMessage(expected_message_yaml);
+  opentelemetry::proto::logs::v1::LogRecord entry;
+  entry.set_severity_text("test-severity-text");
+  logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
+  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_dropped")
+                .value()
+                .get()
+                .value(),
+            0);
+
+  grpc_access_logger_impl_test_helper_.expectSentMessage(
+      expected_message_yaml, Grpc::Status::WellKnownGrpcStatus::Internal, 1);
+  logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
+  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_dropped")
+                .value()
+                .get()
+                .value(),
+            1);
 }
 
 class GrpcAccessLoggerCacheImplTest : public testing::Test {
@@ -140,8 +213,8 @@ public:
   Grpc::MockAsyncClientFactory* factory_;
   Grpc::MockAsyncClientManager async_client_manager_;
   LocalInfo::MockLocalInfo local_info_;
-  NiceMock<Stats::MockIsolatedStatsStore> store_;
-  Stats::Scope& scope_{*store_.rootScope()};
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  Stats::Scope& scope_{*stats_store_.rootScope()};
   NiceMock<ThreadLocal::MockInstance> tls_;
   GrpcAccessLoggerCacheImpl logger_cache_;
   GrpcAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
@@ -181,6 +254,12 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
   logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+
+  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
 }
 
 TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreationResourceAttributes) {
@@ -241,6 +320,11 @@ values:
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
   logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
 }
 
 class GrpcAccessLoggerDisableBuiltinImplTest : public testing::Test {
@@ -262,8 +346,8 @@ public:
   Grpc::MockAsyncClientFactory* factory_;
   Grpc::MockAsyncClientManager async_client_manager_;
   LocalInfo::MockLocalInfo local_info_;
-  NiceMock<Stats::MockIsolatedStatsStore> store_;
-  Stats::Scope& scope_{*store_.rootScope()};
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  Stats::Scope& scope_{*stats_store_.rootScope()};
   NiceMock<ThreadLocal::MockInstance> tls_;
   GrpcAccessLoggerCacheImpl logger_cache_;
   GrpcAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
@@ -291,6 +375,11 @@ TEST_F(GrpcAccessLoggerDisableBuiltinImplTest, WithoutResourceAttributes) {
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
   logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
 }
 
 TEST_F(GrpcAccessLoggerDisableBuiltinImplTest, WithResourceAttributes) {
@@ -340,6 +429,11 @@ values:
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
   logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
 }
 
 } // namespace

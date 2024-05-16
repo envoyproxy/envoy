@@ -22,15 +22,21 @@ namespace Network {
 
 class TestIoSocketHandle : public Test::IoSocketHandlePlatformImpl {
 public:
-  using WriteOverrideType = absl::optional<Api::IoCallUint64Result>(TestIoSocketHandle* io_handle,
-                                                                    const Buffer::RawSlice* slices,
-                                                                    uint64_t num_slice);
+  using WriteOverrideType = absl::optional<Api::IoCallUint64Result>(
+      TestIoSocketHandle* io_handle, const Buffer::RawSlice* slices, uint64_t num_slice,
+      Address::InstanceConstSharedPtr& peer_address_override_out);
   using WriteOverrideProc = std::function<WriteOverrideType>;
+  using ReadOverrideProc = std::function<void(RecvMsgOutput& output)>;
+  using ConnectOverrideProc =
+      std::function<absl::optional<Api::IoCallUint64Result>(TestIoSocketHandle* io_handle)>;
 
-  TestIoSocketHandle(WriteOverrideProc write_override_proc, os_fd_t fd = INVALID_SOCKET,
-                     bool socket_v6only = false, absl::optional<int> domain = absl::nullopt)
+  TestIoSocketHandle(ConnectOverrideProc connect_override_proc,
+                     WriteOverrideProc write_override_proc, ReadOverrideProc read_override_proc,
+                     os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
+                     absl::optional<int> domain = absl::nullopt)
       : Test::IoSocketHandlePlatformImpl(fd, socket_v6only, domain),
-        write_override_(write_override_proc) {
+        connect_override_(connect_override_proc), write_override_(write_override_proc),
+        read_override_(read_override_proc) {
     int type;
     socklen_t length = sizeof(int);
     EXPECT_EQ(0, getOption(SOL_SOCKET, SO_TYPE, &type, &length).return_value_);
@@ -73,11 +79,15 @@ private:
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Ip* self_ip,
                                   const Address::Instance& peer_address) override;
+  Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
+                                  uint32_t self_port, RecvMsgOutput& output) override;
 
   IoHandlePtr duplicate() override;
 
   OptRef<const Address::Instance> peer_address_override_;
+  const ConnectOverrideProc connect_override_;
   const WriteOverrideProc write_override_;
+  const ReadOverrideProc read_override_;
   absl::Mutex mutex_;
   Event::Dispatcher* dispatcher_ ABSL_GUARDED_BY(mutex_) = nullptr;
   Socket::Type socket_type_;
@@ -102,14 +112,19 @@ public:
    * write methods. Returning a Api::IoCallUint64Result from callback skips
    * the write methods with the returned result value.
    */
-  TestSocketInterface(TestIoSocketHandle::WriteOverrideProc write) : write_override_proc_(write) {}
+  TestSocketInterface(TestIoSocketHandle::ConnectOverrideProc connect,
+                      TestIoSocketHandle::WriteOverrideProc write,
+                      TestIoSocketHandle::ReadOverrideProc read)
+      : connect_override_proc_(connect), write_override_proc_(write), read_override_proc_(read) {}
 
 private:
   // SocketInterfaceImpl
   IoHandlePtr makeSocket(int socket_fd, bool socket_v6only,
                          absl::optional<int> domain) const override;
 
+  const TestIoSocketHandle::ConnectOverrideProc connect_override_proc_;
   const TestIoSocketHandle::WriteOverrideProc write_override_proc_;
+  const TestIoSocketHandle::ReadOverrideProc read_override_proc_;
 };
 
 } // namespace Network

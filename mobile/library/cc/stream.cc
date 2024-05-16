@@ -1,7 +1,6 @@
 #include "stream.h"
 
-#include "library/cc/bridge_utility.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 #include "library/common/types/c_types.h"
@@ -11,30 +10,9 @@ namespace Platform {
 
 Stream::Stream(InternalEngine* engine, envoy_stream_t handle) : engine_(engine), handle_(handle) {}
 
-Stream& Stream::sendHeaders(RequestHeadersSharedPtr headers, bool end_stream) {
-  auto request_header_map = Http::Utility::createRequestHeaderMapPtr();
-  for (const auto& [key, values] : headers->allHeaders()) {
-    if (request_header_map->formatter().has_value()) {
-      Http::StatefulHeaderKeyFormatter& formatter = request_header_map->formatter().value();
-      // Make sure the formatter knows the original case.
-      formatter.processKey(key);
-    }
-    for (const auto& value : values) {
-      request_header_map->addCopy(Http::LowerCaseString(key), value);
-    }
-  }
-  engine_->sendHeaders(handle_, std::move(request_header_map), end_stream);
-  return *this;
-}
-
 Stream& Stream::sendHeaders(Http::RequestHeaderMapPtr headers, bool end_stream) {
   engine_->sendHeaders(handle_, std::move(headers), end_stream);
   return *this;
-}
-
-Stream& Stream::sendData(envoy_data data) {
-  Buffer::InstancePtr buffer = Data::Utility::toInternalData(data);
-  return sendData(std::move(buffer));
 }
 
 Stream& Stream::sendData(Buffer::InstancePtr buffer) {
@@ -47,23 +25,8 @@ Stream& Stream::readData(size_t bytes_to_read) {
   return *this;
 }
 
-void Stream::close(RequestTrailersSharedPtr trailers) {
-  auto request_trailer_map = Http::Utility::createRequestTrailerMapPtr();
-  for (const auto& [key, values] : trailers->allHeaders()) {
-    for (const auto& value : values) {
-      request_trailer_map->addCopy(Http::LowerCaseString(key), value);
-    }
-  }
-  engine_->sendTrailers(handle_, std::move(request_trailer_map));
-}
-
 void Stream::close(Http::RequestTrailerMapPtr trailers) {
   engine_->sendTrailers(handle_, std::move(trailers));
-}
-
-void Stream::close(envoy_data data) {
-  Buffer::InstancePtr buffer = Data::Utility::toInternalData(data);
-  close(std::move(buffer));
 }
 
 void Stream::close(Buffer::InstancePtr buffer) {

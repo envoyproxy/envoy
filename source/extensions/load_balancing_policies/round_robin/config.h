@@ -5,7 +5,6 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/load_balancing_policies/common/factory_base.h"
 
 namespace Envoy {

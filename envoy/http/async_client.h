@@ -251,6 +251,10 @@ public:
       send_xff = v;
       return *this;
     }
+    StreamOptions& setSendInternal(bool v) {
+      send_internal = v;
+      return *this;
+    }
     StreamOptions& setHashPolicy(
         const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>& v) {
       hash_policy = v;
@@ -333,7 +337,7 @@ public:
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
-             send_xff == src.send_xff && parent_span_ == src.parent_span_ &&
+             send_xff == src.send_xff && send_internal == src.send_internal && parent_span_ == src.parent_span_ &&
              child_span_name_ == src.child_span_name_ && sampled_ == src.sampled_;
     }
 
@@ -349,6 +353,9 @@ public:
 
     // If true, x-forwarded-for header will be added.
     bool send_xff{true};
+
+    // If true, x-envoy-internal header will be added.
+    bool send_internal{true};
 
     // Provides the hash policy for hashing load balancing strategies.
     Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy> hash_policy;

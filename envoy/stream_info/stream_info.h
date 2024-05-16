@@ -839,6 +839,13 @@ public:
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
 
   /**
+   * @param name the namespace used in the metadata in reverse DNS format, for example:
+   * envoy.test.my_filter.
+   * @param value of type protobuf any to set on the namespace.
+   */
+  virtual void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) PURE;
+
+  /**
    * Object on which filters can share data on a per-request basis. For singleton data objects, only
    * one filter can produce a named data object. List data objects can be updated by multiple
    * filters (append only). Both object types can be consumed by multiple filters.

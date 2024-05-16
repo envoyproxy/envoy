@@ -17,7 +17,7 @@ ListenerFilterBufferImpl::ListenerFilterBufferImpl(IoHandle& io_handle,
   ASSERT(buffer_size > 0);
 
   io_handle_.initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { onFileEvent(events); },
+      dispatcher_, [this](uint32_t events) { return onFileEvent(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Closed);
 }
 
@@ -91,12 +91,12 @@ void ListenerFilterBufferImpl::activateFileEvent(uint32_t events) {
   io_handle_.activateFileEvents(events);
 }
 
-void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
+absl::Status ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
   ENVOY_LOG(trace, "onFileEvent: {}", events);
 
   if (events & Event::FileReadyType::Closed) {
     on_close_cb_(false);
-    return;
+    return absl::OkStatus();
   }
 
   ASSERT(events == Event::FileReadyType::Read);
@@ -110,6 +110,7 @@ void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
     on_close_cb_(false);
   }
   // Did nothing for `Api::IoError::IoErrorCode::Again`
+  return absl::OkStatus();
 }
 
 } // namespace Network

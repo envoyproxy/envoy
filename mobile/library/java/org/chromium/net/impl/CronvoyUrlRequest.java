@@ -944,14 +944,18 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
       int javaError = mapNetErrorToCronetApiErrorCode(netError);
 
       if (isQuicException(javaError)) {
+        // `message` is populated from StreamInfo::responseCodeDetails(), so `message` is used to
+        // populate the error details in the exception.
         enterErrorState(new CronvoyQuicExceptionImpl("Exception in CronvoyUrlRequest: " + netError,
                                                      javaError, netError.getErrorCode(),
-                                                     Errors.QUIC_INTERNAL_ERROR));
+                                                     Errors.QUIC_INTERNAL_ERROR, message));
         return;
       }
 
+      // `message` is populated from StreamInfo::responseCodeDetails(), so `message` is used to
+      // populate the error details in the exception.
       enterErrorState(new CronvoyNetworkExceptionImpl("Exception in CronvoyUrlRequest: " + netError,
-                                                      javaError, netError.getErrorCode()));
+                                                      javaError, netError.getErrorCode(), message));
     }
 
     @Override

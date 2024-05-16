@@ -14,14 +14,6 @@ namespace CertUtility = Envoy::Extensions::TransportSockets::Tls::Utility;
 
 namespace {
 
-template <typename T> T unwrap(ParsingResult<T> res) {
-  if (absl::holds_alternative<T>(res)) {
-    return absl::get<0>(res);
-  }
-
-  throwEnvoyExceptionOrPanic(std::string(absl::get<1>(res)));
-}
-
 int attemptParseTagForErrorMessage(CBS& cbs) {
   unsigned tag = 0;
   if (!CBS_get_any_asn1_element(&cbs, nullptr, &tag, nullptr)) {
@@ -52,8 +44,12 @@ absl::Status skipResponderId(CBS& cbs) {
   // KeyHash ::= OCTET STRING -- SHA-1 hash of responder's public key
   //    (excluding the tag and length fields)
 
-  if (unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
-      unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 2))) {
+  auto opt1 = Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1);
+  RETURN_IF_STATUS_NOT_OK(opt1);
+  auto opt2 = Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 2);
+  RETURN_IF_STATUS_NOT_OK(opt2);
+
+  if (opt1.value() || opt2.value()) {
     return absl::OkStatus();
   }
 
@@ -67,10 +63,14 @@ absl::Status skipCertStatus(CBS& cbs) {
   //  revoked             [1] IMPLICIT RevokedInfo,
   //  unknown             [2] IMPLICIT UnknownInfo
   // }
-  if (!(unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 0)) ||
-        unwrap(
-            Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
-        unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 2)))) {
+  auto opt1 = Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 0);
+  RETURN_IF_STATUS_NOT_OK(opt1);
+  auto opt2 = Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1);
+  RETURN_IF_STATUS_NOT_OK(opt2);
+  auto opt3 = Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 2);
+  RETURN_IF_STATUS_NOT_OK(opt3);
+
+  if (!(opt1.value() || opt2.value() || opt3.value())) {
     return absl::InvalidArgumentError(
         absl::StrCat("Unknown OcspCertStatus tag: ", attemptParseTagForErrorMessage(cbs)));
   }
@@ -181,8 +181,9 @@ absl::StatusOr<std::unique_ptr<OcspResponse>> Asn1OcspUtility::parseOcspResponse
 
   auto status_or_error = Asn1OcspUtility::parseResponseStatus(elem);
   RETURN_IF_STATUS_NOT_OK(status_or_error);
-  auto maybe_bytes =
-      unwrap(Asn1Utility::getOptional(elem, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0));
+  auto opt = Asn1Utility::getOptional(elem, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0);
+  RETURN_IF_STATUS_NOT_OK(opt);
+  auto maybe_bytes = opt.value();
   ResponsePtr resp = nullptr;
   if (maybe_bytes) {
     auto resp_or_error = Asn1OcspUtility::parseResponseBytes(maybe_bytes.value());
@@ -240,7 +241,9 @@ absl::StatusOr<ResponsePtr> Asn1OcspUtility::parseResponseBytes(CBS& cbs) {
     return absl::InvalidArgumentError("OCSP ResponseBytes is not a well-formed SEQUENCE");
   }
 
-  auto oid_str = unwrap(Asn1Utility::parseOid(elem));
+  auto parse_or_error = Asn1Utility::parseOid(elem);
+  RETURN_IF_STATUS_NOT_OK(parse_or_error);
+  auto oid_str = parse_or_error.value();
   if (!CBS_get_asn1(&elem, &response, CBS_ASN1_OCTETSTRING)) {
     return absl::InvalidArgumentError("Expected ASN.1 OCTETSTRING for response");
   }
@@ -289,10 +292,14 @@ absl::StatusOr<ResponseData> Asn1OcspUtility::parseResponseData(CBS& cbs) {
   }
 
   // only support v1, the value of v1 is 0x00
-  auto version_cbs =
-      unwrap(Asn1Utility::getOptional(elem, CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0));
+  auto version_or_error =
+      Asn1Utility::getOptional(elem, CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0);
+  RETURN_IF_STATUS_NOT_OK(version_or_error);
+  auto version_cbs = version_or_error.value();
   if (version_cbs.has_value()) {
-    auto version = unwrap(Asn1Utility::parseInteger(*version_cbs));
+    auto version_or_error = Asn1Utility::parseInteger(*version_cbs);
+    RETURN_IF_STATUS_NOT_OK(version_or_error);
+    auto version = version_or_error.value();
     if (version != "00") {
       return absl::InvalidArgumentError(
           fmt::format("OCSP ResponseData version 0x{} is not supported", version));
@@ -301,14 +308,13 @@ absl::StatusOr<ResponseData> Asn1OcspUtility::parseResponseData(CBS& cbs) {
 
   auto status = skipResponderId(elem);
   RETURN_IF_NOT_OK(status);
-  unwrap(Asn1Utility::skip(elem, CBS_ASN1_GENERALIZEDTIME));
-  auto responses = unwrap(Asn1Utility::parseSequenceOf<SingleResponse>(
-      elem, [](CBS& cbs) -> ParsingResult<SingleResponse> {
-        return {THROW_OR_RETURN_VALUE(parseSingleResponse(cbs), SingleResponse)};
-      }));
+  RETURN_IF_STATUS_NOT_OK(Asn1Utility::skip(elem, CBS_ASN1_GENERALIZEDTIME));
+  auto responses_or_error = Asn1Utility::parseSequenceOf<SingleResponse>(
+      elem, [](CBS& cbs) -> absl::StatusOr<SingleResponse> { return {parseSingleResponse(cbs)}; });
+  RETURN_IF_STATUS_NOT_OK(responses_or_error);
   // Extensions currently ignored.
 
-  return {std::move(responses)};
+  return {std::move(responses_or_error.value())};
 }
 
 absl::StatusOr<SingleResponse> Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
@@ -327,13 +333,16 @@ absl::StatusOr<SingleResponse> Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
   auto id_or_error = Asn1OcspUtility::parseCertId(elem);
   RETURN_IF_STATUS_NOT_OK(id_or_error);
   RETURN_IF_NOT_OK(skipCertStatus(elem));
-  auto this_update = unwrap(Asn1Utility::parseGeneralizedTime(elem));
-  auto next_update = unwrap(Asn1Utility::parseOptional<Envoy::SystemTime>(
+  auto this_update_or_error = Asn1Utility::parseGeneralizedTime(elem);
+  RETURN_IF_STATUS_NOT_OK(this_update_or_error);
+  auto next_update_or_error = Asn1Utility::parseOptional<Envoy::SystemTime>(
       elem, Asn1Utility::parseGeneralizedTime,
-      CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0));
+      CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0);
+  RETURN_IF_STATUS_NOT_OK(next_update_or_error);
   // Extensions currently ignored.
 
-  return SingleResponse{id_or_error.value(), this_update, next_update};
+  return SingleResponse{id_or_error.value(), this_update_or_error.value(),
+                        next_update_or_error.value()};
 }
 
 absl::StatusOr<CertId> Asn1OcspUtility::parseCertId(CBS& cbs) {
@@ -348,12 +357,13 @@ absl::StatusOr<CertId> Asn1OcspUtility::parseCertId(CBS& cbs) {
     return absl::InvalidArgumentError("OCSP CertID is not a well-formed ASN.1 SEQUENCE");
   }
 
-  unwrap(Asn1Utility::skip(elem, CBS_ASN1_SEQUENCE));
-  unwrap(Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING));
-  unwrap(Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING));
-  auto serial_number = unwrap(Asn1Utility::parseInteger(elem));
+  RETURN_IF_STATUS_NOT_OK(Asn1Utility::skip(elem, CBS_ASN1_SEQUENCE));
+  RETURN_IF_STATUS_NOT_OK(Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING));
+  RETURN_IF_STATUS_NOT_OK(Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING));
+  auto serial_number_or_error = Asn1Utility::parseInteger(elem);
+  RETURN_IF_STATUS_NOT_OK(serial_number_or_error);
 
-  return {serial_number};
+  return {serial_number_or_error.value()};
 }
 
 } // namespace Ocsp
