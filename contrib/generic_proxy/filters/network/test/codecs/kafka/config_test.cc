@@ -153,7 +153,7 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
     KafkaRequestFrame request_frame(request);
 
-    // Do nothiing.
+    // Do nothing.
     server_codec.encode(request_frame, encoding_callbacks);
   }
 
@@ -242,7 +242,7 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
             NetworkFilters::Kafka::FetchResponse({}, {}));
     KafkaResponseFrame response_frame(response);
 
-    // Do nothiing.
+    // Do nothing.
     client_codec.encode(response_frame, encoding_callbacks);
   }
 
