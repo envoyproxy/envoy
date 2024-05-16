@@ -25,16 +25,16 @@ import (
 )
 
 type connectionCallback struct {
-	wrapper        unsafe.Pointer
-	writeFunc      func(envoyFilter unsafe.Pointer, buffers unsafe.Pointer, buffersNum int, endStream int)
-	closeFunc      func(envoyFilter unsafe.Pointer, closeType int)
-	infoFunc       func(envoyFilter unsafe.Pointer, infoType int) string
+	wrapper                 unsafe.Pointer
+	writeFunc               func(envoyFilter unsafe.Pointer, buffers unsafe.Pointer, buffersNum int, endStream int)
+	closeFunc               func(envoyFilter unsafe.Pointer, closeType int)
+	infoFunc                func(envoyFilter unsafe.Pointer, infoType int) string
 	connEnableHalfCloseFunc func(envoyFilter unsafe.Pointer, enableHalfClose int)
-	streamInfo     api.StreamInfo
-	state          *filterState
-	sema           sync.WaitGroup
-	waitingOnEnvoy int32
-	mutex          sync.Mutex
+	streamInfo              api.StreamInfo
+	state                   *filterState
+	sema                    sync.WaitGroup
+	waitingOnEnvoy          int32
+	mutex                   sync.Mutex
 }
 
 var _ api.ConnectionCallback = (*connectionCallback)(nil)
