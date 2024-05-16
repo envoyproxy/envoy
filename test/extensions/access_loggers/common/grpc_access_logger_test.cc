@@ -67,7 +67,8 @@ public:
           client, service_method, GrpcCommon::optionalRetryPolicy(config));
     return std::make_unique<
         Common::UnaryGrpcAccessLogClient<ProtobufWkt::Struct, ProtobufWkt::Struct>>(
-        client, service_method, GrpcCommon::optionalRetryPolicy(config), [this]() { return this; });
+        client, service_method, GrpcCommon::optionalRetryPolicy(config),
+        [this]() -> MockGrpcAccessLoggerImpl& { return *this; });
   }
 
   int numInits() const { return num_inits_; }
