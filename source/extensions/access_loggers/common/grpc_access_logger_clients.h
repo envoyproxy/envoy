@@ -61,7 +61,7 @@ private:
 template <typename LogRequest, typename LogResponse>
 class UnaryGrpcAccessLogClient : public GrpcAccessLogClient<LogRequest, LogResponse> {
 public:
-  typedef std::function<Grpc::AsyncRequestCallbacks<LogResponse>*()> AsyncRequestCallbacksFactory;
+  typedef std::function<Grpc::AsyncRequestCallbacks<LogResponse>&()> AsyncRequestCallbacksFactory;
 
   UnaryGrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                            const Protobuf::MethodDescriptor& service_method,
@@ -75,7 +75,7 @@ public:
   bool log(const LogRequest& request) override {
     GrpcAccessLogClient<LogRequest, LogResponse>::client_->send(
         GrpcAccessLogClient<LogRequest, LogResponse>::service_method_, request,
-        *callbacks_factory_(), Tracing::NullSpan::instance(),
+        callbacks_factory_(), Tracing::NullSpan::instance(),
         GrpcAccessLogClient<LogRequest, LogResponse>::opts_);
     return true;
   }

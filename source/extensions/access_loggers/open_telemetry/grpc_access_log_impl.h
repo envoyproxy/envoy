@@ -93,7 +93,7 @@ private:
   void initMessage() override;
   void clearMessage() override;
 
-  std::function<OTelLogRequestCallbacks*()> genOTelCallbacksFactory();
+  std::function<OTelLogRequestCallbacks&()> genOTelCallbacksFactory();
 
   opentelemetry::proto::logs::v1::ScopeLogs* root_;
   Common::GrpcAccessLoggerStats stats_;

@@ -52,18 +52,19 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
   initMessageRoot(config, local_info);
 }
 
-std::function<GrpcAccessLoggerImpl::OTelLogRequestCallbacks*()>
+std::function<GrpcAccessLoggerImpl::OTelLogRequestCallbacks&()>
 GrpcAccessLoggerImpl::genOTelCallbacksFactory() {
-  return [this]() {
-    OTelLogRequestCallbacks* ptr = new OTelLogRequestCallbacks(
+  return [this]() -> OTelLogRequestCallbacks& {
+    auto callback = std::make_unique<OTelLogRequestCallbacks>(
         this->stats_, this->batched_log_entries_, [this](OTelLogRequestCallbacks* p) {
           if (this->callbacks_.contains(p)) {
             this->callbacks_.erase(p);
           }
         });
+    OTelLogRequestCallbacks* ptr = callback.get();
     this->batched_log_entries_ = 0;
-    this->callbacks_.emplace(ptr, ptr);
-    return ptr;
+    this->callbacks_.emplace(ptr, std::move(callback));
+    return *ptr;
   };
 }
 // See comment about the structure of repeated fields in the header file.
