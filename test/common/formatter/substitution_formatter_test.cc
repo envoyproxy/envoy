@@ -2145,7 +2145,7 @@ TEST(SubstitutionFormatterTest, responseTrailerFormatter) {
   }
 }
 
-TEST(SubstitutionFormatterTest, Trac) {
+TEST(SubstitutionFormatterTest, TraceIDFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{};
   Http::TestResponseHeaderMapImpl response_header{};
