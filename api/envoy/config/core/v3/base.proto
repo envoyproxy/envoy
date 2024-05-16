@@ -432,7 +432,7 @@ message DataSource {
   }
 
   // Watched directory that is watched for file changes. If this is set explicitly, the file
-  // specified in the ``filename`` field will be reloaded when the expected events occur.
+  // specified in the ``filename`` field will be reloaded when relevant file move events occur.
   //
   // .. note::
   //   This field only makes sense when the ``filename`` field is set.
