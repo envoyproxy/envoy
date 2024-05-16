@@ -163,7 +163,7 @@ public:
             return e.first.size() != len;
           });
       std::vector<KV> node_contents;
-      // Populate a FindFn for the nodes in that range.
+      // Populate a Node for the entries in that range.
       node_contents.reserve(range_end - range_start);
       std::move(range_start, range_end, std::back_inserter(node_contents));
       table_[range_start->first.size()] = createEqualLengthNode(node_contents);
