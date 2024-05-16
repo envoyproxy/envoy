@@ -435,7 +435,7 @@ message DataSource {
   // specified in the ``filename`` field will be reloaded when the expected events occur.
   //
   // .. note::
-  //   This field is only makes sense when the ``filename`` field is set.
+  //   This field only makes sense when the ``filename`` field is set.
   //
   // .. note::
   //   Envoy only updates when the file is replaced by a file move, and not when the file is
