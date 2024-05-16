@@ -56,9 +56,28 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "grpc_access_logger_clients_lib",
+    hdrs = ["grpc_access_logger_clients.h"],
+    deps = [
+        ":grpc_access_logger_utils_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/grpc:async_client_manager_interface",
+        "//envoy/singleton:instance_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/grpc:typed_async_client_lib",
+        "//source/common/protobuf:utility_lib",
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "grpc_access_logger",
     hdrs = ["grpc_access_logger.h"],
     deps = [
+        ":grpc_access_logger_clients_lib",
         ":grpc_access_logger_utils_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/grpc:async_client_manager_interface",
