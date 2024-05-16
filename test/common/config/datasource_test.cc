@@ -159,11 +159,13 @@ TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
 TEST(DataSourceProviderTest, NonFileDataSourceTest) {
   envoy::config::core::v3::DataSource config;
   TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
-  config.mutable_watched_directory()->set_path(TestEnvironment::temporaryPath("envoy_test"));
 
-  const std::string yaml = R"EOF(
+  const std::string yaml = fmt::format(R"EOF(
     inline_string: "Hello, world!"
-  )EOF";
+    watched_directory:
+      path: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath("envoy_test"));
   TestUtility::loadFromYamlAndValidate(yaml, config);
 
   EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kInlineString,
@@ -242,12 +244,14 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatch) {
 
   envoy::config::core::v3::DataSource config;
   TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
-  config.mutable_watched_directory()->set_path(TestEnvironment::temporaryPath("envoy_test"));
 
   const std::string yaml = fmt::format(R"EOF(
     filename: "{}"
+    watched_directory:
+      path: "{}"
   )EOF",
-                                       TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+                                       TestEnvironment::temporaryPath("envoy_test/watcher_link"),
+                                       TestEnvironment::temporaryPath("envoy_test"));
   TestUtility::loadFromYamlAndValidate(yaml, config);
 
   {
@@ -300,12 +304,14 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatchButUpdateError) {
 
   envoy::config::core::v3::DataSource config;
   TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
-  config.mutable_watched_directory()->set_path(TestEnvironment::temporaryPath("envoy_test"));
 
   const std::string yaml = fmt::format(R"EOF(
     filename: "{}"
+    watched_directory:
+      path: "{}"
   )EOF",
-                                       TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+                                       TestEnvironment::temporaryPath("envoy_test/watcher_link"),
+                                       TestEnvironment::temporaryPath("envoy_test"));
   TestUtility::loadFromYamlAndValidate(yaml, config);
 
   {
