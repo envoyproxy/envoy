@@ -100,13 +100,13 @@ bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view usern
 Http::FilterHeadersStatus BasicAuthFilter::onDenied(absl::string_view body,
                                                     absl::string_view response_code_details) {
   config_->stats().denied_.inc();
-  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, body,
-                                     [uri = this->original_uri_](Http::ResponseHeaderMap& headers) {
-                                       std::string value =
-                                           absl::StrCat("Basic realm=\"", uri, "\"");
-                                       headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
-                                     },
-                                     absl::nullopt, response_code_details);
+  decoder_callbacks_->sendLocalReply(
+      Http::Code::Unauthorized, body,
+      [uri = this->original_uri_](Http::ResponseHeaderMap& headers) {
+        std::string value = absl::StrCat("Basic realm=\"", uri, "\"");
+        headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
+      },
+      absl::nullopt, response_code_details);
   return Http::FilterHeadersStatus::StopIteration;
 }
 
