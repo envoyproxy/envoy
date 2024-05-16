@@ -143,6 +143,19 @@ public:
                          const StreamInfo::StreamInfo& stream_info) const override;
 };
 
+/**
+ * FormatterProvider for trace ID.
+ */
+class TraceIDFormatter : public FormatterProvider {
+public:
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
+};
+
 class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
 public:
   enum Format {

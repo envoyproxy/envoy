@@ -197,6 +197,17 @@ HeadersByteSizeFormatter::formatValueWithContext(const HttpFormatterContext& con
       context.requestHeaders(), context.responseHeaders(), context.responseTrailers()));
 }
 
+ProtobufWkt::Value TraceIDFormatter::formatValueWithContext(const HttpFormatterContext& context,
+                                                            const StreamInfo::StreamInfo&) const {
+  return ValueUtil::stringValue(context.activeSpan().getTraceIdAsHex());
+}
+
+absl::optional<std::string>
+TraceIDFormatter::formatWithContext(const HttpFormatterContext& context,
+                                    const StreamInfo::StreamInfo&) const {
+  return context.activeSpan().getTraceIdAsHex();
+}
+
 GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view format) {
   if (format.empty() || format == "CAMEL_STRING") {
     return GrpcStatusFormatter::CamelString;
@@ -390,6 +401,10 @@ HttpBuiltInCommandParser::getKnownFormatters() {
 
            return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
                                                            max_length);
+         }}},
+       {"TRACE_ID",
+        {CommandSyntaxChecker::COMMAND_ONLY, [](const std::string&, absl::optional<size_t>&) {
+           return std::make_unique<TraceIDFormatter>();
          }}}});
 }
 
