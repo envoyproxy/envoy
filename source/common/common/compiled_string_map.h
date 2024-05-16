@@ -125,7 +125,7 @@ public:
     const size_t key_size = key.size();
     // Theoretically we could also bottom-cap the size range, but the
     // cost of the extra comparison and operation would almost certainly
-    // outweight the benefit of omitting 4 or 5 entries.
+    // outweigh the benefit of omitting 4 or 5 entries.
     if (key_size >= table_.size() || table_[key_size] == nullptr) {
       return {};
     }
