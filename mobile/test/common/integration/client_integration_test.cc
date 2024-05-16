@@ -728,6 +728,21 @@ TEST_P(ClientIntegrationTest, BasicBeforeResponseHeaders) {
   ASSERT_EQ(cc_.on_headers_calls_, 0);
 }
 
+TEST_P(ClientIntegrationTest, ExplicitBeforeResponseHeaders) {
+  explicit_flow_control_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
+
+  stream_ = createNewStream(createDefaultStreamCallbacks());
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls_, 1);
+  ASSERT_EQ(cc_.on_headers_calls_, 0);
+}
+
 TEST_P(ClientIntegrationTest, ResetAfterResponseHeaders) {
   autonomous_allow_incomplete_streams_ = true;
   initialize();
