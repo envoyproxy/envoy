@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ type filter struct {
 	method          string
 	path            string
 	host            string
+	all_headers     map[string][]string
 
 	// for bad api call testing
 	header api.RequestHeaderMap
@@ -180,6 +182,31 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		}
 		return true
 	})
+
+	test_header_key := "test-header-copy"
+
+	old_value := "old-value"
+
+	header.Set(test_header_key, old_value)
+
+	f.all_headers = make(map[string][]string)
+
+	header.RangeWithCopy(func(key, value string) bool {
+		f.all_headers[key] = append(f.all_headers[key], value)
+		return true
+	})
+
+	header_map := header.GetAllHeaders()
+
+	if !reflect.DeepEqual(f.all_headers, header_map) {
+		return f.fail("GetAllHeaders returned incorrect data, expected:\n%v\n got:\n%v", f.all_headers, header_map)
+	}
+
+	header.Set(test_header_key, "new-value")
+
+	if !reflect.DeepEqual(header_map[test_header_key], []string{old_value}) {
+		return f.fail("GetAllHeaders output changed - expected '%v', got '%v'", []string{old_value}, header_map[test_header_key])
+	}
 
 	origin, found := header.Get("x-test-header-0")
 	hdrs := header.Values("x-test-header-0")
