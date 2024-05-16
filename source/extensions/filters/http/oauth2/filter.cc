@@ -724,13 +724,13 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
             ? CookieTailHttpOnlyFormatString
             : CookieTailFormatString;
 
-    const std::string access_token_cookie_tail = fmt::format(cookie_tail_format_string, max_age);
+    std::string access_token_cookie_tail = fmt::format(cookie_tail_format_string, max_age);
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.bearer_token_, "=", access_token_, access_token_cookie_tail));
 
     if (!id_token_.empty()) {
-      const std::string id_token_cookie_tail =
+      std::string id_token_cookie_tail =
           fmt::format(cookie_tail_format_string, expires_id_token_in_);
       headers.addReferenceKey(
           Http::Headers::get().SetCookie,
@@ -738,7 +738,7 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
     }
 
     if (!refresh_token_.empty()) {
-      const std::string refresh_token_cookie_tail =
+      std::string refresh_token_cookie_tail =
           fmt::format(cookie_tail_format_string, expires_refresh_token_in_);
       headers.addReferenceKey(Http::Headers::get().SetCookie,
                               absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
