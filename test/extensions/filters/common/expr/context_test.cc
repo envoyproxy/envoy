@@ -44,6 +44,14 @@ TEST(Context, EmptyHeadersAttributes) {
 }
 
 TEST(Context, InvalidRequest) {
+  Http::TestRequestHeaderMapImpl header_map{{"referer", "dogs.com"}};
+  Protobuf::Arena arena;
+  HeadersWrapper<Http::RequestHeaderMap> headers(arena, &header_map);
+  auto header = headers[CelValue::CreateStringView("dogs.com\n")];
+  EXPECT_FALSE(header.has_value());
+}
+
+TEST(Context, InvalidRequestLegacy) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.consistent_header_validation", "false"}});
 
