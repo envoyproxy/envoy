@@ -27,13 +27,21 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata
               request_rules:
-              - field: METHOD_NAME
+              - field: PROTOCOL
                 on_present:
                   metadata_namespace: envoy.lb
-                  key: method_name
+                  key: protocol
                 on_missing:
                   metadata_namespace: envoy.lb
-                  key: method_name
+                  key: protocol
+                  value: "unknown"
+              - field: TRANSPORT
+                on_present:
+                  metadata_namespace: envoy.lb
+                  key: transport
+                on_missing:
+                  metadata_namespace: envoy.lb
+                  key: transport
                   value: "unknown"
               response_rules:
               - field: MESSAGE_TYPE
@@ -64,7 +72,8 @@ static_resources:
       fallback_policy: ANY_ENDPOINT
       subset_selectors:
       - keys:
-        - method_name
+        - protocol
+        - transport
     load_assignment:
       cluster_name: versioned-cluster
       endpoints:

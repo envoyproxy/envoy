@@ -20,13 +20,15 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Thrift-To-Metadata Filter]
 //
-// The configuration for transforming thrift metadata into filter metadata. This is useful
-// for matching load balancer subsets, logging, etc.
+// The Thrift to Metadata filter serves for thrift over HTTP traffic, expecting serialized
+// Thrift request and response bodies in the HTTP payload. It extracts thrift metadata from the
+// HTTP body and put them into the filter metadata. This is useful for matching load balancer
+// subsets, logging, etc.
 //
 // Thrift to Metadata :ref:`configuration overview <config_http_filters_thrift_to_metadata>`.
 // [#extension: envoy.filters.http.thrift_to_metadata]
 
-enum Fields {
+enum Field {
   // The Thrift method name, string value.
   METHOD_NAME = 0;
 
@@ -78,7 +80,7 @@ message FieldSelector {
 
 message Rule {
   // The field to match on. If set, takes precedence over field_selector.
-  Fields field = 1;
+  Field field = 1;
 
   // Specifies that a match will be performed on the value of a field. If set,
   // the whole http body will be buffered to extract the field value, which
@@ -92,6 +94,8 @@ message Rule {
   KeyValuePair on_missing = 4;
 }
 
+// The configuration for transforming thrift metadata into filter metadata.
+//
 // [#next-free-field: 7]
 message ThriftToMetadata {
   // The list of rules to apply to http request body to extract thrift metadata.

@@ -5,8 +5,9 @@ Envoy Thrift-To-Metadata Filter
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata>`
 
-This filter is configured with rules that will be matched against Apache thrift compatible requests and responses.
-The filter will parse the thrift body, extract thrift metadata or payload, and add them to dynamic metadata
+The Thrift to Metadata filter serves for thrift over HTTP traffic, expecting serialized Thrift request and response bodies
+in the HTTP payload. This filter is configured with rules that will be matched against Apache thrift compatible requests and
+responses in HTTP payload. The filter will parse the thrift body, extract thrift metadata or payload, and add them to dynamic metadata
 based on the configuration of the rule.
 
 The metadata can then be used for load balancing decisions, consumed from logs, etc.
