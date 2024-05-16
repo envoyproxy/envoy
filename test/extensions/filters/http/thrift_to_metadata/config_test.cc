@@ -11,7 +11,7 @@ namespace HttpFilters {
 namespace ThriftToMetadata {
 
 TEST(Factory, Basic) {
-  const std::string yaml =  R"(
+  const std::string yaml = R"(
 request_rules:
 - field: PROTOCOL
   on_present:
