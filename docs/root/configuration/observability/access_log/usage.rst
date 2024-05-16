@@ -695,6 +695,12 @@ UDP
   If the original connection was redirected by iptables TPROXY, and the listener's transparent
   option was set to true, this represents the original destination address and port.
 
+  .. note::
+
+    This may not be the physical remote address of the peer if the address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
+    <config_http_conn_man_headers_x-forwarded-for>`.
+
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
   Local address of the downstream connection, without any port component.
   IP addresses are the only address type with a port component.
