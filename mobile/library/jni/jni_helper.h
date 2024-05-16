@@ -233,11 +233,26 @@ public:
   void throwNew(const char* java_class_name, const char* message);
 
   /**
-   * Determines if an exception is being thrown.
+   * Returns true if an exception is being thrown; false otherwise.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#exceptionoccurred
+   */
+  [[nodiscard]] jboolean exceptionCheck();
+
+  /**
+   * Determines if an exception is being thrown. Returns a `nullptr` if there is no exception.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#exceptionoccurred
    */
   [[nodiscard]] LocalRefUniquePtr<jthrowable> exceptionOccurred();
+
+  /**
+   * Clears any exception that is currently being thrown. If no exception is currently being thrown,
+   * this function has no effect.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#exceptionclear
+   */
+  void exceptionCleared();
 
   /**
    * Creates a new global reference to the object referred to by the `object` argument.

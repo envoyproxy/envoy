@@ -92,13 +92,17 @@ void JniHelper::throwNew(const char* java_class_name, const char* message) {
   LocalRefUniquePtr<jclass> java_class = findClass(java_class_name);
   if (java_class != nullptr) {
     jint error = env_->ThrowNew(java_class.get(), message);
-    ASSERT(error == JNI_OK, fmt::format("Failed calling ThrowNew."));
+    ASSERT(error == JNI_OK, "Failed calling ThrowNew.");
   }
 }
+
+jboolean JniHelper::exceptionCheck() { return env_->ExceptionCheck(); }
 
 LocalRefUniquePtr<jthrowable> JniHelper::exceptionOccurred() {
   return {env_->ExceptionOccurred(), LocalRefDeleter(env_)};
 }
+
+void JniHelper::exceptionCleared() { env_->ExceptionClear(); }
 
 GlobalRefUniquePtr<jobject> JniHelper::newGlobalRef(jobject object) {
   GlobalRefUniquePtr<jobject> result(env_->NewGlobalRef(object), GlobalRefDeleter(env_));

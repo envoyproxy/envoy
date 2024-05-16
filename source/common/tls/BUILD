@@ -60,7 +60,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "ssl_socket_lib",
+    name = "ssl_socket_base",
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
     external_deps = [
@@ -92,6 +92,46 @@ envoy_cc_library(
         "//source/common/common:thread_annotations",
         "//source/common/http:headers_lib",
         "//source/common/network:transport_socket_options_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "client_ssl_socket_lib",
+    srcs = ["client_ssl_socket.cc"],
+    hdrs = ["client_ssl_socket.h"],
+    external_deps = [
+        "abseil_hash",
+        "abseil_node_hash_map",
+        "abseil_optional",
+        "abseil_synchronization",
+        "ssl",
+    ],
+    deps = [
+        ":ssl_socket_base",
+    ],
+)
+
+envoy_cc_library(
+    name = "server_ssl_socket_lib",
+    srcs = ["server_ssl_socket.cc"],
+    hdrs = ["server_ssl_socket.h"],
+    external_deps = [
+        "abseil_hash",
+        "abseil_node_hash_map",
+        "abseil_optional",
+        "abseil_synchronization",
+        "ssl",
+    ],
+    deps = [
+        ":ssl_socket_base",
+    ],
+)
+
+envoy_cc_library(
+    name = "ssl_socket_lib",
+    deps = [
+        ":client_ssl_socket_lib",
+        ":server_ssl_socket_lib",
     ],
 )
 

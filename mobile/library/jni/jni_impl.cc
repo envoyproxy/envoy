@@ -14,7 +14,6 @@
 #include "library/jni/android_network_utility.h"
 #include "library/jni/jni_helper.h"
 #include "library/jni/jni_utility.h"
-#include "library/jni/types/exception.h"
 
 using Envoy::Platform::EngineBuilder;
 
@@ -211,13 +210,18 @@ jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoyHeaders& head
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> result = jni_helper.callObjectMethod<jobjectArray>(
       j_context, jmid_onHeaders, static_cast<jlong>(headers.get().length),
       end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel.get());
-  // TODO(Augustyniak): Pass the name of the filter in here so that we can instrument the origin of
-  // the JNI exception better.
-  bool exception_cleared = Envoy::JNI::Exception::checkAndClear(method);
 
-  if (!exception_cleared) {
+  if (!jni_helper.exceptionCheck()) {
     return result;
   }
+  // TODO(fredyw): The whole code here is a bit weird, but this how it currently works. Consider
+  // rewriting it.
+  auto java_exception = jni_helper.exceptionOccurred();
+  jni_helper.exceptionCleared();
+  std::string java_exception_message =
+      Envoy::JNI::getJavaExceptionMessage(jni_helper, java_exception.get());
+  ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "jni_cleared_pending_exception", "{}",
+                            absl::StrFormat("%s||%s||", java_exception_message, method));
 
   // Create a "no operation" result:
   //  1. Tell the filter chain to continue the iteration.

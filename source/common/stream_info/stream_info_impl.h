@@ -292,6 +292,10 @@ struct StreamInfoImpl : public StreamInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
+  void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) override {
+    (*metadata_.mutable_typed_filter_metadata())[name].MergeFrom(value);
+  }
+
   const FilterStateSharedPtr& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return *filter_state_; }
 
