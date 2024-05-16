@@ -107,6 +107,16 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
+   * Enable Android system proxying.
+   *
+   * @param enable If true, enable Android proxying; otherwise, don't.
+   */
+  public CronvoyEngineBuilderImpl setEnableProxying(boolean enable) {
+    mEnableProxying = enable;
+    return this;
+  }
+
+  /**
    * Adds url interceptors to the cronetEngine
    *
    * @return the builder to facilitate chaining.
