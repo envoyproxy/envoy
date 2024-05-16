@@ -13,6 +13,7 @@ namespace HttpFilters {
 namespace BasicAuth {
 
 namespace {
+constexpr uint32_t MaximumUriLength = 256;
 
 // Function to compute SHA1 hash
 std::string computeSHA1(absl::string_view password) {
@@ -41,6 +42,8 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
   if (route_specific_settings != nullptr) {
     users = &route_specific_settings->users();
   }
+
+  original_uri_ = Http::Utility::buildOriginalUri(headers, MaximumUriLength);
 
   auto auth_header = headers.get(Http::CustomHeaders::get().Authorization);
 
@@ -97,8 +100,13 @@ bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view usern
 Http::FilterHeadersStatus BasicAuthFilter::onDenied(absl::string_view body,
                                                     absl::string_view response_code_details) {
   config_->stats().denied_.inc();
-  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, body, nullptr, absl::nullopt,
-                                     response_code_details);
+  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, body,
+                                     [uri = this->original_uri_](Http::ResponseHeaderMap& headers) {
+                                       std::string value =
+                                           absl::StrCat("Basic realm=\"", uri, "\"");
+                                       headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
+                                     },
+                                     absl::nullopt, response_code_details);
   return Http::FilterHeadersStatus::StopIteration;
 }
 
