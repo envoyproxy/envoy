@@ -264,8 +264,8 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
 
   ProtobufWkt::Struct request_struct;
   request_struct.mutable_fields()->insert({"hits_addend", ValueUtil::numberValue(5)});
-  (*filter_callbacks_.stream_info_.metadata_
-            .mutable_filter_metadata())["envoy.ratelimit"] = request_struct;
+  (*filter_callbacks_.stream_info_.metadata_.mutable_filter_metadata())["envoy.ratelimit"] =
+      request_struct;
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -305,7 +305,6 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   EXPECT_EQ(
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
-
 
 TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
   setUpTest(filter_config_);
