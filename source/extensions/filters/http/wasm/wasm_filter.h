@@ -27,6 +27,9 @@ public:
   FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                Server::Configuration::FactoryContext& context);
 
+  FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
+               Server::Configuration::UpstreamFactoryContext& context);
+
   std::shared_ptr<Context> createFilter() {
     Wasm* wasm = nullptr;
     if (!tls_slot_->currentThreadRegistered()) {

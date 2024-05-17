@@ -59,6 +59,7 @@ protected:
 
   NiceMock<Network::MockListenerInfo> listener_info_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   Api::ApiPtr api_;
@@ -106,6 +107,42 @@ TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
   EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
+  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  cb(filter_callback);
+}
+
+TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasmUpstream) {
+  const std::string json =
+      TestEnvironment::substitute(absl::StrCat(R"EOF(
+  {
+  "config" : {
+  "vm_config": {
+    "runtime": "envoy.wasm.runtime.)EOF",
+                                               std::get<0>(GetParam()), R"EOF(",
+    "configuration": {
+       "@type": "type.googleapis.com/google.protobuf.StringValue",
+       "value": "some configuration"
+    },
+    "code": {
+      "local": {
+        "filename": "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp2.wasm"
+      }
+    },
+  }}}
+  )EOF"));
+
+  envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromJson(json, proto_config);
+  WasmFilterConfig factory;
+  Http::FilterFactoryCb cb;
+  EXPECT_CALL(init_watcher_, ready());
+
+  cb = factory.createFilterFactoryFromProto(proto_config, "stats", upstream_factory_context_)
+           .value();
+  upstream_factory_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(upstream_factory_context_.initManager().state(), Init::Manager::State::Initialized);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_)).Times(0);
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
   cb(filter_callback);
 }

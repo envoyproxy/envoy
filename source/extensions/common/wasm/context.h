@@ -217,7 +217,7 @@ public:
                                Pairs additional_headers, uint32_t grpc_status,
                                std::string_view details) override;
   void clearRouteCache() override {
-    if (decoder_callbacks_) {
+    if (decoder_callbacks_ && decoder_callbacks_->downstreamCallbacks()) {
       decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
   }
