@@ -290,11 +290,9 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
 
   // Initialize connection debug visitor factory if one is configured.
   if (config.has_connection_debug_visitor_config()) {
-    const envoy::config::core::v3::TypedExtensionConfig& connection_debug_visitor_config =
-        config.connection_debug_visitor_config();
     connection_debug_visitor_factory_ =
         Config::Utility::getAndCheckFactory<EnvoyQuicConnectionDebugVisitorFactoryInterface>(
-            connection_debug_visitor_config);
+            config.connection_debug_visitor_config());
     if (connection_debug_visitor_factory_.has_value()) {
       connection_debug_visitor_factory_->setContext(context_);
     }

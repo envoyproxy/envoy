@@ -32,7 +32,7 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
       connection_stats_(connection_stats) {
   // If a factory is available, create a debug visitor and attach it to the connection.
   if (debug_visitor_factory.has_value()) {
-    debug_visitor_ = debug_visitor_factory->createQuicConnectionDebugVisitor(this);
+    debug_visitor_ = debug_visitor_factory->createQuicConnectionDebugVisitor(this, streamInfo());
     quic_connection_->set_debug_visitor(debug_visitor_.get());
   }
 }

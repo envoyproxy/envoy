@@ -689,7 +689,7 @@ TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
   ProcessContextImpl context(test_process_object);
   envoy::config::listener::v3::QuicProtocolOptions quic_config;
   quic_config.mutable_connection_debug_visitor_config()->set_name(
-      "envoy.quic.mock_quic_connection_debug_visitor");
+      "envoy.quic.connection_debug_visitor.mock");
   quic_config.mutable_connection_debug_visitor_config()->mutable_typed_config()->PackFrom(
       test::common::config::DummyConfig());
   auto listener_factory = createQuicListenerFactory(quic_config, context);

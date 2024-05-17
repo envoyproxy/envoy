@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef THIRD_PARTY_ENVOY_SRC_SOURCE_COMMON_QUIC_ENVOY_QUIC_CONNECTION_DEBUG_VISITOR_FACTORY_INTERFACE_H_
-#define THIRD_PARTY_ENVOY_SRC_SOURCE_COMMON_QUIC_ENVOY_QUIC_CONNECTION_DEBUG_VISITOR_FACTORY_INTERFACE_H_
-
 #include <memory>
 #include <string>
 
@@ -10,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/server/process_context.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "quiche/quic/core/quic_connection.h"
 #include "quiche/quic/core/quic_session.h"
@@ -25,7 +23,8 @@ public:
 
   // Returns a debug visitor to be attached to a Quic Connection.
   virtual std::unique_ptr<quic::QuicConnectionDebugVisitor>
-  createQuicConnectionDebugVisitor(quic::QuicSession* session) PURE;
+  createQuicConnectionDebugVisitor(quic::QuicSession* session,
+                                   const StreamInfo::StreamInfo& stream_info) PURE;
 
 protected:
   Envoy::ProcessContextOptRef context_;
@@ -36,5 +35,3 @@ using EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef =
 
 } // namespace Quic
 } // namespace Envoy
-
-#endif // THIRD_PARTY_ENVOY_SRC_SOURCE_COMMON_QUIC_ENVOY_QUIC_CONNECTION_DEBUG_VISITOR_FACTORY_INTERFACE_H_

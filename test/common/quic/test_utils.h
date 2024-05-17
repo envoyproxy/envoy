@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/optref.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_session.h"
@@ -325,26 +326,30 @@ public:
 
 class MockQuicConnectionDebugVisitor : public quic::QuicConnectionDebugVisitor {
 public:
-  MockQuicConnectionDebugVisitor(quic::QuicSession* session) : session_(session) {}
+  MockQuicConnectionDebugVisitor(quic::QuicSession* session,
+                                 const StreamInfo::StreamInfo& stream_info)
+      : session_(session), stream_info_(stream_info) {}
 
   MOCK_METHOD(void, OnConnectionClosed,
               (const quic::QuicConnectionCloseFrame&, quic::ConnectionCloseSource), ());
   MOCK_METHOD(void, OnConnectionCloseFrame, (const quic::QuicConnectionCloseFrame&), ());
 
   quic::QuicSession* session_;
+  const StreamInfo::StreamInfo& stream_info_;
 };
 
 class TestEnvoyQuicConnectionDebugVisitorFactory
     : public EnvoyQuicConnectionDebugVisitorFactoryInterface {
 public:
-  std::string name() const override { return "envoy.quic.mock_quic_connection_debug_visitor"; }
+  std::string name() const override { return "envoy.quic.connection_debug_visitor.mock"; }
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<::test::common::config::DummyConfig>();
   }
   std::unique_ptr<quic::QuicConnectionDebugVisitor>
-  createQuicConnectionDebugVisitor(quic::QuicSession* session) override {
-    auto debug_visitor = std::make_unique<MockQuicConnectionDebugVisitor>(session);
+  createQuicConnectionDebugVisitor(quic::QuicSession* session,
+                                   const StreamInfo::StreamInfo& stream_info) override {
+    auto debug_visitor = std::make_unique<MockQuicConnectionDebugVisitor>(session, stream_info);
     mock_debug_visitor_ = debug_visitor.get();
     return debug_visitor;
   }
