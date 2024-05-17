@@ -169,9 +169,9 @@ new_features:
     :ref:`health_check_config <envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.proxy_protocol_config>`.
 - area: open_telemetry
   change: |
-    added :ref:`stats_prefix
-    <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.stats_prefix>`
-    configuration to support additional stats prefix.
+    added :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.stat_prefix>`
+    configuration to support additional stat prefix.
 
 deprecated:
 - area: tracing
