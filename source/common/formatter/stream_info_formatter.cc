@@ -9,7 +9,6 @@
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
-#include "substitution_format_utility.h"
 
 namespace Envoy {
 namespace Formatter {
