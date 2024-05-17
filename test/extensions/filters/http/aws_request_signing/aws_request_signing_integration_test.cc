@@ -191,6 +191,87 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationUpstream) {
       upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
 }
 
+const std::string SIMPLE_CONFIG = R"EOF(
+layered_runtime:
+  layers:
+  - name: static_layer
+    static_layer:
+      envoy.reloadable_features.use_http_client_to_fetch_aws_credentials: true
+
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8080
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          codec_type: AUTO
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: app
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: versioned-cluster
+          http_filters:
+          - name: envoy.filters.http.aws_request_signing
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
+              service_name: s3
+              region: us-west-2
+              use_unsigned_payload: true
+              match_excluded_headers:
+              - prefix: x-envoy
+              - prefix: x-forwarded
+              - exact: x-amzn-trace-id
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: versioned-cluster
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: versioned-cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8000
+)EOF";
+
+class InitializeFilterTest : public ::testing::Test, public HttpIntegrationTest {
+public:
+  InitializeFilterTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, TestEnvironment::getIpVersionsForTest().front(),
+                            ConfigHelper::httpProxyConfig()) {}
+};
+
+TEST_F(InitializeFilterTest, First) {
+  TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
+
+  config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4, true);
+  HttpIntegrationTest::initialize();
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  EXPECT_EQ(
+      2, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+}
+
 } // namespace
 } // namespace Aws
 } // namespace Common

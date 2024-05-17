@@ -93,6 +93,17 @@ void CachedCredentialsProviderBase::refreshIfNeeded() {
   }
 }
 
+// Logic for async metadata refresh is as follows:
+// Per subclass (instance profile, container credentials, webidentity)
+// 1. Create a single cluster for async handling
+// 2. Create tls slot to hold cluster name and a refresh timer pointer. tls slot instantiation of
+// ThreadLocalCredentialsCache will register the subclass as a callback handler
+// 3. Create refresh timer in the main thread and put it in the slot.
+// 4. When cluster is alive, onClusterAddOrDelete is called which enables the refresh timer. Cluster
+// is deleted from the pending cluster list.
+// 5. Initial credential refresh occurs in main thread and continues in main thread periodically
+// refreshing based on expiration time
+
 // TODO(suniltheta): The field context is of type ServerFactoryContextOptRef so that an
 // optional empty value can be set. Especially in aws iam plugin the cluster manager
 // obtained from server factory context object is not fully initialized due to the
@@ -123,12 +134,10 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
 
         ThreadLocalCredentialsCache& tls_cluster_info = *tls_slot_;
         // Async credential refresh timer
-
         cache_duration_timer_ =
             context_->mainThreadDispatcher().createTimer([this]() -> void { refresh(); });
 
         // Store the timer in pending clusters for use in onClusterAddOrUpdate
-
         cluster_load_handle_ = std::make_unique<LoadClusterEntryHandleImpl>(
             tls_cluster_info.pending_clusters_, cluster_name_, cache_duration_timer_);
       }
@@ -146,8 +155,9 @@ MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::~ThreadLocalCreden
 
 // A thread local callback that occurs on every worker thread during cluster initialization.
 // Credential refresh is only allowed on the main thread as its execution logic is not thread safe.
-// So the first cluster that comes online will post a job to the main thread to perform credential
-// refresh logic. Further clusters that come online will not perform this refresh logic.
+// So the first thread local cluster that comes online will post a job to the main thread to perform
+// credential refresh logic. Further thread local clusters that come online will not trigger the
+// timer.
 
 void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterAddOrUpdate(
     absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand&) {
@@ -159,8 +169,11 @@ void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterAddO
       cluster->cancel();
       ENVOY_LOG_MISC(debug, "Async cluster {} ready, performing initial credential refresh",
                      parent_.cluster_name_);
-      parent_.context_->mainThreadDispatcher().post(
-          [&timer]() { timer->enableTimer(std::chrono::milliseconds(1)); });
+      parent_.context_->mainThreadDispatcher().post([&timer]() {
+        if (!timer->enabled()) {
+          timer->enableTimer(std::chrono::milliseconds(1));
+        }
+      });
     }
     pending_clusters_.erase(it);
   }
