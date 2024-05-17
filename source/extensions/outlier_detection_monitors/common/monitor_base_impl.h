@@ -155,11 +155,10 @@ public:
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() { return validation_visitor_; }
 
 private:
-  // ProtobufMessage::ProdValidationContextImpl validation_context_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
-class MonitorFactory : public Config::TypedFactory {
+class MonitorFactory : public Envoy::Config::TypedFactory {
 public:
   ~MonitorFactory() override = default;
 
