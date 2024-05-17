@@ -73,7 +73,7 @@ public:
                   config_.value())
             : absl::nullopt,
         common_config_);
-    lb_->initialize();
+    EXPECT_TRUE(lb_->initialize().ok());
   }
 
   // Run all tests against both priority 0 and priority 1 host sets, to ensure

@@ -108,7 +108,7 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:timespan_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//contrib/envoy/extensions/filters/network/rocketmq_proxy/v3:pkg_cc_proto",
     ],

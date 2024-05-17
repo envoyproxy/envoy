@@ -62,7 +62,7 @@ public:
   // These functions are wrappers around http client functions, which hand off
   // to http client functions of the same name after doing a dispatcher post
   // (thread context switch)
-  envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
+  envoy_status_t startStream(envoy_stream_t stream, EnvoyStreamCallbacks&& stream_callbacks,
                              bool explicit_flow_control);
 
   /**
@@ -164,8 +164,5 @@ private:
   Thread::PosixThreadPtr main_thread_{nullptr}; // Empty placeholder to be populated later.
   bool terminated_{false};
 };
-
-using InternalEngineSharedPtr = std::shared_ptr<InternalEngine>;
-using InternalEngineWeakPtr = std::weak_ptr<InternalEngine>;
 
 } // namespace Envoy

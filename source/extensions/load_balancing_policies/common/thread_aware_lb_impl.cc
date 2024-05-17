@@ -10,16 +10,16 @@ namespace Upstream {
 //                      HostSetImpl::effectiveLocalityWeight.
 namespace {
 
-void normalizeHostWeights(const HostVector& hosts, double normalized_locality_weight,
-                          NormalizedHostWeightVector& normalized_host_weights,
-                          double& min_normalized_weight, double& max_normalized_weight) {
+absl::Status normalizeHostWeights(const HostVector& hosts, double normalized_locality_weight,
+                                  NormalizedHostWeightVector& normalized_host_weights,
+                                  double& min_normalized_weight, double& max_normalized_weight) {
   // sum should be at most uint32_t max value, so we can validate it by accumulating into unit64_t
   // and making sure there was no overflow
   uint64_t sum = 0;
   for (const auto& host : hosts) {
     sum += host->weight();
     if (sum > std::numeric_limits<uint32_t>::max()) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           fmt::format("The sum of weights of all upstream hosts in a locality exceeds {}",
                       std::numeric_limits<uint32_t>::max()));
     }
@@ -31,12 +31,14 @@ void normalizeHostWeights(const HostVector& hosts, double normalized_locality_we
     min_normalized_weight = std::min(min_normalized_weight, weight);
     max_normalized_weight = std::max(max_normalized_weight, weight);
   }
+  return absl::OkStatus();
 }
 
-void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
-                              const LocalityWeights& locality_weights,
-                              NormalizedHostWeightVector& normalized_host_weights,
-                              double& min_normalized_weight, double& max_normalized_weight) {
+absl::Status normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
+                                      const LocalityWeights& locality_weights,
+                                      NormalizedHostWeightVector& normalized_host_weights,
+                                      double& min_normalized_weight,
+                                      double& max_normalized_weight) {
   ASSERT(locality_weights.size() == hosts_per_locality.get().size());
 
   // sum should be at most uint32_t max value, so we can validate it by accumulating into unit64_t
@@ -45,7 +47,7 @@ void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
   for (const auto weight : locality_weights) {
     sum += weight;
     if (sum > std::numeric_limits<uint32_t>::max()) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           fmt::format("The sum of weights of all localities at the same priority exceeds {}",
                       std::numeric_limits<uint32_t>::max()));
     }
@@ -53,7 +55,7 @@ void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
 
   // Locality weights (unlike host weights) may be 0. If _all_ locality weights were 0, bail out.
   if (sum == 0) {
-    return;
+    return absl::OkStatus();
   }
 
   // Compute normalized weights for all hosts in each locality. If a locality was assigned zero
@@ -62,34 +64,38 @@ void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
     if (locality_weights[i] != 0) {
       const HostVector& hosts = hosts_per_locality.get()[i];
       const double normalized_locality_weight = static_cast<double>(locality_weights[i]) / sum;
-      normalizeHostWeights(hosts, normalized_locality_weight, normalized_host_weights,
-                           min_normalized_weight, max_normalized_weight);
+      RETURN_IF_NOT_OK(normalizeHostWeights(hosts, normalized_locality_weight,
+                                            normalized_host_weights, min_normalized_weight,
+                                            max_normalized_weight));
     }
   }
+  return absl::OkStatus();
 }
 
-void normalizeWeights(const HostSet& host_set, bool in_panic,
-                      NormalizedHostWeightVector& normalized_host_weights,
-                      double& min_normalized_weight, double& max_normalized_weight,
-                      bool locality_weighted_balancing) {
+absl::Status normalizeWeights(const HostSet& host_set, bool in_panic,
+                              NormalizedHostWeightVector& normalized_host_weights,
+                              double& min_normalized_weight, double& max_normalized_weight,
+                              bool locality_weighted_balancing) {
   if (!locality_weighted_balancing || host_set.localityWeights() == nullptr ||
       host_set.localityWeights()->empty()) {
     // If we're not dealing with locality weights, just normalize weights for the flat set of hosts.
     const auto& hosts = in_panic ? host_set.hosts() : host_set.healthyHosts();
-    normalizeHostWeights(hosts, 1.0, normalized_host_weights, min_normalized_weight,
-                         max_normalized_weight);
+    RETURN_IF_NOT_OK(normalizeHostWeights(hosts, 1.0, normalized_host_weights,
+                                          min_normalized_weight, max_normalized_weight));
   } else {
     // Otherwise, normalize weights across all localities.
     const auto& hosts_per_locality =
         in_panic ? host_set.hostsPerLocality() : host_set.healthyHostsPerLocality();
-    normalizeLocalityWeights(hosts_per_locality, *(host_set.localityWeights()),
-                             normalized_host_weights, min_normalized_weight, max_normalized_weight);
+    RETURN_IF_NOT_OK(normalizeLocalityWeights(hosts_per_locality, *(host_set.localityWeights()),
+                                              normalized_host_weights, min_normalized_weight,
+                                              max_normalized_weight));
   }
+  return absl::OkStatus();
 }
 
 } // namespace
 
-void ThreadAwareLoadBalancerBase::initialize() {
+absl::Status ThreadAwareLoadBalancerBase::initialize() {
   // TODO(mattklein123): In the future, once initialized and the initial LB is built, it would be
   // better to use a background thread for computing LB updates. This has the substantial benefit
   // that if the LB computation thread falls behind, host set updates can be trivially collapsed.
@@ -97,15 +103,12 @@ void ThreadAwareLoadBalancerBase::initialize() {
   // complicated initialization as the load balancer would need its own initialized callback. I
   // think the synchronous/asynchronous split is probably the best option.
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector&) -> absl::Status {
-        refresh();
-        return absl::OkStatus();
-      });
+      [this](uint32_t, const HostVector&, const HostVector&) -> absl::Status { return refresh(); });
 
-  refresh();
+  return refresh();
 }
 
-void ThreadAwareLoadBalancerBase::refresh() {
+absl::Status ThreadAwareLoadBalancerBase::refresh() {
   auto per_priority_state_vector = std::make_shared<std::vector<PerPriorityStatePtr>>(
       priority_set_.hostSetsPerPriority().size());
   auto healthy_per_priority_load =
@@ -125,8 +128,10 @@ void ThreadAwareLoadBalancerBase::refresh() {
     NormalizedHostWeightVector normalized_host_weights;
     double min_normalized_weight = 1.0;
     double max_normalized_weight = 0.0;
-    normalizeWeights(*host_set, per_priority_state->global_panic_, normalized_host_weights,
-                     min_normalized_weight, max_normalized_weight, locality_weighted_balancing_);
+    absl::Status status = normalizeWeights(*host_set, per_priority_state->global_panic_,
+                                           normalized_host_weights, min_normalized_weight,
+                                           max_normalized_weight, locality_weighted_balancing_);
+    RETURN_IF_NOT_OK(status);
     per_priority_state->current_lb_ = createLoadBalancer(
         std::move(normalized_host_weights), min_normalized_weight, max_normalized_weight);
   }
@@ -137,6 +142,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
     factory_->degraded_per_priority_load_ = degraded_per_priority_load;
     factory_->per_priority_state_ = per_priority_state_vector;
   }
+  return absl::OkStatus();
 }
 
 HostConstSharedPtr

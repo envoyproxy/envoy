@@ -7,7 +7,7 @@
 #include "source/common/network/filter_state_proxy_info.h"
 
 #include "library/common/api/external.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/types/c_types.h"
 
@@ -73,7 +73,7 @@ void NetworkConfigurationFilter::onProxyResolutionComplete(
 
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
-  ENVOY_LOG(trace, "NetworkConfigurationFilter::decodeHeaders", request_headers);
+  ENVOY_LOG(trace, "NetworkConfigurationFilter::decodeHeaders: {}", request_headers);
 
   const auto authority = request_headers.getHostValue();
   if (authority.empty()) {

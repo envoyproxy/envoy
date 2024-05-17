@@ -8,7 +8,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -58,9 +57,6 @@ public:
   }
 
   void initializeProviderFactory() {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
     Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(*dummy_factory_);
   }
 
@@ -120,6 +116,8 @@ TEST_F(GeoipFilterTest, UseXffSuccessfulLookup) {
       xff_num_trusted_hops: 1
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -150,6 +148,8 @@ TEST_F(GeoipFilterTest, GeoHeadersOverridenForIncomingRequest) {
   const std::string external_request_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -184,6 +184,8 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
   const std::string external_request_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -239,6 +241,8 @@ TEST_F(GeoipFilterTest, GeoHeaderNotAppendedOnEmptyLookup) {
   const std::string external_request_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -268,6 +272,8 @@ TEST_F(GeoipFilterTest, NoCrashIfFilterDestroyedBeforeCallbackCalled) {
   const std::string external_request_yaml = R"EOF(
       provider:
           name: "envoy.geoip_providers.dummy"
+          typed_config:
+            "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
   )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;

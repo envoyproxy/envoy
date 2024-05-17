@@ -37,7 +37,11 @@ UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr 
       config_(config, false) {
   parent_drained_callback_registrar_ = socket_->parentDrainedCallbackRegistrar();
   socket_->ioHandle().initializeFileEvent(
-      dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
+      dispatcher,
+      [this](uint32_t events) {
+        onSocketEvent(events);
+        return absl::OkStatus();
+      },
       Event::PlatformDefaultTriggerType, paused() ? 0 : events_when_unpaused_);
   if (paused()) {
     parent_drained_callback_registrar_->registerParentDrainedCallback(

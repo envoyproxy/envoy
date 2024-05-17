@@ -30,11 +30,11 @@ static void BM_CompiledGoogleReMatcher(benchmark::State& state) {
   envoy::type::matcher::v3::RegexMatcher config;
   config.mutable_google_re2();
   config.set_regex(std::string(ClusterRePattern));
-  const auto matcher = Regex::CompiledGoogleReMatcher(config);
+  const auto matcher = Regex::CompiledGoogleReMatcher::create(config).value();
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : clusterInputs()) {
-      if (matcher.match(cluster_input)) {
+      if (matcher->match(cluster_input)) {
         ++passes;
       }
     }
