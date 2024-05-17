@@ -61,14 +61,14 @@ message Config {
   // This parameter is optional. If set, it will override the value set in the AWS_PROFILE env variable and
   // the provider chain is limited to the AWS credentials file Provider.
   // If credentials configuration is provided, this configuration will be ignored.
-  // If this field is provided, then the default providers chain specified in documentation will be ignored.
+  // If this field is provided, then the default providers chain specified in the documentation will be ignored.
   // (See :ref:`default credentials providers <config_http_filters_aws_lambda_credentials>`).
   string credentials_profile = 5;
 
   // Specifies the credentials to be used. This parameter is optional and if it is set,
   // it will override other providers and will take precedence over credentials_profile.
   // The provider chain is limited to the configuration credentials provider.
-  // If this field is provided, then the default providers chain specified in documentation will be ignored.
+  // If this field is provided, then the default providers chain specified in the documentation will be ignored.
   // (See :ref:`default credentials providers <config_http_filters_aws_lambda_credentials>`).
   //
   // .. warning::
