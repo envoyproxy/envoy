@@ -389,9 +389,10 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     }
   }
 
-  // At this point, we *are* on /_oauth. We believe this request comes from the authorization
-  // server and we expect the query strings to contain the information required to get the access
-  // token
+  // At this point, we are on callback path, configured via `redirect_path_matcher`. We believe
+  // this request comes from the authorization server via an HTTP 302 redirect and we expect the
+  // query strings to contain the information required to get the access token from the auth
+  // server.
   const auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(path_str);
   if (query_parameters.getFirstValue(queryParamsError()).has_value()) {
     sendUnauthorizedResponse();
