@@ -64,6 +64,8 @@ enum OutlierEjectionType {
   // cluster and selects hosts for which ratio of failed replies is above configured value.
   FAILURE_PERCENTAGE_LOCAL_ORIGIN = 6;
 
+  // The host has been ejected by outlier detection extension. Additional information about the ejection
+  // is attached to the event via :ref:`OutlierEjectExtension message <envoy_v3_api_msg_data.cluster.v3.OutlierEjectExtension>`.
   EXTENSION = 7;
 }
 
