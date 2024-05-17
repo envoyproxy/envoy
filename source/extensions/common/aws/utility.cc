@@ -328,6 +328,7 @@ bool Utility::addInternalClusterStatic(
     Upstream::ClusterManager& cm, absl::string_view cluster_name,
     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri) {
   // Check if local cluster exists with that name.
+
   if (cm.getThreadLocalCluster(cluster_name) == nullptr) {
     // Make sure we run this on main thread.
     TRY_ASSERT_MAIN_THREAD {
@@ -379,6 +380,7 @@ bool Utility::addInternalClusterStatic(
                      "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
                      "credentials",
                      cluster_type_str, cluster_name, host_port);
+      return true;
     }
     END_TRY
     CATCH(const EnvoyException& e, {
@@ -386,7 +388,7 @@ bool Utility::addInternalClusterStatic(
       return false;
     });
   }
-  return true;
+  return false;
 }
 
 std::string Utility::getEnvironmentVariableOrDefault(const std::string& variable_name,

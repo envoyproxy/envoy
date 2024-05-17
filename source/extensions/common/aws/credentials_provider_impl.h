@@ -85,6 +85,13 @@ private:
   void extractCredentials(const std::string& credentials_file, const std::string& profile);
 };
 
+class LoadClusterEntryHandle {
+public:
+  virtual ~LoadClusterEntryHandle() = default;
+};
+
+using LoadClusterEntryHandlePtr = std::unique_ptr<LoadClusterEntryHandle>;
+
 class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase {
 public:
   using CurlMetadataFetcher = std::function<absl::optional<std::string>(Http::RequestMessage&)>;
@@ -104,17 +111,32 @@ public:
   static std::chrono::seconds getCacheDuration();
 
 protected:
+  struct LoadClusterEntryHandleImpl
+      : public LoadClusterEntryHandle,
+        RaiiMapOfListElement<std::string, LoadClusterEntryHandleImpl*> {
+    LoadClusterEntryHandleImpl(
+        absl::flat_hash_map<std::string, std::list<LoadClusterEntryHandleImpl*>>& parent,
+        absl::string_view host, Envoy::Event::TimerPtr& timer)
+        : RaiiMapOfListElement<std::string, LoadClusterEntryHandleImpl*>(parent, host, this),
+          timer_(timer) {}
+
+    Envoy::Event::TimerPtr& timer_;
+  };
+
   struct ThreadLocalCredentialsCache : public ThreadLocal::ThreadLocalObject,
                                        public Upstream::ClusterUpdateCallbacks {
     ThreadLocalCredentialsCache(MetadataCredentialsProviderBase& parent)
         : handle_(parent.context_->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)),
           parent_(parent), credentials_(std::make_shared<Credentials>()){};
 
+    ~ThreadLocalCredentialsCache() override;
+
     Upstream::ClusterUpdateCallbacksHandlePtr handle_;
     // Parent credentials provider object
     MetadataCredentialsProviderBase& parent_;
     // The credentials object.
     CredentialsConstSharedPtr credentials_;
+    absl::flat_hash_map<std::string, std::list<LoadClusterEntryHandleImpl*>> pending_clusters_;
 
   private:
     void onClusterAddOrUpdate(absl::string_view cluster_name,
@@ -154,8 +176,6 @@ protected:
   // Metadata receiver initialization timer - number of seconds between retries during the first
   // credential retrieval process
   std::chrono::seconds initialization_timer_;
-  // The thread local slot for cache.
-  ThreadLocal::TypedSlotPtr<ThreadLocalCredentialsCache> tls_;
   // The timer to trigger fetch due to cache duration.
   Envoy::Event::TimerPtr cache_duration_timer_;
   // The Metadata fetcher object.
@@ -178,6 +198,10 @@ protected:
   const std::string debug_name_;
   // The expiration time received in any returned token
   absl::optional<SystemTime> expiration_time_;
+  // Tls slot
+  ThreadLocal::TypedSlot<ThreadLocalCredentialsCache> tls_slot_;
+  // Storage for our per cluster credential timers
+  LoadClusterEntryHandlePtr cluster_load_handle_;
 };
 
 /**
