@@ -40,10 +40,10 @@ public:
           << fmt::format("operation: {}", operation_name_);
 
       std::string all_tags;
-      for (const& auto [key, value] : tags_) {
+      for (const auto& [key, value] : tags_) {
         all_tags += fmt::format("{}: {}\n", key, value);
       }
-      for (const& auto [key, want] : expect_span->tags) {
+      for (const auto& [key, want] : expect_span->tags) {
         absl::string_view got = tags_[key];
         EXPECT_EQ(want, got) << fmt::format("{}: {} not found in tags:\n{}", key, want, all_tags);
       }
