@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_library(
     name = "io_uring_impl_lib",
     srcs = select({
-        "//bazel:linux": ["io_uring_impl.cc"],
+        # "//bazel:linux": ["io_uring_impl.cc"],
         "//conditions:default": [],
     }),
     hdrs = [
@@ -28,7 +28,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "io_uring_worker_lib",
     srcs = select({
-        "//bazel:linux": ["io_uring_worker_impl.cc"],
+        # "//bazel:linux": ["io_uring_worker_impl.cc"],
         "//conditions:default": [],
     }),
     hdrs = ["io_uring_worker_impl.h"],
