@@ -17,47 +17,8 @@ namespace Envoy {
 /**
  * This is a specialized structure intended for static header maps, but
  * there may be other use cases.
- * The structure is:
- * 1. a length-based lookup table so only keys the same length as the
- * target key are considered.
- * 2. a trie that branches on the "most divisions" position of the key.
  *
- * Using this structure is not recommended unless the table is
- * initialize-once, use-many, as the "compile" operation is expensive.
- *
- * Unlike a regular trie, this structure cannot be used for prefix-based
- * matching.
- *
- * For example, if we consider the case where the set of headers is
- * `x-prefix-banana`
- * `x-prefix-babana`
- * `x-prefix-apple`
- * `x-prefix-pineapple`
- * `x-prefix-barana`
- * `x-prefix-banaka`
- *
- * A standard front-first trie looking for `x-prefix-banana` would walk
- * 7 nodes through the tree, first for `x`, then for `-`, etc.
- *
- * This structure first jumps to matching length, eliminating in this
- * example case apple and pineapple.
- * Then the "best split" node is on
- *   `x-prefix-banana`
- *               ^
- * so the first node has 3 non-miss branches, n, b and r for that position.
- * Down that n branch, the "best split" is on
- *   `x-prefix-banana`
- *                 ^
- * which has two branches, n or k.
- * Down the n branch is the leaf node (only `x-prefix-banana` remains) - at
- * this point a regular string-compare checks if the key is an exact match
- * for the string node.
- *
- * Unlike a regular trie, this structure must contain the full keys in the leaf
- * nodes, which could potentially make it larger due to, e.g. containing
- * `x-envoy-` multiple times where a regular trie only has one 'branch' for
- * that. However, it also contains fewer nodes due to not having a node for
- * every character.
+ * See `compiled_string_map.md` for details.
  */
 template <class Value> class CompiledStringMap {
   class Node {
