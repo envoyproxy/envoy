@@ -41,10 +41,10 @@ with the same value.
 The OAuth filter encodes URLs in query parameters using the
 `URL encoding algorithm. <https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm>`_
 
-When receiving request redirected from the authorization service the Oauth filer decodes URLs from query parameters.
+When receiving a request on the configured redirect path the OAuth filter decodes URLs from query parameters.
 However the encoded character sequences that represent ASCII control characters or extended ASCII codepoints are not
-decoded. The characters without defined meaning in URL according to `RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986>`_
-are also left undecoded. Specifically the following characters are left in the encoded form:
+decoded. The characters without defined meaning in a URL according to `RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986>`_
+are also left encoded. Specifically the following characters are left in the encoded form:
 
 * Control characters with values less than or equal ``0x1F``
 * Space (``0x20``)
@@ -53,7 +53,7 @@ are also left undecoded. Specifically the following characters are left in the e
 * Characters without defined meaning in URL: ``"<>\^{}|``
 
 .. note::
-  By default, OAuth2 filter sets some cookies with the following names:
+  By default, the OAuth2 filter sets HTTP cookies with the following names:
   ``BearerToken``, ``OauthHMAC``, and ``OauthExpires``. These cookie names can be customized by
   setting
   :ref:`cookie_names <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_names>`.
