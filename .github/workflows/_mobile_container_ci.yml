@@ -43,6 +43,7 @@ on:
           -e COVERAGE_THRESHOLD
           -e BAZEL_BUILD_OPTION_LIST
           -e MOBILE_DOCS_CHECKOUT_DIR
+          -e ANDROID_NDK_HOME=/.android/sdk/ndk/27.0.11718014
       diskspace-hack:
         type: boolean
         default: false

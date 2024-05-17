@@ -14,7 +14,8 @@ fi
 PATH="$("${LLVM_PREFIX}"/bin/llvm-config --bindir):${PATH}"
 export PATH
 
-LLVM_VERSION="$(llvm-config --version)"
+# LLVM_VERSION="$(llvm-config --version)"
+LLVM_VERSION=16
 LLVM_LIBDIR="$(llvm-config --libdir)"
 LLVM_TARGET="$(llvm-config --host-target)"
 
