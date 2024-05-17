@@ -119,7 +119,7 @@ TEST_F(GrpcMuxFailoverNoFailoverTest, PrimaryOnDiscoveryResponseInvoked) {
 // Validates that onWritable callback is invoked on the primary stream
 // callbacks.
 TEST_F(GrpcMuxFailoverNoFailoverTest, PrimaryOnWriteableInvoked) {
-  // Establish a stream to the primary source, and ensure availabilty (via a
+  // Establish a stream to the primary source, and ensure availability (via a
   // response).
   EXPECT_CALL(primary_stream_, establishNewStream());
   grpc_mux_failover_.establishNewStream();
@@ -281,7 +281,7 @@ TEST_F(GrpcMuxFailoverTest, AlternatingBetweenFailoverAndPrimary) {
     } else {
       // Emulate a failover source failure that will result in an attempt to
       // connect to the primary. It should close the failover stream, and
-      // try to establish the priamry stream.
+      // try to establish the primary stream.
       EXPECT_CALL(failover_stream_, closeStream());
       EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure());
       EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
@@ -291,7 +291,7 @@ TEST_F(GrpcMuxFailoverTest, AlternatingBetweenFailoverAndPrimary) {
   }
 }
 
-// Validate that after the primary is available (a response is recevied), all
+// Validate that after the primary is available (a response is received), all
 // reconnect attempts will be to the primary.
 TEST_F(GrpcMuxFailoverTest, PrimaryOnlyAttemptsAfterPrimaryAvailable) {
   // Initial connection attempt.
@@ -321,7 +321,7 @@ TEST_F(GrpcMuxFailoverTest, PrimaryOnlyAttemptsAfterPrimaryAvailable) {
   }
 }
 
-// Validate that after the failover is available (a response is recevied), all
+// Validate that after the failover is available (a response is received), all
 // reconnect attempts will be to the failover.
 TEST_F(GrpcMuxFailoverTest, FailoverOnlyAttemptsAfterFailoverAvailable) {
   // Initial connection attempt.

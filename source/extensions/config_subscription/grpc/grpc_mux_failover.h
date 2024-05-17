@@ -335,7 +335,7 @@ private:
   // stay true, but if it attempts to connect to the failover, connecting_to_primary_
   // will be set to false, and connecting_to_failover_ will be true.
   // The values of connecting_to_failover_ and connected_to_failover_ will be
-  // deteremined similar to the primary variants.
+  // determined similar to the primary variants.
   // Note that connected_to_primary_ and connected_to_failover_ are mutually
   // exclusive, and (at the moment) connecting_to_primary_ and connecting_to_failover_
   // are also mutually exclusive.
