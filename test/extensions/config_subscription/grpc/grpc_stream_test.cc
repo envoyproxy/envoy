@@ -377,6 +377,11 @@ TEST_F(GrpcStreamTest, RetryOnRemoteClose) {
   }
 }
 
+// Validate that closeStream disables the retry timer.
+TEST_F(GrpcStreamTest, CloseStreamDisablesRetryTimer) {
+  // TODO(adisuissa): add the test.
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

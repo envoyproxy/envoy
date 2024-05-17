@@ -23,6 +23,7 @@ public:
   MOCK_METHOD(void, onReceiveMessage, (ResponseProtoPtr<ResponseProto> && message));
   MOCK_METHOD(void, onReceiveTrailingMetadata, (Http::ResponseTrailerMapPtr && metadata));
   MOCK_METHOD(void, onRemoteClose, (Grpc::Status::GrpcStatus status, const std::string& message));
+  MOCK_METHOD(void, closeStream, ());
 };
 
 } // namespace Config
