@@ -170,7 +170,7 @@ message OutlierDetection {
   // Defaults to true.
   google.protobuf.BoolValue successful_active_health_check_uneject_host = 23;
 
-  // Set of host's passive monitors.
-  // [#not-implemented-hide:]
+  // Set of host's passive extension monitors.
+  // [#extension-category: envoy.outlier_detection_monitors]
   repeated core.v3.TypedExtensionConfig monitors = 24;
 }
