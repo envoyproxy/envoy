@@ -45,6 +45,6 @@ message ErrorBuckets {
   repeated LocalOriginErrors local_origin_errors = 2;
 
   // List of buckets "catching" database errors.
-// [#not-implemented-hide:]
+  // [#not-implemented-hide:]
   repeated DatabaseErrors database_errors = 3;
 }
