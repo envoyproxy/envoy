@@ -1,19 +1,22 @@
+#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
+#include "envoy/upstream/load_balancer.h"
+
 #include "source/common/common/logger.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/integration/http_integration.h"
-#include "test/test_common/utility.h"
-#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "test/test_common/registry.h"
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
-#include "source/common/upstream/cluster_factory_impl.h"
-#include "envoy/upstream/load_balancer.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
 namespace {
+
+using testing::Return;
 
 const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4 = R"EOF(
 name: envoy.filters.http.aws_request_signing
@@ -43,11 +46,10 @@ typed_config:
   - exact: x-amzn-trace-id
 )EOF";
 
-
 const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL = R"EOF(
 aws_request_signing:
   service_name: s3
-  region: us-west-1
+  region: us-east-1
   use_unsigned_payload: true
   host_rewrite: new-host
   match_excluded_headers:
@@ -212,27 +214,53 @@ public:
   MockLogicalDnsClusterFactory() = default;
   ~MockLogicalDnsClusterFactory() override = default;
 
-  MOCK_METHOD((absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>), CreateClusterImpl, (
-    const envoy::config::cluster::v3::Cluster& cluster,
-                    Upstream::ClusterFactoryContext& context
-  ));
+  MOCK_METHOD((absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr,
+                                        Upstream::ThreadAwareLoadBalancerPtr>>),
+              CreateClusterImpl,
+              (const envoy::config::cluster::v3::Cluster& cluster,
+               Upstream::ClusterFactoryContext& context));
 };
-
 
 class InitializeFilterTest : public ::testing::Test, public HttpIntegrationTest {
 public:
   InitializeFilterTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, TestEnvironment::getIpVersionsForTest().front(),
-                            ConfigHelper::httpProxyConfig()), registered_dns_factory_(dns_resolver_factory_){
-                              use_lds_ = false;
-
-}
-  NiceMock<MockLogicalDnsClusterFactory> dns_resolver_factory_;
-  Registry::InjectFactory<Envoy::Upstream::LogicalDnsClusterFactory> registered_dns_factory_;
-
-  void addStandardFilter() {
-    config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4);
+                            ConfigHelper::httpProxyConfig()),
+        dns_cluster_factory_(logical_dns_cluster_factory_),
+        registered_dns_factory_(dns_resolver_factory_) {
+    use_lds_ = false;
   }
+  NiceMock<MockLogicalDnsClusterFactory> logical_dns_cluster_factory_;
+  Registry::InjectFactory<Envoy::Upstream::LogicalDnsClusterFactory> dns_cluster_factory_;
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
+
+  Network::DnsResolver::ResolveCb dns_callback_;
+  Network::MockActiveDnsQuery active_dns_query_;
+  std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
+      new NiceMock<Network::MockDnsResolver>};
+  NiceMock<Event::MockDispatcher> dispatcher_;
+
+  void expectResolve(Network::DnsLookupFamily, const std::string& expected_address) {
+    EXPECT_CALL(*dns_resolver_, resolve(expected_address, _, _))
+        .WillRepeatedly(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                                   Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+          // dns_callback_ = cb;
+          cb(Network::DnsResolver::ResolutionStatus::Success,
+             TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+
+          // return &active_dns_query_;
+          return nullptr;
+        }));
+  }
+
+  void dnsSetup() {
+    ON_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillByDefault(Return(dns_resolver_));
+
+    expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-east-1.amazonaws.com");
+  }
+
+  void addStandardFilter() { config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4); }
 
   void addPerRouteFilter(const std::string& yaml_config) {
 
@@ -240,8 +268,9 @@ public:
         [&yaml_config](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 cfg) {
-                  ENVOY_LOG_MISC(debug, "{}",yaml_config);
-          envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigningPerRoute per_route_config;
+          ENVOY_LOG_MISC(debug, "{}", yaml_config);
+          envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigningPerRoute
+              per_route_config;
           TestUtility::loadFromYaml(yaml_config, per_route_config);
 
           auto* config = cfg.mutable_route_config()
@@ -251,10 +280,7 @@ public:
 
           (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
         });
-          ENVOY_LOG_MISC(debug, "use lds:\n{}",
-                 use_lds_);
-
-    
+    ENVOY_LOG_MISC(debug, "use lds:\n{}", use_lds_);
   }
 
   ~InitializeFilterTest() override {
@@ -267,19 +293,20 @@ public:
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI");
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN");
     TestEnvironment::unsetEnvVar("AWS_EC2_METADATA_DISABLED");
-
   }
 };
 
 TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
   // Web Identity Credentials only
+  dnsSetup();
+
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
-  // dnsSetup();
   initialize();
   std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
@@ -288,12 +315,14 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
+  dnsSetup();
   // Web Identity Credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
   std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
@@ -303,12 +332,14 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
+  dnsSetup();
   // Web Identity Credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
@@ -319,15 +350,16 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
-    // Web Identity Credentials and Container Credentials
+  dnsSetup();
+  // Web Identity Credentials and Container Credentials
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds",
-                              1);
+  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
   initialize();
   std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
@@ -336,17 +368,17 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
       3, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
 }
 
-
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
-    // Web Identity Credentials and Container Credentials
+  dnsSetup();
+  // Web Identity Credentials and Container Credentials
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds",
-                              1);
+  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
   std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
@@ -356,15 +388,16 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
-    // Web Identity Credentials and Container Credentials
+  dnsSetup();
+  // Web Identity Credentials and Container Credentials
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds",
-                              1);
+  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
@@ -373,59 +406,60 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
   EXPECT_EQ(
       3, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
 }
-
 
 TEST_F(InitializeFilterTest, TestWithThreeClustersStandard) {
-    // Web Identity Credentials, Container Credentials and Instance Profile Credentials
-  TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
-  TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
-  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds",
-                              1);
-  TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
-  addStandardFilter();
-  initialize();
-  std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_EQ(
-      3, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
-}
-
-
-TEST_F(InitializeFilterTest, TestWithThreeClustersRouteLevel) {
-    // Web Identity Credentials, Container Credentials and Instance Profile Credentials
-  TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
-  TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
-  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds",
-                              1);
-  TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
-  addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
-  initialize();
-  std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_EQ(
-      3, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
-}
-
-TEST_F(InitializeFilterTest, TestWithThreeClustersRouteLevelAndStandard) {
+  dnsSetup();
   // Web Identity Credentials, Container Credentials and Instance Profile Credentials
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds",
-                              1);
+  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
+  addStandardFilter();
+  initialize();
+  std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  EXPECT_EQ(
+      4, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+}
+
+TEST_F(InitializeFilterTest, TestWithThreeClustersRouteLevel) {
+  dnsSetup();
+  // Web Identity Credentials, Container Credentials and Instance Profile Credentials
+  TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
+  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
+  TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
+  addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
+  initialize();
+  std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  EXPECT_EQ(
+      4, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+}
+
+TEST_F(InitializeFilterTest, TestWithThreeClustersRouteLevelAndStandard) {
+  dnsSetup();
+  // Web Identity Credentials, Container Credentials and Instance Profile Credentials
+  TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
+  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
+  TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
   std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   EXPECT_EQ(
-      3, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+      4, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
 }
 
 } // namespace

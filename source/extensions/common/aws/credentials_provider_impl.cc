@@ -94,7 +94,7 @@ void CachedCredentialsProviderBase::refreshIfNeeded() {
 }
 
 // Logic for async metadata refresh is as follows:
-// Per subclass (instance profile, container credentials, webidentity)
+// Per subclass (instance profile, container credentials, web identity)
 // 1. Create a single cluster for async handling
 // 2. Create tls slot to hold cluster name and a refresh timer pointer. tls slot instantiation of
 // ThreadLocalCredentialsCache will register the subclass as a callback handler
@@ -909,7 +909,9 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
           api, context, fetch_metadata_using_curl, MetadataFetcher::create,
           CONTAINER_METADATA_CLUSTER, full_uri, receiver_state, initialization_timer));
     }
-  } else if (metadata_disabled != TRUE) {
+  }
+
+  if (metadata_disabled != TRUE) {
     ENVOY_LOG(debug, "Using instance profile credentials provider");
     add(factories.createInstanceProfileCredentialsProvider(
         api, context, fetch_metadata_using_curl, MetadataFetcher::create, receiver_state,
