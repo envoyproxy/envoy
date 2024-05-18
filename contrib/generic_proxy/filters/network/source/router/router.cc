@@ -415,6 +415,9 @@ void UpstreamRequest::resetStream(StreamResetReason reason, absl::string_view re
   }
   reset_or_response_complete_ = true;
 
+  // Remove this stream form the parent's list because this upstream request is reset.
+  deferredDelete();
+
   ENVOY_LOG(debug, "generic proxy upstream request: reset upstream request");
 
   generic_upstream_->removeUpstreamRequest(stream_id_);
@@ -427,9 +430,6 @@ void UpstreamRequest::resetStream(StreamResetReason reason, absl::string_view re
     Tracing::TracerUtility::finalizeSpan(*span_, trace_context, stream_info_,
                                          tracing_config_.value().get(), true);
   }
-
-  // Remove this stream form the parent's list because this upstream request is reset.
-  deferredDelete();
 
   // Notify the parent filter that the upstream request has been reset.
   parent_.onUpstreamRequestReset(*this, reason, reason_detail);
@@ -696,7 +696,14 @@ void RouterFilter::onFilterComplete() {
 
   // Clean up all pending upstream requests.
   while (!upstream_requests_.empty()) {
-    (*upstream_requests_.back()).resetStream(StreamResetReason::LocalReset, {});
+    auto* upstream_request = upstream_requests_.back().get();
+    // Remove the upstream request from the upstream request list first. The resetStream() will
+    // also do this. But in some corner cases, the upstream request is already reset and triggers
+    // the router filter to call onFilterComplete(). But note because the upstream request is
+    // already reset, the resetStream() callings will be no-op and the router filter may fall
+    // into the infinite loop.
+    upstream_request->deferredDelete();
+    upstream_request->resetStream(StreamResetReason::LocalReset, {});
   }
 
   // Clean up the timer to avoid the timeout event.

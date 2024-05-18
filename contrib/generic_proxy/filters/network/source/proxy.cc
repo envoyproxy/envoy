@@ -125,7 +125,7 @@ void ActiveStream::resetStream(DownstreamStreamResetReason reason) {
   parent_.stats_helper_.onRequestReset();
   stream_info_.setResponseFlag(responseFlagFromDownstreamReasonReason(reason));
 
-  parent_.deferredStream(*this);
+  completeRequest();
 }
 
 void ActiveStream::sendResponseStartToDownstream() {
@@ -273,7 +273,7 @@ void ActiveStream::onResponseFrame(ResponseCommonFramePtr response_common_frame)
 
 void ActiveStream::completeDirectly() {
   response_stream_end_ = true;
-  parent_.deferredStream(*this);
+  completeRequest();
 };
 
 const Network::Connection* ActiveStream::ActiveFilterBase::connection() const {
@@ -318,7 +318,7 @@ void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) 
   ASSERT(response_stream_end_);
   ASSERT(response_stream_frames_.empty());
 
-  parent_.deferredStream(*this);
+  completeRequest();
 }
 
 void ActiveStream::onEncodingFailure(absl::string_view reason) {
@@ -333,7 +333,16 @@ void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
   std::reverse(encoder_filters_.begin(), encoder_filters_.end());
 }
 
+void ActiveStream::deferredDelete() {
+  if (inserted()) {
+    parent_.callbacks_->connection().dispatcher().deferredDelete(
+        removeFromList(parent_.active_streams_));
+  }
+}
+
 void ActiveStream::completeRequest() {
+  deferredDelete();
+
   if (registered_in_frame_handlers_) {
     parent_.unregisterFrameHandler(requestStreamId());
     registered_in_frame_handlers_ = false;
@@ -366,6 +375,8 @@ void ActiveStream::completeRequest() {
     }
     filter->filter_->onDestroy();
   }
+
+  parent_.mayBeDrainClose();
 }
 
 Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool end_stream) {
@@ -458,19 +469,15 @@ void Filter::newDownstreamRequest(StreamRequestPtr request, absl::optional<Start
   raw_stream->continueDecoding();
 }
 
-void Filter::deferredStream(ActiveStream& stream) {
-  stream.completeRequest();
-
-  if (!stream.inserted()) {
-    return;
-  }
-  callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(active_streams_));
-  mayBeDrainClose();
-}
-
 void Filter::resetDownstreamAllStreams(DownstreamStreamResetReason reason) {
   while (!active_streams_.empty()) {
-    active_streams_.front()->resetStream(reason);
+    auto* stream = active_streams_.front().get();
+    // Remove the stream from the active stream list by the filter self. Although the
+    // resetStream() method will do the same thing. But doing it here could ensure the
+    // stream is removed even if the resetStream() method is not working as expected.
+    // This could ensure this never fall into infinite loop.
+    stream->deferredDelete();
+    stream->resetStream(reason);
   }
 }
 

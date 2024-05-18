@@ -290,6 +290,7 @@ public:
     return {};
   }
 
+  void deferredDelete();
   void completeRequest();
 
   uint64_t requestStreamId() const {
@@ -407,13 +408,6 @@ public:
    * @param start_time the start time of the request.
    */
   void newDownstreamRequest(StreamRequestPtr request, absl::optional<StartTime> start_time = {});
-
-  /**
-   * Move the stream to the deferred delete stream list. This is called when the stream is reset
-   * or completed.
-   * @param stream the stream to be deferred deleted.
-   */
-  void deferredStream(ActiveStream& stream);
 
   static const std::string& name() {
     CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.network.generic_proxy");
