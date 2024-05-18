@@ -43,5 +43,7 @@ envoy_extension_cc_test(
         "//test/extensions/common/aws:aws_mocks",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
+        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib"
+
     ],
 )
