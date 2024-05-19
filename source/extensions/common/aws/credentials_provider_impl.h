@@ -1,6 +1,7 @@
 #pragma once
 
 #include <list>
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -119,8 +120,6 @@ public:
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
 
-  MetadataCredentialsProviderStats generateMetadataCredentialsProviderStats(Stats::Scope& scope);
-
 protected:
   struct LoadClusterEntryHandleImpl
       : public LoadClusterEntryHandle,
@@ -210,11 +209,11 @@ protected:
   // The expiration time received in any returned token
   absl::optional<SystemTime> expiration_time_;
   // Tls slot
-  ThreadLocal::TypedSlotPtr<ThreadLocalCredentialsCache> tls_slot_;
+  ThreadLocal::TypedSlotPtr<ThreadLocalCredentialsCache> tls_slot_ = nullptr;
   // Storage for our per cluster credential timers
   LoadClusterEntryHandlePtr cluster_load_handle_;
-  Stats::ScopeSharedPtr scope_;
-  MetadataCredentialsProviderStats stats_;
+  Stats::ScopeSharedPtr scope_ = nullptr;
+  std::shared_ptr<MetadataCredentialsProviderStats> stats_;
 };
 
 /**

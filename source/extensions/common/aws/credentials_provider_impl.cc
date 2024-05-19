@@ -122,11 +122,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       cluster_name_(std::string(cluster_name)), cluster_type_(cluster_type), uri_(std::string(uri)),
       cache_duration_(getCacheDuration()), receiver_state_(receiver_state),
       initialization_timer_(initialization_timer),
-      debug_name_(absl::StrCat("Fetching aws credentials from cluster=", cluster_name)),
-      tls_slot_(nullptr),
-      scope_(context_->scope().createScope(
-          fmt::format("aws_request_signing.metadata_credentials_provider.{}.", cluster_name_))),
-      stats_(generateMetadataCredentialsProviderStats(*scope_)) {
+      debug_name_(absl::StrCat("Fetching aws credentials from cluster=", cluster_name)) {
   // Async provider cluster setup
   if (context_ && useHttpAsyncClient()) {
     tls_slot_ =
@@ -142,7 +138,9 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
         if (cluster.has_value()) {
           // Async credential refresh timer
           cache_duration_timer_ = context_->mainThreadDispatcher().createTimer([this]() -> void {
-            stats_.credential_refreshes_performed_.inc();
+            if (stats_) {
+              stats_->credential_refreshes_performed_.inc();
+            }
             refresh();
           });
 
@@ -170,13 +168,13 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
         }
       }
     });
+    // Set up metadata credentials statistics
+    scope_ = context_->scope().createScope(
+        fmt::format("aws_request_signing.metadata_credentials_provider.{}.", cluster_name_));
+    stats_ = std::make_shared<MetadataCredentialsProviderStats>(MetadataCredentialsProviderStats{
+        ALL_METADATACREDENTIALSPROVIDER_STATS(POOL_GAUGE(*scope_))});
   }
-}
-
-MetadataCredentialsProviderStats
-MetadataCredentialsProviderBase::generateMetadataCredentialsProviderStats(Stats::Scope& scope) {
-  return {ALL_METADATACREDENTIALSPROVIDER_STATS(POOL_GAUGE(scope))};
-}
+};
 
 MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::~ThreadLocalCredentialsCache() {
   for (const auto& it : pending_clusters_) {
@@ -527,14 +525,18 @@ void InstanceProfileCredentialsProvider::extractCredentials(
 }
 
 void InstanceProfileCredentialsProvider::onMetadataSuccess(const std::string&& body) {
-  stats_.credential_refreshes_succeeded_.inc();
+  if (stats_) {
+    stats_->credential_refreshes_succeeded_.inc();
+  }
   ENVOY_LOG(debug, "AWS Instance metadata fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
 void InstanceProfileCredentialsProvider::onMetadataError(Failure reason) {
-  stats_.credential_refreshes_failed_.inc();
+  if (stats_) {
 
+    stats_->credential_refreshes_failed_.inc();
+  }
   if (continue_on_async_fetch_failure_) {
     ENVOY_LOG(warn, "{}. Reason: {}", continue_on_async_fetch_failure_reason_,
               metadata_fetcher_->failureToString(reason));
@@ -680,13 +682,17 @@ void ContainerCredentialsProvider::extractCredentials(
 }
 
 void ContainerCredentialsProvider::onMetadataSuccess(const std::string&& body) {
-  stats_.credential_refreshes_succeeded_.inc();
+  if (stats_) {
+    stats_->credential_refreshes_succeeded_.inc();
+  }
   ENVOY_LOG(debug, "AWS Task metadata fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
 void ContainerCredentialsProvider::onMetadataError(Failure reason) {
-  stats_.credential_refreshes_failed_.inc();
+  if (stats_) {
+    stats_->credential_refreshes_failed_.inc();
+  }
   ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
   handleFetchDone();
 }
@@ -844,13 +850,17 @@ void WebIdentityCredentialsProvider::extractCredentials(
 }
 
 void WebIdentityCredentialsProvider::onMetadataSuccess(const std::string&& body) {
-  stats_.credential_refreshes_succeeded_.inc();
+  if (stats_) {
+    stats_->credential_refreshes_succeeded_.inc();
+  }
   ENVOY_LOG(debug, "AWS metadata fetch from STS success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
 void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
-  stats_.credential_refreshes_failed_.inc();
+  if (stats_) {
+    stats_->credential_refreshes_failed_.inc();
+  }
   ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
   handleFetchDone();
 }
