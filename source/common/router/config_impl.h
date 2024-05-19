@@ -620,7 +620,7 @@ private:
 using DefaultInternalRedirectPolicy = ConstSingleton<InternalRedirectPolicyImpl>;
 
 /**
- * Base implementation for all route entries.q
+ * Base implementation for all route entries.
  */
 class RouteEntryImplBase : public RouteEntryAndRoute,
                            public Matchable,
@@ -680,6 +680,9 @@ public:
       return *response_headers_parser_;
     }
     return HeaderParser::defaultParser();
+  }
+  bool mostSpecificHeaderMutationWins() const override {
+    return vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins();
   }
   const QueryParamsEvaluator& queryParamsEvaluator() const {
     if (query_params_evaluator_ != nullptr) {

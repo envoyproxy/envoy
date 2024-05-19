@@ -1,0 +1,33 @@
+#include "source/extensions/filters/http/query_parameter_mutation/config.h"
+
+#include <memory>
+
+#include "source/extensions/filters/http/query_parameter_mutation/filter.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace QueryParameterMutation {
+
+Http::FilterFactoryCb Factory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto,
+    const std::string&, Server::Configuration::FactoryContext& context) {
+  auto config = std::make_shared<Config>(proto, context.serverFactoryContext());
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(std::make_shared<Filter>(config));
+  };
+}
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+Factory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config, Server::Configuration::ServerFactoryContext& context,
+    ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<Config>(proto_config, context);
+}
+
+REGISTER_FACTORY(Factory, Server::Configuration::NamedHttpFilterConfigFactory);
+
+} // namespace QueryParameterMutation
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

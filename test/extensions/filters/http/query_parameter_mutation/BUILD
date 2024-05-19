@@ -1,0 +1,25 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_package()
+
+envoy_extension_cc_test(
+    name = "filter_test",
+    srcs = ["filter_test.cc"],
+    extension_names = ["envoy.filters.http.query_parameter_mutation"],
+    deps = [
+        "//source/extensions/filters/http/query_parameter_mutation:filter_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/filters/http/query_parameter_mutation/v3:pkg_cc_proto",
+    ],
+)

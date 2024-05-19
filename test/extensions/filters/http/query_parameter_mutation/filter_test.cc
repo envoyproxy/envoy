@@ -1,0 +1,55 @@
+#include <memory>
+
+#include "envoy/extensions/filters/http/query_parameter_mutation/v3/config.pb.h"
+
+#include "source/extensions/filters/http/query_parameter_mutation/filter.h"
+
+#include "test/mocks/server/mocks.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace QueryParameterMutation {
+
+class FilterTest : public testing::Test {
+public:
+  Http::TestRequestHeaderMapImpl requestHeaders(const std::string& path) {
+    return {{Http::Headers::get().Path.get(), path}};
+  }
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  envoy::extensions::filters::http::query_parameter_mutation::v3::Config proto_config_;
+};
+
+TEST_F(FilterTest, EmptyConfig) {
+  auto config = std::make_shared<Config>(proto_config_, factory_context_.server_factory_context_);
+  auto filter = std::make_unique<Filter>(config);
+
+  const auto path = "/some?random=path";
+  auto request_headers = requestHeaders(path);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+  // Path should be unchanged after running the filter.
+  EXPECT_EQ(path, request_headers.Path()->value().getStringView());
+}
+
+TEST_F(FilterTest, RemoveQueryParameter) {
+  auto remove_list = proto_config_.mutable_query_parameters_to_remove();
+  remove_list->Add("random");
+  auto config = std::make_shared<Config>(proto_config_, factory_context_.server_factory_context_);
+  auto filter = std::make_unique<Filter>(config);
+
+  const auto path = "/some?random=path";
+  auto request_headers = requestHeaders(path);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+  EXPECT_EQ("/some", request_headers.Path()->value().getStringView());
+}
+
+} // QueryParameterMutation
+} // HttpFilters
+} // Extensions
+} // Envoy
