@@ -308,10 +308,9 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
       "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
   initialize();
-  std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_EQ(
-      2, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.sts_token_"
+                               "service_internal.credential_refreshes_performed",
+                               0, std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
@@ -325,10 +324,9 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
       "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
-  std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_EQ(
-      2, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.sts_token_"
+                               "service_internal.credential_refreshes_performed",
+                               0, std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
@@ -344,9 +342,9 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
   std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_EQ(
-      2, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.sts_token_"
+                               "service_internal.credential_refreshes_performed",
+                               0, std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
@@ -363,9 +361,12 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
   addStandardFilter();
   initialize();
   std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_EQ(
-      3, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.ecs_task_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               0);
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.sts_token_"
+                               "service_internal.credential_refreshes_performed",
+                               0, std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
@@ -381,10 +382,12 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
       "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
-  std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_EQ(
-      3, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.ecs_task_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               0);
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.sts_token_"
+                               "service_internal.credential_refreshes_performed",
+                               0, std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
@@ -401,10 +404,12 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
   addStandardFilter();
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
-  std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_EQ(
-      3, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.ecs_task_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               0);
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.sts_token_"
+                               "service_internal.credential_refreshes_performed",
+                               0, std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithThreeClustersStandard) {
@@ -419,10 +424,15 @@ TEST_F(InitializeFilterTest, TestWithThreeClustersStandard) {
       "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
   initialize();
-  std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_EQ(
-      4, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.ec2_instance_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               0);
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.ecs_task_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               0);
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.sts_token_"
+                               "service_internal.credential_refreshes_performed",
+                               0, std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithThreeClustersRouteLevel) {
@@ -437,10 +447,15 @@ TEST_F(InitializeFilterTest, TestWithThreeClustersRouteLevel) {
       "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
-  std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_EQ(
-      4, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.ec2_instance_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               0);
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.ecs_task_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               0);
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.sts_token_"
+                               "service_internal.credential_refreshes_performed",
+                               0, std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithThreeClustersRouteLevelAndStandard) {
@@ -456,12 +471,16 @@ TEST_F(InitializeFilterTest, TestWithThreeClustersRouteLevelAndStandard) {
   addStandardFilter();
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
-  std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_EQ(
-      4, test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value());
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.ec2_instance_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               0);
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.ecs_task_"
+                               "metadata_server_internal.credential_refreshes_performed",
+                               0);
+  test_server_->waitForGaugeGe("aws_request_signing.metadata_credentials_provider.sts_token_"
+                               "service_internal.credential_refreshes_performed",
+                               0, std::chrono::seconds(10));
 }
-
 } // namespace
 } // namespace Aws
 } // namespace Common

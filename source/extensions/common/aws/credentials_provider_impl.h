@@ -90,6 +90,15 @@ public:
   virtual ~LoadClusterEntryHandle() = default;
 };
 
+#define ALL_METADATACREDENTIALSPROVIDER_STATS(GAUGE)                                               \
+  GAUGE(credential_refreshes_performed, Accumulate)                                                \
+  GAUGE(credential_refreshes_failed, Accumulate)                                                   \
+  GAUGE(credential_refreshes_succeeded, Accumulate)
+
+struct MetadataCredentialsProviderStats {
+  ALL_METADATACREDENTIALSPROVIDER_STATS(GENERATE_GAUGE_STRUCT)
+};
+
 using LoadClusterEntryHandlePtr = std::unique_ptr<LoadClusterEntryHandle>;
 
 class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase {
@@ -109,6 +118,8 @@ public:
 
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
+
+  MetadataCredentialsProviderStats generateMetadataCredentialsProviderStats(Stats::Scope& scope);
 
 protected:
   struct LoadClusterEntryHandleImpl
@@ -202,6 +213,8 @@ protected:
   ThreadLocal::TypedSlotPtr<ThreadLocalCredentialsCache> tls_slot_;
   // Storage for our per cluster credential timers
   LoadClusterEntryHandlePtr cluster_load_handle_;
+  Stats::ScopeSharedPtr scope_;
+  MetadataCredentialsProviderStats stats_;
 };
 
 /**

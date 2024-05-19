@@ -123,7 +123,10 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       cache_duration_(getCacheDuration()), receiver_state_(receiver_state),
       initialization_timer_(initialization_timer),
       debug_name_(absl::StrCat("Fetching aws credentials from cluster=", cluster_name)),
-      tls_slot_(nullptr) {
+      tls_slot_(nullptr),
+      scope_(context_->scope().createScope(
+          fmt::format("aws_request_signing.metadata_credentials_provider.{}.", cluster_name_))),
+      stats_(generateMetadataCredentialsProviderStats(*scope_)) {
   // Async provider cluster setup
   if (context_ && useHttpAsyncClient()) {
     tls_slot_ =
@@ -138,8 +141,10 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
                                                             cluster_name_, cluster_type_, uri_);
         if (cluster.has_value()) {
           // Async credential refresh timer
-          cache_duration_timer_ =
-              context_->mainThreadDispatcher().createTimer([this]() -> void { refresh(); });
+          cache_duration_timer_ = context_->mainThreadDispatcher().createTimer([this]() -> void {
+            stats_.credential_refreshes_performed_.inc();
+            refresh();
+          });
 
           // Store the timer in pending cluster list for use in onClusterAddOrUpdate
           cluster_load_handle_ = std::make_unique<LoadClusterEntryHandleImpl>(
@@ -166,6 +171,11 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       }
     });
   }
+}
+
+MetadataCredentialsProviderStats
+MetadataCredentialsProviderBase::generateMetadataCredentialsProviderStats(Stats::Scope& scope) {
+  return {ALL_METADATACREDENTIALSPROVIDER_STATS(POOL_GAUGE(scope))};
 }
 
 MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::~ThreadLocalCredentialsCache() {
@@ -517,13 +527,14 @@ void InstanceProfileCredentialsProvider::extractCredentials(
 }
 
 void InstanceProfileCredentialsProvider::onMetadataSuccess(const std::string&& body) {
-  // TODO(suniltheta): increment fetch success stats
+  stats_.credential_refreshes_succeeded_.inc();
   ENVOY_LOG(debug, "AWS Instance metadata fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
 void InstanceProfileCredentialsProvider::onMetadataError(Failure reason) {
-  // TODO(suniltheta): increment fetch failed stats
+  stats_.credential_refreshes_failed_.inc();
+
   if (continue_on_async_fetch_failure_) {
     ENVOY_LOG(warn, "{}. Reason: {}", continue_on_async_fetch_failure_reason_,
               metadata_fetcher_->failureToString(reason));
@@ -669,13 +680,13 @@ void ContainerCredentialsProvider::extractCredentials(
 }
 
 void ContainerCredentialsProvider::onMetadataSuccess(const std::string&& body) {
-  // TODO(suniltheta): increment fetch success stats
+  stats_.credential_refreshes_succeeded_.inc();
   ENVOY_LOG(debug, "AWS Task metadata fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
 void ContainerCredentialsProvider::onMetadataError(Failure reason) {
-  // TODO(suniltheta): increment fetch failed stats
+  stats_.credential_refreshes_failed_.inc();
   ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
   handleFetchDone();
 }
@@ -833,13 +844,13 @@ void WebIdentityCredentialsProvider::extractCredentials(
 }
 
 void WebIdentityCredentialsProvider::onMetadataSuccess(const std::string&& body) {
-  // TODO(suniltheta): increment fetch success stats
+  stats_.credential_refreshes_succeeded_.inc();
   ENVOY_LOG(debug, "AWS metadata fetch from STS success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
 void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
-  // TODO(suniltheta): increment fetch failed stats
+  stats_.credential_refreshes_failed_.inc();
   ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
   handleFetchDone();
 }
