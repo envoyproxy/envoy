@@ -84,8 +84,7 @@ namespace {
 
 class TestTlsCertificateSelector : public virtual Ssl::TlsCertificateSelector {
 public:
-  TestTlsCertificateSelector(Ssl::ContextSelectionCallbackWeakPtr ctx, const ProtobufWkt::Any&,
-                             TlsCertificateSelectorFactoryContext&)
+  TestTlsCertificateSelector(Ssl::ContextSelectionCallbackWeakPtr ctx, const ProtobufWkt::Any&)
       : ctx_(ctx) {}
   ~TestTlsCertificateSelector() { ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector"); }
   SelectionResult selectTlsContext(const SSL_CLIENT_HELLO*, CertSelectionCallbackPtr cb) override {
@@ -131,14 +130,14 @@ public:
       const ProtobufWkt::Any& config,
       TlsCertificateSelectorFactoryContext& tls_certificate_selector_factory_context,
       ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    tls_certificate_selector_factory_context.options();
+    tls_certificate_selector_factory_context.singletonManager();
     if (selector_cb_) {
       selector_cb_(config, tls_certificate_selector_factory_context, validation_visitor);
     }
-    return [&config, &tls_certificate_selector_factory_context,
-            this](Ssl::ContextSelectionCallbackWeakPtr ctx) {
+    return [&config, this](Ssl::ContextSelectionCallbackWeakPtr ctx) {
       ENVOY_LOG_MISC(info, "debug: init provider");
-      auto provider = std::make_shared<TestTlsCertificateSelector>(
-          ctx, config, tls_certificate_selector_factory_context);
+      auto provider = std::make_shared<TestTlsCertificateSelector>(ctx, config);
       provider->mod_ = mod_;
       return provider;
     };

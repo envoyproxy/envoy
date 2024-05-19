@@ -106,7 +106,7 @@ private:
   Ssl::ValidateStatus cert_validation_result_{Ssl::ValidateStatus::NotStarted};
   // Latch the in-flight cert validation callback.
   // nullopt if there is none.
-  OptRef<CertSelectionCallbackImpl> cert_selection_callback_;
+  OptRef<CertSelectionCallbackImpl> cert_selection_callback_{absl::nullopt};
   // Stores the cert selection result if there is any.
   // NotStarted if no cert selection has ever been kicked off.
   Ssl::CertSelectionStatus cert_selection_result_{Ssl::CertSelectionStatus::NotStarted};

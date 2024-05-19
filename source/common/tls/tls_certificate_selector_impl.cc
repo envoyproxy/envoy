@@ -10,7 +10,7 @@ TlsCertificateSelectorImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_
                                              Ssl::CertSelectionCallbackPtr cb) {
   auto selection_ctx = cb_.lock();
   if (selection_ctx == nullptr) {
-    // ENVOY_LOG(debug, "");
+    ENVOY_LOG(debug, "CertSelectionCallback is gone early");
     return Ssl::SelectionResult::Terminate;
   }
 

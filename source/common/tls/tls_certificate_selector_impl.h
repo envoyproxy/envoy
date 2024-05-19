@@ -15,7 +15,8 @@ namespace Ssl {
 /**
  * The default TLS context provider, selecting certificate based on SNI.
  */
-class TlsCertificateSelectorImpl : public Ssl::TlsCertificateSelector {
+class TlsCertificateSelectorImpl : public Ssl::TlsCertificateSelector,
+                                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   TlsCertificateSelectorImpl(Ssl::ContextSelectionCallbackWeakPtr cb) : cb_(cb){};
 
