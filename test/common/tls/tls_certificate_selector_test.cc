@@ -6,7 +6,6 @@
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/network/transport_socket.h"
-#include "envoy/ssl/handshaker.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
@@ -18,10 +17,11 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/private_key/private_key_manager_impl.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/tls/cert_validator/timed_cert_validator.h"
 #include "test/common/tls/ssl_certs_test.h"
@@ -48,6 +48,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -79,7 +80,7 @@ using testing::WithArg;
 
 namespace Envoy {
 namespace Ssl {
-namespace TlsCertificateSelector {
+namespace {
 
 class TestTlsCertificateSelector : public virtual Ssl::TlsCertificateSelector {
 public:
@@ -209,8 +210,6 @@ protected:
     ON_CALL(transport_socket_factory_context.server_context_, api())
         .WillByDefault(ReturnRef(*server_api));
 
-    ENVOY_LOG_MISC(info, "debug: 1");
-
     MockFunction<TestTlsCertificateSelectorFactory::CreateProviderHook> mock_factory_cb;
     provider_factory_.selector_cb_ = mock_factory_cb.AsStdFunction();
 
@@ -227,8 +226,6 @@ protected:
     auto server_cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         server_tls_context, transport_socket_factory_context);
 
-    ENVOY_LOG_MISC(info, "debug: 2");
-
     provider_factory_.mod_ = mod;
 
     NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
@@ -237,8 +234,6 @@ protected:
     Extensions::TransportSockets::Tls::ServerSslSocketFactory server_ssl_socket_factory(
         std::move(server_cfg), manager, *server_stats_store.rootScope(),
         std::vector<std::string>{});
-
-    ENVOY_LOG_MISC(info, "debug: 3");
 
     auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(version_));
@@ -283,8 +278,6 @@ protected:
     Network::MockConnectionCallbacks client_connection_callbacks;
     client_connection->addConnectionCallbacks(client_connection_callbacks);
     client_connection->connect();
-
-    ENVOY_LOG_MISC(info, "debug: 4");
 
     size_t connect_count = 0;
     auto connect_second_time = [&]() {
@@ -356,6 +349,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TlsCertificateSelectorFactoryTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-} // namespace TlsCertificateSelector
+} // namespace
 } // namespace Ssl
 } // namespace Envoy
