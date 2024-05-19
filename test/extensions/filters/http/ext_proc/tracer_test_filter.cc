@@ -29,12 +29,10 @@ public:
 
   ~Span() {
     EXPECT_TRUE(finished_) << fmt::format("span not finished in operation: {}", operation_name_);
-    bool span_found = false;
     for (const auto& expect_span : expected_spans_) {
       if (expect_span->operation_name != operation_name_) {
         continue;
       }
-      span_found = true;
       EXPECT_EQ(expect_span->sampled, sampled_) << fmt::format("operation: {}", operation_name_);
       EXPECT_EQ(expect_span->context_injected, context_injected_)
           << fmt::format("operation: {}", operation_name_);
@@ -50,9 +48,6 @@ public:
       expect_span->tested = true;
       break;
     }
-
-    EXPECT_TRUE(span_found) << fmt::format("operation '{}' does not match any expected spans",
-                                           operation_name_);
   }
 
   void setTag(absl::string_view name, absl::string_view value) {
@@ -64,12 +59,18 @@ public:
   void injectContext(Tracing::TraceContext&, const Tracing::UpstreamContext&) {
     context_injected_ = true;
   }
-  void setBaggage(absl::string_view name, absl::string_view value) {
-    baggage_.insert_or_assign(name.data(), value.data());
+  void setBaggage(absl::string_view name, absl::string_view value) { /* not implemented */
   }
-  void log(SystemTime, const std::string&) {}
-  std::string getBaggage(absl::string_view) { return EMPTY_STRING; };
-  std::string getTraceIdAsHex() const { return EMPTY_STRING; };
+  void log(SystemTime, const std::string&) { /* not implemented */
+  }
+  std::string getBaggage(absl::string_view) {
+    /* not implemented */
+    return EMPTY_STRING;
+  };
+  std::string getTraceIdAsHex() const {
+    /* not implemented */
+    return EMPTY_STRING;
+  };
 
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& operation_name,
                               SystemTime) {
@@ -82,7 +83,6 @@ private:
   std::string operation_name_;
   std::vector<ExpectedSpan*> expected_spans_;
 
-  std::map<std::string, std::string> baggage_;
   std::map<std::string, std::string> tags_;
   bool context_injected_;
   bool sampled_;

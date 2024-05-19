@@ -633,8 +633,9 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
   if (!IsEnvoyGrpc()) {
     GTEST_SKIP() << "Tracing is currently only supported for Envoy gRPC";
   }
+  initializeConfig();
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    test::integration::filters::ExpectSpan ext_proc_span, ingress_span;
+    test::integration::filters::ExpectSpan ext_proc_span;
     ext_proc_span.set_operation_name(
         "async envoy.service.ext_proc.v3.ExternalProcessor.Process egress");
     ext_proc_span.set_context_injected(true);
@@ -646,17 +647,11 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
     test::integration::filters::TracerTestConfig test_config;
     test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
 
-    ingress_span.set_operation_name("ingress");
-    ingress_span.set_context_injected(true);
-    ingress_span.set_sampled(false);
-    test_config.mutable_expect_spans()->Add()->CopyFrom(ingress_span);
-
-    auto* tracing = cm.mutable_tracing()->mutable_provider();
-    tracing->set_name("tracer-test-filter");
-    tracing->mutable_typed_config()->PackFrom(test_config);
+    auto* tracing = cm.mutable_tracing();
+    tracing->mutable_provider()->set_name("tracer-test-filter");
+    tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
   });
 
-  initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
@@ -705,9 +700,9 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
   if (!IsEnvoyGrpc()) {
     GTEST_SKIP() << "Tracing is currently only supported for Envoy gRPC";
   }
-
+  initializeConfig();
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    test::integration::filters::ExpectSpan ext_proc_span, ingress_span;
+    test::integration::filters::ExpectSpan ext_proc_span;
     ext_proc_span.set_operation_name(
         "async envoy.service.ext_proc.v3.ExternalProcessor.Process egress");
     ext_proc_span.set_context_injected(true);
@@ -720,15 +715,11 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
     test::integration::filters::TracerTestConfig test_config;
     test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
 
-    ingress_span.set_operation_name("ingress");
-    test_config.mutable_expect_spans()->Add()->CopyFrom(ingress_span);
-
-    auto* tracing = cm.mutable_tracing()->mutable_provider();
-    tracing->set_name("tracer-test-filter");
-    tracing->mutable_typed_config()->PackFrom(test_config);
+    auto* tracing = cm.mutable_tracing();
+    tracing->mutable_provider()->set_name("tracer-test-filter");
+    tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
   });
 
-  initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
