@@ -288,7 +288,6 @@ envoy_cc_fuzz_test(
     name = "ext_proc_grpc_fuzz_test",
     srcs = ["ext_proc_grpc_fuzz.cc"],
     hdrs = ["ext_proc_grpc_fuzz.h"],
-    copts = ["-fsanitize=leak"],
     corpus = "ext_proc_grpc_corpus",
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
@@ -306,7 +305,6 @@ envoy_cc_fuzz_test(
 envoy_extension_cc_test(
     name = "ext_proc_benchmark_test",
     srcs = ["ext_proc_benchmark_test.cc"],
-    copts = ["-fsanitize=leak"],
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [
