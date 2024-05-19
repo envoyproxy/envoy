@@ -1,11 +1,12 @@
-#include "source/common/tls/tls_context_provider_impl.h"
+#include "source/common/tls/tls_certificate_selector_impl.h"
+#include "source/common/tls/server_context_impl.h"
 
 namespace Envoy {
 namespace Ssl {
 
 Ssl::SelectionResult
-TlsContextProviderImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
-                                         Ssl::CertSelectionCallbackPtr cb) {
+TlsCertificateSelectorImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
+                                             Ssl::CertSelectionCallbackPtr cb) {
   auto selection_ctx = cb_.lock();
   if (selection_ctx == nullptr) {
     // ENVOY_LOG(debug, "");
@@ -49,9 +50,9 @@ TlsContextProviderImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hell
   return Ssl::SelectionResult::Continue;
 }
 
-TlsContextProviderSharedPtr
-TlsContextProviderFactoryCbImpl(Ssl::ContextSelectionCallbackWeakPtr cb) {
-  return std::make_shared<TlsContextProviderImpl>(cb);
+TlsCertificateSelectorSharedPtr
+TlsCertificateSelectorFactoryCbImpl(Ssl::ContextSelectionCallbackWeakPtr cb) {
+  return std::make_shared<TlsCertificateSelectorImpl>(cb);
 }
 
 } // namespace Ssl

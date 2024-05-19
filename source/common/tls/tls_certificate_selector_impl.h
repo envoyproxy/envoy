@@ -15,9 +15,9 @@ namespace Ssl {
 /**
  * The default TLS context provider, selecting certificate based on SNI.
  */
-class TlsContextProviderImpl : public Ssl::TlsContextProvider {
+class TlsCertificateSelectorImpl : public Ssl::TlsCertificateSelector {
 public:
-  TlsContextProviderImpl(Ssl::ContextSelectionCallbackWeakPtr cb) : cb_(cb){};
+  TlsCertificateSelectorImpl(Ssl::ContextSelectionCallbackWeakPtr cb) : cb_(cb){};
 
   Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
                                         Ssl::CertSelectionCallbackPtr cb) override;
@@ -26,8 +26,8 @@ private:
   Ssl::ContextSelectionCallbackWeakPtr cb_;
 };
 
-TlsContextProviderSharedPtr
-TlsContextProviderFactoryCbImpl(Ssl::ContextSelectionCallbackWeakPtr cb);
+TlsCertificateSelectorSharedPtr
+TlsCertificateSelectorFactoryCbImpl(Ssl::ContextSelectionCallbackWeakPtr cb);
 
 } // namespace Ssl
 } // namespace Envoy

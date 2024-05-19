@@ -82,7 +82,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      Server::Configuration::CommonFactoryContext& factory_context,
                                      Ssl::ContextAdditionalInitFunc additional_init)
     : ContextImpl(scope, config, factory_context, additional_init),
-      tls_context_provider_factory_cb_(config.createTlsContextProvider()),
+      tls_context_provider_factory_cb_(config.createTlsCertificateSelector()),
       session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()),
       full_scan_certs_on_sni_mismatch_(config.fullScanCertsOnSNIMismatch()) {

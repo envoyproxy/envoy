@@ -193,9 +193,9 @@ public:
 
 using CertSelectionCallbackPtr = std::unique_ptr<CertSelectionCallback>;
 
-class TlsContextProvider {
+class TlsCertificateSelector {
 public:
-  virtual ~TlsContextProvider() = default;
+  virtual ~TlsCertificateSelector() = default;
 
   /**
    * select TLS context based on the client hello.
@@ -204,7 +204,7 @@ public:
                                            CertSelectionCallbackPtr cb) PURE;
 };
 
-using TlsContextProviderSharedPtr = std::shared_ptr<TlsContextProvider>;
+using TlsCertificateSelectorSharedPtr = std::shared_ptr<TlsCertificateSelector>;
 
 class ContextSelectionCallback {
 public:
@@ -218,12 +218,12 @@ public:
 
 using ContextSelectionCallbackWeakPtr = std::weak_ptr<ContextSelectionCallback>;
 
-using TlsContextProviderFactoryCb =
-    std::function<TlsContextProviderSharedPtr(ContextSelectionCallbackWeakPtr)>;
+using TlsCertificateSelectorFactoryCb =
+    std::function<TlsCertificateSelectorSharedPtr(ContextSelectionCallbackWeakPtr)>;
 
-class TlsContextProviderFactoryContext {
+class TlsCertificateSelectorFactoryContext {
 public:
-  virtual ~TlsContextProviderFactoryContext() = default;
+  virtual ~TlsCertificateSelectorFactoryContext() = default;
 
   /**
    * Returns the singleton manager.
@@ -241,17 +241,17 @@ public:
   virtual Api::Api& api() PURE;
 };
 
-class TlsContextProviderFactory : public Config::TypedFactory {
+class TlsCertificateSelectorFactory : public Config::TypedFactory {
 public:
   /**
-   * @returns a callback to create a TlsContextProvider. Accepts the |config| and
+   * @returns a callback to create a TlsCertificateSelector. Accepts the |config| and
    * |validation_visitor| for early validation. This virtual base doesn't
    * perform MessageUtil::downcastAndValidate, but an implementation should.
    */
-  virtual TlsContextProviderFactoryCb
-  createTlsContextProviderCb(const ProtobufWkt::Any& config,
-                             TlsContextProviderFactoryContext& tls_context_provider_factory_context,
-                             ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual TlsCertificateSelectorFactoryCb createTlsCertificateSelectorCb(
+      const ProtobufWkt::Any& config,
+      TlsCertificateSelectorFactoryContext& tls_context_provider_factory_context,
+      ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.tls_context_provider"; }
 };

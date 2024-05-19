@@ -97,7 +97,8 @@ public:
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<void()> callback));
 
   MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
-  MOCK_METHOD(Ssl::TlsContextProviderFactoryCb, createTlsContextProvider, (), (const, override));
+  MOCK_METHOD(Ssl::TlsCertificateSelectorFactoryCb, createTlsCertificateSelector, (),
+              (const, override));
   MOCK_METHOD(Ssl::HandshakerCapabilities, capabilities, (), (const, override));
   MOCK_METHOD(Ssl::SslCtxCb, sslctxCb, (), (const, override));
 
@@ -137,7 +138,8 @@ public:
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<void()> callback));
 
   MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
-  MOCK_METHOD(Ssl::TlsContextProviderFactoryCb, createTlsContextProvider, (), (const, override));
+  MOCK_METHOD(Ssl::TlsCertificateSelectorFactoryCb, createTlsCertificateSelector, (),
+              (const, override));
   MOCK_METHOD(Ssl::HandshakerCapabilities, capabilities, (), (const, override));
   MOCK_METHOD(Ssl::SslCtxCb, sslctxCb, (), (const, override));
 

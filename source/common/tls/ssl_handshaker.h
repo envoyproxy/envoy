@@ -143,12 +143,12 @@ private:
 
 using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;
 
-class TlsContextProviderFactoryContextImpl : public Ssl::TlsContextProviderFactoryContext {
+class TlsCertificateSelectorFactoryContextImpl : public Ssl::TlsCertificateSelectorFactoryContext {
 public:
-  TlsContextProviderFactoryContextImpl(Api::Api& api, const Server::Options& options,
-                                       Singleton::Manager& singleton_manager)
+  TlsCertificateSelectorFactoryContextImpl(Api::Api& api, const Server::Options& options,
+                                           Singleton::Manager& singleton_manager)
       : api_(api), options_(options), singleton_manager_(singleton_manager) {}
-  // TlsContextProviderFactoryContext
+  // TlsCertificateSelectorFactoryContext
   Api::Api& api() override { return api_; }
   const Server::Options& options() const override { return options_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }

@@ -79,14 +79,14 @@ using testing::WithArg;
 
 namespace Envoy {
 namespace Ssl {
-namespace TLSContextProvider {
+namespace TlsCertificateSelector {
 
-class TestTlsContextProvider : public virtual Ssl::TlsContextProvider {
+class TestTlsCertificateSelector : public virtual Ssl::TlsCertificateSelector {
 public:
-  TestTlsContextProvider(Ssl::ContextSelectionCallbackWeakPtr ctx, const ProtobufWkt::Any&,
-                         TlsContextProviderFactoryContext&)
+  TestTlsCertificateSelector(Ssl::ContextSelectionCallbackWeakPtr ctx, const ProtobufWkt::Any&,
+                             TlsCertificateSelectorFactoryContext&)
       : ctx_(ctx) {}
-  ~TestTlsContextProvider() { ENVOY_LOG_MISC(info, "debug: ~TestTlsContextProvider"); }
+  ~TestTlsCertificateSelector() { ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector"); }
   SelectionResult selectTlsContext(const SSL_CLIENT_HELLO*, CertSelectionCallbackPtr cb) override {
     ENVOY_LOG_MISC(info, "debug: select context");
 
@@ -120,23 +120,23 @@ private:
   CertSelectionCallbackPtr cb_;
 };
 
-class TestTlsContextProviderFactory : public Ssl::TlsContextProviderFactory {
+class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorFactory {
 public:
   using CreateProviderHook =
-      std::function<void(const ProtobufWkt::Any&, TlsContextProviderFactoryContext&,
+      std::function<void(const ProtobufWkt::Any&, TlsCertificateSelectorFactoryContext&,
                          ProtobufMessage::ValidationVisitor&)>;
 
-  TlsContextProviderFactoryCb
-  createTlsContextProviderCb(const ProtobufWkt::Any& config,
-                             TlsContextProviderFactoryContext& tls_context_provider_factory_context,
-                             ProtobufMessage::ValidationVisitor& validation_visitor) override {
+  TlsCertificateSelectorFactoryCb createTlsCertificateSelectorCb(
+      const ProtobufWkt::Any& config,
+      TlsCertificateSelectorFactoryContext& tls_context_provider_factory_context,
+      ProtobufMessage::ValidationVisitor& validation_visitor) override {
     if (provider_cb_) {
       provider_cb_(config, tls_context_provider_factory_context, validation_visitor);
     }
     return [&config, &tls_context_provider_factory_context,
             this](Ssl::ContextSelectionCallbackWeakPtr ctx) {
       ENVOY_LOG_MISC(info, "debug: init provider");
-      auto provider = std::make_shared<TestTlsContextProvider>(
+      auto provider = std::make_shared<TestTlsCertificateSelector>(
           ctx, config, tls_context_provider_factory_context);
       provider->mod_ = mod_;
       return provider;
@@ -162,11 +162,12 @@ Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
       listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 }
 
-class TlsContextProviderFactoryTest
+class TlsCertificateSelectorFactoryTest
     : public testing::Test,
       public testing::WithParamInterface<Network::Address::IpVersion> {
 protected:
-  TlsContextProviderFactoryTest() : registered_factory_(provider_factory_), version_(GetParam()) {
+  TlsCertificateSelectorFactoryTest()
+      : registered_factory_(provider_factory_), version_(GetParam()) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   }
@@ -210,11 +211,11 @@ protected:
 
     ENVOY_LOG_MISC(info, "debug: 1");
 
-    MockFunction<TestTlsContextProviderFactory::CreateProviderHook> mock_factory_cb;
+    MockFunction<TestTlsCertificateSelectorFactory::CreateProviderHook> mock_factory_cb;
     provider_factory_.provider_cb_ = mock_factory_cb.AsStdFunction();
 
     EXPECT_CALL(mock_factory_cb, Call)
-        .WillOnce(WithArg<1>([&](Ssl::TlsContextProviderFactoryContext& context) {
+        .WillOnce(WithArg<1>([&](Ssl::TlsCertificateSelectorFactoryContext& context) {
           // Check that the objects available via the context are the same ones
           // provided to the parent context.
           EXPECT_THAT(context.api(), Ref(*server_api));
@@ -338,23 +339,23 @@ protected:
     dispatcher->run(Event::Dispatcher::RunType::Block);
   }
 
-  TestTlsContextProviderFactory provider_factory_;
-  Registry::InjectFactory<Ssl::TlsContextProviderFactory> registered_factory_;
+  TestTlsCertificateSelectorFactory provider_factory_;
+  Registry::InjectFactory<Ssl::TlsCertificateSelectorFactory> registered_factory_;
   TestScopedRuntime scoped_runtime_;
 
   Network::Address::IpVersion version_;
 };
 
-TEST_P(TlsContextProviderFactoryTest, Continue) { testUtil(Ssl::SelectionResult::Continue); }
+TEST_P(TlsCertificateSelectorFactoryTest, Continue) { testUtil(Ssl::SelectionResult::Continue); }
 
-TEST_P(TlsContextProviderFactoryTest, Terminate) { testUtil(Ssl::SelectionResult::Terminate); }
+TEST_P(TlsCertificateSelectorFactoryTest, Terminate) { testUtil(Ssl::SelectionResult::Terminate); }
 
-TEST_P(TlsContextProviderFactoryTest, Stop) { testUtil(Ssl::SelectionResult::Stop); }
+TEST_P(TlsCertificateSelectorFactoryTest, Stop) { testUtil(Ssl::SelectionResult::Stop); }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, TlsContextProviderFactoryTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, TlsCertificateSelectorFactoryTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-} // namespace TLSContextProvider
+} // namespace TlsCertificateSelector
 } // namespace Ssl
 } // namespace Envoy

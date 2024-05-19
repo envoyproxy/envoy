@@ -13,7 +13,7 @@
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
-#include "source/common/tls/tls_context_provider_impl.h"
+#include "source/common/tls/tls_certificate_selector_impl.h"
 
 #include "openssl/ssl.h"
 
@@ -260,14 +260,14 @@ ContextConfigImpl::ContextConfigImpl(
   capabilities_ = handshaker_factory->capabilities();
   sslctx_cb_ = handshaker_factory->sslctxCb(handshaker_factory_context);
 
-  if (config.has_custom_tls_context_provider()) {
-    TlsContextProviderFactoryContextImpl provider_factory_context(api_, options_,
-                                                                  singleton_manager_);
+  if (config.has_custom_tls_certificate_selector()) {
+    TlsCertificateSelectorFactoryContextImpl provider_factory_context(api_, options_,
+                                                                      singleton_manager_);
     // If a custom tls context provider is configured, derive the factory from the config.
-    const auto& provider_config = config.custom_tls_context_provider();
-    Ssl::TlsContextProviderFactory* provider_factory =
-        &Config::Utility::getAndCheckFactory<Ssl::TlsContextProviderFactory>(provider_config);
-    tls_context_provider_factory_cb_ = provider_factory->createTlsContextProviderCb(
+    const auto& provider_config = config.custom_tls_certificate_selector();
+    Ssl::TlsCertificateSelectorFactory* provider_factory =
+        &Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorFactory>(provider_config);
+    tls_context_provider_factory_cb_ = provider_factory->createTlsCertificateSelectorCb(
         provider_config.typed_config(), provider_factory_context,
         factory_context.messageValidationVisitor());
   }
@@ -341,9 +341,9 @@ Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
   return handshaker_factory_cb_;
 }
 
-Ssl::TlsContextProviderFactoryCb ContextConfigImpl::createTlsContextProvider() const {
+Ssl::TlsCertificateSelectorFactoryCb ContextConfigImpl::createTlsCertificateSelector() const {
   return tls_context_provider_factory_cb_ != nullptr ? tls_context_provider_factory_cb_
-                                                     : &Ssl::TlsContextProviderFactoryCbImpl;
+                                                     : &Ssl::TlsCertificateSelectorFactoryCbImpl;
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(

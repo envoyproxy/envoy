@@ -170,14 +170,14 @@ envoy_cc_library(
         "context_impl.cc",
         "context_manager_impl.cc",
         "server_context_impl.cc",
-        "tls_context_provider_impl.cc",
+        "tls_certificate_selector_impl.cc",
     ],
     hdrs = [
         "client_context_impl.h",
         "context_impl.h",
         "context_manager_impl.h",
         "server_context_impl.h",
-        "tls_context_provider_impl.h",
+        "tls_certificate_selector_impl.h",
     ],
     external_deps = [
         "abseil_node_hash_set",
