@@ -10,7 +10,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         "//library/common/api:external_api_lib",
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
         "//library/common/logger:logger_delegate_lib",
         "//library/common/types:c_types_lib",
     ],

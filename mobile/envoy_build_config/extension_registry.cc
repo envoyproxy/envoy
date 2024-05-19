@@ -28,7 +28,7 @@
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
-#include "source/extensions/transport_sockets/tls/config.h"
+#include "source/extensions/transport_sockets/tls/upstream_config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
@@ -65,6 +65,10 @@
 #include "source/common/tls/cert_validator/default_validator.h"
 #endif
 
+#if !defined(__APPLE__)
+#include "source/extensions/network/dns_resolver/cares/dns_impl.h"
+#endif
+
 namespace Envoy {
 
 void ExtensionRegistry::registerFactories() {
@@ -81,7 +85,7 @@ void ExtensionRegistry::registerFactories() {
 
   // This is the default cluster used by Envoy mobile to establish connections upstream.
   Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
-  // This allows decompression of brotli-compresssed responses.
+  // This allows decompression of brotli-compressed responses.
   Extensions::Compression::Brotli::Decompressor::forceRegisterBrotliDecompressorLibraryFactory();
   // This allows decompression of gzip-decompressed responses.
   Extensions::Compression::Gzip::Decompressor::forceRegisterGzipDecompressorLibraryFactory();
@@ -112,7 +116,8 @@ void ExtensionRegistry::registerFactories() {
 
   // This filter applies socket tagging based on the x-envoy-mobile-socket-tag header.
   Extensions::HttpFilters::SocketTag::forceRegisterSocketTagFilterFactory();
-  // The k-v store allows caching things like DNS and prefered protocol across application restarts.
+  // The k-v store allows caching things like DNS and preferred protocol across application
+  // restarts.
   Extensions::KeyValue::forceRegisterPlatformKeyValueStoreFactory();
   // This is Envoy's HCM filter, currently required for a functional L7 data plane.
   Extensions::NetworkFilters::HttpConnectionManager::
@@ -146,8 +151,6 @@ void ExtensionRegistry::registerFactories() {
   // These are required to support specific route configs, if they are on.
   // It's likely no current users of E-M require them so we could optionally compile out by default.
   Router::forceRegisterDefaultEarlyDataPolicyFactory();
-  Router::forceRegisterRouteListMatchActionFactory();
-  Router::forceRegisterRouteMatchActionFactory();
   Extensions::UriTemplate::Match::forceRegisterUriTemplateMatcherFactory();
   Extensions::UriTemplate::Rewrite::forceRegisterUriTemplateRewriterFactory();
   Http::Matching::forceRegisterHttpRequestHeadersDataInputFactory();
@@ -158,6 +161,9 @@ void ExtensionRegistry::registerFactories() {
   // Envoy Mobile uses the GetAddrInfo resolver for DNS lookups on android by default.
   // This could be compiled out for iOS.
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
+#if !defined(__APPLE__)
+  Network::forceRegisterCaresDnsResolverFactory();
+#endif
 
   Network::Address::forceRegisterIpResolver();
 

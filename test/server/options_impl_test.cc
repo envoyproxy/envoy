@@ -96,6 +96,8 @@ TEST_F(OptionsImplTest, All) {
       "--local-address-ip-version v6 -l info --component-log-level upstream:debug,connection:trace "
       "--service-cluster cluster --service-node node --service-zone zone "
       "--file-flush-interval-msec 9000 "
+      "--skip-hot-restart-on-no-parent "
+      "--skip-hot-restart-parent-stats "
       "--drain-time-s 60 --log-format [%v] --enable-fine-grain-logging --parent-shutdown-time-s 90 "
       "--log-path "
       "/foo/bar "
@@ -114,6 +116,8 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(2, options->componentLogLevels().size());
   EXPECT_EQ("[%v]", options->logFormat());
   EXPECT_TRUE(options->logFormatSet());
+  EXPECT_TRUE(options->skipHotRestartParentStats());
+  EXPECT_TRUE(options->skipHotRestartOnNoParent());
   EXPECT_EQ("/foo/bar", options->logPath());
   EXPECT_EQ(true, options->enableFineGrainLogging());
   EXPECT_EQ("cluster", options->serviceClusterName());
@@ -517,6 +521,12 @@ TEST_F(OptionsImplTest, LogFormatDefault) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl({"envoy", "-c", "hello"});
   EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
   EXPECT_FALSE(options->logFormatSet());
+}
+
+TEST_F(OptionsImplTest, SkipHotRestartDefaults) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl({"envoy", "-c", "hello"});
+  EXPECT_FALSE(options->skipHotRestartOnNoParent());
+  EXPECT_FALSE(options->skipHotRestartParentStats());
 }
 
 TEST_F(OptionsImplTest, LogFormatOverride) {

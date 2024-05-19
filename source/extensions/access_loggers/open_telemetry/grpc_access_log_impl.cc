@@ -7,6 +7,7 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/grpc/typed_async_client.h"
+#include "source/extensions/access_loggers/common/grpc_access_logger_clients.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
@@ -20,19 +21,9 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace OpenTelemetry {
 
-GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
-    const Grpc::RawAsyncClientSharedPtr& client,
-    const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
-        config,
-    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
-    : GrpcAccessLogger(client, config.common_config(), dispatcher, scope, GRPC_LOG_STATS_PREFIX,
-                       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "opentelemetry.proto.collector.logs.v1.LogsService.Export"),
-                       false) {
-  initMessageRoot(config, local_info);
-}
-
 namespace {
+using opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest;
+using opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse;
 
 opentelemetry::proto::common::v1::KeyValue getStringKeyValue(const std::string& key,
                                                              const std::string& value) {
@@ -44,6 +35,38 @@ opentelemetry::proto::common::v1::KeyValue getStringKeyValue(const std::string& 
 
 } // namespace
 
+GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
+    const Grpc::RawAsyncClientSharedPtr& client,
+    const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
+        config,
+    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
+    : GrpcAccessLogger(
+          config.common_config(), dispatcher, scope, std::nullopt,
+          std::make_unique<Common::UnaryGrpcAccessLogClient<ExportLogsServiceRequest,
+                                                            ExportLogsServiceResponse>>(
+              client,
+              *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                  "opentelemetry.proto.collector.logs.v1.LogsService.Export"),
+              GrpcCommon::optionalRetryPolicy(config.common_config()), genOTelCallbacksFactory())),
+      stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, GRPC_LOG_STATS_PREFIX))}) {
+  initMessageRoot(config, local_info);
+}
+
+std::function<GrpcAccessLoggerImpl::OTelLogRequestCallbacks&()>
+GrpcAccessLoggerImpl::genOTelCallbacksFactory() {
+  return [this]() -> OTelLogRequestCallbacks& {
+    auto callback = std::make_unique<OTelLogRequestCallbacks>(
+        this->stats_, this->batched_log_entries_, [this](OTelLogRequestCallbacks* p) {
+          if (this->callbacks_.contains(p)) {
+            this->callbacks_.erase(p);
+          }
+        });
+    OTelLogRequestCallbacks* ptr = callback.get();
+    this->batched_log_entries_ = 0;
+    this->callbacks_.emplace(ptr, std::move(callback));
+    return *ptr;
+  };
+}
 // See comment about the structure of repeated fields in the header file.
 void GrpcAccessLoggerImpl::initMessageRoot(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
@@ -65,6 +88,7 @@ void GrpcAccessLoggerImpl::initMessageRoot(
 }
 
 void GrpcAccessLoggerImpl::addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) {
+  batched_log_entries_++;
   root_->mutable_log_records()->Add(std::move(entry));
 }
 

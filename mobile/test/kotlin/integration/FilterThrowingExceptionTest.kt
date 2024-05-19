@@ -104,7 +104,7 @@ class FilterThrowingExceptionTest {
     val builder = AndroidEngineBuilder(context)
     val engine =
       builder
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setEventTracker { event ->
           if (

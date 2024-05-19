@@ -1,4 +1,3 @@
-
 parameters:
 
 - name: bucketGCP
@@ -10,12 +9,12 @@ parameters:
 - name: timeoutDockerPublish
   displayName: "Timout Docker publish"
   type: number
-  # in seconds
-  default: 15
+  # in minutes
+  default: 18
 - name: timeoutDockerBuild
   displayName: "Timout Docker build"
   type: number
-  default: 400
+  default: 500
 
 # Auth
 - name: authGCP
@@ -253,7 +252,7 @@ jobs:
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:
-  #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+  #  https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
   condition: |
     and(
       in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),

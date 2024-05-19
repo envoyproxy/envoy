@@ -77,7 +77,7 @@ public:
 
 private:
   template <typename T> T* internalStartRequest(T* async_request);
-  Router::FilterConfig config_;
+  const Router::FilterConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
 
@@ -254,6 +254,7 @@ private:
   upstreamOverrideHost() const override {
     return absl::nullopt;
   }
+  bool shouldLoadShed() const override { return false; }
   absl::string_view filterConfigName() const override { return ""; }
   RequestHeaderMapOptRef requestHeaders() override { return makeOptRefFromPtr(request_headers_); }
   RequestTrailerMapOptRef requestTrailers() override {
@@ -290,6 +291,7 @@ private:
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool send_xff_{true};
+  bool send_internal_{true};
 
   friend class AsyncClientImpl;
   friend class AsyncClientImplUnitTest;

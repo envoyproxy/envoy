@@ -18,7 +18,7 @@
 #include "source/common/network/filter_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/const_singleton.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"

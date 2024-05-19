@@ -4,6 +4,45 @@
 
 namespace Envoy {
 namespace JNI {
+namespace {
+
+constexpr jint JNI_VERSION = JNI_VERSION_1_6;
+constexpr const char* THREAD_NAME = "EnvoyMain";
+std::atomic<JavaVM*> java_vm_cache_;
+thread_local JNIEnv* jni_env_cache_ = nullptr;
+
+} // namespace
+
+jint JniHelper::getVersion() { return JNI_VERSION; }
+
+void JniHelper::initialize(JavaVM* java_vm) {
+  java_vm_cache_.store(java_vm, std::memory_order_release);
+}
+
+JavaVM* JniHelper::getJavaVm() { return java_vm_cache_.load(std::memory_order_acquire); }
+
+void JniHelper::detachCurrentThread() {
+  ASSERT(getJavaVm()->DetachCurrentThread() == JNI_OK, "Unable to detach current thread.");
+}
+
+JNIEnv* JniHelper::getThreadLocalEnv() {
+  if (jni_env_cache_ != nullptr) {
+    return jni_env_cache_;
+  }
+  JavaVM* java_vm = getJavaVm();
+  ASSERT(java_vm != nullptr, "Unable to get JavaVM.");
+  jint result = java_vm->GetEnv(reinterpret_cast<void**>(&jni_env_cache_), getVersion());
+  if (result == JNI_EDETACHED) {
+    JavaVMAttachArgs args = {getVersion(), const_cast<char*>(THREAD_NAME), nullptr};
+#if defined(__ANDROID__)
+    result = java_vm->AttachCurrentThread(&jni_env_cache_, &args);
+#else
+    result = java_vm->AttachCurrentThread(reinterpret_cast<void**>(&jni_env_cache_), &args);
+#endif
+  }
+  ASSERT(result == JNI_OK, "Unable to get JNIEnv.");
+  return jni_env_cache_;
+}
 
 JNIEnv* JniHelper::getEnv() { return env_; }
 
@@ -53,13 +92,17 @@ void JniHelper::throwNew(const char* java_class_name, const char* message) {
   LocalRefUniquePtr<jclass> java_class = findClass(java_class_name);
   if (java_class != nullptr) {
     jint error = env_->ThrowNew(java_class.get(), message);
-    RELEASE_ASSERT(error == JNI_OK, fmt::format("Failed calling ThrowNew."));
+    ASSERT(error == JNI_OK, "Failed calling ThrowNew.");
   }
 }
+
+jboolean JniHelper::exceptionCheck() { return env_->ExceptionCheck(); }
 
 LocalRefUniquePtr<jthrowable> JniHelper::exceptionOccurred() {
   return {env_->ExceptionOccurred(), LocalRefDeleter(env_)};
 }
+
+void JniHelper::exceptionCleared() { env_->ExceptionClear(); }
 
 GlobalRefUniquePtr<jobject> JniHelper::newGlobalRef(jobject object) {
   GlobalRefUniquePtr<jobject> result(env_->NewGlobalRef(object), GlobalRefDeleter(env_));

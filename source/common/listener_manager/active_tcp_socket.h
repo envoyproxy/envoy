@@ -67,10 +67,14 @@ public:
   Network::ConnectionSocket& socket() override { return *socket_.get(); }
   Event::Dispatcher& dispatcher() override;
   void continueFilterChain(bool success) override;
+  void useOriginalDst(bool use_original_dst) override {
+    hand_off_restored_destination_connections_ = use_original_dst;
+  }
 
   void startFilterChain() { continueFilterChain(true); }
 
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
+  void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) override;
   envoy::config::core::v3::Metadata& dynamicMetadata() override {
     return stream_info_->dynamicMetadata();
   };
@@ -88,7 +92,11 @@ private:
   // The owner of this ActiveTcpSocket.
   ActiveStreamListenerBase& listener_;
   Network::ConnectionSocketPtr socket_;
-  const bool hand_off_restored_destination_connections_;
+  // If this field is true and valid original destination address is set, Envoy will try to hand
+  // off the connection to the listener with the original destination address.
+  // This defaults to value of the 'use_original_dst' field of listener proto configuration.
+  // But it can be overridden by the listener filter by calling useOriginalDst() method.
+  bool hand_off_restored_destination_connections_{};
   std::list<ListenerFilterWrapperPtr> accept_filters_;
   std::list<ListenerFilterWrapperPtr>::iterator iter_;
   Event::TimerPtr timer_;

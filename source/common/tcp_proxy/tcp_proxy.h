@@ -33,7 +33,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tcp_proxy/upstream.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -548,6 +548,7 @@ public:
     upstreamOverrideHost() const override {
       return absl::nullopt;
     }
+    bool shouldLoadShed() const override { return false; }
     void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
       tracked_object_stack.add(*this);
     }

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Do not ever set -x here, it is a security hazard as it will place the credentials below in the
 # CI logs.
@@ -21,7 +21,7 @@ set -e
 ##
 
 # Workaround for https://github.com/envoyproxy/envoy/issues/26634
-DOCKER_BUILD_TIMEOUT="${DOCKER_BUILD_TIMEOUT:-400}"
+DOCKER_BUILD_TIMEOUT="${DOCKER_BUILD_TIMEOUT:-500}"
 
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/arm64,linux/amd64}"
 

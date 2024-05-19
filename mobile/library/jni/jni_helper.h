@@ -1,8 +1,8 @@
 #pragma once
 
-#include <memory>
+#include <jni.h>
 
-#include "library/jni/import/jni_import.h"
+#include <memory>
 
 namespace Envoy {
 namespace JNI {
@@ -138,6 +138,30 @@ class JniHelper {
 public:
   explicit JniHelper(JNIEnv* env) : env_(env) {}
 
+  /** Gets the JNI version supported. */
+  static jint getVersion();
+
+  /** Initializes the `JavaVM`. This is typically set in `JNI_OnLoad`. */
+  static void initialize(JavaVM* java_vm);
+
+  /** Gets the `JavaVM`. The `initialize(JavaVM*) must be called first. */
+  static JavaVM* getJavaVm();
+
+  /** Detaches the current thread from the `JavaVM`. */
+  static void detachCurrentThread();
+
+  /**
+   * Gets the thread-local `JNIEnv`. This is useful for getting the `JNIEnv` between threads.
+   * If the thread-local `JNIEnv` does not exist, this function will attach the current thread to
+   * the JavaVM. Care must be taken to ensure `detachCurrentThread()` is called before the thread
+   * exists to avoid a resource leak.
+   *
+   * See https://developer.android.com/training/articles/perf-jni#threads
+   *
+   * The `initialize(JavaVM*)` must be called first or else `JNIEnv` will return a `nullptr`.
+   */
+  static JNIEnv* getThreadLocalEnv();
+
   /** Gets the underlying `JNIEnv`. */
   JNIEnv* getEnv();
 
@@ -209,11 +233,26 @@ public:
   void throwNew(const char* java_class_name, const char* message);
 
   /**
-   * Determines if an exception is being thrown.
+   * Returns true if an exception is being thrown; false otherwise.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#exceptionoccurred
+   */
+  [[nodiscard]] jboolean exceptionCheck();
+
+  /**
+   * Determines if an exception is being thrown. Returns a `nullptr` if there is no exception.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#exceptionoccurred
    */
   [[nodiscard]] LocalRefUniquePtr<jthrowable> exceptionOccurred();
+
+  /**
+   * Clears any exception that is currently being thrown. If no exception is currently being thrown,
+   * this function has no effect.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#exceptionclear
+   */
+  void exceptionCleared();
 
   /**
    * Creates a new global reference to the object referred to by the `object` argument.
