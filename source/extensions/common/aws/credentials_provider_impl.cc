@@ -135,7 +135,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
         [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(*this); });
 
     context_->mainThreadDispatcher().post([this]() {
-      if (context_->clusterManager().getThreadLocalCluster(cluster_name_) == nullptr) {
+      if (!context_->clusterManager().clusters().hasCluster(cluster_name_)) {
 
         auto cluster = Utility::createInternalClusterStatic(context_->clusterManager(),
                                                             cluster_name_, cluster_type_, uri_);
@@ -194,7 +194,7 @@ MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::~ThreadLocalCreden
 
 void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterAddOrUpdate(
     absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand&) {
-
+  Thread::LockGuard lock(lock_);
   auto it = pending_clusters_.find(cluster_name);
   if (it != pending_clusters_.end()) {
     for (auto* cluster : it->second) {

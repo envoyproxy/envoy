@@ -148,6 +148,8 @@ protected:
     // The credentials object.
     CredentialsConstSharedPtr credentials_;
     absl::flat_hash_map<std::string, std::list<LoadClusterEntryHandleImpl*>> pending_clusters_;
+    // Lock guard.
+    Thread::MutexBasicLockable lock_;
 
   private:
     void onClusterAddOrUpdate(absl::string_view cluster_name,
@@ -201,8 +203,6 @@ protected:
   SystemTime last_updated_;
   // Cache credentials when using libcurl.
   Credentials cached_credentials_;
-  // Lock guard.
-  Thread::MutexBasicLockable lock_;
   // The init target.
   std::unique_ptr<Init::TargetImpl> init_target_;
   // Used in logs.
