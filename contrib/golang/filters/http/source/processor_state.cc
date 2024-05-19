@@ -361,12 +361,14 @@ void EncodingProcessorState::addBufferData(Buffer::Instance& data) {
         },
         [this]() -> void {
           if (state_ == FilterState::WaitingAllData) {
-            // On the request path exceeding buffer limits will result in a 413.
-            ENVOY_LOG(debug, "golang filter encode data buffer is full, reply with 413");
+            ENVOY_LOG(debug, "golang filter encode data buffer is full, reply with 500");
+
+            // In this case, sendLocalReply will either send a response directly to the encoder, or
+            // reset the stream.
             encoder_callbacks_->sendLocalReply(
-                Http::Code::PayloadTooLarge,
-                Http::CodeUtility::toString(Http::Code::PayloadTooLarge), nullptr, absl::nullopt,
-                StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
+                Http::Code::InternalServerError,
+                Http::CodeUtility::toString(Http::Code::InternalServerError), nullptr,
+                absl::nullopt, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
             return;
           }
           if (!watermark_requested_) {
