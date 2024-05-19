@@ -59,7 +59,7 @@ public:
   void injectContext(Tracing::TraceContext&, const Tracing::UpstreamContext&) {
     context_injected_ = true;
   }
-  void setBaggage(absl::string_view name, absl::string_view value) { /* not implemented */
+  void setBaggage(absl::string_view, absl::string_view) { /* not implemented */
   }
   void log(SystemTime, const std::string&) { /* not implemented */
   }
