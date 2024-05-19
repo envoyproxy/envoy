@@ -124,22 +124,44 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       initialization_timer_(initialization_timer),
       debug_name_(absl::StrCat("Fetching aws credentials from cluster=", cluster_name)),
       tls_slot_(context_->threadLocal()) {
+  // Async provider cluster setup
   if (context_ && useHttpAsyncClient()) {
     tls_slot_.set(
         [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(*this); });
 
     context_->mainThreadDispatcher().post([this]() {
-      if (Utility::addInternalClusterStatic(context_->clusterManager(), cluster_name_,
-                                            cluster_type_, uri_)) {
+      if (context_->clusterManager().getThreadLocalCluster(cluster_name_) == nullptr) {
 
-        ThreadLocalCredentialsCache& tls_cluster_info = *tls_slot_;
-        // Async credential refresh timer
-        cache_duration_timer_ =
-            context_->mainThreadDispatcher().createTimer([this]() -> void { refresh(); });
+        auto cluster = Utility::createInternalClusterStatic(context_->clusterManager(),
+                                                            cluster_name_, cluster_type_, uri_);
+        if (cluster.has_value()) {
+          ThreadLocalCredentialsCache& tls_cluster_info = *tls_slot_;
+          // Async credential refresh timer
+          cache_duration_timer_ =
+              context_->mainThreadDispatcher().createTimer([this]() -> void { refresh(); });
 
-        // Store the timer in pending clusters for use in onClusterAddOrUpdate
-        cluster_load_handle_ = std::make_unique<LoadClusterEntryHandleImpl>(
-            tls_cluster_info.pending_clusters_, cluster_name_, cache_duration_timer_);
+          // Store the timer in pending cluster list for use in onClusterAddOrUpdate
+          cluster_load_handle_ = std::make_unique<LoadClusterEntryHandleImpl>(
+              tls_cluster_info.pending_clusters_, cluster_name_, cache_duration_timer_);
+
+          // TODO(suniltheta): use random number generator here for cluster version.
+          // While adding multiple clusters make sure that change in random version number across
+          // multiple clusters won't make Envoy delete/replace previously registered internal
+          // cluster.
+          context_->clusterManager().addOrUpdateCluster(cluster.value(), "12345");
+
+          const auto cluster_type_str =
+              envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
+                  ->FindValueByNumber(cluster->type())
+                  ->name();
+          absl::string_view host_port;
+          absl::string_view path;
+          Http::Utility::extractHostPathFromUri(uri_, host_port, path);
+          ENVOY_LOG_MISC(info,
+                         "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
+                         "credentials",
+                         cluster_type_str, cluster_name_, host_port);
+        }
       }
     });
   }

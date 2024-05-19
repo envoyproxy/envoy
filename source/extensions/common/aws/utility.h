@@ -119,10 +119,10 @@ public:
    * exists.
    * @return false if failed to add the cluster
    */
-  static bool
-  addInternalClusterStatic(Upstream::ClusterManager& cm, absl::string_view cluster_name,
-                           const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
-                           absl::string_view uri);
+  static absl::optional<envoy::config::cluster::v3::Cluster>
+  createInternalClusterStatic(Upstream::ClusterManager& cm, absl::string_view cluster_name,
+                              const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
+                              absl::string_view uri);
 
   /**
    * @brief Retrieve an environment variable if set, otherwise return default_value

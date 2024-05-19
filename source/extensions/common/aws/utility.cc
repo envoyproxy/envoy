@@ -324,7 +324,7 @@ absl::optional<std::string> Utility::fetchMetadata(Http::RequestMessage& message
   return buffer.empty() ? absl::nullopt : absl::optional<std::string>(buffer);
 }
 
-bool Utility::addInternalClusterStatic(
+absl::optional<envoy::config::cluster::v3::Cluster> Utility::createInternalClusterStatic(
     Upstream::ClusterManager& cm, absl::string_view cluster_name,
     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri) {
   // Check if local cluster exists with that name.
@@ -368,27 +368,15 @@ bool Utility::addInternalClusterStatic(
         socket->mutable_typed_config()->PackFrom(tls_socket);
       }
 
-      // TODO(suniltheta): use random number generator here for cluster version.
-      // While adding multiple clusters make sure that change in random version number across
-      // multiple clusters won't make Envoy delete/replace previously registered internal cluster.
-      cm.addOrUpdateCluster(cluster, "12345");
-
-      const auto cluster_type_str = envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
-                                        ->FindValueByNumber(cluster_type)
-                                        ->name();
-      ENVOY_LOG_MISC(info,
-                     "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
-                     "credentials",
-                     cluster_type_str, cluster_name, host_port);
-      return true;
+      return cluster;
     }
     END_TRY
     CATCH(const EnvoyException& e, {
       ENVOY_LOG_MISC(error, "Failed to add internal cluster {}: {}", cluster_name, e.what());
-      return false;
+      return {};
     });
   }
-  return false;
+  return {};
 }
 
 std::string Utility::getEnvironmentVariableOrDefault(const std::string& variable_name,
