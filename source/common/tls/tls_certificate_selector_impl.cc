@@ -1,5 +1,5 @@
-#include "source/common/tls/tls_certificate_selector_impl.h"
 #include "source/common/tls/server_context_impl.h"
+#include "source/common/tls/tls_certificate_selector_impl.h"
 
 namespace Envoy {
 namespace Ssl {
