@@ -686,6 +686,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   case Ssl::SelectionResult::Terminate:
     return ssl_select_cert_error;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Tls
