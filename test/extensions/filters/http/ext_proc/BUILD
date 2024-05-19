@@ -142,7 +142,6 @@ envoy_extension_cc_test(
         "envoy.filters.http.ext_proc",
         # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
-        "envoy.tracers.opentelemetry",
     ],
     shard_count = 4,
     tags = [
@@ -156,7 +155,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc:config",
         "//source/extensions/filters/http/set_metadata:config",
         "//source/extensions/retry/host/previous_hosts:config",
-        "//source/extensions/tracers/opentelemetry:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
@@ -290,6 +288,7 @@ envoy_cc_fuzz_test(
     name = "ext_proc_grpc_fuzz_test",
     srcs = ["ext_proc_grpc_fuzz.cc"],
     hdrs = ["ext_proc_grpc_fuzz.h"],
+    copts = ["-fsanitize=leak"],
     corpus = "ext_proc_grpc_corpus",
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
@@ -307,6 +306,7 @@ envoy_cc_fuzz_test(
 envoy_extension_cc_test(
     name = "ext_proc_benchmark_test",
     srcs = ["ext_proc_benchmark_test.cc"],
+    copts = ["-fsanitize=leak"],
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [

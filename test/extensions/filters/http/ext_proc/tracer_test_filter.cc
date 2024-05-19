@@ -22,30 +22,32 @@ struct ExpectedSpan {
   bool tested;
 };
 
+using ExpectedSpansSharedPtr = std::shared_ptr<std::vector<ExpectedSpan>>;
+
 class Span : public Tracing::Span {
 public:
-  Span(const std::string& operation_name, std::vector<ExpectedSpan*> expected_spans)
+  Span(const std::string& operation_name, ExpectedSpansSharedPtr& expected_spans)
       : operation_name_(operation_name), expected_spans_(expected_spans){};
 
   ~Span() {
     EXPECT_TRUE(finished_) << fmt::format("span not finished in operation: {}", operation_name_);
-    for (const auto& expect_span : expected_spans_) {
-      if (expect_span->operation_name != operation_name_) {
+    for (auto& expect_span : *expected_spans_) {
+      if (expect_span.operation_name != operation_name_) {
         continue;
       }
-      EXPECT_EQ(expect_span->sampled, sampled_) << fmt::format("operation: {}", operation_name_);
-      EXPECT_EQ(expect_span->context_injected, context_injected_)
+      EXPECT_EQ(expect_span.sampled, sampled_) << fmt::format("operation: {}", operation_name_);
+      EXPECT_EQ(expect_span.context_injected, context_injected_)
           << fmt::format("operation: {}", operation_name_);
 
       std::string all_tags;
       for (const auto& [key, value] : tags_) {
         all_tags += fmt::format("{}: {}\n", key, value);
       }
-      for (const auto& [key, want] : expect_span->tags) {
+      for (const auto& [key, want] : expect_span.tags) {
         absl::string_view got = tags_[key];
         EXPECT_EQ(want, got) << fmt::format("{}: {} not found in tags:\n{}", key, want, all_tags);
       }
-      expect_span->tested = true;
+      expect_span.tested = true;
       break;
     }
   }
@@ -81,7 +83,7 @@ public:
 
 private:
   std::string operation_name_;
-  std::vector<ExpectedSpan*> expected_spans_;
+  ExpectedSpansSharedPtr expected_spans_;
 
   std::map<std::string, std::string> tags_;
   bool context_injected_;
@@ -92,16 +94,15 @@ private:
 class Driver : public Tracing::Driver, Logger::Loggable<Logger::Id::tracing> {
 public:
   Driver(const test::integration::filters::TracerTestConfig& test_config,
-         Server::Configuration::CommonFactoryContext&) {
+         Server::Configuration::CommonFactoryContext&)
+      : expected_spans_(std::make_shared<std::vector<ExpectedSpan>>()) {
     for (auto expected_span : test_config.expect_spans()) {
-      auto span = std::make_unique<ExpectedSpan>();
-      span->operation_name = expected_span.operation_name();
-      span->sampled = expected_span.sampled();
-      span->context_injected = expected_span.context_injected();
-      for (auto tag : expected_span.tags()) {
-        span->tags[tag.first] = tag.second;
-      }
-      expected_spans_.push_back(span.release());
+      ExpectedSpan span;
+      span.operation_name = expected_span.operation_name();
+      span.sampled = expected_span.sampled();
+      span.context_injected = expected_span.context_injected();
+      span.tags.insert(expected_span.tags().begin(), expected_span.tags().end());
+      expected_spans_->push_back(span);
     };
   };
   // Tracing::Driver
@@ -113,14 +114,14 @@ public:
   };
 
   ~Driver() {
-    for (auto& span : expected_spans_) {
-      EXPECT_TRUE(span->tested) << fmt::format("missing span with operation '{}'",
-                                               span->operation_name);
+    for (auto& span : *expected_spans_) {
+      EXPECT_TRUE(span.tested) << fmt::format("missing span with operation '{}'",
+                                              span.operation_name);
     }
   };
 
 private:
-  std::vector<ExpectedSpan*> expected_spans_;
+  ExpectedSpansSharedPtr expected_spans_;
 };
 
 class TracerTestFactory
