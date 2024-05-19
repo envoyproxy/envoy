@@ -169,7 +169,7 @@ TEST_F(ExtractorTest, TestDuplicatedHeadersWithUniqueTokenPrefixes) {
 
 // Test extracting JWT as Bearer token from the default header location: "Authorization" -
 // using an actual (correctly-formatted) JWT but token is invalid, like: GoodToken +
-// chars_after_space expected to get all token include characters after the space:
+// chars_after_space expected to get only correct token (GoodToken) without characters after space:
 TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWTEndedWithSpaceAndMoreCharachters) {
   std::string chars_after_space = "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj";
   std::string concatenated = std::string(GoodToken) + " ." + chars_after_space;
@@ -181,7 +181,7 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWTEndedWithSpaceAndMore
   EXPECT_EQ(tokens.size(), 1);
 
   // Only the issue1 is using default header location.
-  EXPECT_EQ(tokens[0]->token(), valid_token_with_space_and_chars);
+  EXPECT_EQ(tokens[0]->token(), GoodToken);
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
 }
 
@@ -265,7 +265,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderMatch) {
 }
 
 // Test extracting token from the custom header: "prefix-header"
-// The value is found after the "CCCDDD", then between the '=' and the ','.
+// The value is found after the "CCCDDD", expected to jwt_token only.
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch1) {
   auto headers =
       TestRequestHeaderMapImpl{{"prefix-header", "preamble CCCDDD=jwt_token,extra=more"}};
@@ -274,7 +274,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch1) {
 
   // Match issuer 7 with map key as: prefix-header + 'CCCDDD'
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer7"));
-  EXPECT_EQ(tokens[0]->token(), "jwt_token,extra=more");
+  EXPECT_EQ(tokens[0]->token(), "jwt_token");
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
@@ -285,7 +285,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
 
   // Match issuer 7 with map key as: prefix-header + AAA
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer7"));
-  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu\",comment=\"fish tag\"");
+  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu");
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch3) {
@@ -296,11 +296,11 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch3) {
 
   // Match issuer 8 with map key as: prefix-header + '"CCCDDD"'
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer8"));
-  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu\"}");
+  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu");
 
   // Match issuer 7 with map key as: prefix-header + 'CCCDDD'
   EXPECT_TRUE(tokens[1]->isIssuerAllowed("issuer7"));
-  EXPECT_EQ(tokens[1]->token(), "and0X3Rva2Vu\"}");
+  EXPECT_EQ(tokens[1]->token(), "and0X3Rva2Vu");
 }
 
 // Test extracting token from the custom query parameter: "token_param"
