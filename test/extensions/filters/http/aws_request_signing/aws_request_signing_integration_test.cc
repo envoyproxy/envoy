@@ -256,8 +256,11 @@ public:
 
   void dnsSetup() {
     ON_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillByDefault(Return(dns_resolver_));
-
+#ifdef ENVOY_SSL_FIPS
+    expectResolve(Network::DnsLookupFamily::V4Only, "sts-fips.us-east-1.amazonaws.com");
+#else
     expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-east-1.amazonaws.com");
+#endif
   }
 
   void addStandardFilter() { config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4); }
