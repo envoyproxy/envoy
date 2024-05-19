@@ -250,10 +250,10 @@ public:
    */
   virtual TlsCertificateSelectorFactoryCb createTlsCertificateSelectorCb(
       const ProtobufWkt::Any& config,
-      TlsCertificateSelectorFactoryContext& tls_context_provider_factory_context,
+      TlsCertificateSelectorFactoryContext& tls_certificate_selector_factory_context,
       ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
-  std::string category() const override { return "envoy.tls_context_provider"; }
+  std::string category() const override { return "envoy.tls_certificate_selector"; }
 };
 
 } // namespace Ssl

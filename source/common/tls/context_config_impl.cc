@@ -267,7 +267,7 @@ ContextConfigImpl::ContextConfigImpl(
     const auto& provider_config = config.custom_tls_certificate_selector();
     Ssl::TlsCertificateSelectorFactory* provider_factory =
         &Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorFactory>(provider_config);
-    tls_context_provider_factory_cb_ = provider_factory->createTlsCertificateSelectorCb(
+    tls_certificate_selector_factory_cb_ = provider_factory->createTlsCertificateSelectorCb(
         provider_config.typed_config(), provider_factory_context,
         factory_context.messageValidationVisitor());
   }
@@ -342,8 +342,9 @@ Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
 }
 
 Ssl::TlsCertificateSelectorFactoryCb ContextConfigImpl::createTlsCertificateSelector() const {
-  return tls_context_provider_factory_cb_ != nullptr ? tls_context_provider_factory_cb_
-                                                     : &Ssl::TlsCertificateSelectorFactoryCbImpl;
+  return tls_certificate_selector_factory_cb_ != nullptr
+             ? tls_certificate_selector_factory_cb_
+             : &Ssl::TlsCertificateSelectorFactoryCbImpl;
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(

@@ -108,7 +108,7 @@ private:
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 
-  Ssl::TlsCertificateSelectorFactoryCb tls_context_provider_factory_cb_;
+  Ssl::TlsCertificateSelectorFactoryCb tls_certificate_selector_factory_cb_;
   Ssl::HandshakerFactoryCb handshaker_factory_cb_;
   Ssl::HandshakerCapabilities capabilities_;
   Ssl::SslCtxCb sslctx_cb_;

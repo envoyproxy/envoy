@@ -17,10 +17,10 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
-    name = "tls_context_provider_test",
+    name = "tls_certificate_selector_test",
     size = "large",
     srcs = [
-        "tls_context_provider_test.cc",
+        "tls_certificate_selector_test.cc",
     ],
     data = [
         # TODO(mattklein123): We should consolidate all of our test certs in a single place as

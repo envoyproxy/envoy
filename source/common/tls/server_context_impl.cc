@@ -82,7 +82,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      Server::Configuration::CommonFactoryContext& factory_context,
                                      Ssl::ContextAdditionalInitFunc additional_init)
     : ContextImpl(scope, config, factory_context, additional_init),
-      tls_context_provider_factory_cb_(config.createTlsCertificateSelector()),
+      tls_certificate_selector_factory_cb_(config.createTlsCertificateSelector()),
       session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()),
       full_scan_certs_on_sni_mismatch_(config.fullScanCertsOnSNIMismatch()) {
@@ -637,11 +637,11 @@ ServerContextImpl::findTlsContext(absl::string_view sni, bool client_ecdsa_capab
 
 enum ssl_select_cert_result_t
 ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
-  if (tls_context_provider_ == nullptr) {
+  if (tls_certificate_selector_ == nullptr) {
     // Lazy init the provider here since we can not use shared_from_this in construct method.
-    tls_context_provider_ = tls_context_provider_factory_cb_(shared_from_this());
+    tls_certificate_selector_ = tls_certificate_selector_factory_cb_(shared_from_this());
   }
-  ASSERT(tls_context_provider_ != nullptr);
+  ASSERT(tls_certificate_selector_ != nullptr);
 
   auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
       SSL_get_ex_data(ssl_client_hello->ssl, ContextImpl::sslExtendedSocketInfoIndex()));
@@ -668,7 +668,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   ENVOY_LOG(trace, "TLS context selection result: {}, before selectTlsContext",
             static_cast<int>(selection_result));
 
-  const auto result = tls_context_provider_->selectTlsContext(
+  const auto result = tls_certificate_selector_->selectTlsContext(
       ssl_client_hello, extended_socket_info->createCertSelectionCallback(ssl_client_hello->ssl));
 
   ENVOY_LOG(trace, "TLS context selection result: {}, after selectTlsContext",

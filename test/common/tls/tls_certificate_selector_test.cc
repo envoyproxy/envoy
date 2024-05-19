@@ -128,16 +128,16 @@ public:
 
   TlsCertificateSelectorFactoryCb createTlsCertificateSelectorCb(
       const ProtobufWkt::Any& config,
-      TlsCertificateSelectorFactoryContext& tls_context_provider_factory_context,
+      TlsCertificateSelectorFactoryContext& tls_certificate_selector_factory_context,
       ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    if (provider_cb_) {
-      provider_cb_(config, tls_context_provider_factory_context, validation_visitor);
+    if (selector_cb_) {
+      selector_cb_(config, tls_certificate_selector_factory_context, validation_visitor);
     }
-    return [&config, &tls_context_provider_factory_context,
+    return [&config, &tls_certificate_selector_factory_context,
             this](Ssl::ContextSelectionCallbackWeakPtr ctx) {
       ENVOY_LOG_MISC(info, "debug: init provider");
       auto provider = std::make_shared<TestTlsCertificateSelector>(
-          ctx, config, tls_context_provider_factory_context);
+          ctx, config, tls_certificate_selector_factory_context);
       provider->mod_ = mod_;
       return provider;
     };
@@ -147,7 +147,7 @@ public:
   }
   std::string name() const override { return "test-tls-context-provider"; };
 
-  CreateProviderHook provider_cb_;
+  CreateProviderHook selector_cb_;
   Ssl::SelectionResult mod_;
 };
 
@@ -183,7 +183,7 @@ protected:
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-    custom_tls_context_provider:
+    custom_tls_certificate_selector:
       name: test-tls-context-provider
       typed_config:
         "@type": type.googleapis.com/xds.type.v3.TypedStruct
@@ -212,7 +212,7 @@ protected:
     ENVOY_LOG_MISC(info, "debug: 1");
 
     MockFunction<TestTlsCertificateSelectorFactory::CreateProviderHook> mock_factory_cb;
-    provider_factory_.provider_cb_ = mock_factory_cb.AsStdFunction();
+    provider_factory_.selector_cb_ = mock_factory_cb.AsStdFunction();
 
     EXPECT_CALL(mock_factory_cb, Call)
         .WillOnce(WithArg<1>([&](Ssl::TlsCertificateSelectorFactoryContext& context) {
