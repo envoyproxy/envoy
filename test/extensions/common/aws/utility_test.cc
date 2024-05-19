@@ -14,7 +14,6 @@ using testing::ElementsAre;
 using testing::NiceMock;
 using testing::Pair;
 using testing::Return;
-using testing::Throw;
 
 namespace Envoy {
 namespace Extensions {
@@ -416,28 +415,18 @@ TEST(UtilityTest, ThreadLocalClusterExistsAlready) {
   NiceMock<Upstream::MockThreadLocalCluster> cluster_;
   NiceMock<Upstream::MockClusterManager> cm_;
   EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
-  EXPECT_CALL(cm_, addOrUpdateCluster(_, _)).Times(0);
-  EXPECT_TRUE(Utility::addInternalClusterStatic(cm_, "cluster_name",
-                                                envoy::config::cluster::v3::Cluster::STATIC, ""));
+  auto cluster = Utility::createInternalClusterStatic(
+      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "");
+  EXPECT_FALSE(cluster.has_value());
 }
 
 // Verify that if thread local cluster doesn't exist we can create a new one.
 TEST(UtilityTest, AddStaticClusterSuccess) {
   NiceMock<Upstream::MockClusterManager> cm_;
   EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
-  EXPECT_TRUE(Utility::addInternalClusterStatic(
-      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:80"));
-}
-
-// Handle exception when adding thread local cluster fails.
-TEST(UtilityTest, AddStaticClusterFailure) {
-  NiceMock<Upstream::MockClusterManager> cm_;
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _))
-      .WillOnce(Throw(EnvoyException("exeption message")));
-  EXPECT_FALSE(Utility::addInternalClusterStatic(
-      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:80"));
+  auto cluster = Utility::createInternalClusterStatic(
+      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:80");
+  EXPECT_TRUE(cluster.has_value());
 }
 
 // Verify that for uri argument in addInternalClusterStatic port value is optional
@@ -445,9 +434,9 @@ TEST(UtilityTest, AddStaticClusterFailure) {
 TEST(UtilityTest, AddStaticClusterSuccessEvenWithMissingPort) {
   NiceMock<Upstream::MockClusterManager> cm_;
   EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
-  EXPECT_TRUE(Utility::addInternalClusterStatic(
-      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1/something"));
+  auto cluster = Utility::createInternalClusterStatic(
+      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1/something");
+  EXPECT_TRUE(cluster.has_value());
 }
 
 // The region is simply interpolated into sts.{}.amazonaws.com for most regions
