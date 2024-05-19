@@ -199,7 +199,7 @@ protected:
   // The expiration time received in any returned token
   absl::optional<SystemTime> expiration_time_;
   // Tls slot
-  ThreadLocal::TypedSlot<ThreadLocalCredentialsCache> tls_slot_;
+  ThreadLocal::TypedSlotPtr<ThreadLocalCredentialsCache> tls_slot_;
   // Storage for our per cluster credential timers
   LoadClusterEntryHandlePtr cluster_load_handle_;
 };

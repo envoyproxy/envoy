@@ -123,10 +123,12 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       cache_duration_(getCacheDuration()), receiver_state_(receiver_state),
       initialization_timer_(initialization_timer),
       debug_name_(absl::StrCat("Fetching aws credentials from cluster=", cluster_name)),
-      tls_slot_(context_->threadLocal()) {
+      tls_slot_(nullptr) {
   // Async provider cluster setup
   if (context_ && useHttpAsyncClient()) {
-    tls_slot_.set(
+    tls_slot_ =
+        ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(context_->threadLocal());
+    tls_slot_->set(
         [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(*this); });
 
     context_->mainThreadDispatcher().post([this]() {
@@ -135,14 +137,13 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
         auto cluster = Utility::createInternalClusterStatic(context_->clusterManager(),
                                                             cluster_name_, cluster_type_, uri_);
         if (cluster.has_value()) {
-          ThreadLocalCredentialsCache& tls_cluster_info = *tls_slot_;
           // Async credential refresh timer
           cache_duration_timer_ =
               context_->mainThreadDispatcher().createTimer([this]() -> void { refresh(); });
 
           // Store the timer in pending cluster list for use in onClusterAddOrUpdate
           cluster_load_handle_ = std::make_unique<LoadClusterEntryHandleImpl>(
-              tls_cluster_info.pending_clusters_, cluster_name_, cache_duration_timer_);
+              (*tls_slot_)->pending_clusters_, cluster_name_, cache_duration_timer_);
 
           // TODO(suniltheta): use random number generator here for cluster version.
           // While adding multiple clusters make sure that change in random version number across
@@ -207,9 +208,9 @@ void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterRemo
 };
 
 Credentials MetadataCredentialsProviderBase::getCredentials() {
-  if (useHttpAsyncClient() && context_ && tls_slot_.get().has_value()) {
+  if (useHttpAsyncClient() && context_ && tls_slot_) {
     // If server factory context was supplied then we would have thread local slot initialized.
-    return *tls_slot_->credentials_.get();
+    return *(*tls_slot_)->credentials_.get();
   } else {
     refreshIfNeeded();
     return cached_credentials_;
@@ -264,8 +265,8 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
 void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
     CredentialsConstUniquePtr&& creds) {
   CredentialsConstSharedPtr shared_credentials = std::move(creds);
-  if (tls_slot_.get().has_value()) {
-    tls_slot_.runOnAllThreads([shared_credentials](OptRef<ThreadLocalCredentialsCache> obj) {
+  if (tls_slot_) {
+    tls_slot_->runOnAllThreads([shared_credentials](OptRef<ThreadLocalCredentialsCache> obj) {
       obj->credentials_ = shared_credentials;
     });
   }
