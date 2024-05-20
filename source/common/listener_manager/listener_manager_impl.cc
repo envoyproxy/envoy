@@ -369,7 +369,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
 
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
-        worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
+        worker_factory.createWorker(i, server.overloadManager(), server.nullOverloadManager(), absl::StrCat("worker_", i)));
   }
 }
 

@@ -274,6 +274,7 @@ envoy_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "//source/server:overload_manager_lib",
+        "//source/server:null_overload_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:options_mocks",

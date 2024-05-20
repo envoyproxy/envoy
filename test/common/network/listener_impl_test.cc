@@ -79,7 +79,7 @@ public:
                       bool bind_to_port, bool ignore_global_conn_limit,
                       Server::ThreadLocalOverloadStateOptRef overload_state)
       : TestTcpListenerImpl(dispatcher, random_generator, runtime, socket, cb, bind_to_port,
-                            ignore_global_conn_limit,
+                            ignore_global_conn_limit, false,
                             Network::DefaultMaxConnectionsToAcceptPerSocketEvent, overload_state) {}
 
   TestTcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random_generator,
@@ -88,7 +88,7 @@ public:
                       uint32_t max_connections_to_accept_per_socket_event,
                       Server::ThreadLocalOverloadStateOptRef overload_state)
       : TcpListenerImpl(dispatcher, random_generator, runtime, socket, cb, bind_to_port,
-                        ignore_global_conn_limit, max_connections_to_accept_per_socket_event,
+                        ignore_global_conn_limit, false, max_connections_to_accept_per_socket_event,
                         overload_state) {}
 
   MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (os_fd_t fd));

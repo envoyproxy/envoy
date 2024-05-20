@@ -197,9 +197,21 @@ public:
   virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
 
   /**
+   * @return bool if this listener is configured with bypass_overload_manager
+   *
+   */
+  virtual bool shouldBypassOverloadManager() const PURE;
+
+  /**
    * @return OverloadManager& the overload manager for the server.
    */
   virtual OverloadManager& overloadManager() PURE;
+  
+  /**
+   * @return NullOverloadManager& the dummy overload manager for the server for
+   * listeners that are bypassing a configured OverloadManager
+   */
+  virtual OverloadManager& nullOverloadManager() PURE;
 
   /**
    * @return whether external healthchecks are currently failed or not.

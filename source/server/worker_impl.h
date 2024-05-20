@@ -32,7 +32,7 @@ public:
       : tls_(tls), api_(api), stat_names_(api.rootScope().symbolTable()), hooks_(hooks) {}
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(uint32_t index, OverloadManager& overload_manager,
+  WorkerPtr createWorker(uint32_t index, OverloadManager& overload_manager, OverloadManager& null_overload_manager,
                          const std::string& worker_name) override;
 
 private:

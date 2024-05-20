@@ -37,6 +37,8 @@ public:
   MOCK_METHOD(Envoy::MutexTracer*, mutexTracer, ());
   MOCK_METHOD(const Options&, options, ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
+    MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(Runtime::Loader&, runtime, ());
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(bool, isShutdown, ());

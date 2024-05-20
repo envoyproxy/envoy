@@ -83,6 +83,8 @@ public:
   MOCK_METHOD(StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
+  MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -161,6 +163,8 @@ public:
   MOCK_METHOD(StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
+  MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
 };
 

@@ -35,6 +35,20 @@ protected:
     initialize();
     updateResource(0);
   }
+
+  void
+  initializeWithBypassOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action) {
+    setupOverloadManagerConfig(overload_action);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      listener->set_bypass_overload_manager(true);
+    });
+    initialize();
+    updateResource(0);
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, OverloadIntegrationTest,
@@ -237,6 +251,36 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("202", response->headers().getStatusValue());
   codec_client_->close();
+}
+
+TEST_P(OverloadIntegrationTest, BypassOverloadManagerTest) {
+  initializeWithBypassOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.stop_accepting_requests"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.9
+    )EOF"));
+
+  // Put envoy in overloaded state and validate that it doesn't drop new requests
+  // because we chose to bypass the overload manager on this listener.
+  updateResource(1);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active",1);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"}};
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(0U, response->body().size());
 }
 
 class OverloadScaledTimerIntegrationTest : public OverloadIntegrationTest {
@@ -512,6 +556,19 @@ protected:
     setupOverloadManagerConfig(config);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    initialize();
+    updateResource(0);
+  }
+  void
+  initializeWithBypassOverloadManager(const envoy::config::overload::v3::LoadShedPoint& config) {
+    setupOverloadManagerConfig(config);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      listener->set_bypass_overload_manager(true);
     });
     initialize();
     updateResource(0);
@@ -877,6 +934,30 @@ TEST_P(LoadShedPointIntegrationTest, HttpDownstreamFilterLoadShed) {
   auto response_that_is_proxied = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response_that_is_proxied->waitForEndStream());
   EXPECT_EQ(response_that_is_proxied->headers().getStatusValue(), "200");
+}
+
+TEST_P(LoadShedPointIntegrationTest, ListenerAcceptDoesNotShedLoadWhenBypassed) {
+  // QUIC uses UDP, not TCP.
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeWithBypassOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.tcp_listener_accept"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // Put envoy in overloaded state and check that it rejects the new client connection.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq("overload.envoy.load_shed_points.tcp_listener_accept.scale_percent",
+                               100);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
 }
 
 } // namespace Envoy

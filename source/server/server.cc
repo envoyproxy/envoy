@@ -620,6 +620,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = createOverloadManager();
+  null_overload_manager_ = createNullOverloadManager();
 
   maybeCreateHeapShrinker();
 
@@ -923,6 +924,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // Start overload manager before workers.
   overload_manager.start();
+  null_overload_manager.start();
 
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
@@ -964,7 +966,7 @@ void InstanceBase::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
   const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
-                                    access_log_manager_, init_manager_, overloadManager(), [this] {
+                                    access_log_manager_, init_manager_, overloadManager(), nullOverloadManager(), [this] {
                                       notifyCallbacksForStage(Stage::PostInit);
                                       startWorkers();
                                     });
