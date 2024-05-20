@@ -84,7 +84,8 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
       assertThat(response.getBodyAsString()).isEqualTo("hello, world");
@@ -109,7 +110,8 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
       assertThat(response.getBodyAsString()).isEqualTo("hello, world");
@@ -166,11 +168,12 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
       assertThat(response.getBodyAsString()).isEqualTo("hello, world");
-      assertThat(response.getNbResponseChunks()).isEqualTo(3); // response size: 12, buffer size: 4
+      assertThat(response.getNbResponseChunks()).isEqualTo(3); // response size: 12, buffer, size: 4
     }
   }
 
@@ -189,7 +192,8 @@ public class AndroidEngineExplicitFlowTest {
       Response response = sendRequest(requestScenario);
 
       if (response.getEnvoyError() != null) {
-        fail(response.getEnvoyError().toString());
+        fail("Error code: " + response.getEnvoyError().getErrorCode() +
+             ", error message: " + response.getEnvoyError().getMessage());
       } else {
         assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
         assertThat(response.getBodyAsString()).isEqualTo("hello, world");
@@ -208,7 +212,8 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
       assertThat(response.getBodyAsString()).isEmpty();
@@ -230,7 +235,8 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
       assertThat(response.getBodyAsString()).isEmpty();
@@ -252,7 +258,8 @@ public class AndroidEngineExplicitFlowTest {
     Thread.sleep(100); // If the Stream processes a spurious onCancel callback, we will notice.
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
       assertThat(response.getBodyAsString()).isEmpty();
@@ -275,7 +282,8 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
       assertThat(response.getBodyAsString()).isEqualTo("hello, world");
@@ -298,7 +306,8 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
       assertThat(response.getBodyAsString()).isEqualTo("hello, world");
@@ -322,7 +331,8 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
       assertThat(response.getBodyAsString()).isEqualTo(responseBody);
@@ -352,7 +362,8 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
       assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
@@ -381,7 +392,8 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
       assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
@@ -411,7 +423,8 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
       assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
@@ -429,7 +442,8 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.isCancelled()).isTrue();
       assertThat(response.getRequestChunkSent()).isEqualTo(0);
@@ -448,7 +462,8 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     if (response.getEnvoyError() != null) {
-      fail(response.getEnvoyError().toString());
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
     } else {
       assertThat(response.isCancelled()).isTrue();
       assertThat(response.getRequestChunkSent()).isEqualTo(1);
