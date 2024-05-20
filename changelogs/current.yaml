@@ -159,6 +159,11 @@ new_features:
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
+- area: aws_lambda
+  change: |
+    The ``aws_lambda`` filter now supports the
+    :ref:`credentials <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.credentials>` parameter.
+    This enables setting AWS credentials from the filter configuration.
 - area: access_log
   change: |
     added support for :ref:`%UPSTREAM_HOST_NAME% <config_access_log_format_upstream_host_name>` for the upstream host
