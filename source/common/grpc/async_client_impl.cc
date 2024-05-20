@@ -267,6 +267,7 @@ void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& buffer, bool end_stre
 void AsyncStreamImpl::closeStream() {
   Buffer::OwnedImpl empty_buffer;
   stream_->sendData(empty_buffer, true);
+  current_span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
   current_span_->finishSpan();
 }
 

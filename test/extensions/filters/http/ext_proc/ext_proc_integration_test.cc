@@ -2354,6 +2354,47 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeout) {
   verifyDownstreamResponse(*response, 500);
 }
 
+TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Tracing is currently only supported for Envoy gRPC";
+  }
+
+  // ensure 200 ms timeout
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig();
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    test::integration::filters::ExpectSpan ext_proc_span;
+    ext_proc_span.set_operation_name(
+        "async envoy.service.ext_proc.v3.ExternalProcessor.Process egress");
+    ext_proc_span.set_context_injected(true);
+    ext_proc_span.set_sampled(true);
+    ext_proc_span.mutable_tags()->insert({"status", "canceled"});
+    ext_proc_span.mutable_tags()->insert({"error", ""}); // not an error
+    ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
+    ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
+
+    test::integration::filters::TracerTestConfig test_config;
+    test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
+
+    auto* tracing = cm.mutable_tracing();
+    tracing->mutable_provider()->set_name("tracer-test-filter");
+    tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
+  });
+
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Travel forward 400 ms
+                                 timeSystem().advanceTimeWaitImpl(400ms);
+                                 return false;
+                               });
+
+  // We should immediately have an error response now
+  verifyDownstreamResponse(*response, 500);
+}
+
 TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithLogging) {
   // ensure 200 ms timeout
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
