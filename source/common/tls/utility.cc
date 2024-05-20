@@ -192,7 +192,7 @@ std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type, bool 
 
 std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
   std::string san;
-  ASN1_STRING* str;
+  ASN1_STRING* str = nullptr;
   switch (general_name->type) {
   case GEN_DNS:
     str = general_name->d.dNSName;
