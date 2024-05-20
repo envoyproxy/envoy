@@ -324,59 +324,46 @@ absl::optional<std::string> Utility::fetchMetadata(Http::RequestMessage& message
   return buffer.empty() ? absl::nullopt : absl::optional<std::string>(buffer);
 }
 
-absl::optional<envoy::config::cluster::v3::Cluster> Utility::createInternalClusterStatic(
-    Upstream::ClusterManager& cm, absl::string_view cluster_name,
+envoy::config::cluster::v3::Cluster Utility::createInternalClusterStatic(
+    absl::string_view cluster_name,
     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri) {
   // Check if local cluster exists with that name.
 
-  if (cm.getThreadLocalCluster(cluster_name) == nullptr) {
-    // Make sure we run this on main thread.
-    TRY_ASSERT_MAIN_THREAD {
-      envoy::config::cluster::v3::Cluster cluster;
-      absl::string_view host_port;
-      absl::string_view path;
-      Http::Utility::extractHostPathFromUri(uri, host_port, path);
-      const auto host_attributes = Http::Utility::parseAuthority(host_port);
-      const auto host = host_attributes.host_;
-      const auto port = host_attributes.port_ ? host_attributes.port_.value() : 80;
+  envoy::config::cluster::v3::Cluster cluster;
+  absl::string_view host_port;
+  absl::string_view path;
+  Http::Utility::extractHostPathFromUri(uri, host_port, path);
+  const auto host_attributes = Http::Utility::parseAuthority(host_port);
+  const auto host = host_attributes.host_;
+  const auto port = host_attributes.port_ ? host_attributes.port_.value() : 80;
 
-      cluster.set_name(cluster_name);
-      cluster.set_type(cluster_type);
-      cluster.mutable_connect_timeout()->set_seconds(5);
-      cluster.mutable_load_assignment()->set_cluster_name(cluster_name);
-      auto* endpoint = cluster.mutable_load_assignment()
-                           ->add_endpoints()
-                           ->add_lb_endpoints()
-                           ->mutable_endpoint();
-      auto* addr = endpoint->mutable_address();
-      addr->mutable_socket_address()->set_address(host);
-      addr->mutable_socket_address()->set_port_value(port);
-      cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
-      envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
-      auto* http_protocol_options =
-          protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
-      http_protocol_options->set_accept_http_10(true);
-      (*cluster.mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(protocol_options);
+  cluster.set_name(cluster_name);
+  cluster.set_type(cluster_type);
+  cluster.mutable_connect_timeout()->set_seconds(5);
+  cluster.mutable_load_assignment()->set_cluster_name(cluster_name);
+  auto* endpoint =
+      cluster.mutable_load_assignment()->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* addr = endpoint->mutable_address();
+  addr->mutable_socket_address()->set_address(host);
+  addr->mutable_socket_address()->set_port_value(port);
+  cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+  envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
+  auto* http_protocol_options =
+      protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+  http_protocol_options->set_accept_http_10(true);
+  (*cluster.mutable_typed_extension_protocol_options())
+      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+          .PackFrom(protocol_options);
 
-      // Add tls transport socket if cluster supports https over port 443.
-      if (port == 443) {
-        auto* socket = cluster.mutable_transport_socket();
-        envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_socket;
-        socket->set_name("envoy.transport_sockets.tls");
-        socket->mutable_typed_config()->PackFrom(tls_socket);
-      }
-
-      return cluster;
-    }
-    END_TRY
-    CATCH(const EnvoyException& e, {
-      ENVOY_LOG_MISC(error, "Failed to add internal cluster {}: {}", cluster_name, e.what());
-      return {};
-    });
+  // Add tls transport socket if cluster supports https over port 443.
+  if (port == 443) {
+    auto* socket = cluster.mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_socket;
+    socket->set_name("envoy.transport_sockets.tls");
+    socket->mutable_typed_config()->PackFrom(tls_socket);
   }
-  return {};
+
+  return cluster;
 }
 
 std::string Utility::getEnvironmentVariableOrDefault(const std::string& variable_name,

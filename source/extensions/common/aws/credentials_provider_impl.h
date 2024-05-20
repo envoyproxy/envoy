@@ -176,7 +176,7 @@ protected:
   // The callback used to create a MetadataFetcher instance.
   CreateMetadataFetcherCb create_metadata_fetcher_cb_;
   // The cluster name to use for internal static cluster pointing towards the credentials provider.
-  const std::string cluster_name_;
+  std::string cluster_name_;
   // The cluster type to use for internal static cluster pointing towards the credentials provider.
   const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type_;
   // The uri of internal static cluster credentials provider.
@@ -212,8 +212,12 @@ protected:
   ThreadLocal::TypedSlotPtr<ThreadLocalCredentialsCache> tls_slot_ = nullptr;
   // Storage for our per cluster credential timers
   LoadClusterEntryHandlePtr cluster_load_handle_;
+  // Stats scope
   Stats::ScopeSharedPtr scope_ = nullptr;
+  // Pointer to our stats structure
   std::shared_ptr<MetadataCredentialsProviderStats> stats_;
+  // Lock guard.
+  Thread::MutexBasicLockable baselock_;
 };
 
 /**

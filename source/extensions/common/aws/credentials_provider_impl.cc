@@ -125,6 +125,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       debug_name_(absl::StrCat("Fetching aws credentials from cluster=", cluster_name)) {
   // Async provider cluster setup
   if (context_ && useHttpAsyncClient()) {
+    Thread::LockGuard lock(baselock_);
     tls_slot_ =
         ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(context_->threadLocal());
     tls_slot_->set(
@@ -133,39 +134,35 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
     context_->mainThreadDispatcher().post([this]() {
       if (!context_->clusterManager().clusters().hasCluster(cluster_name_)) {
 
-        auto cluster = Utility::createInternalClusterStatic(context_->clusterManager(),
-                                                            cluster_name_, cluster_type_, uri_);
-        if (cluster.has_value()) {
-          // Async credential refresh timer
-          cache_duration_timer_ = context_->mainThreadDispatcher().createTimer([this]() -> void {
-            if (stats_) {
-              stats_->credential_refreshes_performed_.inc();
-            }
-            refresh();
-          });
+        auto cluster = Utility::createInternalClusterStatic(cluster_name_, cluster_type_, uri_);
+        // Async credential refresh timer
+        cache_duration_timer_ = context_->mainThreadDispatcher().createTimer([this]() -> void {
+          if (stats_) {
+            stats_->credential_refreshes_performed_.inc();
+          }
+          refresh();
+        });
 
-          // Store the timer in pending cluster list for use in onClusterAddOrUpdate
-          cluster_load_handle_ = std::make_unique<LoadClusterEntryHandleImpl>(
-              (*tls_slot_)->pending_clusters_, cluster_name_, cache_duration_timer_);
+        // Store the timer in pending cluster list for use in onClusterAddOrUpdate
+        cluster_load_handle_ = std::make_unique<LoadClusterEntryHandleImpl>(
+            (*tls_slot_)->pending_clusters_, cluster_name_, cache_duration_timer_);
 
-          // TODO(suniltheta): use random number generator here for cluster version.
-          // While adding multiple clusters make sure that change in random version number across
-          // multiple clusters won't make Envoy delete/replace previously registered internal
-          // cluster.
-          context_->clusterManager().addOrUpdateCluster(cluster.value(), "12345");
-
-          const auto cluster_type_str =
-              envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
-                  ->FindValueByNumber(cluster->type())
-                  ->name();
-          absl::string_view host_port;
-          absl::string_view path;
-          Http::Utility::extractHostPathFromUri(uri_, host_port, path);
-          ENVOY_LOG_MISC(info,
-                         "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
-                         "credentials",
-                         cluster_type_str, cluster_name_, host_port);
-        }
+        // TODO(suniltheta): use random number generator here for cluster version.
+        // While adding multiple clusters make sure that change in random version number across
+        // multiple clusters won't make Envoy delete/replace previously registered internal
+        // cluster.
+        context_->clusterManager().addOrUpdateCluster(cluster, "12345");
+        const auto cluster_type_str =
+            envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
+                ->FindValueByNumber(cluster.type())
+                ->name();
+        absl::string_view host_port;
+        absl::string_view path;
+        Http::Utility::extractHostPathFromUri(uri_, host_port, path);
+        ENVOY_LOG_MISC(info,
+                       "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
+                       "credentials",
+                       cluster_type_str, cluster_name_, host_port);
       }
     });
     // Set up metadata credentials statistics
@@ -516,8 +513,13 @@ void InstanceProfileCredentialsProvider::extractCredentials(
   if (useHttpAsyncClient() && context_) {
     setCredentialsToAllThreads(
         std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
-    ENVOY_LOG(debug, "Metadata receiver moving to Ready state");
-    receiver_state_ = MetadataFetcher::MetadataReceiver::ReceiverState::Ready;
+    if (stats_) {
+      stats_->credential_refreshes_succeeded_.inc();
+    }
+    if (receiver_state_ == MetadataFetcher::MetadataReceiver::ReceiverState::FirstRefresh) {
+      ENVOY_LOG(debug, "Metadata receiver moving to Ready state");
+      receiver_state_ = MetadataFetcher::MetadataReceiver::ReceiverState::Ready;
+    }
   } else {
     cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
   }
@@ -525,9 +527,6 @@ void InstanceProfileCredentialsProvider::extractCredentials(
 }
 
 void InstanceProfileCredentialsProvider::onMetadataSuccess(const std::string&& body) {
-  if (stats_) {
-    stats_->credential_refreshes_succeeded_.inc();
-  }
   ENVOY_LOG(debug, "AWS Instance metadata fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
@@ -911,12 +910,17 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
         actual_session_name = fmt::format("{}", now_nanos);
       }
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
+
+      // Handle edge case - if two webidentity request signers are configured with different
+      // regions. This appends the host name to the cluster name to differentiate the two.
+      auto cluster_name_ = absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
+
       ENVOY_LOG(
           debug,
           "Using web identity credentials provider with STS endpoint: {} and session name: {}",
           sts_endpoint, actual_session_name);
       add(factories.createWebIdentityCredentialsProvider(
-          api, context, fetch_metadata_using_curl, MetadataFetcher::create, STS_TOKEN_CLUSTER,
+          api, context, fetch_metadata_using_curl, MetadataFetcher::create, cluster_name_,
           web_token_path, sts_endpoint, role_arn, actual_session_name, receiver_state,
           initialization_timer));
     }

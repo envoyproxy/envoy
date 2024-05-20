@@ -9,11 +9,9 @@
 
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::ElementsAre;
 using testing::NiceMock;
 using testing::Pair;
-using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -410,33 +408,49 @@ TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
   EXPECT_EQ("", names);
 }
 
-// Verify that we don't add a thread local cluster if it already exists.
-TEST(UtilityTest, ThreadLocalClusterExistsAlready) {
-  NiceMock<Upstream::MockThreadLocalCluster> cluster_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
+// Verify that createInternalCluster returns correctly
+TEST(UtilityTest, CreateStaticClusterSuccess) {
   auto cluster = Utility::createInternalClusterStatic(
-      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "");
-  EXPECT_FALSE(cluster.has_value());
-}
-
-// Verify that if thread local cluster doesn't exist we can create a new one.
-TEST(UtilityTest, AddStaticClusterSuccess) {
-  NiceMock<Upstream::MockClusterManager> cm_;
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  auto cluster = Utility::createInternalClusterStatic(
-      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:80");
-  EXPECT_TRUE(cluster.has_value());
+      "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:443");
+  EXPECT_EQ(cluster.load_assignment()
+                .endpoints(0)
+                .lb_endpoints(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .address(),
+            "127.0.0.1");
+  EXPECT_EQ(cluster.load_assignment()
+                .endpoints(0)
+                .lb_endpoints(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .port_value(),
+            443);
 }
 
 // Verify that for uri argument in addInternalClusterStatic port value is optional
 // and can contain request path which will be ignored.
-TEST(UtilityTest, AddStaticClusterSuccessEvenWithMissingPort) {
-  NiceMock<Upstream::MockClusterManager> cm_;
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
+TEST(UtilityTest, CreateStaticClusterSuccessEvenWithMissingPort) {
   auto cluster = Utility::createInternalClusterStatic(
-      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1/something");
-  EXPECT_TRUE(cluster.has_value());
+      "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1/something");
+  EXPECT_EQ(cluster.load_assignment()
+                .endpoints(0)
+                .lb_endpoints(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .address(),
+            "127.0.0.1");
+  EXPECT_EQ(cluster.load_assignment()
+                .endpoints(0)
+                .lb_endpoints(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .port_value(),
+            80);
 }
 
 // The region is simply interpolated into sts.{}.amazonaws.com for most regions
