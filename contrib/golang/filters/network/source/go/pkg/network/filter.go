@@ -62,8 +62,8 @@ func (n *connectionCallback) EnableHalfClose(enabled bool) {
 		enableHalfCloseInt = 1
 	}
 	if n.connEnableHalfCloseFunc == nil {
-            panic("not support for EnableHalfClose, please set connEnableHalfCloseFunc for connectionCallback")
-        }
+		panic("not support for EnableHalfClose, please set connEnableHalfCloseFunc for connectionCallback")
+	}
 	n.connEnableHalfCloseFunc(n.wrapper, enableHalfCloseInt)
 }
 
