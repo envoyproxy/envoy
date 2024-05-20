@@ -90,9 +90,6 @@ public:
     config_.mutable_common_config()->mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
     config_.mutable_common_config()->mutable_buffer_flush_interval()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(FlushInterval).count());
-    logger_ =
-        std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_}, config_,
-                                               dispatcher_, local_info_, *stats_store_.rootScope());
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -103,9 +100,16 @@ public:
   std::unique_ptr<GrpcAccessLoggerImpl> logger_;
   GrpcAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config_;
+
+  void setUpLogger() {
+    logger_ =
+        std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_}, config_,
+                                               dispatcher_, local_info_, *stats_store_.rootScope());
+  }
 };
 
 TEST_F(GrpcAccessLoggerImplTest, Log) {
+  setUpLogger();
   grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
   resource_logs:
     resource:
@@ -144,6 +148,7 @@ TEST_F(GrpcAccessLoggerImplTest, Log) {
 }
 
 TEST_F(GrpcAccessLoggerImplTest, LogWithStats) {
+  setUpLogger();
   std::string expected_message_yaml = R"EOF(
   resource_logs:
     resource:
@@ -192,6 +197,40 @@ TEST_F(GrpcAccessLoggerImplTest, LogWithStats) {
                 .get()
                 .value(),
             1);
+}
+
+TEST_F(GrpcAccessLoggerImplTest, StatsWithCustomPrefix) {
+  *config_.mutable_stat_prefix() = "custom.";
+  setUpLogger();
+  grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
+  resource_logs:
+    resource:
+      attributes:
+        - key: "log_name"
+          value:
+            string_value: "test_log_name"
+        - key: "zone_name"
+          value:
+            string_value: "zone_name"
+        - key: "cluster_name"
+          value:
+            string_value: "cluster_name"
+        - key: "node_name"
+          value:
+            string_value: "node_name"
+    scope_logs:
+      - log_records:
+          - severity_text: "test-severity-text"
+  )EOF");
+  opentelemetry::proto::logs::v1::LogRecord entry;
+  entry.set_severity_text("test-severity-text");
+  logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  EXPECT_EQ(
+      stats_store_.findCounterByString("access_logs.open_telemetry_access_log.custom.logs_written")
+          .value()
+          .get()
+          .value(),
+      1);
 }
 
 class GrpcAccessLoggerCacheImplTest : public testing::Test {
