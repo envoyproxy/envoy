@@ -24,7 +24,10 @@ class EnvoyQuicConnectionDebugVisitorBasic : public quic::QuicConnectionDebugVis
 public:
   EnvoyQuicConnectionDebugVisitorBasic(quic::QuicSession* session,
                                        const StreamInfo::StreamInfo& stream_info)
-      : session_(session), stream_info_(stream_info) {}
+      : session_(session), stream_info_(stream_info) {
+    // Workaround for gcc not understanding [[maybe_unused]] for class members.
+    (void)stream_info_;
+  }
 
   // Writes peer address, connection ID, close source, and error details to info logs.
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
