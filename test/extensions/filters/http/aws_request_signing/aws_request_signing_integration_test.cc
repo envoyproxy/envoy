@@ -23,7 +23,7 @@ name: envoy.filters.http.aws_request_signing
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
   service_name: vpc-lattice-svcs
-  region: us-east-1
+  region: ap-southeast-2
   signing_algorithm: aws_sigv4
   use_unsigned_payload: true
   match_excluded_headers:
@@ -49,7 +49,7 @@ typed_config:
 const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL = R"EOF(
 aws_request_signing:
   service_name: s3
-  region: us-east-1
+  region: ap-southeast-2
   use_unsigned_payload: true
   host_rewrite: new-host
   match_excluded_headers:
@@ -256,11 +256,7 @@ public:
 
   void dnsSetup() {
     ON_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillByDefault(Return(dns_resolver_));
-#ifdef ENVOY_SSL_FIPS
-    expectResolve(Network::DnsLookupFamily::V4Only, "sts-fips.us-east-1.amazonaws.com");
-#else
-    expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-east-1.amazonaws.com");
-#endif
+    expectResolve(Network::DnsLookupFamily::V4Only, "sts.ap-southeast-2.amazonaws.com");
   }
 
   void addStandardFilter() { config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4); }
