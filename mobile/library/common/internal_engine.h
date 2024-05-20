@@ -165,7 +165,4 @@ private:
   bool terminated_{false};
 };
 
-using InternalEngineSharedPtr = std::shared_ptr<InternalEngine>;
-using InternalEngineWeakPtr = std::weak_ptr<InternalEngine>;
-
 } // namespace Envoy

@@ -85,7 +85,7 @@ void ExtensionRegistry::registerFactories() {
 
   // This is the default cluster used by Envoy mobile to establish connections upstream.
   Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
-  // This allows decompression of brotli-compresssed responses.
+  // This allows decompression of brotli-compressed responses.
   Extensions::Compression::Brotli::Decompressor::forceRegisterBrotliDecompressorLibraryFactory();
   // This allows decompression of gzip-decompressed responses.
   Extensions::Compression::Gzip::Decompressor::forceRegisterGzipDecompressorLibraryFactory();
@@ -116,7 +116,8 @@ void ExtensionRegistry::registerFactories() {
 
   // This filter applies socket tagging based on the x-envoy-mobile-socket-tag header.
   Extensions::HttpFilters::SocketTag::forceRegisterSocketTagFilterFactory();
-  // The k-v store allows caching things like DNS and prefered protocol across application restarts.
+  // The k-v store allows caching things like DNS and preferred protocol across application
+  // restarts.
   Extensions::KeyValue::forceRegisterPlatformKeyValueStoreFactory();
   // This is Envoy's HCM filter, currently required for a functional L7 data plane.
   Extensions::NetworkFilters::HttpConnectionManager::

@@ -38,7 +38,5 @@ private:
   StreamClientSharedPtr stream_client_;
 };
 
-using InternalEngineSharedPtr = std::shared_ptr<Engine>;
-
 } // namespace Platform
 } // namespace Envoy

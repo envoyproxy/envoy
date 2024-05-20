@@ -23,9 +23,9 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& fi
                  "Consider increasing value of user.max_inotify_watches via sysctl");
   inotify_event_ = dispatcher.createFileEvent(
       inotify_fd_,
-      [this](uint32_t events) -> void {
+      [this](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
-        onInotifyEvent();
+        return onInotifyEvent();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }
@@ -52,12 +52,12 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
   return absl::OkStatus();
 }
 
-void WatcherImpl::onInotifyEvent() {
+absl::Status WatcherImpl::onInotifyEvent() {
   while (true) {
     uint8_t buffer[sizeof(inotify_event) + NAME_MAX + 1];
     ssize_t rc = read(inotify_fd_, &buffer, sizeof(buffer));
     if (rc == -1 && errno == EAGAIN) {
-      return;
+      return absl::OkStatus();
     }
     RELEASE_ASSERT(rc >= 0, "");
 
@@ -87,10 +87,10 @@ void WatcherImpl::onInotifyEvent() {
         if (watch.events_ & events) {
           if (watch.file_ == file) {
             ENVOY_LOG(debug, "matched callback: file: {}", file);
-            THROW_IF_NOT_OK(watch.cb_(events));
+            RETURN_IF_NOT_OK(watch.cb_(events));
           } else if (watch.file_.empty()) {
             ENVOY_LOG(debug, "matched callback: directory: {}", file);
-            THROW_IF_NOT_OK(watch.cb_(events));
+            RETURN_IF_NOT_OK(watch.cb_(events));
           }
         }
       }
@@ -98,6 +98,7 @@ void WatcherImpl::onInotifyEvent() {
       index += sizeof(inotify_event) + file_event->len;
     }
   }
+  return absl::OkStatus();
 }
 
 } // namespace Filesystem

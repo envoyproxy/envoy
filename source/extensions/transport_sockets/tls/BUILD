@@ -18,7 +18,7 @@ envoy_cc_library(
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
-        "//source/common/tls:ssl_socket_lib",
+        "//source/common/tls:ssl_socket_base",
     ],
 )
 
@@ -31,7 +31,7 @@ envoy_cc_library(
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
-        "//source/common/tls:ssl_socket_lib",
+        "//source/common/tls:server_ssl_socket_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
     alwayslink = True,
@@ -46,7 +46,7 @@ envoy_cc_library(
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
-        "//source/common/tls:ssl_socket_lib",
+        "//source/common/tls:client_ssl_socket_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
     alwayslink = True,

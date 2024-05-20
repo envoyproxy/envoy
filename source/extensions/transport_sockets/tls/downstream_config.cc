@@ -5,7 +5,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/tls/context_config_impl.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 namespace Envoy {
 namespace Extensions {

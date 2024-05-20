@@ -42,7 +42,7 @@ private:
 
   using FileWatchPtr = std::shared_ptr<FileWatch>;
 
-  void onKqueueEvent();
+  absl::Status onKqueueEvent();
   absl::StatusOr<FileWatchPtr> addWatch(absl::string_view path, uint32_t events,
                                         Watcher::OnChangedCb cb, bool pathMustExist);
   void removeWatch(FileWatchPtr& watch);

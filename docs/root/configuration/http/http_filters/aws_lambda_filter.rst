@@ -206,6 +206,8 @@ filter chain within the cluster configuration.
     :linenos:
     :caption: :download:`aws-lambda-filter-upstream.yaml <_include/aws-lambda-filter-upstream.yaml>`
 
+.. _config_http_filters_aws_lambda_credentials:
+
 .. include:: _include/aws_credentials.rst
 
 Statistics
