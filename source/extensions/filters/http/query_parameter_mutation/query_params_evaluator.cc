@@ -25,11 +25,6 @@ QueryParamsEvaluatorPtr QueryParamsEvaluator::configure(
   return query_params_evaluator;
 }
 
-const QueryParamsEvaluator& QueryParamsEvaluator::defaultEvaluator() {
-  static QueryParamsEvaluator* instance = new QueryParamsEvaluator();
-  return *instance;
-}
-
 void QueryParamsEvaluator::evaluateQueryParams(Http::RequestHeaderMap& headers) const {
   if (query_params_to_remove_.empty() && query_params_to_add_.empty()) {
     return;

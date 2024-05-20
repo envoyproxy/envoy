@@ -18,10 +18,9 @@ Http::FilterFactoryCb Factory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
-Factory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config, Server::Configuration::ServerFactoryContext&,
-    ProtobufMessage::ValidationVisitor&) {
+Router::RouteSpecificFilterConfigConstSharedPtr Factory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<Config>(proto_config);
 }
 

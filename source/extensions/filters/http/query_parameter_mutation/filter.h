@@ -19,7 +19,8 @@ namespace QueryParameterMutation {
 
 class Config : public Router::RouteSpecificFilterConfig {
 public:
-  Config(const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config);
+  Config(
+      const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config);
 
   void evaluateQueryParams(Http::RequestHeaderMap& headers) const;
 

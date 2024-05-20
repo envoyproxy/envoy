@@ -10,14 +10,6 @@
 namespace Envoy {
 namespace Router {
 
-TEST(QueryParamsEvaluatorTest, DefaultEvaluator) {
-  auto paramsEvaluator = QueryParamsEvaluator::defaultEvaluator();
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":path", "/path?this=should&stay=the&exact=same"}};
-  paramsEvaluator.evaluateQueryParams(request_headers);
-  EXPECT_EQ("/path?this=should&stay=the&exact=same", request_headers.getPathValue());
-}
-
 TEST(QueryParamsEvaluatorTest, EmptyConfigEvaluator) {
   const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter> query_params_to_add;
   const Protobuf::RepeatedPtrField<std::string> query_params_to_remove;

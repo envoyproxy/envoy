@@ -22,11 +22,6 @@ public:
                 query_params_to_add,
             const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove);
 
-  /**
-   * Returns the same static instance for uses where query params are not configured to save memory.
-   **/
-  static const QueryParamsEvaluator& defaultEvaluator();
-
   void evaluateQueryParams(Http::RequestHeaderMap& headers) const;
 
 protected:
