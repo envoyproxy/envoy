@@ -14,11 +14,12 @@ fi
 PATH="$("${LLVM_PREFIX}"/bin/llvm-config --bindir):${PATH}"
 export PATH
 
-LLVM_VERSION="$(llvm-config --version)"
+# LLVM_VERSION="$(llvm-config --version)"
+LLVM_VERSION=16
 LLVM_LIBDIR="$(llvm-config --libdir)"
 LLVM_TARGET="$(llvm-config --host-target)"
 
-RT_LIBRARY_PATH="${LLVM_LIBDIR}/clang/16/lib/${LLVM_TARGET}"
+RT_LIBRARY_PATH="${LLVM_LIBDIR}/clang/${LLVM_VERSION}/lib/${LLVM_TARGET}"
 
 echo "# Generated file, do not edit. If you want to disable clang, just delete this file.
 build:clang --action_env='PATH=${PATH}' --host_action_env='PATH=${PATH}'
