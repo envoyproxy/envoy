@@ -137,7 +137,7 @@ TEST_P(TlsInspectorTest, SniRegistered) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   // trigger the event to copy the client hello message into buffer
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
@@ -158,7 +158,7 @@ TEST_P(TlsInspectorTest, AlpnRegistered) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   // trigger the event to copy the client hello message into buffer
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
 
   EXPECT_EQ(Network::FilterStatus::Continue, state);
@@ -219,7 +219,7 @@ TEST_P(TlsInspectorTest, MultipleReads) {
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   while (!got_continue) {
     // trigger the event to copy the client hello message into buffer
-    file_event_callback_(Event::FileReadyType::Read);
+    EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
     auto state = filter_->onData(*buffer_);
     if (state == Network::FilterStatus::Continue) {
       got_continue = true;
@@ -245,7 +245,7 @@ TEST_P(TlsInspectorTest, NoExtensions) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   // trigger the event to copy the client hello message into buffer
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
@@ -280,7 +280,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   filter_->onAccept(cb_);
   mockSysCallForPeek(client_hello, true);
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(1, cfg_->stats().client_hello_too_large_.value());
@@ -305,7 +305,7 @@ TEST_P(TlsInspectorTest, ConnectionFingerprint) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   // trigger the event to copy the client hello message into buffer
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
 }
@@ -333,7 +333,7 @@ void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_serve
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   // trigger the event to copy the client hello message into buffer
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
 }
@@ -405,7 +405,7 @@ TEST_P(TlsInspectorTest, NotSsl) {
   data.resize(100);
   mockSysCallForPeek(data);
   // trigger the event to copy the client hello message into buffer:q
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
@@ -430,7 +430,7 @@ TEST_P(TlsInspectorTest, EarlyTerminationShouldNotRecordBytesProcessed) {
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   // Trigger the event to copy the client hello message into buffer
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
 
@@ -458,14 +458,14 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(_)).Times(0);
 
   mockSysCallForPeek(client_hello, true);
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(2 * initial_buffer_size, filter_->maxReadBytes());
   buffer_->resetCapacity(2 * initial_buffer_size);
 
   mockSysCallForPeek(client_hello, true);
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(max_size, filter_->maxReadBytes());
@@ -474,7 +474,7 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
   // The filter should not request a larger buffer as we've reached the max.
   // It should close the connection.
   mockSysCallForPeek(client_hello, true);
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(max_size, filter_->maxReadBytes());

@@ -4277,6 +4277,25 @@ public:
     allocHealthChecker(yaml);
   }
 
+  void setupDataProxyProtocol() {
+    std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    reuse_connection: false
+    tcp_health_check:
+      proxy_protocol_config:
+        version: v2
+      send:
+        text: "01"
+      receive:
+      - text: "02"
+    )EOF";
+
+    allocHealthChecker(yaml);
+  }
+
   void expectSessionCreate() {
     interval_timer_ = new Event::MockTimer(&dispatcher_);
     timeout_timer_ = new Event::MockTimer(&dispatcher_);
@@ -4774,6 +4793,29 @@ TEST_F(TcpHealthCheckerImplTest, ConnectionLocalFailure) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
+}
+
+TEST_F(TcpHealthCheckerImplTest, SuccessProxyProtocol) {
+  InSequence s;
+
+  setupDataProxyProtocol();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  expectSessionCreate();
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_, _));
+  EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  connection_->runHighWatermarkCallbacks();
+  connection_->runLowWatermarkCallbacks();
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  Buffer::OwnedImpl response;
+  addUint8(response, 2);
+  read_filter_->onData(response, false);
 }
 
 class TestGrpcHealthCheckerImpl : public GrpcHealthCheckerImpl {

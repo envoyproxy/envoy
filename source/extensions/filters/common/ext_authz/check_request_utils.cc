@@ -128,7 +128,8 @@ void CheckRequestUtils::setHttpRequest(
     envoy::service::auth::v3::AttributeContext::HttpRequest& httpreq, uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
     const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool encode_raw_headers, const MatcherSharedPtr& request_header_matchers) {
+    bool encode_raw_headers, const MatcherSharedPtr& allowed_headers_matcher,
+    const MatcherSharedPtr& disallowed_headers_matcher) {
   httpreq.set_id(std::to_string(stream_id));
   httpreq.set_method(getHeaderStr(headers.Method()));
   httpreq.set_path(getHeaderStr(headers.Path()));
@@ -145,15 +146,19 @@ void CheckRequestUtils::setHttpRequest(
   // Calling mutable_header_map() creates the field in the request; only do so when necessary.
   auto* mutable_header_map = encode_raw_headers ? httpreq.mutable_header_map() : nullptr;
 
-  headers.iterate([encode_raw_headers, request_header_matchers, mutable_headers,
-                   mutable_header_map](const Envoy::Http::HeaderEntry& e) {
+  headers.iterate([encode_raw_headers, allowed_headers_matcher, disallowed_headers_matcher,
+                   mutable_headers, mutable_header_map](const Envoy::Http::HeaderEntry& e) {
     // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
     if (e.key().getStringView() == Headers::get().EnvoyAuthPartialBody.get()) {
       return Envoy::Http::HeaderMap::Iterate::Continue;
     }
 
     const std::string key(e.key().getStringView());
-    if (request_header_matchers != nullptr && !request_header_matchers->matches(key)) {
+    if (disallowed_headers_matcher != nullptr && disallowed_headers_matcher->matches(key)) {
+      return Envoy::Http::HeaderMap::Iterate::Continue;
+    }
+
+    if (allowed_headers_matcher != nullptr && !allowed_headers_matcher->matches(key)) {
       return Envoy::Http::HeaderMap::Iterate::Continue;
     }
 
@@ -208,17 +213,23 @@ void CheckRequestUtils::setAttrContextRequest(
     envoy::service::auth::v3::AttributeContext::Request& req, const uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
     const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool encode_raw_headers, const MatcherSharedPtr& request_header_matchers) {
+    bool encode_raw_headers, const MatcherSharedPtr& allowed_headers_matcher,
+    const MatcherSharedPtr& disallowed_headers_matcher) {
   setRequestTime(req, stream_info);
   setHttpRequest(*req.mutable_http(), stream_id, stream_info, decoding_buffer, headers,
-                 max_request_bytes, pack_as_bytes, encode_raw_headers, request_header_matchers);
+                 max_request_bytes, pack_as_bytes, encode_raw_headers, allowed_headers_matcher,
+                 disallowed_headers_matcher);
 }
 
 void CheckRequestUtils::setTLSSession(
     envoy::service::auth::v3::AttributeContext::TLSSession& session,
-    const Ssl::ConnectionInfoConstSharedPtr ssl_info) {
-  if (!ssl_info->sni().empty()) {
+    const Envoy::Network::Connection& connection) {
+  const Ssl::ConnectionInfoConstSharedPtr ssl_info = connection.ssl();
+  if (ssl_info != nullptr && !ssl_info->sni().empty()) {
     const std::string server_name(ssl_info->sni());
+    session.set_sni(server_name);
+  } else if (!connection.requestedServerName().empty()) {
+    const std::string server_name(connection.requestedServerName());
     session.set_sni(server_name);
   }
 }
@@ -232,7 +243,8 @@ void CheckRequestUtils::createHttpCheck(
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes, bool pack_as_bytes,
     bool encode_raw_headers, bool include_peer_certificate, bool include_tls_session,
     const Protobuf::Map<std::string, std::string>& destination_labels,
-    const MatcherSharedPtr& request_header_matchers) {
+    const MatcherSharedPtr& allowed_headers_matcher,
+    const MatcherSharedPtr& disallowed_headers_matcher) {
 
   auto attrs = request.mutable_attributes();
   const std::string service = getHeaderStr(headers.EnvoyDownstreamServiceCluster());
@@ -240,16 +252,17 @@ void CheckRequestUtils::createHttpCheck(
   // *cb->connection(), callbacks->streamInfo() and callbacks->decodingBuffer() are not qualified as
   // const.
   auto* cb = const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
+
   setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false,
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), EMPTY_STRING, true,
                      include_peer_certificate);
   setAttrContextRequest(*attrs->mutable_request(), cb->streamId(), cb->streamInfo(),
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
-                        encode_raw_headers, request_header_matchers);
+                        encode_raw_headers, allowed_headers_matcher, disallowed_headers_matcher);
 
-  if (include_tls_session && cb->connection()->ssl() != nullptr) {
-    setTLSSession(*attrs->mutable_tls_session(), cb->connection()->ssl());
+  if (include_tls_session) {
+    setTLSSession(*attrs->mutable_tls_session(), *cb->connection());
   }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
   // Fill in the context extensions and metadata context.
@@ -272,8 +285,9 @@ void CheckRequestUtils::createTcpCheck(
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), server_name, true,
                      include_peer_certificate);
-  if (include_tls_session && cb->connection().ssl() != nullptr) {
-    setTLSSession(*attrs->mutable_tls_session(), cb->connection().ssl());
+
+  if (include_tls_session) {
+    setTLSSession(*attrs->mutable_tls_session(), cb->connection());
   }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
 }

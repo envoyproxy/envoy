@@ -564,8 +564,11 @@ void UdpProxyFilter::UdpActiveSession::createUdpSocket(const Upstream::HostConst
   udp_socket_ = cluster_.filter_.createUdpSocket(host);
   udp_socket_->ioHandle().initializeFileEvent(
       cluster_.filter_.read_callbacks_->udpListener().dispatcher(),
-      [this](uint32_t) { onReadReady(); }, Event::PlatformDefaultTriggerType,
-      Event::FileReadyType::Read);
+      [this](uint32_t) {
+        onReadReady();
+        return absl::OkStatus();
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
   ENVOY_LOG(debug, "creating new session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),

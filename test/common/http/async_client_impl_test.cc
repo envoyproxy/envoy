@@ -177,6 +177,59 @@ TEST_F(AsyncClientImplTest, BasicStream) {
                      .value());
 }
 
+TEST_F(AsyncClientImplTest, BasicStreamWithInternalHeadersDisabled) {
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            // The backing object of 'decoder' should also implemented the
+            // Router::UpstreamToDownstream.
+            const auto* upstream_to_downstream =
+                dynamic_cast<Router::UpstreamToDownstream*>(&decoder);
+            EXPECT_NE(nullptr, upstream_to_downstream);
+            // Ensure the route() is populated and valid.
+            EXPECT_NE(nullptr, upstream_to_downstream->route().routeEntry());
+
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  // Create the headers without x-envoy-internal and x-forwarded-for.
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
+
+  expectResponseHeaders(stream_callbacks_, 200, false);
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
+  EXPECT_CALL(stream_callbacks_, onComplete());
+
+  AsyncClient::StreamOptions option = AsyncClient::StreamOptions();
+  // Set stream option to disable x-envoy-internal and x-forwarded-for headers.
+  option.setSendInternal(false);
+  option.setSendXff(false);
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, option);
+
+  TestRequestHeaderMapImpl send_headers = headers;
+  stream->sendHeaders(send_headers, false);
+  stream->sendData(*body, true);
+
+  response_decoder_->decode1xxHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "100"}}));
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeData(*body, true);
+
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+}
+
 TEST_F(AsyncClientImplTest, Basic) {
   message_->body().add("test body");
   Buffer::Instance& data = message_->body();

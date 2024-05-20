@@ -63,6 +63,9 @@ public:
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
     stream_info_.setDynamicMetadata(name, value);
   }
+  void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) override {
+    stream_info_.setDynamicTypedMetadata(name, value);
+  }
   envoy::config::core::v3::Metadata& dynamicMetadata() override {
     return stream_info_.dynamicMetadata();
   };
