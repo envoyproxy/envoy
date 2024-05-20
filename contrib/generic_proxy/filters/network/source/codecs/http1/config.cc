@@ -577,7 +577,7 @@ Http::Http1::CallbackResult Http1ClientCodec::onHeadersCompleteImpl() {
 Http::Http1::CallbackResult Http1ClientCodec::onMessageCompleteImpl() {
   const auto status_code = parser_->statusCode();
   if (status_code < Envoy::Http::Code::OK) {
-    // There is no difference bewteen single frame mode and normal mode for 1xx responses
+    // There is no difference between single frame mode and normal mode for 1xx responses
     // because they are headers only responses.
 
     ASSERT(buffered_body_.length() == 0);

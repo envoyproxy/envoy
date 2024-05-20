@@ -16,7 +16,9 @@
 #include "source/common/config/config_provider_impl.h"
 #include "source/common/config/null_grpc_mux_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/router/route_provider_manager.h"
 #include "source/common/router/scoped_rds.h"
+#include "source/common/router/static_route_provider_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/matcher/mocks.h"
