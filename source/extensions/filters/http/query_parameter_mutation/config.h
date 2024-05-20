@@ -20,7 +20,9 @@ public:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::query_parameter_mutation::v3::Config&,
       const std::string&, Server::Configuration::FactoryContext&) override;
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(const envoy::extensions::filters::http::query_parameter_mutation::v3::Config&, Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
+  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::query_parameter_mutation::v3::Config&,
+      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };
 
 } // namespace QueryParameterMutation
