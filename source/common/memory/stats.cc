@@ -146,7 +146,7 @@ void AllocatorManager::tcmallocRelease() {
  * has been initialized to `0`, no heap memory will be released in background.
  */
 void AllocatorManager::configureBackgroundMemoryRelease() {
-  RELEASE_ASSERT(!tcmalloc_thread_, "Invalid state, tcmalloc has already been initialised");
+  ENVOY_BUG(!tcmalloc_thread_, "Invalid state, tcmalloc has already been initialised");
   if (bytes_to_release_ > 0) {
     tcmalloc_routine_dispatcher_ = api_.allocateDispatcher(std::string(TCMALLOC_ROUTINE_THREAD_ID));
     memory_release_timer_ = tcmalloc_routine_dispatcher_->createTimer([this]() -> void {
