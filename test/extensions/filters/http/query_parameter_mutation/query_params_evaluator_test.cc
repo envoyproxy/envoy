@@ -1,6 +1,6 @@
 #include <string>
 
-#include "source/common/router/query_params_evaluator.h"
+#include "source/extensions/filters/http/query_parameter_mutation/query_params_evaluator.h"
 
 #include "test/test_common/utility.h"
 

@@ -20,13 +20,14 @@ public:
     return {{Http::Headers::get().Path.get(), path}};
   }
 
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   envoy::extensions::filters::http::query_parameter_mutation::v3::Config proto_config_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 };
 
 TEST_F(FilterTest, EmptyConfig) {
-  auto config = std::make_shared<Config>(proto_config_, factory_context_.server_factory_context_);
+  auto config = std::make_shared<Config>(proto_config_);
   auto filter = std::make_unique<Filter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
 
   const auto path = "/some?random=path";
   auto request_headers = requestHeaders(path);
@@ -39,8 +40,9 @@ TEST_F(FilterTest, EmptyConfig) {
 TEST_F(FilterTest, RemoveQueryParameter) {
   auto remove_list = proto_config_.mutable_query_parameters_to_remove();
   remove_list->Add("random");
-  auto config = std::make_shared<Config>(proto_config_, factory_context_.server_factory_context_);
+  auto config = std::make_shared<Config>(proto_config_);
   auto filter = std::make_unique<Filter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
 
   const auto path = "/some?random=path";
   auto request_headers = requestHeaders(path);

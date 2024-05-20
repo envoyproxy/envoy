@@ -98,14 +98,6 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test(
-    name = "query_params_evaluator_test",
-    srcs = ["query_params_evaluator_test.cc"],
-    deps = [
-        "//source/common/router:query_params_evaluator_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "reset_header_parser_test",
     srcs = ["reset_header_parser_test.cc"],
     deps = [

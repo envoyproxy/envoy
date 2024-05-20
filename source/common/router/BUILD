@@ -441,19 +441,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "query_params_evaluator_lib",
-    srcs = ["query_params_evaluator.cc"],
-    hdrs = ["query_params_evaluator.h"],
-    deps = [
-        "//envoy/http:header_map_interface",
-        "//envoy/http:query_params_interface",
-        "//source/common/http:utility_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "reset_header_parser_lib",
     srcs = ["reset_header_parser.cc"],
     hdrs = ["reset_header_parser.h"],

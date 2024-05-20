@@ -9,8 +9,8 @@
 #include "envoy/router/router.h"
 #include "envoy/server/factory_context.h"
 
-#include "source/common/router/query_params_evaluator.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/query_parameter_mutation/query_params_evaluator.h"
 
 namespace Envoy {
 namespace Extensions {
