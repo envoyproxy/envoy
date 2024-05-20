@@ -213,7 +213,6 @@ public:
     EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
   }
 
-  NiceMock<Event::MockTimer>* attachmentTimeout_timer_{};
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
