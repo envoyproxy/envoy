@@ -11,6 +11,11 @@
 // This file contains JNI implementation used by
 // `test/java/io/envoyproxy/envoymobile/jni/JniUtilityTest.java` unit tests.
 
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
+  Envoy::JNI::JniHelper::initialize(vm);
+  return Envoy::JNI::JniHelper::getVersion();
+}
+
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_protoJavaByteArrayConversion(JNIEnv* env, jclass,
                                                                                jbyteArray source) {
@@ -70,4 +75,12 @@ Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_javaCppNonDirectByteBufferConv
       Envoy::JNI::javaNonDirectByteBufferToCppBufferInstance(jni_helper, java_byte_buffer, length);
   return Envoy::JNI::cppBufferInstanceToJavaNonDirectByteBuffer(jni_helper, *cpp_buffer_instance)
       .release();
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_getJavaExceptionMessage(JNIEnv* env, jclass,
+                                                                          jthrowable throwble) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  std::string exception_message = Envoy::JNI::getJavaExceptionMessage(jni_helper, throwble);
+  return Envoy::JNI::cppStringToJavaString(jni_helper, exception_message).release();
 }

@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
 namespace Envoy {
 namespace Extensions {

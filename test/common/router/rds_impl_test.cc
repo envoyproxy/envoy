@@ -13,6 +13,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/rds_impl.h"
+#include "source/common/router/route_provider_manager.h"
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
@@ -93,6 +94,34 @@ public:
   }
   ~RdsImplTest() override { server_factory_context_.thread_local_.shutdownThread(); }
 
+  RouteConfigProviderSharedPtr create(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          config,
+      Server::Configuration::ServerFactoryContext& factory_context,
+      ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+      const std::string& stat_prefix, RouteConfigProviderManager& route_config_provider_manager) {
+
+    switch (config.route_specifier_case()) {
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        RouteSpecifierCase::kRouteConfig:
+      return route_config_provider_manager.createStaticRouteConfigProvider(
+          config.route_config(), factory_context, validator);
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        RouteSpecifierCase::kRds:
+      return route_config_provider_manager.createRdsRouteConfigProvider(
+          // At the creation of a RDS route config provider, the factory_context's initManager is
+          // always valid, though the init manager may go away later when the listener goes away.
+          config.rds(), factory_context, stat_prefix, init_manager);
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        RouteSpecifierCase::kScopedRoutes:
+      FALLTHRU; // PANIC
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:
+      PANIC("not implemented");
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
   void setup(const std::string& override_config = "") {
     std::string config_yaml = R"EOF(
 rds:
@@ -114,9 +143,9 @@ http_filters:
       config_yaml = override_config;
     }
     EXPECT_CALL(outer_init_manager_, add(_));
-    rds_ = RouteConfigProviderUtil::create(
-        parseHttpConnectionManagerFromYaml(config_yaml), server_factory_context_,
-        validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
+    rds_ =
+        create(parseHttpConnectionManagerFromYaml(config_yaml), server_factory_context_,
+               validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
     rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
     EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
                 start(_));
@@ -145,10 +174,9 @@ http_filters:
   config: {}
     )EOF";
 
-  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
-                                               server_factory_context_, validation_visitor_,
-                                               outer_init_manager_, "foo.",
-                                               *route_config_provider_manager_),
+  EXPECT_THROW(create(parseHttpConnectionManagerFromYaml(config_yaml), server_factory_context_,
+                      validation_visitor_, outer_init_manager_, "foo.",
+                      *route_config_provider_manager_),
                EnvoyException);
 }
 
@@ -172,9 +200,8 @@ http_filters:
     )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
-                                      server_factory_context_, validation_visitor_,
-                                      outer_init_manager_, "foo.", *route_config_provider_manager_),
+      create(parseHttpConnectionManagerFromYaml(config_yaml), server_factory_context_,
+             validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_),
       EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.Struct'");
@@ -203,9 +230,8 @@ http_filters:
   is_optional: true
     )EOF";
 
-  RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
-                                  server_factory_context_, validation_visitor_, outer_init_manager_,
-                                  "foo.", *route_config_provider_manager_);
+  create(parseHttpConnectionManagerFromYaml(config_yaml), server_factory_context_,
+         validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
 }
 
 TEST_F(RdsImplTest, DestroyDuringInitialize) {
@@ -641,9 +667,9 @@ rds:
   testing::NiceMock<Event::MockDispatcher> local_thread_dispatcher;
   testing::MockFunction<void(bool)> mock_callback;
   {
-    auto rds = RouteConfigProviderUtil::create(
-        parseHttpConnectionManagerFromYaml(rds_config), server_factory_context_,
-        validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
+    auto rds =
+        create(parseHttpConnectionManagerFromYaml(rds_config), server_factory_context_,
+               validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
 
     EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
         .WillOnce([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); });

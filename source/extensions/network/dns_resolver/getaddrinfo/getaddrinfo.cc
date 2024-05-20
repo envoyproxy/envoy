@@ -164,11 +164,12 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         // the DNS query is retried.
         // NOTE: this is also how the c-ares resolver treats NONAME and NODATA:
         // https://github.com/envoyproxy/envoy/blob/099d85925b32ce8bf06e241ee433375a0a3d751b/source/extensions/network/dns_resolver/cares/dns_impl.h#L109-L111.
-        ENVOY_LOG(debug, "getaddrinfo no results rc={}", gai_strerror(rc.return_value_));
+        ENVOY_LOG(debug, "getaddrinfo for host={} has no results rc={}", next_query->dns_name_,
+                  gai_strerror(rc.return_value_));
         response = std::make_pair(ResolutionStatus::Success, std::list<DnsResponse>());
       } else {
-        ENVOY_LOG(debug, "getaddrinfo failed with rc={} errno={}", gai_strerror(rc.return_value_),
-                  errorDetails(rc.errno_));
+        ENVOY_LOG(debug, "getaddrinfo failed for host={} with rc={} errno={}",
+                  next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
       }
     }
@@ -185,24 +186,6 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
 
   ENVOY_LOG(debug, "getaddrinfo resolver thread exiting");
 }
-
-// getaddrinfo DNS resolver factory
-class GetAddrInfoDnsResolverFactory : public DnsResolverFactory,
-                                      public Logger::Loggable<Logger::Id::dns> {
-public:
-  std::string name() const override { return {"envoy.network.dns_resolver.getaddrinfo"}; }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::extensions::network::dns_resolver::getaddrinfo::v3::
-                                         GetAddrInfoDnsResolverConfig()};
-  }
-
-  DnsResolverSharedPtr
-  createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
-                    const envoy::config::core::v3::TypedExtensionConfig&) const override {
-    return std::make_shared<GetAddrInfoDnsResolver>(dispatcher, api);
-  }
-};
 
 // Register the CaresDnsResolverFactory
 REGISTER_FACTORY(GetAddrInfoDnsResolverFactory, DnsResolverFactory);

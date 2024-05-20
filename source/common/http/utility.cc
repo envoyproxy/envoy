@@ -1248,6 +1248,15 @@ std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view 
   return encoded;
 }
 
+bool Utility::PercentEncoding::queryParameterIsUrlEncoded(absl::string_view value) {
+  for (char ch : value) {
+    if (shouldPercentEncodeChar(ch)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::string Utility::PercentEncoding::urlDecodeQueryParameter(absl::string_view encoded) {
   std::string decoded;
   decoded.reserve(encoded.size());

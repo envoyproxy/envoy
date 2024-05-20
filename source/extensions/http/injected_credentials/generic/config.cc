@@ -27,7 +27,8 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 
 Common::CredentialInjectorSharedPtr
 GenericCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
-    const Generic& config, Server::Configuration::FactoryContext& context) {
+    const Generic& config, const std::string& /*stats_prefix*/,
+    Server::Configuration::FactoryContext& context) {
   const auto& credential_secret = config.credential();
   auto& server_context = context.serverFactoryContext();
   auto& cluster_manager = server_context.clusterManager();

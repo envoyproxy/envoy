@@ -182,6 +182,14 @@ size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
   if (len > 0 && !first_byte_processed_) {
+    if (delay_reset_) {
+      if (first_message_) {
+        first_message_ = false;
+      } else {
+        framer_.Reset();
+      }
+    }
+
     if (message_type_ == MessageType::Request && !allow_custom_methods_ &&
         !isFirstCharacterOfValidMethod(*slice)) {
       status_ = ParserStatus::Error;
@@ -353,7 +361,9 @@ void BalsaParser::MessageDone() {
     return;
   }
   status_ = convertResult(connection_->onMessageComplete());
-  framer_.Reset();
+  if (!delay_reset_) {
+    framer_.Reset();
+  }
   first_byte_processed_ = false;
   headers_done_ = false;
 }

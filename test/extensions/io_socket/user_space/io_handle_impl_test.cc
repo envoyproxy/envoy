@@ -612,8 +612,12 @@ TEST_F(IoHandleImplTest, EventScheduleBasic) {
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Read | Event::FileReadyType::Write);
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
   schedulable_cb->invokeCallback();
@@ -628,8 +632,12 @@ TEST_F(IoHandleImplTest, SetEnabledTriggerEventSchedule) {
     EXPECT_CALL(*schedulable_cb, enabled());
     EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration()).Times(0);
     io_handle_->initializeFileEvent(
-        dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-        Event::FileReadyType::Read);
+        dispatcher_,
+        [this](uint32_t events) {
+          cb_.called(events);
+          return absl::OkStatus();
+        },
+        Event::FileTriggerType::Edge, Event::FileReadyType::Read);
     testing::Mock::VerifyAndClearExpectations(schedulable_cb);
   }
   {
@@ -664,8 +672,12 @@ TEST_F(IoHandleImplTest, ReadAndWriteAreEdgeTriggered) {
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Read | Event::FileReadyType::Write);
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
   schedulable_cb->invokeCallback();
@@ -691,8 +703,12 @@ TEST_F(IoHandleImplTest, SetDisabledBlockEventSchedule) {
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Write);
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Write);
   ASSERT_TRUE(schedulable_cb->enabled_);
 
   // The write event is cleared and the read event is not ready.
@@ -710,8 +726,12 @@ TEST_F(IoHandleImplTest, EventResetClearCallback) {
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Write);
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Write);
   ASSERT_TRUE(schedulable_cb->enabled_);
   io_handle_->resetFileEvents();
 }
@@ -733,8 +753,12 @@ TEST_F(IoHandleImplTest, DrainToLowWaterMarkTriggerReadEvent) {
   // No event is available.
   EXPECT_CALL(*schedulable_cb, cancel());
   io_handle_peer_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Read | Event::FileReadyType::Write);
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
   // Neither readable nor writable.
   ASSERT_FALSE(schedulable_cb->enabled_);
 
@@ -797,6 +821,7 @@ TEST_F(IoHandleImplTest, Close) {
             should_close = true;
           }
         }
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
   schedulable_cb_->invokeCallback();
@@ -841,6 +866,7 @@ TEST_F(IoHandleImplTest, ShutDownRaiseEvent) {
             should_close = true;
           }
         }
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   schedulable_cb_->invokeCallback();
@@ -881,6 +907,7 @@ TEST_F(IoHandleImplTest, WriteScheduleWritableEvent) {
             should_close = true;
           }
         }
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
   schedulable_cb_->invokeCallback();
@@ -921,6 +948,7 @@ TEST_F(IoHandleImplTest, WritevScheduleWritableEvent) {
             should_close = true;
           }
         }
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
   schedulable_cb_->invokeCallback();
@@ -966,6 +994,7 @@ TEST_F(IoHandleImplTest, ReadAfterShutdownWrite) {
             should_close = true;
           }
         }
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
@@ -999,8 +1028,12 @@ TEST_F(IoHandleImplTest, NotifyWritableAfterShutdownWrite) {
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_peer_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Read);
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   EXPECT_CALL(cb_, called(Event::FileReadyType::Read));
   schedulable_cb->invokeCallback();
   EXPECT_FALSE(schedulable_cb->enabled_);
@@ -1088,8 +1121,8 @@ TEST_F(IoHandleImplTest, ConnectToClosedIoHandle) {
 TEST_F(IoHandleImplTest, ActivateEvent) {
   schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   io_handle_->initializeFileEvent(
-      dispatcher_, [&, handle = io_handle_.get()](uint32_t) {}, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Read);
+      dispatcher_, [&, handle = io_handle_.get()](uint32_t) { return absl::OkStatus(); },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   EXPECT_FALSE(schedulable_cb_->enabled());
   io_handle_->activateFileEvents(Event::FileReadyType::Read);
   ASSERT_TRUE(schedulable_cb_->enabled());
@@ -1106,7 +1139,11 @@ TEST_F(IoHandleImplTest, EventCallbackIsNotInvokedIfHandleIsClosed) {
   schedulable_cb_ =
       new NiceMock<Event::MockSchedulableCallback>(&dispatcher_, &check_schedulable_cb_destroyed);
   io_handle_->initializeFileEvent(
-      dispatcher_, [&, handle = io_handle_.get()](uint32_t) { check_event_cb.Call(); },
+      dispatcher_,
+      [&, handle = io_handle_.get()](uint32_t) {
+        check_event_cb.Call();
+        return absl::OkStatus();
+      },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   EXPECT_FALSE(schedulable_cb_->enabled());
   io_handle_->activateFileEvents(Event::FileReadyType::Read);
@@ -1150,7 +1187,11 @@ TEST_F(IoHandleImplTest, CreatePlatformDefaultTriggerTypeFailOnWindows) {
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, cancel());
   io_handle_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); },
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   io_handle_->close();
   io_handle_peer_->close();

@@ -807,6 +807,7 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
           host_set->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
                                                const HostVector& hosts_removed) {
             runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
+            return absl::OkStatus();
           }));
       host_sets_.push_back(std::move(host_set));
     }
@@ -1163,13 +1164,6 @@ ClusterInfoImpl::ClusterInfoImpl(
       http_protocol_options_->common_http_protocol_options_.has_max_requests_per_connection()) {
     throwEnvoyExceptionOrPanic("Only one of max_requests_per_connection from Cluster or "
                                "HttpProtocolOptions can be specified");
-  }
-
-  // Handle the original_dst_lb_config case first.
-  if (config.lb_config_case() == envoy::config::cluster::v3::Cluster::kOriginalDstLbConfig) {
-    original_dst_lb_config_ =
-        std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
-            config.original_dst_lb_config());
   }
 
   if (config.has_load_balancing_policy() ||
@@ -1539,6 +1533,7 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
         info_->endpointStats().membership_healthy_.set(healthy_hosts);
         info_->endpointStats().membership_degraded_.set(degraded_hosts);
         info_->endpointStats().membership_excluded_.set(excluded_hosts);
+        return absl::OkStatus();
       });
   // Drop overload configuration parsing.
   absl::Status status = parseDropOverloadConfig(cluster.load_assignment());

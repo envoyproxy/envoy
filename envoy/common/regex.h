@@ -37,7 +37,7 @@ public:
    * Create a @ref CompiledMatcher with the given regex expression.
    * @param regex the regex expression match string
    */
-  virtual CompiledMatcherPtr matcher(const std::string& regex) const PURE;
+  virtual absl::StatusOr<CompiledMatcherPtr> matcher(const std::string& regex) const PURE;
 };
 
 using EnginePtr = std::shared_ptr<Engine>;

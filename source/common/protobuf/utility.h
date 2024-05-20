@@ -61,7 +61,7 @@
     return DurationUtil::durationToMilliseconds(msg.field_name());                                 \
   }((message)))
 
-// Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, return the
+// Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, return the
 // default value.
 #define PROTOBUF_GET_SECONDS_OR_DEFAULT(message, field_name, default_value)                        \
   ((message).has_##field_name() ? DurationUtil::durationToSeconds((message).field_name())          \
@@ -288,6 +288,15 @@ public:
                                        bool recurse_into_any = false);
 
   /**
+   * Validates that duration fields in the config are valid.
+   * @param message message to validate.
+   * @param recurse_into_any whether to recurse into Any messages during unexpected checking.
+   * @throw EnvoyException if a duration field is invalid.
+   */
+  static void validateDurationFields(const Protobuf::Message& message,
+                                     bool recurse_into_any = false);
+
+  /**
    * Perform a PGV check on the entire message tree, recursing into Any messages as needed.
    */
   static void recursivePgvCheck(const Protobuf::Message& message);
@@ -306,10 +315,18 @@ public:
   static void validate(const MessageType& message,
                        ProtobufMessage::ValidationVisitor& validation_visitor,
                        bool recurse_into_any = false) {
+    // TODO(adisuissa): There are multiple recursive traversals done by the
+    // calls in this function. This can be refactored into a single recursive
+    // traversal that invokes the various validators.
+
     // Log warnings or throw errors if deprecated fields or unknown fields are in use.
     if (!validation_visitor.skipValidation()) {
       checkForUnexpectedFields(message, validation_visitor, recurse_into_any);
     }
+
+    // Throw an exception if the config has an invalid Duration field. This is needed
+    // because Envoy validates the duration in a strict way that is not supported by PGV.
+    validateDurationFields(message, recurse_into_any);
 
     // TODO(mattklein123): This will recurse the message twice, once above and once for PGV. When
     // we move to always recursing, satisfying the TODO below, we should merge into a single

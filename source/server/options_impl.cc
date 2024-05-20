@@ -71,6 +71,12 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       " connection to the parent cannot be established. Set this to true to instead continue with"
       " a regular startup, while retaining the new epoch value.",
       cmd, false);
+  TCLAP::SwitchArg skip_hot_restart_parent_stats(
+      "", "skip-hot-restart-parent-stats",
+      "When hot restarting, by default the child instance copies stats from the parent"
+      " instance periodically during the draining period. This can potentially be an"
+      " expensive operation; set this to true to reset all stats in child process.",
+      cmd, false);
   TCLAP::ValueArg<std::string> base_id_path(
       "", "base-id-path", "Path to which the base ID is written", false, "", "string", cmd);
   TCLAP::ValueArg<uint32_t> concurrency("", "concurrency", "# of worker threads to run", false,
@@ -235,6 +241,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   base_id_ = base_id.getValue();
   use_dynamic_base_id_ = use_dynamic_base_id.getValue();
   skip_hot_restart_on_no_parent_ = skip_hot_restart_on_no_parent.getValue();
+  skip_hot_restart_parent_stats_ = skip_hot_restart_parent_stats.getValue();
   base_id_path_ = base_id_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
 
@@ -380,6 +387,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_base_id(baseId());
   command_line_options->set_use_dynamic_base_id(useDynamicBaseId());
   command_line_options->set_skip_hot_restart_on_no_parent(skipHotRestartOnNoParent());
+  command_line_options->set_skip_hot_restart_parent_stats(skipHotRestartParentStats());
   command_line_options->set_base_id_path(baseIdPath());
   command_line_options->set_concurrency(concurrency());
   command_line_options->set_config_path(configPath());

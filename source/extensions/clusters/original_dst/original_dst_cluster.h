@@ -151,7 +151,7 @@ private:
     Upstream::LoadBalancerFactorySharedPtr factory() override {
       return std::make_shared<LoadBalancerFactory>(cluster_);
     }
-    void initialize() override {}
+    absl::Status initialize() override { return absl::OkStatus(); }
 
     const OriginalDstClusterHandleSharedPtr cluster_;
   };

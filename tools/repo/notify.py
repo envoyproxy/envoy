@@ -12,11 +12,13 @@ import html
 import icalendar
 import json
 import os
+import pathlib
 import sys
 from datetime import datetime as dt
 from functools import cached_property
 
 import aiohttp
+import yaml
 
 from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.errors import SlackApiError
@@ -33,70 +35,25 @@ CALENDAR = "https://calendar.google.com/calendar/ical/d6glc0l5rc3v235q9l2j29dgov
 ISSUE_LINK = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+label%3Atriage"
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
 
-OPSGENIE_TO_SLACK = {
-    'Adi': 'UT17EMMTP',
-    'Alyssa': 'U78RP48V9',
-    'Greg': 'U78MBV869',
-    'Harvey': 'U78E7055Z',
-    'Joshua': 'U80HPLBPG',
-    'Kevin': 'U016ZPU8KBK',
-    'Keith': 'UGS5P90CF',
-    'kuat': 'U7KTRAA8M',
-    'Lizan': 'U79E51EQ6',
-    'Matt': 'U5CALEVSL',
-    'Kateryna': 'UDYUWRL13',
-    'phlax': 'U017PLM0GNQ',
-    'Raven': 'U02MJHFEX35',
-    'Ryan': 'U01SW3JC8GP',
-    'Hejie': 'U01GNQ3B8AY',
-    'Baiping': 'U017KF5C0Q6',
-    'Yan': 'UJHLR5KFS',
-    'Stephan': 'U78J72Q82',
-}
-
-MAINTAINERS = {
-    'adisuissa': 'UT17EMMTP',
-    'alyssawilk': 'U78RP48V9',
-    'ggreenway': 'U78MBV869',
-    'htuch': 'U78E7055Z',
-    'jmarantz': 'U80HPLBPG',
-    'KBaichoo': 'U016ZPU8KBK',
-    'keith': 'UGS5P90CF',
-    'kyessenov': 'U7KTRAA8M',
-    'lizan': 'U79E51EQ6',
-    'mattklein123': 'U5CALEVSL',
-    'nezdolik': 'UDYUWRL13',
-    'phlax': 'U017PLM0GNQ',
-    'ravenblackx': 'U02MJHFEX35',
-    'RyanTheOptimist': 'U01SW3JC8GP',
-    'soulxu': 'U01GNQ3B8AY',
-    'wbpcode': 'U017KF5C0Q6',
-    'yanavlasov': 'UJHLR5KFS',
-    'zuercher': 'U78J72Q82',
-}
-
-# First pass reviewers who are not maintainers should get
-# notifications but not result in a PR not getting assigned a
-# maintainer owner.
-FIRST_PASS = {
-    'botengyao': 'U037YUAK147',
-    'daixiang0': 'U020CJG6UU8',
-    'silverstar194': 'U03LNPC8JN9',
-    'tyxia': 'U023U1ZN9SP',
-}
-
-# Only notify API reviewers who aren't maintainers.
-# Maintainers are already notified of pending PRs.
-API_REVIEWERS = {
-    'markdroth': 'UMN8K55A6',
-}
-
 
 class RepoNotifier(runner.Runner):
+
+    @cached_property
+    def api_reviewers(self):
+        """Only notify API reviewers who aren't maintainers.
+        Maintainers are already notified of pending PRs."""
+        return {k: v["slack"] for k, v in self.reviewers.items() if v.get("api")}
 
     @property
     def dry_run(self):
         return self.args.dry_run
+
+    @cached_property
+    def first_pass_reviewers(self):
+        """First pass reviewers who are not maintainers should get
+        notifications but not result in a PR not getting assigned a
+        maintainer owner."""
+        return {k: v["slack"] for k, v in self.reviewers.items() if v.get("first-pass")}
 
     @cached_property
     def github(self):
@@ -109,6 +66,10 @@ class RepoNotifier(runner.Runner):
     @async_property(cache=True)
     async def maintainer_notifications(self):
         return (await self.tracked_prs)["maintainer_notifications"]
+
+    @cached_property
+    def maintainers(self):
+        return {k: v["slack"] for k, v in self.reviewers.items() if v.get("maintainer")}
 
     @async_property
     async def pulls(self):
@@ -124,6 +85,10 @@ class RepoNotifier(runner.Runner):
     @cached_property
     def repo(self):
         return self.github[ENVOY_REPO]
+
+    @cached_property
+    def reviewers(self):
+        return yaml.safe_load(pathlib.Path(self.args.reviewers).read_text())
 
     @cached_property
     def session(self):
@@ -183,10 +148,14 @@ class RepoNotifier(runner.Runner):
         # Snag the first name from the "oncall transitioning to" entry.
         opsgenie_name = opsgenie_string.split(' ', 1)[0]
         # Check that the name is in the OPSGENIE_TO_SLACK list, else cc alyssa.
-        if not (uid := OPSGENIE_TO_SLACK.get(opsgenie_name)):
+        if not (uid := self.opsgenie_to_slack.get(opsgenie_name)):
             print("could not find", opsgenie_name)
-            return OPSGENIE_TO_SLACK.get('Alyssa')
+            return self.opsgenie_to_slack.get('Alyssa')
         return uid
+
+    @cached_property
+    def opsgenie_to_slack(self):
+        return {v["opsgenie"]: v["slack"] for v in self.reviewers.values() if "opsgenie" in v}
 
     @async_property(cache=True)
     async def tracked_prs(self):
@@ -206,7 +175,7 @@ class RepoNotifier(runner.Runner):
             message = self.pr_message(age, pull)
 
             if await self.needs_api_review(pull):
-                for assignee in self.get_assignees(pull, API_REVIEWERS):
+                for assignee in self.get_assignees(pull, self.api_reviewers):
                     api_review[assignee["login"]] = api_review.get(
                         assignee["login"],
                         [f"Hello, {assignee['login']}, here are your PR reminders for the day"])
@@ -217,8 +186,9 @@ class RepoNotifier(runner.Runner):
                 stalled_prs.append(message)
 
             has_maintainer = False
-            for assignee in self.get_assignees(pull, {**MAINTAINERS, **FIRST_PASS}):
-                if MAINTAINERS.get(assignee["login"]):
+            assignees = self.get_assignees(pull, {**self.maintainers, **self.first_pass_reviewers})
+            for assignee in assignees:
+                if self.maintainers.get(assignee["login"]):
                     has_maintainer = True
                 maintainers_and_prs[assignee["login"]] = maintainers_and_prs.get(
                     assignee["login"], [])
@@ -239,6 +209,7 @@ class RepoNotifier(runner.Runner):
 
     def add_arguments(self, parser) -> None:
         super().add_arguments(parser)
+        parser.add_argument('reviewers', help="YAML reviewer config")
         parser.add_argument(
             '--dry_run',
             action="store_true",
@@ -277,9 +248,9 @@ class RepoNotifier(runner.Runner):
         await self.post_to_assignees()
 
     async def post_to_assignees(self):
-        review_notifications = ((API_REVIEWERS, await self.shepherd_notifications),
-                                (MAINTAINERS, await self.maintainer_notifications),
-                                (FIRST_PASS, await self.maintainer_notifications))
+        review_notifications = ((self.api_reviewers, await self.shepherd_notifications),
+                                (self.maintainers, await self.maintainer_notifications),
+                                (self.first_pass_reviewers, await self.maintainer_notifications))
         for assignees, messages in review_notifications:
             await self._post_to_assignees(assignees, messages)
 

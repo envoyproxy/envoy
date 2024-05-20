@@ -200,13 +200,13 @@ TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("bar", {}, {});
   grpc_mux_->start();
   // Unknown type, shouldn't do anything.
-  local_info_.context_provider_.update_cb_handler_.runCallbacks("baz");
+  EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz").ok());
   // Update to foo type should resend Node.
   expectSendMessage("foo", {}, {});
-  local_info_.context_provider_.update_cb_handler_.runCallbacks("foo");
+  EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("foo").ok());
   // Update to bar type should resend Node.
   expectSendMessage("bar", {}, {});
-  local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
+  EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar").ok());
 
   expectSendMessage("foo", {}, {"x", "y"});
 }
