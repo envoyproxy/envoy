@@ -9,6 +9,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -98,7 +99,7 @@ public:
     EXPECT_CALL(server_factory_context_, api()).WillRepeatedly(ReturnRef(*api_));
     EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([this] {
       Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
-      EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::Modified, _))
+      EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
           .WillRepeatedly(
               Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
                 on_changed_cbs_.emplace_back(cb);
@@ -362,7 +363,7 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
   EXPECT_EQ("Boxford", city_it->second);
   TestEnvironment::renameFile(city_db_path, city_db_path + "1");
   TestEnvironment::renameFile(reloaded_city_db_path, city_db_path);
-  EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::Modified).ok());
+  EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
   expectReloadStats("city_db", 1, 0);
   captured_lookup_response_.clear();
   EXPECT_EQ(0, captured_lookup_response_.size());
@@ -374,7 +375,7 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
   provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
   const auto& city1_it = captured_lookup_response_.find("x-geo-city");
   EXPECT_EQ("BoxfordImaginary", city1_it->second);
-  // Clean up modificationds to mmdb file names.
+  // Clean up modifications to mmdb file names.
   TestEnvironment::renameFile(city_db_path, reloaded_city_db_path);
   TestEnvironment::renameFile(city_db_path + "1", city_db_path);
 }
@@ -456,7 +457,7 @@ TEST_P(MmdbReloadImplTest, MmdbReloaded) {
   std::string reloaded_db_file_path = TestEnvironment::substitute(test_case.reloaded_db_file_path_);
   TestEnvironment::renameFile(source_db_file_path, source_db_file_path + "1");
   TestEnvironment::renameFile(reloaded_db_file_path, source_db_file_path);
-  EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::Modified).ok());
+  EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
   expectReloadStats(test_case.db_type_, 1, 0);
   captured_lookup_response_.clear();
   remote_address = Network::Utility::parseInternetAddress(test_case.ip_);
@@ -467,7 +468,42 @@ TEST_P(MmdbReloadImplTest, MmdbReloaded) {
   provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
   const auto& geoip_header1_it = captured_lookup_response_.find(test_case.expected_header_name_);
   EXPECT_EQ(test_case.expected_reloaded_header_value_, geoip_header1_it->second);
-  // Clean up modificationds to mmdb file names.
+  // Clean up modifications to mmdb file names.
+  TestEnvironment::renameFile(source_db_file_path, reloaded_db_file_path);
+  TestEnvironment::renameFile(source_db_file_path + "1", source_db_file_path);
+}
+
+TEST_P(MmdbReloadImplTest, MmdbNotReloadedRuntimeFeatureDisabled) {
+  TestScopedRuntime scoped_runtime_;
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.mmdb_files_reload_enabled", "false"}});
+  MmdbReloadTestCase test_case = GetParam();
+  initializeProvider(test_case.yaml_config_);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddress(test_case.ip_);
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  const auto& geoip_header_it = captured_lookup_response_.find(test_case.expected_header_name_);
+  EXPECT_EQ(test_case.expected_header_value_, geoip_header_it->second);
+  expectStats(test_case.db_type_, 1, 1);
+  std::string source_db_file_path = TestEnvironment::substitute(test_case.source_db_file_path_);
+  std::string reloaded_db_file_path = TestEnvironment::substitute(test_case.reloaded_db_file_path_);
+  TestEnvironment::renameFile(source_db_file_path, source_db_file_path + "1");
+  TestEnvironment::renameFile(reloaded_db_file_path, source_db_file_path);
+  EXPECT_EQ(0, on_changed_cbs_.size());
+  expectReloadStats(test_case.db_type_, 0, 0);
+  captured_lookup_response_.clear();
+  remote_address = Network::Utility::parseInternetAddress(test_case.ip_);
+  Geolocation::LookupRequest lookup_rq2{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb2;
+  auto lookup_cb_std2 = lookup_cb2.AsStdFunction();
+  EXPECT_CALL(lookup_cb2, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
+  const auto& geoip_header1_it = captured_lookup_response_.find(test_case.expected_header_name_);
+  EXPECT_EQ(test_case.expected_header_value_, geoip_header1_it->second);
+  // Clean up modifications to mmdb file names.
   TestEnvironment::renameFile(source_db_file_path, reloaded_db_file_path);
   TestEnvironment::renameFile(source_db_file_path + "1", source_db_file_path);
 }

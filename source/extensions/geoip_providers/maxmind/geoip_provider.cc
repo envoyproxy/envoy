@@ -2,6 +2,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -105,23 +106,25 @@ GeoipProvider::GeoipProvider(Event::Dispatcher& dispatcher, Api::Api& api,
   mmdb_reload_thread_ = api.threadFactory().createThread(
       [this]() -> void {
         ENVOY_LOG_MISC(debug, "Started mmdb_reload_routine");
-        if (config_->cityDbPath()) {
+        if (config_->cityDbPath() &&
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.mmdb_files_reload_enabled")) {
           THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-              config_->cityDbPath().value(), Filesystem::Watcher::Events::Modified,
+              config_->cityDbPath().value(), Filesystem::Watcher::Events::MovedTo,
               [this](uint32_t) {
                 return onMaxmindDbUpdate(config_->cityDbPath().value(), CITY_DB_TYPE);
               }));
         }
-        if (config_->ispDbPath()) {
+        if (config_->ispDbPath() &&
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.mmdb_files_reload_enabled")) {
           THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-              config_->ispDbPath().value(), Filesystem::Watcher::Events::Modified,
-              [this](uint32_t) {
+              config_->ispDbPath().value(), Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
                 return onMaxmindDbUpdate(config_->ispDbPath().value(), ISP_DB_TYPE);
               }));
         }
-        if (config_->anonDbPath()) {
+        if (config_->anonDbPath() &&
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.mmdb_files_reload_enabled")) {
           THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
-              config_->anonDbPath().value(), Filesystem::Watcher::Events::Modified,
+              config_->anonDbPath().value(), Filesystem::Watcher::Events::MovedTo,
               [this](uint32_t) {
                 return onMaxmindDbUpdate(config_->anonDbPath().value(), ANON_DB_TYPE);
               }));
@@ -293,11 +296,11 @@ MaxmindDbSharedPtr GeoipProvider::initMaxmindDb(const std::string& db_path,
   }
 }
 
-void GeoipProvider::mmdbReload(MaxmindDbSharedPtr& old_db, const MaxmindDbSharedPtr reloaded_db,
+void GeoipProvider::mmdbReload(MaxmindDbSharedPtr& current_db, const MaxmindDbSharedPtr reloaded_db,
                                absl::Mutex& mu, const absl::string_view& db_type) {
   if (reloaded_db) {
     absl::MutexLock lock(&mu);
-    old_db = reloaded_db;
+    current_db = reloaded_db;
     config_->incDbReloadSuccess(db_type);
   } else {
     config_->incDbReloadError(db_type);
