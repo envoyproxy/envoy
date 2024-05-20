@@ -26,6 +26,12 @@ build --define envoy_mobile_listener=enabled
 build --experimental_repository_downloader_retries=2
 build --enable_platform_specific_config
 
+# Workaround issue with pkgconfig, see https://github.com/envoyproxy/envoy/issues/33225
+build --host_action_env=CXXFLAGS=-Wno-int-conversion
+build --action_env=CXXFLAGS=-Wno-int-conversion
+build --host_action_env=CFLAGS=-Wno-int-conversion
+build --action_env=CFLAGS=-Wno-int-conversion
+
 # Pass CC, CXX and LLVM_CONFIG variables from the environment.
 # We assume they have stable values, so this won't cause action cache misses.
 build --action_env=CC --host_action_env=CC
@@ -147,12 +153,6 @@ build:macos --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
-
-# Workaround issue with pkgconfig, see https://github.com/envoyproxy/envoy/issues/33225
-build:macos --host_action_env=CXXFLAGS=-Wno-int-conversion
-build:macos --action_env=CXXFLAGS=-Wno-int-conversion
-build:macos --host_action_env=CFLAGS=-Wno-int-conversion
-build:macos --action_env=CFLAGS=-Wno-int-conversion
 
 # macOS ASAN/UBSAN
 build:macos-asan --config=asan
