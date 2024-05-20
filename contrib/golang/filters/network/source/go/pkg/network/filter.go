@@ -18,6 +18,7 @@
 package network
 
 import (
+    "fmt"
 	"sync"
 	"unsafe"
 
@@ -61,6 +62,9 @@ func (n *connectionCallback) EnableHalfClose(enabled bool) {
 	if enabled {
 		enableHalfCloseInt = 1
 	}
+	if n.connEnableHalfCloseFunc == nil {
+        panic(fmt.Sprintf("not support for EnableHalfClose, please set connEnableHalfCloseFunc for connectionCallback"))
+    }
 	n.connEnableHalfCloseFunc(n.wrapper, enableHalfCloseInt)
 }
 
