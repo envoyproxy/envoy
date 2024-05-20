@@ -102,14 +102,14 @@ TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
 
 // Verify the average RPS is calculated properly.
 TEST_F(ThreadLocalControllerTest, AverageRps) {
-  // Lookback window is 5s by default in these tests.
+  // Sample window is 5s by default in these tests.
   constexpr auto test_window = std::chrono::seconds(5);
   EXPECT_EQ(test_window, tlc_.samplingWindow());
 
   // We expect the RPS to be 0 after instantiation.
   EXPECT_EQ(0, tlc_.averageRps());
 
-  // Validate the average RPS value is calculated over the entire lookback window.
+  // Validate the average RPS value is calculated over the entire sample window.
   tlc_.recordSuccess();
   tlc_.recordFailure();
   // We had 2 requests, so this would be 0.4 RPS over the full window.

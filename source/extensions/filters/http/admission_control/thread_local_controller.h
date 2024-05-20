@@ -41,7 +41,7 @@ public:
   // Returns the average RPS across the sampling window.
   virtual uint32_t averageRps() const PURE;
 
-  // Returns the lookback window for this controller.
+  // Returns the sample window for this controller.
   virtual std::chrono::seconds samplingWindow() const PURE;
 };
 
