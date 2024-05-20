@@ -2291,13 +2291,15 @@ TEST_P(QuicHttpIntegrationTest, ConnectionDebugVisitor) {
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   quic_session->close(Network::ConnectionCloseType::NoFlush);
+
+  std::string listener = version_ == Network::Address::IpVersion::v4 ? "127.0.0.1_0" : "[__1]_0";
   EXPECT_LOG_CONTAINS(
       "info",
       fmt::format("Quic connection from {} with id {} closed {} with details:",
                   quic_connection_->self_address().ToString(),
                   quic_connection_->connection_id().ToString(),
                   quic::ConnectionCloseSourceToString(quic::ConnectionCloseSource::FROM_PEER)),
-      test_server_->waitForGaugeEq("listener.127.0.0.1_0.downstream_cx_active", 0u));
+      test_server_->waitForGaugeEq(fmt::format("listener.{}.downstream_cx_active", listener), 0u));
 }
 
 } // namespace Quic
