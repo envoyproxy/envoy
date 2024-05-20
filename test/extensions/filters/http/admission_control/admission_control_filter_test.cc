@@ -37,6 +37,7 @@ public:
   MOCK_METHOD(void, recordSuccess, ());
   MOCK_METHOD(void, recordFailure, ());
   MOCK_METHOD(uint32_t, averageRps, (), (const));
+  MOCK_METHOD(std::chrono::seconds, samplingWindow, (), (const));
 };
 
 class MockResponseEvaluator : public ResponseEvaluator {
