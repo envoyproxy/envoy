@@ -584,10 +584,6 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       metadata_match_criteria_ = std::make_unique<MetadataMatchCriteriaImpl>(filter_it->second);
     }
   }
-  if (!route.query_parameters_to_add().empty() || !route.query_parameters_to_remove().empty()) {
-    query_params_evaluator_ = QueryParamsEvaluator::configure(route.query_parameters_to_add(),
-                                                              route.query_parameters_to_remove());
-  }
 
   shadow_policies_.reserve(route.route().request_mirror_policies().size());
   for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
@@ -862,6 +858,10 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
+bool RouteEntryImplBase::mostSpecificHeaderMutationWins() const {
+  return vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins();
+}
+
 void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
@@ -869,11 +869,6 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
     header_parser->evaluateHeaders(headers, stream_info);
-  }
-
-  for (const QueryParamsEvaluator* query_param_evaluator : getQueryParamEvaluators(
-           /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
-    query_param_evaluator->evaluateQueryParams(headers);
   }
 
   // Restore the port if this was a CONNECT request.
@@ -955,20 +950,6 @@ RouteEntryImplBase::getRequestHeaderParsers(bool specificity_ascend) const {
   return getHeaderParsers(&vhost_->globalRouteConfig().requestHeaderParser(),
                           &vhost_->requestHeaderParser(), &requestHeaderParser(),
                           specificity_ascend);
-}
-
-absl::InlinedVector<const QueryParamsEvaluator*, 3>
-RouteEntryImplBase::getQueryParamEvaluators(bool specificity_ascend) const {
-  if (specificity_ascend) {
-    // Sorted from least to most specific: global connection manager level query parameters, virtual
-    // host level query parameters and finally route-level query parameters.
-    return {&vhost_->globalRouteConfig().queryParamsEvaluator(), &vhost_->queryParamsEvaluator(),
-            &queryParamsEvaluator()};
-  } else {
-    // Sorted from most to least specific.
-    return {&queryParamsEvaluator(), &vhost_->queryParamsEvaluator(),
-            &vhost_->globalRouteConfig().queryParamsEvaluator()};
-  }
 }
 
 absl::InlinedVector<const HeaderParser*, 3>
@@ -1737,12 +1718,6 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
                                                        virtual_host.response_headers_to_remove());
   }
 
-  if (!virtual_host.query_parameters_to_add().empty() ||
-      !virtual_host.query_parameters_to_remove().empty()) {
-    query_params_evaluator_ = QueryParamsEvaluator::configure(
-        virtual_host.query_parameters_to_add(), virtual_host.query_parameters_to_remove());
-  }
-
   // Retry and Hedge policies must be set before routes, since they may use them.
   if (virtual_host.has_retry_policy()) {
     retry_policy_ = std::make_unique<envoy::config::route::v3::RetryPolicy>();
@@ -2170,11 +2145,6 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
   if (!config.response_headers_to_add().empty() || !config.response_headers_to_remove().empty()) {
     response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
                                                        config.response_headers_to_remove());
-  }
-
-  if (!config.query_parameters_to_add().empty() || !config.query_parameters_to_remove().empty()) {
-    query_params_evaluator_ = QueryParamsEvaluator::configure(config.query_parameters_to_add(),
-                                                              config.query_parameters_to_remove());
   }
 
   if (config.has_metadata()) {

@@ -15,8 +15,7 @@ namespace HttpFilters {
 namespace QueryParameterMutation {
 
 Config::Config(
-    const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config,
-    Server::Configuration::CommonFactoryContext& context)
+    const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config)
     : query_params_evaluator_(Router::QueryParamsEvaluator::configure(
           proto_config.query_parameters_to_add(), proto_config.query_parameters_to_remove())) {}
 

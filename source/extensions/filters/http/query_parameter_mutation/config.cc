@@ -11,8 +11,8 @@ namespace QueryParameterMutation {
 
 Http::FilterFactoryCb Factory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto,
-    const std::string&, Server::Configuration::FactoryContext& context) {
-  auto config = std::make_shared<Config>(proto, context.serverFactoryContext());
+    const std::string&, Server::Configuration::FactoryContext&) {
+  auto config = std::make_shared<Config>(proto);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Filter>(config));
   };
@@ -20,9 +20,9 @@ Http::FilterFactoryCb Factory::createFilterFactoryFromProtoTyped(
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 Factory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config, Server::Configuration::ServerFactoryContext& context,
+    const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config, Server::Configuration::ServerFactoryContext&,
     ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<Config>(proto_config, context);
+  return std::make_shared<Config>(proto_config);
 }
 
 REGISTER_FACTORY(Factory, Server::Configuration::NamedHttpFilterConfigFactory);

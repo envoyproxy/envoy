@@ -41,7 +41,6 @@ envoy_cc_library(
         ":context_lib",
         ":header_parser_lib",
         ":metadatamatchcriteria_lib",
-        ":query_params_evaluator_lib",
         ":reset_header_parser_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
