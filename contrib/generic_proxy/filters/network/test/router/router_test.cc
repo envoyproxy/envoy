@@ -250,8 +250,10 @@ public:
 
     if (config_->bindUpstreamConnection()) {
       // If upstream connection binding is enabled, the downstream connection will be closed
-      // when the upstream connection is closed.
-      EXPECT_CALL(mock_downstream_connection_, close(Network::ConnectionCloseType::FlushWrite));
+      // when the upstream connection is closed and will clean up all active streams and
+      // L7 filter chains.
+      EXPECT_CALL(mock_downstream_connection_, close(Network::ConnectionCloseType::FlushWrite))
+          .WillOnce(Invoke([this](Network::ConnectionCloseType) { filter_->onDestroy(); }));
     }
 
     EXPECT_CALL(mock_upstream_connection_, close(Network::ConnectionCloseType::FlushWrite))
