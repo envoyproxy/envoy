@@ -920,7 +920,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
       }
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
 
-      // Handle edge case - if two webidentity request signers are configured with different
+      // Handle edge case - if two web identity request signers are configured with different
       // regions. This appends the region to the cluster name to differentiate the two.
       auto cluster_name_ = absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
 
