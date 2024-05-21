@@ -60,7 +60,7 @@ minor_behavior_changes:
     ``envoy.reloadable_features.upstream_remote_address_use_connection`` to false.
 - area: quic
   change: |
-    When a quic connection socket is created, the socket's detected transport protocol will be set to "quic"
+    When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
