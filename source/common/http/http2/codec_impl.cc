@@ -1704,11 +1704,11 @@ ConnectionImpl::Http2Visitor::OnReadyToSendDataForStream(Http2StreamId stream_id
                                                          size_t max_length) {
   StreamImpl* stream = connection_->getStream(stream_id);
   if (stream == nullptr) {
-    return {-1, false, false};
+    return {/*payload_length=*/-1, /*end_data=*/false, /*end_stream=*/false};
   }
   if (stream->pending_send_data_->length() == 0 && !stream->local_end_stream_) {
     stream->data_deferred_ = true;
-    return {0, false, false};
+    return {/*payload_length=*/0, /*end_data=*/false, /*end_stream=*/false};
   }
   const size_t length = std::min<size_t>(max_length, stream->pending_send_data_->length());
   bool end_data = false;
