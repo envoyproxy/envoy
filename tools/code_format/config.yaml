@@ -162,6 +162,7 @@ paths:
     - source/common/router/rds_impl.cc
     - source/common/io/io_uring_worker_impl.cc
     - source/common/event/file_event_impl.cc
+    - source/common/http/async_client_impl.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:
