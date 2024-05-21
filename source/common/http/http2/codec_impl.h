@@ -470,6 +470,8 @@ protected:
   };
 
   // Encapsulates the logic for sending DATA frames on a given stream.
+  // Deprecated. Remove when removing
+  // `envoy_reloadable_features_http2_use_visitor_for_data`.
   class StreamDataFrameSource : public http2::adapter::DataFrameSource {
   public:
     explicit StreamDataFrameSource(StreamImpl& stream) : stream_(stream) {}
