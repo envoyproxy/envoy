@@ -75,7 +75,7 @@ TEST(ShareProviderManagerTest, ShareProviderManagerTest) {
   EXPECT_EQ(4, provider->tokensPerFill(4));
   EXPECT_EQ(8, provider->tokensPerFill(8));
 
-  // Destory the share provider manager.
+  // Destroy the share provider manager.
   // This is used to ensure the share provider is still safe to use even
   // the share provider manager is destroyed. But note this should never
   // happen in real production because the share provider manager should
