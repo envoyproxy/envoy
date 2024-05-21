@@ -73,6 +73,7 @@ class FilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
                const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+               Upstream::ClusterManager& cm, Singleton::Manager& singleton_manager,
                Stats::Scope& scope, Runtime::Loader& runtime, bool per_route = false);
   ~FilterConfig() override {
     // Ensure that the LocalRateLimiterImpl instance will be destroyed on the thread where its inner
@@ -139,6 +140,7 @@ private:
       descriptors_;
   const bool rate_limit_per_connection_;
   const bool always_consume_default_token_bucket_{};
+  Filters::Common::LocalRateLimit::ShareProviderManagerSharedPtr share_provider_manager_;
   std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rate_limiter_;
   const LocalInfo::LocalInfo& local_info_;
   Runtime::Loader& runtime_;
