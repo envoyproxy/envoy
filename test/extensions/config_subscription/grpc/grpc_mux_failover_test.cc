@@ -169,7 +169,7 @@ protected:
     grpc_mux_failover_.establishNewStream();
   }
 
-  // Successfuly connect to the primary source.
+  // Successfully connect to the primary source.
   // Attempts to establish a stream to the primary source, and receives a
   // response from it.
   void connectToPrimary() {
@@ -188,7 +188,7 @@ protected:
 
   // Get to a connecting to failover state.
   // Attempts to establish a stream to the primary source, observes 2 consecutive failures,
-  // attempts to connect to the failover sourcce, but has yet received a response from it.
+  // attempts to connect to the failover source, but has yet received a response from it.
   void connectingToFailover() {
     // Initial connection attempt.
     EXPECT_CALL(primary_stream_, establishNewStream());
@@ -208,9 +208,9 @@ protected:
     primary_callbacks_->onEstablishmentFailure();
   }
 
-  // Successfuly connect to the failover source.
+  // Successfully connect to the failover source.
   // Attempts to establish a stream to the primary source, observes 2 consecutive failures,
-  // attempts to connect to the failover sourcce, and receives a response from it.
+  // attempts to connect to the failover source, and receives a response from it.
   void connectToFailover() {
     connectingToFailover();
 
