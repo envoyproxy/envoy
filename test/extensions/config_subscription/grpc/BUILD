@@ -257,6 +257,7 @@ envoy_cc_test(
         "//source/extensions/config_subscription/grpc:grpc_stream_interface",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

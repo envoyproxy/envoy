@@ -5,6 +5,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/config_subscription/grpc/mocks.h"
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/event/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -35,8 +36,10 @@ protected:
               return std::move(primary_stream_owner_);
             },
             /*failover_stream_creator=*/absl::nullopt,
-            /*grpc_mux_callbacks=*/grpc_mux_callbacks_) {}
+            /*grpc_mux_callbacks=*/grpc_mux_callbacks_,
+            /*dispatcher=*/dispatcher_) {}
 
+  NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<MockGrpcStream<RequestType, ResponseType>> primary_stream_owner_;
   MockGrpcStream<RequestType, ResponseType>& primary_stream_;
   NiceMock<MockGrpcStreamCallbacks> grpc_mux_callbacks_;
@@ -142,23 +145,32 @@ protected:
 
   GrpcMuxFailoverTest()
       // The GrpcMuxFailover test uses a the GrpcMuxFailover with mocked GrpcStream objects.
-      : primary_stream_owner_(std::make_unique<MockGrpcStream<RequestType, ResponseType>>()),
+      : timer_(new Event::MockTimer()),
+        primary_stream_owner_(std::make_unique<MockGrpcStream<RequestType, ResponseType>>()),
         failover_stream_owner_(std::make_unique<MockGrpcStream<RequestType, ResponseType>>()),
-        primary_stream_(*primary_stream_owner_), failover_stream_(*failover_stream_owner_),
-        grpc_mux_failover_(
-            /*primary_stream_creator=*/
-            [this](GrpcStreamCallbacks<ResponseType>* callbacks)
-                -> GrpcStreamInterfacePtr<RequestType, ResponseType> {
-              primary_callbacks_ = callbacks;
-              return std::move(primary_stream_owner_);
-            },
-            /*failover_stream_creator=*/
-            [this](GrpcStreamCallbacks<ResponseType>* callbacks)
-                -> GrpcStreamInterfacePtr<RequestType, ResponseType> {
-              failover_callbacks_ = callbacks;
-              return std::move(failover_stream_owner_);
-            },
-            /*grpc_mux_callbacks=*/grpc_mux_callbacks_) {}
+        primary_stream_(*primary_stream_owner_), failover_stream_(*failover_stream_owner_) {
+    // Overwrite the timer and keep the callback to emulate its invocations later.
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+      timer_cb_ = timer_cb;
+      return timer_;
+    }));
+    grpc_mux_failover_ = std::make_unique<GrpcMuxFailover<RequestType, ResponseType>>(
+        /*primary_stream_creator=*/
+        [this](GrpcStreamCallbacks<ResponseType>* callbacks)
+            -> GrpcStreamInterfacePtr<RequestType, ResponseType> {
+          primary_callbacks_ = callbacks;
+          return std::move(primary_stream_owner_);
+        },
+        /*failover_stream_creator=*/
+        [this](GrpcStreamCallbacks<ResponseType>* callbacks)
+            -> GrpcStreamInterfacePtr<RequestType, ResponseType> {
+          failover_callbacks_ = callbacks;
+          return std::move(failover_stream_owner_);
+        },
+        /*grpc_mux_callbacks=*/grpc_mux_callbacks_,
+        /*dispatcher=*/dispatcher_);
+    EXPECT_CALL(*timer_, disableTimer()).Times(testing::AnyNumber());
+  }
 
   // Get to a connecting to primary state.
   // Attempts to establish a stream to the primary source.
@@ -166,7 +178,7 @@ protected:
     // Initial connection attempt.
     EXPECT_CALL(primary_stream_, establishNewStream());
     EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
-    grpc_mux_failover_.establishNewStream();
+    grpc_mux_failover_->establishNewStream();
   }
 
   // Successfully connect to the primary source.
@@ -193,7 +205,7 @@ protected:
     // Initial connection attempt.
     EXPECT_CALL(primary_stream_, establishNewStream());
     EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
-    grpc_mux_failover_.establishNewStream();
+    grpc_mux_failover_->establishNewStream();
 
     // First disconnect.
     EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure());
@@ -225,6 +237,11 @@ protected:
     failover_callbacks_->onDiscoveryResponse(std::move(response), cp_stats);
   }
 
+  // Override a timer to emualte its expiration without waiting for it to expire.
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  Event::MockTimer* timer_;
+  Event::TimerCb timer_cb_;
+
   std::unique_ptr<MockGrpcStream<RequestType, ResponseType>> primary_stream_owner_;
   std::unique_ptr<MockGrpcStream<RequestType, ResponseType>> failover_stream_owner_;
   MockGrpcStream<RequestType, ResponseType>& primary_stream_;
@@ -232,18 +249,21 @@ protected:
   NiceMock<MockGrpcStreamCallbacks> grpc_mux_callbacks_;
   GrpcStreamCallbacks<ResponseType>* primary_callbacks_{nullptr};
   GrpcStreamCallbacks<ResponseType>* failover_callbacks_{nullptr};
-  GrpcMuxFailover<RequestType, ResponseType> grpc_mux_failover_;
+  std::unique_ptr<GrpcMuxFailover<RequestType, ResponseType>> grpc_mux_failover_;
 };
 
 // Validates that when establishing a stream, its the stream to the primary service
 // that is established, and not the failover.
-TEST_F(GrpcMuxFailoverTest, EstablishPrimaryStream) { connectingToPrimary(); }
+TEST_F(GrpcMuxFailoverTest, EstablishPrimaryStream) {
+  EXPECT_CALL(primary_stream_, establishNewStream());
+  grpc_mux_failover_->establishNewStream();
+}
 
 // Validates that grpcStreamAvailable forwards to the primary by default.
 TEST_F(GrpcMuxFailoverTest, PrimaryStreamAvailableDefault) {
   EXPECT_CALL(primary_stream_, grpcStreamAvailable()).WillOnce(Return(false));
   EXPECT_CALL(failover_stream_, grpcStreamAvailable()).Times(0);
-  EXPECT_FALSE(grpc_mux_failover_.grpcStreamAvailable());
+  EXPECT_FALSE(grpc_mux_failover_->grpcStreamAvailable());
 }
 
 // Validates that grpcStreamAvailable is invoked on the primary stream when connecting to primary.
@@ -251,7 +271,7 @@ TEST_F(GrpcMuxFailoverTest, PrimaryStreamAvailableConnectingToPrimary) {
   connectingToPrimary();
   EXPECT_CALL(primary_stream_, grpcStreamAvailable()).WillOnce(Return(true));
   EXPECT_CALL(failover_stream_, grpcStreamAvailable()).Times(0);
-  EXPECT_TRUE(grpc_mux_failover_.grpcStreamAvailable());
+  EXPECT_TRUE(grpc_mux_failover_->grpcStreamAvailable());
 }
 
 // Validates that a message is sent to the primary stream by default.
@@ -261,14 +281,14 @@ TEST_F(GrpcMuxFailoverTest, SendMessagePrimaryDefault) {
   msg.set_version_info("123");
   EXPECT_CALL(primary_stream_, sendMessage(ProtoEq(msg)));
   EXPECT_CALL(failover_stream_, sendMessage(_)).Times(0);
-  grpc_mux_failover_.sendMessage(msg);
+  grpc_mux_failover_->sendMessage(msg);
 }
 
 // Validates that updating the queue size of the primary stream by default.
 TEST_F(GrpcMuxFailoverTest, MaybeUpdateQueueSizePrimaryDefault) {
   EXPECT_CALL(primary_stream_, maybeUpdateQueueSizeStat(123));
   EXPECT_CALL(failover_stream_, maybeUpdateQueueSizeStat(123)).Times(0);
-  grpc_mux_failover_.maybeUpdateQueueSizeStat(123);
+  grpc_mux_failover_->maybeUpdateQueueSizeStat(123);
 }
 
 // Validates that checkRateLimitAllowsDrain is invoked on the primary stream
@@ -276,7 +296,7 @@ TEST_F(GrpcMuxFailoverTest, MaybeUpdateQueueSizePrimaryDefault) {
 TEST_F(GrpcMuxFailoverTest, CheckRateLimitPrimaryStreamDefault) {
   EXPECT_CALL(primary_stream_, checkRateLimitAllowsDrain()).WillOnce(Return(false));
   EXPECT_CALL(failover_stream_, checkRateLimitAllowsDrain()).Times(0);
-  EXPECT_FALSE(grpc_mux_failover_.checkRateLimitAllowsDrain());
+  EXPECT_FALSE(grpc_mux_failover_->checkRateLimitAllowsDrain());
 }
 
 // Validate that upon failure of first connection to the primary, the second
@@ -332,12 +352,16 @@ TEST_F(GrpcMuxFailoverTest, AlternatingBetweenFailoverAndPrimary) {
     } else {
       // Emulate a failover source failure that will result in an attempt to
       // connect to the primary. It should close the failover stream, and
-      // try to establish the primary stream.
+      // enable the retry timer.
       EXPECT_CALL(failover_stream_, closeStream());
       EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure());
       EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
-      EXPECT_CALL(primary_stream_, establishNewStream());
+      EXPECT_CALL(*timer_, enableTimer(_, _));
       failover_callbacks_->onEstablishmentFailure();
+      // Emulate a timer tick, which should try to reconnect to the primary
+      // stream.
+      EXPECT_CALL(primary_stream_, establishNewStream());
+      timer_cb_();
     }
   }
 }
@@ -361,7 +385,7 @@ TEST_F(GrpcMuxFailoverTest, PrimaryOnlyAttemptsAfterPrimaryAvailable) {
   // Emulate a call to establishNewStream().
   EXPECT_CALL(primary_stream_, establishNewStream());
   EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
-  grpc_mux_failover_.establishNewStream();
+  grpc_mux_failover_->establishNewStream();
 }
 
 // Validate that after the failover is available (a response is received), all
@@ -383,7 +407,25 @@ TEST_F(GrpcMuxFailoverTest, FailoverOnlyAttemptsAfterFailoverAvailable) {
   // Emulate a call to establishNewStream().
   EXPECT_CALL(primary_stream_, establishNewStream()).Times(0);
   EXPECT_CALL(failover_stream_, establishNewStream());
-  grpc_mux_failover_.establishNewStream();
+  grpc_mux_failover_->establishNewStream();
+}
+
+// Validates that after failover attempt failue, the timer is disabled when
+// an external attempt to reconnect is performed.
+TEST_F(GrpcMuxFailoverTest, TimerDisabledUponExternalReconnect) {
+  connectingToFailover();
+
+  // Fail the attempt to connect to the failover.
+  EXPECT_CALL(failover_stream_, closeStream());
+  EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure());
+  EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
+  EXPECT_CALL(*timer_, enableTimer(_, _));
+  failover_callbacks_->onEstablishmentFailure();
+
+  // Attempt to reconnect again.
+  EXPECT_CALL(*timer_, disableTimer());
+  EXPECT_CALL(primary_stream_, establishNewStream());
+  grpc_mux_failover_->establishNewStream();
 }
 
 // Validates that grpcStreamAvailable is invoked on the failover stream when connecting to failover.
@@ -393,7 +435,7 @@ TEST_F(GrpcMuxFailoverTest, StreamAvailableConnectingToFailover) {
   // Ensure that grpcStreamAvailable is invoked on the failover.
   EXPECT_CALL(primary_stream_, grpcStreamAvailable()).Times(0);
   EXPECT_CALL(failover_stream_, grpcStreamAvailable()).WillOnce(Return(true));
-  EXPECT_TRUE(grpc_mux_failover_.grpcStreamAvailable());
+  EXPECT_TRUE(grpc_mux_failover_->grpcStreamAvailable());
 }
 
 // Validates that grpcStreamAvailable is invoked on the failover stream when connected to failover.
@@ -403,7 +445,7 @@ TEST_F(GrpcMuxFailoverTest, StreamAvailableConnectedToFailover) {
   // Ensure that grpcStreamAvailable is invoked on the failover.
   EXPECT_CALL(primary_stream_, grpcStreamAvailable()).Times(0);
   EXPECT_CALL(failover_stream_, grpcStreamAvailable()).WillOnce(Return(true));
-  EXPECT_TRUE(grpc_mux_failover_.grpcStreamAvailable());
+  EXPECT_TRUE(grpc_mux_failover_->grpcStreamAvailable());
 }
 
 // Validates that grpcStreamAvailable is invoked on the primary stream when connected to primary.
@@ -413,7 +455,7 @@ TEST_F(GrpcMuxFailoverTest, StreamAvailableConnectedToPrimary) {
   // Ensure that grpcStreamAvailable is invoked on the failover.
   EXPECT_CALL(primary_stream_, grpcStreamAvailable()).WillOnce(Return(true));
   EXPECT_CALL(failover_stream_, grpcStreamAvailable()).Times(0);
-  EXPECT_TRUE(grpc_mux_failover_.grpcStreamAvailable());
+  EXPECT_TRUE(grpc_mux_failover_->grpcStreamAvailable());
 }
 
 // Validates that sendMessage is invoked on the failover stream when connecting to failover.
@@ -425,7 +467,7 @@ TEST_F(GrpcMuxFailoverTest, SendMessageConnectingToFailover) {
   msg.set_version_info("123");
   EXPECT_CALL(primary_stream_, sendMessage(_)).Times(0);
   EXPECT_CALL(failover_stream_, sendMessage(ProtoEq(msg)));
-  grpc_mux_failover_.sendMessage(msg);
+  grpc_mux_failover_->sendMessage(msg);
 }
 
 // Validates that sendMessage is invoked on the failover stream when connected to failover.
@@ -437,7 +479,7 @@ TEST_F(GrpcMuxFailoverTest, SendMessageConnectedToFailover) {
   msg.set_version_info("123");
   EXPECT_CALL(primary_stream_, sendMessage(_)).Times(0);
   EXPECT_CALL(failover_stream_, sendMessage(ProtoEq(msg)));
-  grpc_mux_failover_.sendMessage(msg);
+  grpc_mux_failover_->sendMessage(msg);
 }
 
 // Validates that sendMessage is invoked on the primary stream when connected to primary.
@@ -449,7 +491,7 @@ TEST_F(GrpcMuxFailoverTest, SendMessageConnectedToPrimary) {
   msg.set_version_info("123");
   EXPECT_CALL(primary_stream_, sendMessage(ProtoEq(msg)));
   EXPECT_CALL(failover_stream_, sendMessage(_)).Times(0);
-  grpc_mux_failover_.sendMessage(msg);
+  grpc_mux_failover_->sendMessage(msg);
 }
 
 // Validates that updating the queue size of the failover stream is invoked when
@@ -459,7 +501,7 @@ TEST_F(GrpcMuxFailoverTest, MaybeUpdateQueueSizeConnectingToFailover) {
 
   EXPECT_CALL(primary_stream_, maybeUpdateQueueSizeStat(_)).Times(0);
   EXPECT_CALL(failover_stream_, maybeUpdateQueueSizeStat(123));
-  grpc_mux_failover_.maybeUpdateQueueSizeStat(123);
+  grpc_mux_failover_->maybeUpdateQueueSizeStat(123);
 }
 
 // Validates that updating the queue size of the failover stream is invoked when
@@ -469,7 +511,7 @@ TEST_F(GrpcMuxFailoverTest, MaybeUpdateQueueSizeConnectedToFailover) {
 
   EXPECT_CALL(primary_stream_, maybeUpdateQueueSizeStat(_)).Times(0);
   EXPECT_CALL(failover_stream_, maybeUpdateQueueSizeStat(123));
-  grpc_mux_failover_.maybeUpdateQueueSizeStat(123);
+  grpc_mux_failover_->maybeUpdateQueueSizeStat(123);
 }
 
 // Validates that updating the queue size of the primary stream is invoked when
@@ -479,7 +521,7 @@ TEST_F(GrpcMuxFailoverTest, MaybeUpdateQueueSizeConnectedToPrimary) {
 
   EXPECT_CALL(primary_stream_, maybeUpdateQueueSizeStat(123));
   EXPECT_CALL(failover_stream_, maybeUpdateQueueSizeStat(_)).Times(0);
-  grpc_mux_failover_.maybeUpdateQueueSizeStat(123);
+  grpc_mux_failover_->maybeUpdateQueueSizeStat(123);
 }
 
 // Validates that checkRateLimitAllowsDrain is invoked on the failover stream
@@ -489,7 +531,7 @@ TEST_F(GrpcMuxFailoverTest, CheckRateLimitConnectingToFailover) {
 
   EXPECT_CALL(primary_stream_, checkRateLimitAllowsDrain()).Times(0);
   EXPECT_CALL(failover_stream_, checkRateLimitAllowsDrain()).WillOnce(Return(false));
-  EXPECT_FALSE(grpc_mux_failover_.checkRateLimitAllowsDrain());
+  EXPECT_FALSE(grpc_mux_failover_->checkRateLimitAllowsDrain());
 }
 
 // Validates that checkRateLimitAllowsDrain is invoked on the failover stream
@@ -499,7 +541,7 @@ TEST_F(GrpcMuxFailoverTest, CheckRateLimitConnectedToFailover) {
 
   EXPECT_CALL(primary_stream_, checkRateLimitAllowsDrain()).Times(0);
   EXPECT_CALL(failover_stream_, checkRateLimitAllowsDrain()).WillOnce(Return(false));
-  EXPECT_FALSE(grpc_mux_failover_.checkRateLimitAllowsDrain());
+  EXPECT_FALSE(grpc_mux_failover_->checkRateLimitAllowsDrain());
 }
 
 // Validates that checkRateLimitAllowsDrain is invoked on the primary stream
@@ -509,7 +551,7 @@ TEST_F(GrpcMuxFailoverTest, CheckRateLimitConnectedToPrimary) {
 
   EXPECT_CALL(primary_stream_, checkRateLimitAllowsDrain()).WillOnce(Return(false));
   EXPECT_CALL(failover_stream_, checkRateLimitAllowsDrain()).Times(0);
-  EXPECT_FALSE(grpc_mux_failover_.checkRateLimitAllowsDrain());
+  EXPECT_FALSE(grpc_mux_failover_->checkRateLimitAllowsDrain());
 }
 
 // Validates that onWritable callback is invoked on the failover stream

@@ -55,7 +55,8 @@ public:
 
   GrpcMuxFailover(GrpcStreamCreator primary_stream_creator,
                   absl::optional<GrpcStreamCreator> failover_stream_creator,
-                  GrpcStreamCallbacks<ResponseType>& grpc_mux_callbacks)
+                  GrpcStreamCallbacks<ResponseType>& grpc_mux_callbacks,
+                  Event::Dispatcher& dispatcher)
       : grpc_mux_callbacks_(grpc_mux_callbacks), primary_callbacks_(*this),
         primary_grpc_stream_(std::move(primary_stream_creator(&primary_callbacks_))),
         connecting_to_primary_(false), connected_to_primary_(false), connecting_to_failover_(false),
@@ -65,6 +66,8 @@ public:
     if (failover_stream_creator.has_value()) {
       ENVOY_LOG(warn, "Using xDS-Failover. Note that the implementation is currently considered "
                       "experimental and may be modified in future Envoy versions!");
+      // Only create the retry timer if failover is supported.
+      complete_retry_timer_ = dispatcher.createTimer([this]() -> void { retryConnections(); });
       failover_callbacks_ = std::make_unique<FailoverGrpcStreamCallbacks>(*this);
       GrpcStreamCreator& failover_stream_creator_ref = failover_stream_creator.value();
       failover_grpc_stream_ = std::move(failover_stream_creator_ref(failover_callbacks_.get()));
@@ -79,6 +82,9 @@ public:
     // Attempt establishing a connection to the primary source.
     // This method may be called multiple times, even if the primary stream is already
     // established or in the process of being established.
+    if (complete_retry_timer_) {
+      complete_retry_timer_->disableTimer();
+    }
     // First check if Envoy ever connected to the primary/failover, and if so
     // persist attempts to that source.
     if (ever_connected_to_primary_) {
@@ -165,6 +171,16 @@ public:
     ASSERT(connecting_to_primary_ || connected_to_primary_);
     return primary_grpc_stream_->get();
   };
+
+  // Retries to connect again to the primary and then (possibly) to the
+  // failover. Assumes that no connection has been made or is being attempted.
+  void retryConnections() {
+    ASSERT(!connecting_to_primary_ && !connected_to_primary_ && !connecting_to_failover_ &&
+           !connected_to_failover_);
+    ENVOY_LOG(trace, "Expired timer, retrying to reconnect to the primary xDS server.");
+    connecting_to_primary_ = true;
+    primary_grpc_stream_->establishNewStream();
+  }
 
 private:
   // A helper class that proxies the callbacks of GrpcStreamCallbacks for the primary service.
@@ -275,8 +291,12 @@ private:
         // reconnecting to the failover source.
         parent_.failover_grpc_stream_->closeStream();
         parent_.grpc_mux_callbacks_.onEstablishmentFailure();
-        parent_.connecting_to_primary_ = true;
-        parent_.primary_grpc_stream_->establishNewStream();
+        // Wait for a short period of time before retrying to reconnect to the
+        // primary, reducing strain on the network/servers in case of an issue.
+        // TODO(adisuissa): In the future, the reconnection attempts to the
+        // primary and failover sources will be decoupled, as each will use its
+        // own backoff timer, and this will not be needed.
+        parent_.complete_retry_timer_->enableTimer(std::chrono::milliseconds(500));
         return;
       }
       // Pass along the failure to the GrpcMux object. Retry will be triggered
@@ -323,6 +343,11 @@ private:
   std::unique_ptr<FailoverGrpcStreamCallbacks> failover_callbacks_;
   // The stream to the failover source.
   GrpcStreamInterfacePtr<RequestType, ResponseType> failover_grpc_stream_;
+
+  // A timer that allows waiting for some period of time before trying to
+  // connect again after both primary and failover attempts failed. Only
+  // initialized when failover is supported.
+  Event::TimerPtr complete_retry_timer_{nullptr};
 
   // Flags to keep track of the state of connections to primary/failover.
   // All initialized to false, as there is no connection process during
