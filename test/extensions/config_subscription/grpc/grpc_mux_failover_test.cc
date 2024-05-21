@@ -237,7 +237,7 @@ protected:
     failover_callbacks_->onDiscoveryResponse(std::move(response), cp_stats);
   }
 
-  // Override a timer to emualte its expiration without waiting for it to expire.
+  // Override a timer to emulate its expiration without waiting for it to expire.
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
@@ -410,7 +410,7 @@ TEST_F(GrpcMuxFailoverTest, FailoverOnlyAttemptsAfterFailoverAvailable) {
   grpc_mux_failover_->establishNewStream();
 }
 
-// Validates that after failover attempt failue, the timer is disabled when
+// Validates that after failover attempt failure, the timer is disabled when
 // an external attempt to reconnect is performed.
 TEST_F(GrpcMuxFailoverTest, TimerDisabledUponExternalReconnect) {
   connectingToFailover();
