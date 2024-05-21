@@ -84,6 +84,7 @@ without further review.
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
+* Kirtimaan Rajshiva ([krajshiva](https://github.com/krajshiva))
 
 # Emeritus maintainers
 

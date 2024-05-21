@@ -99,7 +99,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # http inspector
 /*/extensions/filters/listener/http_inspector @yxue @lizan
 # attribute context
-/*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan
+/*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan @tyxia
 # webassembly access logger extensions
 /*/extensions/access_loggers/wasm @mpwarres @lizan
 # webassembly bootstrap extensions
