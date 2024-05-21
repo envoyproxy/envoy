@@ -98,9 +98,11 @@ void CachedCredentialsProviderBase::refreshIfNeeded() {
 // 1. Create a single cluster for async handling
 // 2. Create tls slot to hold cluster name and a refresh timer pointer. tls slot instantiation of
 // ThreadLocalCredentialsCache will register the subclass as a callback handler
-// 3. Create refresh timer in the main thread and put it in the slot.
+// 3. Create refresh timer in the main thread and put it in the slot. Add cluster to
+// onClusterAddOrDelete pending cluster list inside tls.
 // 4. When cluster is alive, onClusterAddOrDelete is called which enables the refresh timer. Cluster
-// is deleted from the pending cluster list.
+// is then deleted from the pending cluster list to prevent repeated refresh when other threads come
+// alive.
 // 5. Initial credential refresh occurs in main thread and continues in main thread periodically
 // refreshing based on expiration time
 
@@ -115,12 +117,12 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
     const CurlMetadataFetcher& fetch_metadata_using_curl,
     CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri,
-    MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer)
     : api_(api), context_(context), fetch_metadata_using_curl_(fetch_metadata_using_curl),
       create_metadata_fetcher_cb_(create_metadata_fetcher_cb),
       cluster_name_(std::string(cluster_name)), cluster_type_(cluster_type), uri_(std::string(uri)),
-      cache_duration_(getCacheDuration()), receiver_state_(receiver_state),
+      cache_duration_(getCacheDuration()), refresh_state_(refresh_state),
       initialization_timer_(initialization_timer),
       debug_name_(absl::StrCat("Fetching aws credentials from cluster=", cluster_name)) {
   // Async provider cluster setup
@@ -167,9 +169,10 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
     });
     // Set up metadata credentials statistics
     scope_ = context_->scope().createScope(
-        fmt::format("aws_request_signing.metadata_credentials_provider.{}.", cluster_name_));
+        fmt::format("aws.metadata_credentials_provider.{}.", cluster_name_));
     stats_ = std::make_shared<MetadataCredentialsProviderStats>(MetadataCredentialsProviderStats{
-        ALL_METADATACREDENTIALSPROVIDER_STATS(POOL_GAUGE(*scope_))});
+        ALL_METADATACREDENTIALSPROVIDER_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))});
+    stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
   }
 };
 
@@ -212,11 +215,13 @@ void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterRemo
     // Unused callback
 };
 
+// Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 Credentials MetadataCredentialsProviderBase::getCredentials() {
   if (useHttpAsyncClient() && context_ && tls_slot_) {
     // If server factory context was supplied then we would have thread local slot initialized.
     return *(*tls_slot_)->credentials_.get();
   } else {
+    // Refresh for non async case
     refreshIfNeeded();
     return cached_credentials_;
   }
@@ -235,7 +240,7 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
       // unable to perform credential refresh after cluster initialization has completed, we use a
       // short timer to keep retrying. Once successful, we fall back to the normal cache duration
       // or whatever expiration is provided in the credential payload
-      if (receiver_state_ == MetadataFetcher::MetadataReceiver::ReceiverState::FirstRefresh) {
+      if (refresh_state_ == MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh) {
         cache_duration_timer_->enableTimer(initialization_timer_);
         ENVOY_LOG_MISC(debug, "Metadata fetcher initialization failed, retrying in {}",
                        std::chrono::seconds(initialization_timer_.count()));
@@ -331,14 +336,14 @@ InstanceProfileCredentialsProvider::InstanceProfileCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context,
     const CurlMetadataFetcher& fetch_metadata_using_curl,
     CreateMetadataFetcherCb create_metadata_fetcher_cb,
-    MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
 
     absl::string_view cluster_name)
     : MetadataCredentialsProviderBase(api, context, fetch_metadata_using_curl,
                                       create_metadata_fetcher_cb, cluster_name,
                                       envoy::config::cluster::v3::Cluster::STATIC /*cluster_type*/,
-                                      EC2_METADATA_HOST, receiver_state, initialization_timer) {}
+                                      EC2_METADATA_HOST, refresh_state, initialization_timer) {}
 
 bool InstanceProfileCredentialsProvider::needsRefresh() {
   return api_.timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
@@ -516,9 +521,11 @@ void InstanceProfileCredentialsProvider::extractCredentials(
     if (stats_) {
       stats_->credential_refreshes_succeeded_.inc();
     }
-    if (receiver_state_ == MetadataFetcher::MetadataReceiver::ReceiverState::FirstRefresh) {
+    if (refresh_state_ == MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh) {
       ENVOY_LOG(debug, "Metadata receiver moving to Ready state");
-      receiver_state_ = MetadataFetcher::MetadataReceiver::ReceiverState::Ready;
+      refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
+      // Set receiver state in statistics
+      stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
     }
   } else {
     cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
@@ -553,13 +560,13 @@ ContainerCredentialsProvider::ContainerCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context,
     const CurlMetadataFetcher& fetch_metadata_using_curl,
     CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view credential_uri,
-    MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view authorization_token = {},
     absl::string_view cluster_name = {})
     : MetadataCredentialsProviderBase(api, context, fetch_metadata_using_curl,
                                       create_metadata_fetcher_cb, cluster_name,
                                       envoy::config::cluster::v3::Cluster::STATIC /*cluster_type*/,
-                                      credential_uri, receiver_state, initialization_timer),
+                                      credential_uri, refresh_state, initialization_timer),
       credential_uri_(credential_uri), authorization_token_(authorization_token) {}
 
 bool ContainerCredentialsProvider::needsRefresh() {
@@ -671,9 +678,10 @@ void ContainerCredentialsProvider::extractCredentials(
   if (useHttpAsyncClient() && context_) {
     setCredentialsToAllThreads(
         std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
-    ENVOY_LOG(debug, "Metadata receiver moving to Ready state");
-
-    receiver_state_ = MetadataFetcher::MetadataReceiver::ReceiverState::Ready;
+    ENVOY_LOG(debug, "Metadata receiver {} moving to Ready state", cluster_name_);
+    refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
+    // Set receiver state in statistics
+    stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
   } else {
     cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
   }
@@ -701,12 +709,12 @@ WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
     const CurlMetadataFetcher& fetch_metadata_using_curl,
     CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view token_file_path,
     absl::string_view sts_endpoint, absl::string_view role_arn, absl::string_view role_session_name,
-    MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view cluster_name = {})
     : MetadataCredentialsProviderBase(
           api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, cluster_name,
           envoy::config::cluster::v3::Cluster::LOGICAL_DNS /*cluster_type*/, sts_endpoint,
-          receiver_state, initialization_timer),
+          refresh_state, initialization_timer),
       token_file_path_(token_file_path), sts_endpoint_(sts_endpoint), role_arn_(role_arn),
       role_session_name_(role_session_name) {}
 
@@ -829,9 +837,10 @@ void WebIdentityCredentialsProvider::extractCredentials(
             session_token.empty() ? "" : "*****");
   setCredentialsToAllThreads(
       std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
-  ENVOY_LOG(debug, "Metadata receiver moving to Ready state");
-
-  receiver_state_ = MetadataFetcher::MetadataReceiver::ReceiverState::Ready;
+  ENVOY_LOG(debug, "Metadata receiver {} moving to Ready state", cluster_name_);
+  refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
+  // Set receiver state in statistics
+  stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
 
   const auto expiration = Utility::getIntegerFromJsonOrDefault(credentials.value(), EXPIRATION, 0);
 
@@ -887,7 +896,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
   add(factories.createCredentialsFileCredentialsProvider(api));
 
   // Initial state for an async credential receiver
-  auto receiver_state = MetadataFetcher::MetadataReceiver::ReceiverState::FirstRefresh;
+  auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
   // Initial amount of time for async credential receivers to wait for an initial refresh to succeed
   auto initialization_timer = std::chrono::seconds(2);
 
@@ -912,7 +921,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
 
       // Handle edge case - if two webidentity request signers are configured with different
-      // regions. This appends the host name to the cluster name to differentiate the two.
+      // regions. This appends the region to the cluster name to differentiate the two.
       auto cluster_name_ = absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
 
       ENVOY_LOG(
@@ -921,7 +930,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
           sts_endpoint, actual_session_name);
       add(factories.createWebIdentityCredentialsProvider(
           api, context, fetch_metadata_using_curl, MetadataFetcher::create, cluster_name_,
-          web_token_path, sts_endpoint, role_arn, actual_session_name, receiver_state,
+          web_token_path, sts_endpoint, role_arn, actual_session_name, refresh_state,
           initialization_timer));
     }
   }
@@ -938,7 +947,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", uri);
     add(factories.createContainerCredentialsProvider(
         api, context, fetch_metadata_using_curl, MetadataFetcher::create,
-        CONTAINER_METADATA_CLUSTER, uri, receiver_state, initialization_timer));
+        CONTAINER_METADATA_CLUSTER, uri, refresh_state, initialization_timer));
   } else if (!full_uri.empty()) {
     auto authorization_token =
         absl::NullSafeStringView(std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN));
@@ -949,20 +958,18 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
                 full_uri);
       add(factories.createContainerCredentialsProvider(
           api, context, fetch_metadata_using_curl, MetadataFetcher::create,
-          CONTAINER_METADATA_CLUSTER, full_uri, receiver_state, initialization_timer,
+          CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer,
           authorization_token));
     } else {
       ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", full_uri);
       add(factories.createContainerCredentialsProvider(
           api, context, fetch_metadata_using_curl, MetadataFetcher::create,
-          CONTAINER_METADATA_CLUSTER, full_uri, receiver_state, initialization_timer));
+          CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer));
     }
-  }
-
-  if (metadata_disabled != TRUE) {
+  } else if (metadata_disabled != TRUE) {
     ENVOY_LOG(debug, "Using instance profile credentials provider");
     add(factories.createInstanceProfileCredentialsProvider(
-        api, context, fetch_metadata_using_curl, MetadataFetcher::create, receiver_state,
+        api, context, fetch_metadata_using_curl, MetadataFetcher::create, refresh_state,
         initialization_timer, EC2_METADATA_CLUSTER));
   }
 }

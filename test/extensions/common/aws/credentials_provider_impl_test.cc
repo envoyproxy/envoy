@@ -346,8 +346,8 @@ public:
   InstanceProfileCredentialsProviderTest()
       : api_(Api::createApiForTest(time_system_)), raw_metadata_fetcher_(new MockMetadataFetcher) {}
 
-  void setupProvider(MetadataFetcher::MetadataReceiver::ReceiverState receiver_state =
-                         MetadataFetcher::MetadataReceiver::ReceiverState::Ready,
+  void setupProvider(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                         MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
@@ -362,7 +362,7 @@ public:
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        receiver_state, initialization_timer, "credentials_provider_cluster");
+        refresh_state, initialization_timer, "credentials_provider_cluster");
   }
 
   void expectSessionToken(const uint64_t status_code, const std::string&& token) {
@@ -952,7 +952,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1Duri
   expectSessionToken(403 /*Forbidden*/, std::move(std::string()));
   expectCredentialListing(403 /*Forbidden*/, std::move(std::string()));
 
-  setupProvider(MetadataFetcher::MetadataReceiver::ReceiverState::FirstRefresh,
+  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
                 std::chrono::seconds(2));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
@@ -975,7 +975,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv2Duri
   // Unauthorized
   expectCredentialListingIMDSv2(401, std::move(std::string()));
 
-  setupProvider(MetadataFetcher::MetadataReceiver::ReceiverState::FirstRefresh,
+  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
                 std::chrono::seconds(2));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
@@ -999,7 +999,7 @@ TEST_F(InstanceProfileCredentialsProviderTest,
   expectSessionToken(403 /*Forbidden*/, std::move(std::string()));
   expectCredentialListing(403 /*Forbidden*/, std::move(std::string()));
 
-  setupProvider(MetadataFetcher::MetadataReceiver::ReceiverState::FirstRefresh,
+  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
                 std::chrono::seconds(16));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
@@ -1043,7 +1043,7 @@ public:
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
-        nullptr, MetadataFetcher::MetadataReceiver::ReceiverState::Ready, std::chrono::seconds(2),
+        nullptr, MetadataFetcher::MetadataReceiver::RefreshState::Ready, std::chrono::seconds(2),
         "credentials_provider_cluster");
   }
 
@@ -1355,8 +1355,8 @@ public:
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
   }
 
-  void setupProvider(MetadataFetcher::MetadataReceiver::ReceiverState receiver_state =
-                         MetadataFetcher::MetadataReceiver::ReceiverState::Ready,
+  void setupProvider(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                         MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
@@ -1370,7 +1370,7 @@ public:
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        "169.254.170.2:80/path/to/doc", receiver_state, initialization_timer, "auth_token",
+        "169.254.170.2:80/path/to/doc", refresh_state, initialization_timer, "auth_token",
         "credentials_provider_cluster");
   }
 
@@ -1415,7 +1415,7 @@ public:
   Init::TargetHandlePtr init_target_handle_;
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
-  MetadataFetcher::MetadataReceiver::ReceiverState receiver_state_;
+  MetadataFetcher::MetadataReceiver::RefreshState refresh_state_;
 };
 
 TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
@@ -1579,7 +1579,7 @@ TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocumentDuringStartup) {
   // Forbidden
   expectDocument(403, std::move(std::string()));
 
-  setupProvider(MetadataFetcher::MetadataReceiver::ReceiverState::FirstRefresh,
+  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
                 std::chrono::seconds(2));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
@@ -1605,15 +1605,15 @@ public:
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
   }
 
-  void setupProvider(MetadataFetcher::MetadataReceiver::ReceiverState receiver_state =
-                         MetadataFetcher::MetadataReceiver::ReceiverState::Ready,
+  void setupProvider(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                         MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     provider_ = std::make_shared<ContainerCredentialsProvider>(
         *api_, absl::nullopt,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
-        nullptr, "169.254.170.2:80/path/to/doc", receiver_state, initialization_timer, "auth_token",
+        nullptr, "169.254.170.2:80/path/to/doc", refresh_state, initialization_timer, "auth_token",
         "credentials_provider_cluster");
   }
 
@@ -1767,8 +1767,8 @@ public:
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
   }
 
-  void setupProvider(MetadataFetcher::MetadataReceiver::ReceiverState receiver_state =
-                         MetadataFetcher::MetadataReceiver::ReceiverState::Ready,
+  void setupProvider(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                         MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
@@ -1782,7 +1782,7 @@ public:
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        "169.254.170.23:80/v1/credentials", receiver_state, initialization_timer, "",
+        "169.254.170.23:80/v1/credentials", refresh_state, initialization_timer, "",
         "credentials_provider_cluster");
   }
 
@@ -1877,8 +1877,8 @@ public:
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
   }
 
-  void setupProvider(MetadataFetcher::MetadataReceiver::ReceiverState receiver_state =
-                         MetadataFetcher::MetadataReceiver::ReceiverState::Ready,
+  void setupProvider(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                         MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
@@ -1894,12 +1894,12 @@ public:
         },
         TestEnvironment::writeStringToFileForTest("web_token_file", "web_token"),
         "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn", "role-session-name",
-        receiver_state, initialization_timer, "credentials_provider_cluster");
+        refresh_state, initialization_timer, "credentials_provider_cluster");
   }
 
   void
-  setupProviderWithLibcurl(MetadataFetcher::MetadataReceiver::ReceiverState receiver_state =
-                               MetadataFetcher::MetadataReceiver::ReceiverState::Ready,
+  setupProviderWithLibcurl(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                               MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                            std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<WebIdentityCredentialsProvider>(
@@ -1913,7 +1913,7 @@ public:
         },
         TestEnvironment::writeStringToFileForTest("web_token_file", "web_token"),
         "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn", "role-session-name",
-        receiver_state, initialization_timer, "credentials_provider_cluster");
+        refresh_state, initialization_timer, "credentials_provider_cluster");
   }
 
   void expectDocument(const uint64_t status_code, const std::string&& document) {
@@ -2265,7 +2265,7 @@ TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocumentDuringStartup) 
   // Forbidden
   expectDocument(403, std::move(std::string()));
 
-  setupProvider(MetadataFetcher::MetadataReceiver::ReceiverState::FirstRefresh,
+  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
                 std::chrono::seconds(2));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
@@ -2292,7 +2292,7 @@ TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponseDuringStartup) {
 }
 )EOF"));
 
-  setupProvider(MetadataFetcher::MetadataReceiver::ReceiverState::FirstRefresh,
+  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
                 std::chrono::seconds(2));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
@@ -2372,19 +2372,19 @@ public:
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, absl::string_view, absl::string_view, absl::string_view,
                  absl::string_view, absl::string_view,
-                 MetadataFetcher::MetadataReceiver::ReceiverState, std::chrono::seconds),
+                 MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds),
                 (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
                 (Api::Api&, ServerFactoryContextOptRef,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, absl::string_view, absl::string_view,
-                 MetadataFetcher::MetadataReceiver::ReceiverState, std::chrono::seconds,
+                 MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
                  absl::string_view),
                 (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
                 (Api::Api&, ServerFactoryContextOptRef,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
-                 CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::ReceiverState,
+                 CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
                  std::chrono::seconds, absl::string_view),
                 (const));
   };

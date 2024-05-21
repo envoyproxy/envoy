@@ -91,13 +91,14 @@ public:
   virtual ~LoadClusterEntryHandle() = default;
 };
 
-#define ALL_METADATACREDENTIALSPROVIDER_STATS(GAUGE)                                               \
-  GAUGE(credential_refreshes_performed, Accumulate)                                                \
-  GAUGE(credential_refreshes_failed, Accumulate)                                                   \
-  GAUGE(credential_refreshes_succeeded, Accumulate)
+#define ALL_METADATACREDENTIALSPROVIDER_STATS(COUNTER, GAUGE)                                      \
+  COUNTER(credential_refreshes_performed)                                                          \
+  COUNTER(credential_refreshes_failed)                                                             \
+  COUNTER(credential_refreshes_succeeded)                                                          \
+  GAUGE(metadata_refresh_state, Accumulate)
 
 struct MetadataCredentialsProviderStats {
-  ALL_METADATACREDENTIALSPROVIDER_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_METADATACREDENTIALSPROVIDER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 using LoadClusterEntryHandlePtr = std::unique_ptr<LoadClusterEntryHandle>;
@@ -112,7 +113,7 @@ public:
       const CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri,
-      MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer);
 
   Credentials getCredentials() override;
@@ -184,7 +185,7 @@ protected:
   // The cache duration of the fetched credentials.
   std::chrono::seconds cache_duration_;
   // Metadata receiver state, describing where we are along the initial credential refresh process
-  MetadataFetcher::MetadataReceiver::ReceiverState receiver_state_;
+  MetadataFetcher::MetadataReceiver::RefreshState refresh_state_;
   // Metadata receiver initialization timer - number of seconds between retries during the first
   // credential retrieval process
   std::chrono::seconds initialization_timer_;
@@ -228,12 +229,12 @@ protected:
 class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBase,
                                            public MetadataFetcher::MetadataReceiver {
 public:
-  InstanceProfileCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
-      const CurlMetadataFetcher& fetch_metadata_using_curl,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
-      std::chrono::seconds initialization_timer, absl::string_view cluster_name);
+  InstanceProfileCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+                                     const CurlMetadataFetcher& fetch_metadata_using_curl,
+                                     CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                                     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+                                     std::chrono::seconds initialization_timer,
+                                     absl::string_view cluster_name);
 
   // Following functions are for MetadataFetcher::MetadataReceiver interface
   void onMetadataSuccess(const std::string&& body) override;
@@ -270,7 +271,7 @@ public:
                                const CurlMetadataFetcher& fetch_metadata_using_curl,
                                CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                absl::string_view credential_uri,
-                               MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+                               MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                std::chrono::seconds initialization_timer,
                                absl::string_view authorization_token,
                                absl::string_view cluster_name);
@@ -300,7 +301,7 @@ public:
                                  CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                  absl::string_view token_file_path, absl::string_view sts_endpoint,
                                  absl::string_view role_arn, absl::string_view role_session_name,
-                                 MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+                                 MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                  std::chrono::seconds initialization_timer,
                                  absl::string_view cluster_name);
 
@@ -352,7 +353,7 @@ public:
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
       absl::string_view role_session_name,
-      MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer) const PURE;
 
   virtual CredentialsProviderSharedPtr createContainerCredentialsProvider(
@@ -360,7 +361,7 @@ public:
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri,
-      MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
       absl::string_view authorization_token = {}) const PURE;
 
@@ -368,7 +369,7 @@ public:
       Api::Api& api, ServerFactoryContextOptRef context,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) const PURE;
 };
 
@@ -406,22 +407,22 @@ private:
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri,
-      MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
       absl::string_view authorization_token = {}) const override {
     return std::make_shared<ContainerCredentialsProvider>(
         api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, credential_uri,
-        receiver_state, initialization_timer, authorization_token, cluster_name);
+        refresh_state, initialization_timer, authorization_token, cluster_name);
   }
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) const override {
     return std::make_shared<InstanceProfileCredentialsProvider>(
-        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, receiver_state,
+        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
         initialization_timer, cluster_name);
   }
 
@@ -431,11 +432,11 @@ private:
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
       absl::string_view role_session_name,
-      MetadataFetcher::MetadataReceiver::ReceiverState receiver_state,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer) const override {
     return std::make_shared<WebIdentityCredentialsProvider>(
         api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, token_file_path,
-        sts_endpoint, role_arn, role_session_name, receiver_state, initialization_timer,
+        sts_endpoint, role_arn, role_session_name, refresh_state, initialization_timer,
         cluster_name);
   }
 };

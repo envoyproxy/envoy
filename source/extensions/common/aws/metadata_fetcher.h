@@ -43,7 +43,7 @@ public:
     // Metadata fetcher begins in "FirstRefresh" and stays there until first success, then reverts
     // to standard cache duration timing. "FirstRefresh" state will cause credential refresh at 2
     // sec, doubling to a maximum of 30 sec until successful.
-    enum class ReceiverState {
+    enum class RefreshState {
       FirstRefresh,
       Ready,
     };
