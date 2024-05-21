@@ -106,6 +106,7 @@ TEST_P(IoUringImplParamTest, InvalidParams) {
           EXPECT_TRUE(res < 0);
           completions_nr++;
         });
+        return absl::OkStatus();
       },
       trigger, Event::FileReadyType::Read);
 
@@ -144,6 +145,7 @@ TEST_F(IoUringImplTest, InjectCompletion) {
               EXPECT_EQ(-11, res);
               completions_nr++;
             });
+        return absl::OkStatus();
       },
       trigger, Event::FileReadyType::Read);
 
@@ -184,6 +186,7 @@ TEST_F(IoUringImplTest, NestInjectCompletion) {
 
           completions_nr++;
         });
+        return absl::OkStatus();
       },
       trigger, Event::FileReadyType::Read);
 
@@ -217,6 +220,7 @@ TEST_F(IoUringImplTest, RemoveInjectCompletion) {
               EXPECT_EQ(-11, res);
               completions_nr++;
             });
+        return absl::OkStatus();
       },
       trigger, Event::FileReadyType::Read);
 
@@ -257,6 +261,7 @@ TEST_F(IoUringImplTest, NestRemoveInjectCompletion) {
               }
               completions_nr++;
             });
+        return absl::OkStatus();
       },
       trigger, Event::FileReadyType::Read);
 
@@ -302,6 +307,7 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
           EXPECT_EQ(res, strlen("test text"));
         });
         d->exit();
+        return absl::OkStatus();
       },
       trigger, Event::FileReadyType::Read);
 
@@ -351,6 +357,7 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
           // to expect the same order.
           EXPECT_EQ(dynamic_cast<TestRequest*>(user_data)->data_, completions_nr);
         });
+        return absl::OkStatus();
       },
       trigger, Event::FileReadyType::Read);
 

@@ -129,16 +129,20 @@ public:
     // HTTP authz servers only and defaults to blocking all but a few headers (i.e. Authorization,
     // Method, Path and Host).
     if (config.has_grpc_service() && config.has_allowed_headers()) {
-      request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+      allowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
           config.allowed_headers(), false, factory_context);
     } else if (config.has_http_service()) {
       if (config.http_service().authorization_request().has_allowed_headers()) {
-        request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+        allowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
             config.http_service().authorization_request().allowed_headers(), true, factory_context);
       } else {
-        request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+        allowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
             config.allowed_headers(), true, factory_context);
       }
+    }
+    if (config.has_disallowed_headers()) {
+      disallowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+          config.disallowed_headers(), false, factory_context);
     }
   }
 
@@ -205,8 +209,12 @@ public:
 
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
-  const Filters::Common::ExtAuthz::MatcherSharedPtr& requestHeaderMatchers() const {
-    return request_header_matchers_;
+  const Filters::Common::ExtAuthz::MatcherSharedPtr& allowedHeadersMatcher() const {
+    return allowed_headers_matcher_;
+  }
+
+  const Filters::Common::ExtAuthz::MatcherSharedPtr& disallowedHeadersMatcher() const {
+    return disallowed_headers_matcher_;
   }
 
 private:
@@ -267,7 +275,8 @@ private:
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
 
-  Filters::Common::ExtAuthz::MatcherSharedPtr request_header_matchers_;
+  Filters::Common::ExtAuthz::MatcherSharedPtr allowed_headers_matcher_;
+  Filters::Common::ExtAuthz::MatcherSharedPtr disallowed_headers_matcher_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats

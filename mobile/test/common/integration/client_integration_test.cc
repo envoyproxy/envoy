@@ -728,6 +728,21 @@ TEST_P(ClientIntegrationTest, BasicBeforeResponseHeaders) {
   ASSERT_EQ(cc_.on_headers_calls_, 0);
 }
 
+TEST_P(ClientIntegrationTest, ExplicitBeforeResponseHeaders) {
+  explicit_flow_control_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
+
+  stream_ = createNewStream(createDefaultStreamCallbacks());
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls_, 1);
+  ASSERT_EQ(cc_.on_headers_calls_, 0);
+}
+
 TEST_P(ClientIntegrationTest, ResetAfterResponseHeaders) {
   autonomous_allow_incomplete_streams_ = true;
   initialize();
@@ -792,18 +807,59 @@ TEST_P(ClientIntegrationTest, ResetBetweenDataChunks) {
   ASSERT_EQ(cc_.on_error_calls_, 1);
 }
 
-TEST_P(ClientIntegrationTest, ResetAfterData) {
+TEST_P(ClientIntegrationTest, ResetAfterDataExplicit) {
+  explicit_flow_control_ = true;
+
   autonomous_allow_incomplete_streams_ = true;
   initialize();
 
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_DATA, "yes");
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
 
-  stream_ = createNewStream(createDefaultStreamCallbacks());
+  auto callbacks = createDefaultStreamCallbacks();
+  stream_ = createNewStream(std::move(callbacks));
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
+
+  // Allow passing up the data and error
+  stream_->readData(100);
   terminal_callback_.waitReady();
 
+  ASSERT_EQ(cc_.on_data_calls_, 1);
+  ASSERT_EQ(cc_.on_error_calls_, 1);
+}
+
+TEST_P(ClientIntegrationTest, ResetAfterDataExplicitMultipleChunks) {
+  explicit_flow_control_ = true;
+
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_DATA, "yes");
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
+
+  auto callbacks = createDefaultStreamCallbacks();
+  ConditionalInitializer initial_data;
+  callbacks.on_data_ = [this, &initial_data](const Buffer::Instance&, uint64_t /* length */,
+                                             bool /* end_stream */, envoy_stream_intel) {
+    if (!cc_.on_data_calls_) {
+      initial_data.setReady();
+    }
+    cc_.on_data_calls_++;
+  };
+
+  stream_ = createNewStream(std::move(callbacks));
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+
+  // Default body size is 10 - this will force 2 reads.
+  stream_->readData(5);
+  initial_data.waitReady();
+  stream_->readData(5);
+  terminal_callback_.waitReady();
+
+  // Make sure we get both chunks before flushing the error.
+  ASSERT_EQ(cc_.on_data_calls_, 2);
   ASSERT_EQ(cc_.on_error_calls_, 1);
 }
 

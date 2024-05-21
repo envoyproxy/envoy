@@ -172,6 +172,7 @@ public:
         {"x-duplicate", "three"},
         {"allowed-prefix-one", "one"},
         {"allowed-prefix-two", "two"},
+        {"allowed-prefix-denied", "denied"},
         {"not-allowed", "nope"},
         {"regex-food", "food"},
         {"regex-fool", "fool"},
@@ -264,6 +265,7 @@ public:
                    .EnvoyAuthPartialBody.get(),
                "shouldn't be visible in authz request"},
               {"not-allowed", std::nullopt},
+              {"allowed-prefix-denied", std::nullopt},
           };
       for (const auto& [key, value] : unexpected_headers) {
         bool found = false;
@@ -285,6 +287,7 @@ public:
       EXPECT_EQ("one,two,three", (*http_request->mutable_headers())["x-duplicate"]);
       EXPECT_EQ("food", (*http_request->mutable_headers())["regex-food"]);
       EXPECT_EQ("fool", (*http_request->mutable_headers())["regex-fool"]);
+      EXPECT_FALSE(http_request->headers().contains("allowed-prefix-denied"));
       EXPECT_FALSE(http_request->headers().contains("not-allowed"));
     }
 
@@ -609,6 +612,9 @@ attributes:
       - prefix: allowed-prefix
       - safe_regex:
           regex: regex-foo.?
+    disallowed_headers:
+      patterns:
+      - prefix: allowed-prefix-denied
 
     with_request_body:
       max_request_bytes: 1024
@@ -653,6 +659,7 @@ public:
                                        {"x-duplicate", "three"},
                                        {"allowed-prefix-one", "one"},
                                        {"allowed-prefix-two", "two"},
+                                       {"allowed-prefix-denied", "blah"},
                                        {"not-allowed", "nope"},
                                        {"authorization", "legit"},
                                        {"regex-food", "food"},
@@ -688,6 +695,9 @@ public:
                            .getStringView());
     EXPECT_TRUE(ext_authz_request_->headers()
                     .get(Http::LowerCaseString(std::string("not-allowed")))
+                    .empty());
+    EXPECT_TRUE(ext_authz_request_->headers()
+                    .get(Http::LowerCaseString(std::string("allowed-prefix-denied")))
                     .empty());
     EXPECT_EQ("food", ext_authz_request_->headers()
                           .get(Http::LowerCaseString(std::string("regex-food")))[0]
@@ -839,6 +849,9 @@ public:
   const std::string case_sensitive_header_value_{"Case-Sensitive"};
   const std::string legacy_default_config_ = R"EOF(
   transport_api_version: V3
+  disallowed_headers:
+    patterns:
+    - prefix: allowed-prefix-denied
   http_service:
     server_uri:
       uri: "ext_authz:9000"
@@ -874,6 +887,9 @@ public:
     - safe_regex:
         regex: regex-foo.?
     - exact: x-forwarded-for
+  disallowed_headers:
+    patterns:
+    - prefix: allowed-prefix-denied
 
   http_service:
     server_uri:
@@ -967,8 +983,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
       {":scheme", "http"},           {":authority", "host"},
       {"x-duplicate", "one"},        {"x-duplicate", "two"},
       {"x-duplicate", "three"},      {"allowed-prefix-one", "one"},
-      {"allowed-prefix-two", "two"}, {"not-allowed", "nope"},
-      {"regex-food", "food"},        {"regex-fool", "fool"}};
+      {"allowed-prefix-two", "two"}, {"allowed-prefix-denied", "will not be sent"},
+      {"not-allowed", "nope"},       {"regex-food", "food"},
+      {"regex-fool", "fool"}};
 
   auto conn = makeClientConnection(lookupPort("http"));
   codec_client_ = makeHttpConnection(std::move(conn));
@@ -1144,10 +1161,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
       {":method", "POST"},           {":path", "/test"},
       {":scheme", "http"},           {":authority", "host"},
       {"x-bypass", invalid_unicode}, {"allowed-prefix-one", "one"},
-      {"allowed-prefix-two", "two"}, {"not-allowed", "nope"},
-      {"x-duplicate", "one"},        {"x-duplicate", "two"},
-      {"x-duplicate", "three"},      {"regex-food", "food"},
-      {"regex-fool", "fool"}};
+      {"allowed-prefix-two", "two"}, {"allowed-prefix-denied", "denied"},
+      {"not-allowed", "nope"},       {"x-duplicate", "one"},
+      {"x-duplicate", "two"},        {"x-duplicate", "three"},
+      {"regex-food", "food"},        {"regex-fool", "fool"}};
 
   response_ = codec_client_->makeRequestWithBody(headers, {});
 

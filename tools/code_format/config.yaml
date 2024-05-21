@@ -100,10 +100,8 @@ paths:
     - source/common/listener_manager/listener_impl.cc
     - source/common/listener_manager/listener_manager_impl.cc
     - source/common/listener_manager/filter_chain_manager_impl.cc
-    - source/common/upstream/subset_lb_config.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
-    - source/common/upstream/default_local_address_selector_factory.cc
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
@@ -116,12 +114,10 @@ paths:
     - source/common/formatter/substitution_format_string.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/http/http2/codec_impl.cc
-    - source/common/http/hash_policy.cc
     - source/common/http/conn_manager_utility.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/utility.cc
     - source/common/quic/quic_server_transport_socket_factory.cc
-    - source/common/secret/secret_manager_impl.cc
     - source/common/grpc/google_grpc_utils.cc
     - source/common/tcp_proxy/tcp_proxy.cc
     - source/common/config/subscription_factory_impl.cc
@@ -133,12 +129,9 @@ paths:
     - source/common/router/scoped_config_impl.cc
     - source/common/router/header_parser.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc
-    - source/common/filesystem/inotify/watcher_impl.cc
-    - source/common/filesystem/kqueue/watcher_impl.cc
     - source/common/filesystem/win32/directory_iterator_impl.cc
     - source/common/common/utility.cc
     - source/common/common/regex.h
-    - source/common/common/matchers.cc
     - source/exe/stripped_main_base.cc
     - source/server/options_impl.cc
     - source/server/overload_manager_impl.cc
@@ -148,7 +141,6 @@ paths:
     - source/server/server.cc
     - source/server/hot_restarting_base.cc
     - source/server/hot_restart_impl.cc
-    - source/server/ssl_context_manager.cc
     - source/server/config_validation/cluster_manager.cc
     - source/common/upstream/health_discovery_service.cc
     - source/common/secret/sds_api.h
@@ -165,10 +157,11 @@ paths:
     - source/common/tls/context_impl.cc
     - source/common/tls/server_context_impl.cc
     - source/common/tls/context_config_impl.cc
-    - source/common/tls/ocsp/ocsp.cc
     - source/common/config/watched_directory.cc
     - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
+    - source/common/io/io_uring_worker_impl.cc
+    - source/common/event/file_event_impl.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:

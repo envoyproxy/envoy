@@ -11,14 +11,10 @@
 #include "absl/container/flat_hash_map.h"
 #include "library/common/types/c_types.h"
 #include "library/common/types/managed_envoy_headers.h"
-#include "library/jni/import/jni_import.h"
 #include "library/jni/jni_helper.h"
 
 namespace Envoy {
 namespace JNI {
-
-// TODO(Augustyniak): Replace the usages of this global method with Envoy::JNI::Env::get()
-JNIEnv* getEnv();
 
 void setClassLoader(jobject class_loader);
 
@@ -49,7 +45,7 @@ void jniDeleteGlobalRef(void* context);
 void jniDeleteConstGlobalRef(const void* context);
 
 /** Converts `java.lang.Integer` to C++ `int`. */
-int javaIntegerTotInt(JniHelper& jni_helper, jobject boxed_integer);
+int javaIntegerToCppInt(JniHelper& jni_helper, jobject boxed_integer);
 
 /** Converts from Java byte array to `envoy_data`. */
 envoy_data javaByteArrayToEnvoyData(JniHelper& jni_helper, jbyteArray j_data);
@@ -71,12 +67,6 @@ LocalRefUniquePtr<jlongArray> envoyStreamIntelToJavaLongArray(JniHelper& jni_hel
 LocalRefUniquePtr<jlongArray>
 envoyFinalStreamIntelToJavaLongArray(JniHelper& jni_helper,
                                      envoy_final_stream_intel final_stream_intel);
-
-/** Converts from Java `Map` to `envoy_map`. */
-LocalRefUniquePtr<jobject> envoyMapToJavaMap(JniHelper& jni_helper, envoy_map map);
-
-/** Converts from `envoy_data` to Java `String`. */
-LocalRefUniquePtr<jstring> envoyDataToJavaString(JniHelper& jni_helper, envoy_data data);
 
 /** Converts from Java `ByteBuffer` to `envoy_data`. */
 envoy_data javaByteBufferToEnvoyData(JniHelper& jni_helper, jobject j_data);
@@ -226,6 +216,9 @@ Buffer::InstancePtr javaNonDirectByteBufferToCppBufferInstance(JniHelper& jni_he
 LocalRefUniquePtr<jobject>
 cppBufferInstanceToJavaNonDirectByteBuffer(JniHelper& jni_helper,
                                            const Buffer::Instance& cpp_buffer_instance);
+
+/** Gets the Java exception message from the `throwable`. */
+std::string getJavaExceptionMessage(JniHelper& jni_helper, jthrowable throwable);
 
 } // namespace JNI
 } // namespace Envoy

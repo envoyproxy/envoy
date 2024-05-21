@@ -46,6 +46,22 @@ enum class FilterState {
   Destroyed
 };
 
+class CacheFilterConfig {
+public:
+  CacheFilterConfig(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
+                    Server::Configuration::CommonFactoryContext& context);
+
+  // The allow list rules that decide if a header can be varied upon.
+  const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
+  TimeSource& timeSource() const { return time_source_; }
+  bool ignoreRequestCacheControlHeader() const { return ignore_request_cache_control_header_; }
+
+private:
+  const VaryAllowList vary_allow_list_;
+  TimeSource& time_source_;
+  const bool ignore_request_cache_control_header_;
+};
+
 /**
  * A filter that caches responses and attempts to satisfy requests from cache.
  */
@@ -53,9 +69,7 @@ class CacheFilter : public Http::PassThroughFilter,
                     public Logger::Loggable<Logger::Id::cache_filter>,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
-  CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-              const std::string& stats_prefix, Stats::Scope& scope,
-              Server::Configuration::CommonFactoryContext& context,
+  CacheFilter(std::shared_ptr<const CacheFilterConfig> config,
               std::shared_ptr<HttpCache> http_cache);
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -132,7 +146,6 @@ private:
   // CacheFilter::onDestroy, allowing the insert queue to outlive the filter
   // while the necessary cache write operations complete.
   std::unique_ptr<CacheInsertQueue> insert_queue_;
-  TimeSource& time_source_;
   std::shared_ptr<HttpCache> cache_;
   LookupContextPtr lookup_;
   LookupResultPtr lookup_result_;
@@ -142,11 +155,7 @@ private:
   // onHeaders for Range Responses, otherwise initialized by encodeCachedResponse.
   std::vector<AdjustedByteRange> remaining_ranges_;
 
-  // TODO(#12901): The allow list could be constructed only once directly from the config, instead
-  // of doing it per-request. A good example of such config is found in the gzip filter:
-  // source/extensions/filters/http/gzip/gzip_filter.h.
-  // Stores the allow list rules that decide if a header can be varied upon.
-  VaryAllowList vary_allow_list_;
+  const std::shared_ptr<const CacheFilterConfig> config_;
 
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.

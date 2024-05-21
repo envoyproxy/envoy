@@ -452,7 +452,7 @@ void Filter::newDownstreamRequest(StreamRequestPtr request, absl::optional<Start
   auto raw_stream = stream.get();
   LinkedList::moveIntoList(std::move(stream), active_streams_);
 
-  // Initialize filter chian.
+  // Initialize filter chain.
   raw_stream->initializeFilterChain(*config_);
   // Start request.
   raw_stream->continueDecoding();

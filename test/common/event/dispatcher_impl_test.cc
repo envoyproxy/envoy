@@ -1544,7 +1544,12 @@ TEST_F(DispatcherWithWatchdogTest, TouchBeforeFdEvent) {
 
   const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
   Event::FileEventPtr file_event = dispatcher_->createFileEvent(
-      fd, [&](uint32_t) -> void { watcher.ready(); }, trigger, FileReadyType::Read);
+      fd,
+      [&](uint32_t) {
+        watcher.ready();
+        return absl::OkStatus();
+      },
+      trigger, FileReadyType::Read);
   file_event->activate(FileReadyType::Read);
 
   InSequence s;
