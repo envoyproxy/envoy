@@ -1,17 +1,18 @@
 abstracts>=0.0.12
 aio.api.bazel
 aio.api.github>=0.2.5
-aiohttp>=3.9.2
+aio.core>=0.10.2
+aiohttp>=3.9.5
 aioquic>=0.9.21
 cffi>=1.15.0
 clang-format==14.0.6
 clang-tidy==14.0.6
 colorama
 coloredlogs
-cryptography>=41.0.1
+cryptography>=42.0.4
 dependatool>=0.2.2
 envoy.base.utils>=0.5.0
-envoy.code.check>=0.5.8
+envoy.code.check>=0.5.12
 envoy.dependency.check>=0.1.10
 envoy.distribution.release>=0.0.9
 envoy.distribution.repo>=0.0.8
@@ -24,9 +25,10 @@ frozendict>=2.3.7
 gitpython
 gsutil
 icalendar
-jinja2
+idna>=3.7
+jinja2>=3.1.4
 multidict>=6.0.2
-orjson
+orjson>=3.9.15
 pep8-naming
 ply
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
@@ -35,6 +37,7 @@ protobuf<4.26.0
 pygithub
 pyreadline
 pyyaml
+requests>=2.32.0
 setuptools
 slack_sdk
 sphinx>=7,<7.2
