@@ -239,15 +239,24 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  bool force_cache_refresh = false;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reresolve_if_no_connections")) {
+    auto dfp_lb =
+        dynamic_cast<Extensions::Common::DynamicForwardProxy::DfpLb*>(&cluster->loadBalancer());
+    if (dfp_lb) {
+      std::string hostname = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(
+          headers.getHostValue(), default_port);
+      auto host = dfp_lb->findHostByName(hostname);
+      if (host && !host->used()) {
+        force_cache_refresh = true;
+      }
+    }
+  }
+
   latchTime(decoder_callbacks_, DNS_START);
-  // See the comments in dns_cache.h for how loadDnsCacheEntry() handles hosts with embedded
-  // ports.
-  // TODO(mattklein123): Because the filter and cluster have independent configuration, it is
-  //                     not obvious to the user if something is misconfigured. We should see if
-  //                     we can do better here, perhaps by checking the cache to see if anything
-  //                     else is attached to it or something else?
-  auto result = config_->cache().loadDnsCacheEntry(headers.Host()->value().getStringView(),
-                                                   default_port, isProxying(), *this);
+  auto result =
+      config_->cache().loadDnsCacheEntry(headers.Host()->value().getStringView(), default_port,
+                                         isProxying(), force_cache_refresh, *this);
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
     circuit_breaker_.reset();

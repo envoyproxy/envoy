@@ -212,10 +212,11 @@ public:
    * @param default_port the port to use
    * @param is_proxy_lookup indicates if the request is safe to fast-fail. The Dynamic Forward Proxy
    * filter sets this to true if no address is necessary due to an upstream proxy being configured.
+   * @param force_refresh forces a fresh DNS cache lookup if true.
    * @return a handle that on destruction will de-register the callbacks.
    */
   virtual LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
-                                                    bool is_proxy_lookup,
+                                                    bool is_proxy_lookup, bool force_refresh,
                                                     LoadDnsCacheEntryCallbacks& callbacks) PURE;
 
   /**
