@@ -133,6 +133,7 @@ class RepoNotifier(runner.Runner):
             is_approved = (
                 "patch:approved"
                 in [label["name"] for label in issue["labels"]])
+
             is_cve = (
                 "cve/next"
                 in [label["name"] for label in issue["labels"]])
@@ -148,9 +149,12 @@ class RepoNotifier(runner.Runner):
                     # If there's no PR, poll for issue updates.
                     stalled_cve_issues.append(message)
 
+            should_ignore = (
+                "notifier:ignore"
+                in [label["name"] for label in issue["labels"]])
             # If an non-CVE issue hasn't been updated in a week, notify.
             if (not is_cve and age > self.weekend_offset(167) and
-               issue["assignees"]):
+               issue["assignees"]) and not should_ignore:
                 stalled_issues.append(message)
 
             has_assignee = False
