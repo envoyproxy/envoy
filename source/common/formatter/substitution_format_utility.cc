@@ -115,8 +115,8 @@ void SubstitutionFormatUtils::parseSubcommandHeaders(const std::string& subcomma
   }
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consistent_header_validation")) {
-    if (!Http::HeaderUtility::headerValueIsValid(main_header) ||
-        !Http::HeaderUtility::headerValueIsValid(alternative_header)) {
+    if (!Http::HeaderUtility::headerNameIsValid(main_header) ||
+        !Http::HeaderUtility::headerNameIsValid(alternative_header)) {
       throwEnvoyExceptionOrPanic(
           "Invalid header configuration. Format string contains null or newline.");
     }
