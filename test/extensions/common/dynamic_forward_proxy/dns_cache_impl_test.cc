@@ -171,13 +171,13 @@ TEST_P(DnsCacheImplPreresolveTest, PreresolveSuccess) {
   MockLoadDnsCacheEntryCallbacks callbacks;
   if (normalizeDfpHost()) {
     // Retrieve with the hostname and port in the "host".
-    auto result = dns_cache_->loadDnsCacheEntry(authority, port, false, callbacks);
+    auto result = dns_cache_->loadDnsCacheEntry(authority, port, false, false, callbacks);
     EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
     EXPECT_EQ(result.handle_, nullptr);
     EXPECT_NE(absl::nullopt, result.host_info_);
   }
   // Retrieve with the hostname only in the "host".
-  auto result = dns_cache_->loadDnsCacheEntry(host, port, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry(host, port, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   EXPECT_NE(absl::nullopt, result.host_info_);
@@ -212,7 +212,7 @@ TEST_F(DnsCacheImplTest, DnsFirstResolveComplete) {
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
   MockLoadDnsCacheEntryCallbacks callbacks;
-  auto result = dns_cache_->loadDnsCacheEntry("bar.baz.com", 443, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("bar.baz.com", 443, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   EXPECT_NE(absl::nullopt, result.host_info_);
@@ -232,7 +232,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccess) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -325,7 +325,7 @@ TEST_F(DnsCacheImplTest, ForceRefresh) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -359,7 +359,7 @@ TEST_F(DnsCacheImplTest, Ipv4Address) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("127.0.0.1", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("127.0.0.1", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("127.0.0.1", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -393,7 +393,7 @@ TEST_F(DnsCacheImplTest, Ipv4AddressWithPort) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("127.0.0.1", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("127.0.0.1:10000", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("127.0.0.1:10000", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -427,7 +427,7 @@ TEST_F(DnsCacheImplTest, Ipv6Address) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("::1", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("[::1]", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("[::1]", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -458,7 +458,7 @@ TEST_F(DnsCacheImplTest, Ipv6AddressWithPort) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("::1", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("[::1]:10000", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("[::1]:10000", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -489,7 +489,7 @@ TEST_F(DnsCacheImplTest, TTL) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -548,7 +548,7 @@ TEST_F(DnsCacheImplTest, TTL) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -571,7 +571,7 @@ TEST_F(DnsCacheImplTest, TTLWithMinRefreshRate) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -608,7 +608,7 @@ TEST_F(DnsCacheImplTest, TTLWithCustomParameters) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(1000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -657,7 +657,7 @@ TEST_F(DnsCacheImplTest, InlineResolve) {
   Event::PostCb post_cb;
   EXPECT_CALL(context_.server_factory_context_.dispatcher_, post(_))
       .WillOnce([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); });
-  auto result = dns_cache_->loadDnsCacheEntry("localhost", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("localhost", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -702,7 +702,7 @@ TEST_F(DnsCacheImplTest, ResolveTimeout) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -740,7 +740,7 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -758,7 +758,7 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
   checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
-  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   ASSERT_NE(absl::nullopt, result.host_info_);
@@ -794,7 +794,7 @@ TEST_F(DnsCacheImplTest, ResolveFailureWithFailureRefreshRate) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -813,7 +813,7 @@ TEST_F(DnsCacheImplTest, ResolveFailureWithFailureRefreshRate) {
   checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
-  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   ASSERT_NE(absl::nullopt, result.host_info_);
@@ -845,7 +845,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithEmptyResult) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -864,7 +864,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithEmptyResult) {
   checkStats(1 /* attempt */, 1 /* success */, 0 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
-  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   ASSERT_NE(absl::nullopt, result.host_info_);
@@ -892,7 +892,7 @@ TEST_F(DnsCacheImplTest, CancelResolve) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -919,13 +919,13 @@ TEST_F(DnsCacheImplTest, MultipleResolveSameHost) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result1 = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks1);
+  auto result1 = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks1);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result1.status_);
   EXPECT_NE(result1.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result1.host_info_);
 
   MockLoadDnsCacheEntryCallbacks callbacks2;
-  auto result2 = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks2);
+  auto result2 = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks2);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result2.status_);
   EXPECT_NE(result2.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result2.host_info_);
@@ -954,7 +954,7 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   Network::DnsResolver::ResolveCb resolve_cb1;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb1), Return(&resolver_->active_query_)));
-  auto result1 = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks1);
+  auto result1 = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks1);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result1.status_);
   EXPECT_NE(result1.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result1.host_info_);
@@ -964,7 +964,7 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   Network::DnsResolver::ResolveCb resolve_cb2;
   EXPECT_CALL(*resolver_, resolve("bar.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb2), Return(&resolver_->active_query_)));
-  auto result2 = dns_cache_->loadDnsCacheEntry("bar.com", 443, false, callbacks2);
+  auto result2 = dns_cache_->loadDnsCacheEntry("bar.com", 443, false, false, callbacks2);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result2.status_);
   EXPECT_NE(result2.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result2.host_info_);
@@ -1019,7 +1019,7 @@ TEST_F(DnsCacheImplTest, CacheHit) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -1036,7 +1036,7 @@ TEST_F(DnsCacheImplTest, CacheHit) {
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
              TestUtility::makeDnsResponse({"10.0.0.1"}));
 
-  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   ASSERT_NE(absl::nullopt, result.host_info_);
@@ -1052,7 +1052,7 @@ TEST_F(DnsCacheImplTest, CacheHitWithDifferentDefaultPort) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -1074,7 +1074,7 @@ TEST_F(DnsCacheImplTest, CacheHitWithDifferentDefaultPort) {
   // cache entries with different ports.
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  result = dns_cache_->loadDnsCacheEntry("foo.com", 443, false, callbacks);
+  result = dns_cache_->loadDnsCacheEntry("foo.com", 443, false, false, callbacks);
 }
 
 // Make sure we destroy active queries if the cache goes away.
@@ -1086,7 +1086,7 @@ TEST_F(DnsCacheImplTest, CancelActiveQueriesOnDestroy) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -1105,7 +1105,7 @@ TEST_F(DnsCacheImplTest, InvalidPort) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com:abc", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com:abc", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com:abc", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -1124,7 +1124,7 @@ TEST_F(DnsCacheImplTest, MaxHostOverflow) {
   InSequence s;
 
   MockLoadDnsCacheEntryCallbacks callbacks;
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Overflow, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -1473,7 +1473,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
@@ -1608,7 +1608,7 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
 
   {
     MockLoadDnsCacheEntryCallbacks callbacks;
-    auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+    auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, false, callbacks);
     EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
     EXPECT_EQ(result.handle_, nullptr);
     EXPECT_NE(absl::nullopt, result.host_info_);
@@ -1617,7 +1617,7 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
 
   {
     MockLoadDnsCacheEntryCallbacks callbacks;
-    auto result = dns_cache_->loadDnsCacheEntry("bar.com", 80, false, callbacks);
+    auto result = dns_cache_->loadDnsCacheEntry("bar.com", 80, false, false, callbacks);
     EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
     EXPECT_EQ(result.handle_, nullptr);
     ASSERT_NE(absl::nullopt, result.host_info_);

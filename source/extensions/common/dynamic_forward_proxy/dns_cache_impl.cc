@@ -204,7 +204,7 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
   }();
 
   if (primary_host) {
-    if (!ignore_cached_entries || !host_info_->firstResolveComplete()) {
+    if (!ignore_cached_entries || !primary_host->host_info_->firstResolveComplete()) {
       ENVOY_LOG(debug, "main thread resolve for host '{}' skipped. Entry present", host);
       return;
     }

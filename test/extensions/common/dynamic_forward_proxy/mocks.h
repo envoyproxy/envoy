@@ -39,7 +39,7 @@ public:
   };
 
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
-                                            bool is_proxy_request,
+                                            bool is_proxy_request, bool,
                                             LoadDnsCacheEntryCallbacks& callbacks) override {
     MockLoadDnsCacheEntryResult result =
         loadDnsCacheEntry_(host, default_port, is_proxy_request, callbacks);
