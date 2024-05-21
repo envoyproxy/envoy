@@ -176,6 +176,10 @@ protected:
       stream_close_listener_ = std::move(f);
     }
     int64_t OnReadyToSend(absl::string_view serialized) override;
+    DataFrameHeaderInfo OnReadyToSendDataForStream(Http2StreamId stream_id,
+                                                   size_t max_length) override;
+    bool SendDataFrame(Http2StreamId stream_id, absl::string_view frame_header,
+                       size_t payload_bytes) override;
     void OnConnectionError(ConnectionError /*error*/) override {}
     bool OnFrameHeader(Http2StreamId stream_id, size_t length, uint8_t type,
                        uint8_t flags) override;
