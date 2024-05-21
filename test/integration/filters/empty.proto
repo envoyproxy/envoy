@@ -1,9 +1,0 @@
-syntax = "proto3";
-
-package test.integration.filters;
-
-message Backpressure {
-}
-
-message Tee {
-}
