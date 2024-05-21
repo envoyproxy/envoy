@@ -102,6 +102,7 @@ public:
           struct sockaddr addr;
           socklen_t addrlen = sizeof(addr);
           io_socket_handle_ = listener->accept(&addr, &addrlen);
+          return absl::OkStatus();
         },
         Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -119,6 +120,7 @@ public:
           if (events & Event::FileReadyType::Write) {
             io_uring_socket_handle_->getOption(SOL_SOCKET, SO_ERROR, &error, &error_size);
           }
+          return absl::OkStatus();
         },
         Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -162,7 +164,8 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, CancelAndClose) {
 
   // Submit the read request.
   io_uring_socket_handle_->initializeFileEvent(
-      *dispatcher_, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      *dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
   io_uring_socket_handle_->close();
 
   while (fcntl(fd_, F_GETFD, 0) >= 0) {
@@ -184,6 +187,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Accept) {
         auto handle = io_uring_socket_handle_->accept(&addr, &addrlen);
         EXPECT_NE(handle, nullptr);
         accepted = true;
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -216,6 +220,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, AcceptError) {
         auto handle = io_uring_socket_handle_->accept(&addr, &addrlen);
         EXPECT_EQ(handle, nullptr);
         accepted = true;
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -271,6 +276,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ConnectError) {
           // The read error will be transferred to the io_uring handle.
           io_uring_socket_handle_->getOption(SOL_SOCKET, SO_ERROR, &error, &error_size);
         }
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -308,6 +314,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Read) {
         // Read again would expect the EAGAIN returned.
         ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
         EXPECT_TRUE(ret.wouldBlock());
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -346,6 +353,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ReadContinuity) {
           EXPECT_EQ(event, Event::FileReadyType::Read);
           auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
         }
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -419,6 +427,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Readv) {
         ret = io_uring_socket_handle_->readv(11, reservation2.slices(), reservation2.numSlices());
         EXPECT_TRUE(ret.wouldBlock());
         reservation2.commit(0);
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -462,6 +471,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ReadvContinuity) {
               io_uring_socket_handle_->readv(1024, reservation.slices(), reservation.numSlices());
           reservation.commit(ret.return_value_);
         }
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -503,7 +513,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Write) {
   Buffer::OwnedImpl read_buffer;
 
   io_uring_socket_handle_->initializeFileEvent(
-      *dispatcher_, [](uint32_t) {}, Event::PlatformDefaultTriggerType,
+      *dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
       Event::FileReadyType::Write);
 
   io_socket_handle_->initializeFileEvent(
@@ -512,6 +522,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Write) {
         EXPECT_EQ(event, Event::FileReadyType::Read);
         auto ret = io_socket_handle_->read(read_buffer, absl::nullopt);
         EXPECT_EQ(ret.return_value_, data.size());
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -540,7 +551,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Writev) {
   Buffer::OwnedImpl read_buffer;
 
   io_uring_socket_handle_->initializeFileEvent(
-      *dispatcher_, [](uint32_t) {}, Event::PlatformDefaultTriggerType,
+      *dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
       Event::FileReadyType::Write);
 
   io_socket_handle_->initializeFileEvent(
@@ -549,6 +560,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Writev) {
         EXPECT_EQ(event, Event::FileReadyType::Read);
         auto ret = io_socket_handle_->read(read_buffer, absl::nullopt);
         EXPECT_EQ(ret.return_value_, data.size());
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -597,6 +609,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Recv) {
             io_uring_socket_handle_->recv(reservation2.slices()->mem_, reservation2.length(), 0);
         EXPECT_EQ(ret2.return_value_, data.size());
         reservation2.commit(ret2.return_value_);
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -678,6 +691,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ActivateReadEvent) {
         Buffer::OwnedImpl read_buffer;
         auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
         EXPECT_TRUE(ret.wouldBlock());
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   io_uring_socket_handle_->activateFileEvents(Event::FileReadyType::Read);
@@ -701,6 +715,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ActivateWriteEvent) {
         EXPECT_EQ(event, Event::FileReadyType::Write);
         auto ret = io_uring_socket_handle_->write(write_buffer);
         EXPECT_TRUE(ret.wouldBlock());
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Write);
 
@@ -721,7 +736,8 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Shutdown) {
   Buffer::OwnedImpl read_buffer;
 
   io_uring_socket_handle_->initializeFileEvent(
-      *dispatcher_, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      *dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
 
   io_uring_socket_handle_->shutdown(SHUT_WR);
   auto ret = io_socket_handle_->read(read_buffer, absl::nullopt);
@@ -757,6 +773,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest,
         EXPECT_EQ(0, ret.return_value_);
         io_uring_socket_handle_->close();
         got_write_event = true;
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   io_uring_socket_handle_->enableFileEvents(Event::FileReadyType::Write);
@@ -794,6 +811,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, RemoteCloseWithCloseEventDisabled
         } else if (ret.return_value_ == 0) {
           io_uring_socket_handle_->close();
         }
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   io_uring_socket_handle_->enableFileEvents(Event::FileReadyType::Read);
@@ -834,6 +852,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, RemoteCloseWithCloseEventEnabled)
           EXPECT_EQ(0, ret.return_value_);
           io_uring_socket_handle_->close();
         }
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Closed);
 
@@ -869,6 +888,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, CloseIoUringSocketOnDestruction) 
         // Read again would expect the EAGAIN returned.
         ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
         EXPECT_TRUE(ret.wouldBlock());
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -914,6 +934,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, MigrateServerSocketBetweenThreads
         EXPECT_EQ(event, Event::FileReadyType::Read);
         auto ret = io_uring_socket_handle_->read(read_buffer, 5);
         EXPECT_EQ(ret.return_value_, 5);
+        return absl::OkStatus();
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
@@ -941,6 +962,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, MigrateServerSocketBetweenThreads
           if (read_buffer.length() > data.substr(5).length()) {
             read_in_new_thread = true;
           }
+          return absl::OkStatus();
         },
         Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
     initialized_in_new_thread = true;

@@ -37,7 +37,8 @@ TEST_F(IoUringSocketHandleTest, CreateClientSocket) {
   EXPECT_CALL(factory_, getIoUringWorker())
       .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker_)));
   impl.initializeFileEvent(
-      dispatcher_, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
   EXPECT_EQ(IoUringSocketType::Client, impl.ioUringSocketType());
 }
 
@@ -47,7 +48,8 @@ TEST_F(IoUringSocketHandleTest, ReadError) {
   EXPECT_CALL(factory_, getIoUringWorker())
       .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker_)));
   impl.initializeFileEvent(
-      dispatcher_, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
 
   // EAGAIN error.
   Buffer::OwnedImpl read_buffer;
@@ -71,7 +73,8 @@ TEST_F(IoUringSocketHandleTest, WriteError) {
   EXPECT_CALL(factory_, getIoUringWorker())
       .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker_)));
   impl.initializeFileEvent(
-      dispatcher_, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
 
   Buffer::OwnedImpl write_buffer;
   Io::WriteParam write_param{-EBADF};
@@ -87,7 +90,8 @@ TEST_F(IoUringSocketHandleTest, WritevError) {
   EXPECT_CALL(factory_, getIoUringWorker())
       .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker_)));
   impl.initializeFileEvent(
-      dispatcher_, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
 
   Buffer::OwnedImpl write_buffer;
   Io::WriteParam write_param{-EBADF};

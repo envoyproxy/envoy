@@ -90,9 +90,10 @@ void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
   }
   socket_event_udp_forwarding_ = dispatcher.createFileEvent(
       udp_forwarding_rpc_stream_.domain_socket_,
-      [this](uint32_t events) -> void {
+      [this](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
         onSocketEventUdpForwarding();
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }

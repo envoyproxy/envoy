@@ -31,6 +31,7 @@ public class JniUtilityTest {
                                                                     long length);
   public static native ByteBuffer javaCppNonDirectByteBufferConversion(ByteBuffer byteBuffer,
                                                                        long length);
+  public static native String getJavaExceptionMessage(Throwable throwable);
 
   @Test
   public void testProtoJavaByteArrayConversion() throws Exception {
@@ -142,5 +143,11 @@ public class JniUtilityTest {
     ByteBuffer outByteBuffer = javaCppNonDirectByteBufferConversion(inByteBuffer, 3);
     assertThat(outByteBuffer.isDirect()).isFalse();
     assertThat(outByteBuffer.array()).isEqualTo(new byte[] {'h', 'e', 'l'});
+  }
+
+  @Test
+  public void testGetJavaExceptionMessage() {
+    assertThat(getJavaExceptionMessage(new RuntimeException("Test exception")))
+        .isEqualTo("Test exception");
   }
 }
