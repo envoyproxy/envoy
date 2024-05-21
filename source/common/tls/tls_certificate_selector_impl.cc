@@ -7,10 +7,10 @@ namespace Ssl {
 
 Ssl::SelectionResult
 TlsCertificateSelectorImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
-                                             Ssl::CertSelectionCallbackPtr cb) {
+                                             Ssl::CertSelectionCallbackSharedPtr cb) {
   auto selection_ctx = cb_.lock();
   if (selection_ctx == nullptr) {
-    ENVOY_LOG(debug, "CertSelectionCallback is gone early");
+    ENVOY_LOG(debug, "ContextSelectionCallback is gone early");
     return Ssl::SelectionResult::Terminate;
   }
 

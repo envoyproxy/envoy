@@ -191,7 +191,7 @@ public:
                                      bool staple) PURE;
 };
 
-using CertSelectionCallbackPtr = std::unique_ptr<CertSelectionCallback>;
+using CertSelectionCallbackSharedPtr = std::shared_ptr<CertSelectionCallback>;
 
 class TlsCertificateSelector {
 public:
@@ -201,7 +201,7 @@ public:
    * select TLS context based on the client hello.
    */
   virtual SelectionResult selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
-                                           CertSelectionCallbackPtr cb) PURE;
+                                           CertSelectionCallbackSharedPtr cb) PURE;
 };
 
 using TlsCertificateSelectorSharedPtr = std::shared_ptr<TlsCertificateSelector>;

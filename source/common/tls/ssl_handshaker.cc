@@ -62,7 +62,7 @@ SslExtendedSocketInfoImpl::~SslExtendedSocketInfoImpl() {
   if (cert_validate_result_callback_.has_value()) {
     cert_validate_result_callback_->onSslHandshakeCancelled();
   }
-  if (cert_selection_callback_.has_value()) {
+  if (cert_selection_callback_ != nullptr) {
     cert_selection_callback_->onSslHandshakeCancelled();
   }
 }
@@ -103,7 +103,7 @@ void SslExtendedSocketInfoImpl::onCertSelectionCompleted(bool succeeded) {
   const bool async = cert_selection_result_ == Ssl::CertSelectionStatus::Pending;
   cert_selection_result_ =
       succeeded ? Ssl::CertSelectionStatus::Successful : Ssl::CertSelectionStatus::Failed;
-  if (cert_selection_callback_.has_value()) {
+  if (cert_selection_callback_ != nullptr) {
     cert_selection_callback_.reset();
     // Resume handshake.
     if (async) {
@@ -118,11 +118,11 @@ void SslExtendedSocketInfoImpl::setCertSelectionAsync() {
   cert_selection_result_ = Ssl::CertSelectionStatus::Pending;
 }
 
-Ssl::CertSelectionCallbackPtr SslExtendedSocketInfoImpl::createCertSelectionCallback(SSL* ssl) {
-  auto callback = std::make_unique<CertSelectionCallbackImpl>(
+Ssl::CertSelectionCallbackSharedPtr
+SslExtendedSocketInfoImpl::createCertSelectionCallback(SSL* ssl) {
+  cert_selection_callback_ = std::make_shared<CertSelectionCallbackImpl>(
       ssl, ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
-  cert_selection_callback_ = *callback;
-  return callback;
+  return cert_selection_callback_;
 }
 
 SslHandshakerImpl::SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,

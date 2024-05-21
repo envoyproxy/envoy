@@ -87,7 +87,8 @@ public:
   TestTlsCertificateSelector(Ssl::ContextSelectionCallbackWeakPtr ctx, const ProtobufWkt::Any&)
       : ctx_(ctx) {}
   ~TestTlsCertificateSelector() { ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector"); }
-  SelectionResult selectTlsContext(const SSL_CLIENT_HELLO*, CertSelectionCallbackPtr cb) override {
+  SelectionResult selectTlsContext(const SSL_CLIENT_HELLO*,
+                                   CertSelectionCallbackSharedPtr cb) override {
     ENVOY_LOG_MISC(info, "debug: select context");
 
     switch (mod_) {
@@ -117,7 +118,7 @@ public:
 
 private:
   Ssl::ContextSelectionCallbackWeakPtr ctx_;
-  CertSelectionCallbackPtr cb_;
+  CertSelectionCallbackSharedPtr cb_;
 };
 
 class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorFactory {

@@ -87,7 +87,7 @@ public:
 
   void setCertificateValidationAlert(uint8_t alert) { cert_validation_alert_ = alert; }
 
-  Ssl::CertSelectionCallbackPtr createCertSelectionCallback(SSL* ssl) override;
+  Ssl::CertSelectionCallbackSharedPtr createCertSelectionCallback(SSL* ssl) override;
   void onCertSelectionCompleted(bool succeeded) override;
   void setCertSelectionAsync() override;
   Ssl::CertSelectionStatus CertSelectionResult() const override { return cert_selection_result_; }
@@ -104,9 +104,9 @@ private:
   // Stores the validation result if there is any.
   // nullopt if no validation has ever been kicked off.
   Ssl::ValidateStatus cert_validation_result_{Ssl::ValidateStatus::NotStarted};
-  // Latch the in-flight cert validation callback.
-  // nullopt if there is none.
-  OptRef<CertSelectionCallbackImpl> cert_selection_callback_{absl::nullopt};
+  // Latch the in-flight cert selection callback.
+  // nullptr if there is none.
+  std::shared_ptr<CertSelectionCallbackImpl> cert_selection_callback_;
   // Stores the cert selection result if there is any.
   // NotStarted if no cert selection has ever been kicked off.
   Ssl::CertSelectionStatus cert_selection_result_{Ssl::CertSelectionStatus::NotStarted};
