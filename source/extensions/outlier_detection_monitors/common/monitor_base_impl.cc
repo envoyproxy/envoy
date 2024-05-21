@@ -54,7 +54,7 @@ void Monitor::reportResult(const ExtResult& result) {
   if (matchedError) {
     // Count as error.
     if (onError()) {
-      callback_(enforce_, name(), absl::nullopt);
+      callback_(enforce_, name(), absl::nullopt /* extra_info */);
       // Reaching error was reported via callback.
       // but the host may or may not be ejected based on enforce_ parameter.
       // Reset the monitor's state, so a single new error does not

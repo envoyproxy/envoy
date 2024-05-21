@@ -34,13 +34,13 @@ protected:
 
 class HttpCode : public TypedExtResult<Upstream::Outlier::ExtResultType::HTTP_CODE> {
 public:
-  HttpCode(uint64_t code) : code_(code) {}
+  HttpCode(uint32_t code) : code_(code) {}
   HttpCode() = delete;
   virtual ~HttpCode() {}
-  uint64_t code() const { return code_; }
+  uint32_t code() const { return code_; }
 
 private:
-  uint64_t code_;
+  uint32_t code_;
 };
 
 // LocalOriginEvent is used to report errors like resets, timeouts but also
