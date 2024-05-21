@@ -39,10 +39,21 @@ protected:
     ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_scope_));
     ON_CALL(context_, listenerInfo()).WillByDefault(ReturnRef(listener_info_));
     ON_CALL(listener_info_, metadata()).WillByDefault(ReturnRef(listener_metadata_));
-    EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager_));
+    ON_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager_));
     ON_CALL(context_.server_factory_context_, clusterManager())
         .WillByDefault(ReturnRef(cluster_manager_));
     ON_CALL(context_.server_factory_context_, mainThreadDispatcher())
+        .WillByDefault(ReturnRef(dispatcher_));
+
+    ON_CALL(upstream_factory_context_.server_factory_context_, api())
+        .WillByDefault(ReturnRef(*api_));
+    ON_CALL(upstream_factory_context_, scope()).WillByDefault(ReturnRef(stats_scope_));
+    // ON_CALL(context_, listenerInfo()).WillByDefault(ReturnRef(listener_info_));
+    ON_CALL(listener_info_, metadata()).WillByDefault(ReturnRef(listener_metadata_));
+    ON_CALL(upstream_factory_context_, initManager()).WillRepeatedly(ReturnRef(init_manager_));
+    ON_CALL(upstream_factory_context_.server_factory_context_, clusterManager())
+        .WillByDefault(ReturnRef(cluster_manager_));
+    ON_CALL(upstream_factory_context_.server_factory_context_, mainThreadDispatcher())
         .WillByDefault(ReturnRef(dispatcher_));
   }
 
@@ -125,7 +136,7 @@ TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasmUpstream) {
     },
     "code": {
       "local": {
-        "filename": "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp2.wasm"
+        "filename": "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
       }
     },
   }}}
