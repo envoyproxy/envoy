@@ -162,6 +162,11 @@ public:
    * @return whether the listener is a Quic listener.
    */
   virtual bool isQuic() const PURE;
+
+  /**
+   * @return bool whether the listener should bypass overload manager actions
+   */
+  virtual bool shouldBypassOverloadManager() const PURE;
 };
 
 using ListenerInfoConstSharedPtr = std::shared_ptr<const ListenerInfo>;

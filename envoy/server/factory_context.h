@@ -197,12 +197,6 @@ public:
   virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
 
   /**
-   * @return bool if this listener is configured with bypass_overload_manager
-   *
-   */
-  virtual bool shouldBypassOverloadManager() const PURE;
-
-  /**
    * @return OverloadManager& the overload manager for the server.
    */
   virtual OverloadManager& overloadManager() PURE;

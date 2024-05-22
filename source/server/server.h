@@ -202,7 +202,7 @@ public:
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
-  OverloadManager& nullOverloadManager() override { return *null_overload_manager_; }
+  OverloadManager& nullOverloadManager() override { return server_.nullOverloadManager(); }
   bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
 
   // Configuration::TransportSocketFactoryContext
