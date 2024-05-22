@@ -1038,10 +1038,8 @@ void ClientConnectionImpl::connect() {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
     setFailureReason(absl::StrCat(
-        "immediate connect error: ", errorDetails(result.errno_), "|remote address family:",
-        socket_->connectionInfoProvider().remoteAddress()->ip()->version() == Address::IpVersion::v4
-            ? "v4"
-            : "v6"));
+        "immediate connect error: ", errorDetails(result.errno_),
+        "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString()));
     ENVOY_CONN_LOG_EVENT(debug, "connection_immediate_error", "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.
