@@ -97,7 +97,7 @@ GetAddrInfoDnsResolver::processResponse(const PendingQuery& query,
     }
     break;
   }
-  
+
   ENVOY_LOG(debug, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
             accumulateToString<Network::DnsResponse>(final_results, [](const auto& dns_response) {
               return dns_response.addrInfo().address_->asString();
