@@ -1186,8 +1186,8 @@ private:
                               const Http::HeaderMap& headers,
                               const RouteEntryAndRoute* route_selector_override) const;
 
-  RouteConstSharedPtr pickWeightedCluster(const Http::HeaderMap& headers, uint64_t random_value,
-                                          bool ignore_overflow) const;
+  RouteConstSharedPtr pickWeightedCluster(const Http::HeaderMap& headers,
+                                          uint64_t random_value) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;

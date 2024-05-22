@@ -53,6 +53,7 @@
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
 #include "source/extensions/path/rewrite/uri_template/uri_template_rewrite.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -1325,12 +1326,11 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
       return cluster_specifier_plugin_->route(shared_from_this(), headers);
     }
   }
-  return pickWeightedCluster(headers, random_value, true);
+  return pickWeightedCluster(headers, random_value);
 }
 
 RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMap& headers,
-                                                            const uint64_t random_value,
-                                                            const bool ignore_overflow) const {
+                                                            const uint64_t random_value) const {
   absl::optional<uint64_t> random_value_from_header;
   // Retrieve the random value from the header if corresponding header name is specified.
   // weighted_clusters_config_ is known not to be nullptr here. If it were, pickWeightedCluster
@@ -1358,24 +1358,44 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
     }
   }
 
+  // Temporary storage to hold consistent cluster weights. Since cluster weight
+  // can be changed with runtime keys, we need a way to gather all the weight
+  // and aggregate the total without a change in between.
+  // The InlinedVector will be able to handle at least 4 cluster weights
+  // without allocation. For cases when more clusters are needed, it is
+  // reserved to ensure at most a single allocation.
+  absl::InlinedVector<uint32_t, 4> clusterWeights;
+  clusterWeights.reserve(weighted_clusters_config_->weighted_clusters_.size());
+  uint32_t total_cluster_weight = 0;
+
+  for (const WeightedClusterEntrySharedPtr& cluster :
+       weighted_clusters_config_->weighted_clusters_) {
+    auto cluster_weight = cluster->clusterWeight();
+    clusterWeights.push_back(cluster_weight);
+    if (cluster_weight > std::numeric_limits<uint32_t>::max() - total_cluster_weight) {
+      ENVOY_LOG(debug, "Sum of weight cannnot overflow 2^32");
+      return nullptr;
+    }
+    total_cluster_weight += cluster_weight;
+  }
+
+  if (!total_cluster_weight) {
+    ENVOY_LOG(debug, "Sum of weight cannnot be zero");
+    return nullptr;
+  }
   const uint64_t selected_value =
       (random_value_from_header.has_value() ? random_value_from_header.value() : random_value) %
-      weighted_clusters_config_->total_cluster_weight_;
+      total_cluster_weight;
   uint64_t begin = 0;
   uint64_t end = 0;
+  auto clusterWeight = clusterWeights.begin();
 
   // Find the right cluster to route to based on the interval in which
   // the selected value falls. The intervals are determined as
   // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
   for (const WeightedClusterEntrySharedPtr& cluster :
        weighted_clusters_config_->weighted_clusters_) {
-    end = begin + cluster->clusterWeight();
-    if (!ignore_overflow) {
-      // end > total_cluster_weight: This case can only occur with Runtimes,
-      // when the user specifies invalid weights such that
-      // sum(weights) > total_cluster_weight.
-      ASSERT(end <= weighted_clusters_config_->total_cluster_weight_);
-    }
+    end = begin + *(clusterWeight++);
 
     if (selected_value >= begin && selected_value < end) {
       if (!cluster->clusterHeaderName().get().empty() &&
