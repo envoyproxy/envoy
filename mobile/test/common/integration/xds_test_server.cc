@@ -6,7 +6,9 @@
 
 #include "source/common/event/libevent.h"
 #include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
+#include "source/common/tls/ssl_socket.h"
 #include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
@@ -50,6 +52,7 @@ XdsTestServer::XdsTestServer()
   Logger::Context logging_state(spdlog::level::level_enum::err,
                                 "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock_, false, false);
   upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
+  Extensions::TransportSockets::Tls::forceRegisterServerContextFactoryImpl();
   Config::forceRegisterAdsConfigSubscriptionFactory();
   Config::forceRegisterGrpcConfigSubscriptionFactory();
   Config::forceRegisterDeltaGrpcConfigSubscriptionFactory();
