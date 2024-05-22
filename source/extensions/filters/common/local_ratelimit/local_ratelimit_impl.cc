@@ -13,7 +13,7 @@ namespace Filters {
 namespace Common {
 namespace LocalRateLimit {
 
-SINGLETON_MANAGER_REGISTRATION(local_ratelimit_shared_manager);
+SINGLETON_MANAGER_REGISTRATION(local_ratelimit_share_provider_manager);
 
 class DefaultEvenShareMonitor : public ShareProviderManager::ShareMonitor {
 public:
@@ -58,7 +58,7 @@ ShareProviderManagerSharedPtr ShareProviderManager::singleton(Event::Dispatcher&
                                                               Upstream::ClusterManager& cm,
                                                               Singleton::Manager& manager) {
   return manager.getTyped<ShareProviderManager>(
-      SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit_shared_manager),
+      SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit_share_provider_manager),
       [&dispatcher, &cm]() -> Singleton::InstanceSharedPtr {
         const auto& local_cluster_name = cm.localClusterName();
         if (!local_cluster_name.has_value()) {
