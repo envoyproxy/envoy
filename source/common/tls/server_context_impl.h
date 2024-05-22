@@ -89,6 +89,21 @@ private:
   bool full_scan_certs_on_sni_mismatch_;
 };
 
+class ServerContextFactoryImpl : public ServerContextFactory {
+public:
+  std::string name() const override { return "envoy.ssl.server_context_factory.default"; }
+  Ssl::ServerContextSharedPtr
+  createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+                      const std::vector<std::string>& server_names,
+                      Server::Configuration::CommonFactoryContext& factory_context,
+                      Ssl::ContextAdditionalInitFunc additional_init) override {
+    return std::make_shared<ServerContextImpl>(scope, config, server_names, factory_context,
+                                               std::move(additional_init));
+  }
+};
+
+DECLARE_FACTORY(ServerContextFactoryImpl);
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

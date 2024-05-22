@@ -64,6 +64,12 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: admission control
+  change: |
+    Fixed the thread-local controller's average RPS calculation to be calculated over the full
+    lookback window. Previously, the controller would calculate the average RPS over the amount of
+    time elapsed since the oldest valid request sample. This change brings the behavior in line with
+    the documentation.
 - area: outlier detection
   change: |
     Fixed :ref:`successful_active_health_check_uneject_host
