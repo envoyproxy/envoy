@@ -241,6 +241,19 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   bool force_cache_refresh = false;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reresolve_if_no_connections")) {
+    // For Envoy Mobile, we need to handle endpoints becoming unreachable and needing a new DNS
+    // resolution on network change (WIFI to cellular and vice versa). This is expected to be
+    // more performant than the current pattern when enable_drain_post_dns_refresh_ = true
+    // in mobile/library/common/network/connectivity_manager.cc because that force-drains endpoints
+    // even if addresses don't change where this does induce DNS latency if there hasn't been a
+    // network change if the endpoint hasn't been referenced recently, but also guarantees there
+    // will be a DNS resolution relevant to the current network and is more consistent with other
+    // vetted and tested client stacks (e.g. cronet) and resolution any time an endpoint becomes
+    // unreachable.
+    //
+    // If this runtime guard proves useful for Envoy Mobile, it will be replaced
+    // either with a permanent knob or non-reloadable runtime guard (see TODO in
+    // runtime_features.cc)
     auto dfp_lb =
         dynamic_cast<Extensions::Common::DynamicForwardProxy::DfpLb*>(&cluster->loadBalancer());
     if (dfp_lb) {
