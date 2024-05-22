@@ -1038,7 +1038,7 @@ void ClientConnectionImpl::connect() {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
     setFailureReason(absl::StrCat(
-        "immediate connect error: ", errorDetails(result.errno_), "remote address family:",
+        "immediate connect error: ", errorDetails(result.errno_), "|remote address family:",
         socket_->connectionInfoProvider().remoteAddress()->ip()->version() == Address::IpVersion::v4
             ? "v4"
             : "v6"));
