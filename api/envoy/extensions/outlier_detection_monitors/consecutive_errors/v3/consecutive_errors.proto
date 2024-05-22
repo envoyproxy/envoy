@@ -23,9 +23,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // is unhealthy.
 message ConsecutiveErrors {
   // Monitor name.
-  string name = 1;
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The number of consecutive errors before ejection occurs.
+  // Defaults to 3.
   google.protobuf.UInt32Value threshold = 2 [(validate.rules).uint32 = {lte: 100}];
 
   // The % chance that a host is actually ejected. Defaults to 100.
