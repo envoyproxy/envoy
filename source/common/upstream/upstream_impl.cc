@@ -1290,7 +1290,9 @@ ClusterInfoImpl::ClusterInfoImpl(
       codec_filter->mutable_typed_config()->PackFrom(
           envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
-    if (http_filters[http_filters.size() - 1].name() != "envoy.filters.http.upstream_codec") {
+    if (http_filters[http_filters.size() - 1].typed_config().type_url() !=
+        TypeUtil::descriptorFullNameToTypeUrl(
+            "envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec")) {
       throwEnvoyExceptionOrPanic(
           fmt::format("The codec filter is the only valid terminal upstream HTTP filter"));
     }
