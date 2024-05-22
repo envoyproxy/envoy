@@ -248,8 +248,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     // even if addresses don't change where this does induce DNS latency if there hasn't been a
     // network change if the endpoint hasn't been referenced recently, but also guarantees there
     // will be a DNS resolution relevant to the current network and is more consistent with other
-    // vetted and tested client stacks (e.g. cronet) and resolution any time an endpoint becomes
-    // unreachable.
+    // vetted and tested client stacks and resolution any time an endpoint becomes unreachable.
     //
     // If this runtime guard proves useful for Envoy Mobile, it will be replaced
     // either with a permanent knob or non-reloadable runtime guard (see TODO in

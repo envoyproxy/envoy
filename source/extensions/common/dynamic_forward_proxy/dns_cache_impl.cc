@@ -301,7 +301,7 @@ void DnsCacheImpl::removeHost(const std::string& host, const PrimaryHostInfo& pr
     host_to_erase = std::move(host_it->second);
     primary_hosts_.erase(host_it);
   }
-  // In the case of force-remove and reresolve, don't cancel outstanding resolve
+  // In the case of force-remove and resolve, don't cancel outstanding resolve
   // callbacks on remove, as a resolve is pending.
   if (update_threads) {
     notifyThreads(host, primary_host.host_info_);
