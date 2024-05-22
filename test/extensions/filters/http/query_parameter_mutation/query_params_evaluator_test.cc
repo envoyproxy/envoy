@@ -8,7 +8,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Router {
+namespace Extensions {
+namespace HttpFilters {
+namespace QueryParameterMutation {
 
 TEST(QueryParamsEvaluatorTest, EmptyConfigEvaluator) {
   const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter> query_params_to_add;
@@ -68,5 +70,7 @@ TEST(QueryParamsEvaluatorTest, AddEmptyValue) {
   EXPECT_EQ("/path?bar=123&foo=", request_headers.getPathValue());
 }
 
-} // namespace Router
+} // namespace QueryParameterMutation
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

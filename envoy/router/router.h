@@ -1125,8 +1125,6 @@ public:
    * @return EarlyDataPolicy& the configured early data option.
    */
   virtual const EarlyDataPolicy& earlyDataPolicy() const PURE;
-
-  virtual bool mostSpecificHeaderMutationWins() const PURE;
 };
 
 /**

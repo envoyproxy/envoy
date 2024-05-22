@@ -10,7 +10,9 @@
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
-namespace Router {
+namespace Extensions {
+namespace HttpFilters {
+namespace QueryParameterMutation {
 
 class QueryParamsEvaluator;
 using QueryParamsEvaluatorPtr = std::unique_ptr<QueryParamsEvaluator>;
@@ -22,6 +24,11 @@ public:
                 query_params_to_add,
             const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove);
 
+  /**
+   * Processes headers first through query parameter removals then through query parameter
+   * additions. Header is modified in-place.
+   * @param headers supplies the request headers.
+   */
   void evaluateQueryParams(Http::RequestHeaderMap& headers) const;
 
 protected:
@@ -32,5 +39,7 @@ private:
   std::vector<std::string> query_params_to_remove_;
 };
 
-} // namespace Router
+} // namespace QueryParameterMutation
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

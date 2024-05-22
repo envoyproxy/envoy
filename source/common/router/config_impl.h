@@ -672,7 +672,6 @@ public:
     }
     return HeaderParser::defaultParser();
   }
-  bool mostSpecificHeaderMutationWins() const override;
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
@@ -846,9 +845,6 @@ public:
       return parent_->responseHeaderTransforms(stream_info, do_formatting);
     }
 
-    bool mostSpecificHeaderMutationWins() const override {
-      return parent_->mostSpecificHeaderMutationWins();
-    }
     const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }
     const Http::HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
     const HedgePolicy& hedgePolicy() const override { return parent_->hedgePolicy(); }

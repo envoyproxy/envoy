@@ -1,12 +1,15 @@
 #include "source/extensions/filters/http/query_parameter_mutation/query_params_evaluator.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 
 #include "envoy/http/query_params.h"
 
 namespace Envoy {
-namespace Router {
+namespace Extensions {
+namespace HttpFilters {
+namespace QueryParameterMutation {
 
 QueryParamsEvaluatorPtr QueryParamsEvaluator::configure(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter>& query_params_to_add,
@@ -14,8 +17,8 @@ QueryParamsEvaluatorPtr QueryParamsEvaluator::configure(
   QueryParamsEvaluatorPtr query_params_evaluator(new QueryParamsEvaluator());
 
   for (const auto& query_param : query_params_to_add) {
-    const auto& pair = std::make_pair(query_param.key(), query_param.value());
-    query_params_evaluator->query_params_to_add_.emplace_back(pair);
+    query_params_evaluator->query_params_to_add_.emplace_back(
+        std::make_pair(query_param.key(), query_param.value()));
   }
 
   for (const auto& val : query_params_to_remove) {
@@ -48,5 +51,7 @@ void QueryParamsEvaluator::evaluateQueryParams(Http::RequestHeaderMap& headers) 
   headers.setPath(new_path);
 }
 
-} // namespace Router
+} // namespace QueryParameterMutation
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -6,7 +6,6 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
@@ -857,10 +856,6 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
 }
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
-
-bool RouteEntryImplBase::mostSpecificHeaderMutationWins() const {
-  return vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins();
-}
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,

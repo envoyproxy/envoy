@@ -14,15 +14,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace QueryParameterMutation {
 
-Config::Config(
-    const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config)
-    : query_params_evaluator_(Router::QueryParamsEvaluator::configure(
-          proto_config.query_parameters_to_add(), proto_config.query_parameters_to_remove())) {}
+Config::Config(const FilterConfigProto& config)
+    : query_params_evaluator_(QueryParamsEvaluator::configure(
+          config.query_parameters_to_add(), config.query_parameters_to_remove())) {}
 
 void Config::evaluateQueryParams(Http::RequestHeaderMap& headers) const {
   query_params_evaluator_->evaluateQueryParams(headers);
 }
-
 
 Filter::Filter(ConfigSharedPtr config) : config_(config) {}
 
@@ -31,7 +29,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   config_->evaluateQueryParams(headers);
 
-  if (decoder_callbacks_->route()->routeEntry()->mostSpecificHeaderMutationWins()) {
+  const auto& virtual_host = decoder_callbacks_->route()->routeEntry()->virtualHost();
+  if (virtual_host.routeConfig().mostSpecificHeaderMutationsWins()) {
     for (auto config : route_configs_) {
       config->evaluateQueryParams(headers);
     }
@@ -40,7 +39,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       (*it)->evaluateQueryParams(headers);
     }
   }
-  
+
   return Http::FilterHeadersStatus::Continue;
 }
 

@@ -52,6 +52,7 @@ HTTP filters
   oauth2_filter
   on_demand_updates_filter
   original_src_filter
+  query_parameter_mutation_filter
   rate_limit_filter
   rate_limit_quota_filter
   rbac_filter

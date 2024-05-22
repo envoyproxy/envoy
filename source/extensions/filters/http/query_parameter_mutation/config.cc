@@ -9,18 +9,19 @@ namespace Extensions {
 namespace HttpFilters {
 namespace QueryParameterMutation {
 
-Http::FilterFactoryCb Factory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto,
-    const std::string&, Server::Configuration::FactoryContext&) {
+Http::FilterFactoryCb
+Factory::createFilterFactoryFromProtoTyped(const FilterConfigProto& proto, const std::string&,
+                                           Server::Configuration::FactoryContext&) {
   auto config = std::make_shared<Config>(proto);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Filter>(config));
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr Factory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+Router::RouteSpecificFilterConfigConstSharedPtr
+Factory::createRouteSpecificFilterConfigTyped(const FilterConfigProto& proto_config,
+                                              Server::Configuration::ServerFactoryContext&,
+                                              ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<Config>(proto_config);
 }
 

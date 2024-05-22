@@ -111,9 +111,6 @@ struct RouteEntryImpl : public Router::RouteEntry {
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
     return {};
   }
-  bool mostSpecificHeaderMutationWins() const override {
-    return true;
-  }
   void finalizeRequestHeaders(Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                               bool) const override {}
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo&,

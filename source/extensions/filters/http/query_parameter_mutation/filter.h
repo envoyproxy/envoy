@@ -17,15 +17,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace QueryParameterMutation {
 
+using FilterConfigProto = envoy::extensions::filters::http::query_parameter_mutation::v3::Config;
+
 class Config : public Router::RouteSpecificFilterConfig {
 public:
-  Config(
-      const envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config);
+  Config(const FilterConfigProto& config);
 
   void evaluateQueryParams(Http::RequestHeaderMap& headers) const;
 
 private:
-  Router::QueryParamsEvaluatorPtr query_params_evaluator_;
+  QueryParamsEvaluatorPtr query_params_evaluator_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
