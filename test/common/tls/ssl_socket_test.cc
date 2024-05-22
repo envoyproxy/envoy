@@ -337,7 +337,7 @@ Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                     Random::RandomGenerator& rng, Event::Dispatcher& dispatcher) {
   return std::make_unique<Network::TcpListenerImpl>(
       dispatcher, rng, runtime, socket, cb, listener_config.bindToPort(),
-      listener_config.ignoreGlobalConnLimit(),
+      listener_config.ignoreGlobalConnLimit(), listener_config.shouldBypassOverloadManager(),
       listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 }
 
@@ -994,6 +994,7 @@ protected:
     return std::make_unique<Network::TcpListenerImpl>(
         dispatcher, api_->randomGenerator(), runtime, std::move(socket), cb,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.shouldBypassOverloadManager(),
         listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
   }
 
