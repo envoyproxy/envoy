@@ -153,7 +153,7 @@ public:
   }
 
   void basicTest();
-  void trickleTest(bool final_chunk_empty);
+  void trickleTest(bool final_chunk_has_data);
   void explicitFlowControlWithCancels(uint32_t body_size = 1000, bool terminate_engine = false);
 
   static std::string protocolToString(Http::CodecType type) {
