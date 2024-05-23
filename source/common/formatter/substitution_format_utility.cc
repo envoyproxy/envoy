@@ -114,12 +114,11 @@ void SubstitutionFormatUtils::parseSubcommandHeaders(const std::string& subcomma
         absl::StrCat("More than 1 alternative header specified in token: ", subcommand));
   }
 
-  std::cerr << "Validating '" << main_header << "' and '" << alternative_header << "'\n";
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consistent_header_validation")) {
     if (!Http::HeaderUtility::headerNameIsValid(absl::AsciiStrToLower(main_header)) ||
         !Http::HeaderUtility::headerNameIsValid(absl::AsciiStrToLower(alternative_header))) {
       throwEnvoyExceptionOrPanic(
-          "Invalid header configuration. Format string contains null or newline.");
+          "Invalid header configuration. Format string contains invalid characters.");
     }
   } else {
     // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
