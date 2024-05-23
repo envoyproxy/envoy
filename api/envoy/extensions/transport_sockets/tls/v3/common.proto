@@ -339,6 +339,9 @@ message CertificateValidationContext {
     ACCEPT_UNTRUSTED = 1;
   }
 
+  message SystemRootCerts {
+  }
+
   reserved 4, 5;
 
   reserved "verify_subject_alt_name";
@@ -390,10 +393,10 @@ message CertificateValidationContext {
       [(udpa.annotations.field_migrate).oneof_promotion = "ca_cert_source"];
 
   // Use system root certs for validation.
-  // If true, system root certs are used only if neither of the ``trusted_ca``
+  // If present, system root certs are used only if neither of the ``trusted_ca``
   // or ``ca_certificate_provider_instance`` fields are set.
   // [#not-implemented-hide:]
-  bool use_system_root_certs = 17;
+  SystemRootCerts system_root_certs = 17;
 
   // If specified, updates of a file-based ``trusted_ca`` source will be triggered
   // by this watch. This allows explicit control over the path watched, by
