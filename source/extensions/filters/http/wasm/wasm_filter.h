@@ -54,6 +54,9 @@ public:
   }
 
 private:
+  void createWasm(PluginSharedPtr plugin,
+                  Envoy::Server::Configuration::ServerFactoryContext& server,
+                  const Stats::ScopeSharedPtr& scope, Envoy::Init::Manager& init_manager);
   ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
 };
