@@ -115,8 +115,9 @@ void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket&
   if (connection_socket.isOpen()) {
     connection_socket.ioHandle().initializeFileEvent(
         dispatcher_,
-        [this, &connection_socket](uint32_t events) -> void {
+        [this, &connection_socket](uint32_t events) {
           onFileEvent(events, connection_socket);
+          return absl::OkStatus();
         },
         Event::PlatformDefaultTriggerType,
         Event::FileReadyType::Read | Event::FileReadyType::Write);

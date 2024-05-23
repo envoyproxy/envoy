@@ -51,7 +51,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
   private final boolean mEnableInterfaceBinding = false;
-  private final boolean mEnableProxying = false;
+  private boolean mEnableProxying = false;
   private final int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 1;
   private final int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private final int mMaxConnectionsPerHost = 7;
@@ -117,6 +117,16 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setDnsQueryTimeoutSeconds(int timeout) {
     mDnsQueryTimeoutSeconds = timeout;
+    return this;
+  }
+
+  /**
+   * Enable Android system proxying.
+   *
+   * @param enable If true, enable Android proxying; otherwise, don't.
+   */
+  public NativeCronvoyEngineBuilderImpl setEnableProxying(boolean enable) {
+    mEnableProxying = enable;
     return this;
   }
 

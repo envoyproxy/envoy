@@ -217,5 +217,8 @@ LocalRefUniquePtr<jobject>
 cppBufferInstanceToJavaNonDirectByteBuffer(JniHelper& jni_helper,
                                            const Buffer::Instance& cpp_buffer_instance);
 
+/** Gets the Java exception message from the `throwable`. */
+std::string getJavaExceptionMessage(JniHelper& jni_helper, jthrowable throwable);
+
 } // namespace JNI
 } // namespace Envoy
