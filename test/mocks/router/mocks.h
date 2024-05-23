@@ -458,7 +458,6 @@ public:
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
   MOCK_METHOD(const RouteStatsContextOptRef, routeStatsContext, (), (const));
-  MOCK_METHOD(bool, mostSpecificHeaderMutationWins, (), (const));
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -479,7 +478,6 @@ public:
   UpgradeMap upgrade_map_;
   absl::optional<ConnectConfig> connect_config_;
   testing::NiceMock<MockEarlyDataPolicy> early_data_policy_;
-  bool most_specific_header_mutation_wins_{true};
 };
 
 class MockDecorator : public Decorator {
