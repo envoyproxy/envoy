@@ -119,6 +119,8 @@ private:
     // onDNSServiceGetAddrInfoReply callback.
     struct PendingResponse {
       ResolutionStatus status_;
+      bool v4_response_received_;
+      bool v6_response_received_;
       std::list<DnsResponse> v4_responses_;
       std::list<DnsResponse> v6_responses_;
       std::list<DnsResponse> all_responses_;
@@ -131,6 +133,7 @@ private:
     Event::Dispatcher& dispatcher_;
     Event::FileEventPtr sd_ref_event_;
     DNSServiceRef sd_ref_{};
+    DNSServiceProtocol query_protocol_;
     const std::string dns_name_;
     bool synchronously_completed_{};
     bool owned_{};
