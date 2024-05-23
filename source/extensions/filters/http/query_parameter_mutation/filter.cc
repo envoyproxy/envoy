@@ -17,8 +17,9 @@ Config::Config(const FilterConfigProto& config)
     : query_params_evaluator_(std::make_unique<QueryParamsEvaluator>(
           config.query_parameters_to_add(), config.query_parameters_to_remove())) {}
 
-void Config::evaluateQueryParams(Http::RequestHeaderMap& headers) const {
-  query_params_evaluator_->evaluateQueryParams(headers);
+void Config::evaluateQueryParams(Http::RequestHeaderMap& headers,
+                                 StreamInfo::StreamInfo& stream_info) const {
+  query_params_evaluator_->evaluateQueryParams(headers, stream_info);
 }
 
 Filter::Filter(ConfigSharedPtr config) : config_(config) {}
@@ -26,16 +27,17 @@ Filter::Filter(ConfigSharedPtr config) : config_(config) {}
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   route_configs_ = Http::Utility::getAllPerFilterConfig<Config>(decoder_callbacks_);
 
-  config_->evaluateQueryParams(headers);
+  auto& stream_info = decoder_callbacks_->streamInfo();
+  config_->evaluateQueryParams(headers, stream_info);
 
   const auto& virtual_host = decoder_callbacks_->route()->routeEntry()->virtualHost();
   if (virtual_host.routeConfig().mostSpecificHeaderMutationsWins()) {
     for (auto config : route_configs_) {
-      config->evaluateQueryParams(headers);
+      config->evaluateQueryParams(headers, stream_info);
     }
   } else {
     for (auto it = route_configs_.rbegin(); it != route_configs_.rend(); ++it) {
-      (*it)->evaluateQueryParams(headers);
+      (*it)->evaluateQueryParams(headers, stream_info);
     }
   }
 

@@ -22,7 +22,8 @@ class Config : public Router::RouteSpecificFilterConfig {
 public:
   Config(const FilterConfigProto& config);
 
-  void evaluateQueryParams(Http::RequestHeaderMap& headers) const;
+  void evaluateQueryParams(Http::RequestHeaderMap& headers,
+                           StreamInfo::StreamInfo& stream_info) const;
 
 private:
   QueryParamsEvaluatorPtr query_params_evaluator_;

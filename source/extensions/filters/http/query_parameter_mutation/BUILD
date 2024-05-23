@@ -45,8 +45,10 @@ envoy_cc_library(
     srcs = ["query_params_evaluator.cc"],
     hdrs = ["query_params_evaluator.h"],
     deps = [
+        "//envoy/formatter:substitution_formatter_interface",
         "//envoy/http:header_map_interface",
         "//envoy/http:query_params_interface",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

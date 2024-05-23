@@ -4,8 +4,10 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/query_params.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -27,8 +29,11 @@ public:
    * Processes headers first through query parameter removals then through query parameter
    * additions. Header is modified in-place.
    * @param headers supplies the request headers.
+   * @param stream_info used by the substitution formatter. Can be retrieved via
+   * decoder_callbacks_.streamInfo();
    */
-  void evaluateQueryParams(Http::RequestHeaderMap& headers) const;
+  void evaluateQueryParams(Http::RequestHeaderMap& headers,
+                           StreamInfo::StreamInfo& stream_info) const;
 
 protected:
   QueryParamsEvaluator() = default;
@@ -36,6 +41,7 @@ protected:
 private:
   Http::Utility::QueryParamsVector query_params_to_add_;
   std::vector<std::string> query_params_to_remove_;
+  Formatter::FormatterPtr formatter_;
 };
 
 } // namespace QueryParameterMutation

@@ -5,6 +5,8 @@
 #include <utility>
 
 #include "envoy/http/query_params.h"
+#include "envoy/stream_info/stream_info.h"
+#include "source/common/formatter/substitution_formatter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,6 +16,8 @@ namespace QueryParameterMutation {
 QueryParamsEvaluator::QueryParamsEvaluator(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter>& query_params_to_add,
     const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove) {
+
+  formatter_ = std::make_unique<Formatter::FormatterImpl>("", true);
   for (const auto& query_param : query_params_to_add) {
     query_params_to_add_.emplace_back(std::make_pair(query_param.key(), query_param.value()));
   }
@@ -23,7 +27,8 @@ QueryParamsEvaluator::QueryParamsEvaluator(
   }
 }
 
-void QueryParamsEvaluator::evaluateQueryParams(Http::RequestHeaderMap& headers) const {
+void QueryParamsEvaluator::evaluateQueryParams(Http::RequestHeaderMap& headers,
+                                               StreamInfo::StreamInfo& stream_info) const {
   if (query_params_to_remove_.empty() && query_params_to_add_.empty()) {
     return;
   }
@@ -38,8 +43,10 @@ void QueryParamsEvaluator::evaluateQueryParams(Http::RequestHeaderMap& headers) 
   }
 
   // Add new desired query parameters.
+  Formatter::HttpFormatterContext ctx{&headers};
   for (const auto& [key, val] : query_params_to_add_) {
-    query_params.add(key, val);
+    const auto formatter = std::make_unique<Formatter::FormatterImpl>(val, true);
+    query_params.add(key, formatter->formatWithContext(ctx, stream_info));
   }
 
   const auto new_path = query_params.replaceQueryString(headers.Path()->value());
