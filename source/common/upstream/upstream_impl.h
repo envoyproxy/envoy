@@ -874,8 +874,8 @@ public:
   const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
     return http_protocol_options_->common_http_protocol_options_;
   }
-  void configureLbPolicies(const envoy::config::cluster::v3::Cluster& config,
-                           Server::Configuration::ServerFactoryContext& context);
+  absl::Status configureLbPolicies(const envoy::config::cluster::v3::Cluster& config,
+                                   Server::Configuration::ServerFactoryContext& context);
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
   envoy::config::cluster::v3::Cluster::DiscoveryType type() const override { return type_; }
@@ -1020,10 +1020,10 @@ private:
     ResourceManagers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
                      const std::string& cluster_name, Stats::Scope& stats_scope,
                      const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names);
-    ResourceManagerImplPtr load(const envoy::config::cluster::v3::Cluster& config,
-                                Runtime::Loader& runtime, const std::string& cluster_name,
-                                Stats::Scope& stats_scope,
-                                const envoy::config::core::v3::RoutingPriority& priority);
+    absl::StatusOr<ResourceManagerImplPtr>
+    load(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
+         const std::string& cluster_name, Stats::Scope& stats_scope,
+         const envoy::config::core::v3::RoutingPriority& priority);
 
     using Managers = std::array<ResourceManagerImplPtr, NumResourcePriorities>;
 
@@ -1147,7 +1147,7 @@ public:
    * @param address supplies the address proto to resolve.
    * @return Network::Address::InstanceConstSharedPtr the resolved address.
    */
-  const Network::Address::InstanceConstSharedPtr
+  absl::StatusOr<const Network::Address::InstanceConstSharedPtr>
   resolveProtoAddress(const envoy::config::core::v3::Address& address);
 
   // Partitions the provided list of hosts into three new lists containing the healthy, degraded
@@ -1226,7 +1226,7 @@ protected:
   TimeSource& time_source_;
   MainPrioritySetImpl priority_set_;
 
-  void validateEndpointsForZoneAwareRouting(
+  absl::Status validateEndpointsForZoneAwareRouting(
       const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const;
 
 private:
