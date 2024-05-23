@@ -1451,6 +1451,7 @@ viewport
 vip
 virtualhost
 virtualize
+virtualized
 vptr
 vtable
 vtt
