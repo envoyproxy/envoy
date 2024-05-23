@@ -162,7 +162,7 @@ class MonitorFactory : public Envoy::Config::TypedFactory {
 public:
   ~MonitorFactory() override = default;
 
-  virtual MonitorPtr createMonitor(const Protobuf::Message& config,
+  virtual MonitorPtr createMonitor(const std::string& name, const Protobuf::Message& config,
                                    MonitorFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.outlier_detection_monitors"; }
@@ -170,9 +170,10 @@ public:
 
 template <class ConfigProto> class MonitorFactoryBase : public MonitorFactory {
 public:
-  MonitorPtr createMonitor(const Protobuf::Message& config,
+  MonitorPtr createMonitor(const std::string& monitor_name, const Protobuf::Message& config,
                            MonitorFactoryContext& context) override {
-    return createMonitorFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
+    return createMonitorFromProtoTyped(monitor_name,
+                                       MessageUtil::downcastAndValidate<const ConfigProto&>(
                                            config, context.messageValidationVisitor()),
                                        context);
   }
@@ -186,7 +187,8 @@ public:
   MonitorFactoryBase(const std::string& name) : name_(name) {}
 
 private:
-  virtual MonitorPtr createMonitorFromProtoTyped(const ConfigProto& config,
+  virtual MonitorPtr createMonitorFromProtoTyped(const std::string& monitor_name,
+                                                 const ConfigProto& config,
                                                  MonitorFactoryContext& context) PURE;
 
   const std::string name_;

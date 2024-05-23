@@ -31,11 +31,12 @@ public:
       : MonitorFactoryBase("envoy.outlier_detection_monitors.consecutive_errors") {}
 
 private:
-  MonitorPtr createMonitorFromProtoTyped(const envoy::extensions::outlier_detection_monitors::
+  MonitorPtr createMonitorFromProtoTyped(const std::string& monitor_name,
+                                         const envoy::extensions::outlier_detection_monitors::
                                              consecutive_errors::v3::ConsecutiveErrors& config,
                                          MonitorFactoryContext&) override {
     auto monitor = std::make_unique<ConsecutiveErrorsMonitor>(
-        config.name(), config.enforcing().value(),
+        monitor_name, config.enforcing().value(),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, threshold, 3));
     monitor->processBucketsConfig(config.error_buckets());
 

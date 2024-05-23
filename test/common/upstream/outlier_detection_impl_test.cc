@@ -2730,10 +2730,9 @@ TEST_F(OutlierDetectorImplTest, BasicCall) {
     consecutive_local_origin_failure: 0
     split_external_local_origin_errors: true
     monitors:
-    - name: "envoy.outlier_detection_monitors.consecutive_errors"
+    - name: "5xx"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        name: 5xx
         threshold: 3
         enforcing: 100
         error_buckets:
@@ -2781,10 +2780,9 @@ TEST_F(OutlierDetectorImplTest, TwoExtensions) {
     consecutive_local_origin_failure: 0
     split_external_local_origin_errors: true
     monitors:
-    - name: "envoy.outlier_detection_monitors.consecutive_errors"
+    - name: "5xx"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        name: 5xx
         threshold: 3
         enforcing: 100
         error_buckets:
@@ -2792,10 +2790,9 @@ TEST_F(OutlierDetectorImplTest, TwoExtensions) {
             - range:
                 start: 500
                 end: 510
-    - name: "envoy.outlier_detection_monitors.consecutive_errors"
+    - name: "local_origin_monitor"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        name: local_origin_monitor
         threshold: 3
         enforcing: 100
         error_buckets:
@@ -2843,10 +2840,9 @@ TEST_F(OutlierDetectorImplTest, TwoExtensionsOneOverlapping) {
     consecutive_local_origin_failure: 0
     split_external_local_origin_errors: true
     monitors:
-    - name: "envoy.outlier_detection_monitors.consecutive_errors"
+    - name: "5xx"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        name: 5xx
         threshold: 3
         enforcing: 100
         error_buckets:
@@ -2854,10 +2850,9 @@ TEST_F(OutlierDetectorImplTest, TwoExtensionsOneOverlapping) {
             - range:
                 start: 500
                 end: 510
-    - name: "envoy.outlier_detection_monitors.consecutive_errors"
+    - name: "local_origin_monitor"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        name: local_origin_monitor
         threshold: 3
         enforcing: 100
         error_buckets:
@@ -2931,10 +2926,9 @@ TEST_F(OutlierDetectorImplTest, TwoExtensionsOnePreferred) {
     consecutive_local_origin_failure: 0
     split_external_local_origin_errors: true
     monitors:
-    - name: "envoy.outlier_detection_monitors.consecutive_errors"
+    - name: "5xx"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        name: 5xx
         threshold: 3
         enforcing: 100
         error_buckets:
@@ -2942,10 +2936,9 @@ TEST_F(OutlierDetectorImplTest, TwoExtensionsOnePreferred) {
             - range:
                 start: 500
                 end: 510
-    - name: "envoy.outlier_detection_monitors.consecutive_errors"
+    - name: "local_origin_monitor"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        name: local_origin_monitor
         threshold: 3
         enforcing: 100
         error_buckets:

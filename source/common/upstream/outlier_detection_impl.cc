@@ -316,12 +316,12 @@ std::unique_ptr<Extensions::Outlier::MonitorsSet> DetectorConfig::createMonitorE
 
   auto monitors_set = std::make_unique<Extensions::Outlier::MonitorsSet>();
   Extensions::Outlier::MonitorFactoryContext context(validation_visitor_);
-  for (const auto& monitor : extensions_config_) {
+  for (const auto& monitor_config : extensions_config_) {
     auto& factory =
-        Config::Utility::getAndCheckFactory<Extensions::Outlier::MonitorFactory>(monitor);
-    auto config = Config::Utility::translateToFactoryConfig(
-        monitor, validation_visitor_ /*.staticValidationVisitor()*/, factory);
-    auto extension = factory.createMonitor(*config, context);
+        Config::Utility::getAndCheckFactory<Extensions::Outlier::MonitorFactory>(monitor_config);
+    auto config =
+        Config::Utility::translateToFactoryConfig(monitor_config, validation_visitor_, factory);
+    auto extension = factory.createMonitor(monitor_config.name(), *config, context);
     extension->setCallback(callback);
     monitors_set->addMonitor(std::move(extension));
   }

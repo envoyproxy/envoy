@@ -64,7 +64,7 @@ public:
   virtual ~ExtResult() = default;
 
 private:
-  ExtResultType type_;
+  const ExtResultType type_;
 };
 
 /**
