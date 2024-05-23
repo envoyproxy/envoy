@@ -406,7 +406,6 @@ envoy_cc_benchmark_binary(
 
 envoy_benchmark_test(
     name = "utility_trie_speed_test_benchmark_test",
-    size = "large",
     benchmark_binary = "utility_trie_speed_test",
 )
 

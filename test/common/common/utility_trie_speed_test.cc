@@ -66,40 +66,24 @@ template <class TableType> static void typedBmTrieLookups(benchmark::State& stat
   typedBmTrieLookups<TableType>(state, keys);
 }
 
-static void bmBigTrieLookups(benchmark::State& s) {
-  typedBmTrieLookups<TrieLookupTable<BigTrieEntry, const void*>>(s);
-}
-static void bmSmallTrieLookups(benchmark::State& s) {
-  typedBmTrieLookups<TrieLookupTable<SmallTrieEntry, const void*>>(s);
+static void bmTrieLookups(benchmark::State& s) {
+  typedBmTrieLookups<TrieLookupTable<const void*>>(s);
 }
 
 #define ADD_HEADER_TO_KEYS(name) keys.emplace_back(Http::Headers::get().name);
-static void bmBigTrieLookupsRequestHeaders(benchmark::State& s) {
+static void bmTrieLookupsRequestHeaders(benchmark::State& s) {
   std::vector<std::string> keys;
   INLINE_REQ_HEADERS(ADD_HEADER_TO_KEYS);
-  typedBmTrieLookups<TrieLookupTable<BigTrieEntry, const void*>>(s, keys);
+  typedBmTrieLookups<TrieLookupTable<const void*>>(s, keys);
 }
-static void bmSmallTrieLookupsRequestHeaders(benchmark::State& s) {
-  std::vector<std::string> keys;
-  INLINE_REQ_HEADERS(ADD_HEADER_TO_KEYS);
-  typedBmTrieLookups<TrieLookupTable<SmallTrieEntry, const void*>>(s, keys);
-}
-static void bmBigTrieLookupsResponseHeaders(benchmark::State& s) {
+static void bmTrieLookupsResponseHeaders(benchmark::State& s) {
   std::vector<std::string> keys;
   INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
-  typedBmTrieLookups<TrieLookupTable<BigTrieEntry, const void*>>(s, keys);
-}
-static void bmSmallTrieLookupsResponseHeaders(benchmark::State& s) {
-  std::vector<std::string> keys;
-  INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
-  typedBmTrieLookups<TrieLookupTable<SmallTrieEntry, const void*>>(s, keys);
+  typedBmTrieLookups<TrieLookupTable<const void*>>(s, keys);
 }
 
-BENCHMARK(bmBigTrieLookupsRequestHeaders);
-BENCHMARK(bmBigTrieLookupsResponseHeaders);
-BENCHMARK(bmBigTrieLookups)->ArgsProduct({{10, 100, 1000, 10000}, {0, 8, 128}});
-BENCHMARK(bmSmallTrieLookupsRequestHeaders);
-BENCHMARK(bmSmallTrieLookupsResponseHeaders);
-BENCHMARK(bmSmallTrieLookups)->ArgsProduct({{10, 100, 1000, 10000}, {0, 8, 128}});
+BENCHMARK(bmTrieLookupsRequestHeaders);
+BENCHMARK(bmTrieLookupsResponseHeaders);
+BENCHMARK(bmTrieLookups)->ArgsProduct({{10, 100, 1000, 10000}, {0, 8, 128}});
 
 } // namespace Envoy

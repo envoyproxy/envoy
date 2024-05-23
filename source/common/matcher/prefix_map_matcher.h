@@ -31,7 +31,7 @@ protected:
   }
 
 private:
-  TrieLookupTable<SmallTrieEntry, std::shared_ptr<OnMatch<DataType>>> children_;
+  TrieLookupTable<std::shared_ptr<OnMatch<DataType>>> children_;
 };
 
 } // namespace Matcher

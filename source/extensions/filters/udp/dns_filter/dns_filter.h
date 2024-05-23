@@ -97,7 +97,7 @@ public:
   }
   const Network::DnsResolverFactory& dnsResolverFactory() const { return *dns_resolver_factory_; }
   Api::Api& api() const { return api_; }
-  const TrieLookupTable<SmallTrieEntry, DnsVirtualDomainConfigSharedPtr>& getDnsTrie() const {
+  const TrieLookupTable<DnsVirtualDomainConfigSharedPtr>& getDnsTrie() const {
     return dns_lookup_trie_;
   }
 
@@ -123,7 +123,7 @@ private:
 
   mutable DnsFilterStats stats_;
 
-  TrieLookupTable<SmallTrieEntry, DnsVirtualDomainConfigSharedPtr> dns_lookup_trie_;
+  TrieLookupTable<DnsVirtualDomainConfigSharedPtr> dns_lookup_trie_;
   absl::flat_hash_map<std::string, std::chrono::seconds> domain_ttl_;
   bool forward_queries_;
   uint64_t retry_count_;

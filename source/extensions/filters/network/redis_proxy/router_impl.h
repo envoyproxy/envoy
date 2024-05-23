@@ -85,7 +85,7 @@ public:
                  const StreamInfo::StreamInfo& stream_info);
 
 private:
-  TrieLookupTable<SmallTrieEntry, PrefixSharedPtr> prefix_lookup_table_;
+  TrieLookupTable<PrefixSharedPtr> prefix_lookup_table_;
   const bool case_insensitive_;
   Upstreams upstreams_;
   PrefixSharedPtr catch_all_route_;
