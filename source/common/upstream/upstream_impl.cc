@@ -573,6 +573,7 @@ Host::CreateConnectionData HostImplBase::createConnection(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
+  connection->streamInfo().upstreamInfo()->setUpstreamHost(host);
   return {std::move(connection), std::move(host)};
 }
 
