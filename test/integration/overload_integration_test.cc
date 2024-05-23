@@ -36,8 +36,8 @@ protected:
     updateResource(0);
   }
 
-  void
-  initializeWithBypassOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action) {
+  void initializeWithBypassOverloadManager(
+      const envoy::config::overload::v3::OverloadAction& overload_action) {
     setupOverloadManagerConfig(overload_action);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
@@ -266,7 +266,7 @@ TEST_P(OverloadIntegrationTest, BypassOverloadManagerTest) {
   // Put envoy in overloaded state and validate that it doesn't drop new requests
   // because we chose to bypass the overload manager on this listener.
   updateResource(1);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active",1);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},

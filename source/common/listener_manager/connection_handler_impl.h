@@ -172,8 +172,10 @@ class ConnectionHandlerFactoryImpl : public ConnectionHandlerFactory {
 public:
   std::unique_ptr<ConnectionHandler>
   createConnectionHandler(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index,
-                          OverloadManager& overload_manager, OverloadManager& null_overload_manager) override {
-    return std::make_unique<ConnectionHandlerImpl>(dispatcher, worker_index, overload_manager, null_overload_manager);
+                          OverloadManager& overload_manager,
+                          OverloadManager& null_overload_manager) override {
+    return std::make_unique<ConnectionHandlerImpl>(dispatcher, worker_index, overload_manager,
+                                                   null_overload_manager);
   }
   std::unique_ptr<ConnectionHandler>
   createConnectionHandler(Event::Dispatcher& dispatcher,

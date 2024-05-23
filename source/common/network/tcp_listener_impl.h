@@ -18,8 +18,7 @@ class TcpListenerImpl : public BaseListenerImpl {
 public:
   TcpListenerImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                   Runtime::Loader& runtime, SocketSharedPtr socket, TcpListenerCallbacks& cb,
-                  bool bind_to_port, bool ignore_global_conn_limit,
-                  bool bypass_overload_manager,
+                  bool bind_to_port, bool ignore_global_conn_limit, bool bypass_overload_manager,
                   uint32_t max_connections_to_accept_per_socket_event,
                   Server::ThreadLocalOverloadStateOptRef overload_state);
   ~TcpListenerImpl() override {

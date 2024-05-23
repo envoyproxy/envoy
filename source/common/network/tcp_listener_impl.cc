@@ -118,8 +118,7 @@ void TcpListenerImpl::onSocketEvent(short flags) {
 TcpListenerImpl::TcpListenerImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                                  Runtime::Loader& runtime, SocketSharedPtr socket,
                                  TcpListenerCallbacks& cb, bool bind_to_port,
-                                 bool ignore_global_conn_limit,
-                                 bool bypass_overload_manager,
+                                 bool ignore_global_conn_limit, bool bypass_overload_manager,
                                  uint32_t max_connections_to_accept_per_socket_event,
                                  Server::ThreadLocalOverloadStateOptRef overload_state)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), random_(random), runtime_(runtime),
@@ -176,9 +175,7 @@ void TcpListenerImpl::configureLoadShedPoints(
       "LoadShedPoint envoy.load_shed_points.tcp_listener_accept is not found. Is it configured?");
 }
 
-bool TcpListenerImpl::shouldBypassOverloadManager() const {
-  return bypass_overload_manager_;
-}
+bool TcpListenerImpl::shouldBypassOverloadManager() const { return bypass_overload_manager_; }
 
 } // namespace Network
 } // namespace Envoy

@@ -297,7 +297,9 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   return [singletons, filter_config, &context,
           clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
     auto& server_context = context.serverFactoryContext();
-    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager() ? server_context.nullOverloadManager() : server_context.overloadManager();
+    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+                                                    ? server_context.nullOverloadManager()
+                                                    : server_context.overloadManager();
 
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
@@ -865,7 +867,9 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   return [singletons, filter_config, &context, clear_hop_by_hop_headers](
              Network::ReadFilterCallbacks& read_callbacks) -> Http::ApiListenerPtr {
     auto& server_context = context.serverFactoryContext();
-    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager() ? server_context.nullOverloadManager() : server_context.overloadManager();
+    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+                                                    ? server_context.nullOverloadManager()
+                                                    : server_context.overloadManager();
 
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),

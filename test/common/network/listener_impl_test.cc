@@ -77,7 +77,8 @@ class TestTcpListenerImpl : public TcpListenerImpl {
 public:
   TestTcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random_generator,
                       Runtime::Loader& runtime, SocketSharedPtr socket, TcpListenerCallbacks& cb,
-                      bool bind_to_port, bool ignore_global_conn_limit, bool bypass_overload_manager,
+                      bool bind_to_port, bool ignore_global_conn_limit,
+                      bool bypass_overload_manager,
                       Server::ThreadLocalOverloadStateOptRef overload_state)
       : TestTcpListenerImpl(dispatcher, random_generator, runtime, socket, cb, bind_to_port,
                             ignore_global_conn_limit, bypass_overload_manager,
@@ -85,13 +86,13 @@ public:
 
   TestTcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random_generator,
                       Runtime::Loader& runtime, SocketSharedPtr socket, TcpListenerCallbacks& cb,
-                      bool bind_to_port, bool ignore_global_conn_limit, bool bypass_overload_manager,
+                      bool bind_to_port, bool ignore_global_conn_limit,
+                      bool bypass_overload_manager,
                       uint32_t max_connections_to_accept_per_socket_event,
                       Server::ThreadLocalOverloadStateOptRef overload_state)
       : TcpListenerImpl(dispatcher, random_generator, runtime, socket, cb, bind_to_port,
                         ignore_global_conn_limit, bypass_overload_manager,
-                        max_connections_to_accept_per_socket_event,
-                        overload_state) {}
+                        max_connections_to_accept_per_socket_event, overload_state) {}
 
   MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (os_fd_t fd));
 };
@@ -114,7 +115,8 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
                                         listener_callbacks1, true, false, false, overload_state);
   Network::MockTcpListenerCallbacks listener_callbacks2;
   Network::TestTcpListenerImpl listenerDst(dispatcherImpl(), random_generator, runtime, socketDst,
-                                           listener_callbacks2, false, false, false, overload_state);
+                                           listener_callbacks2, false, false, false,
+                                           overload_state);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),

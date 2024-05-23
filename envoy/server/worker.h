@@ -107,7 +107,8 @@ public:
   /**
    * @param index supplies the index of the worker, in the range of [0, concurrency).
    * @param overload_manager supplies the server's overload manager.
-   * @param null_overload_manager supplies the server's null overload manager for conditions where overload manager is disabled.
+   * @param null_overload_manager supplies the server's null overload manager for conditions where
+   * overload manager is disabled.
    * @param worker_name supplies the name of the worker, used for per-worker stats.
    * @return WorkerPtr a new worker.
    */

@@ -155,8 +155,7 @@ public:
   RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
             Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
             Init::Manager& init_manager, OverloadManager& overload_manager,
-            OverloadManager& null_overload_manager,
-            std::function<void()> workers_start_cb);
+            OverloadManager& null_overload_manager, std::function<void()> workers_start_cb);
 
 private:
   Init::WatcherImpl init_watcher_;

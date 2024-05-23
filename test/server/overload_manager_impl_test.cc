@@ -10,8 +10,8 @@
 
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/resource_monitors/common/factory_base.h"
-#include "source/server/overload_manager_impl.h"
 #include "source/server/null_overload_manager.h"
+#include "source/server/overload_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"

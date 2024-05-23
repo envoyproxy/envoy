@@ -135,7 +135,8 @@ public:
   void setSinkPredicates(std::unique_ptr<Stats::SinkPredicates>&&) override {}
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(uint32_t, OverloadManager&, OverloadManager&, const std::string&) override {
+  WorkerPtr createWorker(uint32_t, OverloadManager&, OverloadManager&,
+                         const std::string&) override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
