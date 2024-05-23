@@ -368,7 +368,7 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
     // We only buffer the onStreamClose if we had no errors.
     if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
       ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
-                     status.message()); // GCOV_EXCL_LINE
+                     status.message()); // LCOV_EXCL_LINE
     }
   }
 }
@@ -787,7 +787,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
     // its stream close.
     if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
       ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
-                     status.message()); // GCOV_EXCL_LINE
+                     status.message()); // LCOV_EXCL_LINE
     }
     return;
   }
@@ -985,7 +985,7 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
     // protections that Envoy's codec does not have.
     if (rc == NGHTTP2_ERR_FLOODED) {
       return bufferFloodError(
-          "Flooding was detected in this HTTP/2 session, and it must be closed"); // GCOV_EXCL_LINE
+          "Flooding was detected in this HTTP/2 session, and it must be closed"); // LCOV_EXCL_LINE
     }
     if (rc != static_cast<ssize_t>(slice.len_)) {
       return codecProtocolError(nghttp2_strerror(rc));
@@ -1188,7 +1188,7 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
 
   default:
     // We do not currently support push.
-    ENVOY_BUG(false, "push not supported"); // GCOV_EXCL_LINE
+    ENVOY_BUG(false, "push not supported"); // LCOV_EXCL_LINE
   }
 
   stream->advanceHeadersState();
@@ -1312,7 +1312,7 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
 
   default:
     // Unknown error conditions. Trigger ENVOY_BUG and connection close.
-    ENVOY_BUG(false, absl::StrCat("Unexpected error_code: ", error_code)); // GCOV_EXCL_LINE
+    ENVOY_BUG(false, absl::StrCat("Unexpected error_code: ", error_code)); // LCOV_EXCL_LINE
     break;
   }
 
