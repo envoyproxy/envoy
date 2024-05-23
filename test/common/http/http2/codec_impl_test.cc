@@ -3522,6 +3522,25 @@ TEST_P(Http2CodecImplTest, WindowUpdateFloodOverride) {
   EXPECT_NO_THROW(driveToCompletion());
 }
 
+TEST_P(Http2CodecImplTest, DataFrameWithPadding) {
+  initialize();
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setMethod("POST");
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+  Http2Frame dataFrame = Http2Frame::makeDataFrameWithPadding(Http2Frame::makeClientStreamId(0),
+                                                              "some data with padding", 193);
+  Buffer::OwnedImpl data;
+  data.add(dataFrame.data(), dataFrame.size());
+  server_wrapper_->buffer_.add(std::move(data));
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  driveToCompletion();
+  const Http::Status& status = server_wrapper_->status_;
+  EXPECT_TRUE(status.ok());
+}
+
 TEST_P(Http2CodecImplTest, EmptyDataFlood) {
   expect_buffered_data_on_teardown_ = true;
   Buffer::OwnedImpl data;
