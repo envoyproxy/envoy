@@ -141,4 +141,56 @@ TEST(EngineTest, SetEventTracker) {
   EXPECT_TRUE(on_track.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 
+TEST(EngineTest, DontWaitForOnEngineRunning) {
+  Platform::EngineBuilder engine_builder;
+  engine_builder.setLogLevel(Logger::Logger::debug).enforceTrustChainVerification(false);
+  EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
+
+  std::string actual_status_code;
+  bool actual_end_stream = false;
+  absl::Notification stream_complete;
+  EnvoyStreamCallbacks stream_callbacks;
+  stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers, bool end_stream,
+                                     envoy_stream_intel) {
+    actual_status_code = headers.getStatusValue();
+    actual_end_stream = end_stream;
+  };
+  stream_callbacks.on_data_ = [&](const Buffer::Instance&, uint64_t /* length */, bool end_stream,
+                                  envoy_stream_intel) { actual_end_stream = end_stream; };
+  stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
+    stream_complete.Notify();
+  };
+  stream_callbacks.on_error_ = [&](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {
+    stream_complete.Notify();
+  };
+  stream_callbacks.on_cancel_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
+    stream_complete.Notify();
+  };
+  auto stream_prototype = engine_with_test_server.engine()->streamClient()->newStreamPrototype();
+  Platform::StreamSharedPtr stream = stream_prototype->start(std::move(stream_callbacks));
+
+  auto headers = Http::Utility::createRequestHeaderMapPtr();
+  headers->addCopy(Http::LowerCaseString(":method"), "GET");
+  headers->addCopy(Http::LowerCaseString(":scheme"), "https");
+  headers->addCopy(Http::LowerCaseString(":authority"),
+                   engine_with_test_server.testServer().getAddress());
+  headers->addCopy(Http::LowerCaseString(":path"), "/");
+  stream->sendHeaders(std::move(headers), true);
+  stream_complete.WaitForNotification();
+
+  EXPECT_EQ(actual_status_code, "200");
+  EXPECT_TRUE(actual_end_stream);
+}
+
+TEST(EngineTest, TerminateWithoutWaitingForOnEngineRunning) {
+  absl::Notification engine_running;
+  auto engine_callbacks = std::make_unique<EngineCallbacks>();
+  engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
+
+  Platform::EngineBuilder engine_builder;
+  auto engine = engine_builder.setLogLevel(Logger::Logger::debug).build();
+
+  engine->terminate();
+}
+
 } // namespace Envoy

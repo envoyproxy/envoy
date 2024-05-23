@@ -94,7 +94,7 @@ public:
   }
 
   void testJA3(const std::string& fingerprint, bool expect_server_name = true,
-               const std::string& hash = {});
+               const std::string& hash = {}, bool expect_alpn = true);
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
@@ -311,7 +311,7 @@ TEST_P(TlsInspectorTest, ConnectionFingerprint) {
 }
 
 void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_server_name,
-                               const std::string& hash) {
+                               const std::string& hash, bool expect_alpn) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   proto_config.mutable_enable_ja3_fingerprinting()->set_value(true);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
@@ -328,7 +328,11 @@ void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_serve
   if (expect_server_name) {
     EXPECT_CALL(socket_, setRequestedServerName(absl::string_view("www.envoyproxy.io")));
   }
-  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  if (expect_alpn) {
+    EXPECT_CALL(socket_, setRequestedApplicationProtocols(testing::Contains("HTTP/1.1")));
+  } else {
+    EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  }
   // EXPECT_CALL(cb_, continueFilterChain(true));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
@@ -387,7 +391,7 @@ TEST_P(TlsInspectorTest, ConnectionJA3HashNoEllipticCurvesOrPointFormats) {
 TEST_P(TlsInspectorTest, ConnectionJA3HashTls10NoExtensions) {
   testJA3("769,49162-49157-49161-49156-49159-49154-49160-49155-49172-49167-49171-49166-49169-49164-"
           "49170-49165-57-51-53-47-5-4-10,,,",
-          false);
+          false, "", false);
 }
 
 // Test that the filter sets the correct `JA3` hash with TLS1.1.
