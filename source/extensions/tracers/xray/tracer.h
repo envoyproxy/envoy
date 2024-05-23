@@ -231,7 +231,7 @@ public:
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
 
   // TODO: This method is unimplemented for X-Ray.
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+  std::string getTraceId() const override { return EMPTY_STRING; };
 
   /**
    * Creates a child span.

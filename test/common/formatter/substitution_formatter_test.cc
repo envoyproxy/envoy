@@ -2153,8 +2153,7 @@ TEST(SubstitutionFormatterTest, TraceIDFormatter) {
   std::string body;
 
   Tracing::MockSpan active_span;
-  EXPECT_CALL(active_span, getTraceIdAsHex())
-      .WillRepeatedly(Return("ae0046f9075194306d7de2931bd38ce3"));
+  EXPECT_CALL(active_span, getTraceId()).WillRepeatedly(Return("ae0046f9075194306d7de2931bd38ce3"));
 
   {
     HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,

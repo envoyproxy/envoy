@@ -46,7 +46,7 @@ public:
   void setBaggage(absl::string_view key, absl::string_view value) override;
 
   // TODO: This method is unimplemented for OpenTracing.
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+  std::string getTraceId() const override { return EMPTY_STRING; };
 
 private:
   OpenTracingDriver& driver_;
