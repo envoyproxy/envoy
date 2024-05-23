@@ -25,6 +25,11 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: grpc
+  change: |
+    Changes in ``AsyncStreamImpl`` now propagate tracing context headers in bidirectional streams when using
+    :ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>`. Previously, tracing context headers
+    were not being set when calling external services such as ``ext_proc``.
 - area: tracers
   change: |
     Set status code for OpenTelemetry tracers (previously unset).
@@ -177,6 +182,9 @@ new_features:
   change: |
     added support for :ref:`%UPSTREAM_HOST_NAME% <config_access_log_format_upstream_host_name>` for the upstream host
     identifier.
+- area: access_loggers
+  change: |
+    Added ``TRACE_ID`` :ref:`access log formatter <config_access_log_format>`.
 - area: healthcheck
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting

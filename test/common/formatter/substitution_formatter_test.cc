@@ -25,6 +25,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
@@ -2141,6 +2142,37 @@ TEST(SubstitutionFormatterTest, responseTrailerFormatter) {
     EXPECT_EQ("PO", formatter.formatWithContext(formatter_context, stream_info));
     EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("PO")));
+  }
+}
+
+TEST(SubstitutionFormatterTest, TraceIDFormatter) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{};
+  Http::TestResponseHeaderMapImpl response_header{};
+  Http::TestResponseTrailerMapImpl response_trailer{};
+  std::string body;
+
+  Tracing::MockSpan active_span;
+  EXPECT_CALL(active_span, getTraceIdAsHex())
+      .WillRepeatedly(Return("ae0046f9075194306d7de2931bd38ce3"));
+
+  {
+    HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
+                                           body, AccessLogType::NotSet, &active_span);
+    TraceIDFormatter formatter{};
+    EXPECT_EQ("ae0046f9075194306d7de2931bd38ce3",
+              formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("ae0046f9075194306d7de2931bd38ce3")));
+  }
+
+  {
+    HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
+                                           body);
+    TraceIDFormatter formatter{};
+    EXPECT_EQ(absl::nullopt, formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
   }
 }
 
