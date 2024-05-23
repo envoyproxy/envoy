@@ -34,7 +34,8 @@ TEST_F(FilterTest, EmptyConfig) {
   auto request_headers = requestHeaders(path);
 
   auto mock_config = std::make_shared<NiceMock<Envoy::Router::MockConfig>>();
-  ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, routeConfig()).WillByDefault(testing::ReturnRef(*mock_config));
+  ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, routeConfig())
+      .WillByDefault(testing::ReturnRef(*mock_config));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
   // Path should be unchanged after running the filter.
   EXPECT_EQ(path, request_headers.Path()->value().getStringView());
@@ -51,12 +52,13 @@ TEST_F(FilterTest, RemoveQueryParameter) {
   auto request_headers = requestHeaders(path);
 
   auto mock_config = std::make_shared<NiceMock<Envoy::Router::MockConfig>>();
-  ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, routeConfig()).WillByDefault(testing::ReturnRef(*mock_config));
+  ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, routeConfig())
+      .WillByDefault(testing::ReturnRef(*mock_config));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
   EXPECT_EQ("/some", request_headers.Path()->value().getStringView());
 }
 
-} // QueryParameterMutation
-} // HttpFilters
-} // Extensions
-} // Envoy
+} // namespace QueryParameterMutation
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

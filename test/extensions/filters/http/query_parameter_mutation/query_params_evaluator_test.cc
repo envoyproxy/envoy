@@ -1,3 +1,4 @@
+#include <memory>
 #include <string>
 
 #include "source/extensions/filters/http/query_parameter_mutation/query_params_evaluator.h"
@@ -17,7 +18,7 @@ TEST(QueryParamsEvaluatorTest, EmptyConfigEvaluator) {
   const Protobuf::RepeatedPtrField<std::string> query_params_to_remove;
 
   auto paramsEvaluator =
-      QueryParamsEvaluator::configure(query_params_to_add, query_params_to_remove);
+      std::make_unique<QueryParamsEvaluator>(query_params_to_add, query_params_to_remove);
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/path?this=should&stay=the&exact=same"}};
   paramsEvaluator->evaluateQueryParams(request_headers);
@@ -35,7 +36,7 @@ TEST(QueryParamsEvaluatorTest, AddMultipleParams) {
 
   const Protobuf::RepeatedPtrField<std::string> query_params_to_remove;
   auto paramsEvaluator =
-      QueryParamsEvaluator::configure(query_params_to_add, query_params_to_remove);
+      std::make_unique<QueryParamsEvaluator>(query_params_to_add, query_params_to_remove);
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/path?bar=123"}};
   paramsEvaluator->evaluateQueryParams(request_headers);
   EXPECT_EQ("/path?bar=123&foo=value_1&foo=value_2", request_headers.getPathValue());
@@ -49,7 +50,7 @@ TEST(QueryParamsEvaluatorTest, RemoveMultipleParams) {
                                                                        remove.end());
 
   auto paramsEvaluator =
-      QueryParamsEvaluator::configure(query_params_to_add, query_params_to_remove);
+      std::make_unique<QueryParamsEvaluator>(query_params_to_add, query_params_to_remove);
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/path?foo=value_1&foo=value_2&bar=123"}};
   paramsEvaluator->evaluateQueryParams(request_headers);
@@ -64,7 +65,7 @@ TEST(QueryParamsEvaluatorTest, AddEmptyValue) {
 
   const Protobuf::RepeatedPtrField<std::string> query_params_to_remove;
   auto paramsEvaluator =
-      QueryParamsEvaluator::configure(query_params_to_add, query_params_to_remove);
+      std::make_unique<QueryParamsEvaluator>(query_params_to_add, query_params_to_remove);
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/path?bar=123"}};
   paramsEvaluator->evaluateQueryParams(request_headers);
   EXPECT_EQ("/path?bar=123&foo=", request_headers.getPathValue());

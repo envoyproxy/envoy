@@ -19,8 +19,7 @@ using QueryParamsEvaluatorPtr = std::unique_ptr<QueryParamsEvaluator>;
 
 class QueryParamsEvaluator {
 public:
-  static QueryParamsEvaluatorPtr
-  configure(const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter>&
+  QueryParamsEvaluator(const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter>&
                 query_params_to_add,
             const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove);
 

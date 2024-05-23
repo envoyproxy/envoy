@@ -15,7 +15,7 @@ namespace HttpFilters {
 namespace QueryParameterMutation {
 
 Config::Config(const FilterConfigProto& config)
-    : query_params_evaluator_(QueryParamsEvaluator::configure(
+    : query_params_evaluator_(std::make_unique<QueryParamsEvaluator>(
           config.query_parameters_to_add(), config.query_parameters_to_remove())) {}
 
 void Config::evaluateQueryParams(Http::RequestHeaderMap& headers) const {

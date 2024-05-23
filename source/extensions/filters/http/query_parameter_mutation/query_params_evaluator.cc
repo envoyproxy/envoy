@@ -11,21 +11,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace QueryParameterMutation {
 
-QueryParamsEvaluatorPtr QueryParamsEvaluator::configure(
+QueryParamsEvaluator::QueryParamsEvaluator(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter>& query_params_to_add,
     const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove) {
-  QueryParamsEvaluatorPtr query_params_evaluator(new QueryParamsEvaluator());
-
   for (const auto& query_param : query_params_to_add) {
-    query_params_evaluator->query_params_to_add_.emplace_back(
+    query_params_to_add_.emplace_back(
         std::make_pair(query_param.key(), query_param.value()));
   }
 
   for (const auto& val : query_params_to_remove) {
-    query_params_evaluator->query_params_to_remove_.emplace_back(val);
+    query_params_to_remove_.emplace_back(val);
   }
-
-  return query_params_evaluator;
 }
 
 void QueryParamsEvaluator::evaluateQueryParams(Http::RequestHeaderMap& headers) const {
