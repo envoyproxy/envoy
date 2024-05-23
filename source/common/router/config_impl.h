@@ -407,6 +407,7 @@ using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
  * Implementation of RetryPolicy that reads from the proto route or virtual host config.
  */
 class RetryPolicyImpl : public RetryPolicy {
+
 public:
   RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
                   ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -500,6 +501,7 @@ private:
  * Implementation of HedgePolicy that reads from the proto route or virtual host config.
  */
 class HedgePolicyImpl : public HedgePolicy {
+
 public:
   explicit HedgePolicyImpl(const envoy::config::route::v3::HedgePolicy& hedge_policy);
   HedgePolicyImpl();
@@ -1541,7 +1543,7 @@ private:
 };
 
 /**
- * Shared part of the global route configuration implementation.
+ * Shared part of the route configuration implementation.
  */
 class CommonConfigImpl : public CommonConfig {
 public:
