@@ -7,14 +7,14 @@ Envoy Thrift-To-Metadata Filter
 
 The Thrift to Metadata filter serves for thrift over HTTP traffic, expecting serialized Thrift request and response bodies
 in the HTTP payload. This filter is configured with rules that will be matched against Apache thrift compatible requests and
-responses in HTTP payload. The filter will parse the thrift body, extract thrift metadata or payload, and add them to dynamic metadata
-based on the configuration of the rule.
+responses in HTTP payload. The filter will parse the thrift body, extract *thrift metadata* or *thrift payload*, and add them to
+*dynamic filter metadata* based on the configuration of the rule.
 
-The metadata can then be used for load balancing decisions, consumed from logs, etc.
+The *filter metadata* can then be used for load balancing decisions, consumed from logs, etc.
 
 A typical use case for this filter is to dynamically match a specified thrift method of requests
-with rate limit. For this, thrift method name is attached to the request as dynamic metadata which
-would then be used to match a rate limit action on metadata.
+with rate limit. For this, thrift method name is attached to the request as dynamic filter metadata which
+would then be used to match a rate limit action on filter metadata.
 
 Example
 -------

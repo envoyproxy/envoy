@@ -21,8 +21,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#protodoc-title: Thrift-To-Metadata Filter]
 //
 // The Thrift to Metadata filter serves for thrift over HTTP traffic, expecting serialized
-// Thrift request and response bodies in the HTTP payload. It extracts thrift metadata from the
-// HTTP body and put them into the filter metadata. This is useful for matching load balancer
+// Thrift request and response bodies in the HTTP payload. It extracts *thrift metadata* from the
+// HTTP body and put them into the *filter metadata*. This is useful for matching load balancer
 // subsets, logging, etc.
 //
 // Thrift to Metadata :ref:`configuration overview <config_http_filters_thrift_to_metadata>`.
@@ -32,10 +32,14 @@ enum Field {
   // The Thrift method name, string value.
   METHOD_NAME = 0;
 
-  // The Thrift protocol name, string value. Values are "binary", "binary/non-strict", and "compact".
+  // The Thrift protocol name, string value. Values are "binary", "binary/non-strict", and "compact", with "(auto)" suffix if
+  // :ref:`protocol <envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata.protocol>`
+  // is set to :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`
   PROTOCOL = 1;
 
-  // The Thrift transport name, string value. Values are "framed", "header", and "unframed".
+  // The Thrift transport name, string value. Values are "framed", "header", and "unframed", with "(auto)" suffix if
+  // :ref:`transport <envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata.transport>`
+  // is set to :ref:`AUTO_TRANSPORT<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`
   TRANSPORT = 2;
 
   // The Thrift message type, singed 16-bit integer value.
@@ -87,10 +91,12 @@ message Rule {
   // may have performance implications.
   FieldSelector field_selector = 2 [(xds.annotations.v3.field_status).work_in_progress = true];
 
-  // The key-value pair to set in the metadata if the field is present.
+  // The key-value pair to set in the *filter metadata* if the field is present
+  // in *thrfit metadata*.
   KeyValuePair on_present = 3;
 
-  // The key-value pair to set in the metadata if the field is missing.
+  // The key-value pair to set in the *filter metadata* if the field is missing
+  // in *thrfit metadata*.
   KeyValuePair on_missing = 4;
 }
 
@@ -111,9 +117,11 @@ message ThriftToMetadata {
 
   // Supplies the type of protocol that the Thrift proxy should use. Defaults to
   // :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`.
+  // Note that :ref:`TWITTER<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>` is
+  // not supported due to deprecation in envoy.
   network.thrift_proxy.v3.ProtocolType protocol = 4 [(validate.rules).enum = {defined_only: true}];
 
-  // Allowed content-type for thrift to metadata transformation.
+  // Allowed content-type for thrift payload to filter metadata transformation.
   // Default to ``{"application/x-thrift"}``.
   //
   // Set ``allow_empty_content_type`` if empty/missing content-type header
@@ -121,7 +129,7 @@ message ThriftToMetadata {
   repeated string allow_content_types = 5
       [(validate.rules).repeated = {items {string {min_len: 1}}}];
 
-  // Allowed empty content-type for thrift to metadata transformation.
+  // Allowed empty content-type for thrift payload to filter metadata transformation.
   // Default to false.
   bool allow_empty_content_type = 6;
 }
