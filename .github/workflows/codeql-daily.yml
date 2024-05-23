@@ -27,7 +27,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+      uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29  # v4.1.6
 
     - name: Free disk space
       uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.30
@@ -37,7 +37,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@cdcdbb579706841c47f7063dda365e292e5cad7a  # codeql-bundle-v2.13.4
+      uses: github/codeql-action/init@9fdb3e49720b44c48891d036bb502feb25684276  # codeql-bundle-v3.25.6
       # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
@@ -46,7 +46,9 @@ jobs:
       shell: bash
       run: |
        sudo apt-get update --error-on=any
-       sudo apt-get install --yes libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
+       sudo apt-get install --yes \
+           libtool cmake automake autoconf make ninja-build curl unzip \
+           virtualenv openjdk-11-jdk build-essential libc++1
        # Note: the llvm/clang version should match the version specifed in:
        #  - bazel/repository_locations.bzl
        #  - .github/workflows/codeql-push.yml
@@ -61,11 +63,12 @@ jobs:
       run: |
        bazel/setup_clang.sh bin/clang14
        bazelisk shutdown
-       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ //source/common/http/...
+       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ \
+           //source/common/http/...
 
     - name: Clean Artifacts
       run: |
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@cdcdbb579706841c47f7063dda365e292e5cad7a  # codeql-bundle-v2.13.4
+      uses: github/codeql-action/analyze@9fdb3e49720b44c48891d036bb502feb25684276  # codeql-bundle-v3.25.6

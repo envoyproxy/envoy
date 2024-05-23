@@ -20,9 +20,6 @@ involved and how Envoy plays a role, read the CNCF
 * [Official documentation](https://www.envoyproxy.io/)
 * [FAQ](https://www.envoyproxy.io/docs/envoy/latest/faq/overview)
 * [Unofficial Chinese documentation](https://cloudnative.to/envoy/)
-* Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
-([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
-to find out more about the origin story and design philosophy of Envoy
 * [Blog](https://medium.com/@mattklein123/envoy-threading-model-a8d44b922310) about the threading model
 * [Blog](https://medium.com/@mattklein123/envoy-hot-restart-1d16b14555b5) about hot restart
 * [Blog](https://medium.com/@mattklein123/envoy-stats-b65c7f363342) about stats architecture

@@ -20,7 +20,7 @@ namespace Stats {
 class StatName;
 
 /**
- * Holds a set of symbols used to compose hierarhical names.
+ * Holds a set of symbols used to compose hierarchical names.
  */
 class SymbolTable;
 
@@ -231,8 +231,19 @@ Envoy
  */
 template <typename StatsStructType> class DeferredCreationCompatibleInterface {
 public:
-  // Helper function to get-or-create and return the StatsStructType object.
+  /**
+   * Returns an already existing StatsStructType, or creates a new one and returns it.
+   *
+   * @return The new or already existing StatsStructType.
+   */
   virtual StatsStructType& getOrCreate() PURE;
+
+  /**
+   * Returns whether or not the underlying stats have been initialized yet.
+   *
+   * @return If the underlying stats have been initialized.
+   */
+  virtual bool isPresent() const PURE;
 
   virtual ~DeferredCreationCompatibleInterface() = default;
 };
@@ -249,6 +260,13 @@ public:
 
   inline StatsStructType* operator->() { return &data_->getOrCreate(); };
   inline StatsStructType& operator*() { return data_->getOrCreate(); };
+
+  /**
+   * Returns whether or not the underlying data_ has been initialized yet.
+   *
+   * @return If the underlying data_ has been initialized.
+   */
+  bool isPresent() const { return data_->isPresent(); }
 
 private:
   std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> data_;

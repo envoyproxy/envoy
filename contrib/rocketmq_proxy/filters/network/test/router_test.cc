@@ -21,7 +21,7 @@ namespace Router {
 class RocketmqRouterTestBase {
 public:
   RocketmqRouterTestBase()
-      : config_(rocketmq_proxy_config_, context_),
+      : config_(std::make_shared<ConfigImpl>(rocketmq_proxy_config_, context_)),
         cluster_info_(std::make_shared<Upstream::MockClusterInfo>()) {
     context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"fake_cluster"});
@@ -147,7 +147,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   ConfigImpl::RocketmqProxyConfig rocketmq_proxy_config_;
-  ConfigImpl config_;
+  std::shared_ptr<ConfigImpl> config_;
   std::unique_ptr<ConnectionManager> conn_manager_;
 
   std::unique_ptr<Router> router_;

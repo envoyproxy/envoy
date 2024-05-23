@@ -206,6 +206,7 @@ envoy_cc_library(
     hdrs = ["xds_resource.h"],
     deps = [
         "//source/common/http:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@com_github_cncf_xds//xds/core/v3:pkg_cc_proto",
     ],
 )

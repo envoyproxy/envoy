@@ -10,25 +10,18 @@ envoy_package()
 
 envoy_cc_test(
     name = "io_uring_impl_test",
-    srcs = select({
-        "//bazel:linux_x86_64": ["io_uring_impl_test.cc"],
-        "//conditions:default": [],
-    }),
+    srcs = ["io_uring_impl_test.cc"],
     tags = [
         "nocompdb",
         "skip_on_windows",
     ],
     deps = [
+        "//source/common/io:io_uring_impl_lib",
         "//source/common/network:address_lib",
         "//test/mocks/io:io_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-    ] + select({
-        "//bazel:linux": [
-            "//source/common/io:io_uring_impl_lib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 envoy_cc_test(

@@ -45,17 +45,17 @@ void IoUringSocketEntry::onReadCompleted() {
             "calling event callback since pending read buf has {} size data, data = {}, "
             "fd = {}",
             getReadParam()->buf_.length(), getReadParam()->buf_.toString(), fd_);
-  cb_(Event::FileReadyType::Read);
+  THROW_IF_NOT_OK(cb_(Event::FileReadyType::Read));
 }
 
 void IoUringSocketEntry::onWriteCompleted() {
   ENVOY_LOG(trace, "call event callback for write since result = {}", getWriteParam()->result_);
-  cb_(Event::FileReadyType::Write);
+  THROW_IF_NOT_OK(cb_(Event::FileReadyType::Write));
 }
 
 void IoUringSocketEntry::onRemoteClose() {
   ENVOY_LOG(trace, "onRemoteClose fd = {}", fd_);
-  cb_(Event::FileReadyType::Closed);
+  THROW_IF_NOT_OK(cb_(Event::FileReadyType::Closed));
 }
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
@@ -72,8 +72,12 @@ IoUringWorkerImpl::IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer
   // We only care about the read event of Eventfd, since we only receive the
   // event here.
   file_event_ = dispatcher_.createFileEvent(
-      event_fd, [this](uint32_t) { onFileEvent(); }, Event::PlatformDefaultTriggerType,
-      Event::FileReadyType::Read);
+      event_fd,
+      [this](uint32_t) {
+        onFileEvent();
+        return absl::OkStatus();
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 }
 
 IoUringWorkerImpl::~IoUringWorkerImpl() {

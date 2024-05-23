@@ -16,7 +16,6 @@ load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
-load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 
 # go version for rules_go
 GO_VERSION = "1.20"
@@ -53,7 +52,6 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         ],
     )
     shellcheck_dependencies()
-    upb_deps()
     proxy_wasm_rust_sdk_dependencies()
     rules_fuzzing_dependencies(
         oss_fuzz = True,

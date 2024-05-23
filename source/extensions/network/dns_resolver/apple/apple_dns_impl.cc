@@ -363,8 +363,11 @@ bool AppleDnsResolverImpl::PendingResolution::dnsServiceRefSockFD() {
       fd,
       // note: Event::FileTriggerType::Level is used here to closely resemble the c-ares
       // implementation in dns_impl.cc.
-      [this](uint32_t events) { onEventCallback(events); }, Event::FileTriggerType::Level,
-      Event::FileReadyType::Read);
+      [this](uint32_t events) {
+        onEventCallback(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Level, Event::FileReadyType::Read);
   sd_ref_event_->setEnabled(Event::FileReadyType::Read);
   return true;
 }

@@ -70,11 +70,11 @@ absl::flat_hash_map<int32_t, MonotonicTime>& KafkaMetricsFacadeImpl::getRequestA
 }
 
 KafkaBrokerFilter::KafkaBrokerFilter(Stats::Scope& scope, TimeSource& time_source,
-                                     const BrokerFilterConfig& filter_config)
+                                     const BrokerFilterConfigSharedPtr& filter_config)
     : KafkaBrokerFilter{filter_config, std::make_shared<KafkaMetricsFacadeImpl>(
-                                           scope, time_source, filter_config.statPrefix())} {};
+                                           scope, time_source, filter_config->statPrefix())} {};
 
-KafkaBrokerFilter::KafkaBrokerFilter(const BrokerFilterConfig& filter_config,
+KafkaBrokerFilter::KafkaBrokerFilter(const BrokerFilterConfigSharedPtr& filter_config,
                                      const KafkaMetricsFacadeSharedPtr& metrics)
     : metrics_{metrics}, response_rewriter_{createRewriter(filter_config)},
       response_decoder_{new ResponseDecoder({metrics, response_rewriter_})},

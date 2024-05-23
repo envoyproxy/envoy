@@ -54,7 +54,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb,
                                               parent_.random_);
   for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
-    parent_.validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
+    THROW_IF_NOT_OK(parent_.validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
 
     priority_state_manager.initializePriorityFor(locality_lb_endpoint);
 
@@ -141,12 +141,16 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     PriorityStateManager& priority_state_manager, absl::flat_hash_set<std::string>& all_new_hosts) {
-  const auto address = parent_.resolveProtoAddress(lb_endpoint.endpoint().address());
+  const auto address =
+      THROW_OR_RETURN_VALUE(parent_.resolveProtoAddress(lb_endpoint.endpoint().address()),
+                            const Network::Address::InstanceConstSharedPtr);
   std::vector<Network::Address::InstanceConstSharedPtr> address_list;
   if (!lb_endpoint.endpoint().additional_addresses().empty()) {
     address_list.push_back(address);
     for (const auto& additional_address : lb_endpoint.endpoint().additional_addresses()) {
-      address_list.emplace_back(parent_.resolveProtoAddress(additional_address.address()));
+      address_list.emplace_back(
+          THROW_OR_RETURN_VALUE(parent_.resolveProtoAddress(additional_address.address()),
+                                const Network::Address::InstanceConstSharedPtr));
     }
   }
 

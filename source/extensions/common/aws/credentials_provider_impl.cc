@@ -62,6 +62,11 @@ constexpr char STS_TOKEN_CLUSTER[] = "sts_token_service_internal";
 
 } // namespace
 
+Credentials ConfigCredentialsProvider::getCredentials() {
+  ENVOY_LOG(debug, "Getting AWS credentials from static configuration");
+  return credentials_;
+}
+
 Credentials EnvironmentCredentialsProvider::getCredentials() {
   ENVOY_LOG(debug, "Getting AWS credentials from the environment");
 

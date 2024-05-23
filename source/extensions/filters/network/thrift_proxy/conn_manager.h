@@ -46,6 +46,8 @@ public:
   virtual bool headerKeysPreserveCase() const PURE;
 };
 
+using ConfigSharedPtr = std::shared_ptr<Config>;
+
 /**
  * ConnectionManager is a Network::Filter that will perform Thrift request handling on a connection.
  */
@@ -54,7 +56,7 @@ class ConnectionManager : public Network::ReadFilter,
                           public DecoderCallbacks,
                           Logger::Loggable<Logger::Id::thrift> {
 public:
-  ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
+  ConnectionManager(const ConfigSharedPtr& config, Random::RandomGenerator& random_generator,
                     TimeSource& time_system, const Network::DrainDecision& drain_decision);
   ~ConnectionManager() override;
 
@@ -386,7 +388,7 @@ private:
                     const Http::ResponseHeaderMap* response_headers,
                     const StreamInfo::StreamInfo& stream_info);
 
-  Config& config_;
+  ConfigSharedPtr config_;
   ThriftFilterStats& stats_;
 
   Network::ReadFilterCallbacks* read_callbacks_{};

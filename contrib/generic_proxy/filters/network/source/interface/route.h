@@ -26,6 +26,18 @@ using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpeci
  */
 using RouteTypedMetadataFactory = Envoy::Router::HttpRouteTypedMetadataFactory;
 
+/**
+ * The simplest retry implementation. It only contains the number of retries.
+ */
+class RetryPolicy {
+public:
+  RetryPolicy(uint32_t num_retries) : num_retries_(num_retries) {}
+  uint32_t numRetries() const { return num_retries_; }
+
+private:
+  const uint32_t num_retries_{};
+};
+
 class RouteEntry {
 public:
   virtual ~RouteEntry() = default;
@@ -64,7 +76,13 @@ public:
    * @return route timeout for this route.
    */
   virtual const std::chrono::milliseconds timeout() const PURE;
+
+  /**
+   * @return const RetryPolicy& the retry policy for this route.
+   */
+  virtual const RetryPolicy& retryPolicy() const PURE;
 };
+
 using RouteEntryConstSharedPtr = std::shared_ptr<const RouteEntry>;
 
 class RouteMatcher : public Rds::Config {

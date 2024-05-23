@@ -78,7 +78,8 @@ class LookupRequest {
 public:
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
   LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
-                const VaryAllowList& vary_allow_list);
+                const VaryAllowList& vary_allow_list,
+                bool ignore_request_cache_control_header = false);
 
   const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
 

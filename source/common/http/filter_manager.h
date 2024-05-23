@@ -1101,13 +1101,12 @@ public:
                           const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
                           TimeSource& time_source,
                           StreamInfo::FilterStateSharedPtr parent_filter_state,
-                          StreamInfo::FilterState::LifeSpan filter_state_life_span,
                           Server::OverloadManager& overload_manager)
       : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
                       proxy_100_continue, buffer_limit, filter_chain_factory),
         stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
-                     parent_filter_state, filter_state_life_span,
-                     StreamInfo::FilterState::LifeSpan::FilterChain),
+                     StreamInfo::FilterState::LifeSpan::FilterChain,
+                     std::move(parent_filter_state)),
         local_reply_(local_reply),
         downstream_filter_load_shed_point_(overload_manager.getLoadShedPoint(
             Server::LoadShedPointName::get().HttpDownstreamFilterCheck)) {

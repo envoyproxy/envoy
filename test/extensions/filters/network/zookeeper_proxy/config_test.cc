@@ -104,12 +104,8 @@ latency_threshold_overrides:
       nanos: -150000000
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
-      "Proto constraint validation failed "
-      "\\(ZooKeeperProxyValidationError.LatencyThresholdOverrides\\[0\\]: embedded message failed "
-      "validation \\| caused by LatencyThresholdOverrideValidationError.Threshold: value must be "
-      "greater than or equal to 1ms\\)");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
+                          "Invalid duration: Expected positive duration");
 }
 
 TEST_F(ZookeeperFilterConfigTest, TooSmallLatencyThreshold) {

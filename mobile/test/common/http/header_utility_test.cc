@@ -2,7 +2,6 @@
 
 #include "gtest/gtest.h"
 #include "library/common/bridge/utility.h"
-#include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/types/c_types.h"
 
@@ -57,8 +56,9 @@ TEST(RequestHeaderDataConstructorTest, FromCToCpp) {
   ASSERT_EQ(cpp_headers->size(), c_headers_copy.length);
 
   for (envoy_map_size_t i = 0; i < c_headers_copy.length; i++) {
-    auto expected_key = LowerCaseString(Data::Utility::copyToString(c_headers_copy.entries[i].key));
-    auto expected_value = Data::Utility::copyToString(c_headers_copy.entries[i].value);
+    auto expected_key =
+        LowerCaseString(Bridge::Utility::copyToString(c_headers_copy.entries[i].key));
+    auto expected_value = Bridge::Utility::copyToString(c_headers_copy.entries[i].value);
 
     // Key is present.
     EXPECT_FALSE(cpp_headers->get(expected_key).empty());
@@ -88,8 +88,8 @@ TEST(HeaderDataConstructorTest, FromCppToC) {
   ASSERT_EQ(c_headers.length, static_cast<envoy_map_size_t>(cpp_headers->size()));
 
   for (envoy_map_size_t i = 0; i < c_headers.length; i++) {
-    LowerCaseString actual_key(Data::Utility::copyToString(c_headers.entries[i].key));
-    std::string actual_value = Data::Utility::copyToString(c_headers.entries[i].value);
+    LowerCaseString actual_key(Bridge::Utility::copyToString(c_headers.entries[i].key));
+    std::string actual_value = Bridge::Utility::copyToString(c_headers.entries[i].value);
 
     // Key is present.
     EXPECT_FALSE(cpp_headers->get(actual_key).empty());
@@ -113,8 +113,8 @@ TEST(HeaderDataConstructorTest, FromCppToCWithAlpn) {
   ASSERT_EQ(c_headers.length, static_cast<envoy_map_size_t>(cpp_headers->size()));
 
   for (envoy_map_size_t i = 0; i < c_headers.length; i++) {
-    LowerCaseString actual_key(Data::Utility::copyToString(c_headers.entries[i].key));
-    std::string actual_value = Data::Utility::copyToString(c_headers.entries[i].value);
+    LowerCaseString actual_key(Bridge::Utility::copyToString(c_headers.entries[i].key));
+    std::string actual_value = Bridge::Utility::copyToString(c_headers.entries[i].value);
 
     // Key is present.
     EXPECT_FALSE(cpp_headers->get(actual_key).empty());

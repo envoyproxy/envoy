@@ -111,27 +111,30 @@ struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(
       TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterState::LifeSpan life_span)
-      : StreamInfoImpl(absl::nullopt, time_source, downstream_connection_info_provider,
-                       std::make_shared<FilterStateImpl>(life_span)) {}
+      FilterState::LifeSpan life_span, FilterStateSharedPtr ancestor_filter_state = nullptr)
+      : StreamInfoImpl(
+            absl::nullopt, time_source, downstream_connection_info_provider,
+            std::make_shared<FilterStateImpl>(std::move(ancestor_filter_state), life_span)) {}
 
   StreamInfoImpl(
       Http::Protocol protocol, TimeSource& time_source,
       const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterState::LifeSpan life_span)
-      : StreamInfoImpl(protocol, time_source, downstream_connection_info_provider,
-                       std::make_shared<FilterStateImpl>(life_span)) {}
-
-  StreamInfoImpl(
-      Http::Protocol protocol, TimeSource& time_source,
-      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan parent_life_span,
-      FilterState::LifeSpan life_span)
+      FilterState::LifeSpan life_span, FilterStateSharedPtr ancestor_filter_state = nullptr)
       : StreamInfoImpl(
             protocol, time_source, downstream_connection_info_provider,
-            std::make_shared<FilterStateImpl>(FilterStateImpl::LazyCreateAncestor(
-                                                  std::move(parent_filter_state), parent_life_span),
-                                              life_span)) {}
+            std::make_shared<FilterStateImpl>(std::move(ancestor_filter_state), life_span)) {}
+
+  StreamInfoImpl(
+      absl::optional<Http::Protocol> protocol, TimeSource& time_source,
+      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
+      FilterStateSharedPtr filter_state)
+      : time_source_(time_source), start_time_(time_source.systemTime()),
+        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
+        filter_state_(std::move(filter_state)),
+        downstream_connection_info_provider_(downstream_connection_info_provider != nullptr
+                                                 ? downstream_connection_info_provider
+                                                 : emptyDownstreamAddressProvider()),
+        trace_reason_(Tracing::Reason::NotTraceable) {}
 
   SystemTime startTime() const override { return start_time_; }
 
@@ -289,6 +292,10 @@ struct StreamInfoImpl : public StreamInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
+  void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) override {
+    (*metadata_.mutable_typed_filter_metadata())[name].MergeFrom(value);
+  }
+
   const FilterStateSharedPtr& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return *filter_state_; }
 
@@ -434,43 +441,31 @@ struct StreamInfoImpl : public StreamInfo {
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
   absl::optional<MonotonicTime> final_time_;
-
   absl::optional<Http::Protocol> protocol_;
 
 private:
   absl::optional<uint32_t> response_code_;
-
-public:
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
+
+public:
   absl::InlinedVector<ResponseFlag, 4> response_flags_{};
   bool health_check_request_{};
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
+
+private:
   absl::optional<uint32_t> attempt_count_;
   // TODO(agrawroh): Check if the owner of this storage outlives the StreamInfo. We should only copy
   // the string if it could outlive the StreamInfo.
   absl::optional<std::string> virtual_cluster_name_;
 
-private:
   static Network::ConnectionInfoProviderSharedPtr emptyDownstreamAddressProvider() {
     MUTABLE_CONSTRUCT_ON_FIRST_USE(
         Network::ConnectionInfoProviderSharedPtr,
         std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr));
   }
-
-  StreamInfoImpl(
-      absl::optional<Http::Protocol> protocol, TimeSource& time_source,
-      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
-      FilterStateSharedPtr filter_state)
-      : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
-        filter_state_(std::move(filter_state)),
-        downstream_connection_info_provider_(downstream_connection_info_provider != nullptr
-                                                 ? downstream_connection_info_provider
-                                                 : emptyDownstreamAddressProvider()),
-        trace_reason_(Tracing::Reason::NotTraceable) {}
 
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t bytes_received_{};

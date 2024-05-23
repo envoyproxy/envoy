@@ -661,10 +661,9 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   envoy::config::bootstrap::v3::LayeredRuntime runtime_config;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  absl::Status creation_status;
-  Runtime::LoaderImpl runtime(dispatcher, tls, runtime_config, local_info, store, generator,
-                              validation_visitor, *api, creation_status);
-  ASSERT_TRUE(creation_status.ok());
+  absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
+      dispatcher, tls, runtime_config, local_info, store, generator, validation_visitor, *api);
+  ASSERT_TRUE(loader.ok());
 
   int sampled_count = 0;
   NiceMock<Router::MockRoute> route;
@@ -672,8 +671,8 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   for (int i = 0; i < 1000000; i++) {
     Envoy::Http::TestRequestHeaderMapImpl header{{"x-request-id", rand.uuid()}};
     config.requestIDExtension()->setTraceReason(header, Envoy::Tracing::Reason::Sampling);
-    auto reason = Envoy::Http::ConnectionManagerUtility::mutateTracingRequestHeader(header, runtime,
-                                                                                    config, &route);
+    auto reason = Envoy::Http::ConnectionManagerUtility::mutateTracingRequestHeader(
+        header, *loader.value(), config, &route);
     if (reason == Envoy::Tracing::Reason::Sampling) {
       sampled_count++;
     }

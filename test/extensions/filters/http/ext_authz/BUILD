@@ -95,13 +95,14 @@ envoy_proto_library(
         "//test/fuzz:common_proto",
         "@envoy_api//envoy/config/core/v3:pkg",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg",
+        "@envoy_api//envoy/service/auth/v3:pkg",
     ],
 )
 
 envoy_cc_fuzz_test(
     name = "ext_authz_grpc_fuzz_test",
     srcs = ["ext_authz_grpc_fuzz_test.cc"],
-    corpus = "ext_authz_corpus",
+    corpus = "ext_authz_grpc_corpus",
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
@@ -110,6 +111,7 @@ envoy_cc_fuzz_test(
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
         "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
         "//test/mocks/grpc:grpc_mocks",
+        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
@@ -117,7 +119,7 @@ envoy_cc_fuzz_test(
 envoy_cc_fuzz_test(
     name = "ext_authz_http_fuzz_test",
     srcs = ["ext_authz_http_fuzz_test.cc"],
-    corpus = "ext_authz_corpus",
+    corpus = "ext_authz_http_corpus",
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
@@ -128,6 +130,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
@@ -144,6 +147,5 @@ envoy_cc_test_library(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
     ],
 )
