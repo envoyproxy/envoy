@@ -7,6 +7,7 @@ on:
   push:
     branches:
     - main
+    - release/v1.28
   workflow_dispatch:
 
 concurrency:
@@ -19,6 +20,7 @@ jobs:
     if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
+          && (github.ref_name == 'main')
           && (github.event.push
               || !contains(github.actor, '[bot]'))
       }}
@@ -42,3 +44,32 @@ jobs:
         ref: main
         token: ${{ steps.appauth.outputs.token }}
         workflow: envoy-sync.yaml
+
+  sync-release:
+    runs-on: ubuntu-22.04
+    if: >-
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.ref_name != 'main')
+          && (github.event.push
+              || !contains(github.actor, '[bot]'))
+      }}
+    strategy:
+      fail-fast: false
+      matrix:
+        downstream:
+        - envoy-openssl
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.30
+      id: appauth
+      with:
+        app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.2.30
+      with:
+        repository: "envoyproxy/${{ matrix.downstream }}"
+        ref: main
+        token: ${{ steps.appauth.outputs.token }}
+        workflow: envoy-sync.yaml
+        inputs: |
+          branch: ${{ github.ref_name }}
