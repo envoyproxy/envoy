@@ -207,6 +207,15 @@ public:
   };
 
   /**
+   * Legacy API to avoid churn while we determine if |force_refresh| below is useful.
+   */
+  virtual LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
+                                                    bool is_proxy_lookup,
+                                                    LoadDnsCacheEntryCallbacks& callbacks) {
+    return loadDnsCacheEntry(host, default_port, is_proxy_lookup, false, callbacks);
+  }
+
+  /**
    * Attempt to load a DNS cache entry.
    * @param host the hostname to lookup
    * @param default_port the port to use
