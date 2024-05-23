@@ -185,7 +185,7 @@ public:
       }
 
       // Kick off the receive.
-      file_event_cb_(Event::FileReadyType::Read);
+      EXPECT_TRUE(file_event_cb_(Event::FileReadyType::Read).ok());
     }
 
     UdpProxyFilterTest& parent_;

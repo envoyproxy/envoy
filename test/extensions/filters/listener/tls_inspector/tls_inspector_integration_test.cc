@@ -8,8 +8,8 @@
 #include "source/common/config/api_version.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
+#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_manager_impl.h"
-#include "source/common/tls/ssl_socket.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/integration/integration.h"

@@ -143,8 +143,6 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
         debug, "[S{}] buffering {} bytes due to explicit flow control. {} total bytes buffered.",
         direct_stream_.stream_handle_, data.length(), data.length() + response_data_->length());
     response_data_->move(data);
-  } else if (error_.has_value()) {
-    sendErrorToBridge();
   }
 }
 
@@ -181,6 +179,8 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
 
   if (send_end_stream) {
     onComplete();
+  } else if (explicit_flow_control_ && data.length() == 0 && error_.has_value()) {
+    onError();
   }
 }
 
@@ -305,7 +305,7 @@ void Client::DirectStreamCallbacks::onError() {
   // TODO(goaway): What is the expected behavior when an error is received, held, and then another
   // error occurs (e.g., timeout)?
 
-  if (explicit_flow_control_ && response_headers_forwarded_ && bytes_to_send_ == 0) {
+  if (explicit_flow_control_ && response_data_ && response_data_->length() != 0) {
     ENVOY_LOG(debug, "[S{}] defering remote reset stream due to explicit flow control",
               direct_stream_.stream_handle_);
     if (direct_stream_.parent_.getStream(direct_stream_.stream_handle_,

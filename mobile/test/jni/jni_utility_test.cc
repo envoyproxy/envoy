@@ -76,3 +76,11 @@ Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_javaCppNonDirectByteBufferConv
   return Envoy::JNI::cppBufferInstanceToJavaNonDirectByteBuffer(jni_helper, *cpp_buffer_instance)
       .release();
 }
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_getJavaExceptionMessage(JNIEnv* env, jclass,
+                                                                          jthrowable throwble) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  std::string exception_message = Envoy::JNI::getJavaExceptionMessage(jni_helper, throwble);
+  return Envoy::JNI::cppStringToJavaString(jni_helper, exception_message).release();
+}

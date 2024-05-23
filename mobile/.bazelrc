@@ -38,7 +38,8 @@ build --swiftcopt=-wmo
 # https://github.com/bazelbuild/rules_jvm_external/issues/445
 build --repo_env=JAVA_HOME=../bazel_tools/jdk
 build --define disable_known_issue_asserts=true
-build --define cxxopts=-std=c++17
+# Temporarily set to C++17 because Android NDK does not fully support C++20 yet.
+build --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 # Unset per_object_debug_info. Causes failures on Android Linux release builds.
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
@@ -117,9 +118,6 @@ build:mobile-remote-release-clang-android-publish --linkopt=-fuse-ld=lld
 build:mobile-remote-release-clang-android-publish-xds --config=mobile-remote-release-clang-android-publish
 build:mobile-remote-release-clang-android-publish-xds --define=envoy_mobile_xds=enabled
 
-# Temporary revert to C++17 for mobile NDK builds.
-build:mobile-release-common --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
-
 # Compile releases optimizing for size (eg -Os, etc).
 build:mobile-release-common --config=sizeopt
 
@@ -177,8 +175,6 @@ build:mobile-remote-ci-linux --config=mobile-remote-ci-common
 build:mobile-remote-ci-linux-clang --action_env=CC=/opt/llvm/bin/clang
 build:mobile-remote-ci-linux-clang --action_env=CXX=/opt/llvm/bin/clang++
 build:mobile-remote-ci-linux-clang --config=mobile-remote-ci-linux
-# Temporary revert to C++17 for mobile NDK builds.
-build:mobile-remote-ci-linux-clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 
 #############################################################################
 # mobile-remote-ci-linux-asan: These options are Linux-only using Clang and AddressSanitizer
@@ -250,8 +246,6 @@ test:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --config=mobile-test-android
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
-# Temporary revert to C++17 for mobile NDK builds.
-build:mobile-remote-ci-cc --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 build:mobile-remote-ci-cc --define=envoy_full_protos=disabled
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
 

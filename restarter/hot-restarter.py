@@ -17,7 +17,8 @@ TERM_WAIT_SECONDS = 30
 restart_epoch = 0
 pid_list = []
 
-LOG_FORMAT = "[%(asctime)s][%(process)d][%(levelname)s][%(filename)s:%(lineno)d] %(message)s"
+LOG_FORMAT = "[%(asctime)s.%(msecs)03d][%(process)d][%(levelname)s][core] [%(filename)s:%(lineno)d] %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 LOG_LEVEL = logging.INFO
 logger = logging.getLogger(__name__)
 
@@ -196,7 +197,7 @@ def fork_and_exec():
 def init_logger():
     """init logger"""
     stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    stream_handler.setFormatter(logging.Formatter(LOG_FORMAT, DATE_FORMAT))
     logger.setLevel(LOG_LEVEL)
     logger.addHandler(stream_handler)
 
