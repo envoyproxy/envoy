@@ -46,6 +46,8 @@ public:
   void setBaggage(absl::string_view key, absl::string_view value) override;
 
   // TODO: This method is unimplemented for OpenTracing.
+  // This won't be implemented because OpenTracing was deprecated.
+  // We should remove this method in the future?
   std::string getTraceId() const override { return EMPTY_STRING; };
 
 private:
