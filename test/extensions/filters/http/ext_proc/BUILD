@@ -150,6 +150,7 @@ envoy_extension_cc_test(
     ],
     deps = [
         ":logging_test_filter_lib",
+        ":tracer_test_filter_lib",
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc:config",
         "//source/extensions/filters/http/set_metadata:config",
@@ -161,6 +162,7 @@ envoy_extension_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
@@ -343,5 +345,26 @@ envoy_extension_cc_test_library(
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/ext_proc",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "tracer_test_filter_proto",
+    srcs = [":tracer_test_filter.proto"],
+)
+
+envoy_extension_cc_test_library(
+    name = "tracer_test_filter_lib",
+    srcs = ["tracer_test_filter.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    external_deps = [
+    ],
+    deps = [
+        ":tracer_test_filter_proto_cc_proto",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf",
+        "//source/common/tracing:http_tracer_lib",
+        "//source/common/tracing:trace_context_lib",
+        "//source/extensions/tracers/common:factory_base_lib",
     ],
 )

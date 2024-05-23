@@ -148,12 +148,6 @@ build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/u
 build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
 
-# Workaround issue with pkgconfig, see https://github.com/envoyproxy/envoy/issues/33225
-build:macos --host_action_env=CXXFLAGS=-Wno-int-conversion
-build:macos --action_env=CXXFLAGS=-Wno-int-conversion
-build:macos --host_action_env=CFLAGS=-Wno-int-conversion
-build:macos --action_env=CFLAGS=-Wno-int-conversion
-
 # macOS ASAN/UBSAN
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
