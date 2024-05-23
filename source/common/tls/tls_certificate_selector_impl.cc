@@ -1,7 +1,5 @@
 #include "source/common/tls/tls_certificate_selector_impl.h"
 
-#include "source/common/tls/server_context_impl.h"
-
 namespace Envoy {
 namespace Ssl {
 
@@ -51,10 +49,7 @@ TlsCertificateSelectorImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_
   return Ssl::SelectionResult::Continue;
 }
 
-TlsCertificateSelectorSharedPtr
-TlsCertificateSelectorFactoryCbImpl(Ssl::ContextSelectionCallbackWeakPtr cb) {
-  return std::make_shared<TlsCertificateSelectorImpl>(cb);
-}
+REGISTER_FACTORY(TlsCertificateSelectorFactoryImpl, TlsCertificateSelectorFactory);
 
 } // namespace Ssl
 } // namespace Envoy

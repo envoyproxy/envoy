@@ -9,11 +9,11 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
 #include "source/common/network/cidr_range.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
-#include "source/common/tls/tls_certificate_selector_impl.h"
 
 #include "openssl/ssl.h"
 
@@ -258,9 +258,9 @@ ContextConfigImpl::ContextConfigImpl(
   capabilities_ = handshaker_factory->capabilities();
   sslctx_cb_ = handshaker_factory->sslctxCb(handshaker_factory_context);
 
+  TlsCertificateSelectorFactoryContextImpl provider_factory_context(api_, options_,
+                                                                    singleton_manager_);
   if (config.has_custom_tls_certificate_selector()) {
-    TlsCertificateSelectorFactoryContextImpl provider_factory_context(api_, options_,
-                                                                      singleton_manager_);
     // If a custom tls context provider is configured, derive the factory from the config.
     const auto& provider_config = config.custom_tls_certificate_selector();
     Ssl::TlsCertificateSelectorFactory* provider_factory =
@@ -268,6 +268,16 @@ ContextConfigImpl::ContextConfigImpl(
     tls_certificate_selector_factory_cb_ = provider_factory->createTlsCertificateSelectorCb(
         provider_config.typed_config(), provider_factory_context,
         factory_context.messageValidationVisitor());
+  } else {
+    auto factory = Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorFactory>(
+        "envoy.ssl.certificate_selector_factory.default");
+    if (!factory) {
+      IS_ENVOY_BUG("No envoy.ssl.certificate_selector_factory registered");
+    } else {
+      const ProtobufWkt::Any any;
+      tls_certificate_selector_factory_cb_ = factory->createTlsCertificateSelectorCb(
+          any, provider_factory_context, ProtobufMessage::getNullValidationVisitor());
+    }
   }
 }
 
@@ -340,9 +350,7 @@ Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
 }
 
 Ssl::TlsCertificateSelectorFactoryCb ContextConfigImpl::createTlsCertificateSelector() const {
-  return tls_certificate_selector_factory_cb_ != nullptr
-             ? tls_certificate_selector_factory_cb_
-             : &Ssl::TlsCertificateSelectorFactoryCbImpl;
+  return tls_certificate_selector_factory_cb_;
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(

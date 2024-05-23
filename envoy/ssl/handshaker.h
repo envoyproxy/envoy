@@ -253,7 +253,7 @@ public:
       TlsCertificateSelectorFactoryContext& tls_certificate_selector_factory_context,
       ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
-  std::string category() const override { return "envoy.tls_certificate_selector"; }
+  std::string category() const override { return "envoy.ssl.certificate_selector_factory"; }
 };
 
 } // namespace Ssl
