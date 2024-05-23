@@ -15,8 +15,7 @@ QueryParamsEvaluator::QueryParamsEvaluator(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter>& query_params_to_add,
     const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove) {
   for (const auto& query_param : query_params_to_add) {
-    query_params_to_add_.emplace_back(
-        std::make_pair(query_param.key(), query_param.value()));
+    query_params_to_add_.emplace_back(std::make_pair(query_param.key(), query_param.value()));
   }
 
   for (const auto& val : query_params_to_remove) {

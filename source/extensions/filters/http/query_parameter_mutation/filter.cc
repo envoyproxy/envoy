@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/query_parameter_mutation/filter.h"
 
 #include "envoy/extensions/filters/http/query_parameter_mutation/v3/config.pb.h"
-
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/factory_context.h"

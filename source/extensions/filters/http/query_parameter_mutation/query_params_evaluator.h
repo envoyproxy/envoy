@@ -20,8 +20,8 @@ using QueryParamsEvaluatorPtr = std::unique_ptr<QueryParamsEvaluator>;
 class QueryParamsEvaluator {
 public:
   QueryParamsEvaluator(const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter>&
-                query_params_to_add,
-            const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove);
+                           query_params_to_add,
+                       const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove);
 
   /**
    * Processes headers first through query parameter removals then through query parameter

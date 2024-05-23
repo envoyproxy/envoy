@@ -16,7 +16,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace QueryParameterMutation {
 
-
 TEST(ConfigTest, CreateFilter) {
   const std::string yaml = R"EOF(
 query_parameters_to_add:
@@ -32,7 +31,8 @@ query_parameters_to_remove:
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
