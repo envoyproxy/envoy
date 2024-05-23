@@ -75,7 +75,7 @@ public:
           drained_size_ = 0;
         }
         // Trigger the peek by event.
-        file_event_callback_(Event::FileReadyType::Read);
+        EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
         break;
       }
       case test::common::network::Action::kDrain: {

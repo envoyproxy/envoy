@@ -124,6 +124,10 @@ public:
 
     EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
                                         /*ignore_repeated_field_ordering=*/false));
+    opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse response;
+    access_log_request_->startGrpcStream();
+    access_log_request_->sendGrpcMessage(response);
+    access_log_request_->finishGrpcStream(Grpc::Status::Ok);
     return AssertionSuccess();
   }
 

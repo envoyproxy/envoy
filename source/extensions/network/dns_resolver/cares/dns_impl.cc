@@ -365,7 +365,11 @@ void DnsResolverImpl::onAresSocketStateChange(os_fd_t fd, int read, int write) {
   // If we weren't tracking the fd before, create a new FileEvent.
   if (it == events_.end()) {
     events_[fd] = dispatcher_.createFileEvent(
-        fd, [this, fd](uint32_t events) { onEventCallback(fd, events); },
+        fd,
+        [this, fd](uint32_t events) {
+          onEventCallback(fd, events);
+          return absl::OkStatus();
+        },
         Event::FileTriggerType::Level, Event::FileReadyType::Read | Event::FileReadyType::Write);
   }
   events_[fd]->setEnabled((read ? Event::FileReadyType::Read : 0) |

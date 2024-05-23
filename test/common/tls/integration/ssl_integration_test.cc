@@ -10,11 +10,11 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/tls/client_context_impl.h"
+#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
-#include "source/common/tls/ssl_socket.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/tls/cert_validator/timed_cert_validator.h"

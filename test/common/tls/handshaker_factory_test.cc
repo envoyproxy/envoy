@@ -5,10 +5,10 @@
 #include "envoy/ssl/handshaker.h"
 
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
-#include "source/common/tls/ssl_socket.h"
 #include "source/server/process_context_impl.h"
 
 #include "test/mocks/network/connection.h"

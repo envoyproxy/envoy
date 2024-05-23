@@ -14,7 +14,6 @@
 #include "library/jni/android_network_utility.h"
 #include "library/jni/jni_helper.h"
 #include "library/jni/jni_utility.h"
-#include "library/jni/types/exception.h"
 
 using Envoy::Platform::EngineBuilder;
 
@@ -211,13 +210,18 @@ jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoyHeaders& head
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> result = jni_helper.callObjectMethod<jobjectArray>(
       j_context, jmid_onHeaders, static_cast<jlong>(headers.get().length),
       end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel.get());
-  // TODO(Augustyniak): Pass the name of the filter in here so that we can instrument the origin of
-  // the JNI exception better.
-  bool exception_cleared = Envoy::JNI::Exception::checkAndClear(method);
 
-  if (!exception_cleared) {
+  if (!jni_helper.exceptionCheck()) {
     return result;
   }
+  // TODO(fredyw): The whole code here is a bit weird, but this how it currently works. Consider
+  // rewriting it.
+  auto java_exception = jni_helper.exceptionOccurred();
+  jni_helper.exceptionCleared();
+  std::string java_exception_message =
+      Envoy::JNI::getJavaExceptionMessage(jni_helper, java_exception.get());
+  ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "jni_cleared_pending_exception", "{}",
+                            absl::StrFormat("%s||%s||", java_exception_message, method));
 
   // Create a "no operation" result:
   //  1. Tell the filter chain to continue the iteration.
@@ -266,7 +270,7 @@ jvm_http_filter_on_request_headers(envoy_headers input_headers, bool end_stream,
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> j_headers =
       jni_helper.getObjectArrayElement<jobjectArray>(result.get(), 1);
 
-  int unboxed_status = Envoy::JNI::javaIntegerTotInt(jni_helper, status.get());
+  int unboxed_status = Envoy::JNI::javaIntegerToCppInt(jni_helper, status.get());
   envoy_headers native_headers =
       Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, j_headers.get());
 
@@ -291,7 +295,7 @@ jvm_http_filter_on_response_headers(envoy_headers input_headers, bool end_stream
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> j_headers =
       jni_helper.getObjectArrayElement<jobjectArray>(result.get(), 1);
 
-  int unboxed_status = Envoy::JNI::javaIntegerTotInt(jni_helper, status.get());
+  int unboxed_status = Envoy::JNI::javaIntegerToCppInt(jni_helper, status.get());
   envoy_headers native_headers =
       Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, j_headers.get());
 
@@ -346,7 +350,7 @@ static envoy_filter_data_status jvm_http_filter_on_request_data(envoy_data data,
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> j_data =
       jni_helper.getObjectArrayElement<jobjectArray>(result.get(), 1);
 
-  int unboxed_status = Envoy::JNI::javaIntegerTotInt(jni_helper, status.get());
+  int unboxed_status = Envoy::JNI::javaIntegerToCppInt(jni_helper, status.get());
   envoy_data native_data = Envoy::JNI::javaByteBufferToEnvoyData(jni_helper, j_data.get());
 
   envoy_headers* pending_headers = nullptr;
@@ -380,7 +384,7 @@ static envoy_filter_data_status jvm_http_filter_on_response_data(envoy_data data
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> j_data =
       jni_helper.getObjectArrayElement<jobjectArray>(result.get(), 1);
 
-  int unboxed_status = Envoy::JNI::javaIntegerTotInt(jni_helper, status.get());
+  int unboxed_status = Envoy::JNI::javaIntegerToCppInt(jni_helper, status.get());
   envoy_data native_data = Envoy::JNI::javaByteBufferToEnvoyData(jni_helper, j_data.get());
 
   envoy_headers* pending_headers = nullptr;
@@ -443,7 +447,7 @@ jvm_http_filter_on_request_trailers(envoy_headers trailers, envoy_stream_intel s
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> j_trailers =
       jni_helper.getObjectArrayElement<jobjectArray>(result.get(), 1);
 
-  int unboxed_status = Envoy::JNI::javaIntegerTotInt(jni_helper, status.get());
+  int unboxed_status = Envoy::JNI::javaIntegerToCppInt(jni_helper, status.get());
   envoy_headers native_trailers =
       Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, j_trailers.get());
 
@@ -485,7 +489,7 @@ jvm_http_filter_on_response_trailers(envoy_headers trailers, envoy_stream_intel 
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> j_trailers =
       jni_helper.getObjectArrayElement<jobjectArray>(result.get(), 1);
 
-  int unboxed_status = Envoy::JNI::javaIntegerTotInt(jni_helper, status.get());
+  int unboxed_status = Envoy::JNI::javaIntegerToCppInt(jni_helper, status.get());
   envoy_headers native_trailers =
       Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, j_trailers.get());
 
@@ -586,7 +590,7 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> j_trailers =
       jni_helper.getObjectArrayElement<jobjectArray>(result.get(), 3);
 
-  int unboxed_status = Envoy::JNI::javaIntegerTotInt(jni_helper, status.get());
+  int unboxed_status = Envoy::JNI::javaIntegerToCppInt(jni_helper, status.get());
   envoy_headers* pending_headers =
       Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeadersPtr(jni_helper, j_headers.get());
   envoy_data* pending_data = Envoy::JNI::javaByteBufferToEnvoyDataPtr(jni_helper, j_data.get());
