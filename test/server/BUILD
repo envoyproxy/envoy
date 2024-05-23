@@ -287,9 +287,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "null_overload_manager_impl_test",
-    srcs = ["null_overload_manager_impl_test.cc"],
+    name = "null_overload_manager_test",
+    srcs = ["null_overload_manager_test.cc"],
     deps = [
+        "//source/server:overload_manager_lib",
         "//source/server:null_overload_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/thread_local:thread_local_mocks",

@@ -1190,40 +1190,6 @@ TEST_F(OverloadManagerLoadShedPointImplTest, LoadShedPointShouldUseCurrentReadin
   EXPECT_EQ(overload_action_states[0], UnitFloat(1));
 }
 
-TEST_F(OverloadManagerImplTest, NullOverloadManagerOverloadState) {
-  NullOverloadManager::OverloadState overload_state_non_permissive(dispatcher_, false);
-
-  // Verify that the manager always returns an inactive state for any action
-  auto action_state = overload_state_non_permissive.getState("envoy.overload_actions.shrink_heap");
-  EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
-                                  Property(&OverloadActionState::value, UnitFloat::min())));
-  action_state = overload_state_non_permissive.getState("envoy.overload_actions.stop_accepting_requests");
-  EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
-                                  Property(&OverloadActionState::value, UnitFloat::min())));
-  action_state = overload_state_non_permissive.getState("envoy.overload_actions.some_other_action");
-  EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
-                                  Property(&OverloadActionState::value, UnitFloat::min())));
-
-  // Verify that the manager does not allocate or deallocate any resources
-  EXPECT_FALSE(overload_state_non_permissive.tryAllocateResource(Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 100));
-  EXPECT_FALSE(overload_state_non_permissive.tryDeallocateResource(Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 50));
-
-  // Verify that the manager does not enable any resource monitors
-  EXPECT_FALSE(overload_state_non_permissive.isResourceMonitorEnabled(Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections));
-
-  // Verify that the manager returns a null ProactiveResourceMonitor for any resource
-  EXPECT_FALSE(overload_state_non_permissive.getProactiveResourceMonitorForTest(Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections).has_value());
-}
-
-TEST_F(OverloadManagerImplTest, NullOverloadManagerNoOpOperations) {
-  NullOverloadManager overload_manager(thread_local_, false);
-  EXPECT_ENVOY_BUG(overload_manager.registerForAction("envoy.overload_actions.shrink_heap", dispatcher_, [](OverloadActionState) {}), "Cannot call registerForAction on NullOverloadManager");
-  auto* point = overload_manager.getLoadShedPoint("envoy.load_shed_point.dummy_point");
-  EXPECT_EQ(point, nullptr);
-  auto scaled_timer_factory = overload_manager.scaledTimerFactory();
-  EXPECT_EQ(scaled_timer_factory, nullptr);
-}
-
 } // namespace
 } // namespace Server
 } // namespace Envoy

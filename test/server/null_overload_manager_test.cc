@@ -1,25 +1,21 @@
+#include "envoy/event/scaled_range_timer_manager.h"
+#include "envoy/server/overload/overload_manager.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
+
+#include "source/server/overload_manager_impl.h"
 #include "source/server/null_overload_manager.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/options.h"
 #include "test/mocks/thread_local/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AllOf;
 using testing::AnyNumber;
-using testing::ByMove;
-using testing::DoAll;
 using testing::FloatNear;
-using testing::Invoke;
 using testing::NiceMock;
-using testing::Pointee;
 using testing::Property;
-using testing::Return;
-using testing::SaveArg;
-using testing::UnorderedElementsAreArray;
 
 namespace Envoy {
 namespace Server {
@@ -60,7 +56,7 @@ TEST_F(NullOverloadManagerTest, NullOverloadManagerOverloadState) {
 
 TEST_F(NullOverloadManagerTest, NullOverloadManagerNoOpOperations) {
   NullOverloadManager overload_manager(thread_local_, false);
-  EXPECT_ENVOY_BUG(overload_manager.registerForAction("envoy.overload_actions.shrink_heap", dispatcher_, [](OverloadActionState) {}), "Cannot call registerForAction on NullOverloadManager");
+  EXPECT_TRUE(overload_manager.registerForAction("envoy.overload_actions.shrink_heap", dispatcher_, [](OverloadActionState) {}));
   auto* point = overload_manager.getLoadShedPoint("envoy.load_shed_point.dummy_point");
   EXPECT_EQ(point, nullptr);
   auto scaled_timer_factory = overload_manager.scaledTimerFactory();
