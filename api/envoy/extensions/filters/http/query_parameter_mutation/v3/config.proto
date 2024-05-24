@@ -22,7 +22,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Configures the Query Parameter Mutation filter.
 message Config {
   // Specifies a list of HTTP query parameters that will be added to the HTTP path. Repeat values are supported. For example,
-  // `foo: 1, foo: 2` will appear as `?foo=1&foo=2`. Values are added as exact strings, command substitution is not supported.
+  // ``foo: 1, foo: 2`` will appear as "?foo=1&foo=2". Values are added as exact strings, command substitution is not supported.
   repeated config.core.v3.QueryParameter query_parameters_to_add = 1;
 
   // Specifies a list of HTTP query parameters that will be removed from the HTTP path.
