@@ -109,10 +109,10 @@ message Rule {
   //        name: version
   //        id: 1
   //
-  // The above yaml will match on value of `info.version` in the below thrift schema as input of
+  // The above yaml will match on value of ``info.version`` in the below thrift schema as input of
   // :ref:`on_present<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.on_present>` or
   // :ref:`on_missing<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.on_missing>`
-  // while we are processing `foo` method. This rule won't be applied to `bar` method.
+  // while we are processing ``foo`` method. This rule won't be applied to ``bar`` method.
   //
   // .. code-block:: thrift
   //
