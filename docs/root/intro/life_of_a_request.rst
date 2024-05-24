@@ -460,7 +460,7 @@ The router filter is responsible for all aspects of upstream request lifecycle m
 stream allocated from the HTTP connection pool. It also is responsible for request timeouts, retries
 and affinity.
 
-The router filter is also responsible for the creation and running of the `Upstream HTTP filter <arch_overview_http_filters>`
+The router filter is also responsible for the creation and running of the :ref:`Upstream HTTP filter <arch_overview_http_filters>`
 chain. By default, upstream HTTP filters will start running immediately after headers arrive at the router
 filter, however C++ filters can pause until the upstream connection is established if they need to
 inspect the upstream stream or connection. Upstream HTTP filter chains are by default configured via cluster

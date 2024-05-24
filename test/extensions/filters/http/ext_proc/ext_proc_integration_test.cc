@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/network/address.h"
@@ -12,6 +13,8 @@
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.validate.h"
+#include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.h"
+#include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.validate.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/test_runtime.h"
@@ -626,6 +629,41 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Tracing is currently only supported for Envoy gRPC";
+  }
+  initializeConfig();
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    test::integration::filters::ExpectSpan ext_proc_span;
+    ext_proc_span.set_operation_name(
+        "async envoy.service.ext_proc.v3.ExternalProcessor.Process egress");
+    ext_proc_span.set_context_injected(true);
+    ext_proc_span.set_sampled(true);
+    ext_proc_span.mutable_tags()->insert({"grpc.status_code", "0"});
+    ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
+    ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
+
+    test::integration::filters::TracerTestConfig test_config;
+    test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
+
+    auto* tracing = cm.mutable_tracing();
+    tracing->mutable_provider()->set_name("tracer-test-filter");
+    tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
+  });
+
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+
+  processor_stream_->startGrpcStream();
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithLogging) {
   ConfigOptions config_option = {};
   config_option.add_logging_filter = true;
@@ -648,6 +686,40 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithLogging) {
 // by returning a failure before the first stream response can be sent.
 TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
   initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  // Fail the stream immediately
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
+  verifyDownstreamResponse(*response, 500);
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Tracing is currently only supported for Envoy gRPC";
+  }
+  initializeConfig();
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    test::integration::filters::ExpectSpan ext_proc_span;
+    ext_proc_span.set_operation_name(
+        "async envoy.service.ext_proc.v3.ExternalProcessor.Process egress");
+    ext_proc_span.set_context_injected(true);
+    ext_proc_span.set_sampled(true);
+    ext_proc_span.mutable_tags()->insert({"grpc.status_code", "2"});
+    ext_proc_span.mutable_tags()->insert({"error", "true"});
+    ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
+    ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
+
+    test::integration::filters::TracerTestConfig test_config;
+    test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
+
+    auto* tracing = cm.mutable_tracing();
+    tracing->mutable_provider()->set_name("tracer-test-filter");
+    tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
+  });
+
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
@@ -2269,6 +2341,47 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeout) {
   // ensure 200 ms timeout
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
   initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Travel forward 400 ms
+                                 timeSystem().advanceTimeWaitImpl(400ms);
+                                 return false;
+                               });
+
+  // We should immediately have an error response now
+  verifyDownstreamResponse(*response, 500);
+}
+
+TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Tracing is currently only supported for Envoy gRPC";
+  }
+
+  // ensure 200 ms timeout
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig();
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    test::integration::filters::ExpectSpan ext_proc_span;
+    ext_proc_span.set_operation_name(
+        "async envoy.service.ext_proc.v3.ExternalProcessor.Process egress");
+    ext_proc_span.set_context_injected(true);
+    ext_proc_span.set_sampled(true);
+    ext_proc_span.mutable_tags()->insert({"status", "canceled"});
+    ext_proc_span.mutable_tags()->insert({"error", ""}); // not an error
+    ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
+    ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
+
+    test::integration::filters::TracerTestConfig test_config;
+    test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
+
+    auto* tracing = cm.mutable_tracing();
+    tracing->mutable_provider()->set_name("tracer-test-filter");
+    tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
+  });
+
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true,

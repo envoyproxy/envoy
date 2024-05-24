@@ -188,6 +188,7 @@ typedef struct {
   int64_t response_start_ms;
   // The time when the stream reached a final state: Error, Cancel, Success.
   int64_t stream_end_ms;
+  // TODO(fredyw): This should be a bool instead.
   // True if the upstream socket had been used previously.
   uint64_t socket_reused;
   // The number of bytes sent upstream.

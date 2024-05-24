@@ -340,7 +340,6 @@ protected:
   // The downstream info that is owned by the downstream connection.
   StreamInfo::StreamInfo& downstream_info_;
   std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
-  std::list<UpstreamRequestPtr> upstream_requests_;
   HttpConnPool& parent_;
 
 private:
@@ -390,6 +389,9 @@ private:
   std::unique_ptr<HttpConnPool::Callbacks> conn_pool_callbacks_;
   bool read_half_closed_{};
   bool write_half_closed_{};
+  // upstream_requests_ has to be destroyed first as they may use CombinedUpstream parent
+  // during destruction.
+  std::list<UpstreamRequestPtr> upstream_requests_;
 };
 
 } // namespace TcpProxy

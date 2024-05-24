@@ -21,6 +21,9 @@ using Envoy::Platform::EngineBuilder;
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
   Envoy::JNI::JniHelper::initialize(vm);
+  Envoy::JNI::JniHelper::addClassToCache("io/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel");
+  Envoy::JNI::JniHelper::addClassToCache(
+      "io/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel");
   return Envoy::JNI::JniHelper::getVersion();
 }
 
@@ -61,7 +64,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   //================================================================================================
   std::unique_ptr<Envoy::EnvoyLogger> logger = std::make_unique<Envoy::EnvoyLogger>();
   if (envoy_logger != nullptr) {
-    const jobject envoy_logger_global_ref = env->NewGlobalRef(envoy_logger);
+    jobject envoy_logger_global_ref = env->NewGlobalRef(envoy_logger);
     logger->on_log_ = [envoy_logger_global_ref](Envoy::Logger::Logger::Levels level,
                                                 const std::string& message) {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
@@ -85,7 +88,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   std::unique_ptr<Envoy::EnvoyEventTracker> event_tracker =
       std::make_unique<Envoy::EnvoyEventTracker>();
   if (envoy_event_tracker != nullptr) {
-    const jobject event_tracker_global_ref = env->NewGlobalRef(envoy_event_tracker);
+    jobject event_tracker_global_ref = env->NewGlobalRef(envoy_event_tracker);
     event_tracker->on_track_ = [event_tracker_global_ref](
                                    const absl::flat_hash_map<std::string, std::string>& events) {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
@@ -247,12 +250,6 @@ jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoyHeaders& head
   return noopResult;
 }
 
-static void jvm_on_response_headers(envoy_headers headers, bool end_stream,
-                                    envoy_stream_intel stream_intel, void* context) {
-  const auto managed_headers = Envoy::Types::ManagedEnvoyHeaders(headers);
-  jvm_on_headers("onResponseHeaders", managed_headers, end_stream, stream_intel, context);
-}
-
 static envoy_filter_headers_status
 jvm_http_filter_on_request_headers(envoy_headers input_headers, bool end_stream,
                                    envoy_stream_intel stream_intel, const void* context) {
@@ -326,11 +323,6 @@ static Envoy::JNI::LocalRefUniquePtr<jobjectArray> jvm_on_data(const char* metho
   release_envoy_data(data);
 
   return result;
-}
-
-static void jvm_on_response_data(envoy_data data, bool end_stream, envoy_stream_intel stream_intel,
-                                 void* context) {
-  jvm_on_data("onResponseData", data, end_stream, stream_intel, context);
 }
 
 static envoy_filter_data_status jvm_http_filter_on_request_data(envoy_data data, bool end_stream,
@@ -422,11 +414,6 @@ static Envoy::JNI::LocalRefUniquePtr<jobjectArray> jvm_on_trailers(const char* m
       j_context, jmid_onTrailers, static_cast<jlong>(trailers.length), j_stream_intel.get());
 
   return result;
-}
-
-static void jvm_on_response_trailers(envoy_headers trailers, envoy_stream_intel stream_intel,
-                                     void* context) {
-  jvm_on_trailers("onResponseTrailers", trailers, stream_intel, context);
 }
 
 static envoy_filter_trailers_status
@@ -619,24 +606,6 @@ jvm_http_filter_on_resume_response(envoy_headers* headers, envoy_data* data,
                                    stream_intel, context);
 }
 
-static void call_jvm_on_complete(envoy_stream_intel stream_intel,
-                                 envoy_final_stream_intel final_stream_intel, void* context) {
-  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
-  jobject j_context = static_cast<jobject>(context);
-
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmObserverContext =
-      jni_helper.getObjectClass(j_context);
-  jmethodID jmid_onComplete = jni_helper.getMethodId(jcls_JvmObserverContext.get(), "onComplete",
-                                                     "([J[J)Ljava/lang/Object;");
-
-  Envoy::JNI::LocalRefUniquePtr<jlongArray> j_stream_intel =
-      Envoy::JNI::envoyStreamIntelToJavaLongArray(jni_helper, stream_intel);
-  Envoy::JNI::LocalRefUniquePtr<jlongArray> j_final_stream_intel =
-      Envoy::JNI::envoyFinalStreamIntelToJavaLongArray(jni_helper, final_stream_intel);
-  Envoy::JNI::LocalRefUniquePtr<jobject> unused = jni_helper.callObjectMethod(
-      j_context, jmid_onComplete, j_stream_intel.get(), j_final_stream_intel.get());
-}
-
 static void call_jvm_on_error(envoy_error error, envoy_stream_intel stream_intel,
                               envoy_final_stream_intel final_stream_intel, void* context) {
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
@@ -661,12 +630,6 @@ static void call_jvm_on_error(envoy_error error, envoy_stream_intel stream_intel
   release_envoy_error(error);
 }
 
-static void jvm_on_error(envoy_error error, envoy_stream_intel stream_intel,
-                         envoy_final_stream_intel final_stream_intel, void* context) {
-  call_jvm_on_error(error, stream_intel, final_stream_intel, context);
-  Envoy::JNI::jniDeleteGlobalRef(context);
-}
-
 static void call_jvm_on_cancel(envoy_stream_intel stream_intel,
                                envoy_final_stream_intel final_stream_intel, void* context) {
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
@@ -686,18 +649,6 @@ static void call_jvm_on_cancel(envoy_stream_intel stream_intel,
       j_context, jmid_onCancel, j_stream_intel.get(), j_final_stream_intel.get());
 }
 
-static void jvm_on_complete(envoy_stream_intel stream_intel,
-                            envoy_final_stream_intel final_stream_intel, void* context) {
-  call_jvm_on_complete(stream_intel, final_stream_intel, context);
-  Envoy::JNI::jniDeleteGlobalRef(context);
-}
-
-static void jvm_on_cancel(envoy_stream_intel stream_intel,
-                          envoy_final_stream_intel final_stream_intel, void* context) {
-  call_jvm_on_cancel(stream_intel, final_stream_intel, context);
-  Envoy::JNI::jniDeleteGlobalRef(context);
-}
-
 static void jvm_http_filter_on_error(envoy_error error, envoy_stream_intel stream_intel,
                                      envoy_final_stream_intel final_stream_intel,
                                      const void* context) {
@@ -708,22 +659,6 @@ static void jvm_http_filter_on_cancel(envoy_stream_intel stream_intel,
                                       envoy_final_stream_intel final_stream_intel,
                                       const void* context) {
   call_jvm_on_cancel(stream_intel, final_stream_intel, const_cast<void*>(context));
-}
-
-static void jvm_on_send_window_available(envoy_stream_intel stream_intel, void* context) {
-  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
-  jobject j_context = static_cast<jobject>(context);
-
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmObserverContext =
-      jni_helper.getObjectClass(j_context);
-  jmethodID jmid_onSendWindowAvailable = jni_helper.getMethodId(
-      jcls_JvmObserverContext.get(), "onSendWindowAvailable", "([J)Ljava/lang/Object;");
-
-  Envoy::JNI::LocalRefUniquePtr<jlongArray> j_stream_intel =
-      Envoy::JNI::envoyStreamIntelToJavaLongArray(jni_helper, stream_intel);
-
-  Envoy::JNI::LocalRefUniquePtr<jobject> unused =
-      jni_helper.callObjectMethod(j_context, jmid_onSendWindowAvailable, j_stream_intel.get());
 }
 
 // JvmKeyValueStoreContext
@@ -828,46 +763,113 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   auto java_stream_callbacks_global_ref = jni_helper.newGlobalRef(java_stream_callbacks).release();
   auto engine = reinterpret_cast<Envoy::InternalEngine*>(engine_handle);
   Envoy::EnvoyStreamCallbacks stream_callbacks;
-  // TODO(fredyw): Rewrite the whole implementation to not use the bridge data structures.
-  stream_callbacks.on_headers_ =
-      [java_stream_callbacks_global_ref](const Envoy::Http::ResponseHeaderMap& headers,
-                                         bool end_stream, envoy_stream_intel stream_intel) {
-        envoy_headers bridge_headers = Envoy::Http::Utility::toBridgeHeaders(headers);
-        jvm_on_response_headers(bridge_headers, end_stream, stream_intel,
-                                java_stream_callbacks_global_ref);
-      };
+  stream_callbacks.on_headers_ = [java_stream_callbacks_global_ref](
+                                     const Envoy::Http::ResponseHeaderMap& headers, bool end_stream,
+                                     envoy_stream_intel stream_intel) {
+    Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
+    auto java_headers = Envoy::JNI::cppHeadersToJavaHeaders(jni_helper, headers);
+    auto java_stream_intel = Envoy::JNI::cppStreamIntelToJavaStreamIntel(jni_helper, stream_intel);
+    auto java_stream_callbacks_class = jni_helper.getObjectClass(java_stream_callbacks_global_ref);
+    auto java_on_headers_method_id = jni_helper.getMethodId(
+        java_stream_callbacks_class.get(), "onHeaders",
+        "(Ljava/util/Map;ZLio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;)V");
+    jni_helper.callVoidMethod(java_stream_callbacks_global_ref, java_on_headers_method_id,
+                              java_headers.get(), static_cast<jboolean>(end_stream),
+                              java_stream_intel.get());
+  };
   stream_callbacks.on_data_ = [java_stream_callbacks_global_ref](
                                   const Envoy::Buffer::Instance& buffer, uint64_t length,
                                   bool end_stream, envoy_stream_intel stream_intel) {
-    envoy_data bridge_data = Envoy::Bridge::Utility::toBridgeDataNoDrain(buffer, length);
-    jvm_on_response_data(bridge_data, end_stream, stream_intel, java_stream_callbacks_global_ref);
+    Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
+    auto java_stream_callbacks_class = jni_helper.getObjectClass(java_stream_callbacks_global_ref);
+    auto java_byte_buffer =
+        Envoy::JNI::cppBufferInstanceToJavaDirectByteBuffer(jni_helper, buffer, length);
+    auto java_stream_intel = Envoy::JNI::cppStreamIntelToJavaStreamIntel(jni_helper, stream_intel);
+    auto java_on_data_method_id = jni_helper.getMethodId(
+        java_stream_callbacks_class.get(), "onData",
+        "(Ljava/nio/ByteBuffer;ZLio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;)V");
+    jni_helper.callVoidMethod(java_stream_callbacks_global_ref, java_on_data_method_id,
+                              java_byte_buffer.get(), static_cast<jboolean>(end_stream),
+                              java_stream_intel.get());
   };
-  stream_callbacks.on_trailers_ =
-      [java_stream_callbacks_global_ref](const Envoy::Http::ResponseTrailerMap& trailers,
-                                         envoy_stream_intel stream_intel) {
-        envoy_headers bridge_trailers = Envoy::Http::Utility::toBridgeHeaders(trailers);
-        jvm_on_response_trailers(bridge_trailers, stream_intel, java_stream_callbacks_global_ref);
-      };
-  stream_callbacks.on_complete_ =
-      [java_stream_callbacks_global_ref](envoy_stream_intel stream_intel,
-                                         envoy_final_stream_intel final_stream_intel) {
-        jvm_on_complete(stream_intel, final_stream_intel, java_stream_callbacks_global_ref);
-      };
+  stream_callbacks.on_trailers_ = [java_stream_callbacks_global_ref](
+                                      const Envoy::Http::ResponseTrailerMap& trailers,
+                                      envoy_stream_intel stream_intel) {
+    Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
+    auto java_trailers = Envoy::JNI::cppHeadersToJavaHeaders(jni_helper, trailers);
+    auto java_stream_intel = Envoy::JNI::cppStreamIntelToJavaStreamIntel(jni_helper, stream_intel);
+    auto java_stream_callbacks_class = jni_helper.getObjectClass(java_stream_callbacks_global_ref);
+    auto java_on_trailers_method_id = jni_helper.getMethodId(
+        java_stream_callbacks_class.get(), "onTrailers",
+        "(Ljava/util/Map;Lio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;)V");
+    jni_helper.callVoidMethod(java_stream_callbacks_global_ref, java_on_trailers_method_id,
+                              java_trailers.get(), java_stream_intel.get());
+  };
+  stream_callbacks.on_complete_ = [java_stream_callbacks_global_ref](
+                                      envoy_stream_intel stream_intel,
+                                      envoy_final_stream_intel final_stream_intel) {
+    Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
+    auto java_stream_intel = Envoy::JNI::cppStreamIntelToJavaStreamIntel(jni_helper, stream_intel);
+    auto java_final_stream_intel =
+        Envoy::JNI::cppFinalStreamIntelToJavaFinalStreamIntel(jni_helper, final_stream_intel);
+    auto java_stream_callbacks_class = jni_helper.getObjectClass(java_stream_callbacks_global_ref);
+    auto java_on_complete_method_id =
+        jni_helper.getMethodId(java_stream_callbacks_class.get(), "onComplete",
+                               "(Lio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;"
+                               "Lio/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel;)V");
+    jni_helper.callVoidMethod(java_stream_callbacks_global_ref, java_on_complete_method_id,
+                              java_stream_intel.get(), java_final_stream_intel.get());
+    // on_complete_ is a terminal callback, delete the java_stream_callbacks_global_ref.
+    jni_helper.getEnv()->DeleteGlobalRef(java_stream_callbacks_global_ref);
+  };
   stream_callbacks.on_error_ = [java_stream_callbacks_global_ref](
                                    Envoy::EnvoyError error, envoy_stream_intel stream_intel,
                                    envoy_final_stream_intel final_stream_intel) {
-    envoy_error bridge_error = Envoy::Bridge::Utility::toBridgeError(error);
-    jvm_on_error(bridge_error, stream_intel, final_stream_intel, java_stream_callbacks_global_ref);
+    Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
+    auto java_stream_intel = Envoy::JNI::cppStreamIntelToJavaStreamIntel(jni_helper, stream_intel);
+    auto java_final_stream_intel =
+        Envoy::JNI::cppFinalStreamIntelToJavaFinalStreamIntel(jni_helper, final_stream_intel);
+    auto java_stream_callbacks_class = jni_helper.getObjectClass(java_stream_callbacks_global_ref);
+    auto java_on_error_method_id = jni_helper.getMethodId(
+        java_stream_callbacks_class.get(), "onError",
+        "(ILjava/lang/String;ILio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;"
+        "Lio/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel;)V");
+    auto java_error_message = Envoy::JNI::cppStringToJavaString(jni_helper, error.message);
+    jni_helper.callVoidMethod(java_stream_callbacks_global_ref, java_on_error_method_id,
+                              static_cast<jint>(error.error_code), java_error_message.get(),
+                              error.attempt_count.value_or(-1), java_stream_intel.get(),
+                              java_final_stream_intel.get());
+    // on_error_ is a terminal callback, delete the java_stream_callbacks_global_ref.
+    jni_helper.getEnv()->DeleteGlobalRef(java_stream_callbacks_global_ref);
   };
-  stream_callbacks.on_cancel_ =
-      [java_stream_callbacks_global_ref](envoy_stream_intel stream_intel,
-                                         envoy_final_stream_intel final_stream_intel) {
-        jvm_on_cancel(stream_intel, final_stream_intel, java_stream_callbacks_global_ref);
-      };
-  stream_callbacks.on_send_window_available_ =
-      [java_stream_callbacks_global_ref](envoy_stream_intel stream_intel) {
-        jvm_on_send_window_available(stream_intel, java_stream_callbacks_global_ref);
-      };
+  stream_callbacks.on_cancel_ = [java_stream_callbacks_global_ref](
+                                    envoy_stream_intel stream_intel,
+                                    envoy_final_stream_intel final_stream_intel) {
+    Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
+    auto java_stream_intel = Envoy::JNI::cppStreamIntelToJavaStreamIntel(jni_helper, stream_intel);
+    auto java_final_stream_intel =
+        Envoy::JNI::cppFinalStreamIntelToJavaFinalStreamIntel(jni_helper, final_stream_intel);
+    auto java_stream_callbacks_class = jni_helper.getObjectClass(java_stream_callbacks_global_ref);
+    auto java_on_cancel_method_id =
+        jni_helper.getMethodId(java_stream_callbacks_class.get(), "onCancel",
+                               "(Lio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;"
+                               "Lio/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel;)V");
+    jni_helper.callVoidMethod(java_stream_callbacks_global_ref, java_on_cancel_method_id,
+                              java_stream_intel.get(), java_final_stream_intel.get());
+    // on_cancel_ is a terminal callback, delete the java_stream_callbacks_global_ref.
+    jni_helper.getEnv()->DeleteGlobalRef(java_stream_callbacks_global_ref);
+  };
+  stream_callbacks.on_send_window_available_ = [java_stream_callbacks_global_ref](
+                                                   envoy_stream_intel stream_intel) {
+    Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
+    auto java_stream_intel = Envoy::JNI::cppStreamIntelToJavaStreamIntel(jni_helper, stream_intel);
+    auto java_stream_callbacks_class = jni_helper.getObjectClass(java_stream_callbacks_global_ref);
+    auto java_on_send_window_available_method_id =
+        jni_helper.getMethodId(java_stream_callbacks_class.get(), "onSendWindowAvailable",
+                               "(Lio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;)V");
+    jni_helper.callVoidMethod(java_stream_callbacks_global_ref,
+                              java_on_send_window_available_method_id, java_stream_intel.get());
+  };
 
   envoy_status_t result = engine->startStream(static_cast<envoy_stream_t>(stream_handle),
                                               std::move(stream_callbacks), explicit_flow_control);

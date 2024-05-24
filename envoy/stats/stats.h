@@ -20,7 +20,7 @@ namespace Stats {
 class StatName;
 
 /**
- * Holds a set of symbols used to compose hierarhical names.
+ * Holds a set of symbols used to compose hierarchical names.
  */
 class SymbolTable;
 

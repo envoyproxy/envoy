@@ -16,6 +16,10 @@ behavior_changes:
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
     requests and responses. This behavior can be reverted by setting the feature to false.
+- area: http2
+  change: |
+    Passes HTTP/2 DATA frames through a different codec API. This behavior can be temporarily disabled by setting the runtime
+    feature ``envoy.reloadable_features.http2_use_visitor_for_data`` to false.
 - area: proxy_protocol
   change: |
     Populate typed metadata by default in proxy protocol listener. Typed metadata can be consumed as
@@ -25,6 +29,11 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: grpc
+  change: |
+    Changes in ``AsyncStreamImpl`` now propagate tracing context headers in bidirectional streams when using
+    :ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>`. Previously, tracing context headers
+    were not being set when calling external services such as ``ext_proc``.
 - area: tracers
   change: |
     Set status code for OpenTelemetry tracers (previously unset).
@@ -58,9 +67,18 @@ minor_behavior_changes:
     ``%UPSTREAM_REMOTE_PORT%`` and ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%`` access log format specifiers.
     This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.upstream_remote_address_use_connection`` to false.
+- area: quic
+  change: |
+    When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: admission control
+  change: |
+    Fixed the thread-local controller's average RPS calculation to be calculated over the full
+    lookback window. Previously, the controller would calculate the average RPS over the amount of
+    time elapsed since the oldest valid request sample. This change brings the behavior in line with
+    the documentation.
 - area: outlier detection
   change: |
     Fixed :ref:`successful_active_health_check_uneject_host
@@ -159,14 +177,27 @@ new_features:
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
+- area: aws_lambda
+  change: |
+    The ``aws_lambda`` filter now supports the
+    :ref:`credentials <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.credentials>` parameter.
+    This enables setting AWS credentials from the filter configuration.
 - area: access_log
   change: |
     added support for :ref:`%UPSTREAM_HOST_NAME% <config_access_log_format_upstream_host_name>` for the upstream host
     identifier.
+- area: access_loggers
+  change: |
+    Added ``TRACE_ID`` :ref:`access log formatter <config_access_log_format>`.
 - area: healthcheck
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting
     :ref:`health_check_config <envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.proxy_protocol_config>`.
+- area: open_telemetry
+  change: |
+    added :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.stat_prefix>`
+    configuration to support additional stat prefix for the OpenTelemetry logger.
 - area: ratelimit
   change: |
     Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>` 

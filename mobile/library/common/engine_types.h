@@ -64,6 +64,7 @@ struct EnvoyStreamCallbacks {
    *
    * The callback function pases the following parameters.
    * - buffer: the data received.
+   * - length: the length of data to read. It will always be <= `buffer.length()`
    * - end_stream: whether the data is the last data frame.
    * - stream_intel: contains internal stream metrics.
    */

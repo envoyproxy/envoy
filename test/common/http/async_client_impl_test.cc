@@ -2075,11 +2075,25 @@ TEST_F(AsyncClientImplTest, DumpState) {
 // Must not be in anonymous namespace for friend to work.
 class AsyncClientImplUnitTest : public AsyncClientImplTest {
 public:
-  Router::RetryPolicyImpl retry_policy_;
+  AsyncClientImplUnitTest() {
+    envoy::config::route::v3::RetryPolicy proto_policy;
+    Upstream::RetryExtensionFactoryContextImpl factory_context(
+        client_.factory_context_.singletonManager());
+    auto policy_or_error =
+        Router::RetryPolicyImpl::create(proto_policy, ProtobufMessage::getNullValidationVisitor(),
+                                        factory_context, client_.factory_context_);
+    THROW_IF_STATUS_NOT_OK(policy_or_error, throw);
+    retry_policy_ = std::move(policy_or_error.value());
+    EXPECT_TRUE(retry_policy_.get());
+
+    route_impl_.reset(new NullRouteImpl(
+        client_.cluster_->name(), *retry_policy_, regex_engine_, absl::nullopt,
+        Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>()));
+  }
+
+  std::unique_ptr<Router::RetryPolicyImpl> retry_policy_;
   Regex::GoogleReEngine regex_engine_;
-  std::unique_ptr<NullRouteImpl> route_impl_{new NullRouteImpl(
-      client_.cluster_->name(), retry_policy_, regex_engine_, absl::nullopt,
-      Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>())};
+  std::unique_ptr<NullRouteImpl> route_impl_;
   std::unique_ptr<Http::AsyncStreamImpl> stream_{
       new Http::AsyncStreamImpl(client_, stream_callbacks_, AsyncClient::StreamOptions())};
   NullVirtualHost vhost_;
@@ -2100,12 +2114,15 @@ public:
     TestUtility::loadFromYaml(yaml_config, proto_policy);
     Upstream::RetryExtensionFactoryContextImpl factory_context(
         client_.factory_context_.singletonManager());
-    retry_policy_ =
-        Router::RetryPolicyImpl(proto_policy, ProtobufMessage::getNullValidationVisitor(),
-                                factory_context, client_.factory_context_);
+    auto policy_or_error =
+        Router::RetryPolicyImpl::create(proto_policy, ProtobufMessage::getNullValidationVisitor(),
+                                        factory_context, client_.factory_context_);
+    THROW_IF_STATUS_NOT_OK(policy_or_error, throw);
+    retry_policy_ = std::move(policy_or_error.value());
+    EXPECT_TRUE(retry_policy_.get());
 
     stream_ = std::make_unique<Http::AsyncStreamImpl>(
-        client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy_));
+        client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(*retry_policy_));
   }
 
   const Router::RouteEntry& getRouteFromStream() { return *(stream_->route_->routeEntry()); }

@@ -47,7 +47,7 @@ public:
         .WillOnce([this, buffer](int, const msghdr* msg, int) {
           *buffer =
               std::string{static_cast<char*>(msg->msg_iov[0].iov_base), msg->msg_iov[0].iov_len};
-          udp_file_ready_callback_(Event::FileReadyType::Read);
+          EXPECT_TRUE(udp_file_ready_callback_(Event::FileReadyType::Read).ok());
           return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
         });
     EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).WillRepeatedly([buffer](int, msghdr* msg, int) {

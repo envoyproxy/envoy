@@ -190,13 +190,13 @@ Buffer::InstancePtr javaDirectByteBufferToCppBufferInstance(JniHelper& jni_helpe
                                                             jobject java_byte_buffer, jlong length);
 
 /**
- * Converts from `Envoy::Buffer::Instance` to Java direct `ByteBuffer` (off the JVM heap).
+ * Converts from `Envoy::Buffer::Instance` to Java direct `ByteBuffer` (off the JVM heap) up to the
+ * specified length.
  *
  * The function will avoid copying the data from `Envoy::Buffer::Instance` into the `ByteBuffer`.
  */
-LocalRefUniquePtr<jobject>
-cppBufferInstanceToJavaDirectByteBuffer(JniHelper& jni_helper,
-                                        const Buffer::Instance& cpp_buffer_instance);
+LocalRefUniquePtr<jobject> cppBufferInstanceToJavaDirectByteBuffer(
+    JniHelper& jni_helper, const Buffer::Instance& cpp_buffer_instance, uint64_t length);
 
 /**
  * Converts from Java non-direct `ByteBuffer` (on the JVM heap) to `Envoy::Buffer::Instance` up
@@ -209,16 +209,45 @@ Buffer::InstancePtr javaNonDirectByteBufferToCppBufferInstance(JniHelper& jni_he
                                                                jlong length);
 
 /**
- * Converts from `Envoy::Buffer::Instance` to Java non-direct `ByteBuffer` (off the JVM heap).
+ * Converts from `Envoy::Buffer::Instance` to Java non-direct `ByteBuffer` (off the JVM heap) up to
+ * the specified length.
  *
  * The function will copy the data from `Envoy::Buffer::Instance` into the `ByteBuffer`.
  */
-LocalRefUniquePtr<jobject>
-cppBufferInstanceToJavaNonDirectByteBuffer(JniHelper& jni_helper,
-                                           const Buffer::Instance& cpp_buffer_instance);
+LocalRefUniquePtr<jobject> cppBufferInstanceToJavaNonDirectByteBuffer(
+    JniHelper& jni_helper, const Buffer::Instance& cpp_buffer_instance, uint64_t length);
 
 /** Gets the Java exception message from the `throwable`. */
 std::string getJavaExceptionMessage(JniHelper& jni_helper, jthrowable throwable);
+
+/**
+ * Converts from Java `io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel` to C++
+ * `envoy_stream_intel`.
+ */
+envoy_stream_intel javaStreamIntelToCppStreamIntel(JniHelper& jni_helper,
+                                                   jobject java_stream_intel);
+
+/**
+ * Converts from C++ `envoy_stream_intel` to Java  to
+ * `io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel`.
+ */
+LocalRefUniquePtr<jobject> cppStreamIntelToJavaStreamIntel(JniHelper& jni_helper,
+                                                           const envoy_stream_intel& stream_intel);
+
+/**
+ * Converts from Java `io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel` to C++
+ * `envoy_final_stream_intel`.
+ */
+envoy_final_stream_intel javaFinalStreamIntelToCppFinalStreamIntel(JniHelper& jni_helper,
+                                                                   jobject java_final_stream_intel);
+
+/**
+ * Converts from C++ `envoy_final_stream_intel` to Java  to
+ * `io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel`.
+ */
+LocalRefUniquePtr<jobject>
+cppFinalStreamIntelToJavaFinalStreamIntel(JniHelper& jni_helper,
+                                          const envoy_final_stream_intel& final_stream_intel);
 
 } // namespace JNI
 } // namespace Envoy
