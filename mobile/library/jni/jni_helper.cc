@@ -89,13 +89,7 @@ jmethodID JniHelper::getStaticMethodId(jclass clazz, const char* name, const cha
   return method_id;
 }
 
-LocalRefUniquePtr<jclass> JniHelper::findClass(const char* class_name) {
-  LocalRefUniquePtr<jclass> result(env_->FindClass(class_name), LocalRefDeleter(env_));
-  rethrowException();
-  return result;
-}
-
-jclass JniHelper::findClassFromCache(const char* class_name) {
+jclass JniHelper::findClass(const char* class_name) {
   if (auto i = JCLASS_CACHES.find(class_name); i != JCLASS_CACHES.end()) {
     return i->second;
   }
@@ -108,9 +102,9 @@ LocalRefUniquePtr<jclass> JniHelper::getObjectClass(jobject object) {
 }
 
 void JniHelper::throwNew(const char* java_class_name, const char* message) {
-  LocalRefUniquePtr<jclass> java_class = findClass(java_class_name);
+  jclass java_class = findClass(java_class_name);
   if (java_class != nullptr) {
-    jint error = env_->ThrowNew(java_class.get(), message);
+    jint error = env_->ThrowNew(java_class, message);
     ASSERT(error == JNI_OK, "Failed calling ThrowNew.");
   }
 }
