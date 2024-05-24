@@ -83,7 +83,10 @@ Http::Code ClustersHandler::handlerClusters(Http::ResponseHeaderMap& response_he
 Admin::RequestPtr ClustersHandler::makeRequest(AdminStream& admin_stream) {
   Buffer::OwnedImpl response;
   ClustersParams params;
-  params.parse(admin_stream.getRequestHeaders().getPathValue(), response);
+  Http::Code code = params.parse(admin_stream.getRequestHeaders().getPathValue(), response);
+  if (code != Http::Code::OK) {
+    return Admin::makeStaticTextRequest(response, code);
+  }
   return std::make_unique<ClustersRequest>(ClustersRequest::DefaultChunkLimit, server_, params);
 }
 

@@ -15,11 +15,6 @@ struct ParamsCase {
 
 class ParamsFixture : public testing::TestWithParam<ParamsCase> {};
 
-TEST(ClustersParamsTest, ClustersParamsHasExpectedDefaultValue) {
-  ClustersParams params;
-  EXPECT_EQ(params.format_, ClustersParams::Format::Text);
-}
-
 TEST(ClustersParamsTest, FormatDefaultsToTextWhenNotSupplied) {
   ClustersParams params;
   Buffer::OwnedImpl buffer;
