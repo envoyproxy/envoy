@@ -870,7 +870,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
       mUserCurrentReadBuffer = null; // Avoid the reference to a potentially large buffer.
       int dataRead = data.remaining();
       // It is important to copy the `data` into the `userBuffer` outside the thread execution
-      // because the `data` is backed by a direct `ByteBuffer` and it will be destroyed upon once
+      // because the `data` is backed by a direct `ByteBuffer` and it will be destroyed once
       // the `onData` completes.
       userBuffer.put(data); // NPE ==> BUG, BufferOverflowException ==> User not behaving.
       Runnable task = new Runnable() {

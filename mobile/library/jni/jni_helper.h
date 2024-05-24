@@ -151,7 +151,7 @@ public:
    * See https://developer.android.com/training/articles/perf-jni#jclass,-jmethodid,-and-jfieldid
    *
    * Another reason for caching the `jclass` object is to able to find a non-built-in class when the
-   * native code creates a thread and then attaching it with `AttachCurrentThread`, i.e. calling
+   * native code creates a thread and then attaches it with `AttachCurrentThread`, i.e. calling
    * `getThreadLocalEnv()->getEnv()->FindClass`. This is because there are no stack frames from the
    * application. When calling `FindClass` from the thread, the `JavaVM` will start in the "system"
    * class loader instead of the one associated with the application, so attempts to find
