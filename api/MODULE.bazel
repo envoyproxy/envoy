@@ -1,0 +1,67 @@
+module(
+    name = "envoy_api",
+    version = "0",
+)
+
+bazel_dep(name = "abseil-cpp", version = "20240116.2", repo_name = "com_google_absl")
+bazel_dep(name = "bazel_skylib", version = "1.6.1")
+bazel_dep(name = "gazelle", version = "0.36.0", repo_name = "bazel_gazelle")
+bazel_dep(name = "googleapis", version = "0.0.0-20240326-1c8d509c5", repo_name = "com_google_googleapis")
+bazel_dep(name = "googletest", version = "1.14.0.bcr.1", repo_name = "com_google_googletest")
+bazel_dep(name = "grpc", version = "1.62.1", repo_name = "com_github_grpc_grpc")
+bazel_dep(name = "opencensus-proto", version = "0.4.1", repo_name = "opencensus_proto")
+bazel_dep(name = "protobuf", version = "27.0-rc2", repo_name = "com_google_protobuf")
+bazel_dep(name = "protoc-gen-validate", version = "1.0.4", repo_name = "com_envoyproxy_protoc_gen_validate")
+bazel_dep(name = "re2", version = "2024-05-01", repo_name = "com_googlesource_code_re2")
+bazel_dep(name = "rules_go", version = "0.48.0", repo_name = "io_bazel_rules_go")
+bazel_dep(name = "xds", repo_name = "com_github_cncf_xds")
+
+switched_rules = use_extension("@com_google_googleapis//:extensions.bzl", "switched_rules")
+switched_rules.use_languages(
+    cc = True,
+    go = True,
+)
+
+non_module_deps = use_extension("//bazel:repositories.bzl", "non_module_deps")
+use_repo(
+    non_module_deps,
+    "com_github_bufbuild_buf",
+    "envoy_toolshed",
+    "opentelemetry_proto",  # TODO: Move to bzlmod
+    "prometheus_metrics_model",
+)
+
+go_deps = use_extension("@bazel_gazelle//:extensions.bzl", "go_deps")
+go_deps.module(
+    path = "github.com/planetscale/vtprotobuf",
+    sum = "h1:GFCKgmp0tecUJ0sJuv4pzYCqS9+RGSn52M3FUwPs+uo=",
+    version = "v0.6.1-0.20240319094008-0393e58bdf10",
+)
+go_deps.module(
+    path = "google.golang.org/protobuf",
+    sum = "h1:g0LDEJHgrBl9N9r17Ru3sqWhkIx2NB67okBHPwC7hs8=",
+    version = "v1.31.0",
+)
+go_deps.module(
+    path = "google.golang.org/genproto/googleapis/rpc",
+    sum = "h1:Elxv5MwEkCI9f5SkoL6afed6NTdxaGoAo39eANBwHL8=",
+    version = "v0.0.0-20240521202816-d264139d666e",
+)
+go_deps.module(
+    path = "google.golang.org/genproto/googleapis/api",
+    sum = "h1:SkdGTrROJl2jRGT/Fxv5QUf9jtdKCQh4KQJXbXVLAi0=",
+    version = "v0.0.0-20240521202816-d264139d666e",
+)
+go_deps.module(
+    path = "github.com/golang/protobuf",
+    sum = "h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=",
+    version = "v1.5.4",
+)
+use_repo(
+    go_deps,
+    "com_github_golang_protobuf",
+    "com_github_planetscale_vtprotobuf",
+    "org_golang_google_genproto_googleapis_api",
+    "org_golang_google_genproto_googleapis_rpc",
+    "org_golang_google_protobuf",
+)
