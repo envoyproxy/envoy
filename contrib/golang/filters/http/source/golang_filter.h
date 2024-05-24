@@ -204,6 +204,8 @@ public:
     req_->plugin_name.data = config_->pluginName().data();
     req_->plugin_name.len = config_->pluginName().length();
     req_->worker_id = worker_id;
+    ENVOY_LOG(debug, "initilizing Golang Filter, decode state: {}, encode state: {}",
+              decoding_state_.stateStr(), encoding_state_.stateStr());
   }
 
   // Http::StreamFilterBase

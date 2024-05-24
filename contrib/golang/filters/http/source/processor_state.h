@@ -80,7 +80,10 @@ enum class GolangStatus {
 
 class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
 public:
-  explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) { req = r; }
+  explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) {
+    req = r;
+    state = 0; // 0 is WaitingHeader
+  }
   virtual ~ProcessorState() = default;
 
   FilterState filterState() const { return static_cast<FilterState>(state); }

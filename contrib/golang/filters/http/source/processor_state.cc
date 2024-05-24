@@ -263,7 +263,7 @@ std::string state2Str(FilterState state) {
   case FilterState::Done:
     return "Done";
   default:
-    return "unknown";
+    return "unknown(" + std::to_string(static_cast<int>(state)) + ")";
   }
 }
 
