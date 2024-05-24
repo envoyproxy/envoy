@@ -167,6 +167,10 @@ new_features:
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting
     :ref:`health_check_config <envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.proxy_protocol_config>`.
+- area: ratelimit
+  change: |
+    Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>` 
+    by setting ``envoy.ratelimit.hits_addend`` to the desired value.
 
 deprecated:
 - area: tracing
