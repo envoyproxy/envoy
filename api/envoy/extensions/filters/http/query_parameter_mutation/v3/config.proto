@@ -2,15 +2,16 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.query_parameter_mutation.v3;
 
-import "udpa/annotations/status.proto";
-
 import "envoy/config/core/v3/base.proto";
 
 import "xds/annotations/v3/status.proto";
 
+import "udpa/annotations/status.proto";
+
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.query_parameter_mutation.v3";
-option java_outer_classname = "QueryParameterMutationProto";
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/query_parameter_mutation/v3;query_parameter_mutation";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/query_parameter_mutation/v3;query_parameter_mutationv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
@@ -19,8 +20,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.query_parameter_mutation]
 
 // Configures the Query Parameter Mutation filter.
-//
-// [#next-free-field: 3]
 message Config {
   // Specifies a list of HTTP query parameters that will be added to the HTTP path. Repeat values are supported. For example,
   // `foo: 1, foo: 2` will appear as `?foo=1&foo=2`. Values are added as exact strings, command substitution is not supported.
