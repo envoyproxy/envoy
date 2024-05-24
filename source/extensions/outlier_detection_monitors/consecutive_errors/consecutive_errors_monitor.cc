@@ -9,11 +9,16 @@ namespace Extensions {
 namespace Outlier {
 
 bool ConsecutiveErrorsMonitor::onError() {
-  if (counter_ < max_) {
-    counter_++;
+  uint32_t expected_count = counter_.load();
+
+  while (!counter_.compare_exchange_strong(expected_count, expected_count + 1)) {
+    // no-op. Just keep executing compare_exchange_strong until threads synchronize.
+    ;
   }
 
-  return (counter_ == max_);
+  // The counter_ value may go above max_, but only one thread will see
+  // that counter_ reached max_ and will report it.
+  return ((expected_count + 1) == max_);
 }
 
 void ConsecutiveErrorsMonitor::onSuccess() {
