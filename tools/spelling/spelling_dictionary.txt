@@ -258,6 +258,7 @@ KiB
 Kille
 LBs
 LC
+LCOV
 LDS
 LEDS
 LEV
