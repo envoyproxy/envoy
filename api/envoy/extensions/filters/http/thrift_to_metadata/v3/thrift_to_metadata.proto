@@ -86,18 +86,62 @@ message Rule {
   // The field to match on. If set, takes precedence over field_selector.
   Field field = 1;
 
-  // Specifies that a match will be performed on the value of a field. If set,
-  // the whole http body will be buffered to extract the field value, which
+  // Specifies that a match will be performed on the value of a field in the thrift body.
+  // If set, the whole http body will be buffered to extract the field value, which
   // may have performance implications.
+  //
+  // It's a thrift over http version of
+  // :ref:`field_selector<envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.field_selector>`.
+  //
+  // See also `payload-to-metadata <https://www.envoyproxy.io/docs/envoy/latest/configuration/other_protocols/thrift_filters/payload_to_metadata_filter>`_
+  // for more reference.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //    method_name: foo
+  //    field_selector:
+  //      name: info
+  //      id: 2
+  //      child:
+  //        name: version
+  //        id: 1
+  //
+  // The above yaml will match on value of `info.version` in the below thrift schema as input of
+  // :ref:`on_present<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.on_present>` or
+  // :ref:`on_missing<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.on_missing>`
+  // while we are processing `foo` method. This rule won't be applied to `bar` method.
+  //
+  // .. code-block:: thrift
+  //
+  //    struct Info {
+  //      1: required string version;
+  //    }
+  //    service Server {
+  //      bool foo(1: i32 id, 2: Info info);
+  //      bool bar(1: i32 id, 2: Info info);
+  //    }
+  //
   FieldSelector field_selector = 2 [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // If specified, :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
+  // will be used to extract the field value *only* on the thrift message with method name.
+  string method_name = 3 [(xds.annotations.v3.field_status).work_in_progress = true];
 
   // The key-value pair to set in the *filter metadata* if the field is present
   // in *thrfit metadata*.
-  KeyValuePair on_present = 3;
+  //
+  // If the value in the KeyValuePair is non-empty, it'll be used instead
+  // of field value.
+  KeyValuePair on_present = 4;
 
   // The key-value pair to set in the *filter metadata* if the field is missing
   // in *thrfit metadata*.
-  KeyValuePair on_missing = 4;
+  //
+  // The value in the KeyValuePair must be set, since it'll be used in lieu
+  // of the missing field value.
+  KeyValuePair on_missing = 5;
 }
 
 // The configuration for transforming thrift metadata into filter metadata.
