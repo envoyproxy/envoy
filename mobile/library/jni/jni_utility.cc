@@ -402,7 +402,8 @@ absl::flat_hash_map<std::string, std::string> javaMapToCppMap(JniHelper& jni_hel
 
 LocalRefUniquePtr<jobject> cppHeadersToJavaHeaders(JniHelper& jni_helper,
                                                    const Http::HeaderMap& cpp_headers) {
-  auto java_map_class = jni_helper.findClass("java/util/HashMap");
+  // Use LinkedHashMap to preserve the insertion order.
+  auto java_map_class = jni_helper.findClass("java/util/LinkedHashMap");
   auto java_map_init_method_id = jni_helper.getMethodId(java_map_class.get(), "<init>", "()V");
   auto java_map_put_method_id = jni_helper.getMethodId(
       java_map_class.get(), "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
@@ -511,8 +512,7 @@ bool isJavaDirectByteBuffer(JniHelper& jni_helper, jobject java_byte_buffer) {
 Buffer::InstancePtr javaDirectByteBufferToCppBufferInstance(JniHelper& jni_helper,
                                                             jobject java_byte_buffer,
                                                             jlong length) {
-  RELEASE_ASSERT(java_byte_buffer != nullptr,
-                 "The ByteBuffer argument is not a direct ByteBuffer.");
+  ASSERT(java_byte_buffer != nullptr, "The ByteBuffer argument is not a direct ByteBuffer.");
   // Because the direct ByteBuffer is allocated in the JVM, we need to tell the JVM to not garbage
   // collect it by wrapping with a GlobalRef.
   auto java_byte_buffer_global_ref = jni_helper.newGlobalRef(java_byte_buffer).release();
@@ -529,13 +529,12 @@ Buffer::InstancePtr javaDirectByteBufferToCppBufferInstance(JniHelper& jni_helpe
   return cpp_buffer_instance;
 }
 
-LocalRefUniquePtr<jobject>
-cppBufferInstanceToJavaDirectByteBuffer(JniHelper& jni_helper,
-                                        const Buffer::Instance& cpp_buffer_instance) {
-  // The JNI implementation guarantees that there is only going to be a single slice.
-  Buffer::RawSlice raw_slice = cpp_buffer_instance.frontSlice();
+LocalRefUniquePtr<jobject> cppBufferInstanceToJavaDirectByteBuffer(
+    JniHelper& jni_helper, const Buffer::Instance& cpp_buffer_instance, uint64_t length) {
+  void* data =
+      const_cast<Buffer::Instance&>(cpp_buffer_instance).linearize(static_cast<uint32_t>(length));
   LocalRefUniquePtr<jobject> java_byte_buffer =
-      jni_helper.newDirectByteBuffer(raw_slice.mem_, static_cast<jlong>(raw_slice.len_));
+      jni_helper.newDirectByteBuffer(data, static_cast<jlong>(length));
   return java_byte_buffer;
 }
 
@@ -547,8 +546,7 @@ Buffer::InstancePtr javaNonDirectByteBufferToCppBufferInstance(JniHelper& jni_he
       jni_helper.getMethodId(java_byte_buffer_class.get(), "array", "()[B");
   auto java_byte_array =
       jni_helper.callObjectMethod<jbyteArray>(java_byte_buffer, java_byte_buffer_array_method_id);
-  RELEASE_ASSERT(java_byte_array != nullptr,
-                 "The ByteBuffer argument is not a non-direct ByteBuffer.");
+  ASSERT(java_byte_array != nullptr, "The ByteBuffer argument is not a non-direct ByteBuffer.");
   auto java_byte_array_elements = jni_helper.getByteArrayElements(java_byte_array.get(), nullptr);
   Buffer::InstancePtr cpp_buffer_instance = std::make_unique<Buffer::OwnedImpl>();
   cpp_buffer_instance->add(static_cast<void*>(java_byte_array_elements.get()),
@@ -556,16 +554,14 @@ Buffer::InstancePtr javaNonDirectByteBufferToCppBufferInstance(JniHelper& jni_he
   return cpp_buffer_instance;
 }
 
-LocalRefUniquePtr<jobject>
-cppBufferInstanceToJavaNonDirectByteBuffer(JniHelper& jni_helper,
-                                           const Buffer::Instance& cpp_buffer_instance) {
+LocalRefUniquePtr<jobject> cppBufferInstanceToJavaNonDirectByteBuffer(
+    JniHelper& jni_helper, const Buffer::Instance& cpp_buffer_instance, uint64_t length) {
   auto java_byte_buffer_class = jni_helper.findClass("java/nio/ByteBuffer");
   auto java_byte_buffer_wrap_method_id = jni_helper.getStaticMethodId(
       java_byte_buffer_class.get(), "wrap", "([B)Ljava/nio/ByteBuffer;");
   auto java_byte_array = jni_helper.newByteArray(static_cast<jsize>(cpp_buffer_instance.length()));
   auto java_byte_array_elements = jni_helper.getByteArrayElements(java_byte_array.get(), nullptr);
-  cpp_buffer_instance.copyOut(0, cpp_buffer_instance.length(),
-                              static_cast<void*>(java_byte_array_elements.get()));
+  cpp_buffer_instance.copyOut(0, length, static_cast<void*>(java_byte_array_elements.get()));
   return jni_helper.callStaticObjectMethod(java_byte_buffer_class.get(),
                                            java_byte_buffer_wrap_method_id, java_byte_array.get());
 }
@@ -577,6 +573,141 @@ std::string getJavaExceptionMessage(JniHelper& jni_helper, jthrowable throwable)
   auto java_exception_message =
       jni_helper.callObjectMethod<jstring>(throwable, java_get_message_method_id);
   return javaStringToCppString(jni_helper, java_exception_message.get());
+}
+
+envoy_stream_intel javaStreamIntelToCppStreamIntel(JniHelper& jni_helper,
+                                                   jobject java_stream_intel) {
+  auto java_stream_intel_class = jni_helper.getObjectClass(java_stream_intel);
+  jlong java_stream_id = jni_helper.callLongMethod(
+      java_stream_intel,
+      jni_helper.getMethodId(java_stream_intel_class.get(), "getStreamId", "()J"));
+  jlong java_connection_id = jni_helper.callLongMethod(
+      java_stream_intel,
+      jni_helper.getMethodId(java_stream_intel_class.get(), "getConnectionId", "()J"));
+  jlong java_attempt_count = jni_helper.callLongMethod(
+      java_stream_intel,
+      jni_helper.getMethodId(java_stream_intel_class.get(), "getAttemptCount", "()J"));
+  jlong java_consumed_bytes_from_response = jni_helper.callLongMethod(
+      java_stream_intel,
+      jni_helper.getMethodId(java_stream_intel_class.get(), "getConsumedBytesFromResponse", "()J"));
+
+  return {
+      /* stream_id= */ static_cast<int64_t>(java_stream_id),
+      /* connection_id= */ static_cast<int64_t>(java_connection_id),
+      /* attempt_count= */ static_cast<uint64_t>(java_attempt_count),
+      /* consumed_bytes_from_response= */ static_cast<uint64_t>(java_consumed_bytes_from_response),
+  };
+}
+
+LocalRefUniquePtr<jobject> cppStreamIntelToJavaStreamIntel(JniHelper& jni_helper,
+                                                           const envoy_stream_intel& stream_intel) {
+  auto java_stream_intel_class =
+      jni_helper.findClassFromCache("io/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel");
+  auto java_stream_intel_init_method_id =
+      jni_helper.getMethodId(java_stream_intel_class, "<init>", "(JJJJ)V");
+  return jni_helper.newObject(java_stream_intel_class, java_stream_intel_init_method_id,
+                              static_cast<jlong>(stream_intel.stream_id),
+                              static_cast<jlong>(stream_intel.connection_id),
+                              static_cast<jlong>(stream_intel.attempt_count),
+                              static_cast<jlong>(stream_intel.consumed_bytes_from_response));
+}
+
+envoy_final_stream_intel
+javaFinalStreamIntelToCppFinalStreamIntel(JniHelper& jni_helper, jobject java_final_stream_intel) {
+  auto java_final_stream_intel_class = jni_helper.getObjectClass(java_final_stream_intel);
+  jlong java_stream_start_ms = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getStreamStartMs", "()J"));
+  jlong java_dns_start_ms = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getDnsStartMs", "()J"));
+  jlong java_dns_end_ms = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getDnsEndMs", "()J"));
+  jlong java_connect_start_ms = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getConnectStartMs", "()J"));
+  jlong java_connect_end_ms = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getConnectEndMs", "()J"));
+  jlong java_ssl_start_ms = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getSslStartMs", "()J"));
+  jlong java_ssl_end_ms = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getSslEndMs", "()J"));
+  jlong java_sending_start_ms = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getSendingStartMs", "()J"));
+  jlong java_sending_end_ms = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getSendingEndMs", "()J"));
+  jlong java_response_start_ms = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getResponseStartMs", "()J"));
+  jlong java_stream_end_ms = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getStreamEndMs", "()J"));
+  jboolean java_socket_reused = jni_helper.callBooleanMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getSocketReused", "()Z"));
+  jlong java_sent_byte_count = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getSentByteCount", "()J"));
+  jlong java_received_byte_count = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getReceivedByteCount", "()J"));
+  jlong java_response_flags = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getResponseFlags", "()J"));
+  jlong java_upstream_protocol = jni_helper.callLongMethod(
+      java_final_stream_intel,
+      jni_helper.getMethodId(java_final_stream_intel_class.get(), "getUpstreamProtocol", "()J"));
+
+  return {
+      /* stream_start_ms= */ static_cast<int64_t>(java_stream_start_ms),
+      /* dns_start_ms= */ static_cast<int64_t>(java_dns_start_ms),
+      /* dns_end_ms= */ static_cast<int64_t>(java_dns_end_ms),
+      /* connect_start_ms= */ static_cast<int64_t>(java_connect_start_ms),
+      /* connect_end_ms= */ static_cast<int64_t>(java_connect_end_ms),
+      /* ssl_start_ms= */ static_cast<int64_t>(java_ssl_start_ms),
+      /* ssl_end_ms= */ static_cast<int64_t>(java_ssl_end_ms),
+      /* sending_start_ms= */ static_cast<int64_t>(java_sending_start_ms),
+      /* sending_end_ms= */ static_cast<int64_t>(java_sending_end_ms),
+      /* response_start_ms= */ static_cast<int64_t>(java_response_start_ms),
+      /* stream_end_ms= */ static_cast<int64_t>(java_stream_end_ms),
+      /* socket_reused= */ static_cast<uint64_t>((java_socket_reused == JNI_TRUE) ? 1 : 0),
+      /* sent_byte_count= */ static_cast<uint64_t>(java_sent_byte_count),
+      /* received_byte_count= */ static_cast<uint64_t>(java_received_byte_count),
+      /* response_flags= */ static_cast<uint64_t>(java_response_flags),
+      /* upstream_protocol= */ static_cast<int64_t>(java_upstream_protocol),
+  };
+}
+
+LocalRefUniquePtr<jobject>
+cppFinalStreamIntelToJavaFinalStreamIntel(JniHelper& jni_helper,
+                                          const envoy_final_stream_intel& final_stream_intel) {
+  auto java_final_stream_intel_class =
+      jni_helper.findClassFromCache("io/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel");
+  auto java_final_stream_intel_init_method_id =
+      jni_helper.getMethodId(java_final_stream_intel_class, "<init>", "(JJJJJJJJJJJZJJJJ)V");
+  return jni_helper.newObject(java_final_stream_intel_class, java_final_stream_intel_init_method_id,
+                              static_cast<jlong>(final_stream_intel.stream_start_ms),
+                              static_cast<jlong>(final_stream_intel.dns_start_ms),
+                              static_cast<jlong>(final_stream_intel.dns_end_ms),
+                              static_cast<jlong>(final_stream_intel.connect_start_ms),
+                              static_cast<jlong>(final_stream_intel.connect_end_ms),
+                              static_cast<jlong>(final_stream_intel.ssl_start_ms),
+                              static_cast<jlong>(final_stream_intel.ssl_end_ms),
+                              static_cast<jlong>(final_stream_intel.sending_start_ms),
+                              static_cast<jlong>(final_stream_intel.sending_end_ms),
+                              static_cast<jlong>(final_stream_intel.response_start_ms),
+                              static_cast<jlong>(final_stream_intel.stream_end_ms),
+                              static_cast<jboolean>(final_stream_intel.socket_reused),
+                              static_cast<jlong>(final_stream_intel.sent_byte_count),
+                              static_cast<jlong>(final_stream_intel.received_byte_count),
+                              static_cast<jlong>(final_stream_intel.response_flags),
+                              static_cast<jlong>(final_stream_intel.upstream_protocol));
 }
 
 } // namespace JNI
