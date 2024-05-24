@@ -296,7 +296,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenUnhealthyUpstream) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             // if there is no healthy upstream, the request fails immediately
             cb.onSuccess(request_, std::move(mock_response));
-            return &request_;
+            return nullptr;
           }));
 
   client_->setCallbacks(*mock_callbacks_);
@@ -444,7 +444,7 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenUnhealthyUpstream) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             // if there is no healthy upstream, the request fails immediately
             cb.onSuccess(request_, std::move(mock_response));
-            return &request_;
+            return nullptr;
           }));
 
   client_->setCallbacks(*mock_callbacks_);
