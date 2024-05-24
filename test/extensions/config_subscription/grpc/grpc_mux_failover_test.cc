@@ -259,6 +259,16 @@ TEST_F(GrpcMuxFailoverTest, EstablishPrimaryStream) {
   grpc_mux_failover_->establishNewStream();
 }
 
+// Validates that multiple calls to establishNewStream by default are invoked
+// on the primary stream, and not the failover.
+TEST_F(GrpcMuxFailoverTest, MultipleEstablishPrimaryStream) {
+  EXPECT_CALL(primary_stream_, establishNewStream());
+  grpc_mux_failover_->establishNewStream();
+
+  EXPECT_CALL(primary_stream_, establishNewStream());
+  grpc_mux_failover_->establishNewStream();
+}
+
 // Validates that grpcStreamAvailable forwards to the primary by default.
 TEST_F(GrpcMuxFailoverTest, PrimaryStreamAvailableDefault) {
   EXPECT_CALL(primary_stream_, grpcStreamAvailable()).WillOnce(Return(false));
@@ -406,6 +416,18 @@ TEST_F(GrpcMuxFailoverTest, FailoverOnlyAttemptsAfterFailoverAvailable) {
 
   // Emulate a call to establishNewStream().
   EXPECT_CALL(primary_stream_, establishNewStream()).Times(0);
+  EXPECT_CALL(failover_stream_, establishNewStream());
+  grpc_mux_failover_->establishNewStream();
+}
+
+// Validates that multiple calls to establishNewStream when connecting to the
+// failover are invoked on the failover stream, and not the primary.
+TEST_F(GrpcMuxFailoverTest, MultipleEstablishFailoverStream) {
+  connectingToFailover();
+
+  EXPECT_CALL(failover_stream_, establishNewStream());
+  grpc_mux_failover_->establishNewStream();
+
   EXPECT_CALL(failover_stream_, establishNewStream());
   grpc_mux_failover_->establishNewStream();
 }
