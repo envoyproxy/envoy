@@ -106,7 +106,7 @@ func requestFinalize(r *httpRequest) {
 }
 
 func getOrCreateState(s *C.processState) *processState {
-	r := s.request
+	r := s.req
 	req := getRequest(r)
 	if req == nil {
 		req = createRequest(r)
@@ -155,7 +155,7 @@ func getRequest(r *C.httpRequest) *httpRequest {
 }
 
 func getState(s *C.processState) *processState {
-	r := s.request
+	r := s.req
 	req := getRequest(r)
 	if s.is_encoding == 0 {
 		return &req.decodingState

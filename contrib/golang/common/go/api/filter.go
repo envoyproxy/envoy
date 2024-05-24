@@ -152,10 +152,7 @@ type StreamInfo interface {
 
 type StreamFilterCallbacks interface {
 	StreamInfo() StreamInfo
-}
 
-type FilterCallbacks interface {
-	StreamFilterCallbacks
 	// ClearRouteCache clears the route cache for the current request, and filtermanager will re-fetch the route in the next filter.
 	// Please be careful to invoke it, since filtermanager will raise an 404 route_not_found response when failed to re-fetch a route.
 	ClearRouteCache()
@@ -193,7 +190,7 @@ type EncoderFilterCallbacks interface {
 }
 
 type FilterCallbackHandler interface {
-	FilterCallbacks
+	StreamFilterCallbacks
 	// DecoderFilterCallbacks could only be used in DecodeXXX phases.
 	DecoderFilterCallbacks() DecoderFilterCallbacks
 	// EncoderFilterCallbacks could only be used in EncodeXXX phases.

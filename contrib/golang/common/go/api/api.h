@@ -15,7 +15,7 @@ typedef struct { // NOLINT(modernize-use-using)
 
 struct httpRequest;
 
-typedef struct { // NOLINT(modernize-use-using)
+typedef struct processState { // NOLINT(modernize-use-using)
   struct httpRequest* req;
   int is_encoding;
   int state;
