@@ -133,7 +133,7 @@ private:
       //
       // If the query protocol is set to (kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6),
       // or it is set to 0, then at least two callbacks will be received: at least one for the
-      // IPv4 family and at leastone for the IPv6 family. This is true even if the domain doesn't
+      // IPv4 family and at least one for the IPv6 family. This is true even if the domain doesn't
       // exist (NXDOMAIN).
       bool v4_response_received_{false};
       bool v6_response_received_{false};
