@@ -257,28 +257,6 @@ ContextConfigImpl::ContextConfigImpl(
   }
   capabilities_ = handshaker_factory->capabilities();
   sslctx_cb_ = handshaker_factory->sslctxCb(handshaker_factory_context);
-
-  TlsCertificateSelectorFactoryContextImpl provider_factory_context(api_, options_,
-                                                                    singleton_manager_);
-  if (config.has_custom_tls_certificate_selector()) {
-    // If a custom tls context provider is configured, derive the factory from the config.
-    const auto& provider_config = config.custom_tls_certificate_selector();
-    Ssl::TlsCertificateSelectorFactory* provider_factory =
-        &Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorFactory>(provider_config);
-    tls_certificate_selector_factory_cb_ = provider_factory->createTlsCertificateSelectorCb(
-        provider_config.typed_config(), provider_factory_context,
-        factory_context.messageValidationVisitor());
-  } else {
-    auto factory = Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorFactory>(
-        "envoy.ssl.certificate_selector_factory.default");
-    if (!factory) {
-      IS_ENVOY_BUG("No envoy.ssl.certificate_selector_factory registered");
-    } else {
-      const ProtobufWkt::Any any;
-      tls_certificate_selector_factory_cb_ = factory->createTlsCertificateSelectorCb(
-          any, provider_factory_context, ProtobufMessage::getNullValidationVisitor());
-    }
-  }
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
@@ -347,10 +325,6 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
 
 Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
   return handshaker_factory_cb_;
-}
-
-Ssl::TlsCertificateSelectorFactoryCb ContextConfigImpl::createTlsCertificateSelector() const {
-  return tls_certificate_selector_factory_cb_;
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(
@@ -477,6 +451,28 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     session_timeout_ =
         std::chrono::seconds(DurationUtil::durationToSeconds(config.session_timeout()));
   }
+
+  TlsCertificateSelectorFactoryContextImpl provider_factory_context(api_, options_,
+                                                                    singleton_manager_);
+  if (config.common_tls_context().has_custom_tls_certificate_selector()) {
+    // If a custom tls context provider is configured, derive the factory from the config.
+    const auto& provider_config = config.common_tls_context().custom_tls_certificate_selector();
+    Ssl::TlsCertificateSelectorFactory* provider_factory =
+        &Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorFactory>(provider_config);
+    tls_certificate_selector_factory_cb_ = provider_factory->createTlsCertificateSelectorCb(
+        provider_config.typed_config(), provider_factory_context,
+        factory_context.messageValidationVisitor());
+  } else {
+    auto factory = Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorFactory>(
+        "envoy.ssl.certificate_selector_factory.default");
+    if (!factory) {
+      IS_ENVOY_BUG("No envoy.ssl.certificate_selector_factory registered");
+    } else {
+      const ProtobufWkt::Any any;
+      tls_certificate_selector_factory_cb_ = factory->createTlsCertificateSelectorCb(
+          any, provider_factory_context, ProtobufMessage::getNullValidationVisitor());
+    }
+  }
 }
 
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
@@ -545,6 +541,10 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
     return Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+Ssl::TlsCertificateSelectorFactoryCb ServerContextConfigImpl::createTlsCertificateSelector() const {
+  return tls_certificate_selector_factory_cb_;
 }
 
 } // namespace Tls

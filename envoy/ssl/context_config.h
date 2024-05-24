@@ -89,11 +89,6 @@ public:
   virtual HandshakerFactoryCb createHandshaker() const PURE;
 
   /**
-   * @return a callback which can be used to create TLS context provider instances.
-   */
-  virtual TlsCertificateSelectorFactoryCb createTlsCertificateSelector() const PURE;
-
-  /**
    * @return the set of capabilities for handshaker instances created by this context.
    */
   virtual HandshakerCapabilities capabilities() const PURE;
@@ -204,6 +199,11 @@ public:
    * downstream TLS handshake, false otherwise.
    */
   virtual bool fullScanCertsOnSNIMismatch() const PURE;
+
+  /**
+   * @return a callback which can be used to create TLS context provider instances.
+   */
+  virtual TlsCertificateSelectorFactoryCb createTlsCertificateSelector() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;

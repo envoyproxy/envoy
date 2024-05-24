@@ -60,7 +60,6 @@ public:
   }
 
   void setSecretUpdateCallback(std::function<void()> callback) override;
-  Ssl::TlsCertificateSelectorFactoryCb createTlsCertificateSelector() const override;
   Ssl::HandshakerFactoryCb createHandshaker() const override;
   Ssl::HandshakerCapabilities capabilities() const override { return capabilities_; }
   Ssl::SslCtxCb sslctxCb() const override { return sslctx_cb_; }
@@ -108,7 +107,6 @@ private:
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 
-  Ssl::TlsCertificateSelectorFactoryCb tls_certificate_selector_factory_cb_;
   Ssl::HandshakerFactoryCb handshaker_factory_cb_;
   Ssl::HandshakerCapabilities capabilities_;
   Ssl::SslCtxCb sslctx_cb_;
@@ -174,6 +172,8 @@ public:
 
   bool fullScanCertsOnSNIMismatch() const override { return full_scan_certs_on_sni_mismatch_; }
 
+  Ssl::TlsCertificateSelectorFactoryCb createTlsCertificateSelector() const override;
+
 private:
   static const unsigned DEFAULT_MIN_VERSION;
   static const unsigned DEFAULT_MAX_VERSION;
@@ -194,6 +194,7 @@ private:
       const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
           policy);
 
+  Ssl::TlsCertificateSelectorFactoryCb tls_certificate_selector_factory_cb_;
   absl::optional<std::chrono::seconds> session_timeout_;
   const bool disable_stateless_session_resumption_;
   const bool disable_stateful_session_resumption_;
