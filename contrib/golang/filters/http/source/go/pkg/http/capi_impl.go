@@ -226,16 +226,15 @@ func (c *httpCApiImpl) HttpDrainBuffer(s unsafe.Pointer, bufferPtr uint64, lengt
 
 func (c *httpCApiImpl) HttpSetBufferHelper(s unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction) {
 	state := (*processState)(s)
-	c.httpSetBufferHelper(unsafe.Pointer(state.processState), bufferPtr, unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), action)
+	c.httpSetBufferHelper(state, bufferPtr, unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), action)
 }
 
 func (c *httpCApiImpl) HttpSetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action api.BufferAction) {
 	state := (*processState)(s)
-	c.httpSetBufferHelper(unsafe.Pointer(state.processState), bufferPtr, unsafe.Pointer(unsafe.SliceData(value)), C.int(len(value)), action)
+	c.httpSetBufferHelper(state, bufferPtr, unsafe.Pointer(unsafe.SliceData(value)), C.int(len(value)), action)
 }
 
-func (c *httpCApiImpl) httpSetBufferHelper(s unsafe.Pointer, bufferPtr uint64, data unsafe.Pointer, length C.int, action api.BufferAction) {
-	state := (*processState)(s)
+func (c *httpCApiImpl) httpSetBufferHelper(state *processState, bufferPtr uint64, data unsafe.Pointer, length C.int, action api.BufferAction) {
 	var act C.bufferAction
 	switch action {
 	case api.SetBuffer:
