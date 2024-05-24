@@ -465,9 +465,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   } else {
     auto factory = Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorFactory>(
         "envoy.ssl.certificate_selector_factory.default");
-    if (!factory) {
-      IS_ENVOY_BUG("No envoy.ssl.certificate_selector_factory registered");
-    } else {
+    // mobile build doesn't have server_context.
+    if (factory) {
       const ProtobufWkt::Any any;
       tls_certificate_selector_factory_cb_ = factory->createTlsCertificateSelectorCb(
           any, provider_factory_context, ProtobufMessage::getNullValidationVisitor());
