@@ -61,7 +61,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   //================================================================================================
   std::unique_ptr<Envoy::EnvoyLogger> logger = std::make_unique<Envoy::EnvoyLogger>();
   if (envoy_logger != nullptr) {
-    const jobject envoy_logger_global_ref = env->NewGlobalRef(envoy_logger);
+    jobject envoy_logger_global_ref = env->NewGlobalRef(envoy_logger);
     logger->on_log_ = [envoy_logger_global_ref](Envoy::Logger::Logger::Levels level,
                                                 const std::string& message) {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
@@ -85,7 +85,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   std::unique_ptr<Envoy::EnvoyEventTracker> event_tracker =
       std::make_unique<Envoy::EnvoyEventTracker>();
   if (envoy_event_tracker != nullptr) {
-    const jobject event_tracker_global_ref = env->NewGlobalRef(envoy_event_tracker);
+    jobject event_tracker_global_ref = env->NewGlobalRef(envoy_event_tracker);
     event_tracker->on_track_ = [event_tracker_global_ref](
                                    const absl::flat_hash_map<std::string, std::string>& events) {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
