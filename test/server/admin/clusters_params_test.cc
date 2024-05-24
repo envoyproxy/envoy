@@ -20,24 +20,57 @@ TEST(ClustersParamsTest, ClustersParamsHasExpectedDefaultValue) {
   EXPECT_EQ(params.format_, ClustersParams::Format::Text);
 }
 
-TEST_P(ParamsFixture, ClustersParamsHasExpectedFormatAndStatusCode) {
+TEST(ClustersParamsTest, FormatDefaultsToTextWhenNotSupplied) {
   ClustersParams params;
   Buffer::OwnedImpl buffer;
-  ParamsCase test_case = GetParam();
-  Http::Code code = params.parse(test_case.url_, buffer);
+  std::string url = "localhost:1337/clusters";
+  ClustersParams::Format expected_format = ClustersParams::Format::Text;
+  Http::Code expected_code = Http::Code::OK;
 
-  EXPECT_EQ(params.format_, test_case.expected_format_);
-  EXPECT_EQ(code, test_case.expected_code_);
+  Http::Code code = params.parse(url, buffer);
+
+  EXPECT_EQ(params.format_, expected_format);
+  EXPECT_EQ(code, expected_code);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    AllCases, ParamsFixture,
-    testing::ValuesIn<ParamsCase>({
-        {"localhost:1337/clusters", ClustersParams::Format::Text, Http::Code::OK},
-        {"localhsot:1337/clusters?format=text", ClustersParams::Format::Text, Http::Code::OK},
-        {"localhost:1337/clusters?format=json", ClustersParams::Format::Json, Http::Code::OK},
-        {"localhost:1337/clusters?format=fail", ClustersParams::Format::Unknown, Http::Code::BadRequest},
-    }));
+TEST(ClustersParamsTest, FormatSetToTextWhenTextSupplied) {
+  ClustersParams params;
+  Buffer::OwnedImpl buffer;
+  std::string url = "localhost:1337/clusters?format=text";
+  ClustersParams::Format expected_format = ClustersParams::Format::Text;
+  Http::Code expected_code = Http::Code::OK;
+
+  Http::Code code = params.parse(url, buffer);
+
+  EXPECT_EQ(params.format_, expected_format);
+  EXPECT_EQ(code, expected_code);
+}
+
+TEST(ClustersParamsTest, FormatSetToJsonWhenJsonSupplied) {
+  ClustersParams params;
+  Buffer::OwnedImpl buffer;
+  std::string url = "localhost:1337/clusters?format=json";
+  ClustersParams::Format expected_format = ClustersParams::Format::Json;
+  Http::Code expected_code = Http::Code::OK;
+
+  Http::Code code = params.parse(url, buffer);
+
+  EXPECT_EQ(params.format_, expected_format);
+  EXPECT_EQ(code, expected_code);
+}
+
+TEST(ClustersParamsTest, FormatSetToUnknownWhenInvalidFormatSupplied) {
+  ClustersParams params;
+  Buffer::OwnedImpl buffer;
+  std::string url = "localhost:1337/clusters?format=fail";
+  ClustersParams::Format expected_format = ClustersParams::Format::Unknown;
+  Http::Code expected_code = Http::Code::BadRequest;
+
+  Http::Code code = params.parse(url, buffer);
+
+  EXPECT_EQ(params.format_, expected_format);
+  EXPECT_EQ(code, expected_code);
+}
 
 } // namespace
 } // namespace Server
