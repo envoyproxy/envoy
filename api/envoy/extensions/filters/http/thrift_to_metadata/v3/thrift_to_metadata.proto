@@ -131,14 +131,14 @@ message Rule {
   string method_name = 3 [(xds.annotations.v3.field_status).work_in_progress = true];
 
   // The key-value pair to set in the *filter metadata* if the field is present
-  // in *thrfit metadata*.
+  // in *thrift metadata*.
   //
   // If the value in the KeyValuePair is non-empty, it'll be used instead
   // of field value.
   KeyValuePair on_present = 4;
 
   // The key-value pair to set in the *filter metadata* if the field is missing
-  // in *thrfit metadata*.
+  // in *thrift metadata*.
   //
   // The value in the KeyValuePair must be set, since it'll be used in lieu
   // of the missing field value.
