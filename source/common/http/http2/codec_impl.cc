@@ -368,7 +368,7 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
     // We only buffer the onStreamClose if we had no errors.
     if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
       ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
-                     status.message()); // GCOV_EXCL_LINE
+                     status.message()); // LCOV_EXCL_LINE
     }
   }
 }
@@ -663,8 +663,12 @@ bool ConnectionImpl::StreamDataFrameSource::Send(absl::string_view frame_header,
 
 void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ == -1);
+  const bool skip_frame_source =
+      end_stream ||
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_use_visitor_for_data");
   stream_id_ = parent_.adapter_->SubmitRequest(
-      buildHeaders(headers), end_stream ? nullptr : std::make_unique<StreamDataFrameSource>(*this),
+      buildHeaders(headers),
+      skip_frame_source ? nullptr : std::make_unique<StreamDataFrameSource>(*this), end_stream,
       base());
   ASSERT(stream_id_ > 0);
 }
@@ -685,9 +689,12 @@ void ConnectionImpl::ClientStreamImpl::advanceHeadersState() {
 
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ != -1);
-  parent_.adapter_->SubmitResponse(stream_id_, buildHeaders(headers),
-                                   end_stream ? nullptr
-                                              : std::make_unique<StreamDataFrameSource>(*this));
+  const bool skip_frame_source =
+      end_stream ||
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_use_visitor_for_data");
+  parent_.adapter_->SubmitResponse(
+      stream_id_, buildHeaders(headers),
+      skip_frame_source ? nullptr : std::make_unique<StreamDataFrameSource>(*this), end_stream);
 }
 
 Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
@@ -780,7 +787,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
     // its stream close.
     if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
       ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
-                     status.message()); // GCOV_EXCL_LINE
+                     status.message()); // LCOV_EXCL_LINE
     }
     return;
   }
@@ -978,7 +985,7 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
     // protections that Envoy's codec does not have.
     if (rc == NGHTTP2_ERR_FLOODED) {
       return bufferFloodError(
-          "Flooding was detected in this HTTP/2 session, and it must be closed"); // GCOV_EXCL_LINE
+          "Flooding was detected in this HTTP/2 session, and it must be closed"); // LCOV_EXCL_LINE
     }
     if (rc != static_cast<ssize_t>(slice.len_)) {
       return codecProtocolError(nghttp2_strerror(rc));
@@ -1181,7 +1188,7 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
 
   default:
     // We do not currently support push.
-    ENVOY_BUG(false, "push not supported"); // GCOV_EXCL_LINE
+    ENVOY_BUG(false, "push not supported"); // LCOV_EXCL_LINE
   }
 
   stream->advanceHeadersState();
@@ -1305,7 +1312,7 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
 
   default:
     // Unknown error conditions. Trigger ENVOY_BUG and connection close.
-    ENVOY_BUG(false, absl::StrCat("Unexpected error_code: ", error_code)); // GCOV_EXCL_LINE
+    ENVOY_BUG(false, absl::StrCat("Unexpected error_code: ", error_code)); // LCOV_EXCL_LINE
     break;
   }
 
@@ -1690,6 +1697,58 @@ ConnectionImpl::Http2Visitor::Http2Visitor(ConnectionImpl* connection) : connect
 int64_t ConnectionImpl::Http2Visitor::OnReadyToSend(absl::string_view serialized) {
   return connection_->onSend(reinterpret_cast<const uint8_t*>(serialized.data()),
                              serialized.size());
+}
+
+ConnectionImpl::Http2Visitor::DataFrameHeaderInfo
+ConnectionImpl::Http2Visitor::OnReadyToSendDataForStream(Http2StreamId stream_id,
+                                                         size_t max_length) {
+  StreamImpl* stream = connection_->getStream(stream_id);
+  if (stream == nullptr) {
+    return {/*payload_length=*/-1, /*end_data=*/false, /*end_stream=*/false};
+  }
+  if (stream->pending_send_data_->length() == 0 && !stream->local_end_stream_) {
+    stream->data_deferred_ = true;
+    return {/*payload_length=*/0, /*end_data=*/false, /*end_stream=*/false};
+  }
+  const size_t length = std::min<size_t>(max_length, stream->pending_send_data_->length());
+  bool end_data = false;
+  bool end_stream = false;
+  if (stream->local_end_stream_ && length == stream->pending_send_data_->length()) {
+    end_data = true;
+    if (stream->pending_trailers_to_encode_) {
+      stream->submitTrailers(*stream->pending_trailers_to_encode_);
+      stream->pending_trailers_to_encode_.reset();
+    } else {
+      end_stream = true;
+    }
+  }
+  return {static_cast<int64_t>(length), end_data, end_stream};
+}
+
+bool ConnectionImpl::Http2Visitor::SendDataFrame(Http2StreamId stream_id,
+                                                 absl::string_view frame_header,
+                                                 size_t payload_length) {
+  connection_->protocol_constraints_.incrementOutboundDataFrameCount();
+
+  StreamImpl* stream = connection_->getStream(stream_id);
+  if (stream == nullptr) {
+    ENVOY_CONN_LOG(error, "error sending data frame: stream {} not found", connection_->connection_,
+                   stream_id);
+    return false;
+  }
+  Buffer::OwnedImpl output;
+  connection_->addOutboundFrameFragment(
+      output, reinterpret_cast<const uint8_t*>(frame_header.data()), frame_header.size());
+  if (!connection_->protocol_constraints_.checkOutboundFrameLimits().ok()) {
+    ENVOY_CONN_LOG(debug, "error sending data frame: Too many frames in the outbound queue",
+                   connection_->connection_);
+    stream->setDetails(Http2ResponseCodeDetails::get().outbound_frame_flood);
+  }
+
+  connection_->stats_.pending_send_bytes_.sub(payload_length);
+  output.move(*stream->pending_send_data_, payload_length);
+  connection_->connection_.write(output, false);
+  return true;
 }
 
 bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t length,

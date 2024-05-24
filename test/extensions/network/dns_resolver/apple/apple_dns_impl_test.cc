@@ -27,7 +27,9 @@
 
 using testing::_;
 using testing::DoAll;
+using testing::IsNull;
 using testing::NiceMock;
+using testing::NotNull;
 using testing::Return;
 using testing::SaveArg;
 using testing::StrEq;
@@ -38,6 +40,29 @@ struct _DNSServiceRef_t {};
 namespace Envoy {
 namespace Network {
 namespace {
+
+constexpr DNSServiceFlags SERVICE_FLAGS =
+    kDNSServiceFlagsTimeout | kDNSServiceFlagsReturnIntermediates;
+
+Network::Address::Ipv6Instance& emptyV6Address() {
+  static Network::Address::Ipv6Instance address = [] {
+    static sockaddr_in6* addr6 = new sockaddr_in6;
+    memset(addr6, 0, sizeof(*addr6));
+    addr6->sin6_family = AF_INET6;
+    return Network::Address::Ipv6Instance(*addr6);
+  }();
+  return address;
+}
+
+Network::Address::Ipv4Instance& emptyV4Address() {
+  static Network::Address::Ipv4Instance address = [] {
+    static sockaddr_in* addr4 = new sockaddr_in;
+    memset(addr4, 0, sizeof(*addr4));
+    addr4->sin_family = AF_INET;
+    return Network::Address::Ipv4Instance(addr4);
+  }();
+  return address;
+}
 
 void expectAppleTypedDnsResolverConfig(
     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
@@ -129,6 +154,8 @@ public:
                 PANIC("reached unexpected code");
               }
             }
+          } else {
+            EXPECT_TRUE(results.empty());
           }
           if (exit_dispatcher) {
             dispatcher_->exit();
@@ -292,6 +319,125 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionV6Only) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+// For the tests below:
+//  - ipv4.google.com DNS records only resolve to IPv4 addresses, but if on a network that supports
+//    NAT64/DNS64, DNS can resolve to virtualized IPv6 addresses.
+//  - ipv6.google.com DNS records only resolve to IPv6 addresses.
+
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionAllSupportsV4Only) {
+  EXPECT_NE(nullptr, resolveWithExpectations("ipv4.google.com", DnsLookupFamily::All,
+                                             DnsResolver::ResolutionStatus::Success, true));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionAllSupportsV6Only) {
+  auto* dns_query = resolver_->resolve(
+      "ipv6.google.com", DnsLookupFamily::All,
+      [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+        // On v4 only networks, there will be no results.
+        for (const auto& result : results) {
+          const auto& addrinfo = result.addrInfo();
+          EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
+          EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
+        }
+        dispatcher_->exit();
+      });
+  EXPECT_THAT(dns_query, NotNull());
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionV4OnlySupportsV4Only) {
+  EXPECT_NE(nullptr, resolveWithExpectations("ipv4.google.com", DnsLookupFamily::V4Only,
+                                             DnsResolver::ResolutionStatus::Success, true));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionV4OnlySupportsV6Only) {
+  EXPECT_NE(nullptr, resolveWithExpectations("ipv6.google.com", DnsLookupFamily::V4Only,
+                                             DnsResolver::ResolutionStatus::Success, false));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionV6OnlySupportsV4Only) {
+  auto* dns_query = resolver_->resolve(
+      "ipv4.google.com", DnsLookupFamily::V6Only,
+      [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+        for (const auto& result : results) {
+          const auto& addrinfo = result.addrInfo();
+          EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
+          EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
+        }
+        dispatcher_->exit();
+      });
+  EXPECT_THAT(dns_query, NotNull());
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionV6OnlySupportsV6Only) {
+  auto* dns_query = resolver_->resolve(
+      "ipv6.google.com", DnsLookupFamily::V6Only,
+      [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+        EXPECT_FALSE(results.empty());
+        for (const auto& result : results) {
+          const auto& addrinfo = result.addrInfo();
+          EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
+          EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
+        }
+        dispatcher_->exit();
+      });
+  EXPECT_THAT(dns_query, NotNull());
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionAutoSupportsV4Only) {
+  EXPECT_NE(nullptr, resolveWithExpectations("ipv4.google.com", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Success, true));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionAutoSupportsV6Only) {
+  auto* dns_query = resolver_->resolve(
+      "ipv6.google.com", DnsLookupFamily::Auto,
+      [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+        // On v4 only networks, there will be no results.
+        for (const auto& result : results) {
+          const auto& addrinfo = result.addrInfo();
+          EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
+          EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
+        }
+        dispatcher_->exit();
+      });
+  EXPECT_THAT(dns_query, NotNull());
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionV4PreferredSupportsV4Only) {
+  EXPECT_NE(nullptr, resolveWithExpectations("ipv4.google.com", DnsLookupFamily::V4Preferred,
+                                             DnsResolver::ResolutionStatus::Success, true));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionV4PreferredSupportsV6Only) {
+  auto* dns_query = resolver_->resolve(
+      "ipv6.google.com", DnsLookupFamily::V4Preferred,
+      [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+        // On v4 only networks, there will be no results.
+        for (const auto& result : results) {
+          const auto& addrinfo = result.addrInfo();
+          EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
+          EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
+        }
+        dispatcher_->exit();
+      });
+  EXPECT_THAT(dns_query, NotNull());
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 // dns_sd is very opaque and does not explicitly call out the state that is kept across queries.
 // The following two tests make sure that two consecutive queries for the same domain result in
 // successful resolution. This is implicitly testing the behavior of kDNSServiceFlagsAdd across
@@ -316,24 +462,25 @@ TEST_F(AppleDnsImplTest, DoubleLookupInOneLoop) {
 }
 
 TEST_F(AppleDnsImplTest, DnsIpAddressVersionInvalid) {
+  // The DNS queries are successful, but return no results.
   EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Failure, false));
+                                             DnsResolver::ResolutionStatus::Success, false));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::V4Preferred,
-                                             DnsResolver::ResolutionStatus::Failure, false));
+                                             DnsResolver::ResolutionStatus::Success, false));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::V4Only,
-                                             DnsResolver::ResolutionStatus::Failure, false));
+                                             DnsResolver::ResolutionStatus::Success, false));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::V6Only,
-                                             DnsResolver::ResolutionStatus::Failure, false));
+                                             DnsResolver::ResolutionStatus::Success, false));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::All,
-                                             DnsResolver::ResolutionStatus::Failure, false));
+                                             DnsResolver::ResolutionStatus::Success, false));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -362,9 +509,9 @@ TEST_F(AppleDnsImplTest, Cancel) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-TEST_F(AppleDnsImplTest, Timeout) {
+TEST_F(AppleDnsImplTest, NonExistentDomain) {
   EXPECT_NE(nullptr, resolveWithExpectations("some.domain", DnsLookupFamily::V6Only,
-                                             DnsResolver::ResolutionStatus::Failure, false));
+                                             DnsResolver::ResolutionStatus::Success, false));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -437,8 +584,8 @@ public:
     Network::Address::Ipv4Instance address(&addr4);
     absl::Notification dns_callback_executed;
 
-    EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                    StrEq(hostname.c_str()), _, _))
+    EXPECT_CALL(dns_service_,
+                dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
         .WillOnce(DoAll(
             // Have the API call synchronously call the provided callback.
             WithArgs<5, 6>(Invoke([&](DNSServiceGetAddrInfoReply callback, void* context) -> void {
@@ -482,8 +629,8 @@ public:
     DNSServiceGetAddrInfoReply reply_callback;
     absl::Notification dns_callback_executed;
 
-    EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                    StrEq(hostname.c_str()), _, _))
+    EXPECT_CALL(dns_service_,
+                dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
         .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
 
     EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
@@ -537,10 +684,18 @@ public:
     case V4:
       reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
                      address.sockAddr(), 30, query);
+      // There will always be 2 callbacks, one will have NoSuchRecord for the address family that
+      // wasn't requested.
+      reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoSuchRecord, hostname.c_str(),
+                     emptyV6Address().sockAddr(), 30, query);
       break;
     case V6:
       reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
                      address_v6.sockAddr(), 30, query);
+      // There will always be 2 callbacks, one will have NoSuchRecord for the address family that
+      // wasn't requested.
+      reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoSuchRecord, hostname.c_str(),
+                     emptyV4Address().sockAddr(), 30, query);
       break;
     case Both:
       reply_callback(nullptr, kDNSServiceFlagsAdd | kDNSServiceFlagsMoreComing, 0,
@@ -589,8 +744,8 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInSocketAccess) {
   DNSServiceGetAddrInfoReply reply_callback;
   absl::Notification dns_callback_executed;
 
-  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                  StrEq(hostname.c_str()), _, _))
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(-1));
@@ -625,8 +780,8 @@ TEST_F(AppleDnsImplFakeApiTest, InvalidFileEvent) {
   DNSServiceGetAddrInfoReply reply_callback;
   absl::Notification dns_callback_executed;
 
-  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                  StrEq(hostname.c_str()), _, _))
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
@@ -661,8 +816,8 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResult) {
   DNSServiceGetAddrInfoReply reply_callback;
   absl::Notification dns_callback_executed;
 
-  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                  StrEq(hostname.c_str()), _, _))
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
@@ -720,7 +875,7 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletionUnroutableFamilies) {
   absl::Notification dns_callback_executed;
 
   EXPECT_CALL(dns_service_,
-              dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0,
+              dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0,
                                     kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
                                     StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(
@@ -728,6 +883,8 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletionUnroutableFamilies) {
           WithArgs<5, 6>(Invoke([&](DNSServiceGetAddrInfoReply callback, void* context) -> void {
             callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
                      address.sockAddr(), 30, context);
+            callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoSuchRecord, hostname.c_str(),
+                     emptyV6Address().sockAddr(), 30, context);
           })),
           Return(kDNSServiceErr_NoError)));
 
@@ -757,13 +914,15 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {
   Network::Address::Ipv4Instance address(&addr4);
   absl::Notification dns_callback_executed;
 
-  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                  StrEq(hostname.c_str()), _, _))
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(
           // Have the API call synchronously call the provided callback.
           WithArgs<5, 6>(Invoke([&](DNSServiceGetAddrInfoReply callback, void* context) -> void {
             callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
                      address.sockAddr(), 30, context);
+            callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoSuchRecord, hostname.c_str(),
+                     emptyV6Address().sockAddr(), 30, context);
           })),
           Return(kDNSServiceErr_NoError)));
 
@@ -817,8 +976,8 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddresses) {
   DNSServiceGetAddrInfoReply reply_callback;
   absl::Notification dns_callback_executed;
 
-  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                  StrEq(hostname.c_str()), _, _))
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
@@ -842,6 +1001,9 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddresses) {
 
   reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
                  address2.sockAddr(), 30, query);
+
+  reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoSuchRecord, hostname.c_str(),
+                 emptyV6Address().sockAddr(), 30, query);
 
   dns_callback_executed.WaitForNotification();
 }
@@ -895,8 +1057,8 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddressesSecondOneFails) {
   DNSServiceGetAddrInfoReply reply_callback;
   absl::Notification dns_callback_executed;
 
-  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                  StrEq(hostname.c_str()), _, _))
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
@@ -945,8 +1107,8 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
   absl::Notification dns_callback_executed2;
 
   // Start first query.
-  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                  StrEq(hostname.c_str()), _, _))
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
@@ -966,9 +1128,8 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
   ASSERT_NE(nullptr, query);
 
   // Start second query.
-  EXPECT_CALL(dns_service_,
-              dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, kDNSServiceProtocol_IPv4,
-                                    StrEq(hostname2.c_str()), _, _))
+  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, kDNSServiceProtocol_IPv4,
+                                                  StrEq(hostname2.c_str()), _, _))
       .WillOnce(DoAll(SaveArg<5>(&reply_callback2), Return(kDNSServiceErr_NoError)));
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
@@ -991,9 +1152,13 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
   // be pending.
   reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
                  address.sockAddr(), 30, query);
+  reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoSuchRecord, hostname.c_str(),
+                 emptyV6Address().sockAddr(), 30, query);
 
   reply_callback2(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname2.c_str(),
                   address2.sockAddr(), 30, query2);
+  reply_callback2(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoSuchRecord, hostname2.c_str(),
+                  emptyV6Address().sockAddr(), 30, query2);
 
   dns_callback_executed.WaitForNotification();
   dns_callback_executed2.WaitForNotification();
@@ -1015,8 +1180,8 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
   absl::Notification dns_callback_executed2;
 
   // Start first query.
-  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                  StrEq(hostname.c_str()), _, _))
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
@@ -1038,9 +1203,8 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
   ASSERT_NE(nullptr, query);
 
   // Start second query.
-  EXPECT_CALL(dns_service_,
-              dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, kDNSServiceProtocol_IPv4,
-                                    StrEq(hostname2.c_str()), _, _))
+  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, kDNSServiceProtocol_IPv4,
+                                                  StrEq(hostname2.c_str()), _, _))
       .WillOnce(DoAll(SaveArg<5>(&reply_callback2), Return(kDNSServiceErr_NoError)));
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
@@ -1059,6 +1223,8 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
 
   reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
                  address.sockAddr(), 30, query);
+  reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoSuchRecord, hostname.c_str(),
+                 emptyV6Address().sockAddr(), 30, query);
 
   // The second query fails.
   reply_callback2(nullptr, 0, 0, kDNSServiceErr_Unknown, hostname2.c_str(), nullptr, 30, query2);
@@ -1078,8 +1244,8 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithOnlyNonAdditiveReplies) {
   DNSServiceGetAddrInfoReply reply_callback;
   absl::Notification dns_callback_executed;
 
-  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                  StrEq(hostname.c_str()), _, _))
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
@@ -1098,7 +1264,10 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithOnlyNonAdditiveReplies) {
 
   // Reply _without_ add and _without_ more coming flags. This should cause a flush with an empty
   // response.
-  reply_callback(nullptr, 0, 0, kDNSServiceErr_NoError, hostname.c_str(), nullptr, 30, query);
+  reply_callback(nullptr, 0, 0, kDNSServiceErr_NoError, hostname.c_str(), address.sockAddr(), 30,
+                 query);
+  reply_callback(nullptr, 0, 0, kDNSServiceErr_NoSuchRecord, hostname.c_str(),
+                 emptyV6Address().sockAddr(), 30, query);
   dns_callback_executed.WaitForNotification();
 }
 
@@ -1112,8 +1281,8 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
   Network::Address::Ipv4Instance address(&addr4);
   DNSServiceGetAddrInfoReply reply_callback;
 
-  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                  StrEq(hostname.c_str()), _, _))
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
@@ -1127,7 +1296,7 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
 
   EXPECT_DEATH(reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError,
                               hostname.c_str(), nullptr, 30, query),
-               "invalid to add null address");
+               "address cannot be null");
 }
 
 TEST_F(AppleDnsImplFakeApiTest, DeallocateOnDestruction) {
@@ -1149,8 +1318,8 @@ TEST_F(AppleDnsImplFakeApiTest, DeallocateOnDestruction) {
   DNSServiceGetAddrInfoReply reply_callback;
   absl::Notification dns_callback_executed;
 
-  EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0, 0,
-                                                  StrEq(hostname.c_str()), _, _))
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(
           SaveArg<5>(&reply_callback),
           WithArgs<0>(Invoke([](DNSServiceRef* ref) -> void { *ref = new _DNSServiceRef_t{}; })),
@@ -1175,6 +1344,8 @@ TEST_F(AppleDnsImplFakeApiTest, DeallocateOnDestruction) {
 
   reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
                  address2.sockAddr(), 30, query);
+  reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoSuchRecord, hostname.c_str(),
+                 emptyV6Address().sockAddr(), 30, query);
 
   dns_callback_executed.WaitForNotification();
 }
