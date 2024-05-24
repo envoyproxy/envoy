@@ -59,7 +59,7 @@ TEST_F(FilterTest, UserNotExist) {
   request_headers_user1.setHost("host");
   request_headers_user1.setPath("/");
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders())
-            .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
+      .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
@@ -88,7 +88,7 @@ TEST_F(FilterTest, InvalidPassword) {
   request_headers_user1.setHost("host");
   request_headers_user1.setPath("/");
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders())
-            .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
+      .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
@@ -117,7 +117,7 @@ TEST_F(FilterTest, NoAuthHeader) {
   request_headers_user1.setHost("host");
   request_headers_user1.setPath("/");
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders())
-            .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
+      .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
@@ -146,7 +146,7 @@ TEST_F(FilterTest, HasAuthHeaderButNotForBasic) {
   request_headers_user1.setHost("host");
   request_headers_user1.setPath("/");
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders())
-            .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
+      .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
@@ -175,7 +175,7 @@ TEST_F(FilterTest, HasAuthHeaderButNoColon) {
   request_headers_user1.setHost("host");
   request_headers_user1.setPath("/");
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders())
-            .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
+      .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
@@ -217,7 +217,7 @@ TEST_F(FilterTest, BasicAuthPerRouteDefaultSettings) {
   empty_request_headers.setHost("host");
   empty_request_headers.setPath("/");
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders())
-            .WillOnce(testing::Return(makeOptRef(empty_request_headers)));
+      .WillOnce(testing::Return(makeOptRef(empty_request_headers)));
   UserMap empty_users;
   FilterConfigPerRoute basic_auth_per_route(std::move(empty_users));
 
@@ -266,7 +266,7 @@ TEST_F(FilterTest, BasicAuthPerRouteEnabled) {
   invalid_credentials.setHost("host");
   invalid_credentials.setPath("/");
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders())
-            .WillOnce(testing::Return(makeOptRef(invalid_credentials)));
+      .WillOnce(testing::Return(makeOptRef(invalid_credentials)));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(invalid_credentials, true));
