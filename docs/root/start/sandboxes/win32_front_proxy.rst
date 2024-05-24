@@ -1,6 +1,8 @@
 Windows based Front proxy
 =========================
 
+.. include:: ../../_include/windows_support_ended.rst
+
 .. sidebar:: Requirements
 
    .. include:: _include/docker-env-setup-link.rst
