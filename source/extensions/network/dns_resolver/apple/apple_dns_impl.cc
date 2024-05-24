@@ -145,8 +145,7 @@ AppleDnsResolverImpl::PendingResolution::PendingResolution(AppleDnsResolverImpl&
                                                            const std::string& dns_name,
                                                            DnsLookupFamily dns_lookup_family)
     : parent_(parent), callback_(callback), dispatcher_(dispatcher), dns_name_(dns_name),
-      pending_response_({ResolutionStatus::Success, false, false, {}, {}, {}}),
-      dns_lookup_family_(dns_lookup_family) {}
+      pending_response_(PendingResponse()), dns_lookup_family_(dns_lookup_family) {}
 
 AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   ENVOY_LOG(debug, "Destroying PendingResolution for {}", dns_name_);
@@ -324,7 +323,16 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
   // Make sure that we trigger the failure callback if we get an error back.
   // NoSuchRecord is *not* considered an error; it indicates that a query was successfully
   // completed, but there were no DNS records for that address family.
+  //
+  // If the protocol is set to 0 or set to (kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6),
+  // the behavior is undefined in the API docs as to whether there would be more than one callback
+  // with an error. However, when we receive an error, we call finishResolve(), which results in
+  // the deletion of this PendingResolution instance, and the destructor ensures the DNSServiceRef
+  // gets deallocated (via the dnsServiceRefDeallocate() method), which owns the callback
+  // operation. Hence, after calling finishResolve(), we are guaranteed to not get any more
+  // callbacks to this method.
   if (error_code != kDNSServiceErr_NoError && error_code != kDNSServiceErr_NoSuchRecord) {
+    ENVOY_LOG(info, "==> AAB ERROR: {}", error_code);
     parent_.chargeGetAddrInfoErrorStats(error_code);
 
     pending_response_.status_ = ResolutionStatus::Failure;
@@ -359,17 +367,8 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     }
   }
 
-  // If not expecting a v4 query, or the v4 response has been received, consider the v4 response
-  // complete.
-  const bool v4_response_complete =
-      !((query_protocol_ & kDNSServiceProtocol_IPv4) || query_protocol_ == 0) ||
-      pending_response_.v4_response_received_;
-  // If not expecting a v6 query, or the v4 response has been received, consider the v6 response
-  // complete.
-  const bool v6_response_complete =
-      !((query_protocol_ & kDNSServiceProtocol_IPv6) || query_protocol_ == 0) ||
-      pending_response_.v6_response_received_;
-  if (!(flags & kDNSServiceFlagsMoreComing) && v4_response_complete && v6_response_complete) {
+  if (!(flags & kDNSServiceFlagsMoreComing) && isAddressFamilyProcessed(kDNSServiceProtocol_IPv4) &&
+      isAddressFamilyProcessed(kDNSServiceProtocol_IPv6)) {
     ENVOY_LOG(debug, "DNS Resolver flushing queries pending callback");
     finishResolve();
     // Note: Nothing can follow this call to finishResolve due to deletion of this
@@ -423,6 +422,16 @@ AppleDnsResolverImpl::PendingResolution::buildDnsResponse(const struct sockaddr*
   IS_ENVOY_BUG("unexpected DnsLookupFamily enum");
   sockaddr_in address_in;
   return {std::make_shared<const Address::Ipv4Instance>(&address_in), std::chrono::seconds(ttl)};
+}
+
+bool AppleDnsResolverImpl::PendingResolution::isAddressFamilyProcessed(
+    DNSServiceProtocol protocol) {
+  // If not expecting a v4/v6 query, or the v4/v6 response has been received, consider the address
+  // family as having been processed.
+  const bool response_received = (protocol == kDNSServiceProtocol_IPv4)
+                                     ? pending_response_.v4_response_received_
+                                     : pending_response_.v6_response_received_;
+  return response_received || !((query_protocol_ & protocol) || query_protocol_ == 0);
 }
 
 // apple DNS resolver factory
