@@ -88,7 +88,8 @@ resources:
   }
 
   void handleOauth2TokenRequest(absl::string_view client_secret, bool success = true,
-                                bool good_token = true, bool good_json = true) {
+                                bool good_token = true, bool good_json = true,
+                                int token_expiry = 20) {
     acceptNewStream();
     checkClientSecretInRequest(client_secret);
     if (success) {
@@ -107,7 +108,7 @@ resources:
     }
     oauth_response.mutable_access_token()->set_value("test-access-token");
     if (good_token) {
-      oauth_response.mutable_expires_in()->set_value(2); // 2 seconds
+      oauth_response.mutable_expires_in()->set_value(token_expiry);
     }
     Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
 
@@ -160,6 +161,8 @@ typed_config:
   });
   initializeFilter(filter_config);
   waitForOAuth2Response("test_client_secret");
+  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
+                                 std::chrono::milliseconds(2500));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -175,13 +178,6 @@ typed_config:
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-
-  EXPECT_EQ(1UL,
-            test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
-                ->value());
-  EXPECT_EQ(
-      1UL,
-      test_server_->counter("http.config_test.credential_injector.oauth2.token_fetched")->value());
 }
 
 // Inject credential to a request without credential
@@ -211,8 +207,10 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
   waitForOAuth2Response("test_client_secret");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
+                                 std::chrono::milliseconds(2500));
 
+  codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();
@@ -226,13 +224,6 @@ typed_config:
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-
-  EXPECT_EQ(1UL,
-            test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
-                ->value());
-  EXPECT_EQ(
-      1UL,
-      test_server_->counter("http.config_test.credential_injector.oauth2.token_fetched")->value());
 }
 
 // Inject credential to a request with credential, overwrite is false
@@ -262,6 +253,8 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
   waitForOAuth2Response("test_client_secret");
+  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
+                                 std::chrono::milliseconds(2500));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   default_request_headers_.setCopy(Envoy::Http::LowerCaseString("Authorization"),
@@ -290,7 +283,7 @@ typed_config:
       test_server_->counter("http.config_test.credential_injector.oauth2.token_fetched")->value());
 }
 
-// // Inject credential to a request with credential, overwrite is true
+// Inject credential to a request with credential, overwrite is true
 TEST_P(CredentialInjectorIntegrationTest, CredentialExistsOverwriteTrue) {
   const std::string filter_config =
       R"EOF(
@@ -317,6 +310,8 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
   waitForOAuth2Response("test_client_secret");
+  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
+                                 std::chrono::milliseconds(2500));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   default_request_headers_.setCopy(Envoy::Http::LowerCaseString("Authorization"),
@@ -389,7 +384,7 @@ typed_config:
   waitForOAuth2Response("test_client_secret");
 
   test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(500));
+                                 std::chrono::milliseconds(2500));
 
   EXPECT_EQ(1UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
@@ -455,7 +450,7 @@ typed_config:
               "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_response_code")
           ->value());
   test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(500));
+                                 std::chrono::milliseconds(2500));
 
   EXPECT_EQ(2UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
@@ -505,7 +500,8 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
 
-  waitForOAuth2Response("test_client_secret");
+  getFakeOuth2Connection();
+  handleOauth2TokenRequest("test_client_secret", true, true, true, 2);
 
   test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
                                  std::chrono::milliseconds(500));
@@ -674,6 +670,8 @@ typed_config:
                                  std::chrono::milliseconds(1200));
   // wait for retried token request and respond with good response
   handleOauth2TokenRequest("test_client_secret");
+  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
+                                 std::chrono::milliseconds(1200));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

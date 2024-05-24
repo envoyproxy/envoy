@@ -229,7 +229,7 @@ public:
    * instantiate any needed structured and prepare for further updates. The cluster manager
    * will do this at the appropriate time.
    */
-  virtual void initialize() PURE;
+  virtual absl::Status initialize() PURE;
 };
 
 using ThreadAwareLoadBalancerPtr = std::unique_ptr<ThreadAwareLoadBalancer>;

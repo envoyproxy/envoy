@@ -27,7 +27,7 @@ namespace LoadBalancingPolices {
 namespace Subset {
 namespace {
 
-class SubsetLbTester : public LoadBalancingPolices::Common::BaseTester {
+class SubsetLbTester : public Upstream::BaseTester {
 public:
   SubsetLbTester(uint64_t num_hosts, bool single_host_per_subset)
       : BaseTester(num_hosts, 0, 0, true /* attach metadata */) {

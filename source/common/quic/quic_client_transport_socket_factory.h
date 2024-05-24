@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/tls/client_ssl_socket.h"
 
 namespace Envoy {
 namespace Quic {

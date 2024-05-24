@@ -14,6 +14,11 @@ namespace Network {
 // A test resolver which blocks resolution until unblockResolve is called.
 class TestResolver : public GetAddrInfoDnsResolver {
 public:
+  ~TestResolver() {
+    absl::MutexLock guard(&mutex_);
+    blocked_resolutions_.clear();
+  }
+
   using GetAddrInfoDnsResolver::GetAddrInfoDnsResolver;
 
   static void unblockResolve(absl::optional<std::string> dns_override = {}) {

@@ -175,7 +175,6 @@ public:
 
   /**
    * Start a gRPC stream asynchronously.
-   * TODO(mattklein123): Determine if tracing should be added to streaming requests.
    * @param service_full_name full name of the service (i.e. service_method.service()->full_name()).
    * @param method_name name of the method (i.e. service_method.name()).
    * @param callbacks the callbacks to be notified of stream status.

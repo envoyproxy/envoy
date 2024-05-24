@@ -74,6 +74,7 @@ public:
   void startFilterChain() { continueFilterChain(true); }
 
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
+  void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) override;
   envoy::config::core::v3::Metadata& dynamicMetadata() override {
     return stream_info_->dynamicMetadata();
   };

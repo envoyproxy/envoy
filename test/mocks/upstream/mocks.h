@@ -14,7 +14,7 @@
 
 #include "source/common/common/callback_impl.h"
 #include "source/common/upstream/health_discovery_service.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #include "test/mocks/config/mocks.h"

@@ -7,8 +7,6 @@
 #include "source/common/common/assert.h"
 
 #include "library/common/types/matcher_data.h"
-#include "library/jni/jni_support.h"
-#include "library/jni/types/env.h"
 
 namespace Envoy {
 namespace JNI {
@@ -24,7 +22,7 @@ jobject getClassLoader() {
 }
 
 LocalRefUniquePtr<jclass> findClass(const char* class_name) {
-  JniHelper jni_helper(getEnv());
+  JniHelper jni_helper(JniHelper::getThreadLocalEnv());
   LocalRefUniquePtr<jclass> class_loader = jni_helper.findClass("java/lang/ClassLoader");
   jmethodID find_class_method = jni_helper.getMethodId(class_loader.get(), "loadClass",
                                                        "(Ljava/lang/String;)Ljava/lang/Class;");
@@ -34,10 +32,8 @@ LocalRefUniquePtr<jclass> findClass(const char* class_name) {
   return clazz;
 }
 
-JNIEnv* getEnv() { return Envoy::JNI::Env::get(); }
-
 void jniDeleteGlobalRef(void* context) {
-  JNIEnv* env = getEnv();
+  JNIEnv* env = JniHelper::getThreadLocalEnv();
   jobject ref = static_cast<jobject>(context);
   env->DeleteGlobalRef(ref);
 }
@@ -46,7 +42,7 @@ void jniDeleteConstGlobalRef(const void* context) {
   jniDeleteGlobalRef(const_cast<void*>(context));
 }
 
-int javaIntegerTotInt(JniHelper& jni_helper, jobject boxed_integer) {
+int javaIntegerToCppInt(JniHelper& jni_helper, jobject boxed_integer) {
   LocalRefUniquePtr<jclass> jcls_Integer = jni_helper.findClass("java/lang/Integer");
   jmethodID jmid_intValue = jni_helper.getMethodId(jcls_Integer.get(), "intValue", "()I");
   return jni_helper.callIntMethod(boxed_integer, jmid_intValue);
@@ -63,12 +59,6 @@ envoy_data javaByteArrayToEnvoyData(JniHelper& jni_helper, jbyteArray j_data, si
       jni_helper.getPrimitiveArrayCritical(j_data, nullptr);
   memcpy(native_bytes, critical_data.get(), data_length); // NOLINT(safe-memcpy)
   return {data_length, native_bytes, free, native_bytes};
-}
-
-LocalRefUniquePtr<jstring> envoyDataToJavaString(JniHelper& jni_helper, envoy_data data) {
-  // Ensure we get a null-terminated string, the data coming in via envoy_data might not be.
-  std::string str(reinterpret_cast<const char*>(data.bytes), data.length);
-  return jni_helper.newStringUtf(str.c_str());
 }
 
 LocalRefUniquePtr<jbyteArray> envoyDataToJavaByteArray(JniHelper& jni_helper, envoy_data data) {
@@ -123,22 +113,6 @@ envoyFinalStreamIntelToJavaLongArray(JniHelper& jni_helper,
   critical_array.get()[14] = static_cast<jlong>(final_stream_intel.response_flags);
   critical_array.get()[15] = static_cast<jlong>(final_stream_intel.upstream_protocol);
   return j_array;
-}
-
-LocalRefUniquePtr<jobject> envoyMapToJavaMap(JniHelper& jni_helper, envoy_map map) {
-  LocalRefUniquePtr<jclass> jcls_hashMap = jni_helper.findClass("java/util/HashMap");
-  jmethodID jmid_hashMapInit = jni_helper.getMethodId(jcls_hashMap.get(), "<init>", "(I)V");
-  LocalRefUniquePtr<jobject> j_hashMap =
-      jni_helper.newObject(jcls_hashMap.get(), jmid_hashMapInit, map.length);
-  jmethodID jmid_hashMapPut = jni_helper.getMethodId(
-      jcls_hashMap.get(), "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
-  for (envoy_map_size_t i = 0; i < map.length; i++) {
-    LocalRefUniquePtr<jstring> key = envoyDataToJavaString(jni_helper, map.entries[i].key);
-    LocalRefUniquePtr<jstring> value = envoyDataToJavaString(jni_helper, map.entries[i].value);
-    LocalRefUniquePtr<jobject> ignored =
-        jni_helper.callObjectMethod(j_hashMap.get(), jmid_hashMapPut, key.get(), value.get());
-  }
-  return j_hashMap;
 }
 
 envoy_data javaByteBufferToEnvoyData(JniHelper& jni_helper, jobject j_data) {
@@ -547,7 +521,7 @@ Buffer::InstancePtr javaDirectByteBufferToCppBufferInstance(JniHelper& jni_helpe
       java_byte_buffer_address, static_cast<size_t>(length),
       [java_byte_buffer_global_ref](const void*, size_t,
                                     const Buffer::BufferFragmentImpl* this_fragment) {
-        getEnv()->DeleteGlobalRef(java_byte_buffer_global_ref);
+        JniHelper::getThreadLocalEnv()->DeleteGlobalRef(java_byte_buffer_global_ref);
         delete this_fragment;
       });
   Buffer::InstancePtr cpp_buffer_instance = std::make_unique<Buffer::OwnedImpl>();
@@ -594,6 +568,15 @@ cppBufferInstanceToJavaNonDirectByteBuffer(JniHelper& jni_helper,
                               static_cast<void*>(java_byte_array_elements.get()));
   return jni_helper.callStaticObjectMethod(java_byte_buffer_class.get(),
                                            java_byte_buffer_wrap_method_id, java_byte_array.get());
+}
+
+std::string getJavaExceptionMessage(JniHelper& jni_helper, jthrowable throwable) {
+  auto java_throwable_class = jni_helper.findClass("java/lang/Throwable");
+  auto java_get_message_method_id =
+      jni_helper.getMethodId(java_throwable_class.get(), "getMessage", "()Ljava/lang/String;");
+  auto java_exception_message =
+      jni_helper.callObjectMethod<jstring>(throwable, java_get_message_method_id);
+  return javaStringToCppString(jni_helper, java_exception_message.get());
 }
 
 } // namespace JNI

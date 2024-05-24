@@ -175,6 +175,11 @@ void ActiveTcpSocket::setDynamicMetadata(const std::string& name,
   stream_info_->setDynamicMetadata(name, value);
 }
 
+void ActiveTcpSocket::setDynamicTypedMetadata(const std::string& name,
+                                              const ProtobufWkt::Any& value) {
+  stream_info_->setDynamicTypedMetadata(name, value);
+}
+
 void ActiveTcpSocket::newConnection() {
   connected_ = true;
 

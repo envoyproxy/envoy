@@ -133,7 +133,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
     fixed_delay: -1s
   )EOF";
 
-  handleInvalidConfiguration(yaml_string, "FixedDelay: value must be greater than 0s");
+  handleInvalidConfiguration(yaml_string, "Invalid duration: Expected positive duration");
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {

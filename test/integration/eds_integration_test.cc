@@ -5,7 +5,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/type/v3/http.pb.h"
 
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"

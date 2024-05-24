@@ -300,6 +300,14 @@ public:
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
 
   /**
+   * @param name the namespace used in the metadata in reverse DNS format, for example:
+   * envoy.test.my_filter.
+   * @param value of type protobuf any to set on the namespace. A merge will be performed with new
+   * values for the same key overriding existing.
+   */
+  virtual void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) PURE;
+
+  /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
    * connection.
    */

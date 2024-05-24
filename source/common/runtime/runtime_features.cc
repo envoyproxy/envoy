@@ -51,6 +51,7 @@ RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_send_original_xff);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_http1_reverse_bridge_change_http_status);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_http1_reverse_bridge_handle_empty_response);
 RUNTIME_GUARD(envoy_reloadable_features_hmac_base64_encoding_only);
+RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_delay_reset);
 RUNTIME_GUARD(envoy_reloadable_features_http1_connection_close_header_in_redirect);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year.
 RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
@@ -88,6 +89,7 @@ RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_ssl_transport_failure_reason_format);
 RUNTIME_GUARD(envoy_reloadable_features_stateful_session_encode_ttl_in_cookie);
 RUNTIME_GUARD(envoy_reloadable_features_stop_decode_metadata_on_local_reply);
+RUNTIME_GUARD(envoy_reloadable_features_strict_duration_validation);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_tunneling_send_downstream_fin_on_upstream_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_allow_negative_field_ids);
@@ -96,8 +98,10 @@ RUNTIME_GUARD(envoy_reloadable_features_token_passed_entirely);
 RUNTIME_GUARD(envoy_reloadable_features_udp_socket_apply_aggregated_read_limit);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_allow_connect_with_2xx);
+RUNTIME_GUARD(envoy_reloadable_features_upstream_remote_address_use_connection);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_wait_for_response_headers_before_disabling_read);
 RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
+RUNTIME_GUARD(envoy_reloadable_features_use_typed_metadata_in_proxy_protocol_listener);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_grpc_header_before_log_grpc_status);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
@@ -150,6 +154,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
 // TODO(#33474) removed it once GRO packet dropping is fixed.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_prefer_quic_client_udp_gro);
+// TODO(alyssar) evaluate and either make this a config knob or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_null_addresses);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
