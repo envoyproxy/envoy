@@ -123,6 +123,15 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* s, int response_code, void* bod
       });
 }
 
+CAPIStatus envoyGoFilterHttpSendPanicReply(void* s, void* details_data, int details_len) {
+  return envoyGoFilterProcessStateHandlerWrapper(
+      s, [details_data, details_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        // Since this is only used for logs we don't need to deep copy.
+        auto details = stringViewFromGoPointer(details_data, details_len);
+        return filter->sendPanicReply(details);
+      });
+}
+
 // unsafe API, without copy memory from c to go.
 CAPIStatus envoyGoFilterHttpGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data,
                                       int* value_len) {
@@ -271,15 +280,6 @@ void envoyGoConfigHttpFinalize(void* c) {
   // finalize phase of the go object.
   auto config = reinterpret_cast<httpConfigInternal*>(c);
   delete config;
-}
-
-CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details_data, int details_len) {
-  return envoyGoFilterHandlerWrapper(
-      r, [details_data, details_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-        // Since this is only used for logs we don't need to deep copy.
-        auto details = stringViewFromGoPointer(details_data, details_len);
-        return filter->sendPanicReply(details);
-      });
 }
 
 CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key_data, int key_len,
