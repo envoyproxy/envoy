@@ -498,6 +498,13 @@ envoy.filters.http.original_src:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.original_src.v3.OriginalSrc
+envoy.filters.http.query_parameter_mutation:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+  type_urls:
+  - envoy.extensions.filters.http.query_parameter_mutation.v3.Config
 envoy.filters.http.ratelimit:
   categories:
   - envoy.filters.http
