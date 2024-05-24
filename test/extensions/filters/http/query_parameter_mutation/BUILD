@@ -41,8 +41,8 @@ envoy_cc_test(
     name = "query_params_evaluator_test",
     srcs = ["query_params_evaluator_test.cc"],
     deps = [
-        "//test/mocks/stream_info:stream_info_mocks",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/query_parameter_mutation:query_params_evaluator_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )

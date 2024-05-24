@@ -6,6 +6,7 @@
 
 #include "envoy/http/query_params.h"
 #include "envoy/stream_info/stream_info.h"
+
 #include "source/common/formatter/substitution_formatter.h"
 
 namespace Envoy {
