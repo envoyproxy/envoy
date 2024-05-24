@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.thrift_to_metadata"],
     deps = [
         "//source/extensions/filters/http/thrift_to_metadata:thrift_to_metadata_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
         "//test/common/stream_info:test_util",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",

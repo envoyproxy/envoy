@@ -16,7 +16,6 @@ option java_outer_classname = "ThriftToMetadataProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/thrift_to_metadata/v3;thrift_to_metadatav3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Thrift-To-Metadata Filter]
 //
@@ -182,6 +181,7 @@ message ThriftToMetadata {
 // Thrift to metadata configuration on a per-route basis, which overrides the global configuration for
 // request rules and responses rules.
 message ThriftToMetadataPerRoute {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
   // The list of rules to apply to http request body to extract thrift metadata.
   repeated Rule request_rules = 1;
 
