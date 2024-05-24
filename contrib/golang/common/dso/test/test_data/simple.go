@@ -43,12 +43,12 @@ func envoyGoFilterMergeHttpPluginConfig(namePtr, nameLen, parentId, childId uint
 }
 
 //export envoyGoFilterOnHttpHeader
-func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64 {
+func envoyGoFilterOnHttpHeader(s *C.processState, endStream, headerNum, headerBytes uint64) uint64 {
 	return 0
 }
 
 //export envoyGoFilterOnHttpData
-func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
+func envoyGoFilterOnHttpData(s *C.processState, endStream, buffer, length uint64) uint64 {
 	return 0
 }
 

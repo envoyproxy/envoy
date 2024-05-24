@@ -272,9 +272,9 @@ bool Filter::doDataGo(ProcessorState& state, Buffer::Instance& data, bool end_st
 
   Buffer::Instance& buffer = state.doDataList.push(data);
 
-  ASSERT(req_ != nullptr);
+  auto s = dynamic_cast<processState*>(&state);
   auto status = dynamic_lib_->envoyGoFilterOnHttpData(
-      req_, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());
+      s, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());
 
   return state.handleDataGolangStatus(static_cast<GolangStatus>(status));
 }

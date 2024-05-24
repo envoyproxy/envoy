@@ -88,6 +88,7 @@ func (f *requestMap) StoreReq(key *C.httpRequest, req *httpRequest) error {
 }
 
 func (f *requestMap) GetReq(key *C.httpRequest) *httpRequest {
+    fmt.Printf("worker_id: %d\n", key.worker_id)
 	return f.requests[key.worker_id][key]
 }
 
