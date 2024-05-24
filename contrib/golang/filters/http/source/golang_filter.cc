@@ -218,9 +218,7 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
           const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders()));
     }
 
-    state.enterLog();
     dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()));
-    state.leaveLog();
   } break;
   default:
     // skip calling with unsupported log types
@@ -232,7 +230,7 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
 
 GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
                                  bool end_stream) {
-  ENVOY_LOG(debug, "golang filter passing data to golang, state: {}, end_stream: {}",
+  ENVOY_LOG(debug, "golang filter passing header to golang, state: {}, end_stream: {}",
             state.stateStr(), end_stream);
 
   initRequest(state);

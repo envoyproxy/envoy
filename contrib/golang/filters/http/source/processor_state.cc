@@ -270,9 +270,6 @@ std::string state2Str(FilterState state) {
 std::string ProcessorState::stateStr() {
   std::string prefix = is_encoding == 1 ? "encoder" : "decoder";
   auto state_str = state2Str(filterState());
-  if ((state & static_cast<int>(FilterState::Logging)) > 0) {
-    return prefix + ":" + state_str + ":Logging";
-  }
   return prefix + ":" + state_str;
 }
 
