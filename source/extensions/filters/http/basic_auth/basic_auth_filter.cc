@@ -43,8 +43,6 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
     users = &route_specific_settings->users();
   }
 
-  original_uri_ = Http::Utility::buildOriginalUri(headers, MaximumUriLength);
-
   auto auth_header = headers.get(Http::CustomHeaders::get().Authorization);
 
   if (auth_header.empty()) {
@@ -102,8 +100,10 @@ Http::FilterHeadersStatus BasicAuthFilter::onDenied(absl::string_view body,
   config_->stats().denied_.inc();
   decoder_callbacks_->sendLocalReply(
       Http::Code::Unauthorized, body,
-      [uri = this->original_uri_](Http::ResponseHeaderMap& headers) {
-        std::string value = absl::StrCat("Basic realm=\"", uri, "\"");
+      [this](Http::ResponseHeaderMap& headers) {
+        const auto request_headers = this->decoder_callbacks_->requestHeaders();
+        std::string uri = Http::Utility::buildOriginalUri(*request_headers, MaximumUriLength);
+        const std::string value = absl::StrCat("Basic realm=\"", uri, "\"");
         headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
       },
       absl::nullopt, response_code_details);

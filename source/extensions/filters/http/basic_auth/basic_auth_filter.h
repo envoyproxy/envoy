@@ -92,8 +92,6 @@ private:
 
   // The callback function.
   FilterConfigConstSharedPtr config_;
-
-  std::string original_uri_;
 };
 
 } // namespace BasicAuth
