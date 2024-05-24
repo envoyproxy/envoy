@@ -36,6 +36,7 @@ INSTANTIATE_TEST_SUITE_P(
         {"localhost:1337/clusters", ClustersParams::Format::Text, Http::Code::OK},
         {"localhsot:1337/clusters?format=text", ClustersParams::Format::Text, Http::Code::OK},
         {"localhost:1337/clusters?format=json", ClustersParams::Format::Json, Http::Code::OK},
+        {"localhost:1337/clusters?format=fail", ClustersParams::Format::Unknown, Http::Code::BadRequest},
     }));
 
 } // namespace

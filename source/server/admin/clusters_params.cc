@@ -10,16 +10,18 @@ namespace Envoy {
 namespace Server {
 
 Http::Code ClustersParams::parse(absl::string_view url, Buffer::Instance& response) {
-  UNREFERENCED_PARAMETER(response);
-
   Http::Utility::QueryParamsMulti query =
       Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(url);
   absl::optional<std::string> optional_format = query.getFirstValue("format");
   if (optional_format.has_value()) {
     if (*optional_format == "json") {
       format_ = Format::Json;
-    } else {
+    } else if (*optional_format == "text") {
       format_ = Format::Text;
+    } else {
+      response.addFragments({"invalid format ", *optional_format});
+      format_ = Format::Unknown;
+      return Http::Code::BadRequest;
     }
   }
   return Http::Code::OK;
