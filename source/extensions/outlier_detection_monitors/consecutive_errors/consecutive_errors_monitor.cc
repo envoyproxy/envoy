@@ -11,10 +11,9 @@ namespace Outlier {
 bool ConsecutiveErrorsMonitor::onError() {
   uint32_t expected_count = counter_.load();
 
-  while (!counter_.compare_exchange_strong(expected_count, expected_count + 1)) {
-    // no-op. Just keep executing compare_exchange_strong until threads synchronize.
+  // no-op. Just keep executing compare_exchange_strong until threads synchronize.
+  while (!counter_.compare_exchange_strong(expected_count, expected_count + 1))
     ;
-  }
 
   // The counter_ value may go above max_, but only one thread will see
   // that counter_ reached max_ and will report it.
