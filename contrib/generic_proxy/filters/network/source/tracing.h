@@ -27,7 +27,7 @@ public:
   void remove(absl::string_view key) override;
 
 private:
-  StreamRequest& request_;
+  RequestHeaderFrame& request_;
 };
 
 } // namespace GenericProxy

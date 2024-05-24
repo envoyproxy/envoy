@@ -329,7 +329,8 @@ public:
     }
 
     // Check flags for the command.
-    CommandSyntaxChecker::verifySyntax((*it).second.first, command, sub_command, max_length);
+    THROW_IF_NOT_OK(
+        CommandSyntaxChecker::verifySyntax((*it).second.first, command, sub_command, max_length));
 
     // Create a pointer to the formatter by calling a function
     // associated with formatter's name.

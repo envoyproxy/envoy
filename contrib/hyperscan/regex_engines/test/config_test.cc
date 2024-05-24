@@ -31,7 +31,7 @@ TEST_F(ConfigTest, IncompatibleArchitecture) {
 TEST_F(ConfigTest, Regex) {
   setup();
 
-  Envoy::Regex::CompiledMatcherPtr matcher = engine_->matcher("^/asdf/.+");
+  Envoy::Regex::CompiledMatcherPtr matcher = engine_->matcher("^/asdf/.+").value();
 
   EXPECT_TRUE(matcher->match("/asdf/1"));
   EXPECT_FALSE(matcher->match("/ASDF/1"));

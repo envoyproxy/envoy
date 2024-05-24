@@ -11,8 +11,8 @@
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"
+#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_manager_impl.h"
-#include "source/common/tls/ssl_socket.h"
 #include "source/common/version/version.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 

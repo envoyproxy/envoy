@@ -45,7 +45,9 @@ namespace ExternalProcessing {
   COUNTER(override_message_timeout_received)                                                       \
   COUNTER(override_message_timeout_ignored)                                                        \
   COUNTER(clear_route_cache_ignored)                                                               \
-  COUNTER(clear_route_cache_disabled)
+  COUNTER(clear_route_cache_disabled)                                                              \
+  COUNTER(clear_route_cache_upstream_ignored)                                                      \
+  COUNTER(send_immediate_resp_upstream_ignored)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -148,12 +150,12 @@ public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
                const std::chrono::milliseconds message_timeout,
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
-               const std::string& stats_prefix,
+               const std::string& stats_prefix, bool is_upstream,
                Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
                Server::Configuration::CommonFactoryContext& context)
       : failure_mode_allow_(config.failure_mode_allow()),
-        disable_clear_route_cache_(config.disable_clear_route_cache()),
-        message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
+        route_cache_action_(config.route_cache_action()), message_timeout_(message_timeout),
+        max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()),
         mutation_checker_(config.mutation_rules(), context.regexEngine()),
@@ -163,6 +165,7 @@ public:
         allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
         disallowed_headers_(
             initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
+        is_upstream_(is_upstream),
         untyped_forwarding_namespaces_(
             config.metadata_options().forwarding_namespaces().untyped().begin(),
             config.metadata_options().forwarding_namespaces().untyped().end()),
@@ -174,7 +177,18 @@ public:
             config.metadata_options().receiving_namespaces().untyped().end()),
         expression_manager_(builder, context.localInfo(), config.request_attributes(),
                             config.response_attributes()),
-        immediate_mutation_checker_(context.regexEngine()) {}
+        immediate_mutation_checker_(context.regexEngine()) {
+    if (config.disable_clear_route_cache() &&
+        (route_cache_action_ !=
+         envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
+      ExceptionUtil::throwEnvoyException("disable_clear_route_cache and route_cache_action can not "
+                                         "be set to none-default at the same time.");
+    }
+    if (config.disable_clear_route_cache()) {
+      route_cache_action_ =
+          envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RETAIN;
+    }
+  }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -195,7 +209,10 @@ public:
     return mutation_checker_;
   }
 
-  bool disableClearRouteCache() const { return disable_clear_route_cache_; }
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
+  routeCacheAction() const {
+    return route_cache_action_;
+  }
 
   const std::vector<Matchers::StringMatcherPtr>& allowedHeaders() const { return allowed_headers_; }
   const std::vector<Matchers::StringMatcherPtr>& disallowedHeaders() const {
@@ -205,6 +222,8 @@ public:
   const ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
   const ExpressionManager& expressionManager() const { return expression_manager_; }
+
+  bool isUpstream() const { return is_upstream_; }
 
   const std::vector<std::string>& untypedForwardingMetadataNamespaces() const {
     return untyped_forwarding_namespaces_;
@@ -229,7 +248,8 @@ private:
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
   const bool failure_mode_allow_;
-  const bool disable_clear_route_cache_;
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
+      route_cache_action_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
 
@@ -246,11 +266,11 @@ private:
   const std::vector<Matchers::StringMatcherPtr> allowed_headers_;
   // Empty disallowed_header_ means disallow nothing, i.e, allow all.
   const std::vector<Matchers::StringMatcherPtr> disallowed_headers_;
-
+  // is_upstream_ is true if ext_proc filter is in the upstream filter chain.
+  const bool is_upstream_;
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const std::vector<std::string> untyped_receiving_namespaces_;
-
   const ExpressionManager expression_manager_;
 
   const ImmediateMutationChecker immediate_mutation_checker_;

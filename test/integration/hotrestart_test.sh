@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # In order to get core dumps that can be debugged, uncomment the following line and then run
 # the test using --spawn_strategy=local. (There may be a better way of doing this but this worked

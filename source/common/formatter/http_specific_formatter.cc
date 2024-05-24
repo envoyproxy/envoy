@@ -23,10 +23,11 @@ HttpFormatterContext::HttpFormatterContext(const Http::RequestHeaderMap* request
                                            const Http::ResponseHeaderMap* response_headers,
                                            const Http::ResponseTrailerMap* response_trailers,
                                            absl::string_view local_reply_body,
-                                           AccessLog::AccessLogType log_type)
+                                           AccessLog::AccessLogType log_type,
+                                           const Tracing::Span* active_span)
     : request_headers_(request_headers), response_headers_(response_headers),
       response_trailers_(response_trailers), local_reply_body_(local_reply_body),
-      log_type_(log_type) {}
+      log_type_(log_type), active_span_(active_span) {}
 
 const Http::RequestHeaderMap& HttpFormatterContext::requestHeaders() const {
   return request_headers_ != nullptr ? *request_headers_
@@ -43,6 +44,13 @@ const Http::ResponseTrailerMap& HttpFormatterContext::responseTrailers() const {
 
 absl::string_view HttpFormatterContext::localReplyBody() const { return local_reply_body_; }
 AccessLog::AccessLogType HttpFormatterContext::accessLogType() const { return log_type_; }
+const Tracing::Span& HttpFormatterContext::activeSpan() const {
+  if (active_span_ == nullptr) {
+    return Tracing::NullSpan::instance();
+  }
+
+  return *active_span_;
+}
 
 absl::optional<std::string>
 LocalReplyBodyFormatter::formatWithContext(const HttpFormatterContext& context,
@@ -91,9 +99,9 @@ absl::optional<std::string> HeaderFormatter::format(const Http::HeaderMap& heade
     return absl::nullopt;
   }
 
-  std::string val = std::string(header->value().getStringView());
-  SubstitutionFormatUtils::truncate(val, max_length_);
-  return val;
+  absl::string_view val = header->value().getStringView();
+  val = SubstitutionFormatUtils::truncateStringView(val, max_length_);
+  return std::string(val);
 }
 
 ProtobufWkt::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) const {
@@ -102,9 +110,9 @@ ProtobufWkt::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) 
     return SubstitutionFormatUtils::unspecifiedValue();
   }
 
-  std::string val = std::string(header->value().getStringView());
-  SubstitutionFormatUtils::truncate(val, max_length_);
-  return ValueUtil::stringValue(val);
+  absl::string_view val = header->value().getStringView();
+  val = SubstitutionFormatUtils::truncateStringView(val, max_length_);
+  return ValueUtil::stringValue(std::string(val));
 }
 
 ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
@@ -187,6 +195,25 @@ HeadersByteSizeFormatter::formatValueWithContext(const HttpFormatterContext& con
                                                  const StreamInfo::StreamInfo&) const {
   return ValueUtil::numberValue(extractHeadersByteSize(
       context.requestHeaders(), context.responseHeaders(), context.responseTrailers()));
+}
+
+ProtobufWkt::Value TraceIDFormatter::formatValueWithContext(const HttpFormatterContext& context,
+                                                            const StreamInfo::StreamInfo&) const {
+  auto trace_id = context.activeSpan().getTraceIdAsHex();
+  if (trace_id.empty()) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  return ValueUtil::stringValue(trace_id);
+}
+
+absl::optional<std::string>
+TraceIDFormatter::formatWithContext(const HttpFormatterContext& context,
+                                    const StreamInfo::StreamInfo&) const {
+  auto trace_id = context.activeSpan().getTraceIdAsHex();
+  if (trace_id.empty()) {
+    return absl::nullopt;
+  }
+  return trace_id;
 }
 
 GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view format) {
@@ -382,6 +409,10 @@ HttpBuiltInCommandParser::getKnownFormatters() {
 
            return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
                                                            max_length);
+         }}},
+       {"TRACE_ID",
+        {CommandSyntaxChecker::COMMAND_ONLY, [](const std::string&, absl::optional<size_t>&) {
+           return std::make_unique<TraceIDFormatter>();
          }}}});
 }
 
@@ -397,7 +428,8 @@ FormatterProviderPtr HttpBuiltInCommandParser::parse(const std::string& command,
   }
 
   // Check flags for the command.
-  CommandSyntaxChecker::verifySyntax((*it).second.first, command, subcommand, max_length);
+  THROW_IF_NOT_OK(
+      CommandSyntaxChecker::verifySyntax((*it).second.first, command, subcommand, max_length));
 
   // Create a pointer to the formatter by calling a function
   // associated with formatter's name.

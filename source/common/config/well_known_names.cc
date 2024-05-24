@@ -23,16 +23,16 @@ std::string expandRegex(const std::string& regex) {
               {"<TLS_VERSION>", R"(TLSv\d\.\d)"},
               // A generic name can contain any character except dots.
               {"<TAG_VALUE>", TAG_VALUE_REGEX},
-              // Route names may contain dots in addition to alphanumerics and
-              // dashes with underscores.
-              {"<ROUTE_CONFIG_NAME>", R"([\w-\.]+)"},
+              // Route names may contain dots and slashes in addition to
+              // alphanumerics, underscores, and dashes.
+              {"<ROUTE_CONFIG_NAME>", R"([\w-\./]+)"},
               // Match a prefix that is either a listener plus name or cluster plus name
               {"<LISTENER_OR_CLUSTER_WITH_NAME>", R"((?:listener|cluster)\..*?)"}});
 }
 
 const Regex::CompiledGoogleReMatcher& validTagValueRegex() {
-  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, absl::StrCat("^", TAG_VALUE_REGEX, "$"),
-                         false);
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcherNoSafetyChecks,
+                         absl::StrCat("^", TAG_VALUE_REGEX, "$"));
 }
 
 } // namespace
@@ -206,11 +206,17 @@ TagNameValues::TagNameValues() {
   // connection_limit.(<stat_prefix>.)*
   addTokenized(CONNECTION_LIMIT_PREFIX, "connection_limit.$.**");
 
+  // http.[<stat_prefix>.]rbac.[<optional stat_prefix>]policy.(<policy
+  // name>.).(allowed|shadow_allowed|denied|shadow_denied)
+  addRe2(
+      RBAC_POLICY_NAME,
+      R"(^http\.<TAG_VALUE>\.rbac\.(?:<TAG_VALUE>\.)?policy\.((<TAG_VALUE>)\.)(allowed|shadow_allowed|denied|shadow_denied)$)");
+
   // (<stat_prefix>.).rbac.**
   addTokenized(RBAC_PREFIX, "$.rbac.**");
 
-  // http.<stat_prefix>.rbac.(<rules_stat_prefix>.)*
-  addTokenized(RBAC_HTTP_PREFIX, "http.*.rbac.$.**");
+  // http.<stat_prefix>.rbac.(<rules_stat_prefix>.)* but excluding policy
+  addRe2(RBAC_HTTP_PREFIX, R"(^http\.<TAG_VALUE>\.rbac\.((<TAG_VALUE>)\.).*?)", "", "policy");
 
   // proxy_proto.(versions.v<version_number>.)**
   addRe2(PROXY_PROTOCOL_VERSION, R"(^proxy_proto\.(versions\.v(\d)\.)\w+)", "proxy_proto.versions");

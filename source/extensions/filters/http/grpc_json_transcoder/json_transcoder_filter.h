@@ -141,13 +141,14 @@ private:
 };
 
 using JsonTranscoderConfigSharedPtr = std::shared_ptr<JsonTranscoderConfig>;
+using JsonTranscoderConfigConstSharedPtr = std::shared_ptr<const JsonTranscoderConfig>;
 
 /**
  * The filter instance for gRPC JSON transcoder.
  */
 class JsonTranscoderFilter : public Http::StreamFilter, public Logger::Loggable<Logger::Id::http2> {
 public:
-  JsonTranscoderFilter(const JsonTranscoderConfig& config);
+  JsonTranscoderFilter(const JsonTranscoderConfigConstSharedPtr& config);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -205,7 +206,7 @@ private:
    */
   void maybeExpandBufferLimits();
 
-  const JsonTranscoderConfig& config_;
+  const JsonTranscoderConfigConstSharedPtr config_;
   const JsonTranscoderConfig* per_route_config_{};
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
   TranscoderInputStreamImpl request_in_;

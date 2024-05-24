@@ -18,7 +18,7 @@ class EnvoyEngineSimpleIntegrationTest {
     val countDownLatch = CountDownLatch(1)
     val engine =
       EngineBuilder()
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setOnEngineRunning { countDownLatch.countDown() }
         .build()
@@ -31,7 +31,7 @@ class EnvoyEngineSimpleIntegrationTest {
     val countDownLatch = CountDownLatch(1)
     val engine =
       EngineBuilder()
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setOnEngineRunning { countDownLatch.countDown() }
         .build()

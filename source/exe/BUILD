@@ -158,6 +158,8 @@ envoy_cc_library(
         ":main_common_with_all_extensions_lib",
         # These are compiled as extensions so Envoy Mobile doesn't have to link them in.
         # Envoy requires them.
+        "//source/common/tls:server_context_lib",
+        "//source/extensions/transport_sockets/tls:config",
         "//source/common/listener_manager:listener_manager_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/common/version:version_linkstamp",
@@ -165,6 +167,7 @@ envoy_cc_library(
         # TODO(wbpcode) make this a proper extension
         "//source/extensions/filters/http/match_delegate:config",
         "//source/common/http:rds_lib",
+        "//source/common/router:scoped_rds_lib",
     ] + envoy_select_enable_http3(["//source/common/quic:server_codec_lib"]),
 )
 

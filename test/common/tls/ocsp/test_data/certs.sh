@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Create test certificates and OCSP responses for them for unittests.
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Set the benchmark time to 0 to just verify that the benchmark runs to
 # completion.  We're interacting with two different flag parsers, so the order

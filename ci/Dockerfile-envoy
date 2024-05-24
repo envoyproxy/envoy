@@ -1,5 +1,5 @@
 ARG BUILD_OS=ubuntu
-ARG BUILD_TAG=22.04@sha256:77906da86b60585ce12215807090eb327e7386c8fafb5402369e421f44eff17e
+ARG BUILD_TAG=22.04@sha256:a6d2b38300ce017add71440577d5b0a90460d0e57fd7aec21dd0d1b0761bbfb2
 ARG ENVOY_VRP_BASE_IMAGE=envoy-base
 
 
@@ -54,11 +54,11 @@ FROM envoy AS envoy-tools
 ARG TARGETPLATFORM
 ENV TARGETPLATFORM="${TARGETPLATFORM:-linux/amd64}"
 COPY --chown=0:0 --chmod=755 \
-    "${TARGETPLATFORM}/schema_validator_tool" /usr/local/bin/schema_validator_tool
+    "${TARGETPLATFORM}/schema_validator_tool" "${TARGETPLATFORM}/router_check_tool" /usr/local/bin/
 
 
 # STAGE: envoy-distroless
-FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:0cf184cfdb9ac2878822b15b8917fae5d42fba26da654cd75ab3ed34add0737f AS envoy-distroless
+FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:8a09e5752fb3ab9c9534fcc627eb1f451cd9bcfe66a6b149df62dcb84fb841a6 AS envoy-distroless
 EXPOSE 10000
 ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]

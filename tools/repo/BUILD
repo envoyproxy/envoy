@@ -12,10 +12,13 @@ envoy_py_namespace()
 envoy_pytool_binary(
     name = "notify",
     srcs = ["notify.py"],
+    args = ["$(location //:reviewers.yaml)"],
+    data = ["//:reviewers.yaml"],
     deps = [
         requirement("aio.api.github"),
         requirement("aio.run.runner"),
         requirement("icalendar"),
+        requirement("pyyaml"),
         requirement("slack_sdk"),
     ],
 )

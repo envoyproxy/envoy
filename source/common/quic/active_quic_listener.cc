@@ -31,7 +31,7 @@ ActiveQuicListener::ActiveQuicListener(
     Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, bool kernel_worker_routing,
     const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
-    uint32_t packets_to_read_to_connection_count_ratio,
+    uint32_t packets_to_read_to_connection_count_ratio, bool receive_ecn,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector)
@@ -65,6 +65,24 @@ ActiveQuicListener::ActiveQuicListener(
                                    quic::QuicCryptoServerConfig::ConfigOptions());
   auto alarm_factory =
       std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
+  // Set the socket to report incoming ECN.
+  if (receive_ecn) {
+    if (udp_listener_->localAddress() == nullptr ||
+        udp_listener_->localAddress()->ip() == nullptr) {
+      IS_ENVOY_BUG("UDP Listener does not have local IP address");
+    } else {
+      int optval = 1;
+      socklen_t optlen = sizeof(optval);
+      if (udp_listener_->localAddress()->ip()->ipv6() != nullptr) {
+        listen_socket_.setSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, optlen);
+        if (!udp_listener_->localAddress()->ip()->ipv6()->v6only()) {
+          listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
+        }
+      } else {
+        listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
+      }
+    }
+  }
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
@@ -117,7 +135,8 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
   quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
                                   /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
-                                  /*owns_header_buffer*/ false);
+                                  /*owns_header_buffer*/ false,
+                                  getQuicEcnCodepointFromTosByte(data.tos_));
   if (!quic_dispatcher_->processPacket(self_address, peer_address, packet)) {
     if (non_dispatched_udp_packet_handler_.has_value()) {
       non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
@@ -221,6 +240,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)),
+      receive_ecn_(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")),
       context_(context) {
   const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
@@ -324,22 +344,37 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
     Network::ListenerConfig& config) {
   ASSERT(crypto_server_stream_factory_.has_value());
   if (server_preferred_address_config_ != nullptr) {
-    std::pair<quic::QuicSocketAddress, quic::QuicSocketAddress> addresses =
+    const EnvoyQuicServerPreferredAddressConfig::Addresses addresses =
         server_preferred_address_config_->getServerPreferredAddresses(
             listen_socket_ptr->connectionInfoProvider().localAddress());
-    quic::QuicSocketAddress v4_address = addresses.first;
-    if (v4_address.IsInitialized()) {
-      ENVOY_BUG(v4_address.host().address_family() == quiche::IpAddressFamily::IP_V4,
+    if (addresses.ipv4_.IsInitialized()) {
+      ENVOY_BUG(addresses.ipv4_.host().address_family() == quiche::IpAddressFamily::IP_V4,
                 absl::StrCat("Configured IPv4 server's preferred address isn't a v4 address:",
-                             v4_address.ToString()));
-      quic_config_.SetIPv4AlternateServerAddressToSend(v4_address);
+                             addresses.ipv4_.ToString()));
+      if (addresses.dnat_ipv4_.IsInitialized()) {
+        ENVOY_BUG(
+            addresses.dnat_ipv4_.host().address_family() == quiche::IpAddressFamily::IP_V4,
+            absl::StrCat("Configured IPv4 server's preferred DNAT address isn't a v4 address:",
+                         addresses.dnat_ipv4_.ToString()));
+        quic_config_.SetIPv4AlternateServerAddressForDNat(addresses.ipv4_, addresses.dnat_ipv4_);
+      } else {
+        quic_config_.SetIPv4AlternateServerAddressToSend(addresses.ipv4_);
+      }
     }
-    quic::QuicSocketAddress v6_address = addresses.second;
-    if (v6_address.IsInitialized()) {
-      ENVOY_BUG(v6_address.host().address_family() == quiche::IpAddressFamily::IP_V6,
+
+    if (addresses.ipv6_.IsInitialized()) {
+      ENVOY_BUG(addresses.ipv6_.host().address_family() == quiche::IpAddressFamily::IP_V6,
                 absl::StrCat("Configured IPv6 server's preferred address isn't a v6 address:",
-                             v4_address.ToString()));
-      quic_config_.SetIPv6AlternateServerAddressToSend(v6_address);
+                             addresses.ipv6_.ToString()));
+      if (addresses.dnat_ipv6_.IsInitialized()) {
+        ENVOY_BUG(
+            addresses.dnat_ipv6_.host().address_family() == quiche::IpAddressFamily::IP_V6,
+            absl::StrCat("Configured IPv6 server's preferred DNAT address isn't a v6 address:",
+                         addresses.dnat_ipv6_.ToString()));
+        quic_config_.SetIPv6AlternateServerAddressForDNat(addresses.ipv6_, addresses.dnat_ipv6_);
+      } else {
+        quic_config_.SetIPv6AlternateServerAddressToSend(addresses.ipv6_);
+      }
     }
   }
 
@@ -364,8 +399,8 @@ ActiveQuicListenerFactory::createActiveQuicListener(
   return std::make_unique<ActiveQuicListener>(
       runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
-      packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
-      std::move(cid_generator), worker_selector_);
+      packets_to_read_to_connection_count_ratio, receive_ecn_, crypto_server_stream_factory,
+      proof_source_factory, std::move(cid_generator), worker_selector_);
 }
 
 } // namespace Quic

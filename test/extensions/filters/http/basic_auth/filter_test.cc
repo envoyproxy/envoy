@@ -143,6 +143,47 @@ TEST_F(FilterTest, ExistingUsernameHeader) {
   EXPECT_EQ("user1", request_headers_user1.get_("x-username"));
 }
 
+TEST_F(FilterTest, BasicAuthPerRouteDefaultSettings) {
+  Http::TestRequestHeaderMapImpl empty_request_headers;
+  UserMap empty_users;
+  FilterConfigPerRoute basic_auth_per_route(std::move(empty_users));
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(testing::Return(&basic_auth_per_route));
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
+                           std::function<void(Http::ResponseHeaderMap & headers)>,
+                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                           absl::string_view details) {
+        EXPECT_EQ(Http::Code::Unauthorized, code);
+        EXPECT_EQ("User authentication failed. Missing username and password.", body);
+        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(details, "no_credential_for_basic_auth");
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(empty_request_headers, true));
+}
+
+TEST_F(FilterTest, BasicAuthPerRouteEnabled) {
+  UserMap users_for_route;
+  users_for_route.insert({"admin", {"admin", "0DPiKuNIrrVmD8IUCuw1hQxNqZc="}}); // admin:admin
+  FilterConfigPerRoute basic_auth_per_route(std::move(users_for_route));
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(testing::Return(&basic_auth_per_route));
+
+  Http::TestRequestHeaderMapImpl valid_credentials{{"Authorization", "Basic YWRtaW46YWRtaW4="}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(valid_credentials, true));
+
+  Http::TestRequestHeaderMapImpl invalid_credentials{{"Authorization", "Basic dXNlcjE6dGVzdDE="}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(invalid_credentials, true));
+}
+
 } // namespace BasicAuth
 } // namespace HttpFilters
 } // namespace Extensions

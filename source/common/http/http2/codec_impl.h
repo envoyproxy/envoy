@@ -86,13 +86,12 @@ public:
 
   // Returns a new HTTP/2 session to be used with |connection|.
   virtual std::unique_ptr<http2::adapter::Http2Adapter>
-  create(const nghttp2_session_callbacks* callbacks, ConnectionImplType* connection,
+  create(ConnectionImplType* connection,
          const http2::adapter::OgHttp2Adapter::Options& options) PURE;
 
   // Returns a new HTTP/2 session to be used with |connection|.
-  virtual std::unique_ptr<http2::adapter::Http2Adapter>
-  create(const nghttp2_session_callbacks* callbacks, ConnectionImplType* connection,
-         const nghttp2_option* options) PURE;
+  virtual std::unique_ptr<http2::adapter::Http2Adapter> create(ConnectionImplType* connection,
+                                                               const nghttp2_option* options) PURE;
 
   // Initializes the |session|.
   virtual void init(ConnectionImplType* connection,
@@ -102,11 +101,10 @@ public:
 class ProdNghttp2SessionFactory : public Http2SessionFactory {
 public:
   std::unique_ptr<http2::adapter::Http2Adapter>
-  create(const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
+  create(ConnectionImpl* connection,
          const http2::adapter::OgHttp2Adapter::Options& options) override;
 
-  std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks* callbacks,
-                                                       ConnectionImpl* connection,
+  std::unique_ptr<http2::adapter::Http2Adapter> create(ConnectionImpl* connection,
                                                        const nghttp2_option* options) override;
 
   void init(ConnectionImpl* connection,
@@ -159,25 +157,8 @@ public:
   ExecutionContext* executionContext() const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
-  bool skipCallbackVisitor() const { return skip_callback_visitor_; }
-
 protected:
   friend class ProdNghttp2SessionFactory;
-
-  /**
-   * Wrapper for static nghttp2 callback dispatchers.
-   */
-  // TODO: remove when removing `envoy.reloadable_features.http2_skip_callback_visitor`.
-  class Http2Callbacks {
-  public:
-    Http2Callbacks();
-    ~Http2Callbacks();
-
-    const nghttp2_session_callbacks* callbacks() { return callbacks_; }
-
-  private:
-    nghttp2_session_callbacks* callbacks_;
-  };
 
   /**
    * This class handles protocol events from the codec layer.
@@ -340,14 +321,6 @@ protected:
     // This code assumes that details is a static string, so that we
     // can avoid copying it.
     void setDetails(absl::string_view details) {
-      // TODO(asraa): In some cases nghttp2's error handling may cause processing of multiple
-      // invalid frames for a single stream. If a temporal stream error is returned from a callback,
-      // remaining frames in the buffer will still be partially processed. For example, remaining
-      // frames will still parse through nghttp2's push promise error handling and in
-      // onBeforeFrame(Send/Received) callbacks, which may return invalid frame errors and attempt
-      // to set details again. In these cases, we simply do not overwrite details. When internal
-      // error latching is implemented in the codec for exception removal, we should prevent calling
-      // setDetails in an error state.
       if (details_.empty()) {
         details_ = details;
       }
@@ -716,9 +689,6 @@ protected:
   // Whether to use the new HTTP/2 library.
   bool use_oghttp2_library_;
 
-  // TODO: remove when removing `envoy.reloadable_features.http2_skip_callback_visitor`.
-  static Http2Callbacks http2_callbacks_;
-
   // If deferred processing, the streams will be in LRU order based on when the
   // stream encoded to the http2 connection. The LRU property is used when
   // raising low watermark on the http2 connection to prioritize how streams get
@@ -785,7 +755,6 @@ private:
   Status onGoAway(uint32_t error_code);
   Status onHeaders(int32_t stream_id, size_t length, uint8_t flags);
   Status onRstStream(int32_t stream_id, uint32_t error_code);
-  Status onFrameReceived(const nghttp2_frame* frame);
   int onBeforeFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   int onFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
                   uint32_t error_code);
@@ -826,9 +795,6 @@ private:
   std::chrono::milliseconds keepalive_interval_;
   std::chrono::milliseconds keepalive_timeout_;
   uint32_t keepalive_interval_jitter_percent_;
-
-  const bool skip_callback_visitor_ =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_skip_callback_visitor");
 };
 
 /**

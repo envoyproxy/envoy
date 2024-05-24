@@ -272,7 +272,7 @@ TEST(DefaultCertValidatorTest, WithVerifyDepth) {
   X509_STORE_add_cert(storep, ca_cert.get());
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), storep, cert.get(), intermediates));
 
-  default_validator->addClientValidationContext(ssl_ctx.get(), false);
+  ASSERT_TRUE(default_validator->addClientValidationContext(ssl_ctx.get(), false).ok());
   X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(store_ctx.get()),
                          SSL_CTX_get0_param(ssl_ctx.get()));
 
@@ -291,7 +291,7 @@ TEST(DefaultCertValidatorTest, WithVerifyDepth) {
   X509_STORE_add_cert(storep, ca_cert.get());
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), storep, cert.get(), intermediates));
 
-  default_validator->addClientValidationContext(ssl_ctx.get(), false);
+  ASSERT_TRUE(default_validator->addClientValidationContext(ssl_ctx.get(), false).ok());
   X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(store_ctx.get()),
                          SSL_CTX_get0_param(ssl_ctx.get()));
 
@@ -350,8 +350,8 @@ TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
   auto validator =
       std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
   auto ctx = std::vector<SSL_CTX*>();
-  EXPECT_THROW_WITH_REGEX(validator->initializeSslContexts(ctx, false), EnvoyException,
-                          "Failed to create string SAN matcher of type.*");
+  EXPECT_THAT(validator->initializeSslContexts(ctx, false).status().message(),
+              testing::ContainsRegex("Failed to create string SAN matcher of type.*"));
 }
 
 TEST(DefaultCertValidatorTest, TestInitializeSslContextFailure) {
@@ -368,8 +368,8 @@ TEST(DefaultCertValidatorTest, TestInitializeSslContextFailure) {
   auto validator =
       std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
   auto ctx = std::vector<SSL_CTX*>();
-  EXPECT_THROW_WITH_REGEX(validator->initializeSslContexts(ctx, false), EnvoyException,
-                          "Failed to load trusted CA certificates from.*");
+  EXPECT_THAT(validator->initializeSslContexts(ctx, false).status().message(),
+              testing::ContainsRegex("Failed to load trusted CA certificates from.*"));
 }
 
 } // namespace Tls

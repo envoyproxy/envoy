@@ -261,6 +261,7 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
             name: validation_context
             sds_config:
               resource_api_version: V3
+              initial_fetch_timeout: 5s
               ads: {}
   )EOF",
                             sds_transport_socket);
@@ -268,27 +269,32 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   *cluster.mutable_transport_socket() = sds_transport_socket;
   cluster.set_name("cluster_0");
 
-  // Initial * Delta ADS subscription
+  // Initial * Delta ADS subscription.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster}, {}, "1");
 
-  // The cluster needs this secret, so it's going to request it
+  // The cluster needs this secret, so it's going to request it.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}, {}));
 
-  // Ack the original CDS sub
+  // Cluster should start off warming as the secret is being requested.
+  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
+
+  // Ack the original CDS sub.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
 
-  // Before we send the secret, we'll send a delta removal to make sure we don't get a NACK
+  // Before we send the secret, we'll send a delta removal to make sure we don't get a NACK.
   sendDeltaDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
-      sds_type_url, {}, {"validation_context"}, "2");
+      sds_type_url, {}, {"validation_context"}, "1");
 
-  // Ack the removal
+  // The cluster shouldn't be warming anymore since the server signaled
+  // that the requested resource doesn't exist.
+  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
+
+  // Ack the original LDS subscription.
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(lds_type_url, {}, {}));
+
+  // Ack the removal itself.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
-
-  // Cluster should still be warming
-  test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
 
   envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
@@ -301,27 +307,23 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
                                             "test/config/integration/certs/upstreamcacert.pem")),
                             validation_context);
 
-  // Now actually send the secret
+  // Now actually send the secret.
   sendDeltaDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
       sds_type_url, {validation_context}, {}, "2");
 
-  // we're no longer warming
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  // Ack the original LDS (now that the cluster is warmed?)
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(lds_type_url, {}, {}));
-  // Ack the secret we just sent
+  // Ack the secret we just sent.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
 
-  // Remove the cluster that owns the secret
+  // Remove the cluster that owns the secret.
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {"cluster_0"},
                                                                   "1");
-  // Follow that up with a secret removal
+  // Follow that up with a secret removal.
   sendDeltaDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
       sds_type_url, {}, {"validation_context"}, "3");
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
-  // Ack the CDS removal
+  // Ack the CDS removal.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
-  // Should be an ACK, not a NACK since the SDS removal is ignored
+  // Should be an ACK, not a NACK since the SDS removal is ignored.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
 }
 

@@ -73,7 +73,7 @@ public:
   void log(SystemTime timestamp, const std::string& event) override;
 
   void injectContext(Tracing::TraceContext& trace_context,
-                     const Upstream::HostDescriptionConstSharedPtr&) override;
+                     const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
                               SystemTime start_time) override;
 
@@ -83,8 +83,7 @@ public:
   void setBaggage(absl::string_view, absl::string_view) override;
   std::string getBaggage(absl::string_view) override;
 
-  // TODO: This method is unimplemented for Zipkin.
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+  std::string getTraceIdAsHex() const override { return span_.traceIdAsHexString(); };
 
   /**
    * @return a reference to the Zipkin::Span object.

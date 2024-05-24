@@ -36,7 +36,7 @@ public:
 
   void setup(std::string response_filename) {
     auto der_response = readFile(response_filename);
-    response_ = std::make_unique<OcspResponseWrapper>(der_response, time_system_);
+    response_ = OcspResponseWrapper::create(der_response, time_system_).value();
     EXPECT_EQ(response_->rawBytes(), der_response);
   }
 
@@ -107,8 +107,8 @@ TEST_F(OcspFullResponseParsingTest, ResponderIdKeyHashTest) {
 
 TEST_F(OcspFullResponseParsingTest, MultiCertResponseTest) {
   auto resp_bytes = readFile("multiple_cert_ocsp_resp.der");
-  EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response(resp_bytes, time_system_), EnvoyException,
-                            "OCSP Response must be for one certificate only");
+  EXPECT_EQ(OcspResponseWrapper::create(resp_bytes, time_system_).status().message(),
+            "OCSP Response must be for one certificate only");
 }
 
 TEST_F(OcspFullResponseParsingTest, UnsuccessfulResponseTest) {
@@ -119,8 +119,8 @@ TEST_F(OcspFullResponseParsingTest, UnsuccessfulResponseTest) {
       0xau, 1, 2,
       // no response bytes
   };
-  EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response(data, time_system_), EnvoyException,
-                            "OCSP response was unsuccessful");
+  EXPECT_EQ(OcspResponseWrapper::create(data, time_system_).status().message(),
+            "OCSP response was unsuccessful");
 }
 
 TEST_F(OcspFullResponseParsingTest, NoResponseBodyTest) {
@@ -131,8 +131,8 @@ TEST_F(OcspFullResponseParsingTest, NoResponseBodyTest) {
       0xau, 1, 0,
       // no response bytes
   };
-  EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response(data, time_system_), EnvoyException,
-                            "OCSP response has no body");
+  EXPECT_EQ(OcspResponseWrapper::create(data, time_system_).status().message(),
+            "OCSP response has no body");
 }
 
 TEST_F(OcspFullResponseParsingTest, OnlyOneResponseInByteStringTest) {
@@ -140,16 +140,16 @@ TEST_F(OcspFullResponseParsingTest, OnlyOneResponseInByteStringTest) {
   auto resp2_bytes = readFile("revoked_ocsp_resp.der");
   resp_bytes.insert(resp_bytes.end(), resp2_bytes.begin(), resp2_bytes.end());
 
-  EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response_wrapper(resp_bytes, time_system_),
-                            EnvoyException, "Data contained more than a single OCSP response");
+  EXPECT_EQ(OcspResponseWrapper::create(resp_bytes, time_system_).status().message(),
+            "Data contained more than a single OCSP response");
 }
 
 TEST_F(OcspFullResponseParsingTest, ParseOcspResponseWrongTagTest) {
   auto resp_bytes = readFile("good_ocsp_resp.der");
   // Change the SEQUENCE tag to an `OCTETSTRING` tag
   resp_bytes[0] = 0x4u;
-  EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response_wrapper(resp_bytes, time_system_),
-                            EnvoyException, "OCSP Response is not a well-formed ASN.1 SEQUENCE");
+  EXPECT_EQ(OcspResponseWrapper::create(resp_bytes, time_system_).status().message(),
+            "OCSP Response is not a well-formed ASN.1 SEQUENCE");
 }
 
 class Asn1OcspUtilityTest : public testing::Test {
@@ -159,13 +159,19 @@ public:
     CBS cbs;
     CBS_init(&cbs, asn1_enum.data(), asn1_enum.size());
 
-    EXPECT_EQ(expected, Asn1OcspUtility::parseResponseStatus(cbs));
+    EXPECT_EQ(expected, Asn1OcspUtility::parseResponseStatus(cbs).value());
   }
 
   void expectThrowOnWrongTag(std::function<void(CBS&)> parse) {
     CBS cbs;
     CBS_init(&cbs, asn1_true.data(), asn1_true.size());
     EXPECT_THROW(parse(cbs), EnvoyException);
+  }
+
+  template <class T> void expectFailOnWrongTag(std::function<absl::StatusOr<T>(CBS&)> parse) {
+    CBS cbs;
+    CBS_init(&cbs, asn1_true.data(), asn1_true.size());
+    EXPECT_FALSE(parse(cbs).status().ok());
   }
 
   const std::vector<uint8_t> asn1_true = {0x1u, 1, 0xff};
@@ -181,12 +187,12 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseStatusTest) {
 }
 
 TEST_F(Asn1OcspUtilityTest, ParseMethodWrongTagTest) {
-  expectThrowOnWrongTag(Asn1OcspUtility::parseResponseBytes);
-  expectThrowOnWrongTag(Asn1OcspUtility::parseBasicOcspResponse);
-  expectThrowOnWrongTag(Asn1OcspUtility::parseResponseData);
-  expectThrowOnWrongTag(Asn1OcspUtility::parseSingleResponse);
-  expectThrowOnWrongTag(Asn1OcspUtility::parseCertId);
-  expectThrowOnWrongTag(Asn1OcspUtility::parseResponseStatus);
+  expectFailOnWrongTag<ResponsePtr>(Asn1OcspUtility::parseResponseBytes);
+  expectFailOnWrongTag<std::unique_ptr<BasicOcspResponse>>(Asn1OcspUtility::parseBasicOcspResponse);
+  expectFailOnWrongTag<ResponseData>(Asn1OcspUtility::parseResponseData);
+  expectFailOnWrongTag<SingleResponse>(Asn1OcspUtility::parseSingleResponse);
+  expectFailOnWrongTag<CertId>(Asn1OcspUtility::parseCertId);
+  expectFailOnWrongTag<OcspResponseStatus>(Asn1OcspUtility::parseResponseStatus);
 }
 
 TEST_F(Asn1OcspUtilityTest, ParseResponseDataUnsupportedVersionTest) {
@@ -198,8 +204,8 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseDataUnsupportedVersionTest) {
   std::vector<uint8_t> data = {0x30, 0x05, 0xa0, 0x03, 0x02, 0x01, 0x01};
   CBS cbs;
   CBS_init(&cbs, data.data(), data.size());
-  EXPECT_THROW_WITH_MESSAGE(Asn1OcspUtility::parseResponseData(cbs), EnvoyException,
-                            "OCSP ResponseData version 0x01 is not supported");
+  EXPECT_EQ(Asn1OcspUtility::parseResponseData(cbs).status().message(),
+            "OCSP ResponseData version 0x01 is not supported");
 }
 
 TEST_F(Asn1OcspUtilityTest, ParseResponseDataBadResponderIdVariantTest) {
@@ -214,8 +220,8 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseDataBadResponderIdVariantTest) {
   };
   CBS cbs;
   CBS_init(&cbs, data.data(), data.size());
-  EXPECT_THROW_WITH_MESSAGE(Asn1OcspUtility::parseResponseData(cbs), EnvoyException,
-                            "Unknown choice for Responder ID: 3");
+  EXPECT_EQ(Asn1OcspUtility::parseResponseData(cbs).status().message(),
+            "Unknown choice for Responder ID: 3");
 }
 
 TEST_F(Asn1OcspUtilityTest, ParseOcspResponseBytesMissingTest) {
@@ -228,7 +234,7 @@ TEST_F(Asn1OcspUtilityTest, ParseOcspResponseBytesMissingTest) {
   };
   CBS cbs;
   CBS_init(&cbs, data.data(), data.size());
-  auto response = Asn1OcspUtility::parseOcspResponse(cbs);
+  auto response = Asn1OcspUtility::parseOcspResponse(cbs).value();
   EXPECT_EQ(response->status_, OcspResponseStatus::InternalError);
   EXPECT_TRUE(response->response_ == nullptr);
 }
@@ -237,8 +243,8 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseStatusUnknownVariantTest) {
   std::vector<uint8_t> bad_enum_variant = {0xau, 1, 4};
   CBS cbs;
   CBS_init(&cbs, bad_enum_variant.data(), bad_enum_variant.size());
-  EXPECT_THROW_WITH_MESSAGE(Asn1OcspUtility::parseResponseStatus(cbs), EnvoyException,
-                            "Unknown OCSP Response Status variant: 4");
+  EXPECT_EQ(Asn1OcspUtility::parseResponseStatus(cbs).status().message(),
+            "Unknown OCSP Response Status variant: 4");
 }
 
 TEST_F(Asn1OcspUtilityTest, ParseResponseBytesNoOctetStringTest) {
@@ -260,8 +266,8 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseBytesNoOctetStringTest) {
   CBS_init(&cbs, buf, buf_len);
   bssl::UniquePtr<uint8_t> scoped(buf);
 
-  EXPECT_THROW_WITH_MESSAGE(Asn1OcspUtility::parseResponseBytes(cbs), EnvoyException,
-                            "Expected ASN.1 OCTETSTRING for response");
+  EXPECT_EQ(Asn1OcspUtility::parseResponseBytes(cbs).status().message(),
+            "Expected ASN.1 OCTETSTRING for response");
 }
 
 TEST_F(Asn1OcspUtilityTest, ParseResponseBytesUnknownResponseTypeTest) {
@@ -283,8 +289,8 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseBytesUnknownResponseTypeTest) {
   CBS_init(&cbs, buf, buf_len);
   bssl::UniquePtr<uint8_t> scoped(buf);
 
-  EXPECT_THROW_WITH_MESSAGE(Asn1OcspUtility::parseResponseBytes(cbs), EnvoyException,
-                            "Unknown OCSP Response type with OID: 1.1.1.1.1.1.1");
+  EXPECT_EQ(Asn1OcspUtility::parseResponseBytes(cbs).status().message(),
+            "Unknown OCSP Response type with OID: 1.1.1.1.1.1.1");
 }
 
 } // namespace

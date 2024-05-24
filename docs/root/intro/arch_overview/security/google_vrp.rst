@@ -22,13 +22,13 @@ to be eligible for the program:
    :ref:`execution environment <arch_overview_google_vrp_ee>` and be consistent with the
    program's :ref:`threat model <arch_overview_google_vrp_threat_model>`.
 
-2. Vulnerabilities must be reported to envoy-security@googlegroups.com and be kept under embargo
-   while triage and potential security releases occur. Please follow the :repo:`disclosure guidance
-   <SECURITY.md#disclosures>` when submitting reports. Disclosure SLOs are documented :repo:`here
-   <SECURITY.md#fix-and-disclosure-slos>`. In general, security disclosures are subject to the
-   `Linux Foundation's privacy policy <https://www.linuxfoundation.org/privacy/>`_ with the added
-   proviso that VRP reports (including reporter e-mail address and name) may be freely shared with
-   Google for VRP purposes.
+2. Vulnerabilities must be reported to **both** envoy-security@googlegroups.com and via https://bughunters.google.com/report.
+   Vulenrabilities must be kept under embargo while triage and potential security releases occur.
+   Please follow the :repo:`disclosure guidance <SECURITY.md#disclosures>` when submitting reports.
+   Disclosure SLOs are documented :repo:`here <SECURITY.md#fix-and-disclosure-slos>`. In general,
+   security disclosures are subject to the `Linux Foundation's privacy policy
+   <https://www.linuxfoundation.org/privacy/>`_ with the added proviso that VRP reports (including
+   reporter e-mail address and name) may be freely shared with Google for VRP purposes.
 
 3. Vulnerabilities must not be previously known in a public forum, e.g. GitHub issues trackers,
    CVE databases (when previously associated with Envoy), etc. Existing CVEs that have not been
@@ -41,6 +41,8 @@ Rewards are at the discretion of the Envoy OSS security team and Google. They wi
 the above criteria. If multiple instances of the same vulnerability are reported at the same time by
 independent researchers or the vulnerability is already tracked under embargo by the OSS Envoy
 security team, we will aim to fairly divide the reward amongst reporters.
+
+Rewards should be claimed from Google VRP following the corresponding Envoy security release.
 
 .. _arch_overview_google_vrp_threat_model:
 

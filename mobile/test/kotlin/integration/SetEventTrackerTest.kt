@@ -22,7 +22,7 @@ class SetEventTrackerTest {
     val countDownLatch = CountDownLatch(1)
     val engine =
       EngineBuilder()
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setEventTracker { events ->
           for (entry in events) {

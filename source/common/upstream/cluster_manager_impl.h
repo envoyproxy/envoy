@@ -246,17 +246,9 @@ class ClusterManagerImpl : public ClusterManager,
                            public MissingClusterNotifier,
                            Logger::Loggable<Logger::Id::upstream> {
 public:
-  // Initializes the ClusterManagerImpl instance based on the given Bootstrap config.
-  //
-  // This method *must* be called prior to invoking any other methods on the class and *must* only
-  // be called once. This method should be called immediately after ClusterManagerImpl construction
-  // and from the same thread in which the ClusterManagerImpl was constructed.
-  //
-  // The initialization is separated from the constructor because lots of work, including ADS
-  // initialization, is done in this method. If the contents of this method are invoked during
-  // construction, a derived class cannot override any of the virtual methods and have them invoked
-  // instead, since the base class's methods are used when in a base class constructor.
-  absl::Status init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
+
+  bool initialized() override { return initialized_; }
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
@@ -637,9 +629,8 @@ private:
       // Don't change the order of cluster_info_ and lb_factory_/lb_ as the the lb_factory_/lb_
       // may keep a reference to the cluster_info_.
       ClusterInfoConstSharedPtr cluster_info_;
-      // LB factory if applicable. Not all load balancer types have a factory. LB types that have
-      // a factory will create a new LB on every membership update. LB types that don't have a
-      // factory will create an LB on construction and use it forever.
+
+      // Factory to create active LB.
       LoadBalancerFactorySharedPtr lb_factory_;
       // Current active LB.
       LoadBalancerPtr lb_;

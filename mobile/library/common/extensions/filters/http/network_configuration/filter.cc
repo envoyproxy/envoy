@@ -7,7 +7,7 @@
 #include "source/common/network/filter_state_proxy_info.h"
 
 #include "library/common/api/external.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/types/c_types.h"
 
@@ -73,7 +73,7 @@ void NetworkConfigurationFilter::onProxyResolutionComplete(
 
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
-  ENVOY_LOG(trace, "NetworkConfigurationFilter::decodeHeaders", request_headers);
+  ENVOY_LOG(trace, "NetworkConfigurationFilter::decodeHeaders: {}", request_headers);
 
   const auto authority = request_headers.getHostValue();
   if (authority.empty()) {
@@ -126,11 +126,11 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
       });
 
   switch (proxy_resolution_result) {
-  case Network::ProxyResolutionResult::NO_PROXY_CONFIGURED:
+  case Network::ProxyResolutionResult::NoProxyConfigured:
     return Http::FilterHeadersStatus::Continue;
-  case Network::ProxyResolutionResult::RESULT_COMPLETED:
+  case Network::ProxyResolutionResult::ResultCompleted:
     return continueWithProxySettings(Network::ProxySettings::create(proxy_settings_));
-  case Network::ProxyResolutionResult::RESULT_IN_PROGRESS:
+  case Network::ProxyResolutionResult::ResultInProgress:
     // `onProxyResolutionComplete` method will be called once the proxy resolution completes
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   }

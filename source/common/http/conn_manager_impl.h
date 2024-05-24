@@ -64,7 +64,8 @@ class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
                               public Network::ConnectionCallbacks,
                               public Http::ApiListener {
 public:
-  ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
+  ConnectionManagerImpl(ConnectionManagerConfigSharedPtr config,
+                        const Network::DrainDecision& drain_close,
                         Random::RandomGenerator& random_generator, Http::Context& http_context,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
@@ -566,7 +567,7 @@ private:
   void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
-  Tracing::Tracer& tracer() { return *config_.tracer(); }
+  Tracing::Tracer& tracer() { return *config_->tracer(); }
   void handleCodecErrorImpl(absl::string_view error, absl::string_view details,
                             StreamInfo::CoreResponseFlag response_flag);
   void handleCodecError(absl::string_view error);
@@ -589,7 +590,7 @@ private:
 
   enum class DrainState { NotDraining, Draining, Closing };
 
-  ConnectionManagerConfig& config_;
+  ConnectionManagerConfigSharedPtr config_;
   ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on
                                   // the config in the hot path.
   ServerConnectionPtr codec_;

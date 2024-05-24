@@ -4,6 +4,7 @@
 #include "envoy/router/cluster_specifier_plugin.h"
 
 #include "source/common/config/datasource.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 
 namespace Envoy {
@@ -75,6 +76,11 @@ public:
                             Server::Configuration::CommonFactoryContext& context);
 
   ~LuaClusterSpecifierConfig() {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.restart_features.allow_slot_destroy_on_worker_threads")) {
+      return;
+    }
+
     // The design of the TLS system does not allow TLS state to be modified in worker threads.
     // However, when the route configuration is dynamically updated via RDS, the old
     // LuaClusterSpecifierConfig object may be destructed in a random worker thread. Therefore, to

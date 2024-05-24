@@ -485,6 +485,33 @@ TEST(UtilityTest, GetGovCloudSTSEndpoints) {
   EXPECT_EQ("sts.us-gov-west-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-west-1"));
 }
 
+TEST(UtilityTest, JsonStringFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"access_key_id\":\"testvalue\"}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration =
+      Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
+  EXPECT_EQ(expiration, "testvalue");
+}
+TEST(UtilityTest, JsonStringNotFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"no_access_key_id\":\"testvalue\"}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration =
+      Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
+  EXPECT_EQ(expiration, "notfound");
+}
+TEST(UtilityTest, JsonIntegerFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":5}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  EXPECT_EQ(expiration, 5);
+}
+TEST(UtilityTest, JsonIntegerNotFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"noexpiration\":5}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  // Should return default value
+  EXPECT_EQ(expiration, 0);
+}
 } // namespace
 } // namespace Aws
 } // namespace Common

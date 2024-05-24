@@ -167,7 +167,7 @@ public:
    * Adds X-Ray trace header to the set of outgoing headers.
    */
   void injectContext(Tracing::TraceContext& trace_context,
-                     const Upstream::HostDescriptionConstSharedPtr&) override;
+                     const Tracing::UpstreamContext&) override;
 
   /**
    * Gets the start time of this Span.

@@ -115,7 +115,11 @@ void vclInterfaceRegisterEpollEvent(Envoy::Event::Dispatcher& dispatcher) {
     return;
   }
   mq_fevts_map[wrk_index] = dispatcher.createFileEvent(
-      vppcom_mq_epoll_fd(), [](uint32_t events) -> void { onMqSocketEvents(events); },
+      vppcom_mq_epoll_fd(),
+      [](uint32_t events) {
+        onMqSocketEvents(events);
+        return absl::OkStatus();
+      },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 
@@ -128,7 +132,11 @@ void vclInterfaceInit(Event::Dispatcher& dispatcher, uint32_t concurrency) {
   epoll_handles.resize(std::max(concurrency, static_cast<uint32_t>(1)) * 2);
   epoll_handles[wrk_index] = vppcom_epoll_create();
   mq_fevts_map[wrk_index] = dispatcher.createFileEvent(
-      vppcom_mq_epoll_fd(), [](uint32_t events) -> void { onMqSocketEvents(events); },
+      vppcom_mq_epoll_fd(),
+      [](uint32_t events) {
+        onMqSocketEvents(events);
+        return absl::OkStatus();
+      },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 

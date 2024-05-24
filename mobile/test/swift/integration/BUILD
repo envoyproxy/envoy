@@ -74,6 +74,7 @@ envoy_mobile_swift_test(
     deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_server",
     ],
 )
 
@@ -105,6 +106,7 @@ envoy_mobile_swift_test(
     deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_server",
     ],
 )
 
@@ -118,6 +120,7 @@ envoy_mobile_swift_test(
     deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_server",
     ],
 )
 
@@ -144,6 +147,7 @@ envoy_mobile_swift_test(
     deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_server",
     ],
 )
 
@@ -157,6 +161,7 @@ envoy_mobile_swift_test(
     deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_server",
     ],
 )
 
@@ -170,6 +175,7 @@ envoy_mobile_swift_test(
     deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_server",
     ],
 )
 
@@ -183,6 +189,7 @@ envoy_mobile_swift_test(
     deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_server",
     ],
 )
 
@@ -196,6 +203,7 @@ envoy_mobile_swift_test(
     deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_server",
     ],
 )
 
@@ -209,6 +217,7 @@ envoy_mobile_swift_test(
     deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_server",
     ],
 )
 

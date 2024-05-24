@@ -46,11 +46,19 @@ responseFlagFromDownstreamReasonReason(DownstreamStreamResetReason reason) {
 
 } // namespace
 
-ActiveStream::ActiveStream(Filter& parent, StreamRequestPtr request)
+ActiveStream::ActiveStream(Filter& parent, RequestHeaderFramePtr request,
+                           absl::optional<StartTime> start_time)
     : parent_(parent), request_stream_(std::move(request)),
       request_stream_end_(request_stream_->frameFlags().endStream()),
       stream_info_(parent_.time_source_,
-                   parent_.callbacks_->connection().connectionInfoProviderSharedPtr()) {
+                   parent_.callbacks_->connection().connectionInfoProviderSharedPtr(),
+                   StreamInfo::FilterState::LifeSpan::FilterChain) {
+  // Override the start time if the codec provides one.
+  if (start_time.has_value()) {
+    stream_info_.start_time_ = start_time.value().start_time;
+    stream_info_.start_time_monotonic_ = start_time.value().start_time_monotonic;
+  };
+
   if (!request_stream_end_) {
     // If the request is not fully received, register the stream to the frame handler map.
     parent_.registerFrameHandler(requestStreamId(), this);
@@ -117,7 +125,7 @@ void ActiveStream::resetStream(DownstreamStreamResetReason reason) {
   parent_.stats_helper_.onRequestReset();
   stream_info_.setResponseFlag(responseFlagFromDownstreamReasonReason(reason));
 
-  parent_.deferredStream(*this);
+  completeRequest();
 }
 
 void ActiveStream::sendResponseStartToDownstream() {
@@ -152,7 +160,7 @@ void ActiveStream::sendRequestFrameToUpstream() {
     return;
   }
 
-  if (request_stream_frame_handler_ == nullptr) {
+  if (request_stream_frames_handler_ == nullptr) {
     // The request stream frame handler is not ready yet.
     return;
   }
@@ -163,7 +171,7 @@ void ActiveStream::sendRequestFrameToUpstream() {
     request_stream_frames_.pop_front();
 
     // Send the frame to upstream.
-    request_stream_frame_handler_->onStreamFrame(std::move(frame));
+    request_stream_frames_handler_->onRequestCommonFrame(std::move(frame));
   }
 }
 
@@ -223,9 +231,9 @@ void ActiveStream::continueDecoding() {
   }
 }
 
-void ActiveStream::onRequestFrame(StreamFramePtr frame) {
-  request_stream_end_ = frame->frameFlags().endStream();
-  request_stream_frames_.emplace_back(std::move(frame));
+void ActiveStream::onRequestFrame(RequestCommonFramePtr request_common_frame) {
+  request_stream_end_ = request_common_frame->frameFlags().endStream();
+  request_stream_frames_.emplace_back(std::move(request_common_frame));
 
   ASSERT(registered_in_frame_handlers_);
   if (request_stream_end_) {
@@ -256,16 +264,16 @@ void ActiveStream::onResponseStart(ResponsePtr response) {
   continueEncoding();
 }
 
-void ActiveStream::onResponseFrame(StreamFramePtr frame) {
-  response_stream_end_ = frame->frameFlags().endStream();
-  response_stream_frames_.emplace_back(std::move(frame));
+void ActiveStream::onResponseFrame(ResponseCommonFramePtr response_common_frame) {
+  response_stream_end_ = response_common_frame->frameFlags().endStream();
+  response_stream_frames_.emplace_back(std::move(response_common_frame));
   // Try to send the frame to downstream immediately.
   sendResponseFrameToDownstream();
 }
 
 void ActiveStream::completeDirectly() {
   response_stream_end_ = true;
-  parent_.deferredStream(*this);
+  completeRequest();
 };
 
 const Network::Connection* ActiveStream::ActiveFilterBase::connection() const {
@@ -310,7 +318,12 @@ void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) 
   ASSERT(response_stream_end_);
   ASSERT(response_stream_frames_.empty());
 
-  parent_.deferredStream(*this);
+  completeRequest();
+}
+
+void ActiveStream::onEncodingFailure(absl::string_view reason) {
+  ENVOY_LOG(error, "Generic proxy: response encoding failure: {}", reason);
+  resetStream(DownstreamStreamResetReason::ProtocolError);
 }
 
 void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
@@ -320,7 +333,16 @@ void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
   std::reverse(encoder_filters_.begin(), encoder_filters_.end());
 }
 
+void ActiveStream::deferredDelete() {
+  if (inserted()) {
+    parent_.callbacks_->connection().dispatcher().deferredDelete(
+        removeFromList(parent_.active_streams_));
+  }
+}
+
 void ActiveStream::completeRequest() {
+  deferredDelete();
+
   if (registered_in_frame_handlers_) {
     parent_.unregisterFrameHandler(requestStreamId());
     registered_in_frame_handlers_ = false;
@@ -353,6 +375,8 @@ void ActiveStream::completeRequest() {
     }
     filter->filter_->onDestroy();
   }
+
+  parent_.mayBeDrainClose();
 }
 
 Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool end_stream) {
@@ -365,33 +389,38 @@ Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool 
   return Envoy::Network::FilterStatus::StopIteration;
 }
 
-void Filter::onDecodingSuccess(StreamFramePtr request) {
-  const uint64_t stream_id = request->frameFlags().streamFlags().streamId();
+void Filter::onDecodingSuccess(RequestHeaderFramePtr request_header_frame,
+                               absl::optional<StartTime> start_time) {
+  const uint64_t stream_id = request_header_frame->frameFlags().streamFlags().streamId();
+
+  if (!frame_handlers_.empty()) { // Quick empty check to avoid the map lookup.
+    if (auto iter = frame_handlers_.find(stream_id); iter != frame_handlers_.end()) {
+      ENVOY_LOG(error, "generic proxy: repetitive stream id: {} at same time", stream_id);
+      onDecodingFailure();
+      return;
+    }
+  }
+
+  newDownstreamRequest(std::move(request_header_frame), std::move(start_time));
+}
+
+void Filter::onDecodingSuccess(RequestCommonFramePtr request_common_frame) {
+  const uint64_t stream_id = request_common_frame->frameFlags().streamFlags().streamId();
   // One existing stream expects this frame.
   if (auto iter = frame_handlers_.find(stream_id); iter != frame_handlers_.end()) {
-    iter->second->onRequestFrame(std::move(request));
+    iter->second->onRequestFrame(std::move(request_common_frame));
     return;
   }
 
-  StreamFramePtrHelper<StreamRequest> helper(std::move(request));
-
-  // Create a new active stream for the leading StreamRequest frame.
-  if (helper.typed_frame_ != nullptr) {
-    newDownstreamRequest(std::move(helper.typed_frame_));
-    return;
-  }
-
-  ASSERT(helper.frame_ != nullptr);
   // No existing stream expects this non-leading frame. It should not happen.
   // We treat it as request decoding failure.
-  ENVOY_LOG(error, "generic proxy: id {} not found for stream frame",
-            helper.frame_->frameFlags().streamFlags().streamId());
+  ENVOY_LOG(error, "generic proxy: id {} not found for stream frame", stream_id);
   onDecodingFailure();
 }
 
-void Filter::onDecodingFailure() {
+void Filter::onDecodingFailure(absl::string_view reason) {
+  ENVOY_LOG(error, "generic proxy: request decoding failure: {}", reason);
   stats_helper_.onRequestDecodingError();
-
   resetDownstreamAllStreams(DownstreamStreamResetReason::ProtocolError);
   closeDownstreamConnection();
 }
@@ -429,30 +458,26 @@ void Filter::registerFrameHandler(uint64_t stream_id, ActiveStream* raw_stream) 
 
 void Filter::unregisterFrameHandler(uint64_t stream_id) { frame_handlers_.erase(stream_id); }
 
-void Filter::newDownstreamRequest(StreamRequestPtr request) {
-  auto stream = std::make_unique<ActiveStream>(*this, std::move(request));
+void Filter::newDownstreamRequest(StreamRequestPtr request, absl::optional<StartTime> start_time) {
+  auto stream = std::make_unique<ActiveStream>(*this, std::move(request), start_time);
   auto raw_stream = stream.get();
   LinkedList::moveIntoList(std::move(stream), active_streams_);
 
-  // Initialize filter chian.
+  // Initialize filter chain.
   raw_stream->initializeFilterChain(*config_);
   // Start request.
   raw_stream->continueDecoding();
 }
 
-void Filter::deferredStream(ActiveStream& stream) {
-  stream.completeRequest();
-
-  if (!stream.inserted()) {
-    return;
-  }
-  callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(active_streams_));
-  mayBeDrainClose();
-}
-
 void Filter::resetDownstreamAllStreams(DownstreamStreamResetReason reason) {
   while (!active_streams_.empty()) {
-    active_streams_.front()->resetStream(reason);
+    auto* stream = active_streams_.front().get();
+    // Remove the stream from the active stream list by the filter self. Although the
+    // resetStream() method will do the same thing. But doing it here could ensure the
+    // stream is removed even if the resetStream() method is not working as expected.
+    // This could ensure this never fall into infinite loop.
+    stream->deferredDelete();
+    stream->resetStream(reason);
   }
 }
 

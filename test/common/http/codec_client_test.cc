@@ -489,7 +489,9 @@ TEST_F(CodecClientTest, ResponseHeaderValidationFailsWithConnectionClosure) {
 class CodecNetworkTest : public Event::TestUsingSimulatedTime,
                          public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource(), nullptr) {
+  CodecNetworkTest()
+      : api_(Api::createApiForTest()),
+        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::Connection) {
     dispatcher_ = api_->allocateDispatcher("test_thread");
     auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));

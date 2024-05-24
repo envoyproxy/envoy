@@ -23,13 +23,13 @@ static_resources:
                 route:
                   cluster: service1
                   request_mirror_policies:
-                    - cluster: "service1-mirror"
+                  - cluster: "service1-mirror"
               - match:
                   prefix: "/service/2"
                 route:
                   cluster: service2
                   request_mirror_policies:
-                    - cluster_header: "x-mirror-cluster"
+                  - cluster_header: "x-mirror-cluster"
 
           http_filters:
           - name: envoy.filters.http.router

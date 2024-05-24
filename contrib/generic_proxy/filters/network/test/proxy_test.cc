@@ -362,6 +362,29 @@ TEST_F(FilterTest, NewStreamAndDispatcher) {
   EXPECT_EQ(&active_stream->decoderFiltersForTest()[0]->dispatcher(), &active_stream->dispatcher());
 }
 
+TEST_F(FilterTest, NewStreamWithStartTime) {
+  mock_stream_filters_.push_back({"mock_0", std::make_shared<NiceMock<MockStreamFilter>>()});
+
+  initializeFilter();
+
+  auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+
+  StartTime start_time;
+  start_time.start_time =
+      std::chrono::time_point<std::chrono::system_clock>(std::chrono::milliseconds(111111111));
+  start_time.start_time_monotonic =
+      std::chrono::time_point<std::chrono::steady_clock>(std::chrono::milliseconds(222222222));
+  filter_->onDecodingSuccess(std::move(request), std::move(start_time));
+
+  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  EXPECT_EQ(111111111LL, std::chrono::duration_cast<std::chrono::milliseconds>(
+                             active_stream->streamInfo().startTime().time_since_epoch())
+                             .count());
+  EXPECT_EQ(222222222LL, std::chrono::duration_cast<std::chrono::milliseconds>(
+                             active_stream->streamInfo().startTimeMonotonic().time_since_epoch())
+                             .count());
+}
+
 TEST_F(FilterTest, OnDecodingFailureWithActiveStreams) {
   initializeFilter();
 
@@ -391,6 +414,37 @@ TEST_F(FilterTest, OnDecodingFailureWithActiveStreams) {
   EXPECT_EQ(
       factory_context_.store_.counter("generic_proxy.test_prefix.downstream_rq_flag.DPE").value(),
       2);
+}
+
+TEST_F(FilterTest, OnEncodingFailureWithActiveStreams) {
+  initializeFilter();
+
+  Buffer::OwnedImpl fake_empty_buffer;
+  EXPECT_CALL(*server_codec_, decode(_, _)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+    auto request_0 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+    auto request_1 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+
+    filter_->onDecodingSuccess(std::move(request_0));
+    filter_->onDecodingSuccess(std::move(request_1));
+  }));
+  filter_->onData(fake_empty_buffer, false);
+
+  EXPECT_EQ(2, filter_->activeStreamsForTest().size());
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 2);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 2);
+
+  // One of stream encoding failed.
+  filter_->activeStreamsForTest().begin()->get()->onEncodingFailure();
+
+  EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 2);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_reset_.value(), 1);
+  EXPECT_EQ(
+      factory_context_.store_.counter("generic_proxy.test_prefix.downstream_rq_flag.DPE").value(),
+      1);
 }
 
 TEST_F(FilterTest, ActiveStreamRouteEntry) {
@@ -792,7 +846,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
   auto mock_decoder_filter_0 = std::make_shared<NiceMock<MockDecoderFilter>>();
   mock_decoder_filters_ = {{"mock_0", mock_decoder_filter_0}};
 
-  NiceMock<MockStreamFrameHandler> mock_stream_frame_handler;
+  NiceMock<MockRequestFramesHandler> mock_stream_frame_handler;
 
   EXPECT_CALL(*mock_decoder_filter_0, setDecoderFilterCallbacks(_))
       .WillOnce(Invoke([&mock_stream_frame_handler](DecoderFilterCallback& callbacks) {
@@ -821,16 +875,16 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
 
   // stream_frame_handler will be called twice to handle the two frames (except the first
   // StreamRequest frame).
-  EXPECT_CALL(mock_stream_frame_handler, onStreamFrame(_)).Times(2);
+  EXPECT_CALL(mock_stream_frame_handler, onRequestCommonFrame(_)).Times(2);
 
-  auto request_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  auto request_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   request_frame_1->stream_frame_flags_ = FrameFlags(StreamFlags(), false);
   filter_->onDecodingSuccess(std::move(request_frame_1));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
   EXPECT_EQ(1, filter_->frameHandlersForTest().size());
 
   // When the last frame is the end stream, we will delete the frame handler.
-  auto request_frame_2 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  auto request_frame_2 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   request_frame_2->stream_frame_flags_ = FrameFlags(StreamFlags(), true);
   filter_->onDecodingSuccess(std::move(request_frame_2));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
@@ -861,7 +915,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
 
   active_stream->onResponseStart(std::move(response));
 
-  auto response_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  auto response_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   response_frame_1->stream_frame_flags_ = FrameFlags(StreamFlags(), true);
 
   active_stream->onResponseFrame(std::move(response_frame_1));

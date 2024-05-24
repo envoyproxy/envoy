@@ -1,13 +1,14 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
 
+set -e
 set -o pipefail
 
 # Checks the absolute size and the relative size increase of a file.
 
-# As of Jan 11, 2024, the latest runs show that the test binary size is
-# 4273716 bytes:
-# https://github.com/envoyproxy/envoy/actions/runs/7497709450/job/20411963750
-MAX_SIZE=4500000 # 4.5MB
+# As of May 7, 2024, the latest runs show that the test binary size is
+# 5413199 bytes:
+# https://github.com/envoyproxy/envoy/actions/runs/8990218789/job/24695250246
+MAX_SIZE=5600000 # 5.6MB
 MAX_PERC=1.5
 
 if [ "$(uname)" == "Darwin" ]
@@ -21,6 +22,7 @@ fi
 PERC=$(bc <<< "scale=2; ($SIZE2 - $SIZE1)/$SIZE1 * 100")
 
 echo "The new binary is $PERC % different in size compared to main."
+echo "The old binary is $SIZE1 bytes."
 echo "The new binary is $SIZE2 bytes."
 
 if [ "$SIZE2" -gt $MAX_SIZE ]

@@ -1,0 +1,16 @@
+
+syntax = "proto3";
+
+package test.common.upstream;
+
+import "validate/validate.proto";
+import "envoy/config/cluster/v3/cluster.proto";
+import "test/extensions/load_balancing_policies/common/zone_aware_load_balancer_fuzz.proto";
+
+message LeastRequestLoadBalancerTestCase {
+  test.common.upstream.ZoneAwareLoadBalancerTestCase zone_aware_load_balancer_test_case = 1
+      [(validate.rules).message.required = true];
+  envoy.config.cluster.v3.Cluster.LeastRequestLbConfig least_request_lb_config = 2;
+  // This is used to determine the requests for each host - will wrap around if runs out of space
+  bytes random_bytestring_for_requests = 3 [(validate.rules).bytes = {min_len: 1, max_len: 2048}];
+}

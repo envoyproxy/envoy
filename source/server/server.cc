@@ -29,7 +29,6 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
@@ -42,12 +41,12 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/router/rds_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/tls/context_manager_impl.h"
@@ -262,9 +261,11 @@ void InstanceBase::updateServerStats() {
                                        parent_stats.parent_memory_allocated_);
   server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
   server_stats_->memory_physical_size_.set(Memory::Stats::totalPhysicalBytes());
-  server_stats_->parent_connections_.set(parent_stats.parent_connections_);
-  server_stats_->total_connections_.set(listener_manager_->numConnections() +
-                                        parent_stats.parent_connections_);
+  if (!options().hotRestartDisabled()) {
+    server_stats_->parent_connections_.set(parent_stats.parent_connections_);
+    server_stats_->total_connections_.set(listener_manager_->numConnections() +
+                                          parent_stats.parent_connections_);
+  }
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires().value_or(0));
 
@@ -432,6 +433,12 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     ENVOY_LOG(info, "  {}: {}", ext.first, absl::StrJoin(ext.second->registeredNames(), ", "));
   }
 
+  // The main thread is registered for thread local updates so that code that does not care
+  // whether it runs on the main thread or on workers can still use TLS.
+  // We do this as early as possible because this has no side effect and could ensure that the
+  // TLS always contains a valid main thread dispatcher when TLS is used.
+  thread_local_.registerThread(*dispatcher_, true);
+
   // Handle configuration that needs to take place prior to the main configuration load.
   RETURN_IF_NOT_OK(InstanceUtil::loadBootstrapConfig(
       bootstrap_, options_, messageValidationContext().staticValidationVisitor(), *api_));
@@ -497,8 +504,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  stats_store_.setTagProducer(
-      Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags()));
+  auto producer_or_error =
+      Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
+  RETURN_IF_STATUS_NOT_OK(producer_or_error);
+  stats_store_.setTagProducer(std::move(producer_or_error.value()));
   stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
       bootstrap_.stats_config(), stats_store_.symbolTable(), server_contexts_));
   stats_store_.setHistogramSettings(
@@ -523,7 +532,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
-  server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
+  if (!options().hotRestartDisabled()) {
+    server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
+  }
   InstanceBase::failHealthcheck(false);
 
   // Check if bootstrap has server version override set, if yes, we should use that as
@@ -598,7 +609,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   OptRef<Server::ConfigTracker> config_tracker;
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-  admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this,
+  admin_ = std::make_shared<AdminImpl>(initial_config.admin().profilePath(), *this,
                                        initial_config.admin().ignoreGlobalConnLimit());
 
   config_tracker = admin_->getConfigTracker();
@@ -663,10 +674,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // Workers get created first so they register for thread local updates.
   listener_manager_ = listener_manager_factory->createListenerManager(
       *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
-
-  // The main thread is also registered for thread local updates so that code that does not care
-  // whether it runs on the main thread or on workers can still use TLS.
-  thread_local_.registerThread(*dispatcher_, true);
 
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
@@ -858,13 +865,12 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 #ifdef ENVOY_ENABLE_YAML
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
 #endif
-  absl::Status creation_status;
-  auto loader = std::make_unique<Runtime::LoaderImpl>(
+  absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),
-      server.messageValidationContext().dynamicValidationVisitor(), server.api(), creation_status);
-  THROW_IF_NOT_OK(creation_status);
-  return loader;
+      server.messageValidationContext().dynamicValidationVisitor(), server.api());
+  THROW_IF_NOT_OK(loader.status());
+  return std::move(loader.value());
 }
 
 void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path) {

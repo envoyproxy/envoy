@@ -83,7 +83,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  bool can_send_early_data, bool can_use_http3,
                                  bool enable_half_close)
     : parent_(parent), conn_pool_(std::move(conn_pool)),
-      stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
+      stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr,
+                   StreamInfo::FilterState::LifeSpan::FilterChain),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
       calling_encode_headers_(false), upstream_canary_(false), router_sent_end_stream_(false),
       encode_trailers_(false), retried_(false), awaiting_headers_(true),
@@ -112,13 +113,19 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   // The router checks that the connection pool is non-null before creating the upstream request.
   auto upstream_host = conn_pool_->host();
   Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
+  Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
+                                            &upstream_host->cluster(),     // cluster_
+                                            Tracing::ServiceType::Unknown, // service_type_
+                                            false                          // async_client_span_
+  );
+
   if (span_ != nullptr) {
-    span_->injectContext(trace_context, upstream_host);
+    span_->injectContext(trace_context, upstream_context);
   } else {
     // No independent child span for current upstream request then inject the parent span's tracing
     // context into the request headers.
     // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_host);
+    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context);
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());

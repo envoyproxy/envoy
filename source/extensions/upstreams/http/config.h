@@ -64,6 +64,8 @@ private:
   ProtocolOptionsConfigImpl(
       const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
       envoy::config::core::v3::Http2ProtocolOptions validated_h2_options,
+      Envoy::Http::HeaderValidatorFactoryPtr&& header_validator_factory,
+      absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
       Server::Configuration::ServerFactoryContext& server_context);
   // Constructor for legacy (deprecated) config.
   ProtocolOptionsConfigImpl(

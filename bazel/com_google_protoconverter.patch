@@ -5,7 +5,7 @@
  // The minimum library version which works with the current version of the
  // headers.
 -#define GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION 4023000
-+#define GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION 4024000
++#define GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION 4025000
  
  #ifdef PROTOBUF_RTTI
  #error PROTOBUF_RTTI was previously defined

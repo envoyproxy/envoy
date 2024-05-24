@@ -83,15 +83,17 @@ tls_certificate:
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  Ssl::TlsCertificateConfigImpl tls_config(
-      *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), ctx, *api_);
+  auto tls_config =
+      Ssl::TlsCertificateConfigImpl::create(
+          *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), ctx, *api_)
+          .value();
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            tls_config.certificateChain());
+            tls_config->certificateChain());
 
   const std::string key_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            tls_config.privateKey());
+            tls_config->privateKey());
 }
 
 // Validate that secret manager throws an exception when adding duplicated static TLS certificate
@@ -382,13 +384,14 @@ tls_certificate:
                   ->onConfigUpdate(decoded_resources.refvec_, "")
                   .ok());
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), ctx, *api_);
+  auto tls_config =
+      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value();
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            tls_config.certificateChain());
+            tls_config->certificateChain());
   const std::string key_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            tls_config.privateKey());
+            tls_config->privateKey());
 }
 
 TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
@@ -480,10 +483,11 @@ tls_certificate:
                   ->onConfigUpdate(decoded_resources.refvec_, "keycert-v1")
                   .ok());
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), ctx, *api_);
-  EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config.certificateChain());
-  EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config.privateKey());
-  EXPECT_EQ("DUMMY_PASSWORD", tls_config.password());
+  auto tls_config =
+      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value();
+  EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config->certificateChain());
+  EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config->privateKey());
+  EXPECT_EQ("DUMMY_PASSWORD", tls_config->password());
 
   // Private key and password are removed.
   const std::string expected_secrets_config_dump = R"EOF(
@@ -1119,9 +1123,10 @@ tls_certificate:
   EXPECT_CALL(ssl_context_manager, privateKeyMethodManager())
       .WillRepeatedly(ReturnRef(private_key_method_manager));
   EXPECT_CALL(ctx, sslContextManager()).WillRepeatedly(ReturnRef(ssl_context_manager));
-  EXPECT_THROW_WITH_MESSAGE(
-      Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), ctx, *api_),
-      EnvoyException, "Failed to load private key provider: test");
+  EXPECT_EQ(Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_)
+                .status()
+                .message(),
+            "Failed to load private key provider: test");
 }
 
 // Verify that using the match_subject_alt_names will result in a typed matcher, one for each of

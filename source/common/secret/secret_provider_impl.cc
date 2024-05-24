@@ -41,7 +41,10 @@ ThreadLocalGenericSecretProvider::ThreadLocalGenericSecretProvider(
     GenericSecretConfigProviderSharedPtr&& provider, ThreadLocal::SlotAllocator& tls, Api::Api& api)
     : provider_(provider), api_(api),
       tls_(std::make_unique<ThreadLocal::TypedSlot<ThreadLocalSecret>>(tls)),
-      cb_(provider_->addUpdateCallback([this] { update(); })) {
+      cb_(provider_->addUpdateCallback([this] {
+        update();
+        return absl::OkStatus();
+      })) {
   std::string value;
   if (const auto* secret = provider_->secret(); secret != nullptr) {
     value =

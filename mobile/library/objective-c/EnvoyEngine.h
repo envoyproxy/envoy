@@ -48,18 +48,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel;
 
 /**
- Run the Envoy engine with the provided yaml string and log level.
-
- @param yaml The configuration yaml with which to start Envoy.
- @param config The EnvoyConfiguration used to start Envoy.
- @param logLevel The log level to use when starting Envoy.
- @return A status indicating if the action was successful.
- */
-- (int)runWithYAML:(NSString *)yaml
-            config:(EnvoyConfiguration *)config
-          logLevel:(NSString *)logLevel;
-
-/**
  Opens a new HTTP stream attached to this engine.
 
  @param callbacks Handler for observing stream events.

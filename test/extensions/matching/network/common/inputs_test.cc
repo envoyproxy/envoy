@@ -51,7 +51,8 @@ TEST(MatchingData, HttpDestinationIPInput) {
   auto host = "example.com";
   connection_info_provider->setRequestedServerName(host);
   StreamInfo::StreamInfoImpl stream_info(
-      Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connection_info_provider);
+      Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connection_info_provider,
+      StreamInfo::FilterState::LifeSpan::FilterChain);
   Http::Matching::HttpMatchingDataImpl data(stream_info);
   {
     DestinationIPInput<Http::HttpMatchingData> input;
@@ -323,11 +324,7 @@ TEST(MatchingData, ApplicationProtocolInput) {
 
 TEST(MatchingData, FilterStateInput) {
   std::string key = "filter_state_key";
-
-  envoy::extensions::matching::common_inputs::network::v3::FilterStateInput input_config;
-  input_config.set_key(key);
-
-  FilterStateInput input(input_config);
+  FilterStateInput<MatchingData> input(key);
 
   MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);

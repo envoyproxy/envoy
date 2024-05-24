@@ -110,11 +110,30 @@ FilterDataStatus PanicReplyContext::onRequestBody(size_t, bool) {
   return FilterDataStatus::Continue;
 }
 
+class InvalidGrpcStatusReplyContext : public Context {
+public:
+  explicit InvalidGrpcStatusReplyContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
+
+private:
+  EnvoyRootContext* root() { return static_cast<EnvoyRootContext*>(Context::root()); }
+};
+
+FilterDataStatus InvalidGrpcStatusReplyContext::onRequestBody(size_t size, bool) {
+  sendLocalResponse(200, "ok", "body", {}, size == 0 ? GrpcStatus::InvalidCode : GrpcStatus::PermissionDenied);
+  return FilterDataStatus::Continue;
+}
+
 static RegisterContextFactory register_DupReplyContext(CONTEXT_FACTORY(DupReplyContext),
                                                        ROOT_FACTORY(EnvoyRootContext),
                                                        "send local reply twice");
 static RegisterContextFactory register_PanicReplyContext(CONTEXT_FACTORY(PanicReplyContext),
                                                          ROOT_FACTORY(EnvoyRootContext),
                                                          "panic after sending local reply");
+
+static RegisterContextFactory register_InvalidGrpcStatusReplyContext(CONTEXT_FACTORY(InvalidGrpcStatusReplyContext),
+                                                         ROOT_FACTORY(EnvoyRootContext),
+                                                         "send local reply grpc");
+
 
 END_WASM_PLUGIN

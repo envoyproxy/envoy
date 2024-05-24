@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 export ENVOY_BIN="${TEST_SRCDIR}/envoy/test/integration/hotrestart_small_main"
 

@@ -1,4 +1,6 @@
-#!/bin/bash -E
+#!/usr/bin/env bash
+
+set -E
 
 TESTFILTER="${1:-*}"
 TESTEXCLUDES="${2}"
@@ -15,6 +17,8 @@ FLAKY_SANDBOXES=(
     local_ratelimit
     # https://github.com/envoyproxy/envoy/issues/31333
     locality-load-balancing
+    # https://github.com/envoyproxy/envoy/issues/33533
+    lua-cluster-specifier
     # https://github.com/envoyproxy/envoy/issues/28541
     wasm-cc
     # https://github.com/envoyproxy/envoy/issues/28546

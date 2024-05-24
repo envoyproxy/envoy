@@ -849,4 +849,34 @@ TEST_P(LoadShedPointIntegrationTest, HttpConnectionMnagerCloseConnectionCreating
   EXPECT_EQ(response->headers().getStatusValue(), "200");
 }
 
+TEST_P(LoadShedPointIntegrationTest, HttpDownstreamFilterLoadShed) {
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http_downstream_filter_check"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Put envoy in overloaded state and check that it sends a local reply from router.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http_downstream_filter_check.scale_percent", 100);
+  auto response_with_local_reply = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response_with_local_reply->waitForEndStream());
+  EXPECT_EQ(response_with_local_reply->headers().getStatusValue(), "503");
+
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http_downstream_filter_check.scale_percent", 0);
+
+  auto response_that_is_proxied = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response_that_is_proxied->waitForEndStream());
+  EXPECT_EQ(response_that_is_proxied->headers().getStatusValue(), "200");
+}
+
 } // namespace Envoy
