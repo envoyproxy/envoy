@@ -1452,6 +1452,7 @@ viewport
 vip
 virtualhost
 virtualize
+virtualized
 vptr
 vtable
 vtt
@@ -1510,4 +1511,5 @@ PCIE
 EDNS
 CNAME
 NAT
+NXDOMAIN
 DNAT
