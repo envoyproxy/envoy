@@ -42,7 +42,7 @@ public:
                          true);
     terminal_callback_.waitReady();
     EXPECT_EQ(cc_.on_headers_calls_, 1);
-    EXPECT_EQ(cc_.status, "200");
+    EXPECT_EQ(cc_.status_, "200");
     EXPECT_EQ(cc_.on_data_calls_, 2);
     EXPECT_EQ(cc_.on_complete_calls_, 1);
     EXPECT_EQ(cc_.on_cancel_calls_, 0);
