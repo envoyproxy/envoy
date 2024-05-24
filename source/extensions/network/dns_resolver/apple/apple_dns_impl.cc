@@ -332,7 +332,6 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
   // operation. Hence, after calling finishResolve(), we are guaranteed to not get any more
   // callbacks to this method.
   if (error_code != kDNSServiceErr_NoError && error_code != kDNSServiceErr_NoSuchRecord) {
-    ENVOY_LOG(info, "==> AAB ERROR: {}", error_code);
     parent_.chargeGetAddrInfoErrorStats(error_code);
 
     pending_response_.status_ = ResolutionStatus::Failure;
