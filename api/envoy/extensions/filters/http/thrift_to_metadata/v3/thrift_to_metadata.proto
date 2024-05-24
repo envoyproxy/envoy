@@ -82,6 +82,7 @@ message FieldSelector {
   FieldSelector child = 3;
 }
 
+// [#next-free-field: 6]
 message Rule {
   // The field to match on. If set, takes precedence over field_selector.
   Field field = 1;
