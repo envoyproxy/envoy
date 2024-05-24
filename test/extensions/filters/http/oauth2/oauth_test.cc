@@ -62,10 +62,10 @@ public:
   }
 
   NiceMock<Upstream::MockClusterManager> cm_;
-  std::shared_ptr<OAuth2Client> client_;
   std::shared_ptr<MockCallbacks> mock_callbacks_;
   Http::MockAsyncClientRequest request_;
   std::deque<Http::AsyncClient::Callbacks*> callbacks_;
+  std::shared_ptr<OAuth2Client> client_;
 };
 
 TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
