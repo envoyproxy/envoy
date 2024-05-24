@@ -139,12 +139,6 @@ public:
   };
 };
 
-// REGISTER_FACTORY(StopIterationAndContinueFilterFactory,
-//                  Server::Configuration::NamedHttpFilterConfigFactory);
-
-// REGISTER_FACTORY(StopIterationAndContinueFilterFactory,
-//                  Server::Configuration::UpstreamHttpFilterConfigFactory);
-
 static Registry::RegisterFactory<StopIterationAndContinueFilterFactory,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
