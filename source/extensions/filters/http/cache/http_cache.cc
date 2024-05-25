@@ -24,7 +24,8 @@ namespace HttpFilters {
 namespace Cache {
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
-                             const VaryAllowList& vary_allow_list)
+                             const VaryAllowList& vary_allow_list,
+                             bool ignore_request_cache_control_header)
     : request_headers_(Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers)),
       vary_allow_list_(vary_allow_list), timestamp_(timestamp) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
@@ -36,7 +37,9 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   absl::string_view scheme = request_headers.getSchemeValue();
   ASSERT(Http::Utility::schemeIsValid(request_headers.getSchemeValue()));
 
-  initializeRequestCacheControl(request_headers);
+  if (!ignore_request_cache_control_header) {
+    initializeRequestCacheControl(request_headers);
+  }
   // TODO(toddmgreer): Let config determine whether to include scheme, host, and
   // query params.
 

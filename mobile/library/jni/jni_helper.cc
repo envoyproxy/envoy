@@ -2,8 +2,58 @@
 
 #include "source/common/common/assert.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace JNI {
+namespace {
+
+constexpr jint JNI_VERSION = JNI_VERSION_1_6;
+constexpr const char* THREAD_NAME = "EnvoyMain";
+std::atomic<JavaVM*> java_vm_cache_;
+thread_local JNIEnv* jni_env_cache_ = nullptr;
+absl::flat_hash_map<absl::string_view, jclass> JCLASS_CACHES;
+
+} // namespace
+
+jint JniHelper::getVersion() { return JNI_VERSION; }
+
+void JniHelper::initialize(JavaVM* java_vm) {
+  java_vm_cache_.store(java_vm, std::memory_order_release);
+}
+
+void JniHelper::addClassToCache(const char* class_name) {
+  JNIEnv* env;
+  jint result = getJavaVm()->GetEnv(reinterpret_cast<void**>(&env), getVersion());
+  ASSERT(result == JNI_OK, "Unable to get JNIEnv from the JavaVM.");
+  jclass java_class = reinterpret_cast<jclass>(env->NewGlobalRef(env->FindClass(class_name)));
+  JCLASS_CACHES.emplace(class_name, java_class);
+}
+
+JavaVM* JniHelper::getJavaVm() { return java_vm_cache_.load(std::memory_order_acquire); }
+
+void JniHelper::detachCurrentThread() {
+  ASSERT(getJavaVm()->DetachCurrentThread() == JNI_OK, "Unable to detach current thread.");
+}
+
+JNIEnv* JniHelper::getThreadLocalEnv() {
+  if (jni_env_cache_ != nullptr) {
+    return jni_env_cache_;
+  }
+  JavaVM* java_vm = getJavaVm();
+  ASSERT(java_vm != nullptr, "Unable to get JavaVM.");
+  jint result = java_vm->GetEnv(reinterpret_cast<void**>(&jni_env_cache_), getVersion());
+  if (result == JNI_EDETACHED) {
+    JavaVMAttachArgs args = {getVersion(), const_cast<char*>(THREAD_NAME), nullptr};
+#if defined(__ANDROID__)
+    result = java_vm->AttachCurrentThread(&jni_env_cache_, &args);
+#else
+    result = java_vm->AttachCurrentThread(reinterpret_cast<void**>(&jni_env_cache_), &args);
+#endif
+  }
+  ASSERT(result == JNI_OK, "Unable to get JNIEnv.");
+  return jni_env_cache_;
+}
 
 JNIEnv* JniHelper::getEnv() { return env_; }
 
@@ -39,10 +89,12 @@ jmethodID JniHelper::getStaticMethodId(jclass clazz, const char* name, const cha
   return method_id;
 }
 
-LocalRefUniquePtr<jclass> JniHelper::findClass(const char* class_name) {
-  LocalRefUniquePtr<jclass> result(env_->FindClass(class_name), LocalRefDeleter(env_));
-  rethrowException();
-  return result;
+jclass JniHelper::findClass(const char* class_name) {
+  if (auto i = JCLASS_CACHES.find(class_name); i != JCLASS_CACHES.end()) {
+    return i->second;
+  }
+  ASSERT(false, absl::StrFormat("Unable to find class '%s'.", class_name));
+  return nullptr;
 }
 
 LocalRefUniquePtr<jclass> JniHelper::getObjectClass(jobject object) {
@@ -50,16 +102,20 @@ LocalRefUniquePtr<jclass> JniHelper::getObjectClass(jobject object) {
 }
 
 void JniHelper::throwNew(const char* java_class_name, const char* message) {
-  LocalRefUniquePtr<jclass> java_class = findClass(java_class_name);
+  jclass java_class = findClass(java_class_name);
   if (java_class != nullptr) {
-    jint error = env_->ThrowNew(java_class.get(), message);
-    RELEASE_ASSERT(error == JNI_OK, fmt::format("Failed calling ThrowNew."));
+    jint error = env_->ThrowNew(java_class, message);
+    ASSERT(error == JNI_OK, "Failed calling ThrowNew.");
   }
 }
+
+jboolean JniHelper::exceptionCheck() { return env_->ExceptionCheck(); }
 
 LocalRefUniquePtr<jthrowable> JniHelper::exceptionOccurred() {
   return {env_->ExceptionOccurred(), LocalRefDeleter(env_)};
 }
+
+void JniHelper::exceptionCleared() { env_->ExceptionClear(); }
 
 GlobalRefUniquePtr<jobject> JniHelper::newGlobalRef(jobject object) {
   GlobalRefUniquePtr<jobject> result(env_->NewGlobalRef(object), GlobalRefDeleter(env_));

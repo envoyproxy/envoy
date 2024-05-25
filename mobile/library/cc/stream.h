@@ -24,8 +24,6 @@ public:
    */
   Stream& sendHeaders(Http::RequestHeaderMapPtr headers, bool end_stream);
 
-  [[deprecated]] Stream& sendData(envoy_data data);
-
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple times.
    *
@@ -33,6 +31,11 @@ public:
    */
   Stream& sendData(Buffer::InstancePtr buffer);
 
+  /**
+   * Reads the data up to the number of `bytes_to_read`.
+   *
+   * @param bytes_to_read the number of bytes read
+   */
   Stream& readData(size_t bytes_to_read);
 
   /**
@@ -43,8 +46,6 @@ public:
    */
   void close(Http::RequestTrailerMapPtr trailers);
 
-  [[deprecated]] void close(envoy_data data);
-
   /**
    * Send data over an open HTTP stream and closes the stream.. This method can only be invoked
    * once.
@@ -53,6 +54,7 @@ public:
    */
   void close(Buffer::InstancePtr buffer);
 
+  /** Cancels the stream. */
   void cancel();
 
 private:

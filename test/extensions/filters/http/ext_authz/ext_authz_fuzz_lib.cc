@@ -1,13 +1,11 @@
 #include "test/extensions/filters/http/ext_authz/ext_authz_fuzz_lib.h"
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 
 #include "source/common/network/address_impl.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/http/ext_authz/ext_authz_fuzz.pb.h"
-#include "test/extensions/filters/http/ext_authz/ext_authz_fuzz.pb.validate.h"
 #include "test/mocks/network/mocks.h"
 
 #include "gmock/gmock.h"
@@ -43,14 +41,8 @@ ReusableFilterFactory::newFilter(FilterConfigSharedPtr config,
 }
 
 absl::StatusOr<std::unique_ptr<Filter>> ReusableFuzzerUtil::setup(
-    const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input,
+    const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCaseBase& input,
     Filters::Common::ExtAuthz::ClientPtr client) {
-  try {
-    TestUtility::validate(input);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
-    return absl::InvalidArgumentError(absl::StrCat("EnvoyException during validation: ", e.what()));
-  }
 
   // Prepare filter.
   const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config = input.config();

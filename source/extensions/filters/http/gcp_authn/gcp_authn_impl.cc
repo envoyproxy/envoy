@@ -48,7 +48,7 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessag
   }
 
   // Set up the request options.
-  struct Envoy::Http::AsyncClient::RequestOptions options =
+  Envoy::Http::AsyncClient::RequestOptions options =
       Envoy::Http::AsyncClient::RequestOptions()
           .setTimeout(std::chrono::milliseconds(
               DurationUtil::durationToMilliseconds(config_.http_uri().timeout())))

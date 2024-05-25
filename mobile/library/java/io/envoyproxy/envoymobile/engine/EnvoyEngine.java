@@ -33,17 +33,6 @@ public interface EnvoyEngine {
   void performRegistration(EnvoyConfiguration envoyConfiguration);
 
   /**
-   * Run the Envoy engine with the provided yaml string and log level.
-   *
-   * This does not perform registration, and performRegistration() may need to be called first.
-   *
-   * @param configurationYAML The configuration yaml with which to start Envoy.
-   * @param logLevel          The log level to use when starting Envoy.
-   * @return A status indicating if the action was successful.
-   */
-  EnvoyStatus runWithYaml(String configurationYAML, String logLevel);
-
-  /**
    * Run the Envoy engine with the provided EnvoyConfiguration and log level.
    *
    * This automatically performs any necessary registrations.

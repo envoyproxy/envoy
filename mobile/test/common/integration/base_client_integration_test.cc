@@ -7,7 +7,6 @@
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
-#include "library/cc/bridge_utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 #include "spdlog/spdlog.h"
@@ -85,40 +84,45 @@ void BaseClientIntegrationTest::initialize() {
     stream_prototype_ = engine_->streamClient()->newStreamPrototype();
   }
 
-  stream_prototype_->setOnHeaders(
-      [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
-        cc_.on_headers_calls++;
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_header_consumed_bytes_from_response = intel.consumed_bytes_from_response;
-      });
-  stream_prototype_->setOnData([this](envoy_data c_data, bool) {
-    cc_.on_data_calls++;
-    release_envoy_data(c_data);
-  });
-  stream_prototype_->setOnComplete(
-      [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-        memcpy(&last_stream_final_intel_, &final_intel, sizeof(envoy_final_stream_intel));
-        if (expect_data_streams_) {
-          validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
-        }
-        cc_.on_complete_received_byte_count = final_intel.received_byte_count;
-        cc_.on_complete_calls++;
-        cc_.terminal_callback->setReady();
-      });
-  stream_prototype_->setOnError(
-      [this](Platform::EnvoyErrorSharedPtr, envoy_stream_intel, envoy_final_stream_intel) {
-        cc_.on_error_calls++;
-        cc_.terminal_callback->setReady();
-      });
-  stream_prototype_->setOnCancel([this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-    EXPECT_NE(-1, final_intel.stream_start_ms);
-    cc_.on_cancel_calls++;
-    cc_.terminal_callback->setReady();
-  });
-
-  stream_ = (*stream_prototype_).start(explicit_flow_control_);
   HttpTestUtility::addDefaultHeaders(default_request_headers_);
   default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
+}
+
+EnvoyStreamCallbacks BaseClientIntegrationTest::createDefaultStreamCallbacks() {
+  EnvoyStreamCallbacks stream_callbacks;
+  stream_callbacks.on_headers_ = [this](const Http::ResponseHeaderMap& headers, bool,
+                                        envoy_stream_intel intel) {
+    cc_.on_headers_calls_++;
+    cc_.status_ = absl::StrCat(headers.getStatusValue());
+    cc_.on_header_consumed_bytes_from_response_ = intel.consumed_bytes_from_response;
+  };
+  stream_callbacks.on_data_ = [this](const Buffer::Instance&, uint64_t /* length */,
+                                     bool /* end_stream */,
+                                     envoy_stream_intel) { cc_.on_data_calls_++; };
+  stream_callbacks.on_complete_ = [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+    memcpy(&last_stream_final_intel_, &final_intel, sizeof(envoy_final_stream_intel));
+    if (expect_data_streams_) {
+      validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls_ == 0);
+    }
+    cc_.on_complete_received_byte_count_ = final_intel.received_byte_count;
+    cc_.on_complete_calls_++;
+    cc_.terminal_callback_->setReady();
+  };
+  stream_callbacks.on_error_ = [this](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {
+    cc_.on_error_calls_++;
+    cc_.terminal_callback_->setReady();
+  };
+  stream_callbacks.on_cancel_ = [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+    EXPECT_NE(-1, final_intel.stream_start_ms);
+    cc_.on_cancel_calls_++;
+    cc_.terminal_callback_->setReady();
+  };
+  return stream_callbacks;
+}
+
+Platform::StreamSharedPtr
+BaseClientIntegrationTest::createNewStream(EnvoyStreamCallbacks&& stream_callbacks) {
+  return stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
 }
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
@@ -226,4 +230,5 @@ testing::AssertionResult BaseClientIntegrationTest::waitForGaugeGe(const std::st
   }
   return testing::AssertionSuccess();
 }
+
 } // namespace Envoy

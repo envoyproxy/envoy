@@ -21,6 +21,29 @@ const std::regex& getSystemTimeFormatNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 
+Network::Address::InstanceConstSharedPtr
+getUpstreamRemoteAddress(const StreamInfo::StreamInfo& stream_info) {
+  auto opt_ref = stream_info.upstreamInfo();
+  if (!opt_ref.has_value()) {
+    return nullptr;
+  }
+
+  // TODO(wbpcode): remove this after the flag is removed.
+  const bool use_upstream_remote_address = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.upstream_remote_address_use_connection");
+  if (!use_upstream_remote_address) {
+    if (auto host = opt_ref->upstreamHost(); host != nullptr) {
+      return host->address();
+    }
+    return nullptr;
+  }
+
+  if (auto addr = opt_ref->upstreamRemoteAddress(); addr != nullptr) {
+    return addr;
+  }
+  return nullptr;
+}
+
 } // namespace
 
 MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
@@ -649,7 +672,7 @@ private:
   FieldExtractor field_extractor_;
 };
 
-// StreamInfo Envoy::Network::Address::InstanceConstSharedPtr field extractor.
+// StreamInfo Network::Address::InstanceConstSharedPtr field extractor.
 class StreamInfoAddressFormatterProvider : public StreamInfoFormatterProvider {
 public:
   using FieldExtractor =
@@ -1036,16 +1059,42 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return StreamInfo::ResponseFlagUtils::toString(stream_info);
                   });
             }}},
+          {"UPSTREAM_HOST_NAME",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+                    const auto opt_ref = stream_info.upstreamInfo();
+                    if (!opt_ref.has_value()) {
+                      return absl::nullopt;
+                    }
+                    const auto host = opt_ref->upstreamHost();
+                    if (host == nullptr) {
+                      return absl::nullopt;
+                    }
+                    std::string host_name = host->hostname();
+                    if (host_name.empty()) {
+                      // If no hostname is available, the main address is used.
+                      return host->address()->asString();
+                    }
+                    return absl::make_optional<std::string>(std::move(host_name));
+                  });
+            }}},
           {"UPSTREAM_HOST",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-                      return stream_info.upstreamInfo()->upstreamHost()->address();
+                      -> Network::Address::InstanceConstSharedPtr {
+                    const auto opt_ref = stream_info.upstreamInfo();
+                    if (!opt_ref.has_value()) {
+                      return nullptr;
                     }
-                    return nullptr;
+                    const auto host = opt_ref->upstreamHost();
+                    if (host == nullptr) {
+                      return nullptr;
+                    }
+                    return host->address();
                   });
             }}},
           {"UPSTREAM_CONNECTION_ID",
@@ -1083,7 +1132,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                      -> Network::Address::InstanceConstSharedPtr {
                     if (stream_info.upstreamInfo().has_value()) {
                       return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
                     }
@@ -1095,7 +1144,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withoutPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                      -> Network::Address::InstanceConstSharedPtr {
                     if (stream_info.upstreamInfo().has_value()) {
                       return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
                     }
@@ -1107,7 +1156,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::justPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                      -> Network::Address::InstanceConstSharedPtr {
                     if (stream_info.upstreamInfo().has_value()) {
                       return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
                     }
@@ -1119,11 +1168,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-                      return stream_info.upstreamInfo()->upstreamHost()->address();
-                    }
-                    return nullptr;
+                      -> Network::Address::InstanceConstSharedPtr {
+                    return getUpstreamRemoteAddress(stream_info);
                   });
             }}},
           {"UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
@@ -1131,11 +1177,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withoutPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-                      return stream_info.upstreamInfo()->upstreamHost()->address();
-                    }
-                    return nullptr;
+                      -> Network::Address::InstanceConstSharedPtr {
+                    return getUpstreamRemoteAddress(stream_info);
                   });
             }}},
           {"UPSTREAM_REMOTE_PORT",
@@ -1143,11 +1186,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::justPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-                      return stream_info.upstreamInfo()->upstreamHost()->address();
-                    }
-                    return nullptr;
+                      -> Network::Address::InstanceConstSharedPtr {
+                    return getUpstreamRemoteAddress(stream_info);
                   });
             }}},
           {"UPSTREAM_REQUEST_ATTEMPT_COUNT",

@@ -3,6 +3,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "source/common/tls/server_context_impl.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/test_common/environment.h"
@@ -26,6 +28,8 @@ void XdsIntegrationTest::initialize() {
 
   // Register the extensions required for Envoy Mobile.
   ExtensionRegistry::registerFactories();
+  // For server TLS.
+  Extensions::TransportSockets::Tls::forceRegisterServerContextFactoryImpl();
 
   if (sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta) {

@@ -39,7 +39,7 @@ private:
     std::list<FileWatch> watches_;
   };
 
-  void onInotifyEvent();
+  absl::Status onInotifyEvent();
 
   Filesystem::Instance& file_system_;
   int inotify_fd_;

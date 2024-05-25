@@ -37,9 +37,6 @@ The user account running the examples will need to have permission to use Docker
 
 Full instructions for installing Docker can be found on the `Docker website <https://docs.docker.com/get-docker/>`_
 
-If you want to use the Windows based Envoy images make sure that you
-`switch Docker to use Windows containers <https://docs.docker.com/docker-for-windows/#switch-between-windows-and-linux-containers>`_.
-
 .. _start_sandboxes_setup_docker_compose:
 
 Install ``docker compose``

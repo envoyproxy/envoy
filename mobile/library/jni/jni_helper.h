@@ -1,8 +1,8 @@
 #pragma once
 
-#include <memory>
+#include <jni.h>
 
-#include "library/jni/import/jni_import.h"
+#include <memory>
 
 namespace Envoy {
 namespace JNI {
@@ -138,6 +138,48 @@ class JniHelper {
 public:
   explicit JniHelper(JNIEnv* env) : env_(env) {}
 
+  /** Gets the JNI version supported. */
+  static jint getVersion();
+
+  /** Initializes the `JavaVM`. This function is typically called inside `JNI_OnLoad`. */
+  static void initialize(JavaVM* java_vm);
+
+  /**
+   * Adds the `jclass` object into a cache. This function is typically called inside `JNI_OnLoad`.
+   *
+   * Caching the `jclass` can be useful for performance.
+   * See https://developer.android.com/training/articles/perf-jni#jclass,-jmethodid,-and-jfieldid
+   *
+   * Another reason for caching the `jclass` object is to able to find a non-built-in class when the
+   * native code creates a thread and then attaches it with `AttachCurrentThread`, i.e. calling
+   * `getThreadLocalEnv()->getEnv()->FindClass`. This is because there are no stack frames from the
+   * application. When calling `FindClass` from the thread, the `JavaVM` will start in the "system"
+   * class loader instead of the one associated with the application, so attempts to find
+   * app-specific classes will fail.
+   *
+   * See
+   * https://developer.android.com/training/articles/perf-jni#faq:-why-didnt-findclass-find-my-class
+   */
+  static void addClassToCache(const char* class_name);
+
+  /** Gets the `JavaVM`. The `initialize(JavaVM*) must be called first. */
+  static JavaVM* getJavaVm();
+
+  /** Detaches the current thread from the `JavaVM`. */
+  static void detachCurrentThread();
+
+  /**
+   * Gets the thread-local `JNIEnv`. This is useful for getting the `JNIEnv` between threads.
+   * If the thread-local `JNIEnv` does not exist, this function will attach the current thread to
+   * the JavaVM. Care must be taken to ensure `detachCurrentThread()` is called before the thread
+   * exists to avoid a resource leak.
+   *
+   * See https://developer.android.com/training/articles/perf-jni#threads
+   *
+   * The `initialize(JavaVM*)` must be called first or else `JNIEnv` will return a `nullptr`.
+   */
+  static JNIEnv* getThreadLocalEnv();
+
   /** Gets the underlying `JNIEnv`. */
   JNIEnv* getEnv();
 
@@ -188,11 +230,11 @@ public:
   jmethodID getStaticMethodId(jclass clazz, const char* name, const char* signature);
 
   /**
-   * Finds the given `class_name` using Java classloader.
+   * Finds the given `class_name` using from the cache.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#findclass
    */
-  [[nodiscard]] LocalRefUniquePtr<jclass> findClass(const char* class_name);
+  [[nodiscard]] jclass findClass(const char* class_name);
 
   /**
    * Returns the class of a given `object`.
@@ -209,11 +251,26 @@ public:
   void throwNew(const char* java_class_name, const char* message);
 
   /**
-   * Determines if an exception is being thrown.
+   * Returns true if an exception is being thrown; false otherwise.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#exceptionoccurred
+   */
+  [[nodiscard]] jboolean exceptionCheck();
+
+  /**
+   * Determines if an exception is being thrown. Returns a `nullptr` if there is no exception.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#exceptionoccurred
    */
   [[nodiscard]] LocalRefUniquePtr<jthrowable> exceptionOccurred();
+
+  /**
+   * Clears any exception that is currently being thrown. If no exception is currently being thrown,
+   * this function has no effect.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#exceptionclear
+   */
+  void exceptionCleared();
 
   /**
    * Creates a new global reference to the object referred to by the `object` argument.

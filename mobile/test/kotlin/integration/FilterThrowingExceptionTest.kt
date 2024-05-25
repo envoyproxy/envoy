@@ -91,7 +91,7 @@ class FilterThrowingExceptionTest {
   @Test
   fun `registers a filter that throws an exception and performs an HTTP request`() {
     val onEngineRunningLatch = CountDownLatch(1)
-    val onRespondeHeadersLatch = CountDownLatch(1)
+    val onResponseHeadersLatch = CountDownLatch(1)
     val onJNIExceptionEventLatch = CountDownLatch(2)
 
     var expectedMessages =
@@ -133,13 +133,13 @@ class FilterThrowingExceptionTest {
       .setOnResponseHeaders { responseHeaders, _, _ ->
         val status = responseHeaders.httpStatus ?: 0L
         assertThat(status).isEqualTo(200)
-        onRespondeHeadersLatch.countDown()
+        onResponseHeadersLatch.countDown()
       }
       .start(Executors.newSingleThreadExecutor())
       .sendHeaders(requestHeaders, true)
 
-    onRespondeHeadersLatch.await(15, TimeUnit.SECONDS)
-    assertThat(onRespondeHeadersLatch.count).isEqualTo(0)
+    onResponseHeadersLatch.await(15, TimeUnit.SECONDS)
+    assertThat(onResponseHeadersLatch.count).isEqualTo(0)
 
     onJNIExceptionEventLatch.await(15, TimeUnit.SECONDS)
     assertThat(onJNIExceptionEventLatch.count).isEqualTo(0)

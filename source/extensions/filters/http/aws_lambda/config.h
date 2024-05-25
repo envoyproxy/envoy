@@ -19,12 +19,12 @@ class AwsLambdaFilterFactory
 public:
   AwsLambdaFilterFactory() : DualFactoryBase("envoy.filters.http.aws_lambda") {}
 
-private:
-  Extensions::Common::Aws::CredentialsProviderSharedPtr
-  getCredentialsProvider(const std::string& profile,
-                         Server::Configuration::ServerFactoryContext& server_context,
-                         const std::string& region) const;
+protected:
+  Extensions::Common::Aws::CredentialsProviderSharedPtr getCredentialsProvider(
+      const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
+      Server::Configuration::ServerFactoryContext& server_context, const std::string& region) const;
 
+private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
       const std::string& stats_prefix, DualInfo dual_info,
