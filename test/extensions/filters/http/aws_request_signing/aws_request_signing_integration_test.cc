@@ -185,6 +185,32 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationUpstream) {
       upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
 }
 
+TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationUpstreamAsync) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
+
+  config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4, false);
+  addUpstreamProtocolOptions();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/path"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  // check that our headers have been correctly added upstream
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("authorization")).empty());
+  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amz-date")).empty());
+  EXPECT_FALSE(
+      upstream_request_->headers().get(Http::LowerCaseString("x-amz-security-token")).empty());
+  EXPECT_FALSE(
+      upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
+}
+
 TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationUpstream) {
 
   config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4A, false);
