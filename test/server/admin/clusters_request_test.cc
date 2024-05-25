@@ -63,6 +63,7 @@ protected:
     case ClustersParams::Format::Unknown:
       return nullptr;
     }
+    return nullptr;
   }
 
   struct ResponseResult {
