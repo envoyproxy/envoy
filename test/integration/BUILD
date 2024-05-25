@@ -1818,7 +1818,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 30,
+    shard_count = 40,
     tags = [
         "cpu:3",
     ],
