@@ -5,6 +5,7 @@
 #include "source/extensions/filters/http/thrift_to_metadata/filter.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol_converter.h"
 
+#include "test/common/buffer/utility.h"
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -523,6 +524,85 @@ TEST_P(FilterTest, IncompleteResponseWithTrailer) {
   EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.invalid_thrift_body"), 1);
 }
 
+TEST_P(FilterTest, MalformedRequest) {
+  initializeFilter(config_yaml_);
+  const std::map<std::string, std::string>& expected_metadata = {
+      {"protocol", "unknown"},
+      {"transport", "unknown"},
+      {"request_message_type", "unknown"},
+      {"method_name", "unknown"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected_metadata)));
+
+  Buffer::OwnedImpl buffer{"malformed thrift body"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.invalid_thrift_body"), 1);
+}
+
+TEST_F(FilterTest, MalformedResponse) {
+  initializeFilter(config_yaml_);
+  const std::map<std::string, std::string>& expected_metadata = {
+      {"protocol", "unknown"},
+      {"transport", "unknown"},
+      {"response_message_type", "unknown"},
+      {"method_name", "unknown"},
+      {"response_reply_type", "unknown"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers_, false));
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.filters.http.thrift_to_metadata",
+                                               MapEq(expected_metadata)));
+
+  Buffer::OwnedImpl buffer{"malformed thrift body"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.success"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.invalid_thrift_body"), 1);
+}
+
+TEST_F(FilterTest, ApplicationExceptionResponse) {
+  initializeFilter(config_yaml_);
+  const std::map<std::string, std::string>& expected_metadata = {
+      {"protocol", "unknown"},
+      {"transport", "unknown"},
+      {"response_message_type", "unknown"},
+      {"method_name", "unknown"},
+      {"response_reply_type", "unknown"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers_, false));
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.filters.http.thrift_to_metadata",
+                                               MapEq(expected_metadata)));
+
+  Buffer::OwnedImpl buffer;
+  // Response with unknown transform
+  Buffer::addSeq(buffer, {
+                             0x00, 0x00, 0x00, 0x64, // header: 100 bytes
+                             0x0f, 0xff, 0x00, 0x00, // magic, flags
+                             0x00, 0x00, 0x00, 0x01, // sequence id
+                             0x00, 0x01, 0x00, 0x02, // header size 4, binary proto, 2 transforms
+                             0x01, 0x02, 0x00, 0x00, // transforms: 1, 2; padding
+                         });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.success"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.invalid_thrift_body"), 1);
+}
+
 TEST_P(FilterTest, DecodeTwoDataStreams) {
   const auto [transport_type, protocol_type] = GetParam();
   MessageType message_type = MessageType::Call;
@@ -791,6 +871,7 @@ TEST_F(FilterTest, RequestAllowEmptyContentType) {
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected_metadata)));
 
   Buffer::OwnedImpl buffer;
+  writeMessage(buffer, transport_type, protocol_type, message_type);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
   EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.success"), 1);
