@@ -912,13 +912,13 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamHttpFiltersPauseAndResume) {
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
-    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_, std::chrono::milliseconds(5000)));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   }
 }
 
 TEST_P(TcpTunnelingIntegrationTest, FlowControlOnAndGiantBody) {
   ENVOY_LOG_MISC(warn, "manually logs to trace for debugging");
-  LogLevelSetter save_levels(spdlog::level::debug);
+  LogLevelSetter save_levels(spdlog::level::trace);
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
   testGiantRequestAndResponse(10 * 1024 * 1024, 10 * 1024 * 1024);
