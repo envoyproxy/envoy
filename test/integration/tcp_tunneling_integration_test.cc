@@ -853,7 +853,7 @@ public:
       ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     } else {
       ASSERT_TRUE(
-          upstream_request_->waitForEndStream(*dispatcher_, 2 * TestUtility::DefaultTimeout));
+          upstream_request_->waitForEndStream(*dispatcher_ /*, 2 * TestUtility::DefaultTimeout)*/));
     }
   }
 
@@ -917,6 +917,8 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamHttpFiltersPauseAndResume) {
 }
 
 TEST_P(TcpTunnelingIntegrationTest, FlowControlOnAndGiantBody) {
+  ENVOY_LOG_MISC(warn, "manually logs to trace for debugging");
+  LogLevelSetter save_levels(spdlog::level::trace);
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
   testGiantRequestAndResponse(10 * 1024 * 1024, 10 * 1024 * 1024);
