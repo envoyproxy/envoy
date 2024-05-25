@@ -34,3 +34,15 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "integration_test",
+    size = "large",
+    srcs = ["integration_test.cc"],
+    extension_names = ["envoy.filters.http.thrift_to_metadata"],
+    deps = [
+        "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
+        "//source/extensions/filters/http/thrift_to_metadata:config",
+        "//test/integration:http_protocol_integration_lib",
+    ],
+)

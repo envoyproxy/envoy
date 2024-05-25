@@ -169,10 +169,10 @@ response_rules:
                NetworkFilters::ThriftProxy::ProtocolType protocol_type,
                NetworkFilters::ThriftProxy::MessageType message_type,
                absl::optional<NetworkFilters::ThriftProxy::ReplyType> reply_type = absl::nullopt) {
-    Buffer::OwnedImpl request_buffer;
+    Buffer::OwnedImpl proto_buffer;
     ProtocolConverterSharedPtr protocol_converter = std::make_shared<ProtocolConverter>();
     ProtocolPtr protocol = createProtocol(protocol_type);
-    protocol_converter->initProtocolConverter(*protocol, request_buffer);
+    protocol_converter->initProtocolConverter(*protocol, proto_buffer);
 
     MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
     metadata->setProtocol(protocol_type);
@@ -214,7 +214,7 @@ response_rules:
     protocol_converter->messageEnd();
 
     TransportPtr transport = createTransport(transport_type);
-    transport->encodeFrame(buffer, *metadata, request_buffer);
+    transport->encodeFrame(buffer, *metadata, proto_buffer);
   }
 
   TransportPtr createTransport(NetworkFilters::ThriftProxy::TransportType transport) {
@@ -672,7 +672,7 @@ TEST_P(FilterTest, EncodeTwoDataStreams) {
 }
 
 TEST_F(FilterTest, RequestBodyWithResponseRule) {
-  TransportType transport_type = TransportType::Framed;
+  TransportType transport_type = TransportType::Unframed;
   ProtocolType protocol_type = ProtocolType::Binary;
   MessageType message_type = MessageType::Call;
 
@@ -697,7 +697,7 @@ response_rules:
 }
 
 TEST_F(FilterTest, ResponseBodyWithRequestRule) {
-  TransportType transport_type = TransportType::Framed;
+  TransportType transport_type = TransportType::Unframed;
   ProtocolType protocol_type = ProtocolType::Binary;
   MessageType message_type = MessageType::Reply;
 
@@ -758,7 +758,7 @@ request_rules:
 }
 
 TEST_F(FilterTest, NoApplyOnMissingWhenMetadataIsPresent) {
-  TransportType transport_type = TransportType::Framed;
+  TransportType transport_type = TransportType::Unframed;
   ProtocolType protocol_type = ProtocolType::Binary;
   MessageType message_type = MessageType::Call;
 
@@ -851,7 +851,7 @@ TEST_F(FilterTest, MismatchedResponseContentType) {
 }
 
 TEST_F(FilterTest, RequestAllowEmptyContentType) {
-  TransportType transport_type = TransportType::Framed;
+  TransportType transport_type = TransportType::Unframed;
   ProtocolType protocol_type = ProtocolType::Binary;
   MessageType message_type = MessageType::Call;
 
@@ -881,7 +881,7 @@ TEST_F(FilterTest, RequestAllowEmptyContentType) {
 }
 
 TEST_F(FilterTest, ResponseAllowEmptyContentType) {
-  TransportType transport_type = TransportType::Framed;
+  TransportType transport_type = TransportType::Unframed;
   ProtocolType protocol_type = ProtocolType::Binary;
   MessageType message_type = MessageType::Reply;
 
@@ -912,7 +912,7 @@ TEST_F(FilterTest, ResponseAllowEmptyContentType) {
 }
 
 TEST_F(FilterTest, CustomRequestAllowContentTypeAccepted) {
-  TransportType transport_type = TransportType::Framed;
+  TransportType transport_type = TransportType::Unframed;
   ProtocolType protocol_type = ProtocolType::Binary;
   MessageType message_type = MessageType::Call;
 
@@ -942,7 +942,7 @@ TEST_F(FilterTest, CustomRequestAllowContentTypeAccepted) {
 }
 
 TEST_F(FilterTest, CustomResponseAllowContentTypeAccepted) {
-  TransportType transport_type = TransportType::Framed;
+  TransportType transport_type = TransportType::Unframed;
   ProtocolType protocol_type = ProtocolType::Binary;
   MessageType message_type = MessageType::Reply;
 
