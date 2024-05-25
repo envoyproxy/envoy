@@ -51,9 +51,8 @@ std::vector<std::string> stringsFromGoSlice(void* slice_data, int slice_len) {
 extern "C" {
 #endif
 
-CAPIStatus
-envoyGoFilterProcessStateHandlerWrapper(void* s,
-                                        std::function<CAPIStatus(std::shared_ptr<Filter>&)> f) {
+CAPIStatus envoyGoFilterProcessStateHandlerWrapper(
+    void* s, std::function<CAPIStatus(std::shared_ptr<Filter>&, ProcessorState&)> f) {
   auto state = static_cast<ProcessorState*>(reinterpret_cast<processState*>(s));
   if (!state->isProcessingInGo()) {
     return CAPIStatus::CAPINotInGo;
@@ -61,7 +60,7 @@ envoyGoFilterProcessStateHandlerWrapper(void* s,
   auto req = static_cast<HttpRequestInternal*>(state->req);
   auto weak_filter = req->weakFilter();
   if (auto filter = weak_filter.lock()) {
-    return f(filter);
+    return f(filter, *state);
   }
   return CAPIStatus::CAPIFilterIsGone;
 }
@@ -88,8 +87,8 @@ envoyGoConfigHandlerWrapper(void* c, std::function<CAPIStatus(std::shared_ptr<Fi
 
 CAPIStatus envoyGoFilterHttpContinue(void* s, int status) {
   return envoyGoFilterProcessStateHandlerWrapper(
-      s, [status](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-        return filter->continueStatus(static_cast<GolangStatus>(status));
+      s, [status](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
+        return filter->continueStatus(state, static_cast<GolangStatus>(status));
       });
 }
 
@@ -100,7 +99,8 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* s, int response_code, void* bod
   return envoyGoFilterProcessStateHandlerWrapper(
       s,
       [response_code, body_text_data, body_text_len, headers, headers_num, grpc_status,
-       details_data, details_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+       details_data,
+       details_len](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
         auto header_values = stringsFromGoSlice(headers, headers_num);
         std::function<void(Http::ResponseHeaderMap&)> modify_headers =
             [header_values](Http::ResponseHeaderMap& headers) -> void {
@@ -116,7 +116,7 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* s, int response_code, void* bod
 
         // Deep clone the GoString into C++, since the GoString may be freed after the function
         // returns, while they may still be used in the callback.
-        return filter->sendLocalReply(static_cast<Http::Code>(response_code),
+        return filter->sendLocalReply(state, static_cast<Http::Code>(response_code),
                                       copyStringFromGoPointer(body_text_data, body_text_len),
                                       modify_headers, status,
                                       copyStringFromGoPointer(details_data, details_len));
@@ -125,10 +125,12 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* s, int response_code, void* bod
 
 CAPIStatus envoyGoFilterHttpSendPanicReply(void* s, void* details_data, int details_len) {
   return envoyGoFilterProcessStateHandlerWrapper(
-      s, [details_data, details_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+      s,
+      [details_data, details_len](std::shared_ptr<Filter>& filter,
+                                  ProcessorState& state) -> CAPIStatus {
         // Since this is only used for logs we don't need to deep copy.
         auto details = stringViewFromGoPointer(details_data, details_len);
-        return filter->sendPanicReply(details);
+        return filter->sendPanicReply(state, details);
       });
 }
 
@@ -136,18 +138,20 @@ CAPIStatus envoyGoFilterHttpSendPanicReply(void* s, void* details_data, int deta
 CAPIStatus envoyGoFilterHttpGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data,
                                       int* value_len) {
   return envoyGoFilterProcessStateHandlerWrapper(
-      s, [key_data, key_len, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+      s,
+      [key_data, key_len, value_data, value_len](std::shared_ptr<Filter>& filter,
+                                                 ProcessorState& state) -> CAPIStatus {
         auto key_str = stringViewFromGoPointer(key_data, key_len);
-        return filter->getHeader(key_str, value_data, value_len);
+        return filter->getHeader(state, key_str, value_data, value_len);
       });
 }
 
 CAPIStatus envoyGoFilterHttpCopyHeaders(void* s, void* strs, void* buf) {
   return envoyGoFilterProcessStateHandlerWrapper(
-      s, [strs, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+      s, [strs, buf](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
         auto go_strs = reinterpret_cast<GoString*>(strs);
         auto go_buf = reinterpret_cast<char*>(buf);
-        return filter->copyHeaders(go_strs, go_buf);
+        return filter->copyHeaders(state, go_strs, go_buf);
       });
 }
 
@@ -155,54 +159,57 @@ CAPIStatus envoyGoFilterHttpSetHeaderHelper(void* s, void* key_data, int key_len
                                             int value_len, headerAction act) {
   return envoyGoFilterProcessStateHandlerWrapper(
       s,
-      [key_data, key_len, value_data, value_len,
-       act](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+      [key_data, key_len, value_data, value_len, act](std::shared_ptr<Filter>& filter,
+                                                      ProcessorState& state) -> CAPIStatus {
         auto key_str = stringViewFromGoPointer(key_data, key_len);
         auto value_str = stringViewFromGoPointer(value_data, value_len);
-        return filter->setHeader(key_str, value_str, act);
+        return filter->setHeader(state, key_str, value_str, act);
       });
 }
 
 CAPIStatus envoyGoFilterHttpRemoveHeader(void* s, void* key_data, int key_len) {
   return envoyGoFilterProcessStateHandlerWrapper(
-      s, [key_data, key_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+      s, [key_data, key_len](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
         auto key_str = stringViewFromGoPointer(key_data, key_len);
-        return filter->removeHeader(key_str);
+        return filter->removeHeader(state, key_str);
       });
 }
 
 CAPIStatus envoyGoFilterHttpGetBuffer(void* s, uint64_t buffer_ptr, void* data) {
   return envoyGoFilterProcessStateHandlerWrapper(
-      s, [buffer_ptr, data](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+      s, [buffer_ptr, data](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
-        return filter->copyBuffer(buffer, reinterpret_cast<char*>(data));
+        return filter->copyBuffer(state, buffer, reinterpret_cast<char*>(data));
       });
 }
 
 CAPIStatus envoyGoFilterHttpDrainBuffer(void* s, uint64_t buffer_ptr, uint64_t length) {
   return envoyGoFilterProcessStateHandlerWrapper(
-      s, [buffer_ptr, length](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+      s,
+      [buffer_ptr, length](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
-        return filter->drainBuffer(buffer, length);
+        return filter->drainBuffer(state, buffer, length);
       });
 }
 
 CAPIStatus envoyGoFilterHttpSetBufferHelper(void* s, uint64_t buffer_ptr, void* data, int length,
                                             bufferAction action) {
   return envoyGoFilterProcessStateHandlerWrapper(
-      s, [buffer_ptr, data, length, action](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+      s,
+      [buffer_ptr, data, length, action](std::shared_ptr<Filter>& filter,
+                                         ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
         auto value = stringViewFromGoPointer(data, length);
-        return filter->setBufferHelper(buffer, value, action);
+        return filter->setBufferHelper(state, buffer, value, action);
       });
 }
 
 CAPIStatus envoyGoFilterHttpCopyTrailers(void* s, void* strs, void* buf) {
   return envoyGoFilterProcessStateHandlerWrapper(
-      s, [strs, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+      s, [strs, buf](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
         auto go_strs = reinterpret_cast<GoString*>(strs);
         auto go_buf = reinterpret_cast<char*>(buf);
-        return filter->copyTrailers(go_strs, go_buf);
+        return filter->copyTrailers(state, go_strs, go_buf);
       });
 }
 
@@ -210,19 +217,19 @@ CAPIStatus envoyGoFilterHttpSetTrailer(void* s, void* key_data, int key_len, voi
                                        int value_len, headerAction act) {
   return envoyGoFilterProcessStateHandlerWrapper(
       s,
-      [key_data, key_len, value_data, value_len,
-       act](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+      [key_data, key_len, value_data, value_len, act](std::shared_ptr<Filter>& filter,
+                                                      ProcessorState& state) -> CAPIStatus {
         auto key_str = stringViewFromGoPointer(key_data, key_len);
         auto value_str = stringViewFromGoPointer(value_data, value_len);
-        return filter->setTrailer(key_str, value_str, act);
+        return filter->setTrailer(state, key_str, value_str, act);
       });
 }
 
 CAPIStatus envoyGoFilterHttpRemoveTrailer(void* s, void* key_data, int key_len) {
   return envoyGoFilterProcessStateHandlerWrapper(
-      s, [key_data, key_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+      s, [key_data, key_len](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
         auto key_str = stringViewFromGoPointer(key_data, key_len);
-        return filter->removeTrailer(key_str);
+        return filter->removeTrailer(state, key_str);
       });
 }
 

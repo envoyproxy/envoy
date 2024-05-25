@@ -314,7 +314,8 @@ func (f *filter) decodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 	trailers.Set("x-test-trailer-0", "bar")
 	trailers.Del("x-test-trailer-1")
 
-	if trailers.GetRaw("existed-trailer") == "foo" {
+	existed, _ := trailers.Get("existed-trailer")
+	if existed == "foo" {
 		trailers.Add("x-test-trailer-2", "bar")
 	}
 

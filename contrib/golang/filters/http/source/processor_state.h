@@ -135,6 +135,7 @@ public:
     ASSERT(filterState() == FilterState::WaitingData ||
            (filterState() == FilterState::WaitingAllData && (end_stream || seen_trailers_)));
     setFilterState(FilterState::ProcessingData);
+
     do_end_stream_ = end_stream;
   }
 
@@ -162,6 +163,9 @@ public:
   bool getEndStream() { return end_stream_; }
   // seen trailers also means stream is end
   bool isStreamEnd() { return end_stream_ || seen_trailers_; }
+
+  Http::RequestOrResponseHeaderMap* headers{nullptr};
+  Http::HeaderMap* trailers{nullptr};
 
   BufferList doDataList;
 
