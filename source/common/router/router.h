@@ -124,7 +124,7 @@ public:
    * - x-forwarded-proto header if valid
    * - whether the downstream connection is using TLS
    */
-  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
+  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_ssl,
                                 bool upstream_ssl, bool use_upstream);
 
   /**

@@ -124,7 +124,7 @@ uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds resp
   return static_cast<uint64_t>(response_time.count() * TimeoutPrecisionFactor / timeout.count());
 }
 
-void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
+void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_ssl,
                                       bool upstream_ssl, bool use_upstream) {
   if (use_upstream) {
     if (upstream_ssl) {
@@ -147,7 +147,7 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
     return;
   }
 
-  if (downstream_secure) {
+  if (downstream_ssl) {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
   } else {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
