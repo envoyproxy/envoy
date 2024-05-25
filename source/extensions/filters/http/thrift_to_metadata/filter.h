@@ -16,11 +16,11 @@
 #include "source/extensions/filters/network/thrift_proxy/auto_transport_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/decoder.h"
 #include "source/extensions/filters/network/thrift_proxy/framed_transport_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/header_transport_impl.h"
-#include "source/extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
-#include "source/extensions/filters/network/thrift_proxy/decoder.h"
 #include "source/extensions/filters/network/thrift_proxy/passthrough_decoder_event_handler.h"
+#include "source/extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
 #include "absl/strings/string_view.h"
 

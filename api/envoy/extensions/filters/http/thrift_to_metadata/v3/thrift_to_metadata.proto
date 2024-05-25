@@ -182,6 +182,7 @@ message ThriftToMetadata {
 // request rules and responses rules.
 message ThriftToMetadataPerRoute {
   option (xds.annotations.v3.message_status).work_in_progress = true;
+
   // The list of rules to apply to http request body to extract thrift metadata.
   repeated Rule request_rules = 1;
 
