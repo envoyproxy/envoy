@@ -62,7 +62,7 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          server_context.api(), makeOptRef(server_context), region,
+          server_context.api(), makeOptRef(server_context), dual_info.scope, region,
           Extensions::Common::Aws::Utility::fetchMetadata);
   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
       config.match_excluded_headers().begin(), config.match_excluded_headers().end());
@@ -123,7 +123,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context.api(), makeOptRef(context), region,
+          context.api(), makeOptRef(context), context.scope(), region,
           Extensions::Common::Aws::Utility::fetchMetadata);
 
   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(

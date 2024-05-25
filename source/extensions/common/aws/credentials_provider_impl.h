@@ -109,7 +109,7 @@ public:
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
 
   MetadataCredentialsProviderBase(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Stats::Scope& scope,
       const CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri,
@@ -173,6 +173,7 @@ protected:
   // The optional server factory context.
   ServerFactoryContextOptRef context_;
   // Store the method to fetch metadata from libcurl (deprecated)
+  Stats::Scope& statsscope_;
   CurlMetadataFetcher fetch_metadata_using_curl_;
   // The callback used to create a MetadataFetcher instance.
   CreateMetadataFetcherCb create_metadata_fetcher_cb_;
@@ -229,7 +230,7 @@ protected:
 class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBase,
                                            public MetadataFetcher::MetadataReceiver {
 public:
-  InstanceProfileCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+  InstanceProfileCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context, Stats::Scope& statsscope,
                                      const CurlMetadataFetcher& fetch_metadata_using_curl,
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
@@ -267,7 +268,7 @@ private:
 class ContainerCredentialsProvider : public MetadataCredentialsProviderBase,
                                      public MetadataFetcher::MetadataReceiver {
 public:
-  ContainerCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+  ContainerCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context, Stats::Scope& statsscope,
                                const CurlMetadataFetcher& fetch_metadata_using_curl,
                                CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                absl::string_view credential_uri,
@@ -296,7 +297,7 @@ private:
 class WebIdentityCredentialsProvider : public MetadataCredentialsProviderBase,
                                        public MetadataFetcher::MetadataReceiver {
 public:
-  WebIdentityCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+  WebIdentityCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context, Stats::Scope& statsscope,
                                  const CurlMetadataFetcher& fetch_metadata_using_curl,
                                  CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                  absl::string_view token_file_path, absl::string_view sts_endpoint,
@@ -348,7 +349,7 @@ public:
   createCredentialsFileCredentialsProvider(Api::Api& api) const PURE;
 
   virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Stats::Scope& statsscope,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
@@ -357,7 +358,7 @@ public:
       std::chrono::seconds initialization_timer) const PURE;
 
   virtual CredentialsProviderSharedPtr createContainerCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Stats::Scope& statsscope,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri,
@@ -366,7 +367,7 @@ public:
       absl::string_view authorization_token = {}) const PURE;
 
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Stats::Scope& statsscope,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
@@ -383,12 +384,12 @@ class DefaultCredentialsProviderChain : public CredentialsProviderChain,
                                         public CredentialsProviderChainFactories {
 public:
   DefaultCredentialsProviderChain(
-      Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
+      Api::Api& api, ServerFactoryContextOptRef context, Stats::Scope& statsscope, absl::string_view region,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl)
-      : DefaultCredentialsProviderChain(api, context, region, fetch_metadata_using_curl, *this) {}
+      : DefaultCredentialsProviderChain(api, context, statsscope, region, fetch_metadata_using_curl, *this) {}
 
   DefaultCredentialsProviderChain(
-      Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
+      Api::Api& api, ServerFactoryContextOptRef context, Stats::Scope& statsscope, absl::string_view region,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       const CredentialsProviderChainFactories& factories);
 
@@ -403,7 +404,7 @@ private:
   }
 
   CredentialsProviderSharedPtr createContainerCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Stats::Scope& statsscope,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri,
@@ -411,23 +412,23 @@ private:
       std::chrono::seconds initialization_timer,
       absl::string_view authorization_token = {}) const override {
     return std::make_shared<ContainerCredentialsProvider>(
-        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, credential_uri,
+        api, context, statsscope, fetch_metadata_using_curl, create_metadata_fetcher_cb, credential_uri,
         refresh_state, initialization_timer, authorization_token, cluster_name);
   }
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Stats::Scope& statsscope,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) const override {
     return std::make_shared<InstanceProfileCredentialsProvider>(
-        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
+        api, context, statsscope, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
         initialization_timer, cluster_name);
   }
 
   CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Stats::Scope& statsscope,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
@@ -435,7 +436,7 @@ private:
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer) const override {
     return std::make_shared<WebIdentityCredentialsProvider>(
-        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, token_file_path,
+        api, context, statsscope, fetch_metadata_using_curl, create_metadata_fetcher_cb, token_file_path,
         sts_endpoint, role_arn, role_session_name, refresh_state, initialization_timer,
         cluster_name);
   }
