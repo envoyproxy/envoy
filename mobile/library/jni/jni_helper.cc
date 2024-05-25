@@ -2,18 +2,37 @@
 
 #include "source/common/common/assert.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace JNI {
 namespace {
-
+// Const variables.
 constexpr jint JNI_VERSION = JNI_VERSION_1_6;
 constexpr const char* THREAD_NAME = "EnvoyMain";
+// Non-const variables.
 std::atomic<JavaVM*> java_vm_cache_;
 thread_local JNIEnv* jni_env_cache_ = nullptr;
-absl::flat_hash_map<absl::string_view, jclass> JCLASS_CACHES;
-
+absl::flat_hash_map<absl::string_view, jclass> jclass_cache;
+absl::Mutex jmethod_id_cache_mutex;
+absl::flat_hash_map<
+    std::tuple<jclass, absl::string_view /* method */, absl::string_view /* signature */>,
+    jmethodID>
+    jmethod_id_cache ABSL_GUARDED_BY(jmethod_id_cache_mutex);
+absl::Mutex static_jmethod_id_cache_mutex;
+absl::flat_hash_map<std::tuple<jclass, absl::string_view /* method */, absl::string_view>,
+                    jmethodID /* signature */>
+    static_jmethod_id_cache ABSL_GUARDED_BY(static_jmethod_id_cache_mutex);
+absl::Mutex jfield_id_cache_mutex;
+absl::flat_hash_map<std::tuple<jclass, absl::string_view /* field */, absl::string_view>,
+                    jfieldID /* signature */>
+    jfield_id_cache ABSL_GUARDED_BY(jfield_id_cache_mutex);
+absl::Mutex static_jfield_id_cache_mutex;
+absl::flat_hash_map<std::tuple<jclass, absl::string_view /* field */, absl::string_view>,
+                    jfieldID /* signature */>
+    static_jfield_id_cache ABSL_GUARDED_BY(static_jfield_id_cache_mutex);
 } // namespace
 
 jint JniHelper::getVersion() { return JNI_VERSION; }
@@ -27,7 +46,7 @@ void JniHelper::addClassToCache(const char* class_name) {
   jint result = getJavaVm()->GetEnv(reinterpret_cast<void**>(&env), getVersion());
   ASSERT(result == JNI_OK, "Unable to get JNIEnv from the JavaVM.");
   jclass java_class = reinterpret_cast<jclass>(env->NewGlobalRef(env->FindClass(class_name)));
-  JCLASS_CACHES.emplace(class_name, java_class);
+  jclass_cache.emplace(class_name, java_class);
 }
 
 JavaVM* JniHelper::getJavaVm() { return java_vm_cache_.load(std::memory_order_acquire); }
@@ -58,7 +77,29 @@ JNIEnv* JniHelper::getThreadLocalEnv() {
 JNIEnv* JniHelper::getEnv() { return env_; }
 
 jfieldID JniHelper::getFieldId(jclass clazz, const char* name, const char* signature) {
+  absl::MutexLock lock(&jfield_id_cache_mutex);
+  if (auto it = jfield_id_cache.find(
+          std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
+      it != jfield_id_cache.end()) {
+    return it->second;
+  }
   jfieldID field_id = env_->GetFieldID(clazz, name, signature);
+  jfield_id_cache.emplace(
+      std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature), field_id);
+  rethrowException();
+  return field_id;
+}
+
+jfieldID JniHelper::getStaticFieldId(jclass clazz, const char* name, const char* signature) {
+  absl::MutexLock lock(&static_jfield_id_cache_mutex);
+  if (auto it = static_jfield_id_cache.find(
+          std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
+      it != static_jfield_id_cache.end()) {
+    return it->second;
+  }
+  jfieldID field_id = env_->GetStaticFieldID(clazz, name, signature);
+  static_jfield_id_cache.emplace(
+      std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature), field_id);
   rethrowException();
   return field_id;
 }
@@ -78,19 +119,35 @@ DEFINE_GET_FIELD(Double, jdouble)
 DEFINE_GET_FIELD(Boolean, jboolean)
 
 jmethodID JniHelper::getMethodId(jclass clazz, const char* name, const char* signature) {
+  absl::MutexLock lock(&jmethod_id_cache_mutex);
+  if (auto it = jmethod_id_cache.find(
+          std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
+      it != jmethod_id_cache.end()) {
+    return it->second;
+  }
   jmethodID method_id = env_->GetMethodID(clazz, name, signature);
+  jmethod_id_cache.emplace(
+      std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature), method_id);
   rethrowException();
   return method_id;
 }
 
 jmethodID JniHelper::getStaticMethodId(jclass clazz, const char* name, const char* signature) {
+  absl::MutexLock lock(&static_jmethod_id_cache_mutex);
+  if (auto it = static_jmethod_id_cache.find(
+          std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
+      it != static_jmethod_id_cache.end()) {
+    return it->second;
+  }
   jmethodID method_id = env_->GetStaticMethodID(clazz, name, signature);
+  static_jmethod_id_cache.emplace(
+      std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature), method_id);
   rethrowException();
   return method_id;
 }
 
 jclass JniHelper::findClass(const char* class_name) {
-  if (auto i = JCLASS_CACHES.find(class_name); i != JCLASS_CACHES.end()) {
+  if (auto i = jclass_cache.find(class_name); i != jclass_cache.end()) {
     return i->second;
   }
   ASSERT(false, absl::StrFormat("Unable to find class '%s'.", class_name));

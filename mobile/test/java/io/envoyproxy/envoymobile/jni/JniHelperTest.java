@@ -18,6 +18,7 @@ public class JniHelperTest {
   // Native methods for testing.
   //================================================================================
   public static native void getFieldId(Class<?> clazz, String name, String signature);
+  public static native void getStaticFieldId(Class<?> clazz, String name, String signature);
   public static native byte getByteField(Class<?> clazz, Object instance, String name,
                                          String signature);
   public static native char getCharField(Class<?> clazz, Object instance, String name,
@@ -156,11 +157,19 @@ public class JniHelperTest {
   //================================================================================
   public static void alwaysThrow() { throw new RuntimeException("Test"); }
 
-  static class Foo { private final int field = 1; }
+  static class Foo {
+    private final int field = 1;
+    private static int staticField = 2;
+  }
 
   @Test
   public void testGetFieldId() {
     getFieldId(Foo.class, "field", "I");
+  }
+
+  @Test
+  public void testGetStatocFieldId() {
+    getStaticFieldId(Foo.class, "staticField", "I");
   }
 
   @Test

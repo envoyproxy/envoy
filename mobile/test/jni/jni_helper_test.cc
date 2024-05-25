@@ -24,6 +24,14 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTe
   jni_helper.getFieldId(clazz, name_ptr.get(), sig_ptr.get());
 }
 
+extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getStaticFieldId(
+    JNIEnv* env, jclass, jclass clazz, jstring name, jstring signature) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr name_ptr = jni_helper.getStringUtfChars(name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);
+  jni_helper.getStaticFieldId(clazz, name_ptr.get(), sig_ptr.get());
+}
+
 #define DEFINE_JNI_GET_FIELD(JAVA_TYPE, JNI_TYPE)                                                  \
   extern "C" JNIEXPORT JNI_TYPE JNICALL                                                            \
       Java_io_envoyproxy_envoymobile_jni_JniHelperTest_get##JAVA_TYPE##Field(                      \
