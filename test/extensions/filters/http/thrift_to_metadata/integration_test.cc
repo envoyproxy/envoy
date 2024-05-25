@@ -1,7 +1,8 @@
-#include "test/integration/http_protocol_integration.h"
+#include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol_converter.h"
 #include "source/extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
-#include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
+
+#include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {
 namespace {

@@ -45,4 +45,3 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/thrift_to_metadata:config",
         "//test/integration:http_protocol_integration_lib",
     ],
-)
