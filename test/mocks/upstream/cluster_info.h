@@ -35,28 +35,6 @@ class FilterChainManager;
 
 namespace Upstream {
 
-class MockLoadBalancerSubsetInfo : public LoadBalancerSubsetInfo {
-public:
-  MockLoadBalancerSubsetInfo();
-  ~MockLoadBalancerSubsetInfo() override;
-
-  // Upstream::LoadBalancerSubsetInfo
-  MOCK_METHOD(bool, isEnabled, (), (const));
-  MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy,
-              fallbackPolicy, (), (const));
-  MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy,
-              metadataFallbackPolicy, (), (const));
-  MOCK_METHOD(const ProtobufWkt::Struct&, defaultSubset, (), (const));
-  MOCK_METHOD(const std::vector<SubsetSelectorPtr>&, subsetSelectors, (), (const));
-  MOCK_METHOD(bool, localityWeightAware, (), (const));
-  MOCK_METHOD(bool, scaleLocalityWeight, (), (const));
-  MOCK_METHOD(bool, panicModeAny, (), (const));
-  MOCK_METHOD(bool, listAsAny, (), (const));
-  MOCK_METHOD(bool, allowRedundantKeys, (), (const));
-
-  std::vector<SubsetSelectorPtr> subset_selectors_;
-};
-
 // While this mock class doesn't have any direct use in public Envoy tests, it's
 // useful for constructing tests of downstream private filters that use
 // ClusterTypedMetadata.
@@ -146,8 +124,6 @@ public:
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>, clusterType, (),
               (const));
-  MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>,
-              lbOriginalDstConfig, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::core::v3::TypedExtensionConfig>, upstreamConfig, (),
               (const));
   MOCK_METHOD(bool, maintenanceMode, (), (const));
@@ -243,8 +219,6 @@ public:
       upstream_http_protocol_options_;
   absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocols_cache_options_;
-  std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
-      lb_original_dst_config_;
   Upstream::TypedLoadBalancerFactory* lb_factory_ =
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
           "envoy.load_balancing_policies.round_robin");

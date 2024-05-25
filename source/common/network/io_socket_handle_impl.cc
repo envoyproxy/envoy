@@ -316,7 +316,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     // Get overflow, local address and gso_size from control message.
     for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr;
          cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-
       if (output.msg_[0].local_address_ == nullptr) {
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(
             *cmsg, self_port, fd_, socket_v6only_ || !udp_read_normalize_addresses_);

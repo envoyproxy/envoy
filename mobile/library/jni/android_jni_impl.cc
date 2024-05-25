@@ -1,4 +1,3 @@
-#include "library/jni/import/jni_import.h"
 #include "library/jni/jni_utility.h"
 
 // NOLINT(namespace-envoy)

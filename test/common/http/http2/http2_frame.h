@@ -184,6 +184,8 @@ public:
                                     const std::vector<Header> extra_headers);
   static Http2Frame makeDataFrame(uint32_t stream_index, absl::string_view data,
                                   DataFlags flags = DataFlags::None);
+  static Http2Frame makeDataFrameWithPadding(uint32_t stream_index, absl::string_view data,
+                                             uint8_t padding_size);
 
   /**
    * Creates a frame with the given contents. This frame can be

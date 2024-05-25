@@ -204,7 +204,8 @@ private:
     UpdateCallbacks& callbacks_;
   };
 
-  void startCacheLoad(const std::string& host, uint16_t default_port, bool is_proxy_lookup);
+  void startCacheLoad(const std::string& host, uint16_t default_port, bool is_proxy_lookup,
+                      bool disallow_cached_results);
 
   void startResolve(const std::string& host, PrimaryHostInfo& host_info)
       ABSL_LOCKS_EXCLUDED(primary_hosts_lock_);
@@ -219,7 +220,8 @@ private:
                                       Network::DnsResolver::ResolutionStatus status);
   void runRemoveCallbacks(const std::string& host);
   void notifyThreads(const std::string& host, const DnsHostInfoImplSharedPtr& resolved_info);
-  void onReResolve(const std::string& host);
+  void onReResolveAlarm(const std::string& host);
+  void removeHost(const std::string& host, const PrimaryHostInfo& host_info);
   void onResolveTimeout(const std::string& host);
   PrimaryHostInfo& getPrimaryHost(const std::string& host);
 

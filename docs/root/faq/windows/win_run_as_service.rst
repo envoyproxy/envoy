@@ -1,6 +1,8 @@
 Can I run Envoy on Windows under SCM?
 =====================================
 
+.. include:: ../../_include/windows_support_ended.rst
+
 .. note::
 
     This feature is still in Experimental state.

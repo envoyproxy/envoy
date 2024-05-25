@@ -423,6 +423,19 @@ Http2Frame Http2Frame::makeDataFrame(uint32_t stream_index, absl::string_view da
   return frame;
 }
 
+Http2Frame Http2Frame::makeDataFrameWithPadding(uint32_t stream_index, absl::string_view data,
+                                                uint8_t padding_size) {
+  ASSERT(padding_size > 0);
+  Http2Frame frame;
+  frame.buildHeader(Type::Data, 0, 0x08, makeNetworkOrderStreamId(stream_index));
+  frame.appendData({static_cast<uint8_t>(padding_size - 1u)});
+  frame.appendData(data);
+  std::vector<uint8_t> padding(padding_size - 1);
+  frame.appendData(padding);
+  frame.adjustPayloadSize();
+  return frame;
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

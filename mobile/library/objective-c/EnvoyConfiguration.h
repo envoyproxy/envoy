@@ -32,6 +32,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
 @property (nonatomic, assign) BOOL forceIPv6;
 @property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
+@property (nonatomic, strong, nullable) NSString *upstreamTlsSni;
 @property (nonatomic, assign) BOOL respectSystemProxySettings;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
@@ -82,6 +83,7 @@ NS_ASSUME_NONNULL_BEGIN
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
                                         forceIPv6:(BOOL)forceIPv6
               enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
+                                   upstreamTlsSni:(nullable NSString *)upstreamTlsSni
                        respectSystemProxySettings:(BOOL)respectSystemProxySettings
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds

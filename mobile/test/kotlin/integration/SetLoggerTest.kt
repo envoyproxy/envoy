@@ -6,7 +6,6 @@ import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -22,7 +21,7 @@ class SetLoggerTest {
     val countDownLatch = CountDownLatch(1)
     val logEventLatch = CountDownLatch(1)
     val engine =
-      EngineBuilder(Standard())
+      EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .addNativeFilter(
@@ -57,7 +56,7 @@ class SetLoggerTest {
     val countDownLatch = CountDownLatch(1)
     val logEventLatch = CountDownLatch(1)
     val engine =
-      EngineBuilder(Standard())
+      EngineBuilder()
         .setEventTracker { event ->
           if (event["log_name"] == "event_name") {
             logEventLatch.countDown()

@@ -60,9 +60,6 @@ public:
                  Tracing::Span& span) override;
 
 private:
-  void toAuthzResponseHeader(
-      ResponsePtr& response,
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers);
   Grpc::AsyncClient<envoy::service::auth::v3::CheckRequest, envoy::service::auth::v3::CheckResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
