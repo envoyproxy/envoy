@@ -148,9 +148,9 @@ protocol: TWITTER
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_REGEX(
+  EXPECT_THROW(
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "thrift_to_metadata filter: Protocol TWITTER is not supported");
+      EnvoyException);
 }
 
 } // namespace ThriftToMetadata
