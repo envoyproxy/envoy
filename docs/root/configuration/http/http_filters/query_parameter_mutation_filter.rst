@@ -31,27 +31,23 @@ The following configuration will transform requests from `/some/path?remove-me=v
 The following configuration will add a query parameter only on requests that match `/foobar`.
 
 .. code-block:: yaml
-  filter_chains:
-    - filters:
-      - name: envoy.filters.network.http_connection_manager
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          route_config:
-            virtual_hosts:
-              - name: service
-                domains: ["*"]
-                routes:
-                  - match: { path: /foobar }
-                    route: { cluster: service1 }
-                    typed_per_filter_config:
-                      envoy.filters.http.query_parameter_mutation:
-                        "@type": type.googleapis.com/envoy.extensions.filters.http.query_parameter_mutation.v3.Config
-                        query_parameters_to_add:
-                          - key: param
-                            value: new-value
-                  - match: { path: / }
-                    route: { cluster: service2 }
 
-          http_filters:
-            - name: envoy.filters.http.query_parameter_mutation
-            - name: envoy.filters.http.router
+  route_config:
+    virtual_hosts:
+      - name: service
+        domains: ["*"]
+        routes:
+          - match: { path: /foobar }
+            route: { cluster: service1 }
+            typed_per_filter_config:
+              envoy.filters.http.query_parameter_mutation:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.query_parameter_mutation.v3.Config
+                query_parameters_to_add:
+                  - key: param
+                    value: new-value
+          - match: { path: / }
+            route: { cluster: service2 }
+
+  http_filters:
+    - name: envoy.filters.http.query_parameter_mutation
+    - name: envoy.filters.http.router
