@@ -281,7 +281,6 @@ envoy_cc_test(
         "//envoy/server:instance_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/buffer:buffer_lib",
-        "//source/server/admin:clusters_chunk_processor_lib",
         "//source/server/admin:clusters_params_lib",
         "//source/server/admin:clusters_request_lib",
         "//test/mocks/server:instance_mocks",

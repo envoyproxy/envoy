@@ -3,12 +3,12 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/server/instance.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/headers.h"
 #include "source/common/upstream/host_utility.h"
-#include "source/server/admin/clusters_chunk_processor.h"
 
 #include "clusters_params.h"
 

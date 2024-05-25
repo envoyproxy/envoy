@@ -7,7 +7,8 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "source/server/admin/clusters_chunk_processor.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/json/json_streamer.h"
 #include "source/server/admin/clusters_params.h"
 
 namespace Envoy {
@@ -52,6 +53,22 @@ private:
                                         Upstream::ResourceManager& resource_manager,
                                         Buffer::Instance& response);
   uint64_t idx_;
+};
+
+/**
+ * ClustersJsonContext holds an Envoy::Json::Streamer and the top-level JSON objects throughout the
+ * duration of a request. When it is destructed, the buffer will terminate the array and object
+ * herein. See the Envoy::Json::Streamer implementation for details.
+ */
+struct ClustersJsonContext {
+  ClustersJsonContext(std::unique_ptr<Json::Streamer> streamer, Buffer::Instance& buffer,
+                      Json::Streamer::MapPtr root_map, Json::Streamer::ArrayPtr clusters)
+      : streamer_(std::move(streamer)), buffer_(buffer), root_map_(std::move(root_map)),
+        clusters_(std::move(clusters)) {}
+  std::unique_ptr<Json::Streamer> streamer_;
+  Buffer::Instance& buffer_;
+  Json::Streamer::MapPtr root_map_;
+  Json::Streamer::ArrayPtr clusters_;
 };
 
 /**
