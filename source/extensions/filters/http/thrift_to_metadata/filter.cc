@@ -265,7 +265,7 @@ bool Filter::processData(Buffer::Instance& incoming_data, Buffer::Instance& buff
   buffer.add(incoming_data);
   bool underflow = false;
   TRY_NEEDS_AUDIT {
-    // handler triggeres messageBegin if we get enough data.
+    // handler triggers messageBegin if we get enough data.
     handler->onData(buffer, underflow);
     return true;
   }
