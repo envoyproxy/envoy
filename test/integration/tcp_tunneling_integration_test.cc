@@ -852,8 +852,7 @@ public:
     if (upstreamProtocol() == Http::CodecType::HTTP1) {
       ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     } else {
-      ASSERT_TRUE(
-          upstream_request_->waitForEndStream(*dispatcher_, 2 * TestUtility::DefaultTimeout));
+      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_, TestUtility::DefaultTimeout));
     }
   }
 
