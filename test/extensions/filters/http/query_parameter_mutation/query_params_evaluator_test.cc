@@ -17,12 +17,12 @@ namespace QueryParameterMutation {
 
 class QueryParamsEvaluatorTest : public testing::Test {
 public:
-  absl::string_view evaluateWithPath(absl::string_view path) {
+  std::string evaluateWithPath(const std::string& path) {
     auto paramsEvaluator =
         std::make_unique<QueryParamsEvaluator>(query_params_to_add_, query_params_to_remove_);
-    Http::TestRequestHeaderMapImpl request_headers{{":path", std::string(path)}};
+    Http::TestRequestHeaderMapImpl request_headers{{":path", path}};
     paramsEvaluator->evaluateQueryParams(request_headers, stream_info_);
-    return request_headers.getPathValue();
+    return std::string(request_headers.getPathValue());
   }
 
   void addParamToAdd(absl::string_view key, absl::string_view value) {
