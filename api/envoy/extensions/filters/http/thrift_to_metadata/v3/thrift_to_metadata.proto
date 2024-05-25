@@ -161,6 +161,8 @@ message ThriftToMetadata {
 
   // Supplies the type of protocol that the Thrift proxy should use. Defaults to
   // :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`.
+  // Note that :ref:`LAX_BINARY<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.LAX_BINARY>`
+  // is not fully supported as the state of the art of thrift_proxy network filter.
   // Note that :ref:`TWITTER<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>` is
   // not supported due to deprecation in envoy.
   network.thrift_proxy.v3.ProtocolType protocol = 4 [(validate.rules).enum = {defined_only: true}];
