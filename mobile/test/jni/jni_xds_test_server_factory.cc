@@ -8,6 +8,14 @@
 
 // NOLINT(namespace-envoy)
 
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
+  Envoy::JNI::JniHelper::initialize(vm);
+  Envoy::JNI::JniHelper::addClassToCache("java/util/Map$Entry");
+  Envoy::JNI::JniHelper::addClassToCache(
+      "io/envoyproxy/envoymobile/engine/testing/XdsTestServerFactory$XdsTestServer");
+  return Envoy::JNI::JniHelper::getVersion();
+}
+
 extern "C" JNIEXPORT jobject JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_XdsTestServerFactory_create(JNIEnv* env, jclass) {
   // This is called via JNI from kotlin tests, and Envoy doesn't consider it a test thread
@@ -18,14 +26,14 @@ Java_io_envoyproxy_envoymobile_engine_testing_XdsTestServerFactory_create(JNIEnv
   Envoy::ExtensionRegistry::registerFactories();
   Envoy::XdsTestServer* test_server = new Envoy::XdsTestServer();
 
-  auto java_xds_server_factory_class = jni_helper.findClass(
+  jclass java_xds_server_factory_class = jni_helper.findClass(
       "io/envoyproxy/envoymobile/engine/testing/XdsTestServerFactory$XdsTestServer");
-  auto java_init_method_id = jni_helper.getMethodId(java_xds_server_factory_class.get(), "<init>",
-                                                    "(JLjava/lang/String;I)V");
+  auto java_init_method_id =
+      jni_helper.getMethodId(java_xds_server_factory_class, "<init>", "(JLjava/lang/String;I)V");
   auto host = Envoy::JNI::cppStringToJavaString(jni_helper, test_server->getHost());
   jint port = static_cast<jint>(test_server->getPort());
   return jni_helper
-      .newObject(java_xds_server_factory_class.get(), java_init_method_id,
+      .newObject(java_xds_server_factory_class, java_init_method_id,
                  reinterpret_cast<jlong>(test_server), host.get(), port)
       .release();
 }
