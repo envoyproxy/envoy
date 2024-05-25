@@ -55,7 +55,14 @@ protected:
   using ClustersRequestPtr = std::unique_ptr<ClustersRequest>;
 
   ClustersRequestPtr makeRequest(uint64_t chunk_limit, ClustersParams& params) {
-    return std::make_unique<ClustersRequest>(chunk_limit, mock_server_, params);
+    switch (params.format_) {
+    case ClustersParams::Format::Text:
+      return std::make_unique<TextClustersRequest>(chunk_limit, mock_server_, params);
+    case ClustersParams::Format::Json:
+      return std::make_unique<JsonClustersRequest>(chunk_limit, mock_server_, params);
+    case ClustersParams::Format::Unknown:
+      return nullptr;
+    }
   }
 
   struct ResponseResult {
