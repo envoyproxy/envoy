@@ -967,30 +967,25 @@ CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
   }
-  auto& state = getProcessorState();
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
 
   switch (static_cast<EnvoyValue>(id)) {
   case EnvoyValue::Protocol:
-    if (!state.streamInfo().protocol().has_value()) {
+    if (!streamInfo().protocol().has_value()) {
       return CAPIStatus::CAPIValueNotFound;
     }
-    *value = static_cast<uint64_t>(state.streamInfo().protocol().value());
+    *value = static_cast<uint64_t>(streamInfo().protocol().value());
     break;
   case EnvoyValue::ResponseCode:
-    if (!state.streamInfo().responseCode().has_value()) {
+    if (!streamInfo().responseCode().has_value()) {
       return CAPIStatus::CAPIValueNotFound;
     }
-    *value = state.streamInfo().responseCode().value();
+    *value = streamInfo().responseCode().value();
     break;
   case EnvoyValue::AttemptCount:
-    if (!state.streamInfo().attemptCount().has_value()) {
+    if (!streamInfo().attemptCount().has_value()) {
       return CAPIStatus::CAPIValueNotFound;
     }
-    *value = state.streamInfo().attemptCount().value();
+    *value = streamInfo().attemptCount().value();
     break;
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid integer value id: ", id));
@@ -1005,65 +1000,58 @@ CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) 
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
   }
-  auto& state = getProcessorState();
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
 
   // refer the string to req_->strValue, not deep clone, make sure it won't be freed while reading
   // it on the Go side.
   switch (static_cast<EnvoyValue>(id)) {
   case EnvoyValue::RouteName:
-    req_->strValue = state.streamInfo().getRouteName();
+    req_->strValue = streamInfo().getRouteName();
     break;
   case EnvoyValue::FilterChainName: {
-    const auto filter_chain_info = state.streamInfo().downstreamAddressProvider().filterChainInfo();
+    const auto filter_chain_info = streamInfo().downstreamAddressProvider().filterChainInfo();
     req_->strValue =
         filter_chain_info.has_value() ? std::string(filter_chain_info->name()) : std::string();
     break;
   }
   case EnvoyValue::ResponseCodeDetails:
-    if (!state.streamInfo().responseCodeDetails().has_value()) {
+    if (!streamInfo().responseCodeDetails().has_value()) {
       return CAPIStatus::CAPIValueNotFound;
     }
-    req_->strValue = state.streamInfo().responseCodeDetails().value();
+    req_->strValue = streamInfo().responseCodeDetails().value();
     break;
   case EnvoyValue::DownstreamLocalAddress:
-    req_->strValue = state.streamInfo().downstreamAddressProvider().localAddress()->asString();
+    req_->strValue = streamInfo().downstreamAddressProvider().localAddress()->asString();
     break;
   case EnvoyValue::DownstreamRemoteAddress:
-    req_->strValue = state.streamInfo().downstreamAddressProvider().remoteAddress()->asString();
+    req_->strValue = streamInfo().downstreamAddressProvider().remoteAddress()->asString();
     break;
   case EnvoyValue::UpstreamLocalAddress:
-    if (state.streamInfo().upstreamInfo() &&
-        state.streamInfo().upstreamInfo()->upstreamLocalAddress()) {
-      req_->strValue = state.streamInfo().upstreamInfo()->upstreamLocalAddress()->asString();
+    if (streamInfo().upstreamInfo() && streamInfo().upstreamInfo()->upstreamLocalAddress()) {
+      req_->strValue = streamInfo().upstreamInfo()->upstreamLocalAddress()->asString();
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
     break;
   case EnvoyValue::UpstreamRemoteAddress:
-    if (state.streamInfo().upstreamInfo() &&
-        state.streamInfo().upstreamInfo()->upstreamRemoteAddress()) {
-      req_->strValue = state.streamInfo().upstreamInfo()->upstreamRemoteAddress()->asString();
+    if (streamInfo().upstreamInfo() && streamInfo().upstreamInfo()->upstreamRemoteAddress()) {
+      req_->strValue = streamInfo().upstreamInfo()->upstreamRemoteAddress()->asString();
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
     break;
   case EnvoyValue::UpstreamClusterName:
-    if (state.streamInfo().upstreamClusterInfo().has_value() &&
-        state.streamInfo().upstreamClusterInfo().value()) {
-      req_->strValue = state.streamInfo().upstreamClusterInfo().value()->name();
+    if (streamInfo().upstreamClusterInfo().has_value() &&
+        streamInfo().upstreamClusterInfo().value()) {
+      req_->strValue = streamInfo().upstreamClusterInfo().value()->name();
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
     break;
   case EnvoyValue::VirtualClusterName:
-    if (!state.streamInfo().virtualClusterName().has_value()) {
+    if (!streamInfo().virtualClusterName().has_value()) {
       return CAPIStatus::CAPIValueNotFound;
     }
-    req_->strValue = state.streamInfo().virtualClusterName().value();
+    req_->strValue = streamInfo().virtualClusterName().value();
     break;
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
@@ -1262,12 +1250,6 @@ CAPIStatus Filter::getStringProperty(absl::string_view path, uint64_t* value_dat
     return CAPIStatus::CAPIFilterIsDestroy;
   }
 
-  auto& state = getProcessorState();
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
-
   // to access the headers_ and its friends we need to hold the lock
   activation_request_headers_ = dynamic_cast<const Http::RequestHeaderMap*>(request_headers_);
   if (enter_encoding_) {
@@ -1275,14 +1257,14 @@ CAPIStatus Filter::getStringProperty(absl::string_view path, uint64_t* value_dat
     activation_response_trailers_ = dynamic_cast<const Http::ResponseTrailerMap*>(trailers_);
   }
 
-  if (state.isThreadSafe()) {
-    return getStringPropertyCommon(path, value_data, value_len, state);
+  if (isThreadSafe()) {
+    return getStringPropertyCommon(path, value_data, value_len);
   }
 
   auto weak_ptr = weak_from_this();
-  state.getDispatcher().post([this, &state, weak_ptr, path, value_data, value_len, rc] {
+  getDispatcher().post([this, weak_ptr, path, value_data, value_len, rc] {
     if (!weak_ptr.expired() && !hasDestroyed()) {
-      *rc = getStringPropertyCommon(path, value_data, value_len, state);
+      *rc = getStringPropertyCommon(path, value_data, value_len);
       dynamic_lib_->envoyGoRequestSemaDec(req_);
     } else {
       ENVOY_LOG(info, "golang filter has gone or destroyed in getStringProperty");
@@ -1292,8 +1274,8 @@ CAPIStatus Filter::getStringProperty(absl::string_view path, uint64_t* value_dat
 }
 
 CAPIStatus Filter::getStringPropertyCommon(absl::string_view path, uint64_t* value_data,
-                                           int* value_len, ProcessorState& state) {
-  activation_info_ = &state.streamInfo();
+                                           int* value_len) {
+  activation_info_ = &streamInfo();
   CAPIStatus status = getStringPropertyInternal(path, &req_->strValue);
   if (status == CAPIStatus::CAPIOK) {
     *value_data = reinterpret_cast<uint64_t>(req_->strValue.data());

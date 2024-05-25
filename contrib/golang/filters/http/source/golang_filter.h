@@ -280,6 +280,10 @@ private:
     return has_destroyed_;
   };
   ProcessorState& getProcessorState();
+  const StreamInfo::StreamInfo& streamInfo() const { return decoding_state_.streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return decoding_state_.streamInfo(); }
+  bool isThreadSafe() { return decoding_state_.isThreadSafe(); };
+  Event::Dispatcher& getDispatcher() { return decoding_state_.getDispatcher(); }
 
   bool doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   GolangStatus doHeadersGo(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
@@ -308,8 +312,7 @@ private:
   void populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
                                  uint64_t* buf_data, int* buf_len);
 
-  CAPIStatus getStringPropertyCommon(absl::string_view path, uint64_t* value_data, int* value_len,
-                                     ProcessorState& state);
+  CAPIStatus getStringPropertyCommon(absl::string_view path, uint64_t* value_data, int* value_len);
   CAPIStatus getStringPropertyInternal(absl::string_view path, std::string* result);
   absl::optional<google::api::expr::runtime::CelValue> findValue(absl::string_view name,
                                                                  Protobuf::Arena* arena);
