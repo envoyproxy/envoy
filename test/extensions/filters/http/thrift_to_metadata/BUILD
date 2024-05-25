@@ -41,8 +41,8 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.filters.http.thrift_to_metadata"],
     deps = [
-        "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
         "//source/extensions/filters/http/thrift_to_metadata:config",
+        "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
         "//test/integration:http_protocol_integration_lib",
     ],
 )
