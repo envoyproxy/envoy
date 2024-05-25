@@ -978,33 +978,5 @@ TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
                 .value());
 }
 
-class RouterTestSchemeMatchUpstream : public RouterTestBase {
-public:
-  RouterTestSchemeMatchUpstream()
-      : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
-    EXPECT_CALL(callbacks_.stream_info_, shouldSchemeMatchUpstream()).WillRepeatedly(Return(true));
-  }
-};
-
-TEST_F(RouterTestSchemeMatchUpstream, OverwriteSchemeWithUpstreamTransportProtocol) {
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, absl::optional<Http::Protocol>(), _));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
-      .WillOnce(Return(&cancellable_));
-  expectResponseTimerCreate();
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  headers.setScheme("https");
-  router_->decodeHeaders(headers, true);
-  EXPECT_EQ(headers.getSchemeValue(), "http");
-
-  // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel(_));
-  router_->onDestroy();
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-  EXPECT_EQ(0U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-}
-
 } // namespace Router
 } // namespace Envoy
