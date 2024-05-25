@@ -916,6 +916,8 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamHttpFiltersPauseAndResume) {
 }
 
 TEST_P(TcpTunnelingIntegrationTest, FlowControlOnAndGiantBody) {
+  ENVOY_LOG_MISC(warn, "manually lowering logs to error");
+  LogLevelSetter save_levels(spdlog::level::trace);
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
   testGiantRequestAndResponse(10 * 1024 * 1024, 10 * 1024 * 1024);
