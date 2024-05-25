@@ -125,9 +125,9 @@ uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds resp
 }
 
 void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
-                                      bool upstream_secure, bool use_upstream) {
+                                      bool upstream_ssl, bool use_upstream) {
   if (use_upstream) {
-    if (upstream_secure) {
+    if (upstream_ssl) {
       headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
     } else {
       headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
@@ -724,7 +724,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                                        !config_->suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(
       headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
-      host->transportSocketFactory().implementsSecureTransport(),
+      host->transportSocketFactory().sslCtx() != nullptr,
       callbacks_->streamInfo().shouldSchemeMatchUpstream());
 
   // Ensure an http transport scheme is selected before continuing with decoding.
