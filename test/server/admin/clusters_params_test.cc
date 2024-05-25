@@ -7,14 +7,6 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-struct ParamsCase {
-  std::string url_;
-  ClustersParams::Format expected_format_;
-  Http::Code expected_code_;
-};
-
-class ParamsFixture : public testing::TestWithParam<ParamsCase> {};
-
 TEST(ClustersParamsTest, FormatDefaultsToTextWhenNotSupplied) {
   ClustersParams params;
   Buffer::OwnedImpl buffer;
