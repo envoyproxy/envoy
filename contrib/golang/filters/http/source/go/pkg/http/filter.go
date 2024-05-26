@@ -61,9 +61,8 @@ var protocolsIdToName = map[uint64]string{
 }
 
 type panicInfo struct {
-	paniced      bool
-	details      string
-	processState *processState
+	paniced bool
+	details string
 }
 
 type httpRequest struct {
@@ -148,9 +147,8 @@ func (s *processState) RecoverPanic() {
 			// We can not send local reply now, since not in go now,
 			// will delay to the next time entering Go.
 			s.request.pInfo = panicInfo{
-				paniced:      true,
-				details:      fmt.Sprint(e),
-				processState: s,
+				paniced: true,
+				details: fmt.Sprint(e),
 			}
 
 		default:
