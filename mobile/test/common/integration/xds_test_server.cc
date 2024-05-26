@@ -9,6 +9,7 @@
 #include "source/common/tls/server_context_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/tls_certificate_selector_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"

@@ -8,6 +8,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/server_context_impl.h"
+#include "source/common/tls/tls_certificate_selector_impl.h"
 
 namespace Envoy {
 namespace Quic {
