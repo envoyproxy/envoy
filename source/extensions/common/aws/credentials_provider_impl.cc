@@ -160,6 +160,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
         // multiple clusters won't make Envoy delete/replace previously registered internal
         // cluster.
         context_->clusterManager().addOrUpdateCluster(cluster, "12345");
+
         const auto cluster_type_str =
             envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
                 ->FindValueByNumber(cluster.type())

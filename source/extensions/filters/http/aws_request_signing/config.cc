@@ -61,8 +61,10 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
       Extensions::Common::Aws::SignatureQueryParameterValues::DefaultExpiration);
 
   OptRef<Server::Configuration::ServerFactoryContext> server_factory_context;
+  // Upstream::ClusterManager& s = server_context.clusterManager();
+  // s.isShutdown();
 
-  // We can't use async providers in upstream filter due to cluster manager initialization
+  //   // We can't use async providers in upstream filter due to cluster manager initialization
   if (!dual_info.is_upstream) {
     server_factory_context = makeOptRef(server_context);
   }

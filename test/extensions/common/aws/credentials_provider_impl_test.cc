@@ -555,8 +555,8 @@ public:
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
-  Stats::MockStore store_;
-  Stats::MockScope& stats_scope_{store_.mockScope()};
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& stats_scope_{*store_.rootScope()};
 };
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1) {
@@ -1127,8 +1127,8 @@ public:
   Api::ApiPtr api_;
   NiceMock<MockFetchMetadata> fetch_metadata_;
   InstanceProfileCredentialsProviderPtr provider_;
-  Stats::MockStore store_;
-  Stats::MockScope& stats_scope_{store_.mockScope()};
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& stats_scope_{*store_.rootScope()};
 };
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListingIMDSv1) {
@@ -1449,8 +1449,8 @@ public:
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
   MetadataFetcher::MetadataReceiver::RefreshState refresh_state_;
-  Stats::MockStore store_;
-  Stats::MockScope& stats_scope_{store_.mockScope()};
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& stats_scope_{*store_.rootScope()};
 };
 
 TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
@@ -1665,8 +1665,8 @@ public:
   Api::ApiPtr api_;
   NiceMock<MockFetchMetadata> fetch_metadata_;
   ContainerCredentialsProviderPtr provider_;
-  Stats::MockStore store_;
-  Stats::MockScope& stats_scope_{store_.mockScope()};
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& stats_scope_{*store_.rootScope()};
 };
 
 TEST_F(ContainerCredentialsProviderUsingLibcurlTest, FailedFetchingDocument) {
@@ -1865,8 +1865,8 @@ public:
   Init::TargetHandlePtr init_target_handle_;
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
-  Stats::MockStore store_;
-  Stats::MockScope& stats_scope_{store_.mockScope()};
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& stats_scope_{*store_.rootScope()};
 };
 
 TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {
@@ -2003,8 +2003,8 @@ public:
   Upstream::ClusterUpdateCallbacks* cb_{};
   testing::NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<Upstream::MockThreadLocalCluster> test_cluster{};
-  Stats::MockStore store_;
-  Stats::MockScope& stats_scope_{store_.mockScope()};
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& stats_scope_{*store_.rootScope()};
 };
 
 TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocument) {
@@ -2435,8 +2435,8 @@ public:
   Api::ApiPtr api_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  Stats::MockStore store_;
-  Stats::MockScope& stats_scope_{store_.mockScope()};
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& stats_scope_{*store_.rootScope()};
 
   NiceMock<MockCredentialsProviderChainFactories> factories_;
 };
