@@ -176,8 +176,9 @@ TEST_F(GolangHttpFilterTest, ScriptHeadersOnlyRequestHeadersOnly) {
 TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
   InSequence s;
   setup(PASSTHROUGH, genSoPath(PASSTHROUGH), PASSTHROUGH);
+  auto req = new HttpRequestInternal(*filter_);
 
-  EXPECT_EQ(CAPINotInGo, filter_->setHeader("foo", "bar", HeaderSet));
+  EXPECT_EQ(CAPINotInGo, filter_->setHeader(req->decodingState(), "foo", "bar", HeaderSet));
 }
 
 // invalid config for routeconfig filter
