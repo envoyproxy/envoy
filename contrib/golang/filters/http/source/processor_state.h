@@ -110,7 +110,7 @@ public:
   bool isBufferDataEmpty() { return data_buffer_ == nullptr || data_buffer_->length() == 0; };
   void drainBufferData();
 
-  void setSeenTrailers() { seen_trailers_ = true; }
+  // void setSeenTrailers() { seen_trailers_ = true; }
   bool isProcessingEndStream() { return do_end_stream_; }
 
   virtual void continueProcessing() PURE;
@@ -133,7 +133,7 @@ public:
 
   void processData(bool end_stream) {
     ASSERT(filterState() == FilterState::WaitingData ||
-           (filterState() == FilterState::WaitingAllData && (end_stream || seen_trailers_)));
+           (filterState() == FilterState::WaitingAllData && (end_stream || trailers != nullptr)));
     setFilterState(FilterState::ProcessingData);
 
     do_end_stream_ = end_stream;
@@ -162,7 +162,7 @@ public:
   void setEndStream(bool end_stream) { end_stream_ = end_stream; }
   bool getEndStream() { return end_stream_; }
   // seen trailers also means stream is end
-  bool isStreamEnd() { return end_stream_ || seen_trailers_; }
+  bool isStreamEnd() { return end_stream_ || trailers != nullptr; }
 
   Http::RequestOrResponseHeaderMap* headers{nullptr};
   Http::HeaderMap* trailers{nullptr};
@@ -175,7 +175,7 @@ protected:
   Buffer::InstancePtr data_buffer_{nullptr};
   bool end_stream_{false};
   bool do_end_stream_{false};
-  bool seen_trailers_{false};
+  // bool seen_trailers_{false};
 };
 
 class DecodingProcessorState : public ProcessorState {

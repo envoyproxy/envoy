@@ -377,7 +377,8 @@ bool Filter::doTrailer(ProcessorState& state, Http::HeaderMap& trailers) {
     break;
   }
 
-  ENVOY_LOG(debug, "golang filter doTrailer, return: {}", done);
+  ENVOY_LOG(debug, "golang filter doTrailer, return: {}, seen trailers: {}", done,
+            state.trailers != nullptr);
 
   return done;
 }
@@ -460,6 +461,10 @@ void Filter::continueStatusInternal(ProcessorState& state, GolangStatus status) 
     }
   }
 
+  ENVOY_LOG(debug,
+            "after done handle golang status, status: {}, state: {}, done: {}, seen trailers: {}",
+            int(status), state.stateStr(), done, state.trailers != nullptr);
+
   // TODO: state should also grow in this case
   // state == WaitingData && bufferData is empty && seen trailers
 
@@ -476,10 +481,8 @@ void Filter::continueStatusInternal(ProcessorState& state, GolangStatus status) 
     }
   }
 
-  Thread::ReleasableLockGuard lock(mutex_);
   if (state.filterState() == FilterState::WaitingTrailer && state.trailers != nullptr) {
     auto trailers = state.trailers;
-    lock.release();
     auto done = doTrailerGo(state, *trailers);
     if (done) {
       state.continueProcessing();

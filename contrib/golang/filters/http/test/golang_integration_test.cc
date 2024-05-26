@@ -55,7 +55,7 @@ public:
     decoder_callbacks_ = &callbacks;
   }
 
-  void onDestroy() override{};
+  void onDestroy() override {};
   Http::StreamEncoderFilterCallbacks* decoder_callbacks_;
 };
 
@@ -340,7 +340,9 @@ typed_config:
     entries = upstream_request_->trailers()->get(Http::LowerCaseString("existed-trailer"));
     EXPECT_EQ(2, entries.size());
     EXPECT_EQ("foo", entries[0]->value().getStringView());
-    EXPECT_EQ("bar", entries[1]->value().getStringView());
+    if (entries.size() == 2) {
+      EXPECT_EQ("bar", entries[1]->value().getStringView());
+    }
 
     // check trailer value which set in golang: x-test-trailer-0
     entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-0"));

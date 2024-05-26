@@ -151,13 +151,13 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
   }
 
   // see trailers and no buffered data
-  if (seen_trailers_ && isBufferDataEmpty()) {
+  if (trailers != nullptr && isBufferDataEmpty()) {
     ENVOY_LOG(error, "see trailers and buffer is empty");
     setFilterState(FilterState::WaitingTrailer);
   }
 
-  ENVOY_LOG(debug, "golang filter after handle data status, state: {}, status: {}",
-            int(filterState()), int(status));
+  ENVOY_LOG(debug, "golang filter after handle data status, state: {}, status: {}", stateStr(),
+            int(status));
 
   return done;
 };
@@ -205,8 +205,8 @@ bool ProcessorState::handleGolangStatus(GolangStatus status) {
 
   ENVOY_LOG(debug,
             "before handle golang status, status: {}, state: {}, "
-            "do_end_stream_: {}",
-            int(status), stateStr(), do_end_stream_);
+            "do_end_stream_: {}, seen trailers: {}",
+            int(status), stateStr(), do_end_stream_, trailers != nullptr);
 
   bool done = false;
   switch (filterState()) {
@@ -228,8 +228,8 @@ bool ProcessorState::handleGolangStatus(GolangStatus status) {
 
   ENVOY_LOG(debug,
             "after handle golang status, status: {}, state: {}, "
-            "do_end_stream_: {}",
-            int(status), stateStr(), do_end_stream_);
+            "do_end_stream_: {}, done: {}, seen trailers: {}",
+            int(status), stateStr(), do_end_stream_, done, trailers != nullptr);
 
   return done;
 }
