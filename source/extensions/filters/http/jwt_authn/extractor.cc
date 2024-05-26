@@ -93,7 +93,7 @@ public:
                     const LowerCaseString& header)
       : JwtLocationBase(token, issuer_checker), header_(header) {}
 
-  void removeJwt(Http::HeaderMap& headers) const override { headers.remove(header_); }
+  void removeJwt(Http::RequestHeaderMap& headers) const override { headers.remove(header_); }
 
 private:
   // the header name the JWT is extracted from.
@@ -118,7 +118,7 @@ public:
   JwtCookieLocation(const std::string& token, const JwtIssuerChecker& issuer_checker)
       : JwtLocationBase(token, issuer_checker) {}
 
-  void removeJwt(Http::HeaderMap&) const override {
+  void removeJwt(Http::RequestHeaderMap&) const override {
     // TODO(theshubhamp): remove JWT from cookies.
   }
 };
@@ -137,7 +137,7 @@ public:
 
   std::vector<JwtLocationConstPtr> extract(const Http::RequestHeaderMap& headers) const override;
 
-  void sanitizeHeaders(Http::HeaderMap& headers) const override;
+  void sanitizeHeaders(Http::RequestHeaderMap& headers) const override;
 
 private:
   // add a header config
@@ -341,7 +341,7 @@ absl::string_view ExtractorImpl::extractJWT(absl::string_view value_str,
   return value_str.substr(starting, ending - starting);
 }
 
-void ExtractorImpl::sanitizeHeaders(Http::HeaderMap& headers) const {
+void ExtractorImpl::sanitizeHeaders(Http::RequestHeaderMap& headers) const {
   for (const auto& header : headers_to_sanitize_) {
     headers.remove(header);
   }

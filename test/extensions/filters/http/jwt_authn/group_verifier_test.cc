@@ -83,7 +83,7 @@ public:
       auto mock_auth = std::make_unique<MockAuthenticator>();
       EXPECT_CALL(*mock_auth, doVerify(_, _, _, _, _))
           .WillOnce(Invoke([issuer = it.first, status = it.second](
-                               Http::HeaderMap&, Tracing::Span&, std::vector<JwtLocationConstPtr>*,
+                               Http::RequestHeaderMap&, Tracing::Span&, std::vector<JwtLocationConstPtr>*,
                                SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
                                AuthenticatorCallback callback) {
             if (status == Status::Ok) {
@@ -115,7 +115,7 @@ public:
       auto mock_auth = std::make_unique<MockAuthenticator>();
       EXPECT_CALL(*mock_auth, doVerify(_, _, _, _, _))
           .WillOnce(Invoke([&, iss = provider](
-                               Http::HeaderMap&, Tracing::Span&, std::vector<JwtLocationConstPtr>*,
+                               Http::RequestHeaderMap&, Tracing::Span&, std::vector<JwtLocationConstPtr>*,
                                SetExtractedJwtDataCallback, AuthenticatorCallback callback) {
             callbacks_[iss] = std::move(callback);
           }));
