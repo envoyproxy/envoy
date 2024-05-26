@@ -67,7 +67,7 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         // usage of AWS credentials common utils. Until then we are setting nullopt for server
         // factory context.
         auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
-            context.api(), absl::nullopt /*Empty factory context*/, region,
+            context.api(), absl::nullopt /*Empty factory context*/, context.scope(), region,
             Common::Aws::Utility::fetchMetadata);
         auto signer = std::make_unique<Common::Aws::SigV4SignerImpl>(
             config.service_name(), region, credentials_provider, context,

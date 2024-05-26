@@ -40,7 +40,8 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
 Extensions::Common::Aws::CredentialsProviderSharedPtr
 AwsLambdaFilterFactory::getCredentialsProvider(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-    Server::Configuration::ServerFactoryContext& server_context, const std::string& region) const {
+    Server::Configuration::ServerFactoryContext& server_context, Stats::Scope& stats_scope,
+    bool is_upstream, const std::string& region) const {
   if (proto_config.has_credentials()) {
     ENVOY_LOG(debug,
               "credentials are set from filter configuration, default credentials providers chain "
@@ -58,8 +59,16 @@ AwsLambdaFilterFactory::getCredentialsProvider(
     return std::make_shared<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
         server_context.api(), proto_config.credentials_profile());
   }
+
+  OptRef<Server::Configuration::ServerFactoryContext> server_factory_context;
+
+  // We can't use async providers in upstream filter due to cluster manager initialization
+  if (!is_upstream) {
+    server_factory_context = makeOptRef(server_context);
+  }
+
   return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-      server_context.api(), makeOptRef(server_context), region,
+      server_context.api(), server_factory_context, stats_scope, region,
       Extensions::Common::Aws::Utility::fetchMetadata);
 }
 
@@ -74,7 +83,8 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
   }
   const std::string region = arn->region();
 
-  auto credentials_provider = getCredentialsProvider(proto_config, server_context, region);
+  auto credentials_provider = getCredentialsProvider(proto_config, server_context, dual_info.scope,
+                                                     dual_info.is_upstream, region);
 
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name, region, std::move(credentials_provider), server_context,
@@ -105,8 +115,8 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
         fmt::format("aws_lambda_filter: Invalid ARN: {}", per_route_config.invoke_config().arn()));
   }
   const std::string region = arn->region();
-  auto credentials_provider =
-      getCredentialsProvider(per_route_config.invoke_config(), server_context, region);
+  auto credentials_provider = getCredentialsProvider(
+      per_route_config.invoke_config(), server_context, server_context.scope(), false, region);
 
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name, region, std::move(credentials_provider), server_context,

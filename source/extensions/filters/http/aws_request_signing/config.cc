@@ -60,9 +60,16 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
       config.query_string(), expiration_time,
       Extensions::Common::Aws::SignatureQueryParameterValues::DefaultExpiration);
 
+  OptRef<Server::Configuration::ServerFactoryContext> server_factory_context;
+
+  // We can't use async providers in upstream filter due to cluster manager initialization
+  if (!dual_info.is_upstream) {
+    server_factory_context = makeOptRef(server_context);
+  }
+
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          server_context.api(), makeOptRef(server_context), dual_info.scope, region,
+          server_context.api(), server_factory_context, dual_info.scope, region,
           Extensions::Common::Aws::Utility::fetchMetadata);
   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
       config.match_excluded_headers().begin(), config.match_excluded_headers().end());

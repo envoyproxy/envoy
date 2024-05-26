@@ -278,9 +278,11 @@ credentials:
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactoryWrapper factory;
+  Stats::MockStore store_;
+  Stats::MockScope& stats_scope_{store_.mockScope()};
 
-  auto provider =
-      factory.getCredentialsProvider(proto_config, context.serverFactoryContext(), "region");
+  auto provider = factory.getCredentialsProvider(proto_config, context.serverFactoryContext(),
+                                                 stats_scope_, false, "region");
 
   EXPECT_TRUE(
       std::dynamic_pointer_cast<Extensions::Common::Aws::ConfigCredentialsProvider>(provider));
@@ -304,9 +306,11 @@ credentials_profile: test_profile
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactoryWrapper factory;
+  Stats::MockStore store_;
+  Stats::MockScope& stats_scope_{store_.mockScope()};
 
-  auto provider =
-      factory.getCredentialsProvider(proto_config, context.serverFactoryContext(), "region");
+  auto provider = factory.getCredentialsProvider(proto_config, context.serverFactoryContext(),
+                                                 stats_scope_, false, "region");
 
   EXPECT_FALSE(
       std::dynamic_pointer_cast<Extensions::Common::Aws::ConfigCredentialsProvider>(provider));
@@ -330,8 +334,11 @@ invocation_mode: asynchronous
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactoryWrapper factory;
 
-  auto provider =
-      factory.getCredentialsProvider(proto_config, context.serverFactoryContext(), "region");
+  Stats::MockStore store_;
+  Stats::MockScope& stats_scope_{store_.mockScope()};
+
+  auto provider = factory.getCredentialsProvider(proto_config, context.serverFactoryContext(),
+                                                 stats_scope_, false, "region");
 
   EXPECT_FALSE(
       std::dynamic_pointer_cast<Extensions::Common::Aws::ConfigCredentialsProvider>(provider));
