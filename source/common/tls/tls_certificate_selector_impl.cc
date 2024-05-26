@@ -1,7 +1,9 @@
 #include "source/common/tls/tls_certificate_selector_impl.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 
 Ssl::SelectionResult
 TlsCertificateSelectorImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
@@ -49,7 +51,9 @@ TlsCertificateSelectorImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_
   return Ssl::SelectionResult::Continue;
 }
 
-REGISTER_FACTORY(TlsCertificateSelectorFactoryImpl, TlsCertificateSelectorFactory);
+REGISTER_FACTORY(TlsCertificateSelectorFactoryImpl, Ssl::TlsCertificateSelectorFactory);
 
-} // namespace Ssl
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy

@@ -11,7 +11,9 @@
 #include "openssl/ssl.h"
 
 namespace Envoy {
-namespace Ssl {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 
 /**
  * The default TLS context provider, selecting certificate based on SNI.
@@ -28,11 +30,12 @@ private:
   Ssl::ContextSelectionCallbackWeakPtr cb_;
 };
 
-class TlsCertificateSelectorFactoryImpl : public TlsCertificateSelectorFactory {
+class TlsCertificateSelectorFactoryImpl : public Ssl::TlsCertificateSelectorFactory {
 public:
   std::string name() const override { return "envoy.ssl.certificate_selector_factory.default"; }
-  TlsCertificateSelectorFactoryCb
-  createTlsCertificateSelectorCb(const ProtobufWkt::Any&, TlsCertificateSelectorFactoryContext&,
+  Ssl::TlsCertificateSelectorFactoryCb
+  createTlsCertificateSelectorCb(const ProtobufWkt::Any&,
+                                 Ssl::TlsCertificateSelectorFactoryContext&,
                                  ProtobufMessage::ValidationVisitor&) override {
     return [](Ssl::ContextSelectionCallbackWeakPtr ctx) {
       return std::make_shared<TlsCertificateSelectorImpl>(ctx);
@@ -45,5 +48,7 @@ public:
 
 DECLARE_FACTORY(TlsCertificateSelectorFactoryImpl);
 
-} // namespace Ssl
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy

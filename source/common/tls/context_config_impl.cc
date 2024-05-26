@@ -544,7 +544,7 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
 
 Ssl::TlsCertificateSelectorFactoryCb ServerContextConfigImpl::createTlsCertificateSelector() const {
   if (!tls_certificate_selector_factory_cb_) {
-    IS_ENVOY_BUG("No envoy.ssl.server_context_factory registered");
+    IS_ENVOY_BUG("No envoy.ssl.certificate_selector_factory registered");
   }
   return tls_certificate_selector_factory_cb_;
 }

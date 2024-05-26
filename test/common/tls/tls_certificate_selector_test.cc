@@ -79,16 +79,17 @@ using testing::StrictMock;
 using testing::WithArg;
 
 namespace Envoy {
-namespace Ssl {
-namespace {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 
 class TestTlsCertificateSelector : public virtual Ssl::TlsCertificateSelector {
 public:
   TestTlsCertificateSelector(Ssl::ContextSelectionCallbackWeakPtr ctx, const ProtobufWkt::Any&)
       : ctx_(ctx) {}
   ~TestTlsCertificateSelector() { ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector"); }
-  SelectionResult selectTlsContext(const SSL_CLIENT_HELLO*,
-                                   CertSelectionCallbackSharedPtr cb) override {
+  Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO*,
+                                        Ssl::CertSelectionCallbackSharedPtr cb) override {
     ENVOY_LOG_MISC(info, "debug: select context");
 
     switch (mod_) {
@@ -118,18 +119,18 @@ public:
 
 private:
   Ssl::ContextSelectionCallbackWeakPtr ctx_;
-  CertSelectionCallbackSharedPtr cb_;
+  Ssl::CertSelectionCallbackSharedPtr cb_;
 };
 
 class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorFactory {
 public:
   using CreateProviderHook =
-      std::function<void(const ProtobufWkt::Any&, TlsCertificateSelectorFactoryContext&,
+      std::function<void(const ProtobufWkt::Any&, Ssl::TlsCertificateSelectorFactoryContext&,
                          ProtobufMessage::ValidationVisitor&)>;
 
-  TlsCertificateSelectorFactoryCb createTlsCertificateSelectorCb(
+  Ssl::TlsCertificateSelectorFactoryCb createTlsCertificateSelectorCb(
       const ProtobufWkt::Any& config,
-      TlsCertificateSelectorFactoryContext& tls_certificate_selector_factory_context,
+      Ssl::TlsCertificateSelectorFactoryContext& tls_certificate_selector_factory_context,
       ProtobufMessage::ValidationVisitor& validation_visitor) override {
     tls_certificate_selector_factory_context.options();
     tls_certificate_selector_factory_context.singletonManager();
@@ -223,17 +224,17 @@ protected:
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
     // provider factory callback will be Called here.
-    auto server_cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+    auto server_cfg = std::make_unique<Tls::ServerContextConfigImpl>(
         server_tls_context, transport_socket_factory_context);
 
     provider_factory_.mod_ = mod;
 
     NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-    Extensions::TransportSockets::Tls::ContextManagerImpl manager(server_factory_context);
+    Tls::ContextManagerImpl manager(server_factory_context);
     Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
-    Extensions::TransportSockets::Tls::ServerSslSocketFactory server_ssl_socket_factory(
-        std::move(server_cfg), manager, *server_stats_store.rootScope(),
-        std::vector<std::string>{});
+    Tls::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
+                                                          *server_stats_store.rootScope(),
+                                                          std::vector<std::string>{});
 
     auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(version_));
@@ -253,10 +254,10 @@ protected:
         client_factory_context;
     ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
 
-    auto client_cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-        client_tls_context, client_factory_context);
-    Extensions::TransportSockets::Tls::ClientSslSocketFactory client_ssl_socket_factory(
-        std::move(client_cfg), manager, *client_stats_store.rootScope());
+    auto client_cfg =
+        std::make_unique<Tls::ClientContextConfigImpl>(client_tls_context, client_factory_context);
+    Tls::ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
+                                                          *client_stats_store.rootScope());
     Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
         socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
         client_ssl_socket_factory.createTransportSocket(nullptr, nullptr), nullptr, nullptr);
@@ -349,6 +350,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TlsCertificateSelectorFactoryTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-} // namespace
-} // namespace Ssl
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy
