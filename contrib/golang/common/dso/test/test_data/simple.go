@@ -6,6 +6,10 @@ typedef struct {
 } httpRequest;
 
 typedef struct {
+  int state;
+} processState;
+
+typedef struct {
   unsigned long long int plugin_name_ptr;
   unsigned long long int plugin_name_len;
   unsigned long long int config_ptr;
