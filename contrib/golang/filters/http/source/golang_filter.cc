@@ -75,8 +75,6 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   ProcessorState& state = decoding_state_;
   ENVOY_LOG(debug, "golang filter decodeTrailers, decoding state: {}", state.stateStr());
 
-  // state.setSeenTrailers();
-
   bool done = doTrailer(state, trailers);
 
   return done ? Http::FilterTrailersStatus::Continue : Http::FilterTrailersStatus::StopIteration;
@@ -144,7 +142,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
   ENVOY_LOG(debug, "golang filter encodeData, encoding state: {}, data length: {}, end_stream: {}",
             state.stateStr(), data.length(), end_stream);
 
-  encoding_state_.setEndStream(end_stream);
+  state.setEndStream(end_stream);
 
   // useless now
   /*
@@ -155,7 +153,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
     }
   */
 
-  bool done = doData(encoding_state_, data, end_stream);
+  bool done = doData(state, data, end_stream);
 
   if (done) {
     state.doDataList.moveOut(data);
@@ -170,7 +168,6 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
   ENVOY_LOG(debug, "golang filter encodeTrailers, encoding state: {}", state.stateStr());
 
   activation_response_trailers_ = dynamic_cast<const Http::ResponseTrailerMap*>(&trailers);
-  // encoding_state_.setSeenTrailers();
 
   // useless now
   /*
@@ -743,7 +740,7 @@ CAPIStatus Filter::removeHeader(ProcessorState& state, absl::string_view key) {
     ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
-  if (isThreadSafe()) {
+  if (state.isThreadSafe()) {
     // it's safe to write header in the safe thread.
     headers->remove(Http::LowerCaseString(key));
   } else {
@@ -754,7 +751,7 @@ CAPIStatus Filter::removeHeader(ProcessorState& state, absl::string_view key) {
     // dispatch a callback to write header in the envoy safe thread, to make the write operation
     // safety. otherwise, there might be race between reading in the envoy worker thread and writing
     // in the Go thread.
-    getDispatcher().post([this, weak_ptr, headers, key_str] {
+    state.getDispatcher().post([this, weak_ptr, headers, key_str] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
         Thread::LockGuard lock(mutex_);
         headers->remove(Http::LowerCaseString(key_str));
@@ -872,7 +869,7 @@ CAPIStatus Filter::setTrailer(ProcessorState& state, absl::string_view key, absl
     ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
-  if (isThreadSafe()) {
+  if (state.isThreadSafe()) {
     switch (act) {
     case HeaderAdd:
       trailers->addCopy(Http::LowerCaseString(key), value);
@@ -894,7 +891,7 @@ CAPIStatus Filter::setTrailer(ProcessorState& state, absl::string_view key, absl
     // dispatch a callback to write trailer in the envoy safe thread, to make the write operation
     // safety. otherwise, there might be race between reading in the envoy worker thread and
     // writing in the Go thread.
-    getDispatcher().post([this, &trailers, weak_ptr, key_str, value_str, act] {
+    state.getDispatcher().post([this, trailers, weak_ptr, key_str, value_str, act] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
         Thread::LockGuard lock(mutex_);
         switch (act) {
@@ -932,7 +929,7 @@ CAPIStatus Filter::removeTrailer(ProcessorState& state, absl::string_view key) {
     ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
-  if (isThreadSafe()) {
+  if (state.isThreadSafe()) {
     trailers->remove(Http::LowerCaseString(key));
   } else {
     // should deep copy the string_view before post to dipatcher callback.
@@ -942,7 +939,7 @@ CAPIStatus Filter::removeTrailer(ProcessorState& state, absl::string_view key) {
     // dispatch a callback to write trailer in the envoy safe thread, to make the write operation
     // safety. otherwise, there might be race between reading in the envoy worker thread and writing
     // in the Go thread.
-    getDispatcher().post([this, trailers, weak_ptr, key_str] {
+    state.getDispatcher().post([this, trailers, weak_ptr, key_str] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
         Thread::LockGuard lock(mutex_);
         trailers->remove(Http::LowerCaseString(key_str));
