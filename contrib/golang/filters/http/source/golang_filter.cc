@@ -960,10 +960,6 @@ CAPIStatus Filter::clearRouteCache() {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
   }
-  if (!isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
   ENVOY_LOG(debug, "golang filter clearing route cache");
   decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
   return CAPIStatus::CAPIOK;
@@ -1079,11 +1075,6 @@ CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, uint64_t* 
     return CAPIStatus::CAPIFilterIsDestroy;
   }
 
-  if (!isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
-
   if (!isThreadSafe()) {
     auto weak_ptr = weak_from_this();
     ENVOY_LOG(debug, "golang filter getDynamicMetadata posting request to dispatcher");
@@ -1123,11 +1114,6 @@ CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
-  }
-
-  if (!isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
   }
 
   if (!isThreadSafe()) {
@@ -1171,11 +1157,6 @@ CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view
     return CAPIStatus::CAPIFilterIsDestroy;
   }
 
-  if (!isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
-
   if (isThreadSafe()) {
     streamInfo().filterState()->setData(
         key, std::make_shared<GoStringFilterState>(value),
@@ -1209,11 +1190,6 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, uint64_t* value_d
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
-  }
-
-  if (!isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
   }
 
   if (isThreadSafe()) {

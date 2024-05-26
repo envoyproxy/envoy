@@ -70,6 +70,14 @@ CAPIStatus envoyGoFilterHandlerWrapper(void* r,
   auto req = reinterpret_cast<HttpRequestInternal*>(r);
   auto weak_filter = req->weakFilter();
   if (auto filter = weak_filter.lock()) {
+    // Though it's memory safe without this limitation.
+    // But it's not a good idea to run Go code after continue back to Envoy C++,
+    // so, add this limitation.
+    /*
+    if (!filter->isProcessingInGo()) {
+      return CAPIStatus::CAPINotInGo;
+    }
+    */
     return f(filter);
   }
   return CAPIStatus::CAPIFilterIsGone;

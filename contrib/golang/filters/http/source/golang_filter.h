@@ -278,6 +278,10 @@ public:
   CAPIStatus getStringProperty(absl::string_view path, uint64_t* value_data, int* value_len,
                                GoInt32* rc);
 
+  bool isProcessingInGo() {
+    return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();
+  }
+
 private:
   bool hasDestroyed() {
     Thread::LockGuard lock(mutex_);
@@ -287,9 +291,6 @@ private:
   StreamInfo::StreamInfo& streamInfo() { return decoding_state_.streamInfo(); }
   bool isThreadSafe() { return decoding_state_.isThreadSafe(); };
   Event::Dispatcher& getDispatcher() { return decoding_state_.getDispatcher(); }
-  bool isProcessingInGo() {
-    return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();
-  }
 
   bool doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   GolangStatus doHeadersGo(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,

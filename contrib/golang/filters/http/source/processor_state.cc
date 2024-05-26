@@ -152,7 +152,7 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
 
   // see trailers and no buffered data
   if (trailers != nullptr && isBufferDataEmpty()) {
-    ENVOY_LOG(error, "see trailers and buffer is empty");
+    ENVOY_LOG(debug, "see trailers and buffer is empty");
     setFilterState(FilterState::WaitingTrailer);
   }
 
