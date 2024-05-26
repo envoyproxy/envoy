@@ -29,7 +29,7 @@ public:
 class MockAuthenticator : public Authenticator {
 public:
   MOCK_METHOD(void, doVerify,
-              (Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
+              (Http::RequestHeaderMap & headers, Tracing::Span& parent_span,
                std::vector<JwtLocationConstPtr>* tokens,
                SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
                AuthenticatorCallback callback));

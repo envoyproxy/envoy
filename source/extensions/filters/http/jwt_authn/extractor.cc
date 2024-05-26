@@ -104,12 +104,24 @@ private:
 class JwtParamLocation : public JwtLocationBase {
 public:
   JwtParamLocation(const std::string& token, const JwtIssuerChecker& issuer_checker,
-                   const std::string&)
-      : JwtLocationBase(token, issuer_checker) {}
+                   const std::string& param)
+      : JwtLocationBase(token, issuer_checker), param_(param) {}
 
-  void removeJwt(Http::HeaderMap&) const override {
-    // TODO(qiwzhang): remove JWT from parameter.
+  void removeJwt(Http::RequestHeaderMap& headers) const override {
+
+    absl::string_view path = headers.getPathValue();
+    Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+
+    query_params.remove(param_);
+
+    const auto updated_path = query_params.replaceQueryString(headers.Path()->value());
+    headers.setPath(updated_path);
   }
+
+private:
+  // the param name the JWT is extracted from.
+  const std::string& param_;
 };
 
 // The JwtLocation for cookie extraction.

@@ -191,7 +191,7 @@ message JwtProvider {
 
   // If false, the JWT is removed in the request after a success verification. If true, the JWT is
   // not removed in the request. Default value is false.
-  // caveat: only works for from_header & has no effect for JWTs extracted through from_params & from_cookies.
+  // caveat: only works for from_header/from_params & has no effect for JWTs extracted through from_cookies.
   bool forward = 5;
 
   // Two fields below define where to extract the JWT from an HTTP request.
