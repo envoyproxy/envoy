@@ -30,6 +30,7 @@ void XdsIntegrationTest::initialize() {
   ExtensionRegistry::registerFactories();
   // For server TLS.
   Extensions::TransportSockets::Tls::forceRegisterServerContextFactoryImpl();
+  Extensions::TransportSockets::Tls::forceRegisterTlsCertificateSelectorFactoryImpl();
 
   if (sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta) {
