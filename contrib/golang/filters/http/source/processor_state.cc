@@ -12,7 +12,7 @@ Buffer::Instance& BufferList::push(Buffer::Instance& data) {
   bytes_ += data.length();
 
   auto ptr = std::make_unique<Buffer::OwnedImpl>();
-  Buffer::Instance& buffer = *ptr.get();
+  Buffer::Instance& buffer = *ptr;
   buffer.move(data);
   queue_.push_back(std::move(ptr));
 
