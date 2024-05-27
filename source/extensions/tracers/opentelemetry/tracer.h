@@ -117,7 +117,7 @@ public:
     span_.set_trace_id(absl::HexStringToBytes(trace_id_hex));
   }
 
-  std::string getTraceIdAsHex() const override { return absl::BytesToHexString(span_.trace_id()); };
+  std::string getTraceId() const override { return absl::BytesToHexString(span_.trace_id()); };
 
   OTelSpanKind spankind() const { return span_.kind(); }
 
