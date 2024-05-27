@@ -336,6 +336,26 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("vhost.vhost_1.vcluster.vcluster_1.upstream_rq_200",
                          "vhost.vcluster.upstream_rq", {vhost, vcluster, response_code});
 
+  // http stat_prefix
+  Tag route;
+  route.name_ = tag_names.ROUTE;
+  route.value_ = "route_1";
+
+  Tag route_domain;
+  route_domain.name_ = tag_names.ROUTE;
+  route_domain.value_ = "example.com";
+
+  Tag route_fqdn;
+  route_fqdn.name_ = tag_names.ROUTE;
+  route_fqdn.value_ = "example.com.";
+
+  regex_tester.testRegex("vhost.vhost_1.route.route_1.upstream_rq_total",
+                         "vhost.route.upstream_rq_total", {vhost, route});
+  regex_tester.testRegex("vhost.vhost_1.route.example.com.upstream_rq_total",
+                          "vhost.route.upstream_rq_total", {vhost, route_domain});
+  regex_tester.testRegex("vhost.vhost_1.route.example.com..upstream_rq_total",
+                          "vhost.route.upstream_rq_total", {vhost, route_fqdn});
+
   // Listener http prefix
   Tag listener_http_prefix;
   listener_http_prefix.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;

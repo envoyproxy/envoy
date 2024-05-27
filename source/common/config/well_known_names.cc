@@ -183,7 +183,9 @@ TagNameValues::TagNameValues() {
   addRe2(RDS_ROUTE_CONFIG, R"(^http\.<TAG_VALUE>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
 
   // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
-  addTokenized(ROUTE, "vhost.*.route.$.**");
+  // Note: <route_stat_prefix> can contain dots thus we have to maintain full
+  // match.
+  addRe2(ROUTE, R"(^vhost\.<TAG_VALUE>\.route\.((.*?)\.)\w+?$)", "vhost.");
 
   // thrift.(<stat_prefix>.)*
   addTokenized(THRIFT_PREFIX, "thrift.$.**");
