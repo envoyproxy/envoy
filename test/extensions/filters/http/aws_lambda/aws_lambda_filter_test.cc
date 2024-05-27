@@ -80,8 +80,6 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   FilterStats stats_ = generateStats("test", *stats_store_.rootScope());
   const std::string metadata_yaml_ = "egress_gateway: true";
-  Stats::MockStore store_;
-  Stats::MockScope& stats_scope_{store_.mockScope()};
 };
 
 /**
