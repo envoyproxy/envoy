@@ -22,8 +22,8 @@ public:
 protected:
   Extensions::Common::Aws::CredentialsProviderSharedPtr getCredentialsProvider(
       const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-      Server::Configuration::ServerFactoryContext& server_context, Stats::Scope& stats_scope,
-      bool is_upstream, const std::string& region) const;
+      Server::Configuration::ServerFactoryContext& server_context, bool is_upstream,
+      const std::string& region) const;
 
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(

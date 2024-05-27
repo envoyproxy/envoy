@@ -185,32 +185,6 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationUpstream) {
       upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
 }
 
-TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationUpstreamAsync) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
-
-  config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4, false);
-  addUpstreamProtocolOptions();
-  HttpIntegrationTest::initialize();
-
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/path"}, {":scheme", "http"}, {":authority", "host"}};
-
-  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_TRUE(response->complete());
-  // check that our headers have been correctly added upstream
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("authorization")).empty());
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amz-date")).empty());
-  EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-amz-security-token")).empty());
-  EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
-}
-
 TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationUpstream) {
 
   config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4A, false);
@@ -274,11 +248,9 @@ public:
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, _, _))
         .WillRepeatedly(Invoke([&](const std::string&, Network::DnsLookupFamily,
                                    Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-          // dns_callback_ = cb;
           cb(Network::DnsResolver::ResolutionStatus::Success,
              TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
-          // return &active_dns_query_;
           return nullptr;
         }));
   }
@@ -288,7 +260,9 @@ public:
     expectResolve(Network::DnsLookupFamily::V4Only, "sts.ap-southeast-2.amazonaws.com");
   }
 
-  void addStandardFilter() { config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4); }
+  void addStandardFilter(bool downstream = true) {
+    config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4, downstream);
+  }
 
   void addPerRouteFilter(const std::string& yaml_config) {
 
@@ -308,7 +282,18 @@ public:
 
           (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
         });
-    ENVOY_LOG_MISC(debug, "use lds:\n{}", use_lds_);
+  }
+
+  void addUpstreamProtocolOptions() {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+      protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
+      protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+      ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+    });
   }
 
   ~InitializeFilterTest() override {
@@ -326,6 +311,7 @@ public:
 };
 
 TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
+
   // Web Identity Credentials only
   dnsSetup();
 
@@ -336,15 +322,30 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
+
   initialize();
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
                                  "southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
-  // // std::vector<Stats::GaugeSharedPtr> gauges = test_server_->counters();
-  //   for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
-  //     ENVOY_LOG_MISC(debug, "counter {} val {}", counter->name(),counter->value());
-  //   }
-  // EXPECT_EQ(test_server_->counter("aws.metadata_credentials_provider.sts_token_service_internal-ap-southeast-2.credential_refreshes_performed")->value(),1);
+}
+
+TEST_F(InitializeFilterTest, TestWithOneClusterStandardUpstream) {
+
+  // Web Identity Credentials only
+  dnsSetup();
+
+  TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
+  TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
+  addStandardFilter(false);
+  addUpstreamProtocolOptions();
+  initialize();
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
+                                 1, std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
