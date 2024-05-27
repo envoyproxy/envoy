@@ -117,7 +117,9 @@ AllocatorManager::AllocatorManager(
           MEMORY_ALLOCATOR_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "tcmalloc."))}),
       api_(api) {
 #if defined(GPERFTOOLS_TCMALLOC)
-  RELEASE_ASSERT((bytes_to_release_ == 0), "Memory releasing is not supported for gperf tcmalloc.");
+  if (bytes_to_release_ > 0) {
+    throw Envoy::EnvoyException("Memory releasing is not supported for gperf tcmalloc.");
+  }
 #elif defined(TCMALLOC)
   configureBackgroundMemoryRelease();
 #endif
