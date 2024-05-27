@@ -116,7 +116,6 @@ public final class CronvoyBidirectionalStream
   private static final String X_ENVOY = "x-envoy";
   private static final String X_ENVOY_SELECTED_TRANSPORT = "x-envoy-upstream-alpn";
   private static final String USER_AGENT = "User-Agent";
-  private static final Executor DIRECT_EXECUTOR = new DirectExecutor();
 
   private final CronvoyUrlRequestContext mRequestContext;
   private final Executor mExecutor;
@@ -937,11 +936,6 @@ public final class CronvoyBidirectionalStream
   }
 
   @Override
-  public Executor getExecutor() {
-    return DIRECT_EXECUTOR;
-  }
-
-  @Override
   public void onSendWindowAvailable(EnvoyStreamIntel streamIntel) {
     switch (mState.nextAction(Event.ON_SEND_WINDOW_AVAILABLE)) {
     case NextAction.CHAIN_NEXT_WRITE:
@@ -1110,13 +1104,6 @@ public final class CronvoyBidirectionalStream
       this.mByteBuffer = mByteBuffer;
       this.mInitialPosition = mByteBuffer.position();
       this.mInitialLimit = mByteBuffer.limit();
-    }
-  }
-
-  private static class DirectExecutor implements Executor {
-    @Override
-    public void execute(Runnable runnable) {
-      runnable.run();
     }
   }
 }

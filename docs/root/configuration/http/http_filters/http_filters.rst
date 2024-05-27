@@ -62,5 +62,6 @@ HTTP filters
   stateful_session_filter
   sxg_filter
   tap_filter
+  thrift_to_metadata_filter
   upstream_codec_filter
   wasm_filter
