@@ -67,6 +67,10 @@ minor_behavior_changes:
     ``%UPSTREAM_REMOTE_PORT%`` and ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%`` access log format specifiers.
     This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.upstream_remote_address_use_connection`` to false.
+- area: http
+  change: |
+    Changing header validation checks in the substitution format utility and CEL code to do RCF complaint header validation.
+    This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.consistent_header_validation`` to false.
 - area: quic
   change: |
     When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
