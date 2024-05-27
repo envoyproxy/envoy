@@ -352,9 +352,9 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("vhost.vhost_1.route.route_1.upstream_rq_total",
                          "vhost.route.upstream_rq_total", {vhost, route});
   regex_tester.testRegex("vhost.vhost_1.route.example.com.upstream_rq_total",
-                          "vhost.route.upstream_rq_total", {vhost, route_domain});
+                         "vhost.route.upstream_rq_total", {vhost, route_domain});
   regex_tester.testRegex("vhost.vhost_1.route.example.com..upstream_rq_total",
-                          "vhost.route.upstream_rq_total", {vhost, route_fqdn});
+                         "vhost.route.upstream_rq_total", {vhost, route_fqdn});
 
   // Listener http prefix
   Tag listener_http_prefix;
