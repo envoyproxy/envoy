@@ -22,7 +22,6 @@
 
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::_;
-using testing::DoAll;
 using testing::Eq;
 using testing::InSequence;
 using testing::NiceMock;
@@ -383,7 +382,7 @@ public:
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
 
     provider_ = std::make_shared<InstanceProfileCredentialsProvider>(
-        *api_, context_, stats_scope_,
+        *api_, context_,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
@@ -392,6 +391,18 @@ public:
           return std::move(metadata_fetcher_);
         },
         refresh_state, initialization_timer, "credentials_provider_cluster");
+  }
+
+  void
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                               MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                           std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
+    EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+      init_target_ = target.createHandle("test");
+    }));
+
+    setupProvider(refresh_state, initialization_timer);
+    init_target_->initialize(init_watcher_);
   }
 
   void expectSessionToken(const uint64_t status_code, const std::string&& token) {
@@ -555,8 +566,8 @@ public:
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
-  NiceMock<Stats::MockIsolatedStatsStore> store_;
-  Stats::Scope& stats_scope_{*store_.rootScope()};
+  Init::TargetHandlePtr init_target_;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
 };
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1) {
@@ -565,7 +576,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1) {
   expectSessionToken(403 /*Forbidden*/, std::move(std::string()));
   expectCredentialListing(403 /*Forbidden*/, std::move(std::string()));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
@@ -589,7 +600,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv2) {
   // Unauthorized
   expectCredentialListingIMDSv2(401, std::move(std::string()));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
@@ -612,7 +623,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingIMDSv1) {
   expectSessionToken(200, std::move(std::string()));
   expectCredentialListing(200, std::move(std::string("")));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
@@ -634,7 +645,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingIMDSv2) {
   expectSessionToken(200, std::move("TOKEN"));
   expectCredentialListingIMDSv2(200, std::move(std::string("")));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
@@ -657,7 +668,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingIMDSv1)
   expectSessionToken(200, std::move(std::string()));
   expectCredentialListing(200, std::move(std::string("\n")));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
@@ -680,7 +691,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingIMDSv2)
   expectSessionToken(200, std::move("TOKEN"));
   expectCredentialListingIMDSv2(200, std::move(std::string("\n")));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
@@ -705,7 +716,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentIMDSv1) {
   // Unauthorized
   expectDocument(401, std::move(std::string()));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
@@ -730,7 +741,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentIMDSv2) {
   // Unauthorized
   expectDocumentIMDSv2(401, std::move(std::string()));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
@@ -754,7 +765,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentIMDSv1) {
   expectCredentialListing(200, std::move(std::string("doc1\ndoc2\ndoc3")));
   expectDocument(200, std::move(std::string()));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
@@ -778,7 +789,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentIMDSv2) {
   expectCredentialListingIMDSv2(200, std::move(std::string("doc1\ndoc2\ndoc3")));
   expectDocumentIMDSv2(200, std::move(std::string()));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
@@ -804,7 +815,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentIMDSv1) {
  not json
  )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
@@ -830,7 +841,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentIMDSv2) {
  not json
  )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
@@ -860,7 +871,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesIMDSv1) {
  }
  )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
@@ -890,7 +901,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesIMDSv2) {
  }
  )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
@@ -920,7 +931,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationIMDS
  }
  )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
@@ -950,7 +961,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationIMDS
  }
  )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
@@ -983,8 +994,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1Duri
   expectSessionToken(403 /*Forbidden*/, std::move(std::string()));
   expectCredentialListing(403 /*Forbidden*/, std::move(std::string()));
 
-  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
-                std::chrono::seconds(2));
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                           std::chrono::seconds(2));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
@@ -1006,8 +1017,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv2Duri
   // Unauthorized
   expectCredentialListingIMDSv2(401, std::move(std::string()));
 
-  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
-                std::chrono::seconds(2));
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                           std::chrono::seconds(2));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
@@ -1030,8 +1041,8 @@ TEST_F(InstanceProfileCredentialsProviderTest,
   expectSessionToken(403 /*Forbidden*/, std::move(std::string()));
   expectCredentialListing(403 /*Forbidden*/, std::move(std::string()));
 
-  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
-                std::chrono::seconds(16));
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                           std::chrono::seconds(16));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
@@ -1070,7 +1081,7 @@ public:
 
   void setupProvider() {
     provider_ = std::make_shared<InstanceProfileCredentialsProvider>(
-        *api_, absl::nullopt, stats_scope_,
+        *api_, absl::nullopt,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
@@ -1127,8 +1138,6 @@ public:
   Api::ApiPtr api_;
   NiceMock<MockFetchMetadata> fetch_metadata_;
   InstanceProfileCredentialsProviderPtr provider_;
-  NiceMock<Stats::MockIsolatedStatsStore> store_;
-  Stats::Scope& stats_scope_{*store_.rootScope()};
 };
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListingIMDSv1) {
@@ -1395,7 +1404,7 @@ public:
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, context_, stats_scope_,
+        *api_, context_,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
@@ -1405,6 +1414,18 @@ public:
         },
         "169.254.170.2:80/path/to/doc", refresh_state, initialization_timer, "auth_token",
         "credentials_provider_cluster");
+  }
+
+  void
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                               MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                           std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
+    EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+      init_target_ = target.createHandle("test");
+    }));
+
+    setupProvider(refresh_state, initialization_timer);
+    init_target_->initialize(init_watcher_);
   }
 
   void expectDocument(const uint64_t status_code, const std::string&& document) {
@@ -1449,8 +1470,8 @@ public:
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
   MetadataFetcher::MetadataReceiver::RefreshState refresh_state_;
-  NiceMock<Stats::MockIsolatedStatsStore> store_;
-  Stats::Scope& stats_scope_{*store_.rootScope()};
+  Init::TargetHandlePtr init_target_;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
 };
 
 TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
@@ -1460,7 +1481,7 @@ TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
   // Forbidden
   expectDocument(403, std::move(std::string()));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
@@ -1481,7 +1502,7 @@ TEST_F(ContainerCredentialsProviderTest, EmptyDocument) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectDocument(200, std::move(std::string()));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
@@ -1505,7 +1526,7 @@ TEST_F(ContainerCredentialsProviderTest, MalformedDocument) {
 not json
 )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
@@ -1534,7 +1555,7 @@ TEST_F(ContainerCredentialsProviderTest, EmptyValues) {
 }
 )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
@@ -1563,7 +1584,7 @@ TEST_F(ContainerCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
 }
 )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   // System time is set to Tue Jan  2 03:04:05 UTC 2018, so this credential expiry is in 2hrs
@@ -1590,7 +1611,7 @@ TEST_F(ContainerCredentialsProviderTest, RefreshOnNormalCredentialExpirationNoEx
 }
 )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   // No expiration so we will use the default cache duration timer
@@ -1614,8 +1635,8 @@ TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocumentDuringStartup) {
   // Forbidden
   expectDocument(403, std::move(std::string()));
 
-  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
-                std::chrono::seconds(2));
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                           std::chrono::seconds(2));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
@@ -1644,7 +1665,7 @@ public:
                          MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, absl::nullopt, stats_scope_,
+        *api_, absl::nullopt,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
@@ -1665,8 +1686,6 @@ public:
   Api::ApiPtr api_;
   NiceMock<MockFetchMetadata> fetch_metadata_;
   ContainerCredentialsProviderPtr provider_;
-  NiceMock<Stats::MockIsolatedStatsStore> store_;
-  Stats::Scope& stats_scope_{*store_.rootScope()};
 };
 
 TEST_F(ContainerCredentialsProviderUsingLibcurlTest, FailedFetchingDocument) {
@@ -1811,7 +1830,7 @@ public:
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, context_, stats_scope_,
+        *api_, context_,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
@@ -1821,6 +1840,18 @@ public:
         },
         "169.254.170.23:80/v1/credentials", refresh_state, initialization_timer, "",
         "credentials_provider_cluster");
+  }
+
+  void
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                               MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                           std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
+    EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+      init_target_ = target.createHandle("test");
+    }));
+
+    setupProvider(refresh_state, initialization_timer);
+    init_target_->initialize(init_watcher_);
   }
 
   void expectDocument(const uint64_t status_code, const std::string&& document,
@@ -1865,8 +1896,8 @@ public:
   Init::TargetHandlePtr init_target_handle_;
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
-  NiceMock<Stats::MockIsolatedStatsStore> store_;
-  Stats::Scope& stats_scope_{*store_.rootScope()};
+  Init::TargetHandlePtr init_target_;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
 };
 
 TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {
@@ -1895,7 +1926,7 @@ TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {
 )EOF"),
                  TOKEN_FILE_CONTENTS);
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(1)), nullptr));
 
@@ -1923,7 +1954,7 @@ public:
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<WebIdentityCredentialsProvider>(
-        *api_, context_, stats_scope_,
+        *api_, context_,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
@@ -1937,12 +1968,24 @@ public:
   }
 
   void
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                               MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                           std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
+    EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+      init_target_ = target.createHandle("test");
+    }));
+
+    setupProvider(refresh_state, initialization_timer);
+    init_target_->initialize(init_watcher_);
+  }
+
+  void
   setupProviderWithLibcurl(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
                                MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                            std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<WebIdentityCredentialsProvider>(
-        *api_, context_, stats_scope_,
+        *api_, context_,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
@@ -2003,8 +2046,8 @@ public:
   Upstream::ClusterUpdateCallbacks* cb_{};
   testing::NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<Upstream::MockThreadLocalCluster> test_cluster{};
-  NiceMock<Stats::MockIsolatedStatsStore> store_;
-  Stats::Scope& stats_scope_{*store_.rootScope()};
+  Init::TargetHandlePtr init_target_;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
 };
 
 TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocument) {
@@ -2013,7 +2056,7 @@ TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocument) {
   // Forbidden
   expectDocument(403, std::move(std::string()));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
@@ -2034,7 +2077,7 @@ TEST_F(WebIdentityCredentialsProviderTest, EmptyDocument) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectDocument(200, std::move(std::string()));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
@@ -2058,7 +2101,7 @@ TEST_F(WebIdentityCredentialsProviderTest, MalformedDocument) {
 not json
 )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
@@ -2085,7 +2128,7 @@ TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponse) {
 }
 )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
@@ -2112,7 +2155,7 @@ TEST_F(WebIdentityCredentialsProviderTest, NoCredentials) {
 }
 )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
@@ -2141,7 +2184,7 @@ TEST_F(WebIdentityCredentialsProviderTest, EmptyCredentials) {
 }
 )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
@@ -2174,7 +2217,7 @@ TEST_F(WebIdentityCredentialsProviderTest, CredentialsWithWrongFormat) {
 }
 )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
@@ -2217,7 +2260,7 @@ TEST_F(WebIdentityCredentialsProviderTest, BadExpirationFormat) {
   // the credentials won't be refreshed until the next refresh period (1hr) or new expiration
   // value implicitly set to a value same as refresh interval.
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   // bad expiration format will cause a refresh of 1 hour - 5s (3595 seconds) by default
@@ -2252,7 +2295,7 @@ TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentialsWithMissingExpir
 }
 )EOF"));
 
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   // No expiration should fall back to a one hour - 5s (3595s) refresh
@@ -2285,7 +2328,7 @@ TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) 
   }
 }
 )EOF"));
-  setupProvider();
+  setupProviderWithContext();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(2)), nullptr));
@@ -2306,8 +2349,8 @@ TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocumentDuringStartup) 
   // Forbidden
   expectDocument(403, std::move(std::string()));
 
-  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
-                std::chrono::seconds(2));
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                           std::chrono::seconds(2));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
@@ -2333,8 +2376,8 @@ TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponseDuringStartup) {
 }
 )EOF"));
 
-  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
-                std::chrono::seconds(2));
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                           std::chrono::seconds(2));
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
@@ -2363,26 +2406,6 @@ TEST_F(WebIdentityCredentialsProviderTest, LibcurlEnabled) {
   metadata_fetcher_.reset(raw_metadata_fetcher_);
 }
 
-TEST_F(WebIdentityCredentialsProviderTest, VerifyClusterAddHandlersFire) {
-
-  ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(main_thread_dispatcher_));
-  EXPECT_CALL(cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
-      .WillOnce(DoAll(SaveArgAddress(&cb_), Return(nullptr)));
-
-  setupProvider();
-
-  Upstream::ThreadLocalClusterCommand command =
-      [&test_cluster = test_cluster]() -> Upstream::ThreadLocalCluster& { return test_cluster; };
-
-  cb_->onClusterAddOrUpdate("invalid_cluster", command);
-
-  // Trigger onClusterAddOrUpdate with the correct cluster name - this should trigger a post
-  EXPECT_CALL(main_thread_dispatcher_, post(_));
-  cb_->onClusterAddOrUpdate("credentials_provider_cluster", command);
-
-  delete raw_metadata_fetcher_;
-}
-
 class DefaultCredentialsProviderChainTest : public testing::Test {
 public:
   DefaultCredentialsProviderChainTest() : api_(Api::createApiForTest(time_system_)) {
@@ -2409,21 +2432,21 @@ public:
     MOCK_METHOD(CredentialsProviderSharedPtr, createCredentialsFileCredentialsProvider, (Api::Api&),
                 (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
-                (Api::Api&, ServerFactoryContextOptRef, Stats::Scope& stats_scope,
+                (Api::Api&, ServerFactoryContextOptRef,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, absl::string_view, absl::string_view, absl::string_view,
                  absl::string_view, absl::string_view,
                  MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds),
                 (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
-                (Api::Api&, ServerFactoryContextOptRef, Stats::Scope& stats_scope,
+                (Api::Api&, ServerFactoryContextOptRef,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, absl::string_view, absl::string_view,
                  MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
                  absl::string_view),
                 (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
-                (Api::Api&, ServerFactoryContextOptRef, Stats::Scope& stats_scope,
+                (Api::Api&, ServerFactoryContextOptRef,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
                  std::chrono::seconds, absl::string_view),
@@ -2435,56 +2458,51 @@ public:
   Api::ApiPtr api_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  NiceMock<Stats::MockIsolatedStatsStore> store_;
-  Stats::Scope& stats_scope_{*store_.rootScope()};
 
   NiceMock<MockCredentialsProviderChainFactories> factories_;
 };
 
 TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_,
-              createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
 
-  DefaultCredentialsProviderChain chain(*api_, context_, stats_scope_, "region",
-                                        DummyMetadataFetcher(), factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _))
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _))
       .Times(0);
-  DefaultCredentialsProviderChain chain(*api_, context_, stats_scope_, "region",
-                                        DummyMetadataFetcher(), factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "false", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_,
-              createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
-  DefaultCredentialsProviderChain chain(*api_, context_, stats_scope_, "region",
-                                        DummyMetadataFetcher(), factories_);
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_,
-              createContainerCredentialsProvider(Ref(*api_), _, _, _, _, _,
-                                                 "169.254.170.2:80/path/to/creds", _, _, ""));
-  DefaultCredentialsProviderChain chain(*api_, context_, stats_scope_, "region",
-                                        DummyMetadataFetcher(), factories_);
+  EXPECT_CALL(factories_, createContainerCredentialsProvider(
+                              Ref(*api_), _, _, _, _, "169.254.170.2:80/path/to/creds", _, _, ""));
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createContainerCredentialsProvider(
-                              Ref(*api_), _, _, _, _, _, "http://host/path/to/creds", _, _, ""));
-  DefaultCredentialsProviderChain chain(*api_, context_, stats_scope_, "region",
-                                        DummyMetadataFetcher(), factories_);
+                              Ref(*api_), _, _, _, _, "http://host/path/to/creds", _, _, ""));
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
@@ -2492,19 +2510,18 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_,
-              createContainerCredentialsProvider(Ref(*api_), _, _, _, _, _,
+              createContainerCredentialsProvider(Ref(*api_), _, _, _, _,
                                                  "http://host/path/to/creds", _, _, "auth_token"));
-  DefaultCredentialsProviderChain chain(*api_, context_, stats_scope_, "region",
-                                        DummyMetadataFetcher(), factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityRoleArn) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_,
-              createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
-  DefaultCredentialsProviderChain chain(*api_, context_, stats_scope_, "region",
-                                        DummyMetadataFetcher(), factories_);
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
@@ -2514,13 +2531,12 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_,
               createWebIdentityCredentialsProvider(
-                  Ref(*api_), _, _, _, _, _, "/path/to/web_token", "sts.region.amazonaws.com:443",
+                  Ref(*api_), _, _, _, _, "/path/to/web_token", "sts.region.amazonaws.com:443",
                   "aws:iam::123456789012:role/arn", "1234567890000000", _, _));
-  EXPECT_CALL(factories_,
-              createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
 
-  DefaultCredentialsProviderChain chain(*api_, context_, stats_scope_, "region",
-                                        DummyMetadataFetcher(), factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
@@ -2528,14 +2544,13 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_,
-              createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
   EXPECT_CALL(factories_,
               createWebIdentityCredentialsProvider(
-                  Ref(*api_), _, _, _, _, _, "/path/to/web_token", "sts.region.amazonaws.com:443",
+                  Ref(*api_), _, _, _, _, "/path/to/web_token", "sts.region.amazonaws.com:443",
                   "aws:iam::123456789012:role/arn", "role-session-name", _, _));
-  DefaultCredentialsProviderChain chain(*api_, context_, stats_scope_, "region",
-                                        DummyMetadataFetcher(), factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        factories_);
 }
 
 TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {
