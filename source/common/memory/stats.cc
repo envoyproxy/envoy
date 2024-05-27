@@ -118,8 +118,9 @@ AllocatorManager::AllocatorManager(
       api_(api) {
 #if defined(GPERFTOOLS_TCMALLOC)
   if (bytes_to_release_ > 0) {
-    ENVOY_LOG(error, "Memory releasing is not supported for gperf tcmalloc, no memory releasing "
-                     "will be configured.");
+    ENVOY_LOG_MISC(error,
+                   "Memory releasing is not supported for gperf tcmalloc, no memory releasing "
+                   "will be configured.");
   }
 #elif defined(TCMALLOC)
   configureBackgroundMemoryRelease();
