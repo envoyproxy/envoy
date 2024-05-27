@@ -38,9 +38,8 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
     fixed_input.clear();
 
     fixed_input.insert(fixed_input.begin(), {0x00, 0x00, 0x00, 0x01});
-    fixed_input.insert(fixed_input.end(), SigV4ASignatureConstants::SigV4AAlgorithm[0],
-                       SigV4ASignatureConstants::SigV4AAlgorithm[0] +
-                           sizeof(SigV4ASignatureConstants::SigV4AAlgorithm));
+    fixed_input.insert(fixed_input.end(), SigV4ASignatureConstants::SigV4AAlgorithm.begin(),
+                       SigV4ASignatureConstants::SigV4AAlgorithm.end());
     fixed_input.insert(fixed_input.end(), 0x00);
     fixed_input.insert(fixed_input.end(), access_key_id.begin(), access_key_id.end());
     fixed_input.insert(fixed_input.end(), external_counter);
