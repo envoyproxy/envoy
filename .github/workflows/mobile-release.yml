@@ -119,6 +119,12 @@ jobs:
         # `--pinentry-mode=loopback` could be needed to ensure we
         # suppress the gpg prompt
         echo $GPG_KEY | base64 --decode > signing-key
+        # The key ID C9ADE25A75333454 was obtained from a previous
+        # run of the Mobile Release job. The key ID is consistent
+        # between runs. Hard-coding the key ID is more straightforward
+        # than using `list-secret-keys` to parse out the correct
+        # key ID.
+        echo "default-key C9ADE25A75333454" >> ~/.gnupg/gpg.conf
         gpg --passphrase $GPG_PASSPHRASE --batch --import signing-key
         shred signing-key
 
