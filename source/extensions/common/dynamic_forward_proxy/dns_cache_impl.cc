@@ -35,7 +35,9 @@ DnsCacheImpl::DnsCacheImpl(
     : main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       config_(config), random_generator_(context.serverFactoryContext().api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(selectDnsResolver(config, main_thread_dispatcher_, context.serverFactoryContext())),
+      resolver_(THROW_OR_RETURN_VALUE(
+          selectDnsResolver(config, main_thread_dispatcher_, context.serverFactoryContext()),
+          Network::DnsResolverSharedPtr)),
       tls_slot_(context.serverFactoryContext().threadLocal()),
       scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
@@ -82,7 +84,7 @@ DnsCacheImpl::~DnsCacheImpl() {
   }
 }
 
-Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
+absl::StatusOr<Network::DnsResolverSharedPtr> DnsCacheImpl::selectDnsResolver(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
     Event::Dispatcher& main_thread_dispatcher,
     Server::Configuration::CommonFactoryContext& context) {

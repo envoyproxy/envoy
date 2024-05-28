@@ -54,7 +54,7 @@ public:
 
   ~DnsCacheImpl() override;
   static DnsCacheStats generateDnsCacheStats(Stats::Scope& scope);
-  static Network::DnsResolverSharedPtr selectDnsResolver(
+  static absl::StatusOr<Network::DnsResolverSharedPtr> selectDnsResolver(
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
       Event::Dispatcher& main_thread_dispatcher,
       Server::Configuration::CommonFactoryContext& context);

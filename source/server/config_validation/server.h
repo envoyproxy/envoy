@@ -81,12 +81,7 @@ public:
   }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
-  Network::DnsResolverSharedPtr dnsResolver() override {
-    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    Network::DnsResolverFactory& dns_resolver_factory =
-        Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
-    return dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
-  }
+  Network::DnsResolverSharedPtr dnsResolver() override;
   void drainListeners(OptRef<const Network::ExtraShutdownListenerOptions>) override {}
   DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
