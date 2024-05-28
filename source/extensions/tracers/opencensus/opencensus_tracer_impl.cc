@@ -82,7 +82,7 @@ public:
 
   std::string getTraceId() const override;
 
-  std::string getSpanIdAsHex() const override;
+  std::string getSpanId() const override;
 
 private:
   ::opencensus::trace::Span span_;
@@ -243,7 +243,7 @@ std::string Span::getTraceId() const {
   return ctx.trace_id().ToHex();
 }
 
-std::string Span::getSpanIdAsHex() const {
+std::string Span::getSpanId() const {
   const auto& ctx = span_.context();
   return ctx.span_id().ToHex();
 }

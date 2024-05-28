@@ -264,7 +264,7 @@ TEST(NullTracerTest, BasicFunctionality) {
   span_ptr->setTag("foo", "bar");
   span_ptr->setBaggage("key", "value");
   ASSERT_EQ(span_ptr->getTraceId(), "");
-  ASSERT_EQ(span_ptr->getSpanIdAsHex(), "");
+  ASSERT_EQ(span_ptr->getSpanId(), "");
   span_ptr->injectContext(trace_context, upstream_context);
   span_ptr->log(SystemTime(), "fake_event");
 

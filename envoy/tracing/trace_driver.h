@@ -141,7 +141,7 @@ public:
    * Retrieve the span ID of this span.
    * @return span ID
    */
-  virtual std::string getSpanIdAsHex() const PURE;
+  virtual std::string getSpanId() const PURE;
 };
 
 /**

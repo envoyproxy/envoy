@@ -393,7 +393,7 @@ TEST_F(DatadogTracerSpanTest, GetTraceId) {
 
 TEST_F(DatadogTracerSpanTest, GetSpanIdAsHex) {
   Span span{std::move(span_)};
-  EXPECT_EQ("cafebabe", span.getSpanIdAsHex());
+  EXPECT_EQ("cafebabe", span.getSpanId());
 }
 
 TEST_F(DatadogTracerSpanTest, NoOpMode) {
@@ -435,7 +435,7 @@ TEST_F(DatadogTracerSpanTest, NoOpMode) {
   EXPECT_EQ("", span.getBaggage("foo"));
   span.setBaggage("foo", "bar");
   EXPECT_EQ("", span.getTraceId());
-  EXPECT_EQ("", span.getSpanIdAsHex());
+  EXPECT_EQ("", span.getSpanId());
 }
 
 } // namespace
