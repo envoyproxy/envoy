@@ -1471,7 +1471,7 @@ CAPIStatus Filter::getSpanInfo(spanInfo* span_info) {
 
   auto& active_span = callbacks->activeSpan();
 
-  std::string trace_id_str = active_span.getTraceIdAsHex();
+  std::string trace_id_str = active_span.getTraceId();
   span_info->trace_id.data = strdup(trace_id_str.c_str()); // Must free in Go
   span_info->trace_id.len = trace_id_str.size();
 
