@@ -18,6 +18,7 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/common/expr/context.h"
 
 #include "eval/public/cel_value.h"
@@ -1449,6 +1450,38 @@ CAPIStatus Filter::serializeStringValue(Filters::Common::Expr::CelValue value,
   default:
     return CAPIStatus::CAPISerializationFailure;
   }
+}
+
+CAPIStatus Filter::getSpanInfo(spanInfo* span_info) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  Http::StreamFilterCallbacks* callbacks = state.getFilterCallbacks();
+
+  auto& active_span = callbacks->activeSpan();
+
+  std::string trace_id_str = active_span.getTraceIdAsHex();
+  span_info->trace_id.data = strdup(trace_id_str.c_str()); // Must free in Go
+  span_info->trace_id.len = trace_id_str.size();
+
+  std::string span_id_str = active_span.getSpanIdAsHex();
+  span_info->span_id.data = strdup(span_id_str.c_str()); // Must free in Go
+  span_info->span_id.len = span_id_str.size();
+
+  const Tracing::Decision tracing_decision =
+      Tracing::TracerUtility::shouldTraceRequest(callbacks->streamInfo());
+
+  span_info->sampled = tracing_decision.traced;
+
+  return CAPIStatus::CAPIOK;
 }
 
 void Filter::initRequest(ProcessorState& state) {

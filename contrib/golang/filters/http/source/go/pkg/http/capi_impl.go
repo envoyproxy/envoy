@@ -458,3 +458,27 @@ func (c *httpCApiImpl) HttpRecordMetric(cc unsafe.Pointer, metricId uint32, valu
 	res := C.envoyGoFilterHttpRecordMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), C.uint64_t(value))
 	handleCApiStatus(res)
 }
+
+func (c *httpCApiImpl) HttpGetSpanInfo(cc unsafe.Pointer) api.SpanInfo {
+	cfg := (*httpConfig)(cc)
+
+	var cSpanInfo C.struct_spanInfo
+	cSpanInfoPtr := (*C.struct_spanInfo)(unsafe.Pointer(&cSpanInfo))
+
+	res := C.envoyGoFilterHttpGetSpanInfo(unsafe.Pointer(cfg.config), cSpanInfoPtr)
+	handleCApiStatus(res)
+
+	var spanInfo api.SpanInfo
+
+	spanInfo.TraceID = C.GoStringN(cSpanInfo.trace_id.data, C.int(cSpanInfo.trace_id.len))
+	C.free(unsafe.Pointer(cSpanInfo.trace_id.data))
+
+	spanInfo.SpanID = C.GoStringN(cSpanInfo.span_id.data, C.int(cSpanInfo.span_id.len))
+	C.free(unsafe.Pointer(cSpanInfo.span_id.data))
+
+	if cSpanInfo.sampled == 1 {
+		spanInfo.Sampled = true
+	}
+
+	return spanInfo
+}

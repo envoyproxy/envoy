@@ -146,6 +146,8 @@ type StreamInfo interface {
 	VirtualClusterName() (string, bool)
 	// WorkerID returns the ID of the Envoy worker thread
 	WorkerID() uint32
+	// GetSpanInfo returns span context information of the current request.
+	GetSpanInfo() SpanInfo
 	// Some fields in stream info can be fetched via GetProperty
 	// For example, startTime() is equal to GetProperty("request.time")
 }
