@@ -200,7 +200,7 @@ new_features:
 - area: ext_authz
   change: |
     added
-    :ref:`decoder_header_mutation_rules <envoy.config.filter.http.ext_authz.v3.ExtAuthz.decoder_header_mutation_rules>`
+    :ref:`decoder_header_mutation_rules <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.decoder_header_mutation_rules>`
     which allows you to configure what decoder header mutations are allowed from the ext_authz
     service as well as whether to fail the downstream request if disallowed mutations are requested.
 - area: open_telemetry
