@@ -89,42 +89,30 @@ public:
     // First check if Envoy ever connected to the primary/failover, and if so
     // persist attempts to that source.
     if (ever_connected_to_ == ConnectedState::Primary) {
+      ASSERT(!connecting_to_failover_);
       ENVOY_LOG_MISC(trace, "Attempting to reconnect to the primary gRPC source, as a connection "
                             "to it was previously established.");
-      if (connected_to_ != ConnectedState::Primary) {
-        ASSERT(connected_to_ == ConnectedState::None);
-        connecting_to_primary_ = true;
-        primary_grpc_stream_->establishNewStream();
-      }
+      establishStreamToPrimaryIfNotConnected();
       return;
     } else if (ever_connected_to_ == ConnectedState::Failover) {
+      ASSERT(!connecting_to_primary_);
       ENVOY_LOG_MISC(trace, "Attempting to reconnect to the failover gRPC source, as a connection "
                             "to it was previously established.");
-      if (connected_to_ != ConnectedState::Failover) {
-        ASSERT(connected_to_ == ConnectedState::None);
-        failover_grpc_stream_->establishNewStream();
-      }
+      establishStreamToFailoverIfNotConnected();
       return;
     }
     // No prior connection was established, prefer the primary over the failover.
-    if (connecting_to_failover_ || (connected_to_ == ConnectedState::Failover)) {
-      if (connected_to_ != ConnectedState::Failover) {
-        ASSERT(connected_to_ == ConnectedState::None);
-        failover_grpc_stream_->establishNewStream();
-      }
+    if (connecting_to_failover_) {
+      establishStreamToFailoverIfNotConnected();
     } else {
       // Either connecting to primary or connected to it, or neither.
-      if (connected_to_ != ConnectedState::Primary) {
-        ASSERT(connected_to_ == ConnectedState::None);
-        connecting_to_primary_ = true;
-        primary_grpc_stream_->establishNewStream();
-      }
+      establishStreamToPrimaryIfNotConnected();
     }
   }
 
   // Returns the availability of the underlying stream.
   bool grpcStreamAvailable() const {
-    if (connecting_to_failover_ || (connected_to_ == ConnectedState::Failover)) {
+    if (connectingToOrConnectedToFailover()) {
       return failover_grpc_stream_->grpcStreamAvailable();
     }
     // Either connecting/connected to the primary, or no connection was attempted.
@@ -133,7 +121,7 @@ public:
 
   // Sends a message using the underlying stream.
   void sendMessage(const RequestType& request) {
-    if (connecting_to_failover_ || (connected_to_ == ConnectedState::Failover)) {
+    if (connectingToOrConnectedToFailover()) {
       failover_grpc_stream_->sendMessage(request);
       return;
     }
@@ -143,7 +131,7 @@ public:
 
   // Updates the queue size of the underlying stream.
   void maybeUpdateQueueSizeStat(uint64_t size) {
-    if (connecting_to_failover_ || (connected_to_ == ConnectedState::Failover)) {
+    if (connectingToOrConnectedToFailover()) {
       failover_grpc_stream_->maybeUpdateQueueSizeStat(size);
       return;
     }
@@ -153,7 +141,7 @@ public:
 
   // Returns true if the rate-limit allows draining.
   bool checkRateLimitAllowsDrain() {
-    if (connecting_to_failover_ || (connected_to_ == ConnectedState::Failover)) {
+    if (connectingToOrConnectedToFailover()) {
       return failover_grpc_stream_->checkRateLimitAllowsDrain();
     }
     // Either connecting/connected to the primary, or no connection was attempted.
@@ -162,19 +150,19 @@ public:
 
   // Returns the close status for testing purposes only.
   absl::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() {
-    if (connecting_to_failover_ || (connected_to_ == ConnectedState::Failover)) {
+    if (connectingToOrConnectedToFailover()) {
       return failover_grpc_stream_->getCloseStatusForTest();
     }
-    ASSERT(connecting_to_primary_ || (connected_to_ == ConnectedState::Primary));
+    ASSERT(connectingToOrConnectedToPrimary());
     return primary_grpc_stream_->getCloseStatusForTest();
   }
 
   // Returns the current stream for testing purposes only.
   GrpcStreamInterface<RequestType, ResponseType>& currentStreamForTest() {
-    if (connecting_to_failover_ || (connected_to_ == ConnectedState::Failover)) {
+    if (connectingToOrConnectedToFailover()) {
       return *failover_grpc_stream_;
     }
-    ASSERT(connecting_to_primary_ || (connected_to_ == ConnectedState::Primary));
+    ASSERT(connectingToOrConnectedToPrimary());
     return *primary_grpc_stream_;
   };
 
@@ -206,12 +194,10 @@ private:
     }
 
     void onEstablishmentFailure() override {
-      ASSERT(parent_.connected_to_ != ConnectedState::Failover);
       // This will be called when the primary stream fails to establish a connection, or after the
       // connection was closed.
-      ASSERT((parent_.connecting_to_primary_ || parent_.connected_to_ == ConnectedState::Primary) &&
-             !parent_.connecting_to_failover_ &&
-             (parent_.connected_to_ != ConnectedState::Failover));
+      ASSERT(parent_.connectingToOrConnectedToPrimary() &&
+             !parent_.connectingToOrConnectedToFailover());
       // If there's no failover supported, this will just be a pass-through
       // callback.
       if (parent_.failover_grpc_stream_ != nullptr) {
@@ -247,9 +233,8 @@ private:
 
     void onDiscoveryResponse(ResponseProtoPtr<ResponseType>&& message,
                              ControlPlaneStats& control_plane_stats) override {
-      ASSERT(
-          (parent_.connecting_to_primary_ || (parent_.connected_to_ == ConnectedState::Primary)) &&
-          !parent_.connecting_to_failover_ && (parent_.connected_to_ != ConnectedState::Failover));
+      ASSERT((parent_.connectingToOrConnectedToPrimary()) &&
+             !parent_.connectingToOrConnectedToFailover());
       // Received a response from the primary. The primary is now considered available (no failover
       // will be attempted).
       parent_.ever_connected_to_ = ConnectedState::Primary;
@@ -260,7 +245,7 @@ private:
     }
 
     void onWriteable() override {
-      if (parent_.connecting_to_primary_ || (parent_.connected_to_ == ConnectedState::Primary)) {
+      if (parent_.connectingToOrConnectedToPrimary()) {
         parent_.grpc_mux_callbacks_.onWriteable();
       }
     }
@@ -286,12 +271,10 @@ private:
     }
 
     void onEstablishmentFailure() override {
-      ASSERT(parent_.connected_to_ != ConnectedState::Primary);
       // This will be called when the failover stream fails to establish a connection, or after the
       // connection was closed.
-      ASSERT(
-          (parent_.connecting_to_failover_ || parent_.connected_to_ == ConnectedState::Failover) &&
-          !parent_.connecting_to_primary_ && (parent_.connected_to_ != ConnectedState::Primary));
+      ASSERT(parent_.connectingToOrConnectedToFailover() &&
+             !parent_.connectingToOrConnectedToPrimary());
       if (parent_.ever_connected_to_ != ConnectedState::Failover) {
         ASSERT(parent_.connecting_to_failover_);
         // If Envoy never established a connecting the failover, it will try to connect to the
@@ -322,9 +305,8 @@ private:
 
     void onDiscoveryResponse(ResponseProtoPtr<ResponseType>&& message,
                              ControlPlaneStats& control_plane_stats) override {
-      ASSERT((parent_.connecting_to_failover_ ||
-              (parent_.connected_to_ == ConnectedState::Failover)) &&
-             !parent_.connecting_to_primary_ && (parent_.connected_to_ != ConnectedState::Primary));
+      ASSERT(parent_.connectingToOrConnectedToFailover() &&
+             !parent_.connectingToOrConnectedToPrimary());
       // Received a response from the failover. The failover is now considered available (no going
       // back to the primary will be attempted).
       // TODO(adisuissa): This will be modified in the future, when allowing the primary to always
@@ -336,7 +318,7 @@ private:
     }
 
     void onWriteable() override {
-      if (parent_.connecting_to_failover_ || (parent_.connected_to_ == ConnectedState::Failover)) {
+      if (parent_.connectingToOrConnectedToFailover()) {
         parent_.grpc_mux_callbacks_.onWriteable();
       }
     }
@@ -344,6 +326,34 @@ private:
   private:
     GrpcMuxFailover& parent_;
   };
+
+  // Returns true iff the state is connecting to primary or connected to it.
+  bool connectingToOrConnectedToPrimary() const {
+    return connecting_to_primary_ || (connected_to_ == ConnectedState::Primary);
+  }
+
+  // Returns true iff the state is connecting to failover or connected to it.
+  bool connectingToOrConnectedToFailover() const {
+    return connecting_to_failover_ || (connected_to_ == ConnectedState::Failover);
+  }
+
+  // Establishes a new stream to the primary source if not connected to it.
+  void establishStreamToPrimaryIfNotConnected() {
+    if (connected_to_ != ConnectedState::Primary) {
+      ASSERT(connected_to_ == ConnectedState::None);
+      connecting_to_primary_ = true;
+      primary_grpc_stream_->establishNewStream();
+    }
+  }
+
+  // Establishes a new stream to the failover source if not connected to it.
+  void establishStreamToFailoverIfNotConnected() {
+    if (connected_to_ != ConnectedState::Failover) {
+      ASSERT(connected_to_ == ConnectedState::None);
+      connecting_to_failover_ = true;
+      failover_grpc_stream_->establishNewStream();
+    }
+  }
 
   // The stream callbacks that will be invoked on the GrpcMux object, to notify
   // about the state of the underlying primary/failover stream.
@@ -379,12 +389,13 @@ private:
   // determined similar to the primary variants.
   // Note that while Envoy can only be connected to a single source (mutually
   // exclusive), it can attempt connecting to more than one source at a time.
-  bool connecting_to_primary_ : 1;
-  bool connecting_to_failover_ : 1;
+  bool connecting_to_primary_{false};
+  bool connecting_to_failover_{false};
   ConnectedState connected_to_;
 
   // A flag that keeps track of whether Envoy successfully connected to either the
-  // primary or failover source.
+  // primary or failover source. Envoy successfully connected to a source once
+  // it receives a response from it.
   ConnectedState ever_connected_to_;
 };
 
