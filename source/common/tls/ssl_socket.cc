@@ -26,42 +26,9 @@ namespace {
 
 constexpr absl::string_view NotReadyReason{"TLS error: Secret is not supplied by SDS"};
 
-class InvalidSslSocket : public Network::TransportSocket {
-public:
-  // Network::TransportSocket
-  void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
-  std::string protocol() const override { return EMPTY_STRING; }
-  bool canFlushClose() override { return true; }
-  void closeSocket(Network::ConnectionEvent) override {}
-  Network::IoResult doRead(Buffer::Instance&) override { return {PostIoAction::Close, 0, false}; }
-  Network::IoResult doWrite(Buffer::Instance&, bool) override {
-    return {PostIoAction::Close, 0, false};
-  }
-  void onConnected() override {}
-  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
-  bool startSecureTransport() override { return false; }
-  void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
-};
-
-// This SslSocket will be used when SSL secret is not fetched from SDS server.
-class NotReadySslSocket : public InvalidSslSocket {
-public:
-  // Network::TransportSocket
-  absl::string_view failureReason() const override { return NotReadyReason; }
-};
-
-class ErrorSslSocket : public InvalidSslSocket {
-public:
-  ErrorSslSocket(absl::string_view error) : error_(error) {}
-
-  // Network::TransportSocket
-  absl::string_view failureReason() const override { return error_; }
-
-private:
-  std::string error_;
-};
-
 } // namespace
+
+absl::string_view NotReadySslSocket::failureReason() const { return NotReadyReason; }
 
 absl::StatusOr<std::unique_ptr<SslSocket>>
 SslSocket::create(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
@@ -408,117 +375,6 @@ void SslSocket::onAsynchronousCertValidationComplete() {
   if (info_->state() == Ssl::SocketState::HandshakeInProgress) {
     resumeHandshake();
   }
-}
-
-namespace {
-SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& store) {
-  return {
-      ALL_SSL_SOCKET_FACTORY_STATS(POOL_COUNTER_PREFIX(store, prefix + "_ssl_socket_factory."))};
-}
-} // namespace
-
-ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
-                                               Envoy::Ssl::ContextManager& manager,
-                                               Stats::Scope& stats_scope)
-    : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
-      config_(std::move(config)),
-      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
-  config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
-}
-
-ClientSslSocketFactory::~ClientSslSocketFactory() { manager_.removeContext(ssl_ctx_); }
-
-Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    Upstream::HostDescriptionConstSharedPtr) const {
-  // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
-  // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
-  // use the same ssl_ctx to create SslSocket.
-  Envoy::Ssl::ClientContextSharedPtr ssl_ctx;
-  {
-    absl::ReaderMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx = ssl_ctx_;
-  }
-  if (ssl_ctx) {
-    auto status_or_socket =
-        SslSocket::create(std::move(ssl_ctx), InitialState::Client, transport_socket_options,
-                          config_->createHandshaker());
-    if (status_or_socket.ok()) {
-      return std::move(status_or_socket.value());
-    }
-    return std::make_unique<ErrorSslSocket>(status_or_socket.status().message());
-  } else {
-    ENVOY_LOG(debug, "Create NotReadySslSocket");
-    stats_.upstream_context_secrets_not_ready_.inc();
-    return std::make_unique<NotReadySslSocket>();
-  }
-}
-
-bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
-
-void ClientSslSocketFactory::onAddOrUpdateSecret() {
-  ENVOY_LOG(debug, "Secret is updated.");
-  auto ctx = manager_.createSslClientContext(stats_scope_, *config_);
-  {
-    absl::WriterMutexLock l(&ssl_ctx_mu_);
-    std::swap(ctx, ssl_ctx_);
-  }
-  manager_.removeContext(ctx);
-  stats_.ssl_context_update_by_sds_.inc();
-}
-
-ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
-                                               Envoy::Ssl::ContextManager& manager,
-                                               Stats::Scope& stats_scope,
-                                               const std::vector<std::string>& server_names)
-    : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
-      config_(std::move(config)), server_names_(server_names),
-      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
-  config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
-}
-
-ServerSslSocketFactory::~ServerSslSocketFactory() { manager_.removeContext(ssl_ctx_); }
-
-Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
-  absl::ReaderMutexLock l(&ssl_ctx_mu_);
-  return ssl_ctx_;
-}
-
-Network::TransportSocketPtr ServerSslSocketFactory::createDownstreamTransportSocket() const {
-  // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
-  // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
-  // use the same ssl_ctx to create SslSocket.
-  Envoy::Ssl::ServerContextSharedPtr ssl_ctx;
-  {
-    absl::ReaderMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx = ssl_ctx_;
-  }
-  if (ssl_ctx) {
-    auto status_or_socket = SslSocket::create(std::move(ssl_ctx), InitialState::Server, nullptr,
-                                              config_->createHandshaker());
-    if (status_or_socket.ok()) {
-      return std::move(status_or_socket.value());
-    }
-    return std::make_unique<ErrorSslSocket>(status_or_socket.status().message());
-  } else {
-    ENVOY_LOG(debug, "Create NotReadySslSocket");
-    stats_.downstream_context_secrets_not_ready_.inc();
-    return std::make_unique<NotReadySslSocket>();
-  }
-}
-
-bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
-
-void ServerSslSocketFactory::onAddOrUpdateSecret() {
-  ENVOY_LOG(debug, "Secret is updated.");
-  auto ctx = manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr);
-  {
-    absl::WriterMutexLock l(&ssl_ctx_mu_);
-    std::swap(ctx, ssl_ctx_);
-  }
-  manager_.removeContext(ctx);
-
-  stats_.ssl_context_update_by_sds_.inc();
 }
 
 } // namespace Tls

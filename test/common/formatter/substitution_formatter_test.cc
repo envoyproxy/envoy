@@ -25,6 +25,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
@@ -2144,6 +2145,36 @@ TEST(SubstitutionFormatterTest, responseTrailerFormatter) {
   }
 }
 
+TEST(SubstitutionFormatterTest, TraceIDFormatter) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{};
+  Http::TestResponseHeaderMapImpl response_header{};
+  Http::TestResponseTrailerMapImpl response_trailer{};
+  std::string body;
+
+  Tracing::MockSpan active_span;
+  EXPECT_CALL(active_span, getTraceId()).WillRepeatedly(Return("ae0046f9075194306d7de2931bd38ce3"));
+
+  {
+    HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
+                                           body, AccessLogType::NotSet, &active_span);
+    TraceIDFormatter formatter{};
+    EXPECT_EQ("ae0046f9075194306d7de2931bd38ce3",
+              formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("ae0046f9075194306d7de2931bd38ce3")));
+  }
+
+  {
+    HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
+                                           body);
+    TraceIDFormatter formatter{};
+    EXPECT_EQ(absl::nullopt, formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+}
+
 /**
  * Populate a metadata object with the following test data:
  * "com.test": {"test_key":"test_value","test_obj":{"inner_key":"inner_value"}}
@@ -4040,7 +4071,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    const std::string format = "{{%PROTOCOL%}}   %RESP(not exist)%++%RESP(test)% "
+    const std::string format = "{{%PROTOCOL%}}   %RESP(not_exist)%++%RESP(test)% "
                                "%REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)%"
                                "\t@%TRAILER(THIRD)%@\t%TRAILER(TEST?TEST-2)%[]";
     FormatterImpl formatter(format, false);
@@ -4238,7 +4269,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
                                          body);
 
   {
-    const std::string format = "%PROTOCOL%|%RESP(not exist)%|"
+    const std::string format = "%PROTOCOL%|%RESP(not_exist)%|"
                                "%REQ(FIRST?SECOND)%|%RESP(FIRST?SECOND)%|"
                                "%TRAILER(THIRD)%|%TRAILER(TEST?TEST-2)%";
     FormatterImpl formatter(format, false);
@@ -4249,7 +4280,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
   }
 
   {
-    const std::string format = "%PROTOCOL%|%RESP(not exist)%|"
+    const std::string format = "%PROTOCOL%|%RESP(not_exist)%|"
                                "%REQ(FIRST?SECOND)%%RESP(FIRST?SECOND)%|"
                                "%TRAILER(THIRD)%|%TRAILER(TEST?TEST-2)%";
     FormatterImpl formatter(format, true);

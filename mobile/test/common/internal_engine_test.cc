@@ -486,7 +486,7 @@ TEST_F(ThreadPriorityInternalEngineTest, SetOutOfRangeThreadPriority) {
   // range, and the behavior could be system dependent. On Linux, if the supplied priority value
   // is greater than 19, then the thread priority value that gets set is 19. But since the behavior
   // could be system dependent, we just verify that the thread priority that gets set is not the
-  // out-of-range one that we initialiazed the engine with.
+  // out-of-range one that we initialized the engine with.
   EXPECT_NE(actual_thread_priority, expected_thread_priority);
 }
 
