@@ -23,7 +23,7 @@ public:
   absl::flat_hash_map<std::string, std::string> attributes() { return attributes_; };
   void track(const absl::flat_hash_map<std::string, std::string>& events) {
     if (event_tracker_ != nullptr) {
-      (*event_tracker_)->on_track(events);
+      (*event_tracker_)->on_track_(events);
     }
   }
 

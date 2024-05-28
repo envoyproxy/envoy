@@ -9,6 +9,7 @@ namespace HttpFilters {
 namespace BasicAuth {
 
 using envoy::extensions::filters::http::basic_auth::v3::BasicAuth;
+using envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute;
 
 namespace {
 
@@ -71,6 +72,15 @@ Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<BasicAuthFilter>(config));
   };
+}
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+BasicAuthFilterFactory::createRouteSpecificFilterConfigTyped(
+    const BasicAuthPerRoute& proto_config, Server::Configuration::ServerFactoryContext& context,
+    ProtobufMessage::ValidationVisitor&) {
+  UserMap users = readHtpasswd(THROW_OR_RETURN_VALUE(
+      Config::DataSource::read(proto_config.users(), true, context.api()), std::string));
+  return std::make_unique<FilterConfigPerRoute>(std::move(users));
 }
 
 REGISTER_FACTORY(BasicAuthFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);

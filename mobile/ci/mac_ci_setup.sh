@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -50,6 +50,11 @@ for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"
 done
+
+# This is to save some disk space.
+# https://mac.install.guide/homebrew/8
+brew autoremove
+brew cleanup --prune=all
 
 # https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md#xcode
 sudo xcode-select --switch /Applications/Xcode_14.1.app

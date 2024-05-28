@@ -147,7 +147,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   if (settings.payloadPassthrough()) {
     setLambdaHeaders(headers, settings.arn(), settings.invocationMode(), settings.hostRewrite());
-    settings.signer().signEmptyPayload(headers, settings.arn().region());
+    auto status = settings.signer().signEmptyPayload(headers, settings.arn().region());
+    if (!status.ok()) {
+      ENVOY_LOG(debug, "signing failed: {}", status.message());
+    }
+
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -160,7 +164,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hash = Hex::encode(hashing_util.getSha256Digest(json_buf));
-  settings.signer().sign(headers, hash, settings.arn().region());
+
+  auto status = settings.signer().sign(headers, hash, settings.arn().region());
+  if (!status.ok()) {
+    ENVOY_LOG(debug, "signing failed: {}", status.message());
+  }
   decoder_callbacks_->addDecodedData(json_buf, false);
   return Http::FilterHeadersStatus::Continue;
 }
@@ -220,7 +228,11 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(),
                    settings.hostRewrite());
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
-  settings.signer().sign(*request_headers_, hash, settings.arn().region());
+
+  auto status = settings.signer().sign(*request_headers_, hash, settings.arn().region());
+  if (!status.ok()) {
+    ENVOY_LOG(debug, "signing failed: {}", status.message());
+  }
   stats().upstream_rq_payload_size_.recordValue(decoding_buffer.length());
   return Http::FilterDataStatus::Continue;
 }

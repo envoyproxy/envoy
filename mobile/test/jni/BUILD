@@ -53,6 +53,8 @@ cc_library(
         "//test/common/integration:test_server_lib",
         "@envoy//test/test_common:test_version_linkstamp",
         "@envoy_build_config//:extension_registry",
+        # This is needed since some tests use test extensions.
+        "@envoy_build_config//:test_extensions",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
@@ -84,6 +86,8 @@ cc_library(
         "//test/common/integration:test_server_lib",
         "@envoy//test/test_common:test_version_linkstamp",
         "@envoy_build_config//:extension_registry",
+        # This is needed since some tests use test extensions.
+        "@envoy_build_config//:test_extensions",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
@@ -116,6 +120,8 @@ cc_library(
         "//test/common/integration:xds_test_server_lib",
         "@envoy//test/test_common:test_version_linkstamp",
         "@envoy_build_config//:extension_registry",
+        # This is needed since some tests use test extensions.
+        "@envoy_build_config//:test_extensions",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
@@ -201,11 +207,14 @@ cc_binary(
 
 cc_library(
     name = "jni_utility_test_lib",
+    testonly = True,
     srcs = [
         "jni_utility_test.cc",
     ],
     deps = [
+        "//library/common/http:header_utility_lib",
         "//library/jni:jni_utility_lib",
+        "@envoy//test/test_common:utility_lib",
     ],
     alwayslink = True,
 )

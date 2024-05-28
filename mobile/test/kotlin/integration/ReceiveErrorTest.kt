@@ -13,7 +13,6 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
@@ -84,8 +83,8 @@ class ReceiveErrorTest {
         .build()
 
     val engine =
-      EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .addPlatformFilter(
           name = FILTER_NAME,

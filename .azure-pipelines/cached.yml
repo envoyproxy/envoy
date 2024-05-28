@@ -1,4 +1,3 @@
-
 parameters:
 - name: arch
   type: string
@@ -50,7 +49,12 @@ steps:
     VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: "${{ parameters.cacheTimeoutWorkaround }}"
   displayName: "Cache (${{ parameters.cacheName }})"
   inputs:
-    key: '${{ parameters.cacheName }} | "${{ parameters.version }}" | "${{ parameters.arch }}" | ${{ parameters.keyDocker }} | ${{ parameters.keyBazel }}'
+    key: >-
+      ${{ parameters.cacheName }}
+      | "${{ parameters.version }}"
+      | "${{ parameters.arch }}"
+      | ${{ parameters.keyDocker }}
+      | ${{ parameters.keyBazel }}
     path: "${{ parameters.pathTemp }}/all"
     cacheHitVar: CACHE_RESTORED
 
@@ -81,9 +85,19 @@ steps:
     BAZEL_RESTORED: $(BAZEL_CACHE_RESTORED)
   displayName: "Cache/prime (Docker/Bazel)"
   # TODO(phlax): figure if there is a way to test cache without downloading it
-  condition: and(not(canceled()), eq(${{ parameters.prime }}, true), eq('${{ parameters.cacheName }}', ''), or(ne(variables.DOCKER_CACHE_RESTORED, 'true'), ne(variables.BAZEL_CACHE_RESTORED, 'true')))
+  condition: >-
+    and(not(canceled()),
+        eq(${{ parameters.prime }}, true),
+        eq('${{ parameters.cacheName }}', ''),
+        or(ne(variables.DOCKER_CACHE_RESTORED, 'true'),
+           ne(variables.BAZEL_CACHE_RESTORED, 'true')))
 
 # Load the caches for a job
-- script: sudo .azure-pipelines/docker/load_caches.sh "$(Build.StagingDirectory)" "${{ parameters.pathTemp }}" "${{ parameters.pathDockerBind }}" "${{ parameters.tmpfsDockerDisabled }}"
+- script: >-
+    sudo .azure-pipelines/docker/load_caches.sh
+    "$(Build.StagingDirectory)"
+    "${{ parameters.pathTemp }}"
+    "${{ parameters.pathDockerBind }}"
+    "${{ parameters.tmpfsDockerDisabled }}"
   displayName: "Cache/restore"
   condition: and(not(canceled()), eq(${{ parameters.prime }}, false))

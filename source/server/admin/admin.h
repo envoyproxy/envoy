@@ -67,6 +67,7 @@ class AdminImpl : public Admin,
                   public Network::FilterChainFactory,
                   public Http::FilterChainFactory,
                   public Http::ConnectionManagerConfig,
+                  public std::enable_shared_from_this<AdminImpl>,
                   Logger::Loggable<Logger::Id::admin> {
 public:
   AdminImpl(const std::string& profile_path, Server::Instance& server,

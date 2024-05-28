@@ -42,7 +42,7 @@
       dispatch_queue_create("io.envoyproxy.envoymobile.EnvoyNetworkMonitor", attrs);
   nw_path_monitor_set_queue(_path_monitor, queue);
 
-  __block envoy_network_t previousNetworkType = (envoy_network_t)-1;
+  __block Envoy::NetworkType previousNetworkType = (Envoy::NetworkType)-1;
   Envoy::InternalEngine *engine = _engine;
   nw_path_monitor_set_update_handler(_path_monitor, ^(nw_path_t _Nonnull path) {
     BOOL isSatisfied = nw_path_get_status(path) == nw_path_status_satisfied;
@@ -58,10 +58,10 @@
     }
 
     BOOL isCellular = nw_path_uses_interface_type(path, nw_interface_type_cellular);
-    envoy_network_t network = ENVOY_NET_WWAN;
+    Envoy::NetworkType network = Envoy::NetworkType::WWAN;
     if (!isCellular) {
       BOOL isWifi = nw_path_uses_interface_type(path, nw_interface_type_wifi);
-      network = isWifi ? ENVOY_NET_WLAN : ENVOY_NET_GENERIC;
+      network = isWifi ? Envoy::NetworkType::WLAN : Envoy::NetworkType::Generic;
     }
 
     if (network != previousNetworkType) {
@@ -135,7 +135,8 @@ static void _reachability_callback(SCNetworkReachabilityRef target,
 
   NSLog(@"[Envoy] setting preferred network to %@", isUsingWWAN ? @"WWAN" : @"WLAN");
   EnvoyNetworkMonitor *monitor = (__bridge EnvoyNetworkMonitor *)info;
-  monitor->_engine->setPreferredNetwork(isUsingWWAN ? ENVOY_NET_WWAN : ENVOY_NET_WLAN);
+  monitor->_engine->setPreferredNetwork(isUsingWWAN ? Envoy::NetworkType::WWAN
+                                                    : Envoy::NetworkType::WLAN);
 }
 
 @end

@@ -67,7 +67,8 @@ void RpcStream::bindDomainSocket(uint64_t id, const std::string& role,
   }
 }
 
-void RpcStream::sendHotRestartMessage(sockaddr_un& address, const HotRestartMessage& proto) {
+bool RpcStream::sendHotRestartMessage(sockaddr_un& address, const HotRestartMessage& proto,
+                                      bool allow_failure) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const uint64_t serialized_size = proto.ByteSizeLong();
   const uint64_t total_size = sizeof(uint64_t) + serialized_size;
@@ -127,6 +128,9 @@ void RpcStream::sendHotRestartMessage(sockaddr_un& address, const HotRestartMess
       }
 
       if (saved_errno == ECONNREFUSED) {
+        if (allow_failure) {
+          return false;
+        }
         ENVOY_LOG(error, "hot restart sendmsg() connection refused, retrying");
         absl::SleepFor(CONNECTION_REFUSED_RETRY_DELAY);
         continue;
@@ -144,6 +148,7 @@ void RpcStream::sendHotRestartMessage(sockaddr_un& address, const HotRestartMess
 
   RELEASE_ASSERT(fcntl(domain_socket_, F_SETFL, O_NONBLOCK) != -1,
                  fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
+  return true;
 }
 
 bool RpcStream::replyIsExpectedType(const HotRestartMessage* proto,

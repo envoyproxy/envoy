@@ -81,14 +81,14 @@ public:
     }
   }
 
-  void sign(Http::RequestMessage& message, bool sign_body = false,
-            const absl::string_view override_region = "") override;
-  void sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
-            const absl::string_view override_region = "") override;
-  void signEmptyPayload(Http::RequestHeaderMap& headers,
-                        const absl::string_view override_region = "") override;
-  void signUnsignedPayload(Http::RequestHeaderMap& headers,
-                           const absl::string_view override_region = "") override;
+  absl::Status sign(Http::RequestMessage& message, bool sign_body = false,
+                    const absl::string_view override_region = "") override;
+  absl::Status sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
+                    const absl::string_view override_region = "") override;
+  absl::Status signEmptyPayload(Http::RequestHeaderMap& headers,
+                                const absl::string_view override_region = "") override;
+  absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
+                                   const absl::string_view override_region = "") override;
 
 protected:
   std::string getRegion() const;

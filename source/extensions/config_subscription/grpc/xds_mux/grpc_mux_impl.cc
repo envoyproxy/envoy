@@ -50,6 +50,7 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
           grpc_mux_content.local_info_.contextProvider().addDynamicContextUpdateCallback(
               [this](absl::string_view resource_type_url) {
                 onDynamicContextUpdate(resource_type_url);
+                return absl::OkStatus();
               })),
       config_validators_(std::move(grpc_mux_content.config_validators_)),
       xds_config_tracker_(grpc_mux_content.xds_config_tracker_),

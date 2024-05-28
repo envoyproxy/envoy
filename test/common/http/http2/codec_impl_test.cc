@@ -33,7 +33,6 @@
 #include "codec_impl_test_util.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "quiche/http2/adapter/callback_visitor.h"
 #include "quiche/http2/adapter/nghttp2_adapter.h"
 
 using testing::_;
@@ -555,6 +554,51 @@ protected:
 };
 
 TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
+  initialize();
+
+  InSequence s;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setMethod("POST");
+
+  // Encode request headers.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+
+  // Queue request body.
+  Buffer::OwnedImpl request_body(std::string(1024, 'a'));
+  request_encoder_->encodeData(request_body, true);
+
+  // Flush request body.
+  EXPECT_CALL(request_decoder_, decodeData(_, true)).Times(AtLeast(1));
+  driveToCompletion();
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  // Encode response headers.
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+
+  // Queue response body.
+  Buffer::OwnedImpl response_body(std::string(1024, 'b'));
+  response_encoder_->encodeData(response_body, true);
+
+  // Flush response body.
+  EXPECT_CALL(response_decoder_, decodeData(_, true)).Times(AtLeast(1));
+  driveToCompletion();
+
+  EXPECT_TRUE(client_wrapper_->status_.ok());
+  EXPECT_TRUE(server_wrapper_->status_.ok());
+
+  if (http2_implementation_ == Http2Impl::Nghttp2) {
+    // Regression test for issue #19761.
+    EXPECT_EQ(0, getClientDataSourcesSize());
+    EXPECT_EQ(0, getServerDataSourcesSize());
+  }
+}
+
+TEST_P(Http2CodecImplTest, SimpleRequestResponseOldApi) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_visitor_for_data", "false"}});
   initialize();
 
   InSequence s;
@@ -3478,6 +3522,25 @@ TEST_P(Http2CodecImplTest, WindowUpdateFloodOverride) {
   EXPECT_NO_THROW(driveToCompletion());
 }
 
+TEST_P(Http2CodecImplTest, DataFrameWithPadding) {
+  initialize();
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setMethod("POST");
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+  Http2Frame dataFrame = Http2Frame::makeDataFrameWithPadding(Http2Frame::makeClientStreamId(0),
+                                                              "some data with padding", 193);
+  Buffer::OwnedImpl data;
+  data.add(dataFrame.data(), dataFrame.size());
+  server_wrapper_->buffer_.add(std::move(data));
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  driveToCompletion();
+  const Http::Status& status = server_wrapper_->status_;
+  EXPECT_TRUE(status.ok());
+}
+
 TEST_P(Http2CodecImplTest, EmptyDataFlood) {
   expect_buffered_data_on_teardown_ = true;
   Buffer::OwnedImpl data;
@@ -4561,8 +4624,6 @@ TEST_P(Http2CodecImplTest, BadResponseHeader) {
   EXPECT_TRUE(server_wrapper_->status_.ok());
 }
 
-class TestNghttp2SessionFactory;
-
 // Test client for H/2 METADATA frame edge cases.
 class MetadataTestClientConnectionImpl : public TestClientConnectionImpl {
 public:
@@ -4587,68 +4648,7 @@ public:
   }
 
 protected:
-  friend class TestNghttp2SessionFactory;
-
   NewMetadataEncoder encoder_;
-};
-
-class TestNghttp2SessionFactory : public Http2SessionFactory {
-public:
-  ~TestNghttp2SessionFactory() override {
-    nghttp2_session_callbacks_del(callbacks_);
-    nghttp2_option_del(options_);
-  }
-
-  std::unique_ptr<http2::adapter::Http2Adapter>
-  create(const nghttp2_session_callbacks*, ConnectionImpl* connection,
-         const http2::adapter::OgHttp2Adapter::Options& options) override {
-    // Only need to provide callbacks required to send METADATA frames. The new codec wrapper
-    // requires the send callback, but not the pack_extension callback.
-    nghttp2_session_callbacks_new(&callbacks_);
-    nghttp2_session_callbacks_set_send_callback(
-        callbacks_,
-        [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
-          // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
-          return static_cast<MetadataTestClientConnectionImpl*>(
-                     static_cast<ConnectionImpl*>(user_data))
-              ->onSend(data, length);
-        });
-    auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
-        http2::adapter::Perspective::kClient, *callbacks_, connection);
-    http2::adapter::Http2VisitorInterface& v = *visitor;
-    connection->setVisitor(std::move(visitor));
-    return http2::adapter::OgHttp2Adapter::Create(v, options);
-  }
-
-  std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks*,
-                                                       ConnectionImpl* connection,
-                                                       const nghttp2_option*) override {
-    // Only need to provide callbacks required to send METADATA frames. The new codec wrapper
-    // requires the send callback, but not the pack_extension callback.
-    nghttp2_session_callbacks_new(&callbacks_);
-    nghttp2_session_callbacks_set_send_callback(
-        callbacks_,
-        [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
-          // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
-          return static_cast<MetadataTestClientConnectionImpl*>(
-                     static_cast<ConnectionImpl*>(user_data))
-              ->onSend(data, length);
-        });
-    nghttp2_option_new(&options_);
-    nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
-
-    auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
-        http2::adapter::Perspective::kClient, *callbacks_, connection);
-    http2::adapter::Http2VisitorInterface& v = *visitor;
-    connection->setVisitor(std::move(visitor));
-    return http2::adapter::NgHttp2Adapter::CreateClientAdapter(v, options_);
-  }
-
-  void init(ConnectionImpl*, const envoy::config::core::v3::Http2ProtocolOptions&) override {}
-
-private:
-  nghttp2_session_callbacks* callbacks_;
-  nghttp2_option* options_;
 };
 
 class Http2CodecMetadataTest : public Http2CodecImplTestFixture, public ::testing::Test {
@@ -4680,7 +4680,7 @@ protected:
   }
 
 private:
-  TestNghttp2SessionFactory http2_session_factory_;
+  ProdNghttp2SessionFactory http2_session_factory_;
 };
 
 // Validates noop handling of METADATA frames without a known stream ID.

@@ -264,17 +264,8 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
                                  Upstream::HostDescriptionConstSharedPtr host,
                                  Event::Dispatcher& dispatcher,
                                  Random::RandomGenerator& random_generator,
-                                 const Network::TransportSocketOptionsConstSharedPtr& options)
-    : NoConnectCodecClientProd(type, std::move(connection), host, dispatcher, random_generator,
-                               options) {
-  connect();
-}
-
-NoConnectCodecClientProd::NoConnectCodecClientProd(
-    CodecType type, Network::ClientConnectionPtr&& connection,
-    Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
-    Random::RandomGenerator& random_generator,
-    const Network::TransportSocketOptionsConstSharedPtr& options)
+                                 const Network::TransportSocketOptionsConstSharedPtr& options,
+                                 bool should_connect)
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case CodecType::HTTP1: {
@@ -310,6 +301,9 @@ NoConnectCodecClientProd::NoConnectCodecClientProd(
     PANIC("unexpected");
 #endif
   }
+  }
+  if (should_connect) {
+    connect();
   }
 }
 

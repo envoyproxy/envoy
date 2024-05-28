@@ -49,6 +49,12 @@ message GrpcService {
     // Currently only supported for xDS gRPC streams.
     // If not set, xDS gRPC streams default base interval:500ms, maximum interval:30s will be applied.
     RetryPolicy retry_policy = 3;
+
+    // Maximum gRPC message size that is allowed to be received.
+    // If a message over this limit is received, the gRPC stream is terminated with the RESOURCE_EXHAUSTED error.
+    // This limit is applied to individual messages in the streaming response and not the total size of streaming response.
+    // Defaults to 0, which means unlimited.
+    google.protobuf.UInt32Value max_receive_message_length = 4;
   }
 
   // [#next-free-field: 9]

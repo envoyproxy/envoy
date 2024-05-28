@@ -202,6 +202,9 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<DynamicMetadataMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
+  lua_state_.registerType<ConnectionStreamInfoWrapper>();
+  lua_state_.registerType<ConnectionDynamicMetadataMapWrapper>();
+  lua_state_.registerType<ConnectionDynamicMetadataMapIterator>();
 
   const Filters::Common::Lua::InitializerList initializers(
       // EnvoyTimestampResolution "enum".
@@ -622,6 +625,17 @@ int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
     stream_info_wrapper_.pushStack();
   } else {
     stream_info_wrapper_.reset(StreamInfoWrapper::create(state, callbacks_.streamInfo()), true);
+  }
+  return 1;
+}
+
+int StreamHandleWrapper::luaConnectionStreamInfo(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (connection_stream_info_wrapper_.get() != nullptr) {
+    connection_stream_info_wrapper_.pushStack();
+  } else {
+    connection_stream_info_wrapper_.reset(
+        ConnectionStreamInfoWrapper::create(state, callbacks_.connection()->streamInfo()), true);
   }
   return 1;
 }

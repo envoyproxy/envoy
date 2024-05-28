@@ -38,6 +38,7 @@ envoy_cc_test(
         "@envoy//source/common/quic:quic_transport_socket_factory_lib",
         "@envoy//source/common/quic:udp_gso_batch_writer_lib",
         "@envoy//source/extensions/udp_packet_writer/gso:config",
+        "@envoy//test/extensions/filters/http/dynamic_forward_proxy:test_resolver_lib",
         "@envoy//test/test_common:test_random_generator_lib",
     ],
 )
@@ -234,4 +235,19 @@ envoy_cc_test_library(
         ["@envoy//source/common/signal:sigaction_lib"],
         "@envoy",
     ),
+)
+
+envoy_cc_test_library(
+    name = "engine_with_test_server",
+    srcs = [
+        "engine_with_test_server.cc",
+    ],
+    hdrs = [
+        "engine_with_test_server.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":test_server_lib",
+        "//library/cc:engine_builder_lib",
+    ],
 )

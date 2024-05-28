@@ -94,7 +94,7 @@ public:
   // ClientFactory
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
-         const Extensions::NetworkFilters::Common::Redis::Client::Config&,
+         const Extensions::NetworkFilters::Common::Redis::Client::ConfigSharedPtr&,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
          Stats::Scope&, const std::string&, const std::string&, bool) override {
     EXPECT_EQ(22120, host->address()->ip()->port());
@@ -139,10 +139,11 @@ protected:
         cluster_factory_context, *this, dns_resolver_, cluster_callback_);
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
-    pool_callbacks_ = &cluster_->redis_discovery_session_;
+    pool_callbacks_ = cluster_->redis_discovery_session_.get();
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
-        [&](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) -> void {
+        [&](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) {
           membership_updated_.ready();
+          return absl::OkStatus();
         });
   }
 
@@ -1289,7 +1290,8 @@ TEST_F(RedisClusterTest, HostRemovalAfterHcFail) {
       EXPECT_TRUE(hosts[i]->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
       hosts[i]->healthFlagClear(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
       hosts[i]->healthFlagClear(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
-      health_checker->runCallbacks(hosts[i], Upstream::HealthTransition::Changed);
+      health_checker->runCallbacks(hosts[i], Upstream::HealthTransition::Changed,
+                                   Upstream::HealthState::Healthy);
     }
     expectHealthyHosts(std::list<std::string>(
         {"127.0.0.1:22120", "127.0.0.3:22120", "127.0.0.2:22120", "127.0.0.4:22120"}));
@@ -1301,7 +1303,8 @@ TEST_F(RedisClusterTest, HostRemovalAfterHcFail) {
     EXPECT_CALL(*cluster_callback_, onHostHealthUpdate());
     const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     hosts[2]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
-    health_checker->runCallbacks(hosts[2], Upstream::HealthTransition::Changed);
+    health_checker->runCallbacks(hosts[2], Upstream::HealthTransition::Changed,
+                                 Upstream::HealthState::Unhealthy);
 
     EXPECT_THAT(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size(), 4U);
     EXPECT_THAT(cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size(), 3U);

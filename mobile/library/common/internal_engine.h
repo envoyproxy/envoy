@@ -7,6 +7,7 @@
 #include "source/common/common/posix/thread_impl.h"
 #include "source/common/common/thread.h"
 
+#include "absl/synchronization/notification.h"
 #include "absl/types/optional.h"
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
@@ -37,11 +38,9 @@ public:
   ~InternalEngine();
 
   /**
-   * Run the engine with the provided configuration.
-   * @param config, the Envoy bootstrap configuration to use.
-   * @param log_level, the log level.
+   * Run the engine with the provided options.
+   * @param options, the Envoy options, including the Bootstrap configuration and log level.
    */
-  envoy_status_t run(const std::string& config, const std::string& log_level);
   envoy_status_t run(std::shared_ptr<Envoy::OptionsImplBase> options);
 
   /**
@@ -64,15 +63,39 @@ public:
   // These functions are wrappers around http client functions, which hand off
   // to http client functions of the same name after doing a dispatcher post
   // (thread context switch)
-  envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
+  envoy_status_t startStream(envoy_stream_t stream, EnvoyStreamCallbacks&& stream_callbacks,
                              bool explicit_flow_control);
-  envoy_status_t sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream);
+
+  /**
+   * Send the headers over an open HTTP stream. This function can be invoked
+   * once and needs to be called before `sendData`.
+   *
+   * @param stream the stream to send headers over.
+   * @param headers the headers to send.
+   * @param end_stream indicates whether to close the stream locally after sending this frame.
+   */
+  envoy_status_t sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,
+                             bool end_stream);
 
   envoy_status_t readData(envoy_stream_t stream, size_t bytes_to_read);
 
-  envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream);
+  /**
+   * Send data over an open HTTP stream. This method can be invoked multiple times.
+   *
+   * @param stream the stream to send data over.
+   * @param buffer the data to send.
+   * @param end_stream indicates whether to close the stream locally after sending this frame.
+   */
+  envoy_status_t sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool end_stream);
 
-  envoy_status_t sendTrailers(envoy_stream_t stream, envoy_headers trailers);
+  /**
+   * Send trailers over an open HTTP stream. This method can only be invoked once per stream.
+   * Note that this method implicitly closes the stream locally.
+   *
+   * @param stream the stream to send trailers over.
+   * @param trailers the trailers to send.
+   */
+  envoy_status_t sendTrailers(envoy_stream_t stream, Http::RequestTrailerMapPtr trailers);
 
   envoy_status_t cancelStream(envoy_stream_t stream);
 
@@ -80,7 +103,7 @@ public:
   // to networkConnectivityManager after doing a dispatcher post (thread context switch)
   envoy_status_t setProxySettings(const char* host, const uint16_t port);
   envoy_status_t resetConnectivityState();
-  envoy_status_t setPreferredNetwork(envoy_network_t network);
+  envoy_status_t setPreferredNetwork(NetworkType network);
 
   /**
    * Increment a counter with a given string of elements and by the given count.
@@ -141,9 +164,7 @@ private:
   // instructions scheduled on the main_thread_ need to have a longer lifetime.
   Thread::PosixThreadPtr main_thread_{nullptr}; // Empty placeholder to be populated later.
   bool terminated_{false};
+  absl::Notification engine_running_;
 };
-
-using InternalEngineSharedPtr = std::shared_ptr<InternalEngine>;
-using InternalEngineWeakPtr = std::weak_ptr<InternalEngine>;
 
 } // namespace Envoy

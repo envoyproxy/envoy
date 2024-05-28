@@ -37,7 +37,7 @@ class XdsTest {
     val latch = CountDownLatch(1)
     engine =
       AndroidEngineBuilder(appContext)
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setOnEngineRunning { latch.countDown() }
         .setXds(

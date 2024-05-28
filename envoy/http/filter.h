@@ -812,6 +812,11 @@ public:
    */
   virtual absl::optional<Upstream::LoadBalancerContext::OverrideHost>
   upstreamOverrideHost() const PURE;
+
+  /**
+   * @return true if the filter should shed load based on the system pressure, typically memory.
+   */
+  virtual bool shouldLoadShed() const PURE;
 };
 
 /**
@@ -1193,6 +1198,8 @@ public:
   virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
   virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
+
+  const StreamInfo::FilterState& filterState() const { return streamInfo().filterState(); }
 
   const Network::Address::Instance& localAddress() const {
     return *connectionInfoProvider().localAddress();

@@ -54,9 +54,9 @@ public:
       TestUtility::loadFromYaml(yaml, proto_config_);
       TestUtility::validate(proto_config_);
     }
-    config_ = std::make_unique<TestConfigImpl>(proto_config_, factory_context_, stats_);
+    config_ = std::make_shared<TestConfigImpl>(proto_config_, factory_context_, stats_);
     conn_manager_ = std::make_unique<ConnectionManager>(
-        *config_, factory_context_.server_factory_context_.mainThreadDispatcher().timeSource());
+        config_, factory_context_.server_factory_context_.mainThreadDispatcher().timeSource());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
     conn_manager_->onNewConnection();
     current_ = factory_context_.server_factory_context_.mainThreadDispatcher()
@@ -84,7 +84,7 @@ public:
   RocketmqFilterStats stats_;
   ConfigRocketmqProxy proto_config_;
 
-  std::unique_ptr<TestConfigImpl> config_;
+  std::shared_ptr<TestConfigImpl> config_;
 
   Buffer::OwnedImpl buffer_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;

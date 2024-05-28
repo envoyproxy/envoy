@@ -148,14 +148,14 @@ def api_proto_package(
 
     compilers = ["@io_bazel_rules_go//proto:go_proto", "@com_envoyproxy_protoc_gen_validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
     if has_services:
-        compilers = ["@io_bazel_rules_go//proto:go_grpc", "@com_envoyproxy_protoc_gen_validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
+        compilers = ["@io_bazel_rules_go//proto:go_proto", "@io_bazel_rules_go//proto:go_grpc_v2", "@com_envoyproxy_protoc_gen_validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
 
     deps = (
         [_go_proto_mapping(dep) for dep in deps] +
         [
             "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
-            "@go_googleapis//google/api:annotations_go_proto",
-            "@go_googleapis//google/rpc:status_go_proto",
+            "@org_golang_google_genproto_googleapis_api//annotations:annotations",
+            "@org_golang_google_genproto_googleapis_rpc//status:status",
             "@org_golang_google_protobuf//types/known/anypb:go_default_library",
             "@org_golang_google_protobuf//types/known/durationpb:go_default_library",
             "@org_golang_google_protobuf//types/known/structpb:go_default_library",

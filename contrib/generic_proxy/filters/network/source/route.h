@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -29,6 +30,7 @@ using ProtoRouteAction =
 using ProtoRouteConfiguration =
     envoy::extensions::filters::network::generic_proxy::v3::RouteConfiguration;
 using ProtoVirtualHost = envoy::extensions::filters::network::generic_proxy::v3::VirtualHost;
+using ProtoRetryPolicy = envoy::config::core::v3::RetryPolicy;
 
 class RouteEntryImpl : public RouteEntry {
 public:
@@ -46,6 +48,9 @@ public:
 
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; };
 
+  const std::chrono::milliseconds timeout() const override { return timeout_; };
+  const RetryPolicy& retryPolicy() const override { return retry_policy_; }
+
   RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                                   Server::Configuration::ServerFactoryContext& factory_context,
@@ -59,6 +64,9 @@ private:
 
   const envoy::config::core::v3::Metadata metadata_;
   const Envoy::Config::TypedMetadataImpl<RouteTypedMetadataFactory> typed_metadata_;
+
+  const std::chrono::milliseconds timeout_;
+  const RetryPolicy retry_policy_;
 
   absl::flat_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> per_filter_configs_;
 };

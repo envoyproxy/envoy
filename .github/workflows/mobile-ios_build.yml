@@ -42,7 +42,7 @@ jobs:
       command: ./bazelw
       container-command:
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12
+      runs-on: macos-12-large
       source: |
         source ./ci/mac_ci_setup.sh
         ./bazelw shutdown
@@ -81,12 +81,12 @@ jobs:
       command: ./bazelw
       container-command:
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12
+      runs-on: macos-12-large
       source: |
         source ./ci/mac_ci_setup.sh
         ./bazelw shutdown
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.29
+        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.30
           with:
             app: ${{ matrix.app }}
             args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
@@ -126,17 +126,18 @@ jobs:
       command: ./bazelw
       container-command:
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12
+      runs-on: macos-12-large
       source: |
         source ./ci/mac_ci_setup.sh
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.29
+        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.30
           with:
             app: ${{ matrix.app }}
             args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
             expected: >-
               ${{ matrix.expected
                   || format('received headers with status {0}', matrix.expected-status) }}
+            timeout: ${{ matrix.timeout || '5m' }}
           env:
             ANDROID_NDK_HOME:
             ANDROID_HOME:
@@ -154,15 +155,16 @@ jobs:
           target: swift-baseline-app
         - name: Build swift experimental app
           args: >-
-            --config=mobile-remote-ci-macos-ios-admin
+            --config=mobile-remote-ci-macos-ios
           app: //test/swift/apps/experimental:app
           expected-status: 200
           target: swift-experimental-app
         - name: Build swift async await
           app: //examples/swift/async_await:app
           expected: >-
-            \[2\] Uploaded 7 MB of data
+            Uploaded 7 MB of data
           target: swift-async-await
+          timeout: 10m
         - name: Build objc hello world
           app: //examples/objective-c/hello_world:app
           expected-status: 301

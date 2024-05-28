@@ -79,7 +79,7 @@ DEFINE_PROTO_FUZZER(
 
   try {
     config = std::make_shared<ExternalProcessing::FilterConfig>(
-        proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "",
+        proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "", false,
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
         mocks.factory_context_);
@@ -95,24 +95,23 @@ DEFINE_PROTO_FUZZER(
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
   EXPECT_CALL(*client, start(_, _, _))
-      .WillRepeatedly(Invoke(
-          [&](ExternalProcessing::ExternalProcessorCallbacks&,
-              const Grpc::GrpcServiceConfigWithHashKey&,
-              const StreamInfo::StreamInfo&) -> ExternalProcessing::ExternalProcessorStreamPtr {
-            auto stream = std::make_unique<MockStream>();
-            EXPECT_CALL(*stream, send(_, _))
-                .WillRepeatedly(
-                    Invoke([&](envoy::service::ext_proc::v3::ProcessingRequest&&, bool) -> void {
-                      auto response =
-                          std::make_unique<envoy::service::ext_proc::v3::ProcessingResponse>(
-                              input.response());
-                      filter->onReceiveMessage(std::move(response));
-                    }));
-            EXPECT_CALL(*stream, streamInfo())
-                .WillRepeatedly(ReturnRef(mocks.async_client_stream_info_));
-            EXPECT_CALL(*stream, close()).WillRepeatedly(Return(false));
-            return stream;
-          }));
+      .WillRepeatedly(Invoke([&](ExternalProcessing::ExternalProcessorCallbacks&,
+                                 const Grpc::GrpcServiceConfigWithHashKey&,
+                                 const Envoy::Http::AsyncClient::StreamOptions&)
+                                 -> ExternalProcessing::ExternalProcessorStreamPtr {
+        auto stream = std::make_unique<MockStream>();
+        EXPECT_CALL(*stream, send(_, _))
+            .WillRepeatedly(Invoke([&](envoy::service::ext_proc::v3::ProcessingRequest&&,
+                                       bool) -> void {
+              auto response = std::make_unique<envoy::service::ext_proc::v3::ProcessingResponse>(
+                  input.response());
+              filter->onReceiveMessage(std::move(response));
+            }));
+        EXPECT_CALL(*stream, streamInfo())
+            .WillRepeatedly(ReturnRef(mocks.async_client_stream_info_));
+        EXPECT_CALL(*stream, close()).WillRepeatedly(Return(false));
+        return stream;
+      }));
 
   Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;
   fuzzer.runData(static_cast<Envoy::Http::StreamDecoderFilter*>(filter.get()), input.request());

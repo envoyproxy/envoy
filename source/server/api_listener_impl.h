@@ -87,7 +87,7 @@ protected:
             connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
                 parent.parent_.address_, parent.parent_.address_)),
             stream_info_(parent_.parent_.factory_context_.serverFactoryContext().timeSource(),
-                         connection_info_provider_),
+                         connection_info_provider_, StreamInfo::FilterState::LifeSpan::Connection),
             options_(std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>()) {}
 
       void raiseConnectionEvent(Network::ConnectionEvent event);

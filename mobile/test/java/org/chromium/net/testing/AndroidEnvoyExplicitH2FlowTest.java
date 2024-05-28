@@ -43,7 +43,7 @@ public class AndroidEnvoyExplicitH2FlowTest {
     Context appContext = ApplicationProvider.getApplicationContext();
     engine = new AndroidEngineBuilder(appContext)
                  .setTrustChainVerification(ACCEPT_UNTRUSTED)
-                 .addLogLevel(LogLevel.DEBUG)
+                 .setLogLevel(LogLevel.DEBUG)
                  .setLogger((level, message) -> {
                    System.out.print(message);
                    return null;

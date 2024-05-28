@@ -410,10 +410,13 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHCUnejectHost)
   interval_timer_->invokeCallback();
 
   // Trigger the health checker callbacks with "Changed" status and validate host is unejected.
+  health_checker->runCallbacks(hosts_[0], HealthTransition::Changed, HealthState::Unhealthy);
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
-  health_checker->runCallbacks(hosts_[0], HealthTransition::Changed);
+  health_checker->runCallbacks(hosts_[0], HealthTransition::Changed, HealthState::Healthy);
   EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
@@ -438,10 +441,13 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHCUnejectHost)
   interval_timer_->invokeCallback();
 
   // Trigger the health checker callbacks with "UnChanged" status and validate host is unejected.
+  health_checker->runCallbacks(hosts_[0], HealthTransition::Unchanged, HealthState::Unhealthy);
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
-  health_checker->runCallbacks(hosts_[0], HealthTransition::Unchanged);
+  health_checker->runCallbacks(hosts_[0], HealthTransition::Unchanged, HealthState::Healthy);
   EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
@@ -524,7 +530,7 @@ successful_active_health_check_uneject_host: false
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])))
       .Times(0);
-  health_checker->runCallbacks(hosts_[0], HealthTransition::Changed);
+  health_checker->runCallbacks(hosts_[0], HealthTransition::Changed, HealthState::Healthy);
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 

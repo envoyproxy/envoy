@@ -12,20 +12,24 @@ namespace Formatter {
 
 static const std::string DefaultUnspecifiedValueString = "-";
 
-void CommandSyntaxChecker::verifySyntax(CommandSyntaxFlags flags, const std::string& command,
-                                        const std::string& subcommand,
-                                        const absl::optional<size_t>& length) {
+absl::Status CommandSyntaxChecker::verifySyntax(CommandSyntaxFlags flags,
+                                                const std::string& command,
+                                                const std::string& subcommand,
+                                                const absl::optional<size_t>& length) {
   if ((flags == COMMAND_ONLY) && ((subcommand.length() != 0) || length.has_value())) {
-    throwEnvoyExceptionOrPanic(fmt::format("{} does not take any parameters or length", command));
+    return absl::InvalidArgumentError(
+        fmt::format("{} does not take any parameters or length", command));
   }
 
   if ((flags & PARAMS_REQUIRED).any() && (subcommand.length() == 0)) {
-    throwEnvoyExceptionOrPanic(fmt::format("{} requires parameters", command));
+    return absl::InvalidArgumentError(fmt::format("{} requires parameters", command));
   }
 
   if ((flags & LENGTH_ALLOWED).none() && length.has_value()) {
-    throwEnvoyExceptionOrPanic(fmt::format("{} does not allow length to be specified.", command));
+    return absl::InvalidArgumentError(
+        fmt::format("{} does not allow length to be specified.", command));
   }
+  return absl::OkStatus();
 }
 
 const absl::optional<std::reference_wrapper<const std::string>>
@@ -83,6 +87,15 @@ void SubstitutionFormatUtils::truncate(std::string& str, absl::optional<size_t> 
   if (str.length() > max_length.value()) {
     str.resize(max_length.value());
   }
+}
+
+absl::string_view SubstitutionFormatUtils::truncateStringView(absl::string_view str,
+                                                              absl::optional<size_t> max_length) {
+  if (!max_length) {
+    return str;
+  }
+
+  return str.substr(0, max_length.value());
 }
 
 void SubstitutionFormatUtils::parseSubcommandHeaders(const std::string& subcommand,

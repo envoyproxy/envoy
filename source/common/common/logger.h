@@ -46,6 +46,7 @@ const static bool should_log = true;
   FUNCTION(connection)                                                                             \
   FUNCTION(conn_handler)                                                                           \
   FUNCTION(compression)                                                                            \
+  FUNCTION(credential_injector)                                                                    \
   FUNCTION(decompression)                                                                          \
   FUNCTION(dns)                                                                                    \
   FUNCTION(dubbo)                                                                                  \
@@ -95,7 +96,8 @@ const static bool should_log = true;
   FUNCTION(udp)                                                                                    \
   FUNCTION(wasm)                                                                                   \
   FUNCTION(websocket)                                                                              \
-  FUNCTION(golang)
+  FUNCTION(golang)                                                                                 \
+  FUNCTION(stats_sinks)
 
 // clang-format off
 enum class Id {

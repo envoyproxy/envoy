@@ -53,6 +53,7 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/api:api_interface",
         "//envoy/init:manager_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",
         "//source/common/common:empty_string",
@@ -206,6 +207,7 @@ envoy_cc_library(
     hdrs = ["xds_resource.h"],
     deps = [
         "//source/common/http:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@com_github_cncf_xds//xds/core/v3:pkg_cc_proto",
     ],
 )
@@ -237,19 +239,6 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "stats_utility_lib",
-    srcs = ["stats_utility.cc"],
-    hdrs = ["stats_utility.h"],
-    deps = [
-        "//source/common/stats:histogram_lib",
-        "//source/common/stats:stats_lib",
-        "//source/common/stats:stats_matcher_lib",
-        "//source/common/stats:tag_producer_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 

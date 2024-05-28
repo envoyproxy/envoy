@@ -11,6 +11,9 @@
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
+namespace {
+constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(3);
+} // namespace
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
@@ -40,32 +43,23 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
                      thread_priority, Thread::PosixThreadFactory::create()) {}
 
-envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
-  // Start the Envoy on the dedicated thread.
-  auto options = std::make_shared<Envoy::OptionsImplBase>();
-  options->setConfigYaml(config);
-  if (!log_level.empty()) {
-    ENVOY_BUG(options->setLogLevel(log_level).ok(), "invalid log level");
-  }
-  options->setConcurrency(1);
-  return run(std::move(options));
-}
-
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
 envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
-                                           envoy_http_callbacks bridge_callbacks,
+                                           EnvoyStreamCallbacks&& stream_callbacks,
                                            bool explicit_flow_control) {
-  return dispatcher_->post([&, stream, bridge_callbacks, explicit_flow_control]() {
-    http_client_->startStream(stream, bridge_callbacks, explicit_flow_control);
-  });
+  return dispatcher_->post(
+      [&, stream, stream_callbacks = std::move(stream_callbacks), explicit_flow_control]() mutable {
+        http_client_->startStream(stream, std::move(stream_callbacks), explicit_flow_control);
+      });
 }
 
-envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, envoy_headers headers,
+envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,
                                            bool end_stream) {
-  return dispatcher_->post([&, stream, headers, end_stream]() {
-    http_client_->sendHeaders(stream, headers, end_stream);
+  return dispatcher_->post([this, stream, headers = std::move(headers), end_stream]() mutable {
+    http_client_->sendHeaders(stream, std::move(headers), end_stream);
   });
+  return ENVOY_SUCCESS;
 }
 
 envoy_status_t InternalEngine::readData(envoy_stream_t stream, size_t bytes_to_read) {
@@ -73,14 +67,18 @@ envoy_status_t InternalEngine::readData(envoy_stream_t stream, size_t bytes_to_r
       [&, stream, bytes_to_read]() { http_client_->readData(stream, bytes_to_read); });
 }
 
-envoy_status_t InternalEngine::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
-  return dispatcher_->post(
-      [&, stream, data, end_stream]() { http_client_->sendData(stream, data, end_stream); });
+envoy_status_t InternalEngine::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer,
+                                        bool end_stream) {
+  return dispatcher_->post([&, stream, buffer = std::move(buffer), end_stream]() mutable {
+    http_client_->sendData(stream, std::move(buffer), end_stream);
+  });
 }
 
-envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
-  return dispatcher_->post(
-      [&, stream, trailers]() { http_client_->sendTrailers(stream, trailers); });
+envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream,
+                                            Http::RequestTrailerMapPtr trailers) {
+  return dispatcher_->post([&, stream, trailers = std::move(trailers)]() mutable {
+    http_client_->sendTrailers(stream, std::move(trailers));
+  });
 }
 
 envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
@@ -119,13 +117,13 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
             Assert::addDebugAssertionFailureRecordAction([this](const char* location) {
               absl::flat_hash_map<std::string, std::string> event{
                   {{"name", "assertion"}, {"location", std::string(location)}}};
-              event_tracker_->on_track(event);
+              event_tracker_->on_track_(event);
             });
         bug_handler_registration_ =
             Assert::addEnvoyBugFailureRecordAction([this](const char* location) {
               absl::flat_hash_map<std::string, std::string> event{
                   {{"name", "bug"}, {"location", std::string(location)}}};
-              event_tracker_->on_track(event);
+              event_tracker_->on_track_(event);
             });
       }
 
@@ -178,7 +176,8 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
                                                         server_->serverFactoryContext().scope(),
                                                         server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
-          callbacks_->on_engine_running();
+          engine_running_.Notify();
+          callbacks_->on_engine_running_();
         });
   } // mutex_
 
@@ -196,9 +195,9 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
   assert_handler_registration_.reset(nullptr);
 
   if (event_tracker_ != nullptr) {
-    event_tracker_->on_exit();
+    event_tracker_->on_exit_();
   }
-  callbacks_->on_exit();
+  callbacks_->on_exit_();
 
   return run_success ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
@@ -216,6 +215,10 @@ envoy_status_t InternalEngine::terminate() {
   if (!main_thread_->joinable()) {
     return ENVOY_FAILURE;
   }
+
+  // Wait until the Engine is ready before calling terminate to avoid assertion failures.
+  // TODO(fredyw): Fix this without having to wait.
+  ASSERT(engine_running_.WaitForNotificationWithTimeout(ENGINE_RUNNING_TIMEOUT));
 
   // We need to be sure that MainCommon is finished being constructed so we can dispatch shutdown.
   {
@@ -265,10 +268,10 @@ envoy_status_t InternalEngine::resetConnectivityState() {
   return dispatcher_->post([&]() -> void { connectivity_manager_->resetConnectivityState(); });
 }
 
-envoy_status_t InternalEngine::setPreferredNetwork(envoy_network_t network) {
+envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
   return dispatcher_->post([&, network]() -> void {
     envoy_netconf_t configuration_key =
-        Envoy::Network::ConnectivityManagerImpl::setPreferredNetwork(network);
+        Network::ConnectivityManagerImpl::setPreferredNetwork(network);
     connectivity_manager_->refreshDns(configuration_key, true);
   });
 }

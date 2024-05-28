@@ -105,7 +105,7 @@ TEST_F(UdpUpstreamTest, ExchangeCapsules) {
   EXPECT_CALL(mock_upstream_to_downstream_,
               decodeData(BufferStringEqual(decoded_capsule_fragment), false));
   Envoy::MonotonicTime timestamp;
-  udp_upstream_->processPacket(nullptr, nullptr, std::move(received_data), timestamp);
+  udp_upstream_->processPacket(nullptr, nullptr, std::move(received_data), timestamp, /*tos=*/0);
 }
 
 TEST_F(UdpUpstreamTest, HeaderOnlyRequest) {

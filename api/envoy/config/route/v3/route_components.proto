@@ -763,7 +763,8 @@ message RouteAction {
   // collected for the shadow cluster making this feature useful for testing.
   //
   // During shadowing, the host/authority header is altered such that ``-shadow`` is appended. This is
-  // useful for logging. For example, ``cluster1`` becomes ``cluster1-shadow``.
+  // useful for logging. For example, ``cluster1`` becomes ``cluster1-shadow``. This behavior can be
+  // disabled by setting ``disable_shadow_host_suffix_append`` to ``true``.
   //
   // .. note::
   //
@@ -772,7 +773,7 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing doesn't support Http CONNECT and upgrades.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
@@ -818,6 +819,9 @@ message RouteAction {
 
     // Determines if the trace span should be sampled. Defaults to true.
     google.protobuf.BoolValue trace_sampled = 4;
+
+    // Disables appending the ``-shadow`` suffix to the shadowed ``Host`` header. Defaults to ``false``.
+    bool disable_shadow_host_suffix_append = 6;
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer

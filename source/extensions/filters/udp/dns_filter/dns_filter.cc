@@ -208,10 +208,7 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
                               ProtobufMessage::getNullValidationVisitor(), api_);
     data_source_loaded = true;
   }
-  END_TRY catch (const ProtobufMessage::UnknownProtoFieldException& e) {
-    ENVOY_LOG(warn, "Invalid field in DNS Filter datasource configuration: {}", e.what());
-  }
-  catch (const EnvoyException& e) {
+  END_TRY catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "Filesystem DNS Filter config update failure: {}", e.what());
   }
   return data_source_loaded;

@@ -90,6 +90,7 @@ private:
   absl::flat_hash_map<std::string, TriggerPtr> triggers_;
   std::atomic<float> probability_shed_load_{0};
   Stats::Gauge& scale_percent_;
+  Stats::Counter& shed_load_counter_;
   Random::RandomGenerator& random_generator_;
 };
 

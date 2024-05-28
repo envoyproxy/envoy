@@ -67,8 +67,8 @@ absl::flat_hash_set<std::string> generateAllowContentTypes(
   }
 
   absl::flat_hash_set<std::string> allow_content_types;
-  for (const auto& request_allowed_content_type : proto_allow_content_types) {
-    allow_content_types.insert(request_allowed_content_type);
+  for (const auto& allowed_content_type : proto_allow_content_types) {
+    allow_content_types.insert(allowed_content_type);
   }
   return allow_content_types;
 }

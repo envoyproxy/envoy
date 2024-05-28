@@ -13,7 +13,6 @@ import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
@@ -82,8 +81,8 @@ class CancelStreamTest {
   @Test
   fun `cancel stream calls onCancel callback`() {
     val engine =
-      EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
         .addPlatformFilter(
@@ -98,7 +97,7 @@ class CancelStreamTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "localhost:${httpTestServer.port}",
+          authority = httpTestServer.address,
           path = "/simple.txt"
         )
         .build()
