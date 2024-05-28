@@ -107,9 +107,9 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* bod
       });
 }
 
-CAPIStatus envoyGoFilterHttpGetSpanInfo(void* r, spanInfo* spanInfo) {
-  return envoyGoFilterHandlerWrapper(r, [spanInfo](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-    return filter->getSpanInfo(spanInfo);
+CAPIStatus envoyGoFilterHttpGetSpanInfo(void* r, spanInfo* span_info) {
+  return envoyGoFilterHandlerWrapper(r, [span_info](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    return filter->getSpanInfo(span_info);
   });
 }
 
