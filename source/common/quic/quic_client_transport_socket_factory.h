@@ -69,7 +69,7 @@ class QuicClientTransportSocketConfigFactory
       public Server::Configuration::UpstreamTransportSocketConfigFactory {
 public:
   // Server::Configuration::UpstreamTransportSocketConfigFactory
-  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override;
 
