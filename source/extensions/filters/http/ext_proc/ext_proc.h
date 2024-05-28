@@ -145,6 +145,32 @@ private:
   std::unique_ptr<Filters::Common::MutationRules::Checker> rule_checker_;
 };
 
+class ThreadLocalStreamManager : public Envoy::ThreadLocal::ThreadLocalObject {
+public:
+  ThreadLocalStreamManager() = default;
+  ~ThreadLocalStreamManager() override { stream_manager_.clear(); };
+
+  void add(Filter* filter, ExternalProcessorStreamPtr stream) {
+    stream_manager_[filter] = std::move(stream);
+  }
+
+  void remove(Filter* filter) { stream_manager_.erase(filter); }
+
+  bool streamHasBeenCreated(Filter* filter) {
+    return stream_manager_.contains(filter) && stream_manager_[filter] != nullptr;
+  }
+
+  // TODO(tyxia) Refactor this function and streamHasBeenCreated
+  ExternalProcessorStream* getStreamPointer(Filter* filter) {
+    ASSERT(streamHasBeenCreated(filter) == true);
+    return stream_manager_[filter].get();
+  }
+
+protected:
+  // Map of ExternalProcessorStreamPtr with filter pointer as key.
+  absl::flat_hash_map<Filter*, ExternalProcessorStreamPtr> stream_manager_;
+};
+
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
@@ -188,6 +214,14 @@ public:
       route_cache_action_ =
           envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RETAIN;
     }
+
+    thread_local_stream_manager_slot_ = context.threadLocal().allocateSlot();
+    thread_local_stream_manager_slot_->set([](Envoy::Event::Dispatcher&) {
+      // Envoy::ThreadLocal::ThreadLocalObjectSharedPtr stream_manager =
+      //     std::make_shared<ThreadLocalStreamManager>();
+      // return stream_manager;
+      return std::make_shared<ThreadLocalStreamManager>();
+    });
   }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
@@ -241,6 +275,10 @@ public:
     return immediate_mutation_checker_;
   }
 
+  ThreadLocalStreamManager& threadLocalStreamManager() {
+    return thread_local_stream_manager_slot_->getTyped<ThreadLocalStreamManager>();
+  }
+
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
@@ -274,6 +312,7 @@ private:
   const ExpressionManager expression_manager_;
 
   const ImmediateMutationChecker immediate_mutation_checker_;
+  ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -436,7 +475,9 @@ private:
 
   // The gRPC stream to the external processor, which will be opened
   // when it's time to send the first message.
-  ExternalProcessorStreamPtr stream_;
+  // ExternalProcessorStreamPtr stream_;
+  // raw pointer
+  ExternalProcessorStream* stream_ = nullptr;
 
   // Set to true when no more messages need to be sent to the processor.
   // This happens when the processor has closed the stream, or when it has
