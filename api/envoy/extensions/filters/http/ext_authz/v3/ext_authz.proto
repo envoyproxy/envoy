@@ -267,9 +267,11 @@ message ExtAuthz {
   // continuing decoding / forwarding upstream.
   //
   // In ext_authz, some of the default values for this proto are overridden for backward
-  // compatibility. The following fields' default values are overridden:
-  // - ``allow_all_routing`` = true
-  // - ``allow_envoy`` = true
+  // compatibility. The following fields' default values are overridden (both set to true):
+  // :ref:`allow_all_routing <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutationRules.allow_all_routing>`
+  // :ref:`allow_envoy <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutationRules.allow_envoy>`
+  //
+  // The above has no effect if the fields are set explicitly in your config.
   //
   // Note that no matter what rules are set here, ext_authz can never remove or append
   // pseudo headers.
