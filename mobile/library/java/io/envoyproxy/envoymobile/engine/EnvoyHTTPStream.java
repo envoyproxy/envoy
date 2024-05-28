@@ -10,13 +10,13 @@ public class EnvoyHTTPStream {
   private final long engineHandle;
   private final long streamHandle;
   private final boolean explicitFlowControl;
-  private final JvmCallbackContext callbacksContext;
+  private final EnvoyHTTPCallbacks callbacks;
 
   /**
    * Start the stream via the JNI library.
    */
   void start() {
-    JniLibrary.startStream(engineHandle, streamHandle, callbacksContext, explicitFlowControl);
+    JniLibrary.startStream(engineHandle, streamHandle, callbacks, explicitFlowControl);
   }
 
   /**
@@ -31,7 +31,7 @@ public class EnvoyHTTPStream {
     this.engineHandle = engineHandle;
     this.streamHandle = streamHandle;
     this.explicitFlowControl = explicitFlowControl;
-    callbacksContext = new JvmCallbackContext(callbacks);
+    this.callbacks = callbacks;
   }
 
   /**

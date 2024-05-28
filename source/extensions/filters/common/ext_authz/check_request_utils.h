@@ -143,7 +143,7 @@ private:
       bool encode_raw_headers, const MatcherSharedPtr& allowed_headers_matcher,
       const MatcherSharedPtr& disallowed_headers_matcher);
   static void setTLSSession(envoy::service::auth::v3::AttributeContext::TLSSession& session,
-                            const Ssl::ConnectionInfoConstSharedPtr ssl_info);
+                            const Envoy::Network::Connection& connection);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
   static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);
 };

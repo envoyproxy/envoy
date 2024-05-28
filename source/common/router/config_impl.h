@@ -101,7 +101,7 @@ public:
   absl::optional<bool> disabled(absl::string_view name) const;
 
 private:
-  RouteSpecificFilterConfigConstSharedPtr
+  absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                                   bool is_optional,
                                   Server::Configuration::ServerFactoryContext& factory_context,
@@ -247,7 +247,8 @@ public:
   CommonVirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                         const CommonConfigSharedPtr& global_route_config,
                         Server::Configuration::ServerFactoryContext& factory_context,
-                        Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator);
+                        Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
+                        absl::Status& creation_status);
 
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
   const CommonConfigImpl& globalRouteConfig() const { return *global_route_config_; }
@@ -376,7 +377,8 @@ public:
       const CommonConfigSharedPtr& global_route_config,
       Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
       ProtobufMessage::ValidationVisitor& validator,
-      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters);
+      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters,
+      absl::Status& creation_status);
 
   RouteConstSharedPtr getRouteFromEntries(const RouteCallback& cb,
                                           const Http::RequestHeaderMap& headers,
@@ -409,10 +411,11 @@ using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
 class RetryPolicyImpl : public RetryPolicy {
 
 public:
-  RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                  Upstream::RetryExtensionFactoryContext& factory_context,
-                  Server::Configuration::CommonFactoryContext& common_context);
+  static absl::StatusOr<std::unique_ptr<RetryPolicyImpl>>
+  create(const envoy::config::route::v3::RetryPolicy& retry_policy,
+         ProtobufMessage::ValidationVisitor& validation_visitor,
+         Upstream::RetryExtensionFactoryContext& factory_context,
+         Server::Configuration::CommonFactoryContext& common_context);
   RetryPolicyImpl() = default;
 
   // Router::RetryPolicy
@@ -444,6 +447,10 @@ public:
   std::chrono::milliseconds resetMaxInterval() const override { return reset_max_interval_; }
 
 private:
+  RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
+                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                  Upstream::RetryExtensionFactoryContext& factory_context,
+                  Server::Configuration::CommonFactoryContext& common_context);
   std::chrono::milliseconds per_try_timeout_{0};
   std::chrono::milliseconds per_try_idle_timeout_{0};
   // We set the number of retries to 1 by default (i.e. when no route or vhost level retry policy is
@@ -1162,11 +1169,13 @@ private:
     return absl::nullopt;
   }
 
-  PathMatcherSharedPtr buildPathMatcher(envoy::config::route::v3::Route route,
-                                        ProtobufMessage::ValidationVisitor& validator) const;
+  absl::StatusOr<PathMatcherSharedPtr>
+  buildPathMatcher(envoy::config::route::v3::Route route,
+                   ProtobufMessage::ValidationVisitor& validator) const;
 
-  PathRewriterSharedPtr buildPathRewriter(envoy::config::route::v3::Route route,
-                                          ProtobufMessage::ValidationVisitor& validator) const;
+  absl::StatusOr<PathRewriterSharedPtr>
+  buildPathRewriter(envoy::config::route::v3::Route route,
+                    ProtobufMessage::ValidationVisitor& validator) const;
 
   RouteConstSharedPtr
   pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
@@ -1505,10 +1514,11 @@ DECLARE_FACTORY(RouteListMatchActionFactory);
  */
 class RouteMatcher {
 public:
-  RouteMatcher(const envoy::config::route::v3::RouteConfiguration& config,
-               const CommonConfigSharedPtr& global_route_config,
-               Server::Configuration::ServerFactoryContext& factory_context,
-               ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
+  static absl::StatusOr<std::unique_ptr<RouteMatcher>>
+  create(const envoy::config::route::v3::RouteConfiguration& config,
+         const CommonConfigSharedPtr& global_route_config,
+         Server::Configuration::ServerFactoryContext& factory_context,
+         ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
   RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
@@ -1516,6 +1526,12 @@ public:
   const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
 
 private:
+  RouteMatcher(const envoy::config::route::v3::RouteConfiguration& config,
+               const CommonConfigSharedPtr& global_route_config,
+               Server::Configuration::ServerFactoryContext& factory_context,
+               ProtobufMessage::ValidationVisitor& validator, bool validate_clusters,
+               absl::Status& creation_status);
+
   using WildcardVirtualHosts =
       std::map<int64_t, absl::node_hash_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
   using SubstringFunction = std::function<absl::string_view(absl::string_view, int)>;
@@ -1584,7 +1600,8 @@ public:
     return max_direct_response_body_size_bytes_;
   }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
-  ClusterSpecifierPluginSharedPtr clusterSpecifierPlugin(absl::string_view provider) const;
+  absl::StatusOr<ClusterSpecifierPluginSharedPtr>
+  clusterSpecifierPlugin(absl::string_view provider) const;
   bool ignorePathParametersInPathMatching() const {
     return ignore_path_parameters_in_path_matching_;
   }

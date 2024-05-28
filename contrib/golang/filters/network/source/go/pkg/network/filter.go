@@ -25,15 +25,16 @@ import (
 )
 
 type connectionCallback struct {
-	wrapper        unsafe.Pointer
-	writeFunc      func(envoyFilter unsafe.Pointer, buffers unsafe.Pointer, buffersNum int, endStream int)
-	closeFunc      func(envoyFilter unsafe.Pointer, closeType int)
-	infoFunc       func(envoyFilter unsafe.Pointer, infoType int) string
-	streamInfo     api.StreamInfo
-	state          *filterState
-	sema           sync.WaitGroup
-	waitingOnEnvoy int32
-	mutex          sync.Mutex
+	wrapper                 unsafe.Pointer
+	writeFunc               func(envoyFilter unsafe.Pointer, buffers unsafe.Pointer, buffersNum int, endStream int)
+	closeFunc               func(envoyFilter unsafe.Pointer, closeType int)
+	infoFunc                func(envoyFilter unsafe.Pointer, infoType int) string
+	connEnableHalfCloseFunc func(envoyFilter unsafe.Pointer, enableHalfClose int)
+	streamInfo              api.StreamInfo
+	state                   *filterState
+	sema                    sync.WaitGroup
+	waitingOnEnvoy          int32
+	mutex                   sync.Mutex
 }
 
 var _ api.ConnectionCallback = (*connectionCallback)(nil)
@@ -53,6 +54,17 @@ func (n *connectionCallback) Close(closeType api.ConnectionCloseType) {
 
 func (n *connectionCallback) StreamInfo() api.StreamInfo {
 	return n
+}
+
+func (n *connectionCallback) EnableHalfClose(enabled bool) {
+	var enableHalfCloseInt int
+	if enabled {
+		enableHalfCloseInt = 1
+	}
+	if n.connEnableHalfCloseFunc == nil {
+		panic("EnableHalfClose is not supported for downstream connection yet")
+	}
+	n.connEnableHalfCloseFunc(n.wrapper, enableHalfCloseInt)
 }
 
 func (n *connectionCallback) GetRouteName() string {

@@ -98,7 +98,11 @@ public:
 
     EXPECT_EQ(want_tls_session != nullptr, request.attributes().has_tls_session());
     if (want_tls_session != nullptr) {
-      EXPECT_EQ(want_tls_session->sni(), request.attributes().tls_session().sni());
+      if (!want_tls_session->sni().empty()) {
+        EXPECT_EQ(want_tls_session->sni(), request.attributes().tls_session().sni());
+      } else {
+        EXPECT_EQ(requested_server_name_, request.attributes().tls_session().sni());
+      }
     }
   }
 
@@ -223,10 +227,10 @@ TEST_F(CheckRequestUtilsTest, TcpPeerCertificate) {
 // Verify that createTcpCheck populates the tls session details correctly.
 TEST_F(CheckRequestUtilsTest, TcpTlsSession) {
   envoy::service::auth::v3::CheckRequest request;
-  EXPECT_CALL(net_callbacks_, connection()).Times(5).WillRepeatedly(ReturnRef(connection_));
+  EXPECT_CALL(net_callbacks_, connection()).Times(4).WillRepeatedly(ReturnRef(connection_));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
-  EXPECT_CALL(Const(connection_), ssl()).Times(4).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(Const(connection_), ssl()).Times(3).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
@@ -238,6 +242,29 @@ TEST_F(CheckRequestUtilsTest, TcpTlsSession) {
                                     Protobuf::Map<std::string, std::string>());
   EXPECT_TRUE(request.attributes().has_tls_session());
   EXPECT_EQ(want_tls_session.sni(), request.attributes().tls_session().sni());
+}
+
+// Verify that createTcpCheck populates the tls session details correctly from the connection when
+// TLS session information isn't present.
+TEST_F(CheckRequestUtilsTest, TcpTlsSessionNoSessionSni) {
+  envoy::service::auth::v3::CheckRequest request;
+  EXPECT_CALL(net_callbacks_, connection()).Times(4).WillRepeatedly(ReturnRef(connection_));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(connection_, requestedServerName())
+      .Times(3)
+      .WillRepeatedly(Return(requested_server_name_));
+  EXPECT_CALL(Const(connection_), ssl()).Times(3).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+  envoy::service::auth::v3::AttributeContext_TLSSession want_tls_session;
+  EXPECT_CALL(*ssl_, sni()).WillOnce(ReturnRef(want_tls_session.sni()));
+
+  CheckRequestUtils::createTcpCheck(&net_callbacks_, request, false, true,
+                                    Protobuf::Map<std::string, std::string>());
+  EXPECT_TRUE(request.attributes().has_tls_session());
+  EXPECT_EQ(requested_server_name_, request.attributes().tls_session().sni());
 }
 
 // Verify that createHttpCheck's dependencies are invoked when it's called.
@@ -691,11 +718,11 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerCertificate) {
 // Verify that the SNI is populated correctly.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
   EXPECT_CALL(callbacks_, connection())
-      .Times(4)
+      .Times(3)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
-  EXPECT_CALL(Const(connection_), ssl()).Times(4).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(Const(connection_), ssl()).Times(3).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
   EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));
@@ -715,11 +742,14 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
 // Verify that the SNI is populated correctly.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   EXPECT_CALL(callbacks_, connection())
-      .Times(4)
+      .Times(3)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
-  EXPECT_CALL(Const(connection_), ssl()).Times(4).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(Const(connection_), ssl()).Times(3).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(connection_, requestedServerName())
+      .Times(2)
+      .WillRepeatedly(Return(requested_server_name_));
   EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
   EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));

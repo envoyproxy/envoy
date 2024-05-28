@@ -725,7 +725,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   // ====
   Tracing::SpanPtr span6 = driver_->startSpan(config_, request_headers_, stream_info_,
                                               operation_name_, {Tracing::Reason::Sampling, true});
-  EXPECT_EQ(span6->getTraceIdAsHex(), "0000000000000000");
+  EXPECT_EQ(span6->getTraceId(), "0000000000000000");
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
@@ -798,7 +798,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
   EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
   EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());
   EXPECT_TRUE(zipkin_span->span().sampled());
-  EXPECT_EQ(trace_id, zipkin_span->getTraceIdAsHex());
+  EXPECT_EQ(trace_id, zipkin_span->getTraceId());
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {

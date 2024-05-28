@@ -22,50 +22,6 @@
 namespace Envoy {
 namespace Router {
 
-RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
-    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-        config,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
-    const std::string& stat_prefix, RouteConfigProviderManager& route_config_provider_manager) {
-
-  switch (config.route_specifier_case()) {
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      RouteSpecifierCase::kRouteConfig:
-    return route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), factory_context, validator);
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      RouteSpecifierCase::kRds:
-    return route_config_provider_manager.createRdsRouteConfigProvider(
-        // At the creation of a RDS route config provider, the factory_context's initManager is
-        // always valid, though the init manager may go away later when the listener goes away.
-        config.rds(), factory_context, stat_prefix, init_manager);
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      RouteSpecifierCase::kScopedRoutes:
-    FALLTHRU; // PANIC
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:
-    PANIC("not implemented");
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM;
-}
-
-StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
-    const envoy::config::route::v3::RouteConfiguration& config, Rds::ConfigTraits& config_traits,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    Rds::RouteConfigProviderManager& route_config_provider_manager)
-    : base_(config, config_traits, factory_context, route_config_provider_manager),
-      route_config_provider_manager_(route_config_provider_manager) {}
-
-StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
-  route_config_provider_manager_.eraseStaticProvider(this);
-}
-
-ConfigConstSharedPtr StaticRouteConfigProviderImpl::configCast() const {
-  ASSERT(dynamic_cast<const Config*>(StaticRouteConfigProviderImpl::config().get()));
-  return std::static_pointer_cast<const Config>(StaticRouteConfigProviderImpl::config());
-}
-
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     RouteConfigUpdatePtr&& config_update,
@@ -218,45 +174,6 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
       config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
     }
   });
-}
-
-RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(OptRef<Server::Admin> admin)
-    : manager_(admin, "routes", proto_traits_) {}
-
-Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
-    const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
-    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    Init::Manager& init_manager) {
-  auto provider = manager_.addDynamicProvider(
-      rds, rds.route_config_name(), init_manager,
-      [&factory_context, &rds, &stat_prefix, this](uint64_t manager_identifier) {
-        auto config_update =
-            std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits_, factory_context);
-        auto resource_decoder = std::make_shared<
-            Envoy::Config::OpaqueResourceDecoderImpl<envoy::config::route::v3::RouteConfiguration>>(
-            factory_context.messageValidationContext().dynamicValidationVisitor(), "name");
-        auto subscription = std::make_shared<RdsRouteConfigSubscription>(
-            std::move(config_update), std::move(resource_decoder), rds, manager_identifier,
-            factory_context, stat_prefix, manager_);
-        auto provider =
-            std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription), factory_context);
-        return std::make_pair(provider, &provider->subscription().initTarget());
-      });
-  ASSERT(dynamic_cast<RouteConfigProvider*>(provider.get()));
-  return std::static_pointer_cast<RouteConfigProvider>(provider);
-}
-
-RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigProvider(
-    const envoy::config::route::v3::RouteConfiguration& route_config,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator) {
-  auto provider = manager_.addStaticProvider([&factory_context, &validator, &route_config, this]() {
-    ConfigTraitsImpl config_traits(validator);
-    return std::make_unique<StaticRouteConfigProviderImpl>(route_config, config_traits,
-                                                           factory_context, manager_);
-  });
-  ASSERT(dynamic_cast<RouteConfigProvider*>(provider.get()));
-  return RouteConfigProviderPtr(static_cast<RouteConfigProvider*>(provider.release()));
 }
 
 } // namespace Router
