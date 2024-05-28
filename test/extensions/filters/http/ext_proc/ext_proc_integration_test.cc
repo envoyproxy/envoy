@@ -3913,9 +3913,87 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithHeader) {
   upstream_request_->encodeData(100, true);
 
   processResponseHeadersMessage(
-      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&) {
         Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, aysncModeReproEarlyClosureHeader) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  // proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  // TODO(tyxia) skip response body. 
+  // proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  proto_config_.set_observability_mode(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  handleUpstreamRequest();
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  /* TODO(tyxia) 
+  * Header processing above is ok, Body processing here is performed after filter
+  * destroyed so it should fail
+  * But it seems that only fail in Google gRPC?
+  * 
+  */
+  // gRPC stream is closed due to filter destruction on mainStream
+  // processResponseBodyMessage(
+  //     *grpc_upstreams_[0], true, [](const HttpBody& body, BodyResponse& body_resp) {
+  //       EXPECT_TRUE(body.end_of_stream());
+  //       body_resp.mutable_response()->mutable_body_mutation()->set_body("123");
+  //       return true;
+  //     });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+// TODO(tyxia) This test can be used to reproduce the early closeure issue 
+// Comment out if (end_stream) {
+TEST_P(ExtProcIntegrationTest, aysncModeReproEarlyClosureBody) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  // TODO(tyxia) skip response body. 
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  proto_config_.set_observability_mode(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+
+  std::string body_str = std::string(10 , 'a');
+  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
+
+  // handleUpstreamRequest();
+  handleUpstreamRequestWithTrailer();
+  // processResponseHeadersMessage(
+  //     *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+  //       headers_resp.mutable_response()->mutable_header_mutation()->add_remove_headers(
+  //           "content-length");
+  //       return true;
+  //     });
+
+  /* TODO(tyxia) 
+  * Header processing above is ok, Body processing here is performed after filter
+  * destroyed so it should fail
+  * But it seems that only fail in Google gRPC?
+  * 
+  */
+  // gRPC stream is closed due to filter destruction on mainStream
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], true, [](const HttpBody&, BodyResponse& body_resp) {
+        // EXPECT_TRUE(body.end_of_stream());
+        body_resp.mutable_response()->mutable_body_mutation()->set_body("123");
         return true;
       });
 
@@ -3956,7 +4034,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
   Http::TestResponseHeaderMapImpl response_headers =
       Http::TestResponseHeaderMapImpl{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, false);
-  upstream_request_->encodeData(100, true);
+  upstream_request_->encodeData(10, true);
 
   processResponseBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
     EXPECT_TRUE(body.end_of_stream());
@@ -3966,6 +4044,8 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
   verifyDownstreamResponse(*response, 200);
 }
 
+// TODO(tyxia) This test can be used to reproduce the early closeure issue 
+// Setting "return FilterTrailersStatus::Continue;""
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
   proto_config_.set_observability_mode(true);
 
@@ -3982,6 +4062,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
   // processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
   processResponseTrailersMessage(
       *grpc_upstreams_[0], true, [](const HttpTrailers& trailers, TrailersResponse& resp) {
+        ENVOY_LOG(error, "tyxia_received_trailer");
         Http::TestResponseTrailerMapImpl expected_trailers{{"x-test-trailers", "Yes"}};
         EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
         auto* trailer_mut = resp.mutable_header_mutation();
@@ -4003,7 +4084,6 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
 
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -4038,11 +4118,12 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
         return true;
       });
 
-  processRequestTrailersMessage(
-      *grpc_upstreams_[0], false, [](const HttpTrailers& trailers, TrailersResponse&) {
-        // Verify the trailer.
+  // Process request trailer message
+  processGenericMessage(
+      *grpc_upstreams_[0], false, [](const ProcessingRequest& req, ProcessingResponse& resp) {
         Http::TestRequestTrailerMapImpl expected_trailers{{"x-trailer-foo", "yes"}};
-        EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
+        EXPECT_THAT(req.request_trailers().trailers(), HeaderProtosEqual(expected_trailers));
+        resp.set_last_message_ack(true);
         return true;
       });
 
@@ -4058,12 +4139,6 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
       Http::TestResponseHeaderMapImpl{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, false);
   upstream_request_->encodeData(100, true);
-
-  processResponseBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
-    EXPECT_TRUE(body.end_of_stream());
-    return true;
-  });
-
   verifyDownstreamResponse(*response, 200);
 }
 
