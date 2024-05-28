@@ -266,9 +266,9 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   latchTime(decoder_callbacks_, DNS_START);
-  auto result =
-      config_->cache().loadDnsCacheEntry(headers.Host()->value().getStringView(), default_port,
-                                         isProxying(), force_cache_refresh, *this);
+  auto result = config_->cache().loadDnsCacheEntryWithForceRefresh(
+      headers.Host()->value().getStringView(), default_port, isProxying(), force_cache_refresh,
+      *this);
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
     circuit_breaker_.reset();

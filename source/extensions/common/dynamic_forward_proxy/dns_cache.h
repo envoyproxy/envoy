@@ -212,7 +212,7 @@ public:
   virtual LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
                                                     bool is_proxy_lookup,
                                                     LoadDnsCacheEntryCallbacks& callbacks) {
-    return loadDnsCacheEntry(host, default_port, is_proxy_lookup, false, callbacks);
+    return loadDnsCacheEntryWithForceRefresh(host, default_port, is_proxy_lookup, false, callbacks);
   }
 
   /**
@@ -224,9 +224,10 @@ public:
    * @param force_refresh forces a fresh DNS cache lookup if true.
    * @return a handle that on destruction will de-register the callbacks.
    */
-  virtual LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
-                                                    bool is_proxy_lookup, bool force_refresh,
-                                                    LoadDnsCacheEntryCallbacks& callbacks) PURE;
+  virtual LoadDnsCacheEntryResult
+  loadDnsCacheEntryWithForceRefresh(absl::string_view host, uint16_t default_port,
+                                    bool is_proxy_lookup, bool force_refresh,
+                                    LoadDnsCacheEntryCallbacks& callbacks) PURE;
 
   /**
    * Add update callbacks to the cache.

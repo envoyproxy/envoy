@@ -98,9 +98,9 @@ DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {
 }
 
 DnsCacheImpl::LoadDnsCacheEntryResult
-DnsCacheImpl::loadDnsCacheEntry(absl::string_view raw_host, uint16_t default_port,
-                                bool is_proxy_lookup, bool force_refresh,
-                                LoadDnsCacheEntryCallbacks& callbacks) {
+DnsCacheImpl::loadDnsCacheEntryWithForceRefresh(absl::string_view raw_host, uint16_t default_port,
+                                                bool is_proxy_lookup, bool force_refresh,
+                                                LoadDnsCacheEntryCallbacks& callbacks) {
   std::string host = DnsHostInfo::normalizeHostForDfp(raw_host, default_port);
 
   ENVOY_LOG(debug, "thread local lookup for host '{}' {}", host,
