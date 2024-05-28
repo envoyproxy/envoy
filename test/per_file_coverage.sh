@@ -94,6 +94,7 @@ get_coverage_target() {
 # Make sure that for each directory with code, coverage doesn't dip
 # below the default coverage threshold.
 SOURCES=$(find source/* -type d)
+HIGH_COVERAGE_STRING=""
 while read -r DIRECTORY
 do
   get_coverage_target "$DIRECTORY"
@@ -109,10 +110,15 @@ do
   if [[ $COVERAGE_VALUE =~ "n" ]]; then
     continue;
   fi;
+
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${DIRECTORY_THRESHOLD}" | bc)
   if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
     echo "Code coverage for ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} (${COVERAGE_VALUE})"
     FAILED=1
+  fi
+  COVERAGE_HIGH=$(echo "${COVERAGE_VALUE}>${DIRECTORY_THRESHOLD}" | bc)
+  if [[ (${DIRECTORY_THRESHOLD} != "${DEFAULT_COVERAGE_THRESHOLD}") && "${COVERAGE_HIGH}" -eq 1 ]]; then
+    HIGH_COVERAGE_STRING+="\"${DIRECTORY}:${COVERAGE_VALUE} (${DIRECTORY_THRESHOLD})\"\n"
   fi
   if [[ -n ${VERBOSE} && ${COVERAGE_VALUE} > ${DIRECTORY_THRESHOLD} ]]; then
     if [[ ${DIRECTORY_THRESHOLD} < $DEFAULT_COVERAGE_THRESHOLD ]]; then
@@ -121,5 +127,9 @@ do
   fi
 
 done <<< "$SOURCES"
+
+if [[ ${FAILED} != 1 ]]; then
+  echo -e "Coverage in the following directories may be adjusted up:\n ${HIGH_COVERAGE_STRING}"
+fi
 
 exit $FAILED
