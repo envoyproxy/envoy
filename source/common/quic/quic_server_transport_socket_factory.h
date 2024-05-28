@@ -72,7 +72,7 @@ class QuicServerTransportSocketConfigFactory
       public Server::Configuration::DownstreamTransportSocketConfigFactory {
 public:
   // Server::Configuration::DownstreamTransportSocketConfigFactory
-  Network::DownstreamTransportSocketFactoryPtr
+  absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& config,
                                Server::Configuration::TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) override;

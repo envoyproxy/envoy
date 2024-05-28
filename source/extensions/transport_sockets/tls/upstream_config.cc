@@ -12,7 +12,8 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-Network::UpstreamTransportSocketFactoryPtr UpstreamSslSocketFactory::createTransportSocketFactory(
+absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
+UpstreamSslSocketFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
   auto client_config = std::make_unique<ClientContextConfigImpl>(
