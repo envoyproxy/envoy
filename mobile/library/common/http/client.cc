@@ -132,7 +132,8 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   // Send data if in default flow control mode, or if resumeData has been called in explicit
   // flow control mode.
   if (bytes_to_send_ > 0 || !explicit_flow_control_) {
-    ASSERT(!hasBufferedData());
+    // We shouldn't be calling sendDataToBridge with newly arrived data if there's buffered data.
+    ASSERT(!response_data_.get() || response_data_->length() == 0);
     sendDataToBridge(data, end_stream);
   }
 
@@ -235,14 +236,13 @@ void Client::DirectStreamCallbacks::resumeData(size_t bytes_to_send) {
   // Make sure to send end stream with data only if
   // 1) it has been received from the peer and
   // 2) there are no trailers
-  if (hasBufferedData() ||
-      (remote_end_stream_received_ && !remote_end_stream_forwarded_ && !response_trailers_)) {
+  if (hasDataToSend()) {
     sendDataToBridge(*response_data_, remote_end_stream_received_ && !response_trailers_.get());
     bytes_to_send_ = 0;
   }
 
   // If all buffered data has been sent, send and free up trailers.
-  if (!hasBufferedData() && response_trailers_.get() && bytes_to_send_ > 0) {
+  if (!hasDataToSend() && response_trailers_.get() && bytes_to_send_ > 0) {
     sendTrailersToBridge(*response_trailers_);
     response_trailers_.reset();
     bytes_to_send_ = 0;
@@ -305,7 +305,7 @@ void Client::DirectStreamCallbacks::onError() {
   // TODO(goaway): What is the expected behavior when an error is received, held, and then another
   // error occurs (e.g., timeout)?
 
-  if (explicit_flow_control_ && response_data_ && response_data_->length() != 0) {
+  if (explicit_flow_control_ && (hasDataToSend() || response_trailers_.get())) {
     ENVOY_LOG(debug, "[S{}] defering remote reset stream due to explicit flow control",
               direct_stream_.stream_handle_);
     if (direct_stream_.parent_.getStream(direct_stream_.stream_handle_,

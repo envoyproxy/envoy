@@ -3,8 +3,10 @@
 #include "envoy/api/os_sys_calls.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
 
 namespace Envoy {
@@ -112,11 +114,19 @@ void SubstitutionFormatUtils::parseSubcommandHeaders(const std::string& subcomma
         absl::StrCat("More than 1 alternative header specified in token: ", subcommand));
   }
 
-  // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
-  if (!Envoy::Http::validHeaderString(main_header) ||
-      !Envoy::Http::validHeaderString(alternative_header)) {
-    throwEnvoyExceptionOrPanic(
-        "Invalid header configuration. Format string contains null or newline.");
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consistent_header_validation")) {
+    if (!Http::HeaderUtility::headerNameIsValid(absl::AsciiStrToLower(main_header)) ||
+        !Http::HeaderUtility::headerNameIsValid(absl::AsciiStrToLower(alternative_header))) {
+      throwEnvoyExceptionOrPanic(
+          "Invalid header configuration. Format string contains invalid characters.");
+    }
+  } else {
+    // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
+    if (!Envoy::Http::validHeaderString(main_header) ||
+        !Envoy::Http::validHeaderString(alternative_header)) {
+      throwEnvoyExceptionOrPanic(
+          "Invalid header configuration. Format string contains null or newline.");
+    }
   }
 }
 

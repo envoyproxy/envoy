@@ -258,6 +258,7 @@ KiB
 Kille
 LBs
 LC
+LCOV
 LDS
 LEDS
 LEV
@@ -1451,6 +1452,7 @@ viewport
 vip
 virtualhost
 virtualize
+virtualized
 vptr
 vtable
 vtt
@@ -1509,4 +1511,5 @@ PCIE
 EDNS
 CNAME
 NAT
+NXDOMAIN
 DNAT
