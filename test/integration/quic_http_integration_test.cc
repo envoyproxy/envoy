@@ -578,6 +578,20 @@ public:
   }
 };
 
+class QuicHttpIntegrationSPATest
+    : public QuicHttpIntegrationTestBase,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+public:
+  QuicHttpIntegrationSPATest()
+      : QuicHttpIntegrationTestBase(std::get<0>(GetParam()), ConfigHelper::quicHttpProxyConfig()) {}
+
+  void SetUp() override {
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients",
+        std::get<1>(GetParam()) ? "true" : "false");
+  }
+};
+
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -586,6 +600,18 @@ INSTANTIATE_TEST_SUITE_P(QuicHttpMultiAddressesIntegrationTest,
                          QuicHttpMultiAddressesIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+static std::string SPATestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+  return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)), "_",
+                      std::get<1>(params.param) ? "all_clients_impl" : "quiche_client_impl");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicHttpIntegrationSPATests, QuicHttpIntegrationSPATest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(true, false)),
+    SPATestParamsToString);
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   useAccessLog("%DOWNSTREAM_TLS_VERSION% %DOWNSTREAM_TLS_CIPHER% %DOWNSTREAM_TLS_SESSION_ID%");
@@ -1869,7 +1895,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
   }
 }
 
-TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
+TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(
       [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -1942,7 +1968,7 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
   }
 }
 
-TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDNAT) {
+TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(
       [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -2032,10 +2058,12 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDNAT) {
   }
 }
 
-TEST_P(QuicHttpIntegrationTest, PreferredAddressRuntimeFlag) {
+TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients")) {
+    return;
+  }
   autonomous_upstream_ = true;
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients", "false");
   config_helper_.addConfigModifier(
       [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listen_address = bootstrap.mutable_static_resources()
@@ -2092,7 +2120,7 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressRuntimeFlag) {
   ASSERT_TRUE(response->complete());
 }
 
-TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDualStack) {
+TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
   if (!(TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6) &&
         version_ == Network::Address::IpVersion::v4)) {
     return;
