@@ -26,6 +26,7 @@ envoy_mobile_android_test(
     ],
     native_lib_name = "envoy_jni_utility_test",
     deps = [
+        "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
         "@maven//:com_google_protobuf_protobuf_javalite",
     ],
 )

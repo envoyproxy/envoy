@@ -4,7 +4,7 @@ import android.content.Context
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl
 
 /** The engine builder to use to create Envoy engine on Android. */
-class AndroidEngineBuilder @JvmOverloads constructor(context: Context) : EngineBuilder() {
+class AndroidEngineBuilder(context: Context) : EngineBuilder() {
   init {
     addEngineType {
       AndroidEngineImpl(
