@@ -622,7 +622,7 @@ attributes:
       patterns:
       - prefix: allowed-prefix-denied
 
-    upstream_request_header_mutation_rules:
+    decoder_header_mutation_rules:
       disallow_expression:
         regex: ^disallow-mutation.*
 
@@ -860,7 +860,7 @@ public:
     patterns:
     - prefix: allowed-prefix-denied
 
-  upstream_request_header_mutation_rules:
+  decoder_header_mutation_rules:
     disallow_expression:
       regex: disallow-mutation.*
 
@@ -903,7 +903,7 @@ public:
     patterns:
     - prefix: allowed-prefix-denied
 
-  upstream_request_header_mutation_rules:
+  decoder_header_mutation_rules:
     disallow_expression:
       regex: disallow-mutation.*
 
