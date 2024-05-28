@@ -38,8 +38,9 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
     fixed_input.clear();
 
     fixed_input.insert(fixed_input.begin(), {0x00, 0x00, 0x00, 0x01});
-    fixed_input.insert(fixed_input.end(), SigV4ASignatureConstants::SigV4AAlgorithm.begin(),
-                       SigV4ASignatureConstants::SigV4AAlgorithm.end());
+    // static constexpr failing asan testing, so converting to dynamic string view
+    auto s = absl::string_view(SigV4ASignatureConstants::SigV4AAlgorithm);
+    fixed_input.insert(fixed_input.end(), s.begin(), s.end());
     fixed_input.insert(fixed_input.end(), 0x00);
     fixed_input.insert(fixed_input.end(), access_key_id.begin(), access_key_id.end());
     fixed_input.insert(fixed_input.end(), external_counter);
@@ -66,7 +67,6 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
       result = SigV4AKeyDerivationResult::AkdrSuccess;
       // PrivateKey d = c+1
       constantTimeAddOne(&k0);
-
       priv_key_num = BN_bin2bn(k0.data(), k0.size(), nullptr);
 
       // Create a new OpenSSL EC_KEY by curve nid for secp256r1 (NIST P-256)
