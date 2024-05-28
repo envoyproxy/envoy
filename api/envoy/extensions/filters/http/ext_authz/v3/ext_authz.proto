@@ -32,7 +32,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 27]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
+      "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
 
   reserved 4;
 
