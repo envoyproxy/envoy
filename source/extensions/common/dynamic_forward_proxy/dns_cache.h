@@ -207,16 +207,27 @@ public:
   };
 
   /**
+   * Legacy API to avoid churn while we determine if |force_refresh| below is useful.
+   */
+  virtual LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
+                                                    bool is_proxy_lookup,
+                                                    LoadDnsCacheEntryCallbacks& callbacks) {
+    return loadDnsCacheEntryWithForceRefresh(host, default_port, is_proxy_lookup, false, callbacks);
+  }
+
+  /**
    * Attempt to load a DNS cache entry.
    * @param host the hostname to lookup
    * @param default_port the port to use
    * @param is_proxy_lookup indicates if the request is safe to fast-fail. The Dynamic Forward Proxy
    * filter sets this to true if no address is necessary due to an upstream proxy being configured.
+   * @param force_refresh forces a fresh DNS cache lookup if true.
    * @return a handle that on destruction will de-register the callbacks.
    */
-  virtual LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
-                                                    bool is_proxy_lookup,
-                                                    LoadDnsCacheEntryCallbacks& callbacks) PURE;
+  virtual LoadDnsCacheEntryResult
+  loadDnsCacheEntryWithForceRefresh(absl::string_view host, uint16_t default_port,
+                                    bool is_proxy_lookup, bool force_refresh,
+                                    LoadDnsCacheEntryCallbacks& callbacks) PURE;
 
   /**
    * Add update callbacks to the cache.
