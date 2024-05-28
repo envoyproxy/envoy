@@ -20,9 +20,9 @@ package api
 import "unsafe"
 
 type SpanInfo struct {
-	// The trace ID of the active span, in hex format.
+	// The trace ID of the active span.
 	TraceID string
-	// The span ID of the active span, in hex format.
+	// The span ID of the active span.
 	SpanID string
 	// Whether the span is selected for export.
 	Sampled bool
