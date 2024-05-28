@@ -228,7 +228,7 @@ TEST_P(JsonToMetadataIntegrationTest, NoBody) {
                                                         {":authority", "host"},
                                                         {"Content-Type", "application/json"}};
 
-  runTest(incoming_headers_, "", response_headers_, "");
+  runTest(incoming_headers, "", response_headers_, "");
 
   EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.success")->value());
   EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.mismatched_content_type")->value());
