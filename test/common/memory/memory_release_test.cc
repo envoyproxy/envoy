@@ -66,8 +66,10 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
     GTEST_SKIP() << "Skipping test, cannot measure memory usage precisely on this platform.";
   }
 #if defined(GPERFTOOLS_TCMALLOC)
-  EXPECT_DEATH(initialiseAllocatorManager(MB /*bytes per second*/, 0),
-               "Memory releasing is not supported for gperf tcmalloc.");
+  EXPECT_LOG_CONTAINS("error",
+                      "Memory releasing is not supported for gperf tcmalloc, no memory releasing "
+                      "will be configured.",
+                      initialiseAllocatorManager(MB /*bytes per second*/, 0));
 #elif defined(TCMALLOC)
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LOG_CONTAINS(
@@ -112,8 +114,10 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
     GTEST_SKIP() << "Skipping test, cannot measure memory usage precisely on this platform.";
   }
 #if defined(GPERFTOOLS_TCMALLOC)
-  EXPECT_DEATH(initialiseAllocatorManager(MB /*bytes per second*/, 0),
-               "Memory releasing is not supported for gperf tcmalloc.");
+  EXPECT_LOG_CONTAINS("error",
+                      "Memory releasing is not supported for gperf tcmalloc, no memory releasing "
+                      "will be configured.",
+                      initialiseAllocatorManager(MB /*bytes per second*/, 0));
 #elif defined(TCMALLOC)
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LOG_CONTAINS(
