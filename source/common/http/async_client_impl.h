@@ -291,6 +291,7 @@ private:
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool send_xff_{true};
+  bool send_internal_{true};
 
   friend class AsyncClientImpl;
   friend class AsyncClientImplUnitTest;

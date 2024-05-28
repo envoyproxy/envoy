@@ -175,7 +175,7 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  EXPECT_EQ(span->getTraceIdAsHex(), trace_id_hex);
+  EXPECT_EQ(span->getTraceId(), trace_id_hex);
 
   // Remove headers, then inject context into header from the span.
   request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT.key());

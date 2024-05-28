@@ -33,6 +33,7 @@ public:
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };
   void setUseDynamicBaseId(bool use_dynamic_base_id) { use_dynamic_base_id_ = use_dynamic_base_id; }
   void setSkipHotRestartOnNoParent(bool skip) { skip_hot_restart_on_no_parent_ = skip; }
+  void setSkipHotRestartParentStats(bool skip) { skip_hot_restart_parent_stats_ = skip; }
   void setBaseIdPath(const std::string& base_id_path) { base_id_path_ = base_id_path; }
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
@@ -98,6 +99,7 @@ public:
   uint64_t baseId() const override { return base_id_; }
   bool useDynamicBaseId() const override { return use_dynamic_base_id_; }
   bool skipHotRestartOnNoParent() const override { return skip_hot_restart_on_no_parent_; }
+  bool skipHotRestartParentStats() const override { return skip_hot_restart_parent_stats_; }
   const std::string& baseIdPath() const override { return base_id_path_; }
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
@@ -170,6 +172,7 @@ private:
   uint64_t base_id_{0};
   bool use_dynamic_base_id_{false};
   bool skip_hot_restart_on_no_parent_{false};
+  bool skip_hot_restart_parent_stats_{false};
   std::string base_id_path_;
   uint32_t concurrency_{1};
   std::string config_path_;

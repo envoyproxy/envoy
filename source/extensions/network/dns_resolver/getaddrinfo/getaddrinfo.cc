@@ -70,8 +70,8 @@ GetAddrInfoDnsResolver::processResponse(const PendingQuery& query,
   }
 
   std::list<DnsResponse> final_results;
-  switch (query.dns_lookup_family_)
-  case DnsLookupFamily::All: {
+  switch (query.dns_lookup_family_) {
+  case DnsLookupFamily::All:
     final_results = std::move(v4_results);
     final_results.splice(final_results.begin(), v6_results);
     break;
@@ -98,10 +98,10 @@ GetAddrInfoDnsResolver::processResponse(const PendingQuery& query,
     break;
   }
 
-    ENVOY_LOG(debug, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
-              accumulateToString<Network::DnsResponse>(final_results, [](const auto& dns_response) {
-                return dns_response.addrInfo().address_->asString();
-              }));
+  ENVOY_LOG(debug, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
+            accumulateToString<Network::DnsResponse>(final_results, [](const auto& dns_response) {
+              return dns_response.addrInfo().address_->asString();
+            }));
 
   return std::make_pair(ResolutionStatus::Success, final_results);
 }
@@ -164,11 +164,12 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         // the DNS query is retried.
         // NOTE: this is also how the c-ares resolver treats NONAME and NODATA:
         // https://github.com/envoyproxy/envoy/blob/099d85925b32ce8bf06e241ee433375a0a3d751b/source/extensions/network/dns_resolver/cares/dns_impl.h#L109-L111.
-        ENVOY_LOG(debug, "getaddrinfo no results rc={}", gai_strerror(rc.return_value_));
+        ENVOY_LOG(debug, "getaddrinfo for host={} has no results rc={}", next_query->dns_name_,
+                  gai_strerror(rc.return_value_));
         response = std::make_pair(ResolutionStatus::Success, std::list<DnsResponse>());
       } else {
-        ENVOY_LOG(debug, "getaddrinfo failed with rc={} errno={}", gai_strerror(rc.return_value_),
-                  errorDetails(rc.errno_));
+        ENVOY_LOG(debug, "getaddrinfo failed for host={} with rc={} errno={}",
+                  next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
       }
     }

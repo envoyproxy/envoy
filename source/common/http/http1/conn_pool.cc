@@ -52,10 +52,10 @@ void ActiveClient::StreamWrapper::onDecodeComplete() {
   decode_complete_ = encode_complete_;
   ENVOY_CONN_LOG(debug, "response complete", *parent_.codec_client_);
 
-  if (!parent_.stream_wrapper_->encode_complete_) {
+  if (!encode_complete_) {
     ENVOY_CONN_LOG(debug, "response before request complete", *parent_.codec_client_);
     parent_.codec_client_->close();
-  } else if (parent_.stream_wrapper_->close_connection_ || parent_.codec_client_->remoteClosed()) {
+  } else if (close_connection_ || parent_.codec_client_->remoteClosed()) {
     ENVOY_CONN_LOG(debug, "saw upstream close connection", *parent_.codec_client_);
     parent_.codec_client_->close();
   } else {

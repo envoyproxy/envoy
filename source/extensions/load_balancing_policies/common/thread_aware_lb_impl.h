@@ -8,7 +8,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
@@ -87,7 +87,7 @@ public:
   };
   // Upstream::ThreadAwareLoadBalancer
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
-  void initialize() override;
+  absl::Status initialize() override;
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext*) override { return nullptr; }
@@ -165,7 +165,7 @@ private:
   virtual HashingLoadBalancerSharedPtr
   createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
                      double min_normalized_weight, double max_normalized_weight) PURE;
-  void refresh();
+  absl::Status refresh();
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
   const bool locality_weighted_balancing_{};

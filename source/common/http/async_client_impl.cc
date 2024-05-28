@@ -85,9 +85,11 @@ createRetryPolicy(AsyncClientImpl& parent, const AsyncClient::StreamOptions& opt
   if (options.retry_policy.has_value()) {
     Upstream::RetryExtensionFactoryContextImpl factory_context(
         parent.factory_context_.singletonManager());
-    return std::make_unique<Router::RetryPolicyImpl>(options.retry_policy.value(),
-                                                     ProtobufMessage::getNullValidationVisitor(),
-                                                     factory_context, context);
+    return THROW_OR_RETURN_VALUE(
+        Router::RetryPolicyImpl::create(options.retry_policy.value(),
+                                        ProtobufMessage::getNullValidationVisitor(),
+                                        factory_context, context),
+        std::unique_ptr<const Router::RetryPolicy>);
   }
   if (options.parsed_retry_policy == nullptr) {
     return std::make_unique<Router::RetryPolicyImpl>();
@@ -111,8 +113,8 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
           parent_.cluster_->name(),
           retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
           parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy)),
-      account_(options.account_), buffer_limit_(options.buffer_limit_),
-      send_xff_(options.send_xff) {
+      account_(options.account_), buffer_limit_(options.buffer_limit_), send_xff_(options.send_xff),
+      send_internal_(options.send_internal) {
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
   stream_info_.setIsShadow(options.is_shadow);
   stream_info_.setUpstreamClusterInfo(parent_.cluster_);
@@ -173,7 +175,10 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
   }
 
   is_grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
-  headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
+  if (send_internal_) {
+    headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
+  }
+
   if (send_xff_) {
     Utility::appendXff(headers, *parent_.config_->local_info_.address());
   }

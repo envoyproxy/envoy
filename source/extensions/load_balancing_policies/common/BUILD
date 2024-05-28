@@ -23,10 +23,35 @@ envoy_cc_library(
     hdrs = ["thread_aware_lb_impl.h"],
     external_deps = ["abseil_synchronization"],
     deps = [
+        ":load_balancer_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
-        "//source/common/upstream:load_balancer_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "load_balancer_lib",
+    srcs = ["load_balancer_impl.cc"],
+    hdrs = ["load_balancer_impl.h"],
+    # previously considered core code and used by mobile.
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/common:random_generator_interface",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/upstream:load_balancer_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_protos_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
+        "//source/common/upstream:scheduler_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/least_request/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/random/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto",
     ],
 )

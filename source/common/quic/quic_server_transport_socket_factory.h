@@ -8,7 +8,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 namespace Envoy {
 namespace Quic {
