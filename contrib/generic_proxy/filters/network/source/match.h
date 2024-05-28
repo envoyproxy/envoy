@@ -210,7 +210,8 @@ public:
 
 class RequestMatchInputMatcher : public Matcher::InputMatcher {
 public:
-  RequestMatchInputMatcher(const RequestMatcherProto& config);
+  RequestMatchInputMatcher(const RequestMatcherProto& config,
+                           Server::Configuration::CommonFactoryContext& context);
 
   bool match(const Matcher::MatchingDataType& input) override;
 

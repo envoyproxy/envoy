@@ -243,7 +243,8 @@ private:
  */
 class MetadataFilter : public Filter {
 public:
-  MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config);
+  MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config,
+                 Server::Configuration::CommonFactoryContext& context);
 
   bool evaluate(const Formatter::HttpFormatterContext& context,
                 const StreamInfo::StreamInfo& info) const override;

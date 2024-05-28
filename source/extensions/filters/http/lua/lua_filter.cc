@@ -202,6 +202,9 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<DynamicMetadataMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
+  lua_state_.registerType<ConnectionStreamInfoWrapper>();
+  lua_state_.registerType<ConnectionDynamicMetadataMapWrapper>();
+  lua_state_.registerType<ConnectionDynamicMetadataMapIterator>();
 
   const Filters::Common::Lua::InitializerList initializers(
       // EnvoyTimestampResolution "enum".
@@ -353,6 +356,12 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   ASSERT(state_ == State::Running);
 
   StreamHandleWrapper::HttpCallOptions options;
+  options.request_options_
+      .setParentSpan(callbacks_.activeSpan())
+      // By default, do not enforce a sampling decision on this `httpCall`'s span.
+      // Instead, reuse the parent span's sampling decision. Callers can override
+      // this default with the `trace_sampled` flag in the table argument below.
+      .setSampled(absl::nullopt);
 
   // Check if the last argument is table of options. For example:
   // handle:httpCall(cluster, headers, body, {["timeout"] = 200, ...}).
@@ -372,7 +381,6 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
     options.is_async_request_ = lua_toboolean(state, AsyncFlagIndex);
   }
 
-  options.request_options_.setParentSpan(callbacks_.activeSpan());
   return doHttpCall(state, options);
 }
 
@@ -617,6 +625,17 @@ int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
     stream_info_wrapper_.pushStack();
   } else {
     stream_info_wrapper_.reset(StreamInfoWrapper::create(state, callbacks_.streamInfo()), true);
+  }
+  return 1;
+}
+
+int StreamHandleWrapper::luaConnectionStreamInfo(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (connection_stream_info_wrapper_.get() != nullptr) {
+    connection_stream_info_wrapper_.pushStack();
+  } else {
+    connection_stream_info_wrapper_.reset(
+        ConnectionStreamInfoWrapper::create(state, callbacks_.connection()->streamInfo()), true);
   }
   return 1;
 }

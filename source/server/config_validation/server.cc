@@ -5,7 +5,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "source/common/common/utility.h"
-#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/event/real_time_system.h"
@@ -13,6 +12,7 @@
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/admin/admin_factory_context.h"
@@ -101,7 +101,9 @@ void ValidationInstance::initialize(const Options& options,
   regex_engine_ = createRegexEngine(
       bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
 
-  Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags());
+  auto producer_or_error =
+      Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
+  THROW_IF_STATUS_NOT_OK(producer_or_error, throw);
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
     *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
   }

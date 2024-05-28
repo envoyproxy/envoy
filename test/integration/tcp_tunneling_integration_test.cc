@@ -6,8 +6,10 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
+#include "test/integration/filters/add_header_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/integration/tcp_tunneling_integration.h"
 
 #include "gtest/gtest.h"
 
@@ -715,8 +717,10 @@ TEST_P(ProxyingConnectIntegrationTest, 2xxStatusCode) {
   cleanupUpstreamAndDownstream();
 }
 
+using HttpFilterProto =
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 // Tunneling downstream TCP over an upstream HTTP CONNECT tunnel.
-class TcpTunnelingIntegrationTest : public HttpProtocolIntegrationTest {
+class TcpTunnelingIntegrationTest : public BaseTcpTunnelingIntegrationTest {
 public:
   void SetUp() override {
     enableHalfClose(true);
@@ -739,7 +743,40 @@ public:
           filter->mutable_typed_config()->PackFrom(proxy_config);
           filter->set_name("envoy.filters.network.tcp_proxy");
         });
-    HttpProtocolIntegrationTest::SetUp();
+    BaseTcpTunnelingIntegrationTest::SetUp();
+  }
+
+  void addHttpUpstreamFilterToCluster(const HttpFilterProto& config) {
+    config_helper_.addConfigModifier([config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      ConfigHelper::HttpProtocolOptions protocol_options =
+          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+              (*cluster->mutable_typed_extension_protocol_options())
+                  ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+      *protocol_options.add_http_filters() = config;
+      (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(protocol_options);
+    });
+  }
+
+  const HttpFilterProto getAddHeaderFilterConfig(const std::string& name, const std::string& key,
+                                                 const std::string& value) {
+    HttpFilterProto filter_config;
+    filter_config.set_name(name);
+    auto configuration = test::integration::filters::AddHeaderFilterConfig();
+    configuration.set_header_key(key);
+    configuration.set_header_value(value);
+    filter_config.mutable_typed_config()->PackFrom(configuration);
+    return filter_config;
+  }
+
+  const HttpFilterProto getCodecFilterConfig() {
+    HttpFilterProto filter_config;
+    filter_config.set_name("envoy.filters.http.upstream_codec");
+    auto configuration = envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec();
+    filter_config.mutable_typed_config()->PackFrom(configuration);
+    return filter_config;
   }
 
   void setUpConnection(FakeHttpConnectionPtr& fake_upstream_connection) {
@@ -792,6 +829,22 @@ TEST_P(TcpTunnelingIntegrationTest, Basic) {
 
   setUpConnection(fake_upstream_connection_);
   sendBidiData(fake_upstream_connection_);
+  closeConnection(fake_upstream_connection_);
+}
+
+TEST_P(TcpTunnelingIntegrationTest, UpstreamHttpFilters) {
+  if (!(GetParam().tunneling_with_upstream_filters)) {
+    return;
+  }
+  addHttpUpstreamFilterToCluster(getAddHeaderFilterConfig("add_header", "foo", "bar"));
+  addHttpUpstreamFilterToCluster(getCodecFilterConfig());
+  initialize();
+
+  setUpConnection(fake_upstream_connection_);
+  sendBidiData(fake_upstream_connection_);
+  EXPECT_EQ(
+      "bar",
+      upstream_request_->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
   closeConnection(fake_upstream_connection_);
 }
 
@@ -1842,9 +1895,9 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
 
 INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+    testing::ValuesIn(BaseTcpTunnelingIntegrationTest::getProtocolTestParams(
         {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3},
         {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3})),
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
+    BaseTcpTunnelingIntegrationTest::protocolTestParamsToString);
 } // namespace
 } // namespace Envoy

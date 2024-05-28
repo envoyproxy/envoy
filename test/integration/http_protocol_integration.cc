@@ -53,13 +53,10 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
         for (Http1ParserImpl http1_implementation : http1_implementations) {
           for (Http2Impl http2_implementation : http2_implementations) {
             for (bool defer_processing : http2_bool_values) {
-              for (bool deprecate_callback_visitor : http2_bool_values) {
-                for (bool use_header_validator : use_header_validator_values) {
-                  ret.push_back(HttpProtocolTestParams{
-                      ip_version, downstream_protocol, upstream_protocol, http1_implementation,
-                      http2_implementation, defer_processing, use_header_validator,
-                      deprecate_callback_visitor});
-                }
+              for (bool use_header_validator : use_header_validator_values) {
+                ret.push_back(HttpProtocolTestParams{
+                    ip_version, downstream_protocol, upstream_protocol, http1_implementation,
+                    http2_implementation, defer_processing, use_header_validator});
               }
             }
           }
@@ -68,40 +65,6 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
     }
   }
   return ret;
-}
-
-absl::string_view upstreamToString(Http::CodecType type) {
-  switch (type) {
-  case Http::CodecType::HTTP1:
-    return "HttpUpstream";
-  case Http::CodecType::HTTP2:
-    return "Http2Upstream";
-  case Http::CodecType::HTTP3:
-    return "Http3Upstream";
-  }
-  return "UnknownUpstream";
-}
-
-absl::string_view downstreamToString(Http::CodecType type) {
-  switch (type) {
-  case Http::CodecType::HTTP1:
-    return "HttpDownstream_";
-  case Http::CodecType::HTTP2:
-    return "Http2Downstream_";
-  case Http::CodecType::HTTP3:
-    return "Http3Downstream_";
-  }
-  return "UnknownDownstream";
-}
-
-absl::string_view http2ImplementationToString(Http2Impl impl) {
-  switch (impl) {
-  case Http2Impl::Nghttp2:
-    return "Nghttp2";
-  case Http2Impl::Oghttp2:
-    return "Oghttp2";
-  }
-  return "UnknownHttp2Impl";
 }
 
 std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
@@ -113,8 +76,6 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
                       http2ImplementationToString(params.param.http2_implementation),
                       params.param.defer_processing_backedup_streams ? "WithDeferredProcessing"
                                                                      : "NoDeferredProcessing",
-                      params.param.deprecate_callback_visitor ? "WithCallbackVisitor"
-                                                              : "NoCallbackVisitor",
                       params.param.use_universal_header_validator ? "Uhv" : "Legacy");
 }
 

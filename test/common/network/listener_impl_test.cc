@@ -50,7 +50,8 @@ static void errorCallbackTest(Address::IpVersion version) {
       Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection->connect();
 
-  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         Network::ConnectionPtr conn = dispatcher->createServerConnection(
@@ -120,7 +121,8 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
 
   EXPECT_CALL(listener, getLocalAddress(_)).Times(0);
 
-  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(listener_callbacks2, onAccept_(_)).Times(0);
   EXPECT_CALL(listener_callbacks1, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
@@ -154,7 +156,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;
-  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         server_connections.emplace_back(dispatcher_->createServerConnection(
@@ -227,7 +230,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;
-  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         server_connections.emplace_back(dispatcher_->createServerConnection(
@@ -281,7 +285,8 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
       Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection->connect();
 
-  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         Network::ConnectionPtr conn = dispatcher_->createServerConnection(
@@ -330,7 +335,8 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
       Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection->connect();
 
-  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         Network::ConnectionPtr conn = dispatcher_->createServerConnection(
@@ -591,6 +597,7 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
   EXPECT_CALL(overload_manager, getLoadShedPoint(testing::_))
       .WillRepeatedly(Return(&accept_connection_point));
   listener.configureLoadShedPoints(overload_manager);
+  listener.disable();
 
   // When accepting we'll reject the first connection, get queried again and accept the
   // second connection.
@@ -628,6 +635,7 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
   client_connection2->addConnectionCallbacks(connection_callbacks2);
   client_connection2->connect();
 
+  listener.enable();
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 

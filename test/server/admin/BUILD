@@ -97,6 +97,7 @@ envoy_cc_test(
         "//source/common/thread_local:thread_local_lib",
         "//source/server/admin:utils_lib",
         "//test/mocks/server:admin_stream_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:real_threads_test_helper_lib",
         "//test/test_common:stats_utility_lib",

@@ -78,15 +78,3 @@ def envoy_mobile_objc_test(name, srcs, data = [], deps = [], tags = [], visibili
         visibility = visibility,
         flaky = flaky,
     )
-
-def envoy_mobile_swift_copts(enable_cxx_interop):
-    if enable_cxx_interop:
-        return [
-            "-enable-experimental-cxx-interop",
-            "-Xcc",
-            "-std=c++17",
-            "-Xcc",
-            "-Wno-deprecated-declarations",
-        ]
-    else:
-        return []

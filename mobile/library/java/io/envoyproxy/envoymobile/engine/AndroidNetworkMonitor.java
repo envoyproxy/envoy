@@ -30,9 +30,6 @@ import java.util.Collections;
 public class AndroidNetworkMonitor extends BroadcastReceiver {
   private static final String PERMISSION_DENIED_STATS_ELEMENT =
       "android_permissions.network_state_denied";
-  private static final int ENVOY_NET_GENERIC = 0;
-  private static final int ENVOY_NET_WWAN = 1;
-  private static final int ENVOY_NET_WLAN = 2;
 
   private static volatile AndroidNetworkMonitor instance = null;
 
@@ -53,6 +50,15 @@ public class AndroidNetworkMonitor extends BroadcastReceiver {
       }
       instance = new AndroidNetworkMonitor(context, envoyEngine);
     }
+  }
+
+  /**
+   * Sets the {@link AndroidNetworkMonitor} singleton instance to null, so that it can be recreated
+   * when a new EnvoyEngine is created.
+   */
+  @VisibleForTesting
+  public static void shutdown() {
+    instance = null;
   }
 
   private AndroidNetworkMonitor(Context context, EnvoyEngine envoyEngine) {
@@ -129,13 +135,13 @@ public class AndroidNetworkMonitor extends BroadcastReceiver {
 
     switch (networkType) {
     case ConnectivityManager.TYPE_MOBILE:
-      envoyEngine.setPreferredNetwork(EnvoyNetworkType.ENVOY_NETWORK_TYPE_WWAN);
+      envoyEngine.setPreferredNetwork(EnvoyNetworkType.WWAN);
       return;
     case ConnectivityManager.TYPE_WIFI:
-      envoyEngine.setPreferredNetwork(EnvoyNetworkType.ENVOY_NETWORK_TYPE_WLAN);
+      envoyEngine.setPreferredNetwork(EnvoyNetworkType.WLAN);
       return;
     default:
-      envoyEngine.setPreferredNetwork(EnvoyNetworkType.ENVOY_NETWORK_TYPE_GENERIC);
+      envoyEngine.setPreferredNetwork(EnvoyNetworkType.GENERIC);
     }
   }
 

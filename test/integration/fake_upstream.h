@@ -198,7 +198,7 @@ public:
     {
       absl::MutexLock lock(&lock_);
       last_body_size = body_.length();
-      if (!grpc_decoder_.decode(body_, decoded_grpc_frames_)) {
+      if (!grpc_decoder_.decode(body_, decoded_grpc_frames_).ok()) {
         return testing::AssertionFailure()
                << "Couldn't decode gRPC data frame: " << body_.toString();
       }
@@ -210,7 +210,7 @@ public:
       }
       {
         absl::MutexLock lock(&lock_);
-        if (!grpc_decoder_.decode(body_, decoded_grpc_frames_)) {
+        if (!grpc_decoder_.decode(body_, decoded_grpc_frames_).ok()) {
           return testing::AssertionFailure()
                  << "Couldn't decode gRPC data frame: " << body_.toString();
         }

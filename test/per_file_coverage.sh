@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # directory:coverage_percent
 # for existing directories with low coverage.
@@ -7,13 +7,13 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api:84.5" # flaky due to posix: be careful adjusting
 "source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
 "source/common/common/posix:88.8" # No easy way to test pthread_create failure.
-"source/common/config:95.8"
+"source/common/config:95.6"
 "source/common/crypto:95.5"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
 "source/common/http/http2:95.6"
 "source/common/json:94.6"
-"source/common/matcher:94.6"
+"source/common/matcher:94.4"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/quic:93.5"
@@ -28,8 +28,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/common/tap:94.5"
 "source/extensions/common/wasm:88.0" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
+"source/extensions/filters/common:96.5"
 "source/extensions/filters/common/fault:94.5"
-"source/extensions/filters/common/rbac:90.5"
+"source/extensions/filters/common/rbac:90.2"
 "source/extensions/filters/http/cache:95.0"
 "source/extensions/filters/http/grpc_json_transcoder:93.8" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:88.0"

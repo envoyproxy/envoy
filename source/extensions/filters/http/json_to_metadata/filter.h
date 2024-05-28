@@ -60,7 +60,7 @@ class FilterConfig {
 public:
   FilterConfig(
       const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
-      Stats::Scope& scope);
+      Stats::Scope& scope, Regex::Engine& regex_engine);
 
   JsonToMetadataStats& rqstats() { return rqstats_; }
   JsonToMetadataStats& respstats() { return respstats_; }

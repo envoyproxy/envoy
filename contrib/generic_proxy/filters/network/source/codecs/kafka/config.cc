@@ -78,7 +78,7 @@ void KafkaClientCodec::encode(const GenericProxy::StreamFrame& frame,
 
 CodecFactoryPtr
 KafkaCodecFactoryConfig::createCodecFactory(const Protobuf::Message&,
-                                            Envoy::Server::Configuration::FactoryContext&) {
+                                            Envoy::Server::Configuration::ServerFactoryContext&) {
   return std::make_unique<KafkaCodecFactory>();
 }
 

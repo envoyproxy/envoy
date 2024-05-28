@@ -154,11 +154,11 @@ void mergeHeaderValuesField(
 // set of rules for that purpose.
 class ImmediateMutationChecker {
 public:
-  ImmediateMutationChecker() {
+  ImmediateMutationChecker(Regex::Engine& regex_engine) {
     HeaderMutationRules rules;
     rules.mutable_allow_all_routing()->set_value(true);
     rules.mutable_allow_envoy()->set_value(true);
-    rule_checker_ = std::make_unique<Checker>(rules);
+    rule_checker_ = std::make_unique<Checker>(rules, regex_engine);
   }
 
   const Checker& checker() const { return *rule_checker_; }
@@ -166,10 +166,6 @@ public:
 private:
   std::unique_ptr<Checker> rule_checker_;
 };
-
-const ImmediateMutationChecker& immediateResponseChecker() {
-  CONSTRUCT_ON_FIRST_USE(ImmediateMutationChecker);
-}
 
 ProcessingMode allDisabledMode() {
   ProcessingMode pm;
@@ -292,7 +288,15 @@ Filter::StreamOpenState Filter::openStream() {
   }
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
-    stream_ = client_->start(*this, config_with_hash_key_, decoder_callbacks_->streamInfo());
+
+    Http::AsyncClient::ParentContext grpc_context;
+    grpc_context.stream_info = &decoder_callbacks_->streamInfo();
+    auto options = Http::AsyncClient::StreamOptions()
+                       .setParentSpan(decoder_callbacks_->activeSpan())
+                       .setParentContext(grpc_context)
+                       .setBufferBodyForRetry(true);
+
+    stream_ = client_->start(*this, config_with_hash_key_, options);
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       // Asserts that `stream_` is nullptr since it is not valid to be used any further
@@ -1051,6 +1055,11 @@ void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status) {
 }
 
 void Filter::sendImmediateResponse(const ImmediateResponse& response) {
+  if (config_->isUpstream()) {
+    stats_.send_immediate_resp_upstream_ignored_.inc();
+    ENVOY_LOG(debug, "Ignoring send immediate response when ext_proc filter is in upstream");
+    return;
+  }
   auto status_code = response.has_status() ? response.status().code() : DefaultImmediateStatus;
   if (!MutationUtils::isValidHttpStatus(status_code)) {
     ENVOY_LOG(debug, "Ignoring attempt to set invalid HTTP status {}", status_code);
@@ -1069,9 +1078,9 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
                                                          config().mutationChecker(),
                                                          stats_.rejected_header_mutations_);
       } else {
-        mut_status = MutationUtils::applyHeaderMutations(response.headers(), headers, false,
-                                                         immediateResponseChecker().checker(),
-                                                         stats_.rejected_header_mutations_);
+        mut_status = MutationUtils::applyHeaderMutations(
+            response.headers(), headers, false, config().immediateMutationChecker().checker(),
+            stats_.rejected_header_mutations_);
       }
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",

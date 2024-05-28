@@ -424,13 +424,14 @@ absl::Status JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::M
       message.SerializeAsString(), json_out, response_translate_options_.json_print_options);
 }
 
-JsonTranscoderFilter::JsonTranscoderFilter(const JsonTranscoderConfig& config) : config_(config) {}
+JsonTranscoderFilter::JsonTranscoderFilter(const JsonTranscoderConfigConstSharedPtr& config)
+    : config_(config) {}
 
 void JsonTranscoderFilter::initPerRouteConfig() {
   const auto* route_local =
       Http::Utility::resolveMostSpecificPerFilterConfig<JsonTranscoderConfig>(decoder_callbacks_);
 
-  per_route_config_ = route_local ? route_local : &config_;
+  per_route_config_ = route_local ? route_local : config_.get();
 }
 
 void JsonTranscoderFilter::maybeExpandBufferLimits() {
@@ -883,7 +884,7 @@ void JsonTranscoderFilter::maybeSendHttpBodyRequestMessage(Buffer::Instance* dat
 bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
     Http::ResponseHeaderMap& response_headers, Buffer::Instance& data) {
   std::vector<Grpc::Frame> frames;
-  decoder_.decode(data, frames);
+  std::ignore = decoder_.decode(data, frames);
   if (frames.empty()) {
     return false;
   }

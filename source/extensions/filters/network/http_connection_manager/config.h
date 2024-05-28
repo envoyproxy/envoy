@@ -34,8 +34,6 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/cidr_range.h"
-#include "source/common/router/rds_impl.h"
-#include "source/common/router/scoped_rds.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/well_known_names.h"
@@ -54,19 +52,19 @@ using FilterConfigProviderManager =
  */
 class HttpConnectionManagerFilterConfigFactory
     : Logger::Loggable<Logger::Id::config>,
-      public Common::FactoryBase<
+      public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager> {
 public:
   HttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
+      : ExceptionFreeFactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
 
-  static Network::FilterFactoryCb createFilterFactoryFromProtoAndHopByHop(
+  static absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoAndHopByHop(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
       Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers);
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
       Server::Configuration::FactoryContext& context) override;
@@ -79,14 +77,16 @@ DECLARE_FACTORY(HttpConnectionManagerFilterConfigFactory);
  */
 class MobileHttpConnectionManagerFilterConfigFactory
     : Logger::Loggable<Logger::Id::config>,
-      public Common::FactoryBase<envoy::extensions::filters::network::http_connection_manager::v3::
-                                     EnvoyMobileHttpConnectionManager> {
+      public Common::ExceptionFreeFactoryBase<
+          envoy::extensions::filters::network::http_connection_manager::v3::
+              EnvoyMobileHttpConnectionManager> {
 public:
   MobileHttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().EnvoyMobileHttpConnectionManager, true) {}
+      : ExceptionFreeFactoryBase(NetworkFilterNames::get().EnvoyMobileHttpConnectionManager, true) {
+  }
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::http_connection_manager::v3::
           EnvoyMobileHttpConnectionManager& proto_config,
       Server::Configuration::FactoryContext& context) override;
@@ -133,7 +133,7 @@ public:
           config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
-      Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+      Config::ConfigProviderManager* scoped_routes_config_provider_manager,
       Tracing::TracerManager& tracer_manager,
       FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status);
 
@@ -304,8 +304,7 @@ private:
   const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
-  Router::RouteConfigProviderManager& route_config_provider_manager_;
-  Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
+  Config::ConfigProviderManager* scoped_routes_config_provider_manager_;
   FilterConfigProviderManager& filter_config_provider_manager_;
   CodecType codec_type_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
@@ -386,7 +385,7 @@ public:
   struct Singletons {
     std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider_;
     Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager_;
-    Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager_;
+    std::shared_ptr<Config::ConfigProviderManager> scoped_routes_config_provider_manager_;
     Tracing::TracerManagerSharedPtr tracer_manager_;
     std::shared_ptr<FilterConfigProviderManager> filter_config_provider_manager_;
   };
@@ -414,7 +413,7 @@ public:
           proto_config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
-      Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+      Config::ConfigProviderManager* scoped_routes_config_provider_manager,
       Tracing::TracerManager& tracer_manager,
       FilterConfigProviderManager& filter_config_provider_manager);
 };

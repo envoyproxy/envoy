@@ -34,11 +34,13 @@ const Http::HeaderMap& lengthZeroHeader() {
 // Static response used for creating authorization ERROR responses.
 const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
-                                            Http::HeaderVector{},
-                                            Http::HeaderVector{},
-                                            Http::HeaderVector{},
-                                            Http::HeaderVector{},
-                                            Http::HeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
                                             {{}},
                                             Http::Utility::QueryParamsVector{},
                                             {},
@@ -60,9 +62,8 @@ struct SuccessResponse {
     headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
       // UpstreamHeaderMatcher
       if (matchers_->matches(header.key().getStringView())) {
-        response_->headers_to_set.emplace_back(
-            Http::LowerCaseString{std::string(header.key().getStringView())},
-            std::string(header.value().getStringView()));
+        response_->headers_to_set.emplace_back(header.key().getStringView(),
+                                               header.value().getStringView());
       }
       if (append_matchers_->matches(header.key().getStringView())) {
         // If there is an existing matching key in the current headers, the new entry will be
@@ -70,16 +71,14 @@ struct SuccessResponse {
         // a matching "key" from the authorization response headers {"key": "value2"}, the
         // request to upstream server will have two entries for "key": {"key": "value1", "key":
         // "value2"}.
-        response_->headers_to_add.emplace_back(
-            Http::LowerCaseString{std::string(header.key().getStringView())},
-            std::string(header.value().getStringView()));
+        response_->headers_to_add.emplace_back(header.key().getStringView(),
+                                               header.value().getStringView());
       }
       if (response_matchers_->matches(header.key().getStringView())) {
         // For HTTP implementation, the response headers from the auth server will, by default, be
         // appended (using addCopy) to the encoded response headers.
-        response_->response_headers_to_add.emplace_back(
-            Http::LowerCaseString{std::string(header.key().getStringView())},
-            std::string(header.value().getStringView()));
+        response_->response_headers_to_add.emplace_back(header.key().getStringView(),
+                                                        header.value().getStringView());
       }
       if (to_dynamic_metadata_matchers_->matches(header.key().getStringView())) {
         const std::string key{header.key().getStringView()};
@@ -122,7 +121,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(Router::HeaderParser::configure(
           config.http_service().authorization_request().headers_to_add(),
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)) {}
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)),
+      encode_raw_headers_(config.encode_raw_headers()) {}
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -152,8 +152,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(Http::Headers::get().Host.get());
     matchers.push_back(
-        std::make_unique<
-            Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
             matcher, context));
 
     return std::make_shared<NotHeaderKeyMatcher>(std::move(matchers));
@@ -169,8 +168,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
     matchers.push_back(
-        std::make_unique<
-            Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
             matcher, context));
   }
 
@@ -217,18 +215,35 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(lengthZeroHeader());
   }
 
-  for (const auto& header : http_request.headers()) {
-    const Http::LowerCaseString key{header.first};
+  if (config_->encodeRawHeaders()) {
+    for (const auto& header : http_request.header_map().headers()) {
+      const Http::LowerCaseString key{header.key()};
 
-    // Skip setting content-length header since it is already configured at initialization.
-    if (key == Http::Headers::get().ContentLength) {
-      continue;
+      // Skip setting content-length header since it is already configured at initialization.
+      if (key == Http::Headers::get().ContentLength) {
+        continue;
+      }
+
+      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
+        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
+      } else {
+        headers->addCopy(key, header.raw_value());
+      }
     }
+  } else {
+    for (const auto& header : http_request.headers()) {
+      const Http::LowerCaseString key{header.first};
 
-    if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-      headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
-    } else {
-      headers->addCopy(key, header.second);
+      // Skip setting content-length header since it is already configured at initialization.
+      if (key == Http::Headers::get().ContentLength) {
+        continue;
+      }
+
+      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
+        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+      } else {
+        headers->addCopy(key, header.second);
+      }
     }
   }
 
@@ -307,7 +322,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   const auto& storage_header_name = Headers::get().EnvoyAuthHeadersToRemove;
   // If we are going to construct an Ok response we need to save the
   // headers_to_remove in a variable first.
-  std::vector<Http::LowerCaseString> headers_to_remove;
+  std::vector<std::string> headers_to_remove;
   if (status_code == enumToInt(Http::Code::OK)) {
     const auto& get_result = message->headers().get(storage_header_name);
     for (size_t i = 0; i < get_result.size(); ++i) {
@@ -318,7 +333,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
             storage_header_value, ",", /*keep_empty_string=*/false, /*trim_whitespace=*/true);
         headers_to_remove.reserve(headers_to_remove.size() + header_names.size());
         for (const auto& header_name : header_names) {
-          headers_to_remove.push_back(Http::LowerCaseString(std::string(header_name)));
+          headers_to_remove.emplace_back(header_name);
         }
       }
     }
@@ -335,11 +350,13 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                        config_->clientHeaderOnSuccessMatchers(),
                        config_->dynamicMetadataMatchers(),
                        Response{CheckStatus::OK,
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
                                 std::move(headers_to_remove),
                                 Http::Utility::QueryParamsVector{},
                                 {},
@@ -356,11 +373,13 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                          config_->clientHeaderOnSuccessMatchers(),
                          config_->dynamicMetadataMatchers(),
                          Response{CheckStatus::Denied,
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
                                   {{}},
                                   Http::Utility::QueryParamsVector{},
                                   {},

@@ -267,6 +267,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Buffer::BufferMemoryAccountSharedPtr account() const override;
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
   absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
+  bool shouldLoadShed() const override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -545,6 +546,11 @@ public:
    * Returns the DownstreamStreamFilterCallbacks for downstream HTTP filters.
    */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
+  /**
+   * Returns if close from the upstream is to be handled with half-close semantics.
+   * This is used for HTTP/1.1 codec.
+   */
+  virtual bool isHalfCloseEnabled() PURE;
 };
 
 /**
@@ -696,7 +702,8 @@ public:
         filter_manager_callbacks_.responseHeaders().ptr(),
         filter_manager_callbacks_.responseTrailers().ptr(),
         {},
-        access_log_type};
+        access_log_type,
+        &filter_manager_callbacks_.activeSpan()};
 
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(log_context, streamInfo());
@@ -852,6 +859,8 @@ public:
 
   void onDownstreamReset() { state_.saw_downstream_reset_ = true; }
   bool sawDownstreamReset() { return state_.saw_downstream_reset_; }
+
+  virtual bool shouldLoadShed() { return false; };
 
 protected:
   struct State {
@@ -1092,12 +1101,20 @@ public:
                           const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
                           TimeSource& time_source,
                           StreamInfo::FilterStateSharedPtr parent_filter_state,
-                          StreamInfo::FilterState::LifeSpan filter_state_life_span)
+                          Server::OverloadManager& overload_manager)
       : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
                       proxy_100_continue, buffer_limit, filter_chain_factory),
         stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
-                     parent_filter_state, filter_state_life_span),
-        local_reply_(local_reply) {}
+                     StreamInfo::FilterState::LifeSpan::FilterChain,
+                     std::move(parent_filter_state)),
+        local_reply_(local_reply),
+        downstream_filter_load_shed_point_(overload_manager.getLoadShedPoint(
+            Server::LoadShedPointName::get().HttpDownstreamFilterCheck)) {
+    ENVOY_LOG_ONCE_IF(
+        trace, downstream_filter_load_shed_point_ == nullptr,
+        "LoadShedPoint envoy.load_shed_points.http_downstream_filter_check is not found. "
+        "Is it configured?");
+  }
   ~DownstreamFilterManager() override {
     ASSERT(prepared_local_reply_ == nullptr,
            "Filter Manager destroyed without executing prepared local reply");
@@ -1131,6 +1148,11 @@ public:
   bool remoteDecodeComplete() const override {
     return streamInfo().downstreamTiming() &&
            streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
+  }
+
+  bool shouldLoadShed() override {
+    return downstream_filter_load_shed_point_ != nullptr &&
+           downstream_filter_load_shed_point_->shouldShedLoad();
   }
 
 private:
@@ -1171,6 +1193,7 @@ private:
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
   Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
+  Server::LoadShedPoint* downstream_filter_load_shed_point_{nullptr};
 };
 
 } // namespace Http

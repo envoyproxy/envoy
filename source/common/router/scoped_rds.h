@@ -320,5 +320,37 @@ public:
   const envoy::config::core::v3::ConfigSource& rds_config_source_;
 };
 
+class SrdsFactoryDefault : public SrdsFactory {
+public:
+  // UntypedFactory
+  virtual std::string name() const override { return "envoy.srds_factory.default"; }
+
+  virtual std::unique_ptr<Envoy::Config::ConfigProviderManager>
+  createScopedRoutesConfigProviderManager(
+      Server::Configuration::ServerFactoryContext& factory_context,
+      RouteConfigProviderManager& route_config_provider_manager) override {
+    return std::make_unique<Router::ScopedRoutesConfigProviderManager>(
+        factory_context.admin(), route_config_provider_manager);
+  }
+
+  Envoy::Config::ConfigProviderPtr createConfigProvider(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          config,
+      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager) override {
+    return Router::ScopedRoutesConfigProviderUtil::create(
+        config, factory_context, factory_context.initManager(), stat_prefix,
+        scoped_routes_config_provider_manager);
+  }
+
+  // If enabled in the HttpConnectionManager config, returns a ConfigProvider for scoped routing
+  // configuration.
+  ScopeKeyBuilderPtr createScopeKeyBuilder(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          config) override {
+    return Router::ScopedRoutesConfigProviderUtil::createScopeKeyBuilder(config);
+  }
+};
+
 } // namespace Router
 } // namespace Envoy

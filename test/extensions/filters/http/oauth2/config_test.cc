@@ -130,7 +130,6 @@ config:
   EXPECT_CALL(context.server_factory_context_, clusterManager()).Times(2);
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context.server_factory_context_, timeSource());
-  EXPECT_CALL(context.server_factory_context_, api());
   EXPECT_CALL(context, initManager()).Times(2);
   EXPECT_CALL(context, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb =

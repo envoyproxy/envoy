@@ -2,10 +2,13 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/http/filter.h"
 #include "envoy/http/header_evaluator.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
+
+#include "source/common/router/router.h"
 
 namespace Envoy {
 
@@ -48,14 +51,17 @@ public:
   virtual void
   propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
                             const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
+  virtual const Envoy::Router::FilterConfig& routerFilterConfig() const PURE;
+  virtual Server::Configuration::ServerFactoryContext& serverFactoryContext() const PURE;
 };
 
 using TunnelingConfigHelperOptConstRef = OptRef<const TunnelingConfigHelper>;
 
 // An API for wrapping either a TCP or an HTTP connection pool.
-class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
+class GenericConnPool : public Event::DeferredDeletable,
+                        public Logger::Loggable<Logger::Id::router> {
 public:
-  virtual ~GenericConnPool() = default;
+  ~GenericConnPool() override = default;
 
   /**
    * Called to create a TCP connection or HTTP stream for "CONNECT" streams.
@@ -105,9 +111,9 @@ public:
 
 // Interface for a generic Upstream, which can communicate with a TCP or HTTP
 // upstream.
-class GenericUpstream {
+class GenericUpstream : public Event::DeferredDeletable {
 public:
-  virtual ~GenericUpstream() = default;
+  ~GenericUpstream() override = default;
 
   /**
    * Enable/disable further data from this stream.
@@ -175,6 +181,7 @@ public:
                         TunnelingConfigHelperOptConstRef config,
                         Upstream::LoadBalancerContext* context,
                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+                        Http::StreamDecoderFilterCallbacks& stream_decoder_callbacks,
                         StreamInfo::StreamInfo& downstream_info) const PURE;
 };
 

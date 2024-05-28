@@ -32,7 +32,7 @@ using TrieSharedPtr = std::shared_ptr<Trie>;
 
 class Rule {
 public:
-  Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root);
+  Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root, Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
   const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
   const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
@@ -66,7 +66,8 @@ struct Trie {
 class Config {
 public:
   Config(const envoy::extensions::filters::network::thrift_proxy::filters::payload_to_metadata::v3::
-             PayloadToMetadata& config);
+             PayloadToMetadata& config,
+         Regex::Engine& regex_engine);
   const PayloadToMetadataRules& requestRules() const { return request_rules_; }
   TrieSharedPtr trieRoot() const { return trie_root_; };
 

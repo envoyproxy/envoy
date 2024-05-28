@@ -23,8 +23,8 @@ Factory::factoriesFromProto(const envoy::config::core::v3::TypedExtensionConfig&
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(codec_config.typed_config(),
                                                 context.messageValidationVisitor(), *message);
-  return {factory.createCodecFactory(*message, context),
-          factory.createProxyFactory(*message, context)};
+  return {factory.createCodecFactory(*message, context.serverFactoryContext()),
+          factory.createProxyFactory(*message, context.serverFactoryContext())};
 }
 
 Rds::RouteConfigProviderSharedPtr
@@ -145,7 +145,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
           custom_proxy_factory](Envoy::Network::FilterManager& filter_manager) -> void {
     // Create filter by the custom filter factory if the custom filter factory is not null.
     if (custom_proxy_factory != nullptr) {
-      custom_proxy_factory->createProxy(filter_manager, config);
+      custom_proxy_factory->createProxy(context, filter_manager, config);
       return;
     }
 

@@ -62,7 +62,7 @@ class ThriftFilterConfigTestBase {
 public:
   void testConfig(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config) {
     Network::FilterFactoryCb cb;
-    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
+    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_).value(); });
     EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_.serverFactoryContext()));
 
     Network::MockConnection connection;
@@ -94,9 +94,12 @@ INSTANTIATE_TEST_SUITE_P(ProtocolTypes, ThriftFilterProtocolConfigTest,
                          testing::ValuesIn(getProtocolTypes()));
 
 TEST_F(ThriftFilterConfigTest, ValidateFail) {
-  EXPECT_THROW(factory_.createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy(), context_),
-               ProtoValidationException);
+  EXPECT_THROW(
+      factory_
+          .createFilterFactoryFromProto(
+              envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy(), context_)
+          .IgnoreError(),
+      ProtoValidationException);
 }
 
 TEST_F(ThriftFilterConfigTest, ValidProtoConfiguration) {
@@ -152,7 +155,8 @@ thrift_filters:
   header.push_back('\000'); // Add an invalid character for http header.
   config.mutable_route_config()->mutable_routes()->at(0).mutable_route()->set_cluster_header(
       header);
-  EXPECT_THROW(factory_.createFilterFactoryFromProto(config, context_), ProtoValidationException);
+  EXPECT_THROW(factory_.createFilterFactoryFromProto(config, context_).IgnoreError(),
+               ProtoValidationException);
 }
 
 // Test config with an explicitly defined router filter.
@@ -188,8 +192,8 @@ thrift_filters:
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
       parseThriftProxyFromV3Yaml(yaml);
 
-  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
-                          "no_such_filter");
+  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_).IgnoreError(),
+                          EnvoyException, "no_such_filter");
 }
 
 // Test config with multiple filters.
@@ -270,7 +274,7 @@ resources:
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
       parseThriftProxyFromV3Yaml(config_yaml);
   Matchers::UniversalStringMatcher universal_name_matcher;
-  Network::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config, context_);
+  Network::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config, context_).value();
   auto response =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
   const auto decoded_resources = TestUtility::decodeResources<
@@ -298,8 +302,8 @@ trds:
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
       parseThriftProxyFromV3Yaml(yaml);
-  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
-                          "both trds and route_config is present in ThriftProxy");
+  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_).IgnoreError(),
+                          EnvoyException, "both trds and route_config is present in ThriftProxy");
 }
 
 TEST_F(ThriftFilterConfigTest, ThriftProxyTrdsApiConfigSource) {
@@ -314,7 +318,8 @@ trds:
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
       parseThriftProxyFromV3Yaml(yaml);
-  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_).IgnoreError(),
+                          EnvoyException,
                           "trds supports only aggregated api_type in api_config_source");
 }
 

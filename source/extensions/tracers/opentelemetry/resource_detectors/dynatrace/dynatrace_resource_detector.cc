@@ -38,7 +38,7 @@ Resource DynatraceResourceDetector::detect() {
     END_TRY catch (const EnvoyException& e) {
       failure_count++;
       ENVOY_LOG(
-          warn,
+          debug,
           "Failed to detect resource attributes from the Dynatrace enrichment file: {}, error: {}.",
           file_name, e.what());
     }

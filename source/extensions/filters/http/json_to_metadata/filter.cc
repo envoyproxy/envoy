@@ -67,17 +67,19 @@ absl::flat_hash_set<std::string> generateAllowContentTypes(
   }
 
   absl::flat_hash_set<std::string> allow_content_types;
-  for (const auto& request_allowed_content_type : proto_allow_content_types) {
-    allow_content_types.insert(request_allowed_content_type);
+  for (const auto& allowed_content_type : proto_allow_content_types) {
+    allow_content_types.insert(allowed_content_type);
   }
   return allow_content_types;
 }
 
 Regex::CompiledMatcherPtr generateAllowContentTypeRegexs(
-    const envoy::type::matcher::v3::RegexMatcher& proto_allow_content_types_regex) {
+    const envoy::type::matcher::v3::RegexMatcher& proto_allow_content_types_regex,
+    Regex::Engine& regex_engine) {
 
   Regex::CompiledMatcherPtr allow_content_types_regex;
-  allow_content_types_regex = Regex::Utility::parseRegex(proto_allow_content_types_regex);
+  allow_content_types_regex =
+      Regex::Utility::parseRegex(proto_allow_content_types_regex, regex_engine);
 
   return allow_content_types_regex;
 }
@@ -106,7 +108,7 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
-    Stats::Scope& scope)
+    Stats::Scope& scope, Regex::Engine& regex_engine)
     : rqstats_{ALL_JSON_TO_METADATA_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "json_to_metadata.rq"))},
       respstats_{
@@ -122,12 +124,12 @@ FilterConfig::FilterConfig(
       request_allow_content_types_regex_(
           proto_config.request_rules().has_allow_content_types_regex()
               ? generateAllowContentTypeRegexs(
-                    proto_config.request_rules().allow_content_types_regex())
+                    proto_config.request_rules().allow_content_types_regex(), regex_engine)
               : nullptr),
       response_allow_content_types_regex_(
           proto_config.response_rules().has_allow_content_types_regex()
               ? generateAllowContentTypeRegexs(
-                    proto_config.response_rules().allow_content_types_regex())
+                    proto_config.response_rules().allow_content_types_regex(), regex_engine)
               : nullptr) {
   if (request_rules_.empty() && response_rules_.empty()) {
     throw EnvoyException("json_to_metadata_filter: Per filter configs must at least specify "
@@ -405,7 +407,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::Continue;
   }
   if (!config_->requestContentTypeAllowed(headers.getContentTypeValue())) {
-    request_processing_finished_ = true;
+    handleAllOnError(config_->requestRules(), true, *decoder_callbacks_,
+                     request_processing_finished_);
     config_->rqstats().mismatched_content_type_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -424,7 +427,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     return Http::FilterHeadersStatus::Continue;
   }
   if (!config_->responseContentTypeAllowed(headers.getContentTypeValue())) {
-    response_processing_finished_ = true;
+    handleAllOnError(config_->responseRules(), false, *encoder_callbacks_,
+                     response_processing_finished_);
     config_->respstats().mismatched_content_type_.inc();
     return Http::FilterHeadersStatus::Continue;
   }

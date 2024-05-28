@@ -8,7 +8,8 @@ namespace Broker {
 
 // ResponseRewriterImpl.
 
-ResponseRewriterImpl::ResponseRewriterImpl(const BrokerFilterConfig& config) : config_{config} {};
+ResponseRewriterImpl::ResponseRewriterImpl(const BrokerFilterConfigSharedPtr& config)
+    : config_{config} {};
 
 void ResponseRewriterImpl::onMessage(AbstractResponseSharedPtr response) {
   responses_to_rewrite_.push_back(response);
@@ -92,8 +93,8 @@ void DoNothingRewriter::process(Buffer::Instance&) {}
 
 // Factory method.
 
-ResponseRewriterSharedPtr createRewriter(const BrokerFilterConfig& config) {
-  if (config.needsResponseRewrite()) {
+ResponseRewriterSharedPtr createRewriter(const BrokerFilterConfigSharedPtr& config) {
+  if (config->needsResponseRewrite()) {
     return std::make_shared<ResponseRewriterImpl>(config);
   } else {
     return std::make_shared<DoNothingRewriter>();

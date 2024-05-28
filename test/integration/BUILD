@@ -160,7 +160,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//test/config:utility_lib",
         "//test/integration/filters:eds_ready_filter_config_lib",
         "//test/test_common:network_utility_lib",
@@ -281,7 +281,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//test/config:utility_lib",
         "//test/integration/clusters:custom_static_cluster",
         "//test/test_common:network_utility_lib",
@@ -347,6 +347,7 @@ envoy_cc_test_binary(
         "abseil_symbolize",
     ],
     deps = [
+        "//source/common/http:rds_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
@@ -1272,6 +1273,7 @@ envoy_cc_test_library(
         "//source/common/http:codec_client_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:rds_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/listener_manager:connection_handler_lib",
@@ -1279,10 +1281,12 @@ envoy_cc_test_library(
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//source/common/router:scoped_rds_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
+        "//source/common/tls:server_context_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers/file:config",
@@ -1332,6 +1336,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
+        "//source/extensions/filters/http/match_delegate:config",
         "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
@@ -1577,6 +1582,7 @@ envoy_cc_test(
     srcs = ["extension_discovery_integration_test.cc"],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/filters/http/match_delegate:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
         "//test/integration/filters:set_is_terminal_filter_config_proto_cc_proto",
@@ -1812,20 +1818,36 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 8,
+    shard_count = 30,
     tags = [
         "cpu:3",
     ],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
+        ":tcp_tunneling_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/upstreams/http/tcp:config",
+        "//test/integration/filters:add_header_filter_config_lib",
+        "//test/integration/filters:add_header_filter_proto_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "tcp_tunneling_integration_lib",
+    srcs = [
+        "tcp_tunneling_integration.cc",
+    ],
+    hdrs = [
+        "tcp_tunneling_integration.h",
+    ],
+    deps = [
+        ":http_integration_lib",
     ],
 )
 

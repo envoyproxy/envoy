@@ -1,0 +1,26 @@
+zone_aware_load_balancer_test_case {
+  load_balancer_test_case {
+    common_lb_config {
+    }
+    setup_priority_levels {
+      num_hosts_in_priority_level: 99
+      random_bytestring: 2
+    }
+    seed_for_prng: 8
+  }
+  need_local_priority_set: true
+  random_bytestring_for_weights: " "
+}
+round_robin_lb_config {
+  slow_start_config {
+    slow_start_window {
+      seconds: 2304
+    }
+    aggression {
+      default_value: 6.42285339593621e-322
+      runtime_key: "RRRRRRRRRRRRRRRRRRRRRRR"
+    }
+    min_weight_percent {
+    }
+  }
+}

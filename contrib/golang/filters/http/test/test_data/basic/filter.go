@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ type filter struct {
 	method          string
 	path            string
 	host            string
+	all_headers     map[string][]string
 
 	// for bad api call testing
 	header api.RequestHeaderMap
@@ -32,6 +34,8 @@ type filter struct {
 	databuffer  string // return api.Stop
 	panic       string // hit panic in which phase
 	badapi      bool   // bad api call
+	newPath     string // set new path
+	clearRoute  bool   // clear route cache
 }
 
 func parseQuery(path string) url.Values {
@@ -76,6 +80,8 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 	f.localreplay = f.query_params.Get("localreply")
 	f.panic = f.query_params.Get("panic")
 	f.badapi = f.query_params.Get("badapi") != ""
+	f.newPath = f.query_params.Get("newPath")
+	f.clearRoute = f.query_params.Get("clearRoute") != ""
 }
 
 func (f *filter) fail(msg string, a ...any) api.StatusType {
@@ -177,6 +183,31 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		return true
 	})
 
+	test_header_key := "test-header-copy"
+
+	old_value := "old-value"
+
+	header.Set(test_header_key, old_value)
+
+	f.all_headers = make(map[string][]string)
+
+	header.RangeWithCopy(func(key, value string) bool {
+		f.all_headers[key] = append(f.all_headers[key], value)
+		return true
+	})
+
+	header_map := header.GetAllHeaders()
+
+	if !reflect.DeepEqual(f.all_headers, header_map) {
+		return f.fail("GetAllHeaders returned incorrect data, expected:\n%v\n got:\n%v", f.all_headers, header_map)
+	}
+
+	header.Set(test_header_key, "new-value")
+
+	if !reflect.DeepEqual(header_map[test_header_key], []string{old_value}) {
+		return f.fail("GetAllHeaders output changed - expected '%v', got '%v'", []string{old_value}, header_map[test_header_key])
+	}
+
 	origin, found := header.Get("x-test-header-0")
 	hdrs := header.Values("x-test-header-0")
 	if found {
@@ -226,6 +257,13 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 
 	if f.panic == "decode-header" {
 		badcode()
+	}
+
+	if f.newPath != "" {
+		header.SetPath(f.newPath)
+	}
+	if f.clearRoute {
+		f.callbacks.ClearRouteCache()
 	}
 	return api.Continue
 }

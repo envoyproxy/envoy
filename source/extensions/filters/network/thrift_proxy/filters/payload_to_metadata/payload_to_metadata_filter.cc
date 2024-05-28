@@ -20,15 +20,17 @@ using FieldSelector = envoy::extensions::filters::network::thrift_proxy::filters
     payload_to_metadata::v3::PayloadToMetadata::FieldSelector;
 
 Config::Config(const envoy::extensions::filters::network::thrift_proxy::filters::
-                   payload_to_metadata::v3::PayloadToMetadata& config) {
+                   payload_to_metadata::v3::PayloadToMetadata& config,
+               Regex::Engine& regex_engine) {
   trie_root_ = std::make_shared<Trie>();
   request_rules_.reserve(config.request_rules().size());
   for (const auto& entry : config.request_rules()) {
-    request_rules_.emplace_back(entry, static_cast<uint16_t>(request_rules_.size()), trie_root_);
+    request_rules_.emplace_back(entry, static_cast<uint16_t>(request_rules_.size()), trie_root_,
+                                regex_engine);
   }
 }
 
-Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
+Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root, Regex::Engine& regex_engine)
     : rule_(rule), rule_id_(rule_id) {
   if (!rule_.has_on_present() && !rule_.has_on_missing()) {
     throw EnvoyException("payload to metadata filter: neither `on_present` nor `on_missing` set");
@@ -41,7 +43,7 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
 
   if (rule_.has_on_present() && rule_.on_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule_.on_present().regex_value_rewrite();
-    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 

@@ -14,7 +14,7 @@ public:
 
   // Upstream::ThreadAwareLoadBalancer
   MOCK_METHOD(LoadBalancerFactorySharedPtr, factory, ());
-  MOCK_METHOD(void, initialize, ());
+  MOCK_METHOD(absl::Status, initialize, ());
 };
 } // namespace Upstream
 } // namespace Envoy

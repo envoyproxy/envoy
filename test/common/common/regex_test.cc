@@ -14,12 +14,12 @@ namespace Regex {
 namespace {
 
 TEST(Utility, ParseRegex) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
+  Regex::GoogleReEngine engine;
   {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.mutable_google_re2();
     matcher.set_regex("(+invalid)");
-    EXPECT_THROW_WITH_MESSAGE(Utility::parseRegex(matcher), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(Utility::parseRegex(matcher, engine), EnvoyException,
                               "no argument for repetition operator: +");
   }
 
@@ -28,7 +28,7 @@ TEST(Utility, ParseRegex) {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.mutable_google_re2();
     matcher.set_regex("/asdf/.*");
-    const auto compiled_matcher = Utility::parseRegex(matcher);
+    const auto compiled_matcher = Utility::parseRegex(matcher, engine);
     const std::string long_string = "/asdf/" + std::string(50 * 1024, 'a');
     EXPECT_TRUE(compiled_matcher->match(long_string));
   }
@@ -38,7 +38,7 @@ TEST(Utility, ParseRegex) {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.mutable_google_re2();
     matcher.set_regex("/status/200(/.*)?$");
-    const auto compiled_matcher = Utility::parseRegex(matcher);
+    const auto compiled_matcher = Utility::parseRegex(matcher, engine);
     EXPECT_TRUE(compiled_matcher->match("/status/200"));
     EXPECT_TRUE(compiled_matcher->match("/status/200/"));
     EXPECT_TRUE(compiled_matcher->match("/status/200/foo"));
@@ -51,7 +51,7 @@ TEST(Utility, ParseRegex) {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
-    EXPECT_NO_THROW(Utility::parseRegex(matcher));
+    EXPECT_NO_THROW(Utility::parseRegex(matcher, engine));
   }
 
   // Positive case to ensure matcher can be created by config without google_re2 field.
@@ -59,7 +59,7 @@ TEST(Utility, ParseRegex) {
     TestScopedRuntime scoped_runtime;
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
-    EXPECT_NO_THROW(Utility::parseRegex(matcher));
+    EXPECT_NO_THROW(Utility::parseRegex(matcher, engine));
   }
 
   // Verify max program size with the deprecated field codepath plus runtime.
@@ -71,10 +71,10 @@ TEST(Utility, ParseRegex) {
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2()->mutable_max_program_size()->set_value(1);
 #ifndef GTEST_USES_SIMPLE_RE
-    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher, engine), EnvoyException,
                             "RE2 program size of [0-9]+ > max program size of 1\\.");
 #else
-    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher, engine), EnvoyException,
                             "RE2 program size of \\d+ > max program size of 1\\.");
 #endif
   }
@@ -88,11 +88,11 @@ TEST(Utility, ParseRegex) {
     matcher.mutable_google_re2();
 #ifndef GTEST_USES_SIMPLE_RE
     EXPECT_THROW_WITH_REGEX(
-        Utility::parseRegex(matcher), EnvoyException,
+        Utility::parseRegex(matcher, engine), EnvoyException,
         "RE2 program size of [0-9]+ > max program size of 1 set for the error level threshold\\.");
 #else
     EXPECT_THROW_WITH_REGEX(
-        Utility::parseRegex(matcher), EnvoyException,
+        Utility::parseRegex(matcher, engine), EnvoyException,
         "RE2 program size of \\d+ > max program size of 1 set for the error level threshold\\.");
 #endif
   }
@@ -105,12 +105,12 @@ TEST(Utility, ParseRegex) {
         "/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*");
     matcher.mutable_google_re2();
 #ifndef GTEST_USES_SIMPLE_RE
-    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher, engine), EnvoyException,
                             "RE2 program size of [0-9]+ > max program size of 100 set for the "
                             "error level threshold\\.");
 #else
     EXPECT_THROW_WITH_REGEX(
-        Utility::parseRegex(matcher), EnvoyException,
+        Utility::parseRegex(matcher, engine), EnvoyException,
         "RE2 program size of \\d+ > max program size of 100 set for the error level threshold\\.");
 #endif
   }
@@ -122,9 +122,9 @@ TEST(Utility, ParseRegex) {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
-    EXPECT_NO_THROW(Utility::parseRegex(matcher));
+    EXPECT_NO_THROW(Utility::parseRegex(matcher, engine));
     EXPECT_LOG_CONTAINS("warn", "> max program size of 1 set for the warn level threshold",
-                        Utility::parseRegex(matcher));
+                        Utility::parseRegex(matcher, engine));
   }
 
   // Verify that no check is performed if the warn level max program size is not set by runtime.
@@ -133,8 +133,8 @@ TEST(Utility, ParseRegex) {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
-    EXPECT_NO_THROW(Utility::parseRegex(matcher));
-    EXPECT_LOG_NOT_CONTAINS("warn", "> max program size", Utility::parseRegex(matcher));
+    EXPECT_NO_THROW(Utility::parseRegex(matcher, engine));
+    EXPECT_LOG_NOT_CONTAINS("warn", "> max program size", Utility::parseRegex(matcher, engine));
   }
 }
 

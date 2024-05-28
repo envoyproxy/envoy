@@ -73,6 +73,7 @@ virtual_hosts:
         allow_origin_string_match:
         - safe_regex:
             regex: ".*\\.envoyproxy\\.io"
+        forward_not_matching_preflights: false
   - match:
       prefix: "/cors-expose-headers"
     route:
@@ -358,6 +359,23 @@ TEST_P(CorsFilterIntegrationTest, TestAllowedOriginRegex) {
       },
       Http::TestResponseHeaderMapImpl{
           {"access-control-allow-origin", "www.envoyproxy.io"},
+          {"access-control-allow-credentials", "true"},
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+      });
+}
+
+TEST_P(CorsFilterIntegrationTest, TestNotAllowedOriginRegex) {
+  testNormalRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/cors-allow-origin-regex/test"},
+          {":scheme", "http"},
+          {":authority", "test-host"},
+          {"origin", "www.envooooooyproxy.io"},
+      },
+      Http::TestResponseHeaderMapImpl{
           {"access-control-allow-credentials", "true"},
           {"server", "envoy"},
           {"content-length", "0"},

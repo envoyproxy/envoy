@@ -31,11 +31,15 @@ public:
     const std::string yaml_string = R"EOF(
           tenant: "abc12345"
           cluster_id: -1743916452
-          token: "tokenval"
-          http_uri:
-            cluster: "cluster_name"
-            uri: "https://testhost.com/api/v2/samplingConfiguration"
-            timeout: 0.250s
+          http_service:
+            http_uri:
+              cluster: "cluster_name"
+              uri: "https://testhost.com/api/v2/samplingConfiguration"
+              timeout: 0.250s
+            request_headers_to_add:
+            - header:
+                key: "authorization"
+                value: "Api-Token tokenval"
           root_spans_per_minute: 1000
     )EOF";
     TestUtility::loadFromYaml(yaml_string, proto_config_);
@@ -58,7 +62,6 @@ protected:
 };
 
 MATCHER_P(MessageMatcher, unusedArg, "") {
-  // prefix 'Api-Token' should be added to 'tokenval' set via SamplerConfigProvider constructor
   return (arg->headers()
               .get(Http::CustomHeaders::get().Authorization)[0]
               ->value()
@@ -206,11 +209,11 @@ TEST_F(SamplerConfigProviderTest, TestValueConfigured) {
   const std::string yaml_string = R"EOF(
           tenant: "abc12345"
           cluster_id: -1743916452
-          token: "tokenval"
-          http_uri:
-            cluster: "cluster_name"
-            uri: "https://testhost.com/otlp/v1/traces"
-            timeout: 0.250s
+          http_service:
+            http_uri:
+              cluster: "cluster_name"
+              uri: "https://testhost.com/otlp/v1/traces"
+              timeout: 0.250s
           root_spans_per_minute: 3456
     )EOF";
 
@@ -226,11 +229,11 @@ TEST_F(SamplerConfigProviderTest, TestNoValueConfigured) {
   const std::string yaml_string = R"EOF(
           tenant: "abc12345"
           cluster_id: -1743916452
-          token: "tokenval"
-          http_uri:
-            cluster: "cluster_name"
-            uri: "https://testhost.com/otlp/v1/traces"
-            timeout: 500s
+          http_service:
+            http_uri:
+              cluster: "cluster_name"
+              uri: "https://testhost.com/otlp/v1/traces"
+              timeout: 500s
     )EOF";
 
   envoy::extensions::tracers::opentelemetry::samplers::v3::DynatraceSamplerConfig proto_config;
@@ -246,11 +249,11 @@ TEST_F(SamplerConfigProviderTest, TestValueZeroConfigured) {
   const std::string yaml_string = R"EOF(
           tenant: "abc12345"
           cluster_id: -1743916452
-          token: "tokenval"
-          http_uri:
-            cluster: "cluster_name"
-            uri: "https://testhost.com/otlp/v1/traces"
-            timeout: 0.250s
+          http_service:
+            http_uri:
+              cluster: "cluster_name"
+              uri: "https://testhost.com/otlp/v1/traces"
+              timeout: 0.250s
           root_spans_per_minute: 0
     )EOF";
 

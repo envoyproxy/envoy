@@ -56,7 +56,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
-    regex_ = Regex::Utility::parseRegex(config.safe_regex_match());
+    regex_ = Regex::Utility::parseRegex(config.safe_regex_match(), factory_context.regexEngine());
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kRangeMatch:
     header_match_type_ = HeaderMatchType::Range;
@@ -81,9 +81,9 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
     header_match_type_ = HeaderMatchType::StringMatch;
-    string_match_ = std::make_unique<
-        Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
-        config.string_match(), factory_context);
+    string_match_ =
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            config.string_match(), factory_context);
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:

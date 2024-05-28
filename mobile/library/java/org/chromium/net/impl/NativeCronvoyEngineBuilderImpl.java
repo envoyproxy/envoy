@@ -20,6 +20,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.chromium.net.ExperimentalCronetEngine;
@@ -37,32 +38,35 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mDnsRefreshSeconds = 60;
   private final int mDnsFailureRefreshSecondsBase = 2;
   private final int mDnsFailureRefreshSecondsMax = 10;
-  private final int mDnsQueryTimeoutSeconds = 25;
-  private final int mDnsMinRefreshSeconds = 60;
+  private int mDnsQueryTimeoutSeconds = 5;
+  private int mDnsMinRefreshSeconds = 60;
   private final List<String> mDnsPreresolveHostnames = Collections.emptyList();
   private final boolean mEnableDNSCache = false;
   private final int mDnsCacheSaveIntervalSeconds = 1;
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
-  private final boolean mDnsUseSystemResolver = true;
+  private boolean mUseCares = false;
+  private boolean mUseGro = false;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
   private final boolean mEnableInterfaceBinding = false;
-  private final boolean mEnableProxying = false;
+  private boolean mEnableProxying = false;
   private final int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 1;
   private final int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private final int mMaxConnectionsPerHost = 7;
-  private final int mStreamIdleTimeoutSeconds = 15;
+  private int mStreamIdleTimeoutSeconds = 15;
   private final int mPerTryIdleTimeoutSeconds = 15;
   private final String mAppVersion = "unspecified";
   private final String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private final boolean mEnablePlatformCertificatesValidation = true;
+  private String mUpstreamTlsSni = "";
   private final String mNodeId = "";
   private final String mNodeRegion = "";
   private final String mNodeZone = "";
   private final String mNodeSubZone = "";
+  private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
   /**
    * Builder for Native Cronet Engine. Default config enables SPDY, disables QUIC and HTTP cache.
@@ -79,6 +83,103 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setEnableDrainPostDnsRefresh(boolean enable) {
     mEnableDrainPostDnsRefresh = enable;
+    return this;
+  }
+
+  /**
+   * Enable using the c_ares DNS resolver.
+   *
+   * @param enable If true, use c_ares.
+   */
+  public NativeCronvoyEngineBuilderImpl setUseCares(boolean enable) {
+    mUseCares = enable;
+    return this;
+  }
+
+  /**
+   * Specify whether to use UDP GRO for upstream QUIC/HTTP3 sockets, if GRO is available on the
+   * system.
+   *
+   * @param enable If true, use UDP GRO.
+   */
+  public NativeCronvoyEngineBuilderImpl setUseGro(boolean enable) {
+    mUseGro = enable;
+    return this;
+  }
+
+  /**
+   * Set the DNS query timeout, in seconds, which ensures that DNS queries succeed or fail
+   * within that time range. See the DnsCacheConfig.dns_query_timeout proto field for details.
+   *
+   * The default is 5s.
+   *
+   * @param timeout The DNS query timeout value, in seconds.
+   */
+  public NativeCronvoyEngineBuilderImpl setDnsQueryTimeoutSeconds(int timeout) {
+    mDnsQueryTimeoutSeconds = timeout;
+    return this;
+  }
+
+  /**
+   * Enable Android system proxying.
+   *
+   * @param enable If true, enable Android proxying; otherwise, don't.
+   */
+  public NativeCronvoyEngineBuilderImpl setEnableProxying(boolean enable) {
+    mEnableProxying = enable;
+    return this;
+  }
+
+  /**
+   * Set the DNS minimum refresh time, in seconds, which ensures that we wait to refresh a DNS
+   * entry for at least the minimum refresh time. For example, if the DNS record TTL is 60 seconds
+   * and setMinDnsRefreshSeconds(120) is invoked, then at least 120 seconds will transpire before
+   * the DNS entry for a host is refreshed.
+   *
+   * The default is 60s.
+   *
+   * @param minRefreshSeconds The DNS minimum refresh time, in seconds.
+   */
+  public NativeCronvoyEngineBuilderImpl setMinDnsRefreshSeconds(int minRefreshSeconds) {
+    mDnsMinRefreshSeconds = minRefreshSeconds;
+    return this;
+  }
+
+  /**
+   * Set the stream idle timeout, in seconds, which is defined as the period in which there are no
+   * active requests. When the idle timeout is reached, the connection is closed.
+   *
+   * The default is 15s.
+   *
+   * @param timeout The stream idle timeout, in seconds.
+   */
+  public NativeCronvoyEngineBuilderImpl setStreamIdleTimeoutSeconds(int timeout) {
+    mStreamIdleTimeoutSeconds = timeout;
+    return this;
+  }
+
+  /**
+   * Sets the boolean value for the reloadable runtime feature flag value. For example, to set the
+   * Envoy runtime flag `envoy.reloadable_features.http_allow_partial_urls_in_referer` to true,
+   * call `setRuntimeGuard("http_allow_partial_urls_in_referer", true)`.
+   *
+   * TODO(abeyad): Change the name to setRuntimeFeature here and in the C++ APIs.
+   *
+   * @param feature The reloadable runtime feature flag name.
+   * @param value The Boolean value to set the runtime feature flag to.
+   */
+  public NativeCronvoyEngineBuilderImpl setRuntimeGuard(String feature, boolean value) {
+    mRuntimeGuards.put(feature, value);
+    return this;
+  }
+
+  /**
+   * Sets the upstream TLS socket's SNI override. If empty, no SNI override will be configured.
+   *
+   * @param sni The SNI to override on the upstream HTTP/3 or HTTP/2 TLS socket.
+   */
+  public NativeCronvoyEngineBuilderImpl setUpstreamTlsSni(String sni) {
+    mUpstreamTlsSni = sni;
     return this;
   }
 
@@ -102,7 +203,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   public CronvoyEngineBuilderImpl addUrlInterceptorsForTesting() {
     nativeFilterChain.add(new EnvoyNativeFilterConfig(
         "envoy.filters.http.test_read",
-        "{\"@type\": type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead}"));
+        "[type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead] {}"));
     return this;
   }
 
@@ -128,20 +229,19 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     List<EnvoyHTTPFilterFactory> platformFilterChain = Collections.emptyList();
     Map<String, EnvoyStringAccessor> stringAccessors = Collections.emptyMap();
     Map<String, EnvoyKeyValueStore> keyValueStores = Collections.emptyMap();
-    Map<String, Boolean> runtimeGuards = Collections.emptyMap();
 
     return new EnvoyConfiguration(
         mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mEnableDrainPostDnsRefresh, quicEnabled(), quicConnectionOptions(),
+        mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mUseGro, quicConnectionOptions(),
         quicClientConnectionOptions(), quicHints(), quicCanonicalSuffixes(),
         mEnableGzipDecompression, brotliEnabled(), portMigrationEnabled(), mEnableSocketTag,
         mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
-        platformFilterChain, stringAccessors, keyValueStores, runtimeGuards,
-        mEnablePlatformCertificatesValidation,
+        platformFilterChain, stringAccessors, keyValueStores, mRuntimeGuards,
+        mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
         /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
         /*xdsPort=*/0, /*xdsGrpcInitialMetadata=*/Collections.emptyMap(),
         /*xdsSslRootCerts=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone,

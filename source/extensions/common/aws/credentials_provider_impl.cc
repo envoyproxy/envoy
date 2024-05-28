@@ -43,6 +43,7 @@ constexpr char WEB_IDENTITY_RESULT_ELEMENT[] = "AssumeRoleWithWebIdentityResult"
 constexpr char AWS_CONTAINER_CREDENTIALS_RELATIVE_URI[] = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI";
 constexpr char AWS_CONTAINER_CREDENTIALS_FULL_URI[] = "AWS_CONTAINER_CREDENTIALS_FULL_URI";
 constexpr char AWS_CONTAINER_AUTHORIZATION_TOKEN[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN";
+constexpr char AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE";
 constexpr char AWS_EC2_METADATA_DISABLED[] = "AWS_EC2_METADATA_DISABLED";
 
 constexpr std::chrono::hours REFRESH_INTERVAL{1};
@@ -60,6 +61,11 @@ constexpr char CONTAINER_METADATA_CLUSTER[] = "ecs_task_metadata_server_internal
 constexpr char STS_TOKEN_CLUSTER[] = "sts_token_service_internal";
 
 } // namespace
+
+Credentials ConfigCredentialsProvider::getCredentials() {
+  ENVOY_LOG(debug, "Getting AWS credentials from static configuration");
+  return credentials_;
+}
 
 Credentials EnvironmentCredentialsProvider::getCredentials() {
   ENVOY_LOG(debug, "Getting AWS credentials from the environment");
@@ -185,7 +191,7 @@ void CredentialsFileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the credentials file");
 
   auto credentials_file = Utility::getCredentialFilePath();
-  auto profile = Utility::getCredentialProfileName();
+  auto profile = profile_.empty() ? Utility::getCredentialProfileName() : profile_;
 
   ENVOY_LOG(debug, "Credentials file path = {}, profile name = {}", credentials_file, profile);
 
@@ -374,19 +380,24 @@ void InstanceProfileCredentialsProvider::extractCredentials(
     }
     return;
   }
-  Json::ObjectSharedPtr document_json;
-  TRY_NEEDS_AUDIT { document_json = Json::Factory::loadFromString(credential_document_value); }
-  END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Could not parse AWS credentials document: {}", e.what());
+
+  absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
+  document_json_or_error = Json::Factory::loadFromStringNoThrow(credential_document_value);
+  if (!document_json_or_error.ok()) {
+    ENVOY_LOG(error, "Could not parse AWS credentials document: {}",
+              document_json_or_error.status().message());
     if (async) {
       handleFetchDone();
     }
     return;
   }
 
-  const auto access_key_id = document_json->getString(ACCESS_KEY_ID, "");
-  const auto secret_access_key = document_json->getString(SECRET_ACCESS_KEY, "");
-  const auto session_token = document_json->getString(TOKEN, "");
+  const auto access_key_id =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), ACCESS_KEY_ID, "");
+  const auto secret_access_key =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), SECRET_ACCESS_KEY, "");
+  const auto session_token =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), TOKEN, "");
 
   ENVOY_LOG(debug,
             "Obtained following AWS credentials from the EC2MetadataService: {}={}, {}={}, {}={}",
@@ -425,7 +436,7 @@ void InstanceProfileCredentialsProvider::onMetadataError(Failure reason) {
   }
 }
 
-TaskRoleCredentialsProvider::TaskRoleCredentialsProvider(
+ContainerCredentialsProvider::ContainerCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context,
     const CurlMetadataFetcher& fetch_metadata_using_curl,
     CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view credential_uri,
@@ -435,14 +446,29 @@ TaskRoleCredentialsProvider::TaskRoleCredentialsProvider(
           envoy::config::cluster::v3::Cluster::STATIC /*cluster_type*/, credential_uri),
       credential_uri_(credential_uri), authorization_token_(authorization_token) {}
 
-bool TaskRoleCredentialsProvider::needsRefresh() {
+bool ContainerCredentialsProvider::needsRefresh() {
   const auto now = api_.timeSource().systemTime();
   return (now - last_updated_ > REFRESH_INTERVAL) ||
          (expiration_time_ - now < REFRESH_GRACE_PERIOD);
 }
 
-void TaskRoleCredentialsProvider::refresh() {
-  ENVOY_LOG(debug, "Getting AWS credentials from the task role at URI: {}", credential_uri_);
+void ContainerCredentialsProvider::refresh() {
+  ENVOY_LOG(debug, "Getting AWS credentials from the container role at URI: {}", credential_uri_);
+
+  // ECS Task role: use const authorization_token set during initialization
+  absl::string_view authorization_header = authorization_token_;
+  absl::StatusOr<std::string> token_or_error;
+
+  if (authorization_token_.empty()) {
+    // EKS Pod Identity token is sourced from AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
+    if (const auto token_file = std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE)) {
+      token_or_error = api_.fileSystem().fileReadToEnd(std::string(token_file));
+      if (token_or_error.ok()) {
+        ENVOY_LOG_MISC(debug, "Container authorization token file contents loaded");
+        authorization_header = token_or_error.value();
+      }
+    }
+  }
 
   absl::string_view host;
   absl::string_view path;
@@ -453,12 +479,12 @@ void TaskRoleCredentialsProvider::refresh() {
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(host);
   message.headers().setPath(path);
-  message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_token_);
+  message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
   if (!useHttpAsyncClient() || !context_) {
     // Using curl to fetch the AWS credentials.
     const auto credential_document = fetch_metadata_using_curl_(message);
     if (!credential_document) {
-      ENVOY_LOG(error, "Could not load AWS credentials document from the task role");
+      ENVOY_LOG(error, "Could not load AWS credentials document from the container role");
       return;
     }
     extractCredentials(std::move(credential_document.value()));
@@ -480,34 +506,41 @@ void TaskRoleCredentialsProvider::refresh() {
   }
 }
 
-void TaskRoleCredentialsProvider::extractCredentials(
+void ContainerCredentialsProvider::extractCredentials(
     const std::string&& credential_document_value) {
   if (credential_document_value.empty()) {
     handleFetchDone();
     return;
   }
-  Json::ObjectSharedPtr document_json;
-  TRY_NEEDS_AUDIT { document_json = Json::Factory::loadFromString(credential_document_value); }
-  END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Could not parse AWS credentials document from the task role: {}", e.what());
+  absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
+
+  document_json_or_error = Json::Factory::loadFromStringNoThrow(credential_document_value);
+  if (!document_json_or_error.ok()) {
+    ENVOY_LOG(error, "Could not parse AWS credentials document from the container role: {}",
+              document_json_or_error.status().message());
     handleFetchDone();
     return;
   }
 
-  const auto access_key_id = document_json->getString(ACCESS_KEY_ID, "");
-  const auto secret_access_key = document_json->getString(SECRET_ACCESS_KEY, "");
-  const auto session_token = document_json->getString(TOKEN, "");
+  const auto access_key_id =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), ACCESS_KEY_ID, "");
+  const auto secret_access_key =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), SECRET_ACCESS_KEY, "");
+  const auto session_token =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), TOKEN, "");
 
-  ENVOY_LOG(debug, "Found following AWS credentials in the task role: {}={}, {}={}, {}={}",
+  ENVOY_LOG(debug, "Found following AWS credentials in the container role: {}={}, {}={}, {}={}",
             AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
             secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
             session_token.empty() ? "" : "*****");
 
-  const auto expiration_str = document_json->getString(EXPIRATION, "");
+  const auto expiration_str =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), EXPIRATION, "");
+
   if (!expiration_str.empty()) {
     absl::Time expiration_time;
     if (absl::ParseTime(EXPIRATION_FORMAT, expiration_str, &expiration_time, nullptr)) {
-      ENVOY_LOG(debug, "Task role AWS credentials expiration time: {}", expiration_str);
+      ENVOY_LOG(debug, "Container role AWS credentials expiration time: {}", expiration_str);
       expiration_time_ = absl::ToChronoTime(expiration_time);
     }
   }
@@ -522,13 +555,13 @@ void TaskRoleCredentialsProvider::extractCredentials(
   handleFetchDone();
 }
 
-void TaskRoleCredentialsProvider::onMetadataSuccess(const std::string&& body) {
+void ContainerCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   // TODO(suniltheta): increment fetch success stats
   ENVOY_LOG(debug, "AWS Task metadata fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
-void TaskRoleCredentialsProvider::onMetadataError(Failure reason) {
+void ContainerCredentialsProvider::onMetadataError(Failure reason) {
   // TODO(suniltheta): increment fetch failed stats
   ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
   handleFetchDone();
@@ -562,7 +595,12 @@ void WebIdentityCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}", sts_endpoint_);
 
   const auto web_token_file_or_error = api_.fileSystem().fileReadToEnd(token_file_path_);
-  THROW_IF_STATUS_NOT_OK(web_token_file_or_error, throw);
+  if (!web_token_file_or_error.ok()) {
+    ENVOY_LOG(debug, "Unable to read AWS web identity credentials from {}", token_file_path_);
+    cached_credentials_ = Credentials();
+    return;
+  }
+
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
@@ -603,16 +641,17 @@ void WebIdentityCredentialsProvider::extractCredentials(
     return;
   }
 
-  Json::ObjectSharedPtr document_json;
-  TRY_NEEDS_AUDIT { document_json = Json::Factory::loadFromString(credential_document_value); }
-  END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Could not parse AWS credentials document from STS: {}", e.what());
+  absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
+  document_json_or_error = Json::Factory::loadFromStringNoThrow(credential_document_value);
+  if (!document_json_or_error.ok()) {
+    ENVOY_LOG(error, "Could not parse AWS credentials document from STS: {}",
+              document_json_or_error.status().message());
     handleFetchDone();
     return;
   }
 
   absl::StatusOr<Json::ObjectSharedPtr> root_node =
-      document_json->getObjectNoThrow(WEB_IDENTITY_RESPONSE_ELEMENT);
+      document_json_or_error.value()->getObjectNoThrow(WEB_IDENTITY_RESPONSE_ELEMENT);
   if (!root_node.ok()) {
     ENVOY_LOG(error, "AWS STS credentials document is empty");
     handleFetchDone();
@@ -633,42 +672,37 @@ void WebIdentityCredentialsProvider::extractCredentials(
     return;
   }
 
-  TRY_NEEDS_AUDIT {
-    const auto access_key_id = credentials.value()->getString(ACCESS_KEY_ID, "");
-    const auto secret_access_key = credentials.value()->getString(SECRET_ACCESS_KEY, "");
-    const auto session_token = credentials.value()->getString(SESSION_TOKEN, "");
+  const auto access_key_id =
+      Utility::getStringFromJsonOrDefault(credentials.value(), ACCESS_KEY_ID, "");
+  const auto secret_access_key =
+      Utility::getStringFromJsonOrDefault(credentials.value(), SECRET_ACCESS_KEY, "");
+  const auto session_token =
+      Utility::getStringFromJsonOrDefault(credentials.value(), SESSION_TOKEN, "");
 
-    ENVOY_LOG(debug, "Received the following AWS credentials from STS: {}={}, {}={}, {}={}",
-              AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
-              secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
-              session_token.empty() ? "" : "*****");
-    setCredentialsToAllThreads(
-        std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
-  }
-  END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from STS: {}", e.what());
+  // Mandatory response fields
+  if (access_key_id.empty() || secret_access_key.empty() || session_token.empty()) {
+    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from STS");
     handleFetchDone();
     return;
   }
 
-  TRY_NEEDS_AUDIT {
-    const auto expiration = credentials.value()->getInteger(EXPIRATION, 0);
-    if (expiration != 0) {
-      expiration_time_ =
-          std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(expiration));
-      ENVOY_LOG(debug, "AWS STS credentials expiration time (unix timestamp): {}", expiration);
-    } else {
-      expiration_time_ = api_.timeSource().systemTime() + REFRESH_INTERVAL;
-      ENVOY_LOG(warn, "Could not get Expiration value of AWS credentials document from STS, so "
-                      "setting expiration to 1 hour in future");
-    }
-  }
-  END_TRY catch (EnvoyException& e) {
+  ENVOY_LOG(debug, "Received the following AWS credentials from STS: {}={}, {}={}, {}={}",
+            AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
+            secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
+            session_token.empty() ? "" : "*****");
+  setCredentialsToAllThreads(
+      std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
+
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(credentials.value(), EXPIRATION, 0);
+
+  if (expiration != 0) {
+    expiration_time_ =
+        std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(expiration));
+    ENVOY_LOG(debug, "AWS STS credentials expiration time (unix timestamp): {}", expiration);
+  } else {
     expiration_time_ = api_.timeSource().systemTime() + REFRESH_INTERVAL;
-    ENVOY_LOG(warn,
-              "Could not parse Expiration value of AWS credentials document from STS: {}, so "
-              "setting expiration to 1 hour in future",
-              e.what());
+    ENVOY_LOG(warn, "Could not get Expiration value of AWS credentials document from STS, so "
+                    "setting expiration to 1 hour in future");
   }
 
   last_updated_ = api_.timeSource().systemTime();
@@ -747,26 +781,26 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
 
   if (!relative_uri.empty()) {
     const auto uri = absl::StrCat(CONTAINER_METADATA_HOST, relative_uri);
-    ENVOY_LOG(debug, "Using task role credentials provider with URI: {}", uri);
-    add(factories.createTaskRoleCredentialsProvider(api, context, fetch_metadata_using_curl,
-                                                    MetadataFetcher::create,
-                                                    CONTAINER_METADATA_CLUSTER, uri));
+    ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", uri);
+    add(factories.createContainerCredentialsProvider(api, context, fetch_metadata_using_curl,
+                                                     MetadataFetcher::create,
+                                                     CONTAINER_METADATA_CLUSTER, uri));
   } else if (!full_uri.empty()) {
-    const auto authorization_token =
+    auto authorization_token =
         absl::NullSafeStringView(std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN));
     if (!authorization_token.empty()) {
       ENVOY_LOG(debug,
-                "Using task role credentials provider with URI: "
+                "Using container role credentials provider with URI: "
                 "{} and authorization token",
                 full_uri);
-      add(factories.createTaskRoleCredentialsProvider(
+      add(factories.createContainerCredentialsProvider(
           api, context, fetch_metadata_using_curl, MetadataFetcher::create,
           CONTAINER_METADATA_CLUSTER, full_uri, authorization_token));
     } else {
-      ENVOY_LOG(debug, "Using task role credentials provider with URI: {}", full_uri);
-      add(factories.createTaskRoleCredentialsProvider(api, context, fetch_metadata_using_curl,
-                                                      MetadataFetcher::create,
-                                                      CONTAINER_METADATA_CLUSTER, full_uri));
+      ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", full_uri);
+      add(factories.createContainerCredentialsProvider(api, context, fetch_metadata_using_curl,
+                                                       MetadataFetcher::create,
+                                                       CONTAINER_METADATA_CLUSTER, full_uri));
     }
   } else if (metadata_disabled != TRUE) {
     ENVOY_LOG(debug, "Using instance profile credentials provider");

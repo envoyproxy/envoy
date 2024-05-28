@@ -27,34 +27,34 @@ absl::string_view Asn1Utility::cbsToString(CBS& cbs) {
   return {str_head, CBS_len(&cbs)};
 }
 
-ParsingResult<absl::optional<CBS>> Asn1Utility::getOptional(CBS& cbs, unsigned tag) {
+absl::StatusOr<absl::optional<CBS>> Asn1Utility::getOptional(CBS& cbs, unsigned tag) {
   int is_present;
   CBS data;
   if (!CBS_get_optional_asn1(&cbs, &data, &is_present, tag)) {
-    return "Failed to parse ASN.1 element tag";
+    return absl::InvalidArgumentError("Failed to parse ASN.1 element tag");
   }
 
   return is_present ? absl::optional<CBS>(data) : absl::nullopt;
 }
 
-ParsingResult<std::string> Asn1Utility::parseOid(CBS& cbs) {
+absl::StatusOr<std::string> Asn1Utility::parseOid(CBS& cbs) {
   CBS oid;
   if (!CBS_get_asn1(&cbs, &oid, CBS_ASN1_OBJECT)) {
-    return absl::string_view("Input is not a well-formed ASN.1 OBJECT");
+    return absl::InvalidArgumentError("Input is not a well-formed ASN.1 OBJECT");
   }
   CSmartPtr<char, freeOpensslString> oid_text(CBS_asn1_oid_to_text(&oid));
   if (oid_text == nullptr) {
-    return absl::string_view("Failed to parse oid");
+    return absl::InvalidArgumentError("Failed to parse oid");
   }
 
   std::string oid_text_str(oid_text.get());
   return oid_text_str;
 }
 
-ParsingResult<Envoy::SystemTime> Asn1Utility::parseGeneralizedTime(CBS& cbs) {
+absl::StatusOr<Envoy::SystemTime> Asn1Utility::parseGeneralizedTime(CBS& cbs) {
   CBS elem;
   if (!CBS_get_asn1(&cbs, &elem, CBS_ASN1_GENERALIZEDTIME)) {
-    return "Input is not a well-formed ASN.1 GENERALIZEDTIME";
+    return absl::InvalidArgumentError("Input is not a well-formed ASN.1 GENERALIZEDTIME");
   }
 
   auto time_str = cbsToString(elem);
@@ -64,24 +64,24 @@ ParsingResult<Envoy::SystemTime> Asn1Utility::parseGeneralizedTime(CBS& cbs) {
   // `GENERALIZEDTIME` spec, are not supported.
   // Reference: https://tools.ietf.org/html/rfc5280#section-4.1.2.5.2
   if (time_str.length() > 0 && absl::ascii_toupper(time_str.at(time_str.length() - 1)) != 'Z') {
-    return "GENERALIZEDTIME must be in UTC";
+    return absl::InvalidArgumentError("GENERALIZEDTIME must be in UTC");
   }
 
   absl::Time time;
   auto utc_time_str = time_str.substr(0, time_str.length() - 1);
   std::string parse_error;
   if (!absl::ParseTime(GENERALIZED_TIME_FORMAT, utc_time_str, &time, &parse_error)) {
-    return "Error parsing string of GENERALIZEDTIME format";
+    return absl::InvalidArgumentError("Error parsing string of GENERALIZEDTIME format");
   }
   return absl::ToChronoTime(time);
 }
 
 // Performs the following conversions to go from bytestring to hex integer
 // `CBS` -> `ASN1_INTEGER` -> `BIGNUM` -> String.
-ParsingResult<std::string> Asn1Utility::parseInteger(CBS& cbs) {
+absl::StatusOr<std::string> Asn1Utility::parseInteger(CBS& cbs) {
   CBS num;
   if (!CBS_get_asn1(&cbs, &num, CBS_ASN1_INTEGER)) {
-    return absl::string_view("Input is not a well-formed ASN.1 INTEGER");
+    return absl::InvalidArgumentError("Input is not a well-formed ASN.1 INTEGER");
   }
 
   auto head = CBS_data(&num);
@@ -100,29 +100,29 @@ ParsingResult<std::string> Asn1Utility::parseInteger(CBS& cbs) {
     }
   }
 
-  return absl::string_view("Failed to parse ASN.1 INTEGER");
+  return absl::InvalidArgumentError("Failed to parse ASN.1 INTEGER");
 }
 
-ParsingResult<std::vector<uint8_t>> Asn1Utility::parseOctetString(CBS& cbs) {
+absl::StatusOr<std::vector<uint8_t>> Asn1Utility::parseOctetString(CBS& cbs) {
   CBS value;
   if (!CBS_get_asn1(&cbs, &value, CBS_ASN1_OCTETSTRING)) {
-    return "Input is not a well-formed ASN.1 OCTETSTRING";
+    return absl::InvalidArgumentError("Input is not a well-formed ASN.1 OCTETSTRING");
   }
 
   auto data = reinterpret_cast<const uint8_t*>(CBS_data(&value));
   return std::vector<uint8_t>{data, data + CBS_len(&value)};
 }
 
-ParsingResult<absl::monostate> Asn1Utility::skipOptional(CBS& cbs, unsigned tag) {
+absl::StatusOr<absl::monostate> Asn1Utility::skipOptional(CBS& cbs, unsigned tag) {
   if (!CBS_get_optional_asn1(&cbs, nullptr, nullptr, tag)) {
-    return "Failed to parse ASN.1 element tag";
+    return absl::InvalidArgumentError("Failed to parse ASN.1 element tag");
   }
   return absl::monostate();
 }
 
-ParsingResult<absl::monostate> Asn1Utility::skip(CBS& cbs, unsigned tag) {
+absl::StatusOr<absl::monostate> Asn1Utility::skip(CBS& cbs, unsigned tag) {
   if (!CBS_get_asn1(&cbs, nullptr, tag)) {
-    return "Failed to parse ASN.1 element";
+    return absl::InvalidArgumentError("Failed to parse ASN.1 element");
   }
 
   return absl::monostate();

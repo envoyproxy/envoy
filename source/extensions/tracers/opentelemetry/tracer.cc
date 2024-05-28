@@ -7,6 +7,7 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
+#include "source/common/tracing/common_values.h"
 #include "source/common/tracing/trace_context_impl.h"
 #include "source/extensions/tracers/opentelemetry/otlp_utils.h"
 
@@ -38,9 +39,8 @@ void callSampler(SamplerSharedPtr sampler, const absl::optional<SpanContext> spa
   if (!sampler) {
     return;
   }
-  const auto sampling_result =
-      sampler->shouldSample(span_context, new_span.getTraceIdAsHex(), operation_name,
-                            new_span.spankind(), trace_context, {});
+  const auto sampling_result = sampler->shouldSample(
+      span_context, new_span.getTraceId(), operation_name, new_span.spankind(), trace_context, {});
   new_span.setSampled(sampling_result.isSampled());
 
   if (sampling_result.attributes) {
@@ -69,7 +69,7 @@ Span::Span(const std::string& name, SystemTime start_time, Envoy::TimeSource& ti
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& name,
                                   SystemTime start_time) {
   // Build span_context from the current span, then generate the child span from that context.
-  SpanContext span_context(kDefaultVersion, getTraceIdAsHex(), spanId(), sampled(), tracestate());
+  SpanContext span_context(kDefaultVersion, getTraceId(), spanId(), sampled(), tracestate());
   return parent_tracer_.startSpan(name, start_time, span_context, {},
                                   ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
 }
@@ -83,8 +83,9 @@ void Span::finishSpan() {
   }
 }
 
-void Span::injectContext(Tracing::TraceContext& trace_context,
-                         const Upstream::HostDescriptionConstSharedPtr&) {
+void Span::setOperation(absl::string_view operation) { span_.set_name(operation); };
+
+void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   std::string trace_id_hex = absl::BytesToHexString(span_.trace_id());
   std::string span_id_hex = absl::BytesToHexString(span_.span_id());
   std::vector<uint8_t> trace_flags_vec{sampled()};
@@ -121,7 +122,25 @@ void Span::setAttribute(absl::string_view name, const OTelAttribute& attribute_v
   *span_.add_attributes() = key_value;
 }
 
-void Span::setTag(absl::string_view name, absl::string_view value) { setAttribute(name, value); }
+void Span::setTag(absl::string_view name, absl::string_view value) {
+  if (name == Tracing::Tags::get().HttpStatusCode) {
+    uint64_t status_code;
+    // For HTTP status codes in the 5xx range, as well as any other code the client failed to
+    // interpret, span status MUST be set to Error.
+    //
+    // For HTTP status codes in the 4xx range span status MUST be left unset in case of
+    // SpanKind.SERVER and MUST be set to Error in case of SpanKind.CLIENT.
+    if (absl::SimpleAtoi(value, &status_code)) {
+      if (status_code >= 500 ||
+          (status_code >= 400 &&
+           span_.kind() == ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT)) {
+        span_.mutable_status()->set_code(
+            ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_ERROR);
+      }
+    }
+  }
+  setAttribute(name, value);
+}
 
 Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
                Random::RandomGenerator& random, Runtime::Loader& runtime,

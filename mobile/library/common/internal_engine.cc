@@ -1,31 +1,34 @@
 #include "library/common/internal_engine.h"
 
+#include <sys/resource.h>
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/common/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/synchronization/notification.h"
-#include "library/common/bridge/utility.h"
-#include "library/common/data/utility.h"
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
+namespace {
+constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(3);
+} // namespace
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
-envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
-
-InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, envoy_logger logger,
-                               envoy_event_tracker event_tracker,
+InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
+                               std::unique_ptr<EnvoyLogger> logger,
+                               std::unique_ptr<EnvoyEventTracker> event_tracker,
+                               absl::optional<int> thread_priority,
                                Thread::PosixThreadFactoryPtr thread_factory)
-    : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)), logger_(logger),
-      event_tracker_(event_tracker), dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
+    : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
+      logger_(std::move(logger)), event_tracker_(std::move(event_tracker)),
+      thread_priority_(thread_priority),
+      dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
   ExtensionRegistry::registerFactories();
 
-  // TODO(Augustyniak): Capturing an address of event_tracker_ and registering it in the API
-  // registry may lead to crashes at Engine shutdown. To be figured out as part of
-  // https://github.com/envoyproxy/envoy-mobile/issues/332
-  Envoy::Api::External::registerApi(std::string(envoy_event_tracker_api_name), &event_tracker_);
+  Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker_);
   // Envoy Mobile always requires dfp_mixed_scheme for the TLS and cleartext DFP clusters.
   // While dfp_mixed_scheme defaults to true, some environments force it to false (e.g. within
   // Google), so we force it back to true in Envoy Mobile.
@@ -33,29 +36,73 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, envoy
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
-InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, envoy_logger logger,
-                               envoy_event_tracker event_tracker)
-    : InternalEngine(std::move(callbacks), logger, event_tracker,
-                     Thread::PosixThreadFactory::create()) {}
+InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
+                               std::unique_ptr<EnvoyLogger> logger,
+                               std::unique_ptr<EnvoyEventTracker> event_tracker,
+                               absl::optional<int> thread_priority)
+    : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
+                     thread_priority, Thread::PosixThreadFactory::create()) {}
 
-envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
-  // Start the Envoy on the dedicated thread.
-  auto options = std::make_shared<Envoy::OptionsImplBase>();
-  options->setConfigYaml(config);
-  if (!log_level.empty()) {
-    ENVOY_BUG(options->setLogLevel(log_level).ok(), "invalid log level");
-  }
-  options->setConcurrency(1);
-  return run(std::move(options));
+envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
+
+envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
+                                           EnvoyStreamCallbacks&& stream_callbacks,
+                                           bool explicit_flow_control) {
+  return dispatcher_->post(
+      [&, stream, stream_callbacks = std::move(stream_callbacks), explicit_flow_control]() mutable {
+        http_client_->startStream(stream, std::move(stream_callbacks), explicit_flow_control);
+      });
+}
+
+envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,
+                                           bool end_stream) {
+  return dispatcher_->post([this, stream, headers = std::move(headers), end_stream]() mutable {
+    http_client_->sendHeaders(stream, std::move(headers), end_stream);
+  });
+  return ENVOY_SUCCESS;
+}
+
+envoy_status_t InternalEngine::readData(envoy_stream_t stream, size_t bytes_to_read) {
+  return dispatcher_->post(
+      [&, stream, bytes_to_read]() { http_client_->readData(stream, bytes_to_read); });
+}
+
+envoy_status_t InternalEngine::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer,
+                                        bool end_stream) {
+  return dispatcher_->post([&, stream, buffer = std::move(buffer), end_stream]() mutable {
+    http_client_->sendData(stream, std::move(buffer), end_stream);
+  });
+}
+
+envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream,
+                                            Http::RequestTrailerMapPtr trailers) {
+  return dispatcher_->post([&, stream, trailers = std::move(trailers)]() mutable {
+    http_client_->sendTrailers(stream, std::move(trailers));
+  });
+}
+
+envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
+  return dispatcher_->post([&, stream]() { http_client_->cancelStream(stream); });
 }
 
 // This function takes a `std::shared_ptr` instead of `std::unique_ptr` because `std::function` is a
 // copy-constructible type, so it's not possible to move capture `std::unique_ptr` with
 // `std::function`.
 envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options) {
-  main_thread_ =
-      thread_factory_->createThread([this, options]() mutable -> void { main(options); },
-                                    /* options= */ absl::nullopt, /* crash_on_failure= */ false);
+  main_thread_ = thread_factory_->createThread(
+      [this, options]() mutable -> void {
+        if (thread_priority_) {
+          // Set the thread priority before invoking the thread routine.
+          const int rc = setpriority(PRIO_PROCESS, thread_factory_->currentThreadId().getId(),
+                                     *thread_priority_);
+          if (rc != 0) {
+            ENVOY_LOG(debug, "failed to set thread priority: {}", Envoy::errorDetails(errno));
+          }
+        }
+
+        main(options);
+      },
+      /* options= */ absl::nullopt, /* crash_on_failure= */ false);
   return (main_thread_ != nullptr) ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
 
@@ -65,25 +112,25 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
   {
     Thread::LockGuard lock(mutex_);
     TRY_NEEDS_AUDIT {
-      if (event_tracker_.track != nullptr) {
+      if (event_tracker_ != nullptr) {
         assert_handler_registration_ =
             Assert::addDebugAssertionFailureRecordAction([this](const char* location) {
-              const auto event = Bridge::Utility::makeEnvoyMap(
-                  {{"name", "assertion"}, {"location", std::string(location)}});
-              event_tracker_.track(event, event_tracker_.context);
+              absl::flat_hash_map<std::string, std::string> event{
+                  {{"name", "assertion"}, {"location", std::string(location)}}};
+              event_tracker_->on_track_(event);
             });
         bug_handler_registration_ =
             Assert::addEnvoyBugFailureRecordAction([this](const char* location) {
-              const auto event = Bridge::Utility::makeEnvoyMap(
-                  {{"name", "bug"}, {"location", std::string(location)}});
-              event_tracker_.track(event, event_tracker_.context);
+              absl::flat_hash_map<std::string, std::string> event{
+                  {{"name", "bug"}, {"location", std::string(location)}}};
+              event_tracker_->on_track_(event);
             });
       }
 
       // We let the thread clean up this log delegate pointer
-      if (logger_.log) {
-        log_delegate_ptr_ =
-            std::make_unique<Logger::LambdaDelegate>(logger_, Logger::Registry::getSink());
+      if (logger_ != nullptr) {
+        log_delegate_ptr_ = std::make_unique<Logger::LambdaDelegate>(std::move(logger_),
+                                                                     Logger::Registry::getSink());
       } else {
         log_delegate_ptr_ =
             std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
@@ -129,7 +176,8 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
                                                         server_->serverFactoryContext().scope(),
                                                         server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
-          callbacks_->on_engine_running();
+          engine_running_.Notify();
+          callbacks_->on_engine_running_();
         });
   } // mutex_
 
@@ -146,7 +194,10 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
   bug_handler_registration_.reset(nullptr);
   assert_handler_registration_.reset(nullptr);
 
-  callbacks_->on_exit();
+  if (event_tracker_ != nullptr) {
+    event_tracker_->on_exit_();
+  }
+  callbacks_->on_exit_();
 
   return run_success ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
@@ -164,6 +215,10 @@ envoy_status_t InternalEngine::terminate() {
   if (!main_thread_->joinable()) {
     return ENVOY_FAILURE;
   }
+
+  // Wait until the Engine is ready before calling terminate to avoid assertion failures.
+  // TODO(fredyw): Fix this without having to wait.
+  ASSERT(engine_running_.WaitForNotificationWithTimeout(ENGINE_RUNNING_TIMEOUT));
 
   // We need to be sure that MainCommon is finished being constructed so we can dispatch shutdown.
   {
@@ -213,10 +268,10 @@ envoy_status_t InternalEngine::resetConnectivityState() {
   return dispatcher_->post([&]() -> void { connectivity_manager_->resetConnectivityState(); });
 }
 
-envoy_status_t InternalEngine::setPreferredNetwork(envoy_network_t network) {
+envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
   return dispatcher_->post([&, network]() -> void {
     envoy_netconf_t configuration_key =
-        Envoy::Network::ConnectivityManagerImpl::setPreferredNetwork(network);
+        Network::ConnectivityManagerImpl::setPreferredNetwork(network);
     connectivity_manager_->refreshDns(configuration_key, true);
   });
 }
@@ -306,17 +361,20 @@ Stats::Store& InternalEngine::getStatsStore() {
 
 void InternalEngine::logInterfaces(absl::string_view event,
                                    std::vector<Network::InterfacePair>& interfaces) {
-  std::vector<std::string> names;
-  names.resize(interfaces.size());
-  std::transform(interfaces.begin(), interfaces.end(), names.begin(),
-                 [](Network::InterfacePair& pair) { return std::get<0>(pair); });
+  auto all_names_printer = [](std::vector<Network::InterfacePair>& interfaces) -> std::string {
+    std::vector<std::string> names;
+    names.resize(interfaces.size());
+    std::transform(interfaces.begin(), interfaces.end(), names.begin(),
+                   [](Network::InterfacePair& pair) { return std::get<0>(pair); });
 
-  auto unique_end = std::unique(names.begin(), names.end());
-  std::string all_names = std::accumulate(names.begin(), unique_end, std::string{},
-                                          [](std::string acc, std::string next) {
-                                            return acc.empty() ? next : std::move(acc) + "," + next;
-                                          });
-  ENVOY_LOG_EVENT(debug, event, all_names);
+    auto unique_end = std::unique(names.begin(), names.end());
+    std::string all_names = std::accumulate(
+        names.begin(), unique_end, std::string{}, [](std::string acc, std::string next) {
+          return acc.empty() ? next : std::move(acc) + "," + next;
+        });
+    return all_names;
+  };
+  ENVOY_LOG_EVENT(debug, event, "{}", all_names_printer(interfaces));
 }
 
 } // namespace Envoy

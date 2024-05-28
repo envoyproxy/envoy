@@ -8,6 +8,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -176,6 +177,26 @@ public:
    * @return Name of the profile string.
    */
   static std::string getCredentialProfileName();
+
+  /**
+   * @brief Return a string value from a json object key, or a default it not found. Does not throw
+   * exceptions.
+   *
+   * @return String value or default
+   */
+  static std::string getStringFromJsonOrDefault(Json::ObjectSharedPtr json_object,
+                                                const std::string& string_value,
+                                                const std::string& string_default);
+
+  /**
+   * @brief Return an integer value from a json object key, or a default it not found. Does not
+   * throw exceptions.
+   *
+   * @return Integer value or default
+   */
+  static int64_t getIntegerFromJsonOrDefault(Json::ObjectSharedPtr json_object,
+                                             const std::string& integer_value,
+                                             const int64_t integer_default);
 };
 
 } // namespace Aws

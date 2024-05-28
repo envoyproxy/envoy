@@ -106,7 +106,7 @@ public:
   Router::ContextImpl router_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   MockShadowWriter* shadow_writer_;
-  FilterConfig config_;
+  FilterConfigSharedPtr config_;
   std::unique_ptr<RouterTestFilter> router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};

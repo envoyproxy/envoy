@@ -204,7 +204,7 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
 TEST_F(TestSPIFFEValidator, TestInitializeSslContexts) {
   initialize();
   EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
-            validator().initializeSslContexts({}, false));
+            validator().initializeSslContexts({}, false).value());
 }
 
 TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
@@ -678,7 +678,7 @@ typed_config:
   bool foundTestServer = false;
   bool foundTestCA = false;
   SSLContextPtr ctx = SSL_CTX_new(TLS_method());
-  validator().addClientValidationContext(ctx.get(), false);
+  ASSERT_TRUE(validator().addClientValidationContext(ctx.get(), false).ok());
   for (X509_NAME* name : SSL_CTX_get_client_CA_list(ctx.get())) {
     const int cn_index = X509_NAME_get_index_by_NID(name, NID_commonName, -1);
     EXPECT_TRUE(cn_index >= 0);

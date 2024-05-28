@@ -233,6 +233,7 @@ envoy_cc_test(
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
@@ -278,6 +279,11 @@ envoy_cc_test(
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "compiled_string_map_test",
+    srcs = ["compiled_string_map_test.cc"],
 )
 
 envoy_cc_test(

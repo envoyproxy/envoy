@@ -89,6 +89,7 @@ public:
   }
 
   void SetUp() override {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
     quic_connection_ = new TestEnvoyQuicClientConnection(
         quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_, quic_version_,
         *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr, /*prefer_gro=*/true),
@@ -450,14 +451,14 @@ TEST_P(EnvoyQuicClientSessionTest, HandlePacketsWithoutDestinationAddress) {
     auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
                                                       stateless_reset_packet->length());
     quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
-                                    time_system_.monotonicTime());
+                                    time_system_.monotonicTime(), /*tos=*/0);
   }
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
       .Times(0);
   auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
                                                     stateless_reset_packet->length());
   quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
-                                  time_system_.monotonicTime());
+                                  time_system_.monotonicTime(), /*tos=*/0);
 }
 
 // Tests that receiving a STATELESS_RESET packet on the probing socket doesn't cause crash.
@@ -504,6 +505,71 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   EXPECT_EQ(self_addr_->asString(), quic_connection_->self_address().ToString());
 }
 
+TEST_P(EnvoyQuicClientSessionTest, EcnReportingIsEnabled) {
+  const Network::ConnectionSocketPtr& socket = quic_connection_->connectionSocket();
+  absl::optional<Network::Address::IpVersion> version = socket->ipVersion();
+  EXPECT_TRUE(version.has_value());
+  int optval;
+  socklen_t optlen = sizeof(optval);
+  Api::SysCallIntResult rv;
+  if (*version == Network::Address::IpVersion::v6) {
+    rv = socket->getSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, &optlen);
+  } else {
+    rv = socket->getSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, &optlen);
+  }
+  EXPECT_EQ(rv.return_value_, 0);
+  EXPECT_EQ(optval, 1);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
+  absl::optional<Network::Address::IpVersion> version = peer_socket_->ipVersion();
+  EXPECT_TRUE(version.has_value());
+  // Make the peer socket send ECN marks
+  Api::SysCallIntResult rv;
+  int optval = 1; // Code point for ECT(1) in RFC3168.
+  if (*version == Network::Address::IpVersion::v6) {
+    rv = peer_socket_->setSocketOption(IPPROTO_IPV6, IPV6_TCLASS, &optval, sizeof(optval));
+  } else {
+    rv = peer_socket_->setSocketOption(IPPROTO_IP, IP_TOS, &optval, sizeof(optval));
+  }
+  EXPECT_EQ(rv.return_value_, 0);
+  // This test uses ConstructEncryptedPacket() to build an ECN-marked server
+  // response. Unfortunately, that function uses the packet's destination
+  // connection ID regardless of whether it is a client or server packet. By
+  // setting the connection IDs to be the same, the keys will be correct.
+  quic_connection_->set_client_connection_id(quic_connection_->connection_id());
+  envoy_quic_session_->connect();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // The first six bytes of a server hello, which is enough for the client to
+  // process the packet successfully.
+  char server_hello[] = {
+      0x02, 0x00, 0x00, 0x56, 0x03, 0x03,
+  };
+  auto packet = absl::WrapUnique<quic::QuicEncryptedPacket>(quic::test::ConstructEncryptedPacket(
+      quic_connection_->client_connection_id(), quic_connection_->connection_id(),
+      /*version_flag=*/true, /*reset_flag=*/false, /*packet_number=*/1,
+      std::string(server_hello, sizeof(server_hello)), /*full_padding=*/false,
+      quic::CONNECTION_ID_PRESENT, quic::CONNECTION_ID_PRESENT, quic::PACKET_1BYTE_PACKET_NUMBER,
+      &quic_version_, quic::Perspective::IS_SERVER));
+
+  Buffer::RawSlice slice;
+  // packet->data() is const, so it has to be copied to send to sendmsg.
+  char buffer[100];
+  memcpy(buffer, packet->data(), packet->length());
+  slice.mem_ = buffer;
+  slice.len_ = packet->length();
+  quic::CrypterPair crypters;
+  quic::CryptoUtils::CreateInitialObfuscators(quic::Perspective::IS_CLIENT, GetParam(),
+                                              quic_connection_->connection_id(), &crypters);
+  quic_connection_->InstallDecrypter(quic::ENCRYPTION_INITIAL, std::move(crypters.decrypter));
+
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  const quic::QuicConnectionStats& stats = quic_connection_->GetStats();
+  EXPECT_EQ(stats.num_ecn_marks_received.ect1, 1);
+}
+
 class MockOsSysCallsImpl : public Api::OsSysCallsImpl {
 public:
   MOCK_METHOD(Api::SysCallSizeResult, recvmsg, (os_fd_t socket, msghdr* msg, int flags),
@@ -533,16 +599,14 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   slice.mem_ = write_data.data();
   slice.len_ = write_data.length();
 
-  // Make sure the option for GRO is set on the socket.
-// Windows doesn't have the GRO socket options.
-#if !defined(WIN32)
+  // We already skip the test if UDP GRO is not supported, so checking the socket option is safe
+  // here.
   int sock_opt;
   socklen_t sock_len = sizeof(int);
   EXPECT_EQ(0, quic_connection_->connectionSocket()
                    ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
                    .return_value_);
   EXPECT_EQ(1, sock_opt);
-#endif
 
   // GRO uses `recvmsg`, not `recvmmsg`.
   EXPECT_CALL(os_sys_calls, supportsUdpGro()).WillRepeatedly(Return(true));
@@ -565,6 +629,10 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
 
 class EnvoyQuicClientSessionDisallowMmsgTest : public EnvoyQuicClientSessionTest {
 public:
+  EnvoyQuicClientSessionDisallowMmsgTest()
+      : is_udp_gro_supported_on_platform_(Api::OsSysCallsSingleton::get().supportsUdpGro()),
+        singleton_injector_(&os_sys_calls_) {}
+
   void SetUp() override {
     EXPECT_CALL(os_sys_calls_, supportsUdpGro()).WillRepeatedly(Return(false));
     EnvoyQuicClientSessionTest::SetUp();
@@ -572,9 +640,10 @@ public:
 
 protected:
   NiceMock<MockOsSysCallsImpl> os_sys_calls_;
+  const bool is_udp_gro_supported_on_platform_;
 
 private:
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_{&os_sys_calls_};
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_;
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionDisallowMmsgTests,
@@ -592,16 +661,17 @@ TEST_P(EnvoyQuicClientSessionDisallowMmsgTest, UsesRecvMsgWhenNoGro) {
   slice.mem_ = write_data.data();
   slice.len_ = write_data.length();
 
-// Windows doesn't have the GRO socket options.
-#if !defined(WIN32)
-  // Make sure the option for GRO is *not* set on the socket.
-  int sock_opt;
-  socklen_t sock_len = sizeof(int);
-  EXPECT_EQ(0, quic_connection_->connectionSocket()
-                   ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
-                   .return_value_);
-  EXPECT_EQ(0, sock_opt);
-#endif
+  if (is_udp_gro_supported_on_platform_) {
+    // Make sure the option for GRO is *not* set on the socket. This check cannot be called if the
+    // platform doesn't support the UDP_GRO socket option; otherwise getSocketOption() will return
+    // an error with errno set to "Protocol not supported".
+    int sock_opt;
+    socklen_t sock_len = sizeof(int);
+    EXPECT_EQ(0, quic_connection_->connectionSocket()
+                     ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
+                     .return_value_);
+    EXPECT_EQ(0, sock_opt);
+  }
 
   // Uses `recvmsg`, not `recvmmsg`.
   EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _)).Times(0);
@@ -662,6 +732,7 @@ TEST_P(EnvoyQuicClientSessionAllowMmsgTest, UsesRecvMmsgWhenNoGroAndMmsgAllowed)
       .WillRepeatedly(Invoke([&](os_fd_t, struct mmsghdr*, unsigned int, int,
                                  struct timespec*) -> Api::SysCallIntResult {
         dispatcher_->exit();
+        // EAGAIN should be returned with -1 but returning 0 here shouldn't cause busy looping.
         return {0, SOCKET_ERROR_AGAIN};
       }));
 

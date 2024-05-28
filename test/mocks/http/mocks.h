@@ -109,6 +109,7 @@ public:
   MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
+  MOCK_METHOD(bool, isHalfCloseEnabled, ());
 
   ResponseHeaderMapPtr informational_headers_;
   ResponseHeaderMapPtr response_headers_;
@@ -320,6 +321,7 @@ public:
   MOCK_METHOD(void, setUpstreamOverrideHost, (Upstream::LoadBalancerContext::OverrideHost));
   MOCK_METHOD(absl::optional<Upstream::LoadBalancerContext::OverrideHost>, upstreamOverrideHost, (),
               (const));
+  MOCK_METHOD(bool, shouldLoadShed, (), (const));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
@@ -330,6 +332,7 @@ public:
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};
+  NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
 class MockStreamEncoderFilterCallbacks : public StreamEncoderFilterCallbacks,

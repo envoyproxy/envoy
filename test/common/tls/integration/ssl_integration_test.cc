@@ -9,11 +9,12 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/tls/client_context_impl.h"
+#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
-#include "source/common/tls/ssl_socket.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/tls/cert_validator/timed_cert_validator.h"
@@ -925,7 +926,12 @@ TEST_P(SslCertficateIntegrationTest, BothEcdsaAndRsaOnlyEcdsaOcspResponse) {
   const uint8_t* resp;
   size_t resp_len;
   SSL_get0_ocsp_response(socket->ssl(), &resp, &resp_len);
-  EXPECT_NE(0, resp_len);
+  ASSERT_GT(resp_len, 0);
+  ASSERT_NE(resp, nullptr);
+  std::string ocsp_resp{reinterpret_cast<const char*>(resp), resp_len};
+  std::string expected_ocsp_resp{TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsa_ocsp_resp.der"))};
+  EXPECT_EQ(ocsp_resp, expected_ocsp_resp);
 }
 
 // Server has ECDSA and RSA certificates with OCSP responses and stapling required policy works.

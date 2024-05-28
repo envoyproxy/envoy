@@ -8,7 +8,6 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/protobuf.h"
@@ -31,6 +30,7 @@
 
 using testing::ContainsRegex;
 using testing::Eq;
+using testing::HasSubstr;
 using testing::Optional;
 using testing::Ref;
 using testing::Return;
@@ -54,26 +54,6 @@ TEST(UtilityTest, ConfigSourceInitFetchTimeout) {
   config_source.mutable_initial_fetch_timeout()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(654));
   EXPECT_EQ(654, Utility::configSourceInitialFetchTimeout(config_source).count());
-}
-
-TEST(UtilityTest, createTagProducer) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = StatsUtility::createTagProducer(bootstrap, {});
-  ASSERT_TRUE(producer != nullptr);
-  Stats::TagVector tags;
-  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
-  ASSERT_EQ(extracted_name, "http.rq_total");
-  ASSERT_EQ(tags.size(), 1);
-}
-
-TEST(UtilityTest, createTagProducerWithDefaultTgs) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = StatsUtility::createTagProducer(bootstrap, {{"foo", "bar"}});
-  ASSERT_TRUE(producer != nullptr);
-  Stats::TagVector tags;
-  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
-  EXPECT_EQ(extracted_name, "http.rq_total");
-  EXPECT_EQ(tags.size(), 2);
 }
 
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
@@ -156,12 +136,11 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    EXPECT_EQ(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
-                                               false)
-            .status()
-            .message(),
-        "API configs must have either a gRPC service or a cluster name defined: api_type: GRPC\n");
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .status()
+                    .message(),
+                HasSubstr("API configs must have either a gRPC service or a cluster name defined"));
   }
 
   {
@@ -545,7 +524,7 @@ TEST(UtilityTest, AnyWrongType) {
       Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
                                      out),
       EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
@@ -563,7 +542,7 @@ TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
       Utility::translateAnyToFactoryConfig(typed_config,
                                            ProtobufMessage::getStrictValidationVisitor(), factory),
       EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST(UtilityTest, TranslateAnyToFactoryConfig) {
@@ -735,10 +714,10 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
 
   // GRPC cluster without GRPC services.
-  EXPECT_EQ(
+  EXPECT_THAT(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
           .message(),
-      "API configs must have either a gRPC service or a cluster name defined: api_type: GRPC\n");
+      HasSubstr("API configs must have either a gRPC service or a cluster name defined"));
 
   // Non-existent cluster.
   api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo_cluster");

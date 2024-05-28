@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/composite:filter_lib",
         "//source/extensions/filters/http/fault:config",
         "//source/extensions/filters/http/fault:fault_filter_lib",
+        "//test/integration/filters:set_response_code_filter_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
@@ -35,9 +36,9 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.composite"],
     deps = [
         "//source/common/http:header_map_lib",
-        "//source/common/http/match_delegate:config",
         "//source/extensions/filters/http/composite:config",
         "//source/extensions/filters/http/composite:filter_lib",
+        "//source/extensions/filters/http/match_delegate:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",

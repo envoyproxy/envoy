@@ -71,6 +71,11 @@ envoyGoConfigHandlerWrapper(void* c, std::function<CAPIStatus(std::shared_ptr<Fi
   return CAPIStatus::CAPIFilterIsGone;
 }
 
+CAPIStatus envoyGoFilterHttpClearRouteCache(void* r) {
+  return envoyGoFilterHandlerWrapper(
+      r, [](std::shared_ptr<Filter>& filter) -> CAPIStatus { return filter->clearRouteCache(); });
+}
+
 CAPIStatus envoyGoFilterHttpContinue(void* r, int status) {
   return envoyGoFilterHandlerWrapper(r, [status](std::shared_ptr<Filter>& filter) -> CAPIStatus {
     return filter->continueStatus(static_cast<GolangStatus>(status));

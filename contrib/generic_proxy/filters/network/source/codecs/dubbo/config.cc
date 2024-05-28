@@ -114,7 +114,7 @@ ResponsePtr DubboServerCodec::respond(Status status, absl::string_view data,
 
 CodecFactoryPtr
 DubboCodecFactoryConfig::createCodecFactory(const Protobuf::Message&,
-                                            Envoy::Server::Configuration::FactoryContext&) {
+                                            Envoy::Server::Configuration::ServerFactoryContext&) {
   return std::make_unique<DubboCodecFactory>();
 }
 

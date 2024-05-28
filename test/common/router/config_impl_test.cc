@@ -166,8 +166,7 @@ parseRouteConfigurationFromYaml(const std::string& yaml) {
 
 class ConfigImplTestBase {
 protected:
-  ConfigImplTestBase()
-      : api_(Api::createApiForTest()), engine_(std::make_unique<Regex::GoogleReEngine>()) {
+  ConfigImplTestBase() : api_(Api::createApiForTest()) {
     ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
@@ -342,7 +341,6 @@ most_specific_header_mutations_wins: {0}
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Event::SimulatedTimeSystem test_time_;
-  ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
 class RouteMatcherTest : public testing::Test,
@@ -3168,6 +3166,12 @@ TEST_F(RouterMatcherHashPolicyTest, HashIpv4DifferentAddresses) {
 }
 
 TEST_F(RouterMatcherHashPolicyTest, HashIpv6DifferentAddresses) {
+  if (!TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
+    // an exception like "IPv6 addresses are not supported on this machine" will be thrown
+    // if we don't add IP version check and run test on a machine that doesn't support IPv6
+    GTEST_SKIP() << "IPv6 addresses are not supported on this machine";
+  }
+
   firstRouteHashPolicy()->mutable_connection_properties()->set_source_ip(true);
   {
     // Different addresses should produce different hashes.
@@ -6410,9 +6414,9 @@ virtual_hosts:
               - name: cluster2
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Field 'weight' is missing in: name: \"cluster1\"\n");
+      "Field 'weight' is missing in:.*[\n]*name: \"cluster1\"\n");
 
   const std::string yaml2 = R"EOF(
 virtual_hosts:
@@ -9256,9 +9260,6 @@ virtual_hosts:
 // Verifies that we're creating a new instance of the retry plugins on each call instead of
 // always returning the same one.
 TEST_F(RouteConfigurationV2, RetryPluginsAreNotReused) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: regex
@@ -9272,8 +9273,12 @@ virtual_hosts:
           retry_policy:
             retry_host_predicate:
             - name: envoy.test_host_predicate
+              typed_config:
+                "@type": type.googleapis.com/google.protobuf.Struct
             retry_priority:
               name: envoy.test_retry_priority
+              typed_config:
+                "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
 
   Upstream::MockRetryPriority priority{{}, {}};
@@ -10388,6 +10393,26 @@ virtual_hosts:
       config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
   EXPECT_TRUE(internal_redirect_policy.enabled());
   EXPECT_EQ(2, internal_redirect_policy.responseHeadersToCopy().size());
+}
+
+TEST_F(RouteConfigurationV2, InternalRedirectPolicyAcceptsResponseHeadersToCopyInvalid) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy:
+            response_headers_to_copy: ["x-foo", ":authority"]
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      ":-prefixed headers or Hosts may not be specified here.");
 }
 
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {

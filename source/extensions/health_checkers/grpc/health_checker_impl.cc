@@ -135,7 +135,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeData(Buffer::Ins
   }
   // We should end up with only one frame here.
   std::vector<Grpc::Frame> decoded_frames;
-  if (!decoder_.decode(data, decoded_frames)) {
+  if (!decoder_.decode(data, decoded_frames).ok()) {
     onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "gRPC wire protocol decode error",
                   false);
     return;
@@ -211,7 +211,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
 
   StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, parent_.dispatcher_.timeSource(),
-                                         local_connection_info_provider_);
+                                         local_connection_info_provider_,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info.upstreamInfo()->setUpstreamHost(host_);
   parent_.request_headers_parser_->evaluateHeaders(headers_message->headers(), stream_info);

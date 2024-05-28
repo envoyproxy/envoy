@@ -495,7 +495,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
       startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
 
   // Wait till stats are flushed to custom sink and validate that the actual flush happens.
-  TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_);
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
@@ -591,10 +591,12 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
       post_init = true;
       post_init_fired.Notify();
     });
-    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
-      shutdown = true;
-      shutdown_begin.Notify();
-    });
+    ServerLifecycleNotifier::HandlePtr handle3 =
+        server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
+          shutdown = true;
+          shutdown_begin.Notify();
+          handle3 = nullptr;
+        });
     auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                              [&](Event::PostCb completion_cb) {
                                                // Block till we're told to complete
@@ -612,7 +614,7 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
     server_->run();
     handle1 = nullptr;
     handle2 = nullptr;
-    handle3 = nullptr;
+    // handle3 is nulled out in the callback itself, to test that works as well
     handle4 = nullptr;
     server_ = nullptr;
     thread_local_ = nullptr;
@@ -958,12 +960,12 @@ TEST_P(ServerInstanceImplTest, ValidationDefault) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_THAT_THROWS_MESSAGE(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
-      EnvoyException, "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").message(),
+      "Protobuf message (foo) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_NO_THROW(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
+  EXPECT_TRUE(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar").ok());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -973,11 +975,11 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStatic) {
   options_.service_node_name_ = "some_node_name";
   options_.allow_unknown_static_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_NO_THROW(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
+  EXPECT_TRUE(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").ok());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_NO_THROW(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
+  EXPECT_TRUE(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar").ok());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -988,13 +990,15 @@ TEST_P(ServerInstanceImplTest, ValidationRejectDynamic) {
   options_.reject_unknown_dynamic_fields_ = true;
   options_.ignore_unknown_dynamic_fields_ = true; // reject takes precedence over ignore
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_THAT_THROWS_MESSAGE(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
-      EnvoyException, "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").message(),
+      "Protobuf message (foo) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_THAT_THROWS_MESSAGE(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"),
-      EnvoyException, "Protobuf message (bar) has unknown fields");
+  EXPECT_EQ(server_->messageValidationContext()
+                .dynamicValidationVisitor()
+                .onUnknownField("bar")
+                .message(),
+            "Protobuf message (bar) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -1005,12 +1009,14 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
   options_.allow_unknown_static_fields_ = true;
   options_.reject_unknown_dynamic_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_NO_THROW(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
+  EXPECT_TRUE(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").ok());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_THAT_THROWS_MESSAGE(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"),
-      EnvoyException, "Protobuf message (bar) has unknown fields");
+  EXPECT_EQ(server_->messageValidationContext()
+                .dynamicValidationVisitor()
+                .onUnknownField("bar")
+                .message(),
+            "Protobuf message (bar) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 

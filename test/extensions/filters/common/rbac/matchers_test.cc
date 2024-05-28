@@ -412,6 +412,7 @@ TEST(AuthenticatedMatcher, NoSSL) {
 }
 
 TEST(MetadataMatcher, MetadataMatcher) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl header;
   NiceMock<StreamInfo::MockStreamInfo> info;
@@ -429,9 +430,11 @@ TEST(MetadataMatcher, MetadataMatcher) {
   matcher.add_path()->set_key("label");
 
   matcher.mutable_value()->mutable_string_match()->set_exact("test");
-  checkMatcher(MetadataMatcher(matcher), false, conn, header, info);
+  checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context)), false, conn, header,
+               info);
   matcher.mutable_value()->mutable_string_match()->set_exact("prod");
-  checkMatcher(MetadataMatcher(matcher), true, conn, header, info);
+  checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context)), true, conn, header,
+               info);
 }
 
 TEST(PolicyMatcher, PolicyMatcher) {
@@ -526,30 +529,32 @@ TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
 }
 
 TEST(PathMatcher, NoPathInHeader) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Envoy::Http::TestRequestHeaderMapImpl headers;
   envoy::type::matcher::v3::PathMatcher matcher;
   matcher.mutable_path()->mutable_safe_regex()->mutable_google_re2();
   matcher.mutable_path()->mutable_safe_regex()->set_regex(".*");
 
   headers.setPath("/path");
-  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers);
   headers.removePath();
-  checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
+  checkMatcher(PathMatcher(matcher, context), false, Envoy::Network::MockConnection(), headers);
 }
 
 TEST(PathMatcher, ValidPathInHeader) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Envoy::Http::TestRequestHeaderMapImpl headers;
   envoy::type::matcher::v3::PathMatcher matcher;
   matcher.mutable_path()->set_exact("/exact");
 
   headers.setPath("/exact");
-  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers);
   headers.setPath("/exact?param=val");
-  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers);
   headers.setPath("/exact#fragment");
-  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers);
   headers.setPath("/exacz");
-  checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
+  checkMatcher(PathMatcher(matcher, context), false, Envoy::Network::MockConnection(), headers);
 }
 
 class TestObject : public StreamInfo::FilterState::Object {
@@ -558,6 +563,7 @@ public:
 };
 
 TEST(FilterStateMatcher, FilterStateMatcher) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl header;
   NiceMock<StreamInfo::MockStreamInfo> info;
@@ -568,10 +574,10 @@ TEST(FilterStateMatcher, FilterStateMatcher) {
   matcher.set_key("test.key");
   matcher.mutable_string_match()->set_prefix("test");
 
-  checkMatcher(FilterStateMatcher(matcher), false, conn, header, info);
+  checkMatcher(FilterStateMatcher(matcher, context), false, conn, header, info);
   filter_state.setData("test.key", std::make_shared<TestObject>(),
                        StreamInfo::FilterState::StateType::ReadOnly);
-  checkMatcher(FilterStateMatcher(matcher), true, conn, header, info);
+  checkMatcher(FilterStateMatcher(matcher, context), true, conn, header, info);
 }
 
 TEST(UriTemplateMatcher, UriTemplateMatcherFactory) {

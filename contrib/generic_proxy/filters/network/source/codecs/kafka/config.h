@@ -151,7 +151,7 @@ public:
   // CodecFactoryConfig
   GenericProxy::CodecFactoryPtr
   createCodecFactory(const Envoy::Protobuf::Message& config,
-                     Envoy::Server::Configuration::FactoryContext& context) override;
+                     Envoy::Server::Configuration::ServerFactoryContext& context) override;
   std::string name() const override { return "envoy.generic_proxy.codecs.kafka"; }
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtoConfig>();

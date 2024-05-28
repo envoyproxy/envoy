@@ -152,7 +152,8 @@ struct Harness {
 
     auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
         dispatcher_->timeSource(),
-        connection->connectionSocket()->connectionInfoProviderSharedPtr());
+        connection->connectionSocket()->connectionInfoProviderSharedPtr(),
+        StreamInfo::FilterState::LifeSpan::Connection);
     auto session = std::make_unique<EnvoyQuicServerSession>(
         quic_config_, quic::ParsedQuicVersionVector{quic_version_}, std::move(connection), nullptr,
         &crypto_stream_helper_, &crypto_config_, &compressed_certs_cache_, *dispatcher_.get(),

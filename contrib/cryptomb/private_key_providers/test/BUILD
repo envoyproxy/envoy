@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_contrib_package",
@@ -80,5 +81,19 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "speed_test",
+    srcs = ["speed_test.cc"],
+    external_deps = [
+        "benchmark",
+        "ssl",
+    ],
+    deps = [
+        "//contrib/cryptomb/private_key_providers/source:ipp_crypto_wrapper_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
     ],
 )

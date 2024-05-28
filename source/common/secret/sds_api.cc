@@ -69,7 +69,7 @@ void SdsApi::onWatchUpdate() {
     const uint64_t new_hash = next_hash;
     if (new_hash != files_hash_) {
       resolveSecret(files);
-      update_callback_manager_.runCallbacks();
+      THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
       files_hash_ = new_hash;
     }
   }
@@ -82,7 +82,7 @@ void SdsApi::onWatchUpdate() {
 
 absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                     const std::string& version_info) {
-  const absl::Status status = validateUpdateSize(resources.size());
+  const absl::Status status = validateUpdateSize(resources.size(), 0);
   if (!status.ok()) {
     return status;
   }
@@ -103,7 +103,7 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     const auto files = loadFiles();
     files_hash_ = getHashForFiles(files);
     resolveSecret(files);
-    update_callback_manager_.runCallbacks();
+    THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
 
     auto* watched_directory = getWatchedDirectory();
     // Either we have a watched path and can defer the watch monitoring to a
@@ -143,12 +143,28 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   return absl::OkStatus();
 }
 
-absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                    const Protobuf::RepeatedPtrField<std::string>&,
-                                    const std::string&) {
-  const absl::Status status = validateUpdateSize(added_resources.size());
+absl::Status
+SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                       const std::string&) {
+  const absl::Status status = validateUpdateSize(added_resources.size(), removed_resources.size());
   if (!status.ok()) {
     return status;
+  }
+
+  if (removed_resources.size() == 1) {
+    // SDS is a singleton (e.g. single-resource) resource subscription, so it should never be
+    // removed except by the modification of the referenced cluster/listener. Therefore, since the
+    // server indicates a removal, ignore it (via an ACK).
+    ENVOY_LOG_MISC(
+        trace,
+        "Server sent a delta SDS update attempting to remove a resource (name: {}). Ignoring.",
+        removed_resources[0]);
+
+    // Even if we ignore this resource, the owning resource (LDS/CDS) should still complete
+    // warming.
+    init_target_.ready();
+    return absl::OkStatus();
   }
   return onConfigUpdate(added_resources, added_resources[0].get().version());
 }
@@ -160,14 +176,22 @@ void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reaso
   init_target_.ready();
 }
 
-absl::Status SdsApi::validateUpdateSize(int num_resources) {
-  if (num_resources == 0) {
+absl::Status SdsApi::validateUpdateSize(uint32_t added_resources_num,
+                                        uint32_t removed_resources_num) const {
+  if (added_resources_num == 0 && removed_resources_num == 0) {
     return absl::InvalidArgumentError(
         fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
   }
-  if (num_resources != 1) {
+
+  // This conditional technically allows a response with added=1 removed=1
+  // which is nonsensical since SDS is a singleton resource subscription.
+  // It is, however, preferred to ignore these nonsensical responses rather
+  // than NACK them, so it is allowed here.
+  if (added_resources_num > 1 || removed_resources_num > 1) {
     return absl::InvalidArgumentError(
-        fmt::format("Unexpected SDS secrets length: {}", num_resources));
+        fmt::format("Unexpected SDS secrets length for {}, number of added resources "
+                    "{}, number of removed resources {}. Expected sum is 1",
+                    sds_config_name_, added_resources_num, removed_resources_num));
   }
   return absl::OkStatus();
 }

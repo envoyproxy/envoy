@@ -32,7 +32,7 @@ public:
   tlsCertificates() const override {
     std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> configs;
     for (const auto& config : tls_certificate_configs_) {
-      configs.push_back(config);
+      configs.push_back(*config);
     }
     return configs;
   }
@@ -77,6 +77,7 @@ protected:
   Api::Api& api_;
   const Server::Options& options_;
   Singleton::Manager& singleton_manager_;
+  Server::ServerLifecycleNotifier& lifecycle_notifier_;
 
 private:
   static unsigned tlsVersionFromProto(
@@ -88,7 +89,7 @@ private:
   const std::string ecdh_curves_;
   const std::string signature_algorithms_;
 
-  std::vector<Ssl::TlsCertificateConfigImpl> tls_certificate_configs_;
+  std::vector<std::unique_ptr<Ssl::TlsCertificateConfigImpl>> tls_certificate_configs_;
   Ssl::CertificateValidationContextConfigPtr validation_context_config_;
   // If certificate validation context type is combined_validation_context. default_cvc_
   // holds a copy of CombinedCertificateValidationContext::default_validation_context.

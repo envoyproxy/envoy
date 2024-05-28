@@ -14,9 +14,8 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
-#include "library/cc/log_level.h"
 #include "library/common/api/external.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 
 #if defined(__APPLE__)
 #include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
@@ -42,10 +41,25 @@ DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
   const auto& clusters = bootstrap.static_resources().clusters();
   for (const auto& cluster : clusters) {
     if (cluster.name() == "base") {
-      MessageUtil::unpackTo(cluster.cluster_type().typed_config(), cluster_config);
+      MessageUtil::unpackTo(cluster.cluster_type().typed_config(), cluster_config).IgnoreError();
     }
   }
   return cluster_config;
+}
+
+template <typename ProtoType>
+bool repeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
+                           const Protobuf::RepeatedPtrField<ProtoType>& rhs) {
+  if (lhs.size() != rhs.size()) {
+    return false;
+  }
+
+  for (int i = 0; i < lhs.size(); ++i) {
+    if (!Protobuf::util::MessageDifferencer::Equals(lhs[i], rhs[i])) {
+      return false;
+    }
+  }
+  return true;
 }
 
 TEST(TestConfig, ConfigIsApplied) {
@@ -73,6 +87,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
       .setForceAlwaysUsev6(true)
+      .setUseGroIfAvailable(true)
       .setDeviceOs("probably-ubuntu-on-CI");
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
@@ -98,6 +113,7 @@ TEST(TestConfig, ConfigIsApplied) {
 #endif
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
       "key: \"always_use_v6\" value { bool_value: true }",
+      "key: \"prefer_quic_client_udp_gro\" value { bool_value: true }",
       "key: \"test_feature_false\" value { bool_value: true }",
       "key: \"allow_client_socket_creation_failure\" value { bool_value: true }",
       "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
@@ -227,6 +243,18 @@ TEST(TestConfig, EnableDrainPostDnsRefresh) {
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("enable_drain_post_dns_refresh: true"));
 }
 
+TEST(TestConfig, SetDnsQueryTimeout) {
+  EngineBuilder engine_builder;
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  // The default value.
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 5 }"));
+
+  engine_builder.addDnsQueryTimeoutSeconds(30);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 30 }"));
+}
+
 TEST(TestConfig, EnforceTrustChainVerification) {
   EngineBuilder engine_builder;
 
@@ -263,7 +291,7 @@ TEST(TestConfig, AddDnsPreresolveHostnames) {
   auto& host_addr2 = *expected_dns_preresolve_hostnames.Add();
   host_addr2.set_address("lyft.com");
   host_addr2.set_port_value(443);
-  EXPECT_TRUE(TestUtility::repeatedPtrFieldEqual(
+  EXPECT_TRUE(repeatedPtrFieldEqual(
       getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
       expected_dns_preresolve_hostnames));
 
@@ -274,7 +302,7 @@ TEST(TestConfig, AddDnsPreresolveHostnames) {
   auto& host_addr3 = *expected_dns_preresolve_hostnames.Add();
   host_addr3.set_address("google.com");
   host_addr3.set_port_value(443);
-  EXPECT_TRUE(TestUtility::repeatedPtrFieldEqual(
+  EXPECT_TRUE(repeatedPtrFieldEqual(
       getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
       expected_dns_preresolve_hostnames));
 }
@@ -440,14 +468,15 @@ private:
   mutable int count_ = 0;
 };
 
+#ifdef ENVOY_ENABLE_FULL_PROTOS
 TEST(TestConfig, AddNativeFilters) {
   EngineBuilder engine_builder;
 
   std::string filter_name1 = "envoy.filters.http.buffer1";
   std::string filter_name2 = "envoy.filters.http.buffer2";
   std::string filter_config =
-      "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\","
-      "\"max_request_bytes\":5242880}";
+      "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes { "
+      "value: 5242880 } }";
   engine_builder.addNativeFilter(filter_name1, filter_config);
   engine_builder.addNativeFilter(filter_name2, filter_config);
 
@@ -477,6 +506,7 @@ TEST(TestConfig, AddPlatformFilter) {
   EXPECT_THAT(bootstrap_str, HasSubstr("http.platform_bridge.PlatformBridge"));
   EXPECT_THAT(bootstrap_str, HasSubstr("platform_filter_name: \"" + filter_name + "\""));
 }
+#endif // ENVOY_ENABLE_FULL_PROTOS
 
 // TODO(RyanTheOptimist): This test seems to be flaky. #2641
 TEST(TestConfig, DISABLED_StringAccessors) {
@@ -491,7 +521,7 @@ TEST(TestConfig, DISABLED_StringAccessors) {
   EXPECT_EQ(0, accessor->count());
   envoy_data data = c_accessor->get_string(c_accessor->context);
   EXPECT_EQ(1, accessor->count());
-  EXPECT_EQ(data_string, Data::Utility::copyToString(data));
+  EXPECT_EQ(data_string, Bridge::Utility::copyToString(data));
   release_envoy_data(data);
 }
 

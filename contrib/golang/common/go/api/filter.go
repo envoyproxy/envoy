@@ -158,6 +158,9 @@ type StreamFilterCallbacks interface {
 
 type FilterCallbacks interface {
 	StreamFilterCallbacks
+	// ClearRouteCache clears the route cache for the current request, and filtermanager will re-fetch the route in the next filter.
+	// Please be careful to invoke it, since filtermanager will raise an 404 route_not_found response when failed to re-fetch a route.
+	ClearRouteCache()
 	// Continue or SendLocalReply should be last API invoked, no more code after them.
 	Continue(StatusType)
 	SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
@@ -245,6 +248,8 @@ type ConnectionCallback interface {
 	Write(buffer []byte, endStream bool)
 	// Close the connection.
 	Close(closeType ConnectionCloseType)
+	// EnableHalfClose only for upstream connection
+	EnableHalfClose(enabled bool)
 }
 
 type StateType int

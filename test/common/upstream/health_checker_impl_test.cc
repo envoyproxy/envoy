@@ -155,7 +155,7 @@ public:
       absl::node_hash_map<std::string,
                           const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
-  HttpHealthCheckerImplTest() : engine_(std::make_unique<Regex::GoogleReEngine>()) {}
+  HttpHealthCheckerImplTest() = default;
 
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
@@ -165,7 +165,7 @@ public:
 
   void addCompletionCallback() {
     health_checker_->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        [this](HostSharedPtr host, HealthTransition changed_state, HealthState) -> void {
           onHostStatus(host, changed_state);
         });
   }
@@ -875,7 +875,6 @@ public:
   std::list<uint32_t> connection_index_{};
   std::list<uint32_t> codec_index_{};
   const HostWithHealthCheckMap health_checker_map_{};
-  ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
 TEST_F(HttpHealthCheckerImplTest, Success) {
@@ -3542,7 +3541,7 @@ public:
 
   void addCompletionCallback() {
     health_checker_->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        [this](HostSharedPtr host, HealthTransition changed_state, HealthState) -> void {
           onHostStatus(host, changed_state);
         });
   }
@@ -3775,6 +3774,40 @@ TEST_F(HttpHealthCheckerImplTest, MethodConnectDisallowedValidation) {
 
   EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                           "Proto constraint validation failed.*")
+}
+
+TEST_F(HttpHealthCheckerImplTest, InvalidHost) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    http_health_check:
+      host: "\x07"
+      path: "/aaa"
+    )EOF";
+
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
+                          "Proto constraint validation failed*")
+}
+
+TEST_F(HttpHealthCheckerImplTest, InvalidPath) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    http_health_check:
+      host: "aaa"
+      path: "\x08"
+    )EOF";
+
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
+                          "Proto constraint validation failed*")
 }
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
@@ -4235,6 +4268,25 @@ public:
     healthy_threshold: 2
     reuse_connection: false
     tcp_health_check:
+      send:
+        text: "01"
+      receive:
+      - text: "02"
+    )EOF";
+
+    allocHealthChecker(yaml);
+  }
+
+  void setupDataProxyProtocol() {
+    std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    reuse_connection: false
+    tcp_health_check:
+      proxy_protocol_config:
+        version: v2
       send:
         text: "01"
       receive:
@@ -4743,6 +4795,29 @@ TEST_F(TcpHealthCheckerImplTest, ConnectionLocalFailure) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
 }
 
+TEST_F(TcpHealthCheckerImplTest, SuccessProxyProtocol) {
+  InSequence s;
+
+  setupDataProxyProtocol();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  expectSessionCreate();
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_, _));
+  EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  connection_->runHighWatermarkCallbacks();
+  connection_->runLowWatermarkCallbacks();
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  Buffer::OwnedImpl response;
+  addUint8(response, 2);
+  read_filter_->onData(response, false);
+}
+
 class TestGrpcHealthCheckerImpl : public GrpcHealthCheckerImpl {
 public:
   using GrpcHealthCheckerImpl::GrpcHealthCheckerImpl;
@@ -4865,7 +4940,7 @@ public:
 
   void addCompletionCallback() {
     health_checker_->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        [this](HostSharedPtr host, HealthTransition changed_state, HealthState) -> void {
           onHostStatus(host, changed_state);
         });
   }
@@ -5106,7 +5181,7 @@ public:
         .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
           std::vector<Grpc::Frame> decoded_frames;
           Grpc::Decoder decoder;
-          ASSERT_TRUE(decoder.decode(data, decoded_frames));
+          ASSERT_TRUE(decoder.decode(data, decoded_frames).ok());
           ASSERT_EQ(1U, decoded_frames.size());
           auto& frame = decoded_frames[0];
           Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
@@ -5290,7 +5365,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithAdditionalHeaders) {
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
         std::vector<Grpc::Frame> decoded_frames;
         Grpc::Decoder decoder;
-        ASSERT_TRUE(decoder.decode(data, decoded_frames));
+        ASSERT_TRUE(decoder.decode(data, decoded_frames).ok());
         ASSERT_EQ(1U, decoded_frames.size());
         auto& frame = decoded_frames[0];
         Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));

@@ -293,7 +293,7 @@ TEST_F(ReverseBridgeTest, GrpcRequest) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
 
     EXPECT_EQ(1, frames.size());
     EXPECT_EQ(12, frames[0].length_);
@@ -376,7 +376,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoContentLength) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
 
     EXPECT_EQ(1, frames.size());
     EXPECT_EQ(12, frames[0].length_);
@@ -509,7 +509,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
 
     EXPECT_EQ(1, frames.size());
     EXPECT_EQ(12, frames[0].length_);
@@ -722,7 +722,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
 
     EXPECT_EQ(1, frames.size());
     EXPECT_EQ(12, frames[0].length_);
@@ -799,7 +799,7 @@ TEST_F(ReverseBridgeTest, RouteWithTrailers) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
 
     EXPECT_EQ(4, trailers.size());
     EXPECT_EQ(1, frames.size());

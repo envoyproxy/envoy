@@ -378,16 +378,13 @@ message CertificateValidationContext {
   // can be treated as trust anchor as well. It allows verification with building valid partial chain instead
   // of a full chain.
   //
-  // Only one of ``trusted_ca`` and ``ca_certificate_provider_instance`` may be specified.
-  //
-  // [#next-major-version: This field and watched_directory below should ideally be moved into a
-  // separate sub-message, since there's no point in specifying the latter field without this one.]
+  // If ``ca_certificate_provider_instance`` is set, it takes precedence over ``trusted_ca``.
   config.core.v3.DataSource trusted_ca = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "ca_cert_source"];
 
   // Certificate provider instance for fetching TLS certificates.
   //
-  // Only one of ``trusted_ca`` and ``ca_certificate_provider_instance`` may be specified.
+  // If set, takes precedence over ``trusted_ca``.
   // [#not-implemented-hide:]
   CertificateProviderPluginInstance ca_certificate_provider_instance = 13
       [(udpa.annotations.field_migrate).oneof_promotion = "ca_cert_source"];

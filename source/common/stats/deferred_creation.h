@@ -55,6 +55,7 @@ public:
     }
   }
   inline StatsStructType& getOrCreate() override { return getOrCreateHelper(); }
+  bool isPresent() const override { return !internal_stats_.isNull(); }
 
 private:
   // We can't call getOrCreate directly from constructor, otherwise the compiler complains about
@@ -92,6 +93,7 @@ public:
   DirectStats(const typename StatsStructType::StatNameType& stat_names, Stats::Scope& scope)
       : stats_(stat_names, scope) {}
   inline StatsStructType& getOrCreate() override { return stats_; }
+  bool isPresent() const override { return true; }
 
 private:
   StatsStructType stats_;

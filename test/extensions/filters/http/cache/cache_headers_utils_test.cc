@@ -489,6 +489,7 @@ TEST(GetAllMatchingHeaderNames, EmptyRuleset) {
 }
 
 TEST(GetAllMatchingHeaderNames, EmptyHeaderMap) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Http::TestRequestHeaderMapImpl headers;
   std::vector<Matchers::StringMatcherPtr> ruleset;
   absl::flat_hash_set<absl::string_view> result;
@@ -497,7 +498,7 @@ TEST(GetAllMatchingHeaderNames, EmptyHeaderMap) {
   matcher.set_exact("accept");
   ruleset.emplace_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher));
+          matcher, context));
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
@@ -505,6 +506,7 @@ TEST(GetAllMatchingHeaderNames, EmptyHeaderMap) {
 }
 
 TEST(GetAllMatchingHeaderNames, SingleMatchSingleValue) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Http::TestRequestHeaderMapImpl headers{{"accept", "image/*"}, {"accept-language", "en-US"}};
   std::vector<Matchers::StringMatcherPtr> ruleset;
   absl::flat_hash_set<absl::string_view> result;
@@ -513,7 +515,7 @@ TEST(GetAllMatchingHeaderNames, SingleMatchSingleValue) {
   matcher.set_exact("accept");
   ruleset.emplace_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher));
+          matcher, context));
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
@@ -522,6 +524,7 @@ TEST(GetAllMatchingHeaderNames, SingleMatchSingleValue) {
 }
 
 TEST(GetAllMatchingHeaderNames, SingleMatchMultiValue) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Http::TestRequestHeaderMapImpl headers{{"accept", "image/*"}, {"accept", "text/html"}};
   std::vector<Matchers::StringMatcherPtr> ruleset;
   absl::flat_hash_set<absl::string_view> result;
@@ -530,7 +533,7 @@ TEST(GetAllMatchingHeaderNames, SingleMatchMultiValue) {
   matcher.set_exact("accept");
   ruleset.emplace_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher));
+          matcher, context));
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
@@ -539,6 +542,7 @@ TEST(GetAllMatchingHeaderNames, SingleMatchMultiValue) {
 }
 
 TEST(GetAllMatchingHeaderNames, MultipleMatches) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Http::TestRequestHeaderMapImpl headers{{"accept", "image/*"}, {"accept-language", "en-US"}};
   std::vector<Matchers::StringMatcherPtr> ruleset;
   absl::flat_hash_set<absl::string_view> result;
@@ -547,11 +551,11 @@ TEST(GetAllMatchingHeaderNames, MultipleMatches) {
   matcher.set_exact("accept");
   ruleset.emplace_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher));
+          matcher, context));
   matcher.set_exact("accept-language");
   ruleset.emplace_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher));
+          matcher, context));
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 

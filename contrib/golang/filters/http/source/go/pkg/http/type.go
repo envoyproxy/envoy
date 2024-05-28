@@ -155,6 +155,18 @@ func (h *requestOrResponseHeaderMapImpl) RangeWithCopy(f func(key, value string)
 	}
 }
 
+func (h *requestOrResponseHeaderMapImpl) GetAllHeaders() map[string][]string {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initHeaders()
+	copiedHeaders := make(map[string][]string)
+	for key, value := range h.headers {
+		copiedHeaders[key] = make([]string, len(value))
+		copy(copiedHeaders[key], value)
+	}
+	return copiedHeaders
+}
+
 // api.RequestHeaderMap
 type requestHeaderMapImpl struct {
 	requestOrResponseHeaderMapImpl
@@ -180,6 +192,18 @@ func (h *requestHeaderMapImpl) Path() string {
 func (h *requestHeaderMapImpl) Host() string {
 	v, _ := h.Get(":authority")
 	return v
+}
+
+func (h *requestHeaderMapImpl) SetMethod(method string) {
+	h.Set(":method", method)
+}
+
+func (h *requestHeaderMapImpl) SetPath(path string) {
+	h.Set(":path", path)
+}
+
+func (h *requestHeaderMapImpl) SetHost(host string) {
+	h.Set(":authority", host)
 }
 
 // api.ResponseHeaderMap
@@ -304,6 +328,18 @@ func (h *requestOrResponseTrailerMapImpl) RangeWithCopy(f func(key, value string
 			}
 		}
 	}
+}
+
+func (h *requestOrResponseTrailerMapImpl) GetAllHeaders() map[string][]string {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initTrailers()
+	copiedHeaders := make(map[string][]string)
+	for key, value := range h.headers {
+		copiedHeaders[key] = make([]string, len(value))
+		copy(copiedHeaders[key], value)
+	}
+	return copiedHeaders
 }
 
 // api.RequestTrailerMap

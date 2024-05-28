@@ -46,6 +46,7 @@ const static bool should_log = true;
   FUNCTION(connection)                                                                             \
   FUNCTION(conn_handler)                                                                           \
   FUNCTION(compression)                                                                            \
+  FUNCTION(credential_injector)                                                                    \
   FUNCTION(decompression)                                                                          \
   FUNCTION(dns)                                                                                    \
   FUNCTION(dubbo)                                                                                  \
@@ -95,7 +96,8 @@ const static bool should_log = true;
   FUNCTION(udp)                                                                                    \
   FUNCTION(wasm)                                                                                   \
   FUNCTION(websocket)                                                                              \
-  FUNCTION(golang)
+  FUNCTION(golang)                                                                                 \
+  FUNCTION(stats_sinks)
 
 // clang-format off
 enum class Id {
@@ -205,19 +207,8 @@ public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
   void clearLock() { stderr_sink_->clearLock(); }
 
-  template <class FmtStr, class... Args>
   void logWithStableName(absl::string_view stable_name, absl::string_view level,
-                         absl::string_view component, FmtStr fmt_str, Args... msg) {
-    auto tls_sink = tlsDelegate();
-    if (tls_sink != nullptr) {
-      tls_sink->logWithStableName(stable_name, level, component,
-                                  fmt::format(fmt::runtime(fmt_str), msg...));
-      return;
-    }
-    absl::ReaderMutexLock sink_lock(&sink_mutex_);
-    sink_->logWithStableName(stable_name, level, component,
-                             fmt::format(fmt::runtime(fmt_str), msg...));
-  }
+                         absl::string_view component, absl::string_view message);
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
   void flush() override;
@@ -657,7 +648,7 @@ public:
     ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
       ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL, (LOGGER).name(), \
-                                                              ##__VA_ARGS__);                      \
+                                                              fmt::format(__VA_ARGS__));           \
     }                                                                                              \
   } while (0)
 
@@ -669,8 +660,9 @@ public:
       ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, "{}" FORMAT,                                      \
                           ::Envoy::Logger::Utility::serializeLogTags(log_tags), ##__VA_ARGS__);    \
       ::Envoy::Logger::Registry::getSink()->logWithStableName(                                     \
-          EVENT_NAME, #LEVEL, (ENVOY_LOGGER()).name(), "{}" FORMAT,                                \
-          ::Envoy::Logger::Utility::serializeLogTags(log_tags), ##__VA_ARGS__);                    \
+          EVENT_NAME, #LEVEL, (ENVOY_LOGGER()).name(),                                             \
+          fmt::format("{}" FORMAT, ::Envoy::Logger::Utility::serializeLogTags(log_tags),           \
+                      ##__VA_ARGS__));                                                             \
     }                                                                                              \
   } while (0)
 

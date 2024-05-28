@@ -79,7 +79,7 @@ const std::string CONFIG_WITH_REDIRECTION = CONFIG + R"EOF(
 )EOF";
 
 // This is a configuration with moved/ask redirection support and DNS lookups enabled.
-const std::string CONFIG_WITH_REDIRECTION_DNS = CONFIG_WITH_REDIRECTION + R"EOF(
+constexpr absl::string_view CONFIG_WITH_REDIRECTION_DNS = R"EOF({}
             dns_cache_config:
               name: foo
               dns_lookup_family: {}
@@ -470,7 +470,7 @@ class RedisProxyWithRedirectionAndDNSIntegrationTest
 public:
   RedisProxyWithRedirectionAndDNSIntegrationTest()
       : RedisProxyWithRedirectionIntegrationTest(
-            fmt::format(fmt::runtime(CONFIG_WITH_REDIRECTION_DNS),
+            fmt::format(CONFIG_WITH_REDIRECTION_DNS, CONFIG_WITH_REDIRECTION,
                         Network::Test::ipVersionToDnsFamily(GetParam())),
             2) {}
 };

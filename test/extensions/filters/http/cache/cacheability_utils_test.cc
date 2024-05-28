@@ -94,8 +94,7 @@ TEST_F(CanServeRequestFromCacheTest, AuthorizationHeader) {
 }
 
 INSTANTIATE_TEST_SUITE_P(ConditionalHeaders, RequestConditionalHeadersTest,
-                         testing::Values("if-match", "if-none-match", "if-modified-since",
-                                         "if-unmodified-since", "if-range"),
+                         testing::Values("if-none-match", "if-modified-since", "if-range"),
                          [](const auto& info) {
                            std::string test_name = info.param;
                            absl::c_replace_if(

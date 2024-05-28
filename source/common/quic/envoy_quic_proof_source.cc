@@ -189,7 +189,8 @@ EnvoyQuicProofSource::getTransportSocketAndFilterChain(
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), server_address, client_address, hostname, "h3");
   StreamInfo::StreamInfoImpl info(time_source_,
-                                  connection_socket->connectionInfoProviderSharedPtr());
+                                  connection_socket->connectionInfoProviderSharedPtr(),
+                                  StreamInfo::FilterState::LifeSpan::Connection);
   const Network::FilterChain* filter_chain =
       filter_chain_manager_->findFilterChain(*connection_socket, info);
 

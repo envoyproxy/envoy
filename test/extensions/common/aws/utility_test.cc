@@ -3,6 +3,7 @@
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -155,6 +156,7 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
 
 // Headers in the exclusion list are not canonicalized
 TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Http::TestRequestHeaderMapImpl headers{
       {":authority", "example.com"},          {"x-forwarded-for", "1.2.3.4"},
       {"x-forwarded-proto", "https"},         {"x-amz-date", "20130708T220855Z"},
@@ -168,7 +170,7 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
     config.set_exact(str);
     exclusion_list.emplace_back(
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config));
+            config, context));
   }
   std::vector<std::string> prefixes = {"x-envoy"};
   for (auto& match_str : prefixes) {
@@ -176,7 +178,7 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
     config.set_prefix(match_str);
     exclusion_list.emplace_back(
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config));
+            config, context));
   }
   const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
   EXPECT_THAT(map,
@@ -483,6 +485,33 @@ TEST(UtilityTest, GetGovCloudSTSEndpoints) {
   EXPECT_EQ("sts.us-gov-west-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-west-1"));
 }
 
+TEST(UtilityTest, JsonStringFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"access_key_id\":\"testvalue\"}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration =
+      Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
+  EXPECT_EQ(expiration, "testvalue");
+}
+TEST(UtilityTest, JsonStringNotFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"no_access_key_id\":\"testvalue\"}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration =
+      Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
+  EXPECT_EQ(expiration, "notfound");
+}
+TEST(UtilityTest, JsonIntegerFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":5}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  EXPECT_EQ(expiration, 5);
+}
+TEST(UtilityTest, JsonIntegerNotFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"noexpiration\":5}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  // Should return default value
+  EXPECT_EQ(expiration, 0);
+}
 } // namespace
 } // namespace Aws
 } // namespace Common

@@ -16,8 +16,9 @@ public:
   // sent by Envoy is checked against the value produced by the `expected_path_builder` functor.
   // This allows validation of path normalization, fragment stripping, etc. If the replacement value
   // is not in either set, then the request is expected to be rejected.
+  using PathFormatter = std::function<std::string(char)>;
   void
-  validateCharacterSetInUrl(absl::string_view path_format,
+  validateCharacterSetInUrl(PathFormatter path_formatter,
                             const std::array<uint32_t, 8>& uhv_allowed_characters,
                             absl::string_view additionally_allowed_characters,
                             const std::function<std::string(uint32_t)>& expected_path_builder) {
@@ -38,7 +39,7 @@ public:
       }
       auto client = makeHttpConnection(lookupPort("http"));
 
-      std::string path = fmt::format(fmt::runtime(path_format), static_cast<char>(ascii));
+      std::string path = path_formatter(static_cast<char>(ascii));
       Http::HeaderString invalid_value{};
       invalid_value.setCopyUnvalidatedForTestOnly(path);
       Http::TestRequestHeaderMapImpl headers{
@@ -261,14 +262,16 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPathWithoutPathNormali
   additionally_allowed_characters += "?#";
 
   // Fragment will be stripped from path in this test
-  validateCharacterSetInUrl("/path/with/ad{:c}itional/characters",
-                            Extensions::Http::HeaderValidators::EnvoyDefault::kPathHeaderCharTable,
-                            additionally_allowed_characters, [](uint32_t ascii) -> std::string {
-                              return ascii == '#'
-                                         ? "/path/with/ad"
-                                         : fmt::format("/path/with/ad{:c}itional/characters",
-                                                       static_cast<char>(ascii));
-                            });
+  PathFormatter path_formatter = [](char c) {
+    return fmt::format("/path/with/ad{:c}itional/characters", c);
+  };
+  validateCharacterSetInUrl(
+      path_formatter, Extensions::Http::HeaderValidators::EnvoyDefault::kPathHeaderCharTable,
+      additionally_allowed_characters, [](uint32_t ascii) -> std::string {
+        return ascii == '#'
+                   ? "/path/with/ad"
+                   : fmt::format("/path/with/ad{:c}itional/characters", static_cast<char>(ascii));
+      });
 }
 
 TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPathWithPathNormalization) {
@@ -295,9 +298,12 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPathWithPathNormalizat
       generateExtendedAsciiPercentEncoding();
   encoded_characters.merge(percent_encoded_extended_ascii);
 
+  PathFormatter path_formatter = [](char c) {
+    return fmt::format("/path/with/ad{:c}itional/characters", c);
+  };
   validateCharacterSetInUrl(
-      "/path/with/ad{:c}itional/characters", Http::kUriQueryAndFragmentCharTable,
-      additionally_allowed_characters, [&encoded_characters](uint32_t ascii) -> std::string {
+      path_formatter, Http::kUriQueryAndFragmentCharTable, additionally_allowed_characters,
+      [&encoded_characters](uint32_t ascii) -> std::string {
         if (ascii == '#') {
           return "/path/with/ad";
         }
@@ -330,13 +336,16 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInQuery) {
   // fragment Note that the fragment will be stripped from the URL path
   additionally_allowed_characters += '#';
 
-  validateCharacterSetInUrl(
-      "/query?with=a{:c}ditional&characters", Http::kUriQueryAndFragmentCharTable,
-      additionally_allowed_characters, [](uint32_t ascii) -> std::string {
-        return ascii == '#'
-                   ? "/query?with=a"
-                   : fmt::format("/query?with=a{:c}ditional&characters", static_cast<char>(ascii));
-      });
+  PathFormatter path_formatter = [](char c) {
+    return fmt::format("/query?with=a{:c}ditional&characters", c);
+  };
+  validateCharacterSetInUrl(path_formatter, Http::kUriQueryAndFragmentCharTable,
+                            additionally_allowed_characters, [](uint32_t ascii) -> std::string {
+                              return ascii == '#'
+                                         ? "/query?with=a"
+                                         : fmt::format("/query?with=a{:c}ditional&characters",
+                                                       static_cast<char>(ascii));
+                            });
 }
 
 TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInFragment) {
@@ -353,7 +362,10 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInFragment) {
   additionally_allowed_characters += '#';
 
   // Note that fragment is stripped from the URL path in this test
-  validateCharacterSetInUrl("/query?with=a#frag{:c}ment", Http::kUriQueryAndFragmentCharTable,
+  PathFormatter path_formatter = [](char c) {
+    return fmt::format("/query?with=a#frag{:c}ment", c);
+  };
+  validateCharacterSetInUrl(path_formatter, Http::kUriQueryAndFragmentCharTable,
                             additionally_allowed_characters,
                             [](uint32_t) -> std::string { return "/query?with=a"; });
 }

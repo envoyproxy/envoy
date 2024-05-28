@@ -49,10 +49,10 @@ MessageMetadataSharedPtr createDubboResponse(DubboRequest& request, ResponseStat
 TEST(DubboRequestTest, DubboRequestTest) {
   DubboRequest request(createDubboRequst(false));
 
-  // Static atrributes test.
+  // Static attributes test.
   { EXPECT_EQ("dubbo", request.protocol()); }
 
-  // Basic atrributes test.
+  // Basic attributes test.
   {
     EXPECT_EQ("fake_service", request.host());
     EXPECT_EQ("fake_service", request.path());
@@ -85,7 +85,7 @@ TEST(DubboRequestTest, DubboRequestTest) {
 TEST(DubboResponseTest, DubboResponseTest) {
   DubboRequest request(createDubboRequst(false));
 
-  // Static atrributes test.
+  // Static attributes test.
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithValue));
@@ -195,7 +195,7 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
     buffer.writeBEInt<int64_t>(0);
     buffer.writeBEInt<int64_t>(0);
 
-    EXPECT_CALL(callbacks, onDecodingFailure());
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
     server_codec.decode(buffer, false);
   }
 
@@ -236,7 +236,7 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
     EXPECT_CALL(*raw_serializer, deserializeRpcRequest(_, _))
         .WillOnce(Return(ByMove(std::make_unique<RpcRequest>("a", "b", "c", "d"))));
 
-    EXPECT_CALL(callbacks, onDecodingSuccess(_));
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
     server_codec.decode(buffer, false);
   }
 
@@ -318,7 +318,7 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
     buffer.writeBEInt<int64_t>(0);
     buffer.writeBEInt<int64_t>(0);
 
-    EXPECT_CALL(callbacks, onDecodingFailure());
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
     client_codec.decode(buffer, false);
   }
 
@@ -362,7 +362,7 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
     EXPECT_CALL(*raw_serializer, deserializeRpcResponse(_, _))
         .WillOnce(Return(ByMove(std::move(response))));
 
-    EXPECT_CALL(callbacks, onDecodingSuccess(_));
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
     client_codec.decode(buffer, false);
   }
 
@@ -405,7 +405,7 @@ TEST(DubboCodecFactoryConfigTest, DubboCodecFactoryConfigTest) {
 
   Server::Configuration::MockFactoryContext context;
 
-  EXPECT_NE(nullptr, config.createCodecFactory(*proto_config, context));
+  EXPECT_NE(nullptr, config.createCodecFactory(*proto_config, context.server_factory_context_));
 }
 
 } // namespace

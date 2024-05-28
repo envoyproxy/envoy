@@ -155,8 +155,8 @@ TEST_F(AwsRequestSigningFilterTest, SignFails) {
   setup();
   EXPECT_CALL(*(filter_config_->signer_),
               signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> void {
-        throw EnvoyException("failed");
+      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
+        return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
       }));
 
   Http::TestRequestHeaderMapImpl headers;
@@ -176,8 +176,9 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignFails) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
   EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(),
                                                An<const std::string&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&, const absl::string_view) -> void {
-        throw EnvoyException("failed");
+      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
+                          const absl::string_view) -> absl::Status {
+        return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
       }));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));

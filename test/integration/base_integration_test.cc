@@ -19,7 +19,7 @@
 #include "source/common/event/libevent.h"
 #include "source/common/network/utility.h"
 #include "source/common/tls/context_config_impl.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 #include "source/server/proto_descriptors.h"
 
 #include "test/integration/utility.h"
@@ -427,6 +427,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
     const auto admin_addr =
         test_server->server().admin()->socket().connectionInfoProvider().localAddress();
     if (admin_addr->type() == Network::Address::Type::Ip) {
+      ENVOY_LOG(debug, "registered 'admin' as port {}.", admin_addr->ip()->port());
       registerPort("admin", admin_addr->ip()->port());
     }
   }

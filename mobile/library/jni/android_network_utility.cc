@@ -1,10 +1,7 @@
 #include "library/jni/android_network_utility.h"
 
-#include "library/common/data/utility.h"
-#include "library/jni/jni_support.h"
+#include "library/common/bridge//utility.h"
 #include "library/jni/jni_utility.h"
-#include "library/jni/types/exception.h"
-#include "library/jni/types/java_virtual_machine.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -13,6 +10,28 @@ namespace JNI {
 namespace {
 // Helper functions call into AndroidNetworkLibrary, but they are not platform dependent
 // because AndroidNetworkLibray can be called in non-Android platform with mock interfaces.
+
+/**
+ * The list of certificate verification results returned from Java side to the C++ side.
+ * A Java counterpart lives in org.chromium.net.CertVerifyStatusAndroid.java.
+ */
+enum class CertVerifyStatus : int {
+  // Certificate is trusted.
+  Ok = 0,
+  // Certificate verification could not be conducted.
+  Failed = -1,
+  // Certificate is not trusted due to non-trusted root of the certificate chain.
+  NoTrustedRoot = -2,
+  // Certificate is not trusted because it has expired.
+  Expired = -3,
+  // Certificate is not trusted because it is not valid yet.
+  NotYetValid = -4,
+  // Certificate is not trusted because it could not be parsed.
+  UnableToParse = -5,
+  // Certificate is not trusted because it has an extendedKeyUsage field, but its value is not
+  // correct for a web server.
+  IncorrectKeyUsage = -6,
+};
 
 bool jvmCertIsIssuedByKnownRoot(JniHelper& jni_helper, jobject result) {
   LocalRefUniquePtr<jclass> jcls_AndroidCertVerifyResult =
@@ -24,14 +43,14 @@ bool jvmCertIsIssuedByKnownRoot(JniHelper& jni_helper, jobject result) {
   return is_issued_by_known_root;
 }
 
-envoy_cert_verify_status_t jvmCertGetStatus(JniHelper& jni_helper, jobject j_result) {
+CertVerifyStatus jvmCertGetStatus(JniHelper& jni_helper, jobject j_result) {
   LocalRefUniquePtr<jclass> jcls_AndroidCertVerifyResult =
       findClass("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
   jmethodID jmid_getStatus =
       jni_helper.getMethodId(jcls_AndroidCertVerifyResult.get(), "getStatus", "()I");
   ASSERT(jmid_getStatus);
-  envoy_cert_verify_status_t result =
-      static_cast<envoy_cert_verify_status_t>(jni_helper.callIntMethod(j_result, jmid_getStatus));
+  CertVerifyStatus result =
+      static_cast<CertVerifyStatus>(jni_helper.callIntMethod(j_result, jmid_getStatus));
   return result;
 }
 
@@ -46,12 +65,11 @@ LocalRefUniquePtr<jobjectArray> jvmCertGetCertificateChainEncoded(JniHelper& jni
   return certificate_chain;
 }
 
-static void extractCertVerifyResult(JniHelper& jni_helper, jobject result,
-                                    envoy_cert_verify_status_t* status,
+static void extractCertVerifyResult(JniHelper& jni_helper, jobject result, CertVerifyStatus* status,
                                     bool* is_issued_by_known_root,
                                     std::vector<std::string>* verified_chain) {
   *status = jvmCertGetStatus(jni_helper, result);
-  if (*status == CERT_VERIFY_STATUS_OK) {
+  if (*status == CertVerifyStatus::Ok) {
     *is_issued_by_known_root = jvmCertIsIssuedByKnownRoot(jni_helper, result);
     LocalRefUniquePtr<jobjectArray> chain_byte_array =
         jvmCertGetCertificateChainEncoded(jni_helper, result);
@@ -64,19 +82,20 @@ static void extractCertVerifyResult(JniHelper& jni_helper, jobject result,
 // `auth_type` and `host` are expected to be UTF-8 encoded.
 static void jvmVerifyX509CertChain(const std::vector<std::string>& cert_chain,
                                    std::string auth_type, absl::string_view hostname,
-                                   envoy_cert_verify_status_t* status,
-                                   bool* is_issued_by_known_root,
+                                   CertVerifyStatus* status, bool* is_issued_by_known_root,
                                    std::vector<std::string>* verified_chain) {
-  JniHelper jni_helper(getEnv());
+  JniHelper jni_helper(JniHelper::getThreadLocalEnv());
   LocalRefUniquePtr<jobject> result =
       callJvmVerifyX509CertChain(jni_helper, cert_chain, auth_type, hostname);
-  if (Exception::checkAndClear()) {
-    *status = CERT_VERIFY_STATUS_NOT_YET_VALID;
+  if (jni_helper.exceptionCheck()) {
+    *status = CertVerifyStatus::NotYetValid;
+    jni_helper.exceptionCleared();
   } else {
     extractCertVerifyResult(jni_helper, result.get(), status, is_issued_by_known_root,
                             verified_chain);
-    if (Exception::checkAndClear()) {
-      *status = CERT_VERIFY_STATUS_FAILED;
+    if (jni_helper.exceptionCheck()) {
+      *status = CertVerifyStatus::Failed;
+      jni_helper.exceptionCleared();
     }
   }
 }
@@ -84,7 +103,7 @@ static void jvmVerifyX509CertChain(const std::vector<std::string>& cert_chain,
 } // namespace
 
 // `auth_type` and `host` are expected to be UTF-8 encoded.
-LocalRefUniquePtr<jobject> callJvmVerifyX509CertChain(Envoy::JNI::JniHelper& jni_helper,
+LocalRefUniquePtr<jobject> callJvmVerifyX509CertChain(JniHelper& jni_helper,
                                                       const std::vector<std::string>& cert_chain,
                                                       std::string auth_type,
                                                       absl::string_view hostname) {
@@ -106,7 +125,7 @@ LocalRefUniquePtr<jobject> callJvmVerifyX509CertChain(Envoy::JNI::JniHelper& jni
 
 envoy_cert_validation_result verifyX509CertChain(const std::vector<std::string>& certs,
                                                  absl::string_view hostname) {
-  envoy_cert_verify_status_t result;
+  CertVerifyStatus result;
   bool is_issued_by_known_root;
   std::vector<std::string> verified_chain;
   std::vector<std::string> cert_chain;
@@ -119,26 +138,26 @@ envoy_cert_validation_result verifyX509CertChain(const std::vector<std::string>&
   jvmVerifyX509CertChain(cert_chain, "RSA", hostname, &result, &is_issued_by_known_root,
                          &verified_chain);
   switch (result) {
-  case CERT_VERIFY_STATUS_OK:
+  case CertVerifyStatus::Ok:
     return {ENVOY_SUCCESS, 0, nullptr};
-  case CERT_VERIFY_STATUS_EXPIRED: {
+  case CertVerifyStatus::Expired: {
     return {ENVOY_FAILURE, SSL_AD_CERTIFICATE_EXPIRED,
             "AndroidNetworkLibrary_verifyServerCertificates failed: expired cert."};
   }
-  case CERT_VERIFY_STATUS_NO_TRUSTED_ROOT:
+  case CertVerifyStatus::NoTrustedRoot:
     return {ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
             "AndroidNetworkLibrary_verifyServerCertificates failed: no trusted root."};
-  case CERT_VERIFY_STATUS_UNABLE_TO_PARSE:
+  case CertVerifyStatus::UnableToParse:
     return {ENVOY_FAILURE, SSL_AD_BAD_CERTIFICATE,
             "AndroidNetworkLibrary_verifyServerCertificates failed: unable to parse cert."};
-  case CERT_VERIFY_STATUS_INCORRECT_KEY_USAGE:
+  case CertVerifyStatus::IncorrectKeyUsage:
     return {ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
             "AndroidNetworkLibrary_verifyServerCertificates failed: incorrect key usage."};
-  case CERT_VERIFY_STATUS_FAILED:
+  case CertVerifyStatus::Failed:
     return {
         ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
         "AndroidNetworkLibrary_verifyServerCertificates failed: validation couldn't be conducted."};
-  case CERT_VERIFY_STATUS_NOT_YET_VALID:
+  case CertVerifyStatus::NotYetValid:
     return {ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
             "AndroidNetworkLibrary_verifyServerCertificates failed: not yet valid."};
   default:
@@ -146,7 +165,7 @@ envoy_cert_validation_result verifyX509CertChain(const std::vector<std::string>&
   }
 }
 
-void jvmDetachThread() { JavaVirtualMachine::detachCurrentThread(); }
+void jvmDetachThread() { JniHelper::detachCurrentThread(); }
 
 } // namespace JNI
 } // namespace Envoy

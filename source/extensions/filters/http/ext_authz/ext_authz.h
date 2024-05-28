@@ -39,7 +39,8 @@ namespace ExtAuthz {
   COUNTER(denied)                                                                                  \
   COUNTER(error)                                                                                   \
   COUNTER(disabled)                                                                                \
-  COUNTER(failure_mode_allowed)
+  COUNTER(failure_mode_allowed)                                                                    \
+  COUNTER(invalid)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
@@ -69,7 +70,10 @@ public:
         // cause non UTF-8 body content to be changed when it doesn't need to.
         pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
 
-        status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
+        encode_raw_headers_(config.encode_raw_headers()),
+
+        status_on_error_(toErrorCode(config.status_on_error().code())),
+        validate_mutations_(config.validate_mutations()), scope_(scope),
         runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
         filter_enabled_(config.has_filter_enabled()
                             ? absl::optional<Runtime::FractionalPercent>(
@@ -77,7 +81,8 @@ public:
                             : absl::nullopt),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
-                ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
+                ? absl::optional<Matchers::MetadataMatcher>(
+                      Matchers::MetadataMatcher(config.filter_enabled_metadata(), factory_context))
                 : absl::nullopt),
         deny_at_disable_(config.has_deny_at_disable()
                              ? absl::optional<Runtime::FeatureFlag>(
@@ -101,6 +106,7 @@ public:
         ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
         ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
         ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
+        ext_authz_invalid_(pool_.add(createPoolStatName(config.stat_prefix(), "invalid"))),
         ext_authz_failure_mode_allowed_(
             pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {
     auto bootstrap = factory_context.bootstrap();
@@ -123,16 +129,20 @@ public:
     // HTTP authz servers only and defaults to blocking all but a few headers (i.e. Authorization,
     // Method, Path and Host).
     if (config.has_grpc_service() && config.has_allowed_headers()) {
-      request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+      allowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
           config.allowed_headers(), false, factory_context);
     } else if (config.has_http_service()) {
       if (config.http_service().authorization_request().has_allowed_headers()) {
-        request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+        allowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
             config.http_service().authorization_request().allowed_headers(), true, factory_context);
       } else {
-        request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+        allowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
             config.allowed_headers(), true, factory_context);
       }
+    }
+    if (config.has_disallowed_headers()) {
+      disallowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+          config.disallowed_headers(), false, factory_context);
     }
   }
 
@@ -150,7 +160,11 @@ public:
 
   bool packAsBytes() const { return pack_as_bytes_; }
 
+  bool headersAsBytes() const { return encode_raw_headers_; }
+
   Http::Code statusOnError() const { return status_on_error_; }
+
+  bool validateMutations() const { return validate_mutations_; }
 
   bool filterEnabled(const envoy::config::core::v3::Metadata& metadata) {
     const bool enabled = filter_enabled_.has_value() ? filter_enabled_->enabled() : true;
@@ -195,8 +209,12 @@ public:
 
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
-  const Filters::Common::ExtAuthz::MatcherSharedPtr& requestHeaderMatchers() const {
-    return request_header_matchers_;
+  const Filters::Common::ExtAuthz::MatcherSharedPtr& allowedHeadersMatcher() const {
+    return allowed_headers_matcher_;
+  }
+
+  const Filters::Common::ExtAuthz::MatcherSharedPtr& disallowedHeadersMatcher() const {
+    return disallowed_headers_matcher_;
   }
 
 private:
@@ -230,7 +248,9 @@ private:
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const bool pack_as_bytes_;
+  const bool encode_raw_headers_;
   const Http::Code status_on_error_;
+  const bool validate_mutations_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
@@ -255,7 +275,8 @@ private:
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
 
-  Filters::Common::ExtAuthz::MatcherSharedPtr request_header_matchers_;
+  Filters::Common::ExtAuthz::MatcherSharedPtr allowed_headers_matcher_;
+  Filters::Common::ExtAuthz::MatcherSharedPtr disallowed_headers_matcher_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
@@ -263,6 +284,7 @@ public:
   const Stats::StatName ext_authz_ok_;
   const Stats::StatName ext_authz_denied_;
   const Stats::StatName ext_authz_error_;
+  const Stats::StatName ext_authz_invalid_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
 };
 
@@ -350,6 +372,11 @@ public:
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
 private:
+  // Called when the filter is configured to reject invalid responses & the authz response contains
+  // invalid header or query parameters. Sends a local response with the configured rejection status
+  // code.
+  void rejectResponse();
+
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
@@ -381,6 +408,8 @@ private:
   Http::RequestHeaderMap* request_headers_;
   Http::HeaderVector response_headers_to_add_{};
   Http::HeaderVector response_headers_to_set_{};
+  Http::HeaderVector response_headers_to_add_if_absent_{};
+  Http::HeaderVector response_headers_to_overwrite_if_exists_{};
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;

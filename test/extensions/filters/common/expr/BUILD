@@ -31,6 +31,7 @@ envoy_extension_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:host_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

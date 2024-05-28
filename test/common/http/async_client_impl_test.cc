@@ -5,6 +5,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/async_client_impl.h"
@@ -13,6 +14,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/buffer/mocks.h"
@@ -173,6 +175,59 @@ TEST_F(AsyncClientImplTest, BasicStream) {
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                      .counter("internal.upstream_rq_200")
                      .value());
+}
+
+TEST_F(AsyncClientImplTest, BasicStreamWithInternalHeadersDisabled) {
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            // The backing object of 'decoder' should also implemented the
+            // Router::UpstreamToDownstream.
+            const auto* upstream_to_downstream =
+                dynamic_cast<Router::UpstreamToDownstream*>(&decoder);
+            EXPECT_NE(nullptr, upstream_to_downstream);
+            // Ensure the route() is populated and valid.
+            EXPECT_NE(nullptr, upstream_to_downstream->route().routeEntry());
+
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  // Create the headers without x-envoy-internal and x-forwarded-for.
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
+
+  expectResponseHeaders(stream_callbacks_, 200, false);
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
+  EXPECT_CALL(stream_callbacks_, onComplete());
+
+  AsyncClient::StreamOptions option = AsyncClient::StreamOptions();
+  // Set stream option to disable x-envoy-internal and x-forwarded-for headers.
+  option.setSendInternal(false);
+  option.setSendXff(false);
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, option);
+
+  TestRequestHeaderMapImpl send_headers = headers;
+  stream->sendHeaders(send_headers, false);
+  stream->sendData(*body, true);
+
+  response_decoder_->decode1xxHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "100"}}));
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeData(*body, true);
+
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
 }
 
 TEST_F(AsyncClientImplTest, Basic) {
@@ -690,6 +745,64 @@ TEST_F(AsyncClientImplTest, WithMetadata) {
       {Envoy::Config::MetadataFilters::get().ENVOY_LB,
        MessageUtil::keyValueStruct("fake_test_key", "fake_test_value")});
   options.setMetadata(metadata);
+
+  auto* request = client_.send(std::move(message_), callbacks_, options);
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 200);
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(data, true);
+}
+
+class TestStateObject : public StreamInfo::FilterState::Object {
+public:
+  TestStateObject(std::string value) : value_(value) {}
+
+  const std::string& value() const { return value_; }
+
+private:
+  std::string value_;
+};
+
+TEST_F(AsyncClientImplTest, WithFilterState) {
+  message_->body().add("test-body");
+  Buffer::Instance& data = message_->body();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
+      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
+                           Upstream::LoadBalancerContext* context) {
+        const StreamInfo::FilterState& filter_state = context->requestStreamInfo()->filterState();
+        const TestStateObject* state = filter_state.getDataReadOnly<TestStateObject>("test-filter");
+        EXPECT_NE(state, nullptr);
+        EXPECT_EQ(state->value(), "stored-test-state");
+        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+      }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
+
+  AsyncClient::RequestOptions options;
+  auto state_object = std::make_shared<TestStateObject>("stored-test-state");
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData("test-filter", state_object, StreamInfo::FilterState::StateType::Mutable);
+  options.setFilterState(filter_state);
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
   EXPECT_NE(request, nullptr);
@@ -1962,10 +2075,25 @@ TEST_F(AsyncClientImplTest, DumpState) {
 // Must not be in anonymous namespace for friend to work.
 class AsyncClientImplUnitTest : public AsyncClientImplTest {
 public:
-  Router::RetryPolicyImpl retry_policy_;
-  std::unique_ptr<NullRouteImpl> route_impl_{new NullRouteImpl(
-      client_.cluster_->name(), retry_policy_, absl::nullopt,
-      Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>())};
+  AsyncClientImplUnitTest() {
+    envoy::config::route::v3::RetryPolicy proto_policy;
+    Upstream::RetryExtensionFactoryContextImpl factory_context(
+        client_.factory_context_.singletonManager());
+    auto policy_or_error =
+        Router::RetryPolicyImpl::create(proto_policy, ProtobufMessage::getNullValidationVisitor(),
+                                        factory_context, client_.factory_context_);
+    THROW_IF_STATUS_NOT_OK(policy_or_error, throw);
+    retry_policy_ = std::move(policy_or_error.value());
+    EXPECT_TRUE(retry_policy_.get());
+
+    route_impl_.reset(new NullRouteImpl(
+        client_.cluster_->name(), *retry_policy_, regex_engine_, absl::nullopt,
+        Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>()));
+  }
+
+  std::unique_ptr<Router::RetryPolicyImpl> retry_policy_;
+  Regex::GoogleReEngine regex_engine_;
+  std::unique_ptr<NullRouteImpl> route_impl_;
   std::unique_ptr<Http::AsyncStreamImpl> stream_{
       new Http::AsyncStreamImpl(client_, stream_callbacks_, AsyncClient::StreamOptions())};
   NullVirtualHost vhost_;
@@ -1986,12 +2114,15 @@ public:
     TestUtility::loadFromYaml(yaml_config, proto_policy);
     Upstream::RetryExtensionFactoryContextImpl factory_context(
         client_.factory_context_.singletonManager());
-    retry_policy_ =
-        Router::RetryPolicyImpl(proto_policy, ProtobufMessage::getNullValidationVisitor(),
-                                factory_context, client_.factory_context_);
+    auto policy_or_error =
+        Router::RetryPolicyImpl::create(proto_policy, ProtobufMessage::getNullValidationVisitor(),
+                                        factory_context, client_.factory_context_);
+    THROW_IF_STATUS_NOT_OK(policy_or_error, throw);
+    retry_policy_ = std::move(policy_or_error.value());
+    EXPECT_TRUE(retry_policy_.get());
 
     stream_ = std::make_unique<Http::AsyncStreamImpl>(
-        client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy_));
+        client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(*retry_policy_));
   }
 
   const Router::RouteEntry& getRouteFromStream() { return *(stream_->route_->routeEntry()); }

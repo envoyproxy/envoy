@@ -22,7 +22,7 @@ namespace {
 
 class ThriftRouteMatcherTest : public testing::Test {
 public:
-  ThriftRouteMatcherTest() : engine_(std::make_unique<Regex::GoogleReEngine>()) {}
+  ThriftRouteMatcherTest() = default;
 
 protected:
   RouteMatcher createMatcher(
@@ -38,8 +38,6 @@ protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 
 private:
-  ScopedInjectableLoader<Regex::Engine> engine_;
-
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration
   parseRouteConfigurationFromV3Yaml(const std::string& yaml) {
     envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration route_config;

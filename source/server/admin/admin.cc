@@ -221,7 +221,11 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                         "Render text_readouts as new gaugues with value 0 (increases Prometheus "
                         "data size)"},
                        {ParamDescriptor::Type::String, "filter",
-                        "Regular expression (Google re2) for filtering stats"}}),
+                        "Regular expression (Google re2) for filtering stats"},
+                       {ParamDescriptor::Type::Enum,
+                        "histogram_buckets",
+                        "Histogram bucket display mode",
+                        {"cumulative", "summary"}}}),
           makeHandler("/stats/recentlookups", "Show recent stat-name lookups",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false),
           makeHandler("/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
@@ -284,9 +288,9 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   // Pass in the null overload manager so that the admin interface is accessible even when Envoy
   // is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-      *this, server_.drainManager(), server_.api().randomGenerator(), server_.httpContext(),
-      server_.runtime(), server_.localInfo(), server_.clusterManager(), null_overload_manager_,
-      server_.timeSource())});
+      shared_from_this(), server_.drainManager(), server_.api().randomGenerator(),
+      server_.httpContext(), server_.runtime(), server_.localInfo(), server_.clusterManager(),
+      null_overload_manager_, server_.timeSource())});
   return true;
 }
 

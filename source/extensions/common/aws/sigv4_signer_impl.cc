@@ -22,7 +22,7 @@ namespace Aws {
 
 std::string SigV4SignerImpl::createCredentialScope(absl::string_view short_date,
                                                    absl::string_view override_region) const {
-  return fmt::format(fmt::runtime(SigV4SignatureConstants::SigV4CredentialScopeFormat), short_date,
+  return fmt::format(SigV4SignatureConstants::SigV4CredentialScopeFormat, short_date,
                      override_region.empty() ? region_ : override_region, service_name_);
 }
 
@@ -31,8 +31,8 @@ std::string SigV4SignerImpl::createStringToSign(absl::string_view canonical_requ
                                                 absl::string_view credential_scope) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   return fmt::format(
-      fmt::runtime(SigV4SignatureConstants::SigV4StringToSignFormat),
-      SigV4SignatureConstants::SigV4Algorithm, long_date, credential_scope,
+      SigV4SignatureConstants::SigV4StringToSignFormat, SigV4SignatureConstants::SigV4Algorithm,
+      long_date, credential_scope,
       Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
 }
 
@@ -59,7 +59,7 @@ std::string SigV4SignerImpl::createAuthorizationHeader(
     const std::map<std::string, std::string>& canonical_headers,
     absl::string_view signature) const {
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
-  return fmt::format(fmt::runtime(SigV4SignatureConstants::SigV4AuthorizationHeaderFormat),
+  return fmt::format(SigV4SignatureConstants::SigV4AuthorizationHeaderFormat,
                      SigV4SignatureConstants::SigV4Algorithm,
                      createAuthorizationCredential(access_key_id, credential_scope), signed_headers,
                      signature);

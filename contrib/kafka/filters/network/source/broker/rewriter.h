@@ -38,7 +38,7 @@ using ResponseRewriterSharedPtr = std::shared_ptr<ResponseRewriter>;
  */
 class ResponseRewriterImpl : public ResponseRewriter, private Logger::Loggable<Logger::Id::kafka> {
 public:
-  ResponseRewriterImpl(const BrokerFilterConfig& config);
+  ResponseRewriterImpl(const BrokerFilterConfigSharedPtr& config);
 
   // ResponseCallback
   void onMessage(AbstractResponseSharedPtr response) override;
@@ -69,7 +69,7 @@ private:
   // Pointer-to-member used to handle varying field names across the structs.
   template <typename T> void maybeUpdateHostAndPort(T& arg, const int32_t T::*node_id_field) const {
     const int32_t node_id = arg.*node_id_field;
-    const absl::optional<HostAndPort> hostAndPort = config_.findBrokerAddressOverride(node_id);
+    const absl::optional<HostAndPort> hostAndPort = config_->findBrokerAddressOverride(node_id);
     if (hostAndPort) {
       ENVOY_LOG(trace, "Changing broker [{}] from {}:{} to {}:{}", node_id, arg.host_, arg.port_,
                 hostAndPort->first, hostAndPort->second);
@@ -78,7 +78,7 @@ private:
     }
   }
 
-  const BrokerFilterConfig& config_;
+  const BrokerFilterConfigSharedPtr config_;
   std::vector<AbstractResponseSharedPtr> responses_to_rewrite_;
 };
 
@@ -99,7 +99,7 @@ public:
 /**
  * Factory method that creates a rewriter depending on configuration.
  */
-ResponseRewriterSharedPtr createRewriter(const BrokerFilterConfig& config);
+ResponseRewriterSharedPtr createRewriter(const BrokerFilterConfigSharedPtr& config);
 
 } // namespace Broker
 } // namespace Kafka

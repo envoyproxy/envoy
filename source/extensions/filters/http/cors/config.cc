@@ -31,7 +31,7 @@ Router::RouteSpecificFilterConfigConstSharedPtr
 CorsFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::cors::v3::CorsPolicy& policy,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<CorsPolicyImpl>(policy, context.runtime());
+  return std::make_shared<CorsPolicyImpl>(policy, context);
 }
 
 /**

@@ -1,4 +1,6 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
+
+set -e
 
 # This is run on every commit that GitHub Actions picks up. It assumes that docs have already been
 # built via docs/build.sh. The commit behavior differs depending on the nature of the commit:

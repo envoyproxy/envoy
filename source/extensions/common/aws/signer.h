@@ -19,8 +19,8 @@ public:
    * @param override_region override the default region that has to be used to sign the request
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void sign(Http::RequestMessage& message, bool sign_body,
-                    const absl::string_view override_region = "") PURE;
+  virtual absl::Status sign(Http::RequestMessage& message, bool sign_body,
+                            const absl::string_view override_region = "") PURE;
 
   /**
    * Sign an AWS request without a payload (empty string used as content hash).
@@ -28,8 +28,8 @@ public:
    * @param override_region override the default region that has to be used to sign the request
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void signEmptyPayload(Http::RequestHeaderMap& headers,
-                                const absl::string_view override_region = "") PURE;
+  virtual absl::Status signEmptyPayload(Http::RequestHeaderMap& headers,
+                                        const absl::string_view override_region = "") PURE;
 
   /**
    * Sign an AWS request using the literal string UNSIGNED-PAYLOAD in the canonical request.
@@ -37,8 +37,8 @@ public:
    * @param override_region override the default region that has to be used to sign the request
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void signUnsignedPayload(Http::RequestHeaderMap& headers,
-                                   const absl::string_view override_region = "") PURE;
+  virtual absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
+                                           const absl::string_view override_region = "") PURE;
 
   /**
    * Sign an AWS request.
@@ -47,8 +47,8 @@ public:
    * @param override_region override the default region that has to be used to sign the request
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
-                    const absl::string_view override_region = "") PURE;
+  virtual absl::Status sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
+                            const absl::string_view override_region = "") PURE;
 };
 
 using SignerPtr = std::unique_ptr<Signer>;

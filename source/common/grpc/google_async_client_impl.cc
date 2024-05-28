@@ -166,7 +166,8 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
     : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
       service_full_name_(service_full_name), method_name_(method_name), callbacks_(callbacks),
       options_(options), unused_stream_info_(Http::Protocol::Http2, dispatcher_.timeSource(),
-                                             Network::ConnectionInfoProviderSharedPtr{}) {}
+                                             Network::ConnectionInfoProviderSharedPtr{},
+                                             StreamInfo::FilterState::LifeSpan::FilterChain) {}
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
@@ -465,7 +466,12 @@ void GoogleAsyncRequestImpl::cancel() {
 
 void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   Tracing::HttpTraceContext trace_context(metadata);
-  current_span_->injectContext(trace_context, nullptr);
+  Tracing::UpstreamContext upstream_context(nullptr,                          // host_
+                                            nullptr,                          // cluster_
+                                            Tracing::ServiceType::GoogleGrpc, // service_type_
+                                            true                              // async_client_span_
+  );
+  current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

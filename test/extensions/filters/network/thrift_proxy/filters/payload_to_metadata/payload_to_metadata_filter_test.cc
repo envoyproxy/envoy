@@ -52,7 +52,7 @@ public:
     envoy::extensions::filters::network::thrift_proxy::filters::payload_to_metadata::v3::
         PayloadToMetadata proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
-    const auto& filter_config = std::make_shared<Config>(proto_config);
+    const auto& filter_config = std::make_shared<Config>(proto_config, regex_engine_);
     if (malform_simulate) {
       filter_config->trie_root_ = nullptr;
     }
@@ -268,6 +268,7 @@ public:
     decoder->onData(buffer, underflow);
   }
 
+  Regex::GoogleReEngine regex_engine_;
   NiceMock<ThriftProxy::ThriftFilters::MockDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   std::shared_ptr<PayloadToMetadataFilter> filter_;

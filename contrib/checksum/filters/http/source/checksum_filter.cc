@@ -11,19 +11,22 @@ namespace HttpFilters {
 namespace ChecksumFilter {
 
 static std::vector<ChecksumFilterConfig::ChecksumMatcher> buildMatchers(
-    const envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig& proto_config) {
+    const envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig& proto_config,
+    Server::Configuration::CommonFactoryContext& context) {
   std::vector<ChecksumFilterConfig::ChecksumMatcher> matchers;
   for (const auto& checksum : proto_config.checksums()) {
     std::vector<uint8_t> bytes = Hex::decode(checksum.sha256());
-    matchers.emplace_back(std::make_unique<Matchers::PathMatcher>(checksum.path_matcher()),
+    matchers.emplace_back(std::make_unique<Matchers::PathMatcher>(checksum.path_matcher(), context),
                           Sha256Checksum{bytes.begin(), bytes.end()});
   }
   return matchers;
 }
 
 ChecksumFilterConfig::ChecksumFilterConfig(
-    const envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig& proto_config)
-    : matchers_(buildMatchers(proto_config)), reject_unmatched_(proto_config.reject_unmatched()) {}
+    const envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig& proto_config,
+    Server::Configuration::CommonFactoryContext& context)
+    : matchers_(buildMatchers(proto_config, context)),
+      reject_unmatched_(proto_config.reject_unmatched()) {}
 
 OptRef<const Sha256Checksum> ChecksumFilterConfig::expectedChecksum(absl::string_view path) {
   for (const auto& m : matchers_) {

@@ -32,7 +32,7 @@ public:
             Http::HeaderUtility::buildHeaderDataVector(rule.match().headers(), context)) {
     for (const auto& query_parameter : rule.match().query_parameters()) {
       config_query_parameters_.push_back(
-          std::make_unique<Router::ConfigUtility::QueryParameterMatcher>(query_parameter));
+          std::make_unique<Router::ConfigUtility::QueryParameterMatcher>(query_parameter, context));
     }
   }
 
@@ -66,7 +66,7 @@ public:
   PrefixMatcherImpl(const RequirementRule& rule,
                     Server::Configuration::CommonFactoryContext& context)
       : BaseMatcherImpl(rule, context), prefix_(rule.match().prefix()),
-        path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
+        path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_, context)) {}
 
   bool matches(const Http::RequestHeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers) && path_matcher_->match(headers.getPathValue())) {
@@ -89,7 +89,7 @@ class PathMatcherImpl : public BaseMatcherImpl {
 public:
   PathMatcherImpl(const RequirementRule& rule, Server::Configuration::CommonFactoryContext& context)
       : BaseMatcherImpl(rule, context), path_(rule.match().path()),
-        path_matcher_(Matchers::PathMatcher::createExact(path_, !case_sensitive_)) {}
+        path_matcher_(Matchers::PathMatcher::createExact(path_, !case_sensitive_, context)) {}
 
   bool matches(const Http::RequestHeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers) && path_matcher_->match(headers.getPathValue())) {
@@ -114,7 +114,7 @@ public:
   RegexMatcherImpl(const RequirementRule& rule,
                    Server::Configuration::CommonFactoryContext& context)
       : BaseMatcherImpl(rule, context), regex_str_(rule.match().safe_regex().regex()),
-        path_matcher_(Matchers::PathMatcher::createSafeRegex(rule.match().safe_regex())) {
+        path_matcher_(Matchers::PathMatcher::createSafeRegex(rule.match().safe_regex(), context)) {
     ASSERT(rule.match().path_specifier_case() ==
            envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
   }
@@ -166,7 +166,7 @@ public:
   PathSeparatedPrefixMatcherImpl(const RequirementRule& rule,
                                  Server::Configuration::CommonFactoryContext& context)
       : BaseMatcherImpl(rule, context), prefix_(rule.match().path_separated_prefix()),
-        path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
+        path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_, context)) {}
 
   bool matches(const Http::RequestHeaderMap& headers) const override {
     if (!BaseMatcherImpl::matchRoute(headers)) {

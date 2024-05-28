@@ -82,13 +82,13 @@ public:
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
   void injectContext(Tracing::TraceContext& trace_context,
-                     const Upstream::HostDescriptionConstSharedPtr& upstream) override;
+                     const Tracing::UpstreamContext& upstream) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool do_sample) override;
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   void setBaggage(absl::string_view, absl::string_view) override {}
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; }
+  std::string getTraceId() const override { return tracing_context_->traceId(); }
   std::string getSpanIdAsHex() const override { return EMPTY_STRING; }
 
   const TracingContextPtr tracingContext() { return tracing_context_; }

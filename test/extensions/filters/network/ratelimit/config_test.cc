@@ -23,8 +23,9 @@ TEST(RateLimitFilterConfigTest, ValidateFail) {
   envoy::extensions::filters::network::ratelimit::v3::RateLimit rate_limit;
   rate_limit.mutable_rate_limit_service()->set_transport_api_version(
       envoy::config::core::v3::ApiVersion::V3);
-  EXPECT_THROW(RateLimitConfigFactory().createFilterFactoryFromProto(rate_limit, context),
-               ProtoValidationException);
+  EXPECT_THROW(
+      RateLimitConfigFactory().createFilterFactoryFromProto(rate_limit, context).IgnoreError(),
+      ProtoValidationException);
 }
 
 TEST(RateLimitFilterConfigTest, CorrectProto) {
@@ -55,7 +56,7 @@ TEST(RateLimitFilterConfigTest, CorrectProto) {
       }));
 
   RateLimitConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
   Network::MockConnection connection;
 
   EXPECT_CALL(connection, addReadFilter(_));
@@ -70,7 +71,8 @@ TEST(RateLimitFilterConfigTest, EmptyProto) {
   envoy::extensions::filters::network::ratelimit::v3::RateLimit empty_proto_config =
       *dynamic_cast<envoy::extensions::filters::network::ratelimit::v3::RateLimit*>(
           factory.createEmptyConfigProto().get());
-  EXPECT_THROW(factory.createFilterFactoryFromProto(empty_proto_config, context), EnvoyException);
+  EXPECT_THROW(factory.createFilterFactoryFromProto(empty_proto_config, context).IgnoreError(),
+               EnvoyException);
 }
 
 TEST(RateLimitFilterConfigTest, IncorrectProto) {

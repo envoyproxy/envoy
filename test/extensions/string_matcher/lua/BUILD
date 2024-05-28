@@ -17,8 +17,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.string_matcher.lua"],
     deps = [
         "//source/extensions/string_matcher/lua:config",
-        "//test/mocks/api:api_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/string_matcher/lua/v3:pkg_cc_proto",

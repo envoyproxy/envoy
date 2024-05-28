@@ -591,7 +591,7 @@ filter_chains:
 class NonTerminalFilterFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
+  absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager&) -> void {};
@@ -671,7 +671,7 @@ filter_chains:
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactoryFromProto(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProto(
       const Protobuf::Message&,
       Configuration::FactoryContext& filter_chain_factory_context) override {
     return commonFilterFactory(filter_chain_factory_context);
@@ -5318,7 +5318,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
   }
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
                             "error adding listener '127.0.0.1:1234': filter chain 'bar' has "
-                            "the same matching rules defined as 'foo'");
+                            "the same matching rules defined as 'foo'"
+#ifdef ENVOY_ENABLE_YAML
+                            ". duplicate matcher is: {\"transport_protocol\":\"tls\"}"
+#endif
+  );
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest,

@@ -21,6 +21,29 @@ const std::regex& getSystemTimeFormatNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 
+Network::Address::InstanceConstSharedPtr
+getUpstreamRemoteAddress(const StreamInfo::StreamInfo& stream_info) {
+  auto opt_ref = stream_info.upstreamInfo();
+  if (!opt_ref.has_value()) {
+    return nullptr;
+  }
+
+  // TODO(wbpcode): remove this after the flag is removed.
+  const bool use_upstream_remote_address = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.upstream_remote_address_use_connection");
+  if (!use_upstream_remote_address) {
+    if (auto host = opt_ref->upstreamHost(); host != nullptr) {
+      return host->address();
+    }
+    return nullptr;
+  }
+
+  if (auto addr = opt_ref->upstreamRemoteAddress(); addr != nullptr) {
+    return addr;
+  }
+  return nullptr;
+}
+
 } // namespace
 
 MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
@@ -313,6 +336,165 @@ FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) con
   }
 }
 
+const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointGetter>
+    CommonDurationFormatter::KnownTimePointGetters{
+        {FirstDownstreamRxByteReceived,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           return stream_info.startTimeMonotonic();
+         }},
+        {LastDownstreamRxByteReceived,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->lastDownstreamRxByteReceived();
+           }
+           return {};
+         }},
+        {FirstUpstreamTxByteSent,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().first_upstream_tx_byte_sent_;
+           }
+           return {};
+         }},
+        {LastUpstreamTxByteSent,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().last_upstream_tx_byte_sent_;
+           }
+           return {};
+         }},
+        {FirstUpstreamRxByteReceived,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().first_upstream_rx_byte_received_;
+           }
+           return {};
+         }},
+        {LastUpstreamRxByteReceived,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().last_upstream_rx_byte_received_;
+           }
+           return {};
+         }},
+        {FirstDownstreamTxByteSent,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->firstDownstreamTxByteSent();
+           }
+           return {};
+         }},
+        {LastDownstreamTxByteSent,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->lastDownstreamTxByteSent();
+           }
+           return {};
+         }},
+    };
+
+CommonDurationFormatter::TimePointGetter
+CommonDurationFormatter::getTimePointGetterByName(absl::string_view name) {
+  auto it = KnownTimePointGetters.find(name);
+  if (it != KnownTimePointGetters.end()) {
+    return it->second;
+  }
+
+  return [key = std::string(name)](const StreamInfo::StreamInfo& info) {
+    const auto downstream_timing = info.downstreamTiming();
+    if (downstream_timing.has_value()) {
+      return downstream_timing->getValue(key);
+    }
+    return absl::optional<MonotonicTime>{};
+  };
+}
+
+std::unique_ptr<CommonDurationFormatter>
+CommonDurationFormatter::create(absl::string_view sub_command) {
+  // Split the sub_command by ':'.
+  absl::InlinedVector<absl::string_view, 3> parsed_sub_commands = absl::StrSplit(sub_command, ':');
+
+  if (parsed_sub_commands.size() < 2 || parsed_sub_commands.size() > 3) {
+    throwEnvoyExceptionOrPanic(
+        fmt::format("Invalid common duration configuration: {}.", sub_command));
+  }
+
+  absl::string_view start = parsed_sub_commands[0];
+  absl::string_view end = parsed_sub_commands[1];
+
+  // Milliseconds is the default precision.
+  DurationPrecision precision = DurationPrecision::Milliseconds;
+
+  if (parsed_sub_commands.size() == 3) {
+    absl::string_view precision_str = parsed_sub_commands[2];
+    if (precision_str == MillisecondsPrecision) {
+      precision = DurationPrecision::Milliseconds;
+    } else if (precision_str == MicrosecondsPrecision) {
+      precision = DurationPrecision::Microseconds;
+    } else if (precision_str == NanosecondsPrecision) {
+      precision = DurationPrecision::Nanoseconds;
+    } else {
+      throwEnvoyExceptionOrPanic(
+          fmt::format("Invalid common duration precision: {}.", precision_str));
+    }
+  }
+
+  TimePointGetter start_getter = getTimePointGetterByName(start);
+  TimePointGetter end_getter = getTimePointGetterByName(end);
+
+  return std::make_unique<CommonDurationFormatter>(std::move(start_getter), std::move(end_getter),
+                                                   precision);
+}
+
+absl::optional<uint64_t>
+CommonDurationFormatter::getDurationCount(const StreamInfo::StreamInfo& info) const {
+  auto time_point_beg = time_point_beg_(info);
+  auto time_point_end = time_point_end_(info);
+
+  if (!time_point_beg.has_value() || !time_point_end.has_value()) {
+    return absl::nullopt;
+  }
+
+  if (time_point_end.value() < time_point_beg.value()) {
+    return absl::nullopt;
+  }
+
+  auto duration = time_point_end.value() - time_point_beg.value();
+
+  switch (duration_precision_) {
+  case DurationPrecision::Milliseconds:
+    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+  case DurationPrecision::Microseconds:
+    return std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+  case DurationPrecision::Nanoseconds:
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+  }
+  PANIC("Invalid duration precision");
+}
+
+absl::optional<std::string>
+CommonDurationFormatter::format(const StreamInfo::StreamInfo& info) const {
+  auto duration = getDurationCount(info);
+  if (!duration.has_value()) {
+    return absl::nullopt;
+  }
+  return fmt::format_int(duration.value()).str();
+}
+ProtobufWkt::Value CommonDurationFormatter::formatValue(const StreamInfo::StreamInfo& info) const {
+  auto duration = getDurationCount(info);
+  if (!duration.has_value()) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  return ValueUtil::numberValue(duration.value());
+}
+
 // A SystemTime formatter that extracts the startTime from StreamInfo. Must be provided
 // an access log command that starts with `START_TIME`.
 StartTimeFormatter::StartTimeFormatter(const std::string& format)
@@ -490,7 +672,7 @@ private:
   FieldExtractor field_extractor_;
 };
 
-// StreamInfo Envoy::Network::Address::InstanceConstSharedPtr field extractor.
+// StreamInfo Network::Address::InstanceConstSharedPtr field extractor.
 class StreamInfoAddressFormatterProvider : public StreamInfoFormatterProvider {
 public:
   using FieldExtractor =
@@ -856,6 +1038,11 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return stream_info.currentDuration();
                   });
             }}},
+          {"COMMON_DURATION",
+           {CommandSyntaxChecker::PARAMS_REQUIRED,
+            [](const std::string& sub_command, absl::optional<size_t>) {
+              return CommonDurationFormatter::create(sub_command);
+            }}},
           {"RESPONSE_FLAGS",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, absl::optional<size_t>) {
@@ -872,16 +1059,42 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return StreamInfo::ResponseFlagUtils::toString(stream_info);
                   });
             }}},
+          {"UPSTREAM_HOST_NAME",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+                    const auto opt_ref = stream_info.upstreamInfo();
+                    if (!opt_ref.has_value()) {
+                      return absl::nullopt;
+                    }
+                    const auto host = opt_ref->upstreamHost();
+                    if (host == nullptr) {
+                      return absl::nullopt;
+                    }
+                    std::string host_name = host->hostname();
+                    if (host_name.empty()) {
+                      // If no hostname is available, the main address is used.
+                      return host->address()->asString();
+                    }
+                    return absl::make_optional<std::string>(std::move(host_name));
+                  });
+            }}},
           {"UPSTREAM_HOST",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-                      return stream_info.upstreamInfo()->upstreamHost()->address();
+                      -> Network::Address::InstanceConstSharedPtr {
+                    const auto opt_ref = stream_info.upstreamInfo();
+                    if (!opt_ref.has_value()) {
+                      return nullptr;
                     }
-                    return nullptr;
+                    const auto host = opt_ref->upstreamHost();
+                    if (host == nullptr) {
+                      return nullptr;
+                    }
+                    return host->address();
                   });
             }}},
           {"UPSTREAM_CONNECTION_ID",
@@ -919,7 +1132,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                      -> Network::Address::InstanceConstSharedPtr {
                     if (stream_info.upstreamInfo().has_value()) {
                       return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
                     }
@@ -931,7 +1144,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withoutPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                      -> Network::Address::InstanceConstSharedPtr {
                     if (stream_info.upstreamInfo().has_value()) {
                       return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
                     }
@@ -943,7 +1156,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::justPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+                      -> Network::Address::InstanceConstSharedPtr {
                     if (stream_info.upstreamInfo().has_value()) {
                       return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
                     }
@@ -955,11 +1168,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-                      return stream_info.upstreamInfo()->upstreamHost()->address();
-                    }
-                    return nullptr;
+                      -> Network::Address::InstanceConstSharedPtr {
+                    return getUpstreamRemoteAddress(stream_info);
                   });
             }}},
           {"UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
@@ -967,11 +1177,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::withoutPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-                      return stream_info.upstreamInfo()->upstreamHost()->address();
-                    }
-                    return nullptr;
+                      -> Network::Address::InstanceConstSharedPtr {
+                    return getUpstreamRemoteAddress(stream_info);
                   });
             }}},
           {"UPSTREAM_REMOTE_PORT",
@@ -979,11 +1186,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::justPort(
                   [](const StreamInfo::StreamInfo& stream_info)
-                      -> std::shared_ptr<const Envoy::Network::Address::Instance> {
-                    if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-                      return stream_info.upstreamInfo()->upstreamHost()->address();
-                    }
-                    return nullptr;
+                      -> Network::Address::InstanceConstSharedPtr {
+                    return getUpstreamRemoteAddress(stream_info);
                   });
             }}},
           {"UPSTREAM_REQUEST_ATTEMPT_COUNT",

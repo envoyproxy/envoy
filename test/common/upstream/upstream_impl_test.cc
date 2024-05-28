@@ -168,7 +168,45 @@ std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
 }
 
 class StrictDnsParamTest : public testing::TestWithParam<StrictDnsConfigTuple>,
-                           public UpstreamImplTestBase {};
+                           public UpstreamImplTestBase {
+public:
+  void dropOverloadRuntimeTest(uint64_t numerator, float drop_ratio) {
+    auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+    ReadyWatcher initialized;
+    const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    )EOF" + std::get<0>(GetParam()) +
+                             R"EOF(
+    lb_policy: round_robin
+    load_assignment:
+        policy:
+          drop_overloads:
+            category: test
+            drop_percentage:
+              numerator: 50
+              denominator: HUNDRED
+    )EOF";
+
+    EXPECT_CALL(runtime_.snapshot_, getInteger(_, _)).WillRepeatedly(Return(numerator));
+    envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        false);
+    if (numerator <= 100) {
+      StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver);
+      EXPECT_EQ(drop_ratio, cluster.dropOverload().value());
+    } else {
+      EXPECT_THROW_WITH_MESSAGE(
+          StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver),
+          EnvoyException,
+          fmt::format("load_balancing_policy.drop_overload_limit runtime key config {} is invalid. "
+                      "The valid range is 0~100",
+                      numerator));
+    }
+  }
+};
 
 INSTANTIATE_TEST_SUITE_P(DnsParam, StrictDnsParamTest,
                          testing::ValuesIn(generateStrictDnsParams()));
@@ -292,6 +330,35 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
       "Cluster drop_overloads config denominator setting is invalid : 4. Valid range 0~2.");
 }
 
+TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+  ReadyWatcher initialized;
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
+    lb_policy: round_robin
+    load_assignment:
+        policy:
+          drop_overloads:
+            category: test
+            drop_percentage:
+              numerator: 200
+              denominator: HUNDRED
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  EXPECT_THROW_WITH_MESSAGE(
+      StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver), EnvoyException,
+      "Cluster drop_overloads config is invalid. drop_ratio=2(Numerator 200 / Denominator 100). "
+      "The valid range is 0~1.");
+}
+
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
@@ -320,6 +387,23 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
   EXPECT_THROW_WITH_MESSAGE(
       StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver), EnvoyException,
       "Cluster drop_overloads config has 2 categories. Envoy only support one.");
+}
+
+// Drop overload runtime key configuration test
+TEST_P(StrictDnsParamTest, DropOverLoadRuntimeOverrideSmall) { dropOverloadRuntimeTest(10, 0.1); }
+
+TEST_P(StrictDnsParamTest, DropOverLoadRuntimeOverrideLarge) { dropOverloadRuntimeTest(80, 0.5); }
+
+// Edge condition test
+TEST_P(StrictDnsParamTest, DropOverLoadRuntimeOverrideLowerBound) { dropOverloadRuntimeTest(0, 0); }
+
+TEST_P(StrictDnsParamTest, DropOverLoadRuntimeOverrideUpperBound) {
+  dropOverloadRuntimeTest(100, 0.5);
+}
+
+// Error configuration test
+TEST_P(StrictDnsParamTest, DropOverLoadRuntimeOverrideTooLarge) {
+  dropOverloadRuntimeTest(150, 0.5);
 }
 
 class StrictDnsClusterImplTest : public testing::Test, public UpstreamImplTestBase {
@@ -433,7 +517,10 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
@@ -537,7 +624,10 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -754,7 +844,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
       if (i == 1) {
         EXPECT_CALL(initialized, ready());
       }
-      health_checker->runCallbacks(hosts[i], HealthTransition::Changed);
+      health_checker->runCallbacks(hosts[i], HealthTransition::Changed, HealthState::Healthy);
     }
   }
 
@@ -769,7 +859,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
     EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
 
     hosts[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-    health_checker->runCallbacks(hosts[1], HealthTransition::Changed);
+    health_checker->runCallbacks(hosts[1], HealthTransition::Changed, HealthState::Unhealthy);
   }
 
   // Unlike EDS we will not remove if HC is failing but will wait until the next polling interval.
@@ -950,7 +1040,10 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -1071,11 +1164,13 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   // host multiple times.
   absl::node_hash_set<HostSharedPtr> removed_hosts;
   auto priority_update_cb2 = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
+      [&](uint32_t, const HostVector&, const HostVector& hosts_removed) {
         for (const auto& host : hosts_removed) {
           EXPECT_EQ(removed_hosts.end(), removed_hosts.find(host));
           removed_hosts.insert(host);
+          return absl::OkStatus();
         }
+        return absl::OkStatus();
       });
 
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1162,7 +1257,10 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -1358,7 +1456,10 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRate) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -2203,9 +2304,8 @@ TEST_F(StaticClusterImplTest, RingHash) {
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_EQ("envoy.load_balancing_policies.ring_hash",
-            cluster->info()->loadBalancerFactory()->name());
+            cluster->info()->loadBalancerFactory().name());
   EXPECT_TRUE(cluster->info()->addedViaApi());
 }
 
@@ -2240,9 +2340,8 @@ TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
 
   cluster->initialize([] {});
 
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_EQ("envoy.load_balancing_policies.round_robin",
-            cluster->info()->loadBalancerFactory()->name());
+            cluster->info()->loadBalancerFactory().name());
   auto slow_start_config =
       dynamic_cast<const Extensions::LoadBalancingPolices::RoundRobin::LegacyRoundRobinLbConfig*>(
           cluster->info()->loadBalancerConfig().ptr())
@@ -2286,9 +2385,8 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
 
   cluster->initialize([] {});
 
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_EQ("envoy.load_balancing_policies.least_request",
-            cluster->info()->loadBalancerFactory()->name());
+            cluster->info()->loadBalancerFactory().name());
   auto slow_start_config =
       dynamic_cast<
           const Extensions::LoadBalancingPolices::LeastRequest::LegacyLeastRequestLbConfig*>(
@@ -2406,12 +2504,12 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   EXPECT_CALL(initialized, ready());
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
 
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -2423,7 +2521,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Unhealthy);
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_healthy_.value());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
@@ -2438,7 +2536,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(2UL, cluster->info()->endpointStats().membership_healthy_.value());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
@@ -2453,7 +2551,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Unhealthy);
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
@@ -2463,7 +2561,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
@@ -2473,7 +2571,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Unhealthy);
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
@@ -2483,7 +2581,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
@@ -2493,7 +2591,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::DEGRADED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_healthy_.value());
@@ -2557,7 +2655,7 @@ TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
@@ -2604,8 +2702,7 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(0U, cluster->info()->maxRequestsPerConnection());
   EXPECT_EQ(::Envoy::Http2::Utility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE,
             cluster->info()->http2Options().hpack_table_size().value());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
-  EXPECT_EQ("envoy.load_balancing_policies.random", cluster->info()->loadBalancerFactory()->name());
+  EXPECT_EQ("envoy.load_balancing_policies.random", cluster->info()->loadBalancerFactory().name());
   EXPECT_THAT(
       std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
       ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
@@ -2682,10 +2779,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_TRUE(cluster->info()->addedViaApi());
   EXPECT_TRUE(cluster->info()->loadBalancerConfig().has_value());
-  EXPECT_NE(nullptr, cluster->info()->loadBalancerFactory());
 }
 
 // lb_policy is set to LOAD_BALANCING_POLICY_CONFIG and has no load_balancing_policy.
@@ -2874,7 +2969,7 @@ TEST_F(StaticClusterImplTest, EmptyLbSubsetConfig) {
 
   auto cluster = createCluster(cluster_config, factory_context);
 
-  EXPECT_EQ(cluster->info()->loadBalancerFactory()->name(),
+  EXPECT_EQ(cluster->info()->loadBalancerFactory().name(),
             "envoy.load_balancing_policies.round_robin");
 }
 
@@ -2960,7 +3055,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_TRUE(cluster->info()->addedViaApi());
 }
 
@@ -2999,7 +3093,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_TRUE(cluster->info()->addedViaApi());
 }
 
@@ -3682,12 +3775,15 @@ TEST(PrioritySet, Extend) {
   uint32_t membership_changes = 0;
   uint32_t last_priority = 0;
   auto priority_update_cb = priority_set.addPriorityUpdateCb(
-      [&](uint32_t priority, const HostVector&, const HostVector&) -> void {
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
         last_priority = priority;
         ++priority_changes;
+        return absl::OkStatus();
       });
-  auto member_update_cb = priority_set.addMemberUpdateCb(
-      [&](const HostVector&, const HostVector&) -> void { ++membership_changes; });
+  auto member_update_cb = priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) {
+    ++membership_changes;
+    return absl::OkStatus();
+  });
 
   // The initial priority set starts with priority level 0.
   EXPECT_EQ(1, priority_set.hostSetsPerPriority().size());
@@ -3745,9 +3841,10 @@ TEST(PrioritySet, Extend) {
 
   // We're going to do a noop host change, so add a callback to assert that we're not announcing
   // any host changes.
-  auto member_update_cb2 = priority_set.addMemberUpdateCb(
-      [&](const HostVector& added, const HostVector& removed) -> void {
+  auto member_update_cb2 =
+      priority_set.addMemberUpdateCb([&](const HostVector& added, const HostVector& removed) {
         EXPECT_TRUE(added.empty() && removed.empty());
+        return absl::OkStatus();
       });
 
   TestBatchUpdateCb batch_update(hosts, hosts_per_locality);
@@ -3917,8 +4014,7 @@ TEST_F(ClusterInfoImplTest, Metadata) {
             Config::Metadata::metadataValue(&cluster->info()->metadata(), "com.bar.foo", "baz")
                 .string_value());
   EXPECT_EQ(0.3, cluster->info()->lbConfig().healthy_panic_threshold().value());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
-  EXPECT_EQ("envoy.load_balancing_policies.maglev", cluster->info()->loadBalancerFactory()->name());
+  EXPECT_EQ("envoy.load_balancing_policies.maglev", cluster->info()->loadBalancerFactory().name());
 }
 
 // Verify retry budget default values are honored.
@@ -4550,7 +4646,7 @@ public:
   TestNetworkFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
 
   // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
+  absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
     PANIC("not implemented");

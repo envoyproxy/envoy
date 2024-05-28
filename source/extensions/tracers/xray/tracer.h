@@ -167,7 +167,7 @@ public:
    * Adds X-Ray trace header to the set of outgoing headers.
    */
   void injectContext(Tracing::TraceContext& trace_context,
-                     const Upstream::HostDescriptionConstSharedPtr&) override;
+                     const Tracing::UpstreamContext&) override;
 
   /**
    * Gets the start time of this Span.
@@ -231,7 +231,7 @@ public:
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
 
   // TODO: This method is unimplemented for X-Ray.
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+  std::string getTraceId() const override { return trace_id_; };
 
   // TODO: This method is unimplemented for X-Ray.
   std::string getSpanIdAsHex() const override { return EMPTY_STRING; };

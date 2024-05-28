@@ -110,6 +110,11 @@ func capiStatusToErr(status C.CAPIStatus) error {
 	return errors.New("unknown status")
 }
 
+func (c *httpCApiImpl) ClearRouteCache(r unsafe.Pointer) {
+	res := C.envoyGoFilterHttpClearRouteCache(r)
+	handleCApiStatus(res)
+}
+
 func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
 	res := C.envoyGoFilterHttpContinue(r, C.int(status))
 	handleCApiStatus(res)

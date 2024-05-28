@@ -16,8 +16,8 @@ JsonToMetadataConfig::JsonToMetadataConfig() : FactoryBase("envoy.filters.http.j
 Http::FilterFactoryCb JsonToMetadataConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<FilterConfig> config =
-      std::make_shared<FilterConfig>(proto_config, context.scope());
+  std::shared_ptr<FilterConfig> config = std::make_shared<FilterConfig>(
+      proto_config, context.scope(), context.serverFactoryContext().regexEngine());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(config));

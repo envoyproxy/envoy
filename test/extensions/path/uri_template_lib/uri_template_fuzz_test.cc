@@ -17,7 +17,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
       Envoy::Extensions::UriTemplate::parseRewritePattern(input);
 
   // Test matcher parser.
-  absl::StatusOr<absl::string_view> match =
+  absl::StatusOr<std::string> match =
       Envoy::Extensions::UriTemplate::convertPathPatternSyntaxToRegex(input);
 }
 

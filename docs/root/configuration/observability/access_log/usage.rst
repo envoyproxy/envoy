@@ -394,6 +394,33 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+.. _config_access_log_format_common_duration:
+
+%COMMON_DURATION(START:END:PRECISION)%
+  HTTP
+    Total duration between the START time point and the END time point in specific PRECISION.
+    The START and END time points are specified by the following values (NOTE: all values
+    here are case-sensitive):
+
+    * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
+    * ``DS_RX_END``: The time point of the downstream request receiving end.
+    * ``US_TX_BEG``: The time point of the upstream request sending begin.
+    * ``US_TX_END``: The time point of the upstream request sending end.
+    * ``US_RX_BEG``: The time point of the upstream response receiving begin.
+    * ``US_RX_END``: The time point of the upstream response receiving end.
+    * ``DS_TX_BEG``: The time point of the downstream response sending begin.
+    * ``DS_TX_END``: The time point of the downstream response sending end.
+    * Dynamic value: Other values will be treated as custom time points that are set by named keys.
+
+    The PRECISION is specified by the following values (NOTE: all values here are case-sensitive):
+
+    * ``ms``: Millisecond precision.
+    * ``us``: Microsecond precision.
+    * ``ns``: Nanosecond precision.
+
+  TCP/UDP
+    Not implemented ("-").
+
 %REQUEST_DURATION%
   HTTP
     Total duration in milliseconds of the request from the start time to the last byte of
@@ -471,7 +498,7 @@ The following command operators are supported:
 
 %RESPONSE_FLAGS% / %RESPONSE_FLAGS_LONG%
   Additional details about the response or connection, if any. For TCP connections, the response codes mentioned in
-  the descriptions do not apply. %RESPONSE_FLAGS% will outout a short string. %RESPONSE_FLAGS% will outout a Pascal case string.
+  the descriptions do not apply. %RESPONSE_FLAGS% will output a short string. %RESPONSE_FLAGS_LONG% will output a Pascal case string.
   Possible values are:
 
 HTTP and TCP
@@ -536,8 +563,13 @@ UDP
 .. _config_access_log_format_upstream_host:
 
 %UPSTREAM_HOST%
-  Upstream host URL (e.g., tcp://ip:port for TCP connections). Identical to the :ref:`UPSTREAM_REMOTE_ADDRESS
-  <config_access_log_format_upstream_remote_address>` value.
+  Main address of upstream host (e.g., ip:port for TCP connections).
+
+.. _config_access_log_format_upstream_host_name:
+
+%UPSTREAM_HOST_NAME%
+  Upstream host name (e.g., DNS name). If no DNS name is available, the main address of the upstream host
+  (e.g., ip:port for TCP connections) will be used.
 
 %UPSTREAM_CLUSTER%
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
@@ -559,7 +591,8 @@ UDP
 
 %UPSTREAM_REMOTE_ADDRESS%
   Remote address of the upstream connection. If the address is an IP address it includes both
-  address and port. Identical to the :ref:`UPSTREAM_HOST <config_access_log_format_upstream_host>` value.
+  address and port. Identical to the :ref:`UPSTREAM_HOST <config_access_log_format_upstream_host>` value if the upstream
+  host only has one address and connection is established successfully.
 
 %UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
   Remote address of the upstream connection, without any port component.
@@ -661,6 +694,12 @@ UDP
   :ref:`Original Destination Filter <config_listener_filters_original_dst>` using SO_ORIGINAL_DST socket option.
   If the original connection was redirected by iptables TPROXY, and the listener's transparent
   option was set to true, this represents the original destination address and port.
+
+  .. note::
+
+    This may not be the physical remote address of the peer if the address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
+    <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
   Local address of the downstream connection, without any port component.
@@ -1177,3 +1216,9 @@ UDP
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.
   Z is an optional parameter denoting string truncation up to Z characters long.
+
+%TRACE_ID%
+  HTTP
+    The trace ID of the request. If the request does not have a trace ID, this will be an empty string.
+  TCP/UDP
+    Not implemented ("-").

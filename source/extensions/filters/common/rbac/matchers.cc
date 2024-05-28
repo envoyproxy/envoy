@@ -32,14 +32,15 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   case envoy::config::rbac::v3::Permission::RuleCase::kAny:
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v3::Permission::RuleCase::kMetadata:
-    return std::make_shared<const MetadataMatcher>(permission.metadata());
+    return std::make_shared<const MetadataMatcher>(
+        Matchers::MetadataMatcher(permission.metadata(), context));
   case envoy::config::rbac::v3::Permission::RuleCase::kNotRule:
     return std::make_shared<const NotMatcher>(permission.not_rule(), validation_visitor, context);
   case envoy::config::rbac::v3::Permission::RuleCase::kRequestedServerName:
     return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name(),
                                                               context);
   case envoy::config::rbac::v3::Permission::RuleCase::kUrlPath:
-    return std::make_shared<const PathMatcher>(permission.url_path());
+    return std::make_shared<const PathMatcher>(permission.url_path(), context);
   case envoy::config::rbac::v3::Permission::RuleCase::kUriTemplate: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(permission.uri_template());
@@ -81,13 +82,14 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAny:
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v3::Principal::IdentifierCase::kMetadata:
-    return std::make_shared<const MetadataMatcher>(principal.metadata());
+    return std::make_shared<const MetadataMatcher>(
+        Matchers::MetadataMatcher(principal.metadata(), context));
   case envoy::config::rbac::v3::Principal::IdentifierCase::kNotId:
     return std::make_shared<const NotMatcher>(principal.not_id(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kUrlPath:
-    return std::make_shared<const PathMatcher>(principal.url_path());
+    return std::make_shared<const PathMatcher>(principal.url_path(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kFilterState:
-    return std::make_shared<const FilterStateMatcher>(principal.filter_state());
+    return std::make_shared<const FilterStateMatcher>(principal.filter_state(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::IDENTIFIER_NOT_SET:
     break; // Fall through to PANIC.
   }
