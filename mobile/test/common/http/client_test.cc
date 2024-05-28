@@ -33,8 +33,13 @@ namespace Envoy {
 namespace Http {
 
 enum FlowControl {
+  // Run with explicit flow control false.
   OFF,
+  // Run with explicit flow control true, and generally call resumeData call
+  // before data / fin / trailers arrive.
   EARLY_RESUME,
+  // Run with explicit flow control true, and generally call resumeData after
+  // data / fin / trailers arrive.
   LATE_RESUME,
 };
 
@@ -151,12 +156,14 @@ protected:
       callbacks->resumeData(bytes);
     }
   }
+
   void resumeDataIfLateResume(int32_t bytes) {
     if (explicit_flow_control_ == LATE_RESUME) {
       auto callbacks = dynamic_cast<Client::DirectStreamCallbacks*>(response_encoder_);
       callbacks->resumeData(bytes);
     }
   }
+
   void resumeData(int32_t bytes) {
     if (explicit_flow_control_ != OFF) {
       auto callbacks = dynamic_cast<Client::DirectStreamCallbacks*>(response_encoder_);
