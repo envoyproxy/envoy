@@ -216,9 +216,8 @@ public:
     }
 
     thread_local_stream_manager_slot_ = context.threadLocal().allocateSlot();
-    thread_local_stream_manager_slot_->set([](Envoy::Event::Dispatcher&) {
-      return std::make_shared<ThreadLocalStreamManager>();
-    });
+    thread_local_stream_manager_slot_->set(
+        [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
   }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
