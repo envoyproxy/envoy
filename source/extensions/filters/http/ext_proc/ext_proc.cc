@@ -325,7 +325,6 @@ void Filter::closeStream() {
     if (stream_->close()) {
       stats_.streams_closed_.inc();
     }
-    // stream_.reset();
     stream_ = nullptr;
     config_->threadLocalStreamManager().remove(this);
   } else {

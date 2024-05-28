@@ -217,9 +217,6 @@ public:
 
     thread_local_stream_manager_slot_ = context.threadLocal().allocateSlot();
     thread_local_stream_manager_slot_->set([](Envoy::Event::Dispatcher&) {
-      // Envoy::ThreadLocal::ThreadLocalObjectSharedPtr stream_manager =
-      //     std::make_shared<ThreadLocalStreamManager>();
-      // return stream_manager;
       return std::make_shared<ThreadLocalStreamManager>();
     });
   }
@@ -475,8 +472,6 @@ private:
 
   // The gRPC stream to the external processor, which will be opened
   // when it's time to send the first message.
-  // ExternalProcessorStreamPtr stream_;
-  // raw pointer
   ExternalProcessorStream* stream_ = nullptr;
 
   // Set to true when no more messages need to be sent to the processor.
