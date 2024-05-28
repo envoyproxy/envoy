@@ -62,6 +62,7 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//envoy/http:protocol_interface",
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:utility_lib",

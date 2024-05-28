@@ -39,9 +39,8 @@ void callSampler(SamplerSharedPtr sampler, const absl::optional<SpanContext> spa
   if (!sampler) {
     return;
   }
-  const auto sampling_result =
-      sampler->shouldSample(span_context, new_span.getTraceIdAsHex(), operation_name,
-                            new_span.spankind(), trace_context, {});
+  const auto sampling_result = sampler->shouldSample(
+      span_context, new_span.getTraceId(), operation_name, new_span.spankind(), trace_context, {});
   new_span.setSampled(sampling_result.isSampled());
 
   if (sampling_result.attributes) {
@@ -70,7 +69,7 @@ Span::Span(const std::string& name, SystemTime start_time, Envoy::TimeSource& ti
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& name,
                                   SystemTime start_time) {
   // Build span_context from the current span, then generate the child span from that context.
-  SpanContext span_context(kDefaultVersion, getTraceIdAsHex(), spanId(), sampled(), tracestate());
+  SpanContext span_context(kDefaultVersion, getTraceId(), spanId(), sampled(), tracestate());
   return parent_tracer_.startSpan(name, start_time, span_context, {},
                                   ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
 }
