@@ -104,7 +104,7 @@ Http::FilterHeadersStatus BasicAuthFilter::onDenied(absl::string_view body,
         const auto request_headers = this->decoder_callbacks_->requestHeaders();
         const std::string uri = Http::Utility::buildOriginalUri(*request_headers, MaximumUriLength);
         const std::string value = absl::StrCat("Basic realm=\"", uri, "\"");
-        headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
+        headers.setReferenceKey(Http::Headers::get().WWWAuthenticate, value);
       },
       absl::nullopt, response_code_details);
   return Http::FilterHeadersStatus::StopIteration;
