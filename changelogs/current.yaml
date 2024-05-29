@@ -187,7 +187,7 @@ new_features:
 - area: proxy_protocol
   change: |
     Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.stat_prefix>`
-    to the proxy protocol listener filter configuration, allowing for differentiating statistics when multiple proxy 
+    to the proxy protocol listener filter configuration, allowing for differentiating statistics when multiple proxy
     protocol listener filters are configured.
 - area: aws_lambda
   change: |
