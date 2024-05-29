@@ -147,27 +147,16 @@ private:
 
 class ThreadLocalStreamManager : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
-  ThreadLocalStreamManager() = default;
-  ~ThreadLocalStreamManager() override { stream_manager_.clear(); };
-
-  void add(Filter* filter, ExternalProcessorStreamPtr stream) {
+  // Store the ExternalProcessorStreamPtr in the map and return its raw pointer.
+  ExternalProcessorStream* store(Filter* filter, ExternalProcessorStreamPtr stream) {
     stream_manager_[filter] = std::move(stream);
-  }
-
-  void remove(Filter* filter) { stream_manager_.erase(filter); }
-
-  bool streamHasBeenCreated(Filter* filter) {
-    return stream_manager_.contains(filter) && stream_manager_[filter] != nullptr;
-  }
-
-  // TODO(tyxia) Refactor this function and streamHasBeenCreated
-  ExternalProcessorStream* getStreamPointer(Filter* filter) {
-    ASSERT(streamHasBeenCreated(filter) == true);
     return stream_manager_[filter].get();
   }
 
-protected:
-  // Map of ExternalProcessorStreamPtr with filter pointer as key.
+  void erase(Filter* filter) { stream_manager_.erase(filter); }
+
+private:
+  // Map of ExternalProcessorStreamPtrs with filter pointer as key.
   absl::flat_hash_map<Filter*, ExternalProcessorStreamPtr> stream_manager_;
 };
 
@@ -203,7 +192,8 @@ public:
             config.metadata_options().receiving_namespaces().untyped().end()),
         expression_manager_(builder, context.localInfo(), config.request_attributes(),
                             config.response_attributes()),
-        immediate_mutation_checker_(context.regexEngine()) {
+        immediate_mutation_checker_(context.regexEngine()),
+        thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
     if (config.disable_clear_route_cache() &&
         (route_cache_action_ !=
          envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
@@ -214,8 +204,6 @@ public:
       route_cache_action_ =
           envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RETAIN;
     }
-
-    thread_local_stream_manager_slot_ = context.threadLocal().allocateSlot();
     thread_local_stream_manager_slot_->set(
         [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
   }

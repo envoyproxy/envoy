@@ -308,8 +308,7 @@ Filter::StreamOpenState Filter::openStream() {
     }
     stats_.streams_started_.inc();
 
-    config_->threadLocalStreamManager().add(this, std::move(stream_object));
-    stream_ = config_->threadLocalStreamManager().getStreamPointer(this);
+    stream_ = config_->threadLocalStreamManager().store(this, std::move(stream_object));
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
@@ -326,7 +325,7 @@ void Filter::closeStream() {
       stats_.streams_closed_.inc();
     }
     stream_ = nullptr;
-    config_->threadLocalStreamManager().remove(this);
+    config_->threadLocalStreamManager().erase(this);
   } else {
     ENVOY_LOG(debug, "Stream already closed");
   }
