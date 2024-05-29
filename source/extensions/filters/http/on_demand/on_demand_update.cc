@@ -61,7 +61,9 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
   if (odcds_config->resources_locator().empty()) {
     odcds = cm.allocateOdCdsApi(odcds_config->source(), absl::nullopt, validation_visitor);
   } else {
-    auto locator = Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator());
+    auto locator = THROW_OR_RETURN_VALUE(
+        Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator()),
+        xds::core::v3::ResourceLocator);
     odcds = cm.allocateOdCdsApi(odcds_config->source(), locator, validation_visitor);
   }
   // If changing the default timeout, please update the documentation in on_demand.proto too.
