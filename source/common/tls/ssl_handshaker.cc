@@ -32,9 +32,9 @@ void ValidateResultCallbackImpl::onCertValidationResult(bool succeeded,
 
 void CertSelectionCallbackImpl::onSslHandshakeCancelled() { extended_socket_info_.reset(); }
 
-void CertSelectionCallbackImpl::onCertSelectionResult(bool succeeded,
-                                                      const Ssl::TlsContext& selected_ctx,
+void CertSelectionCallbackImpl::onCertSelectionResult(OptRef<const Ssl::TlsContext> selected_ctx,
                                                       bool staple) {
+  auto succeeded = selected_ctx.has_value();
   ENVOY_LOG(debug, "onCertSelectionResult: {}, {}", succeeded, staple);
   if (!extended_socket_info_.has_value()) {
     ENVOY_LOG(debug, "extended socket info is gone, maybe connection terminated");
@@ -44,13 +44,13 @@ void CertSelectionCallbackImpl::onCertSelectionResult(bool succeeded,
     // Apply the selected context. This must be done before OCSP stapling below
     // since applying the context can remove the previously-set OCSP response.
     // This will only return NULL if memory allocation fails.
-    RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_, selected_ctx.ssl_ctx_.get()) != nullptr, "");
+    RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_, selected_ctx->ssl_ctx_.get()) != nullptr, "");
 
     if (staple) {
       // We avoid setting the OCSP response if the client didn't request it, but doing so is safe.
-      RELEASE_ASSERT(selected_ctx.ocsp_response_,
+      RELEASE_ASSERT(selected_ctx->ocsp_response_,
                      "OCSP response must be present under OcspStapleAction::Staple");
-      auto& resp_bytes = selected_ctx.ocsp_response_->rawBytes();
+      auto& resp_bytes = selected_ctx->ocsp_response_->rawBytes();
       const int rc = SSL_set_ocsp_response(ssl_, resp_bytes.data(), resp_bytes.size());
       RELEASE_ASSERT(rc != 0, "");
     }

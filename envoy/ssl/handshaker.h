@@ -166,12 +166,12 @@ public:
 };
 
 enum class SelectionResult {
-  // continue the TLS handshake.
+  // Continue the TLS handshake.
   Continue,
-  // block the TLS handshake.
+  // Block the TLS handshake.
   Stop,
-  // terminate the TLS handshake.
-  Terminate
+  // Abort the TLS handshake.
+  AbortHandshake
 };
 
 /**
@@ -187,8 +187,7 @@ public:
    * Called when the cert selection completes.
    * It's safe to call it even the SSL connection may be terminated early.
    */
-  virtual void onCertSelectionResult(bool succeeded, const Ssl::TlsContext& selected_ctx,
-                                     bool staple) PURE;
+  virtual void onCertSelectionResult(OptRef<const Ssl::TlsContext> selected_ctx, bool staple) PURE;
 };
 
 using CertSelectionCallbackSharedPtr = std::shared_ptr<CertSelectionCallback>;

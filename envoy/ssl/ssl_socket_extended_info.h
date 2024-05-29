@@ -109,7 +109,7 @@ public:
   /**
    * @return CertSelectionStatus the cert selection status.
    */
-  virtual CertSelectionStatus CertSelectionResult() const PURE;
+  virtual CertSelectionStatus certSelectionResult() const PURE;
 };
 
 } // namespace Ssl

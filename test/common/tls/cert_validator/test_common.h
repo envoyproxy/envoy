@@ -43,7 +43,7 @@ public:
   void setCertSelectionAsync() override {
     cert_selection_result_ = Ssl::CertSelectionStatus::Pending;
   }
-  Ssl::CertSelectionStatus CertSelectionResult() const override { return cert_selection_result_; }
+  Ssl::CertSelectionStatus certSelectionResult() const override { return cert_selection_result_; }
 
 private:
   Envoy::Ssl::ClientValidationStatus status_;

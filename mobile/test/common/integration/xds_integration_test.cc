@@ -4,7 +4,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "source/common/tls/server_context_impl.h"
-#include "source/common/tls/tls_certificate_selector_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/integration/base_client_integration_test.h"

@@ -95,7 +95,7 @@ public:
     switch (mod_) {
     case Ssl::SelectionResult::Continue:
       ENVOY_LOG_MISC(info, "debug: select cert done");
-      cb->onCertSelectionResult(true, getTlsContext(), false);
+      cb->onCertSelectionResult(getTlsContext(), false);
       break;
     case Ssl::SelectionResult::Stop:
       ENVOY_LOG_MISC(info, "debug: select cert async");
@@ -110,7 +110,7 @@ public:
 
   void selectTlsContextAsync() {
     ENVOY_LOG_MISC(info, "debug: select cert async done");
-    cb_->onCertSelectionResult(true, getTlsContext(), false);
+    cb_->onCertSelectionResult(getTlsContext(), false);
   }
 
   const Ssl::TlsContext& getTlsContext() { return ctx_.lock()->getTlsContexts()[0]; }
@@ -315,7 +315,7 @@ protected:
             connect_second_time();
           }));
     } else {
-      if (mod == Ssl::SelectionResult::Terminate) {
+      if (mod == Ssl::SelectionResult::AbortHandshake) {
         EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
             .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
         EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
@@ -342,7 +342,9 @@ protected:
 
 TEST_P(TlsCertificateSelectorFactoryTest, Continue) { testUtil(Ssl::SelectionResult::Continue); }
 
-TEST_P(TlsCertificateSelectorFactoryTest, Terminate) { testUtil(Ssl::SelectionResult::Terminate); }
+TEST_P(TlsCertificateSelectorFactoryTest, Terminate) {
+  testUtil(Ssl::SelectionResult::AbortHandshake);
+}
 
 TEST_P(TlsCertificateSelectorFactoryTest, Stop) { testUtil(Ssl::SelectionResult::Stop); }
 

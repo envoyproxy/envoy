@@ -24,6 +24,7 @@
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/ocsp/ocsp.h"
 #include "source/common/tls/stats.h"
+#include "source/common/tls/tls_certificate_selector_impl.h"
 
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"

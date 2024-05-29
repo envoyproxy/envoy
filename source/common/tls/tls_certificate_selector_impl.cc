@@ -10,8 +10,8 @@ TlsCertificateSelectorImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_
                                              Ssl::CertSelectionCallbackSharedPtr cb) {
   auto selection_ctx = cb_.lock();
   if (selection_ctx == nullptr) {
-    ENVOY_LOG(debug, "ContextSelectionCallback is gone early");
-    return Ssl::SelectionResult::Terminate;
+    IS_ENVOY_BUG("ContextSelectionCallback is gone early");
+    return Ssl::SelectionResult::AbortHandshake;
   }
 
   auto server_ctx = std::dynamic_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(
@@ -39,12 +39,12 @@ TlsCertificateSelectorImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_
     break;
   case Extensions::TransportSockets::Tls::OcspStapleAction::Fail:
     stats.ocsp_staple_failed_.inc();
-    return Ssl::SelectionResult::Terminate;
+    return Ssl::SelectionResult::AbortHandshake;
   case Extensions::TransportSockets::Tls::OcspStapleAction::ClientNotCapable:
     // This happens when client does not support OCSP, do nothing.
     break;
   }
-  cb->onCertSelectionResult(true, selected_ctx,
+  cb->onCertSelectionResult(selected_ctx,
                             ocsp_staple_action ==
                                 Extensions::TransportSockets::Tls::OcspStapleAction::Staple);
 

@@ -59,8 +59,7 @@ public:
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
-  void onCertSelectionResult(bool succeeded, const Ssl::TlsContext& selected_ctx,
-                             bool staple) override;
+  void onCertSelectionResult(OptRef<const Ssl::TlsContext> selected_ctx, bool staple) override;
 
   void onSslHandshakeCancelled();
 
@@ -90,7 +89,7 @@ public:
   Ssl::CertSelectionCallbackSharedPtr createCertSelectionCallback(SSL* ssl) override;
   void onCertSelectionCompleted(bool succeeded) override;
   void setCertSelectionAsync() override;
-  Ssl::CertSelectionStatus CertSelectionResult() const override { return cert_selection_result_; }
+  Ssl::CertSelectionStatus certSelectionResult() const override { return cert_selection_result_; }
 
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
