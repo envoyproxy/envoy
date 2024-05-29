@@ -26,7 +26,6 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
               failure_mode_allow: false
-              transport_api_version: V3
               status_on_error:
                 code: 503
               grpc_service:

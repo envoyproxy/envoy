@@ -60,10 +60,8 @@ public:
           TestUtility::parseYaml<
               envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand>(R"EOF(
           odcds_config:
-            resource_api_version: V3
             api_config_source:
               api_type: DELTA_GRPC
-              transport_api_version: V3
               grpc_services:
                 envoy_grpc:
                   cluster_name: cluster_0

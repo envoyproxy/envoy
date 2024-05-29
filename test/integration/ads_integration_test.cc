@@ -260,7 +260,6 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
           validation_context_sds_secret_config:
             name: validation_context
             sds_config:
-              resource_api_version: V3
               initial_fetch_timeout: 5s
               ads: {}
   )EOF",
@@ -345,7 +344,6 @@ TEST_P(AdsIntegrationTest, ClusterSharingSecretWarming) {
           validation_context_sds_secret_config:
             name: validation_context
             sds_config:
-              resource_api_version: V3
               ads: {}
   )EOF",
                             sds_transport_socket);
@@ -402,7 +400,6 @@ TEST_P(AdsIntegrationTest, SecretsPausedDuringCDS) {
             validation_context_sds_secret_config:
               name: validation_context_{}
               sds_config:
-                resource_api_version: V3
                 ads: {{}}
     )EOF",
                                           i),
@@ -2693,11 +2690,9 @@ TEST_P(AdsIntegrationTest, SrdsPausedDuringLds) {
                       separator: =
                       key: vip
               rds_config_source:
-                resource_api_version: V3
                 ads: {}
               scoped_rds:
                 scoped_rds_config_source:
-                  resource_api_version: V3
                   ads: {}
             http_filters:
             - name: envoy.filters.http.router

@@ -2611,7 +2611,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     apply_default_config_without_warming: true
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -2639,7 +2639,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/google.protobuf.Value
     type_urls:
@@ -2669,7 +2669,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
       pass_through_mode: false
@@ -2700,7 +2700,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     type_urls:
@@ -2732,7 +2732,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/xds.type.v3.TypedStruct
       type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -2766,7 +2766,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/udpa.type.v1.TypedStruct
       type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -2800,7 +2800,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     type_urls:
     - type.googleapis.com/google.protobuf.Value
   )EOF";
@@ -2827,7 +2827,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
       pass_through_mode: false
