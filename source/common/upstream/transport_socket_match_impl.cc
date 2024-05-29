@@ -15,9 +15,10 @@ absl::StatusOr<std::unique_ptr<TransportSocketMatcherImpl>> TransportSocketMatch
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope) {
   absl::Status creation_status = absl::OkStatus();
-  return std::unique_ptr<TransportSocketMatcherImpl>(new TransportSocketMatcherImpl(
+  auto ret = std::unique_ptr<TransportSocketMatcherImpl>(new TransportSocketMatcherImpl(
       socket_matches, factory_context, default_factory, stats_scope, creation_status));
-  // FIXME RETURN IF NOT OK
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
 }
 
 TransportSocketMatcherImpl::TransportSocketMatcherImpl(
