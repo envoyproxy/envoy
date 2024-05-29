@@ -391,7 +391,7 @@ TEST_F(DatadogTracerSpanTest, GetTraceId) {
   EXPECT_EQ("cafebabe", span.getTraceId());
 }
 
-TEST_F(DatadogTracerSpanTest, GetSpanIdAsHex) {
+TEST_F(DatadogTracerSpanTest, GetSpanId) {
   Span span{std::move(span_)};
   EXPECT_EQ("cafebabe", span.getSpanId());
 }
