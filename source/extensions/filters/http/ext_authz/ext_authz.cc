@@ -419,7 +419,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                                   EMPTY_STRING)) {
       case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, key);
-        request_headers_->remove(Http::LowerCaseString(key));
+        request_headers_->remove(lowercase_key);
         break;
       case CheckResult::IGNORE:
         ENVOY_STREAM_LOG(trace, "Ignoring disallowed header removal '{}'.", *decoder_callbacks_,
