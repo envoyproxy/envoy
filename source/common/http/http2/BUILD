@@ -65,18 +65,6 @@ envoy_cc_library(
     ],
 )
 
-# Separate library for some nghttp2 setup stuff to avoid having tests take a
-# dependency on everything in codec_lib.
-envoy_cc_library(
-    name = "nghttp2_lib",
-    srcs = ["nghttp2.cc"],
-    hdrs = ["nghttp2.h"],
-    external_deps = ["nghttp2"],
-    deps = [
-        "//source/common/common:minimal_logger_lib",
-    ],
-)
-
 envoy_cc_library(
     name = "conn_pool_lib",
     srcs = ["conn_pool.cc"],

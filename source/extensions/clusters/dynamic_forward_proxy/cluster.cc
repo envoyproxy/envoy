@@ -388,7 +388,10 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (cluster_.enableSubCluster()) {
     return cluster_.chooseHost(host, context);
   }
+  return findHostByName(host);
+}
 
+Upstream::HostConstSharedPtr Cluster::LoadBalancer::findHostByName(const std::string& host) const {
   {
     absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
     const auto host_it = cluster_.host_map_.find(host);

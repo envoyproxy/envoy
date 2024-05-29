@@ -526,8 +526,10 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
   if (dyn_resources.has_cds_config() || !dyn_resources.cds_resources_locator().empty()) {
     std::unique_ptr<xds::core::v3::ResourceLocator> cds_resources_locator;
     if (!dyn_resources.cds_resources_locator().empty()) {
-      cds_resources_locator = std::make_unique<xds::core::v3::ResourceLocator>(
-          Config::XdsResourceIdentifier::decodeUrl(dyn_resources.cds_resources_locator()));
+      cds_resources_locator =
+          std::make_unique<xds::core::v3::ResourceLocator>(THROW_OR_RETURN_VALUE(
+              Config::XdsResourceIdentifier::decodeUrl(dyn_resources.cds_resources_locator()),
+              xds::core::v3::ResourceLocator));
     }
     cds_api_ = factory_.createCds(dyn_resources.cds_config(), cds_resources_locator.get(), *this);
     init_helper_.setCds(cds_api_.get());

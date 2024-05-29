@@ -69,7 +69,7 @@ public:
     /* not implemented */
     return EMPTY_STRING;
   };
-  std::string getTraceIdAsHex() const {
+  std::string getTraceId() const {
     /* not implemented */
     return EMPTY_STRING;
   };
