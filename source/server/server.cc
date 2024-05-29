@@ -35,7 +35,6 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
-#include "source/common/memory/stats.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_interface.h"
@@ -528,6 +527,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   validation_context_.setCounters(server_stats_->static_unknown_fields_,
                                   server_stats_->dynamic_unknown_fields_,
                                   server_stats_->wip_protos_);
+
+  memory_allocator_manager_ = std::make_unique<Memory::AllocatorManager>(
+      *api_, *stats_store_.rootScope(), bootstrap_.memory_allocator_manager());
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
