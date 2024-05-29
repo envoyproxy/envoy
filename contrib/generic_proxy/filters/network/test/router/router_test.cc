@@ -36,7 +36,8 @@ public:
     ON_CALL(*this, removeUpstreamRequest(_)).WillByDefault(Invoke([this](uint64_t stream_id) {
       requests_.erase(stream_id);
     }));
-    ON_CALL(*this, upstreamConnection()).WillByDefault(ReturnRef(mock_upstream_connection_));
+    ON_CALL(*this, upstreamConnection())
+        .WillByDefault(Return(makeOptRef<Network::Connection>(mock_upstream_connection_)));
     ON_CALL(*this, upstreamHost()).WillByDefault(Return(host_description_));
     ON_CALL(*this, clientCodec()).WillByDefault(ReturnRef(mock_client_codec_));
   }
