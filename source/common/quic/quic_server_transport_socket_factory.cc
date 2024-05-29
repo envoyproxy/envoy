@@ -121,6 +121,7 @@ void QuicServerTransportSocketFactory::initialize() {
   config_->setSecretUpdateCallback([this]() {
     // The callback also updates config_ with the new secret.
     onSecretUpdated();
+    return absl::OkStatus();
   });
   if (!config_->alpnProtocols().empty()) {
     supported_alpns_ = absl::StrSplit(config_->alpnProtocols(), ',');
