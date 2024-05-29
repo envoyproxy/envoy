@@ -34,7 +34,7 @@ Statistics
 ----------
 
 This filter emits the following general statistics, rooted at *downstream_proxy_proto.<stat_prefix>*
-<stat_prefix>
+
 .. csv-table::
   :header: Name, Type, Description
   :widths: 4, 1, 8

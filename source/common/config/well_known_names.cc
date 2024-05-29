@@ -28,7 +28,7 @@ std::string expandRegex(const std::string& regex) {
               {"<ROUTE_CONFIG_NAME>", R"([\w-\./]+)"},
               // Match a prefix that is either a listener plus name or cluster plus name
               {"<LISTENER_OR_CLUSTER_WITH_NAME>", R"((?:listener|cluster)\..*?)"},
-              {"<PROXY_PROTOCOL_VERSION>", R"(\d+)"}});
+              {"<PROXY_PROTOCOL_VERSION>", R"(\d)"}});
 }
 
 const Regex::CompiledGoogleReMatcher& validTagValueRegex() {
