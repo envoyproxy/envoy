@@ -79,6 +79,9 @@ minor_behavior_changes:
     In xDS configuration, the :ref:`AUTO <envoy_v3_api_enum_value_config.core.v3.ApiVersion.AUTO>` value now means
     :ref:`V3 <envoy_v3_api_enum_value_config.core.v3.ApiVersion.V3>`. :ref:`AUTO <envoy_v3_api_enum_value_config.core.v3.ApiVersion.AUTO>`
     is the default value of the enum, so this field may be omitted from all configurations now.
+- area: filters
+  change: |
+    Set ``WWW-Authenticate`` header for 401 responses from the Basic Auth filter.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

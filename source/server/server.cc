@@ -756,9 +756,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
       !bootstrap_.dynamic_resources().lds_resources_locator().empty()) {
     std::unique_ptr<xds::core::v3::ResourceLocator> lds_resources_locator;
     if (!bootstrap_.dynamic_resources().lds_resources_locator().empty()) {
-      lds_resources_locator =
-          std::make_unique<xds::core::v3::ResourceLocator>(Config::XdsResourceIdentifier::decodeUrl(
-              bootstrap_.dynamic_resources().lds_resources_locator()));
+      lds_resources_locator = std::make_unique<xds::core::v3::ResourceLocator>(
+          THROW_OR_RETURN_VALUE(Config::XdsResourceIdentifier::decodeUrl(
+                                    bootstrap_.dynamic_resources().lds_resources_locator()),
+                                xds::core::v3::ResourceLocator));
     }
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(),
                                     lds_resources_locator.get());

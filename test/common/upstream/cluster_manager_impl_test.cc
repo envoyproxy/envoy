@@ -421,7 +421,8 @@ TEST_F(ODCDTest, TestAllocateWithLocator) {
       "static_cluster");
 
   auto locator =
-      Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.config.cluster.v3.Cluster/bar");
+      Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.config.cluster.v3.Cluster/bar")
+          .value();
   auto handle = cluster_manager_->allocateOdCdsApi(config, locator, mock_visitor);
   EXPECT_NE(handle, nullptr);
 }

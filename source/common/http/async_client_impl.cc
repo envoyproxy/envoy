@@ -38,6 +38,9 @@ AsyncClientImpl::~AsyncClientImpl() {
 }
 
 template <typename T> T* AsyncClientImpl::internalStartRequest(T* async_request) {
+  if (!async_request) {
+    return nullptr;
+  }
   async_request->initialize();
   std::unique_ptr<AsyncStreamImpl> new_request{async_request};
 
@@ -60,7 +63,7 @@ AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
                                             AsyncClient::Callbacks& callbacks,
                                             const AsyncClient::RequestOptions& options) {
   AsyncRequestImpl* async_request =
-      new AsyncRequestImpl(std::move(request), *this, callbacks, options);
+      AsyncRequestImpl::create(std::move(request), *this, callbacks, options);
   return internalStartRequest(async_request);
 }
 
@@ -68,28 +71,33 @@ AsyncClient::OngoingRequest*
 AsyncClientImpl::startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
                               const AsyncClient::RequestOptions& options) {
   AsyncOngoingRequestImpl* async_request =
-      new AsyncOngoingRequestImpl(std::move(request_headers), *this, callbacks, options);
+      AsyncOngoingRequestImpl::create(std::move(request_headers), *this, callbacks, options);
   return internalStartRequest(async_request);
 }
 
 AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
                                             const AsyncClient::StreamOptions& options) {
-  std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(*this, callbacks, options)};
-  LinkedList::moveIntoList(std::move(new_stream), active_streams_);
+  auto stream_or_error = AsyncStreamImpl::create(*this, callbacks, options);
+  if (!stream_or_error.ok()) {
+    callbacks.onReset();
+    return nullptr;
+  }
+  LinkedList::moveIntoList(std::move(stream_or_error.value()), active_streams_);
   return active_streams_.front().get();
 }
 
 std::unique_ptr<const Router::RetryPolicy>
 createRetryPolicy(AsyncClientImpl& parent, const AsyncClient::StreamOptions& options,
-                  Server::Configuration::CommonFactoryContext& context) {
+                  Server::Configuration::CommonFactoryContext& context,
+                  absl::Status& creation_status) {
   if (options.retry_policy.has_value()) {
     Upstream::RetryExtensionFactoryContextImpl factory_context(
         parent.factory_context_.singletonManager());
-    return THROW_OR_RETURN_VALUE(
-        Router::RetryPolicyImpl::create(options.retry_policy.value(),
-                                        ProtobufMessage::getNullValidationVisitor(),
-                                        factory_context, context),
-        std::unique_ptr<const Router::RetryPolicy>);
+    auto policy_or_error = Router::RetryPolicyImpl::create(
+        options.retry_policy.value(), ProtobufMessage::getNullValidationVisitor(), factory_context,
+        context);
+    creation_status = policy_or_error.status();
+    return policy_or_error.status().ok() ? std::move(policy_or_error.value()) : nullptr;
   }
   if (options.parsed_retry_policy == nullptr) {
     return std::make_unique<Router::RetryPolicyImpl>();
@@ -98,7 +106,8 @@ createRetryPolicy(AsyncClientImpl& parent, const AsyncClient::StreamOptions& opt
 }
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
-                                 const AsyncClient::StreamOptions& options)
+                                 const AsyncClient::StreamOptions& options,
+                                 absl::Status& creation_status)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_->random_.random()),
       router_(options.filter_config_ ? options.filter_config_ : parent.config_,
               parent.config_->async_stats_),
@@ -108,7 +117,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                        : std::make_shared<StreamInfo::FilterStateImpl>(
                              StreamInfo::FilterState::LifeSpan::FilterChain)),
       tracing_config_(Tracing::EgressConfig::get()),
-      retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_)),
+      retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_, creation_status)),
       route_(std::make_shared<NullRouteImpl>(
           parent_.cluster_->name(),
           retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
@@ -291,8 +300,12 @@ void AsyncStreamImpl::resetStream(Http::StreamResetReason, absl::string_view) {
 
 AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
                                                AsyncClient::Callbacks& callbacks,
-                                               const AsyncClient::RequestOptions& options)
-    : AsyncStreamImpl(parent, *this, options), callbacks_(callbacks) {
+                                               const AsyncClient::RequestOptions& options,
+                                               absl::Status& creation_status)
+    : AsyncStreamImpl(parent, *this, options, creation_status), callbacks_(callbacks) {
+  if (!creation_status.ok()) {
+    return;
+  }
   if (nullptr != options.parent_span_) {
     const std::string child_span_name =
         options.child_span_name_.empty()

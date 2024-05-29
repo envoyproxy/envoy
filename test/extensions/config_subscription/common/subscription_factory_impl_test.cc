@@ -61,7 +61,7 @@ public:
   SubscriptionPtr
   collectionSubscriptionFromUrl(const std::string& xds_url,
                                 const envoy::config::core::v3::ConfigSource& config) {
-    const auto resource_locator = XdsResourceIdentifier::decodeUrl(xds_url);
+    const auto resource_locator = XdsResourceIdentifier::decodeUrl(xds_url).value();
     return subscription_factory_.collectionSubscriptionFromUrl(
         resource_locator, config, "envoy.config.endpoint.v3.ClusterLoadAssignment",
         *stats_store_.rootScope(), callbacks_, resource_decoder_);
