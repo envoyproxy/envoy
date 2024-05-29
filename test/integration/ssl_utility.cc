@@ -106,8 +106,9 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
       tls_context, mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::UpstreamTransportSocketFactoryPtr{
-      new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
-          std::move(cfg), context_manager, *client_stats_store->rootScope())};
+      THROW_OR_RETURN_VALUE(Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
+                                std::move(cfg), context_manager, *client_stats_store->rootScope()),
+                            Network::UpstreamTransportSocketFactoryPtr)};
 }
 
 Network::DownstreamTransportSocketFactoryPtr
@@ -122,9 +123,10 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
 
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   if (!use_http3) {
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
-        std::vector<std::string>{});
+    return Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+               std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
+               std::vector<std::string>{})
+        .value();
   }
   envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
   quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
@@ -155,9 +157,10 @@ Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(
       tls_context, factory_context);
 
   static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
-  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-      std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
-      std::vector<std::string>{});
+  return Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+             std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
+             std::vector<std::string>{})
+      .value();
 }
 Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port) {

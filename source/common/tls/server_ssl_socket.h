@@ -34,9 +34,9 @@ class ServerSslSocketFactory : public Network::DownstreamTransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:
-  ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
-                         Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope,
-                         const std::vector<std::string>& server_names);
+  static absl::StatusOr<std::unique_ptr<ServerSslSocketFactory>>
+  create(Envoy::Ssl::ServerContextConfigPtr config, Envoy::Ssl::ContextManager& manager,
+         Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
 
   ~ServerSslSocketFactory() override;
 
@@ -45,6 +45,12 @@ public:
 
   // Secret::SecretCallbacks
   absl::Status onAddOrUpdateSecret() override;
+
+protected:
+  ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
+                         Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope,
+                         const std::vector<std::string>& server_names,
+                         absl::Status& creation_status);
 
 private:
   Ssl::ContextManager& manager_;
