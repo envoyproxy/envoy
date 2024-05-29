@@ -143,7 +143,7 @@ std::string Span::getTraceIdAsHex() const {
 }
 
 std::string Span::getSpanIdAsHex() const {
-  // TODO(ashishb-solo): This method is not yet implemented for Datadog.
+  // TODO(#34412): This method is not yet implemented for Datadog.
   return EMPTY_STRING;
 }
 
