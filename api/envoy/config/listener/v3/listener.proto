@@ -388,7 +388,7 @@ message Listener {
   // :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`.
   bool ignore_global_conn_limit = 31;
 
-  // Whether the listener bypass configured overload manager actions.
+  // Whether the listener bypasses configured overload manager actions.
   bool bypass_overload_manager = 35;
 }
 
