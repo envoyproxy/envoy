@@ -139,7 +139,7 @@ public:
     }
     return [&config, this](Ssl::ContextSelectionCallbackWeakPtr ctx) {
       ENVOY_LOG_MISC(info, "debug: init provider");
-      auto provider = std::make_shared<TestTlsCertificateSelector>(ctx, config);
+      auto provider = std::make_unique<TestTlsCertificateSelector>(ctx, config);
       provider->mod_ = mod_;
       return provider;
     };

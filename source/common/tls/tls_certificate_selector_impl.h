@@ -38,7 +38,7 @@ public:
                                  Ssl::TlsCertificateSelectorFactoryContext&,
                                  ProtobufMessage::ValidationVisitor&) override {
     return [](Ssl::ContextSelectionCallbackWeakPtr ctx) {
-      return std::make_shared<TlsCertificateSelectorImpl>(ctx);
+      return std::make_unique<TlsCertificateSelectorImpl>(ctx);
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

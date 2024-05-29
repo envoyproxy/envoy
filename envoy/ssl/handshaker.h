@@ -203,7 +203,7 @@ public:
                                            CertSelectionCallbackSharedPtr cb) PURE;
 };
 
-using TlsCertificateSelectorSharedPtr = std::shared_ptr<TlsCertificateSelector>;
+using TlsCertificateSelectorPtr = std::unique_ptr<TlsCertificateSelector>;
 
 class ContextSelectionCallback {
 public:
@@ -218,7 +218,7 @@ public:
 using ContextSelectionCallbackWeakPtr = std::weak_ptr<ContextSelectionCallback>;
 
 using TlsCertificateSelectorFactoryCb =
-    std::function<TlsCertificateSelectorSharedPtr(ContextSelectionCallbackWeakPtr)>;
+    std::function<TlsCertificateSelectorPtr(ContextSelectionCallbackWeakPtr)>;
 
 class TlsCertificateSelectorFactoryContext {
 public:
