@@ -1579,7 +1579,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(
   for (const auto& it : config.plugins_config()) {
     auto plugin_name = it.first;
     auto route_plugin = it.second;
-    RoutePluginConfigPtr conf(new RoutePluginConfig(plugin_name, route_plugin));
+    RoutePluginConfigPtr conf = std::make_shared<RoutePluginConfig>(plugin_name, route_plugin);
     ENVOY_LOG(debug, "per route golang filter config, type_url: {}",
               route_plugin.config().type_url());
     plugins_config_.insert({plugin_name, std::move(conf)});
@@ -1643,13 +1643,12 @@ uint64_t RoutePluginConfig::getConfigId() {
   auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
   auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
 
-  config_ = new httpConfig();
-  config_->plugin_name_ptr = name_ptr;
-  config_->plugin_name_len = plugin_name_.length();
-  config_->config_ptr = buf_ptr;
-  config_->config_len = buf.length();
-  config_->is_route_config = 1;
-  return dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
+  config_.plugin_name_ptr = name_ptr;
+  config_.plugin_name_len = plugin_name_.length();
+  config_.config_ptr = buf_ptr;
+  config_.config_len = buf.length();
+  config_.is_route_config = 1;
+  return dso_lib_->envoyGoFilterNewHttpPluginConfig(&config_);
 };
 
 uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {

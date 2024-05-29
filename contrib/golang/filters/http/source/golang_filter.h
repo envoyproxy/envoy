@@ -93,6 +93,7 @@ private:
   // TODO(StarryVae): use rwlock.
   Thread::MutexBasicLockable mutex_{};
   MetricStoreSharedPtr metric_store_ ABSL_GUARDED_BY(mutex_);
+  // filter level config is created in C++ side, and freed by Golang GC finalizer.
   httpConfigInternal* config_{nullptr};
 };
 
@@ -118,7 +119,8 @@ private:
   uint64_t cached_parent_id_ ABSL_GUARDED_BY(mutex_){0};
 
   absl::Mutex mutex_;
-  httpConfig* config_{nullptr};
+  // route level config, no Golang GC finalizer.
+  httpConfig config_;
 };
 
 using RoutePluginConfigPtr = std::shared_ptr<RoutePluginConfig>;
