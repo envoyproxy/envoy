@@ -163,6 +163,38 @@ paths:
     - source/common/event/file_event_impl.cc
     - source/common/http/async_client_impl.cc
     - source/common/grpc/google_async_client_impl.cc
+    # Extensions can exempt entire directories but new extensions
+    # points should ideally use StatusOr
+    - source/extensions/access_loggers
+    - source/extensions/bootstrap
+    - source/extensions/clusters
+    - source/extensions/common
+    - source/extensions/config
+    - source/extensions/config_subscription
+    - source/extensions/compression/zstd/common
+    - source/extensions/early_data
+    - source/extensions/filters
+    - source/extensions/formatter
+    - source/extensions/geoip_providers
+    - source/extensions/grpc_credentials
+    - source/extensions/health_check
+    - source/extensions/health_checkers
+    - source/extensions/http
+    - source/extensions/io_socket
+    - source/extensions/key_value
+    - source/extensions/listener_managers
+    - source/extensions/load_balancing_policies
+    - source/extensions/matching
+    - source/extensions/network
+    - source/extensions/path
+    - source/extensions/rate_limit_descriptors
+    - source/extensions/resource_monitors
+    - source/extensions/retry
+    - source/extensions/router
+    - source/extensions/stat_sinks
+    - source/extensions/string_matcher
+    - source/extensions/tracers
+    - source/extensions/transport_sockets
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:
