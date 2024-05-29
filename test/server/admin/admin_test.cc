@@ -17,6 +17,7 @@
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 #include "source/server/admin/stats_request.h"
 #include "source/server/configuration_impl.h"
+#include "source/server/null_overload_manager.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
