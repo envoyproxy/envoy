@@ -67,6 +67,7 @@ public:
         SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+        /*failover_async_client_=*/nullptr,
         /*dispatcher_=*/dispatcher_,
         /*service_method_=*/
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -777,9 +778,9 @@ TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {
   ads_config.mutable_rate_limit_settings()->mutable_max_tokens()->set_value(100);
   ads_config.mutable_rate_limit_settings()->mutable_fill_rate()->set_value(
       std::numeric_limits<double>::quiet_NaN());
-  EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), dispatcher, random, scope,
-                               ads_config, local_info, nullptr, nullptr, absl::nullopt,
-                               absl::nullopt, false),
+  EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
+                               random, scope, ads_config, local_info, nullptr, nullptr,
+                               absl::nullopt, absl::nullopt, false),
                EnvoyException);
 }
 

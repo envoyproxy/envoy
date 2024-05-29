@@ -22,7 +22,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/grpc/common.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
-#include "source/extensions/config_subscription/grpc/grpc_stream.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_failover.h"
 #include "source/extensions/config_subscription/grpc/pausable_ack_queue.h"
 #include "source/extensions/config_subscription/grpc/watch_map.h"
 #include "source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.h"
@@ -107,7 +107,7 @@ public:
     return makeOptRefFromPtr(eds_resources_cache_.get());
   }
 
-  GrpcStream<RQ, RS>& grpcStreamForTest() { return grpc_stream_; }
+  GrpcStreamInterface<RQ, RS>& grpcStreamForTest() { return grpc_stream_.currentStreamForTest(); }
 
 protected:
   class WatchImpl : public Envoy::Config::GrpcMuxWatch {
@@ -172,7 +172,8 @@ private:
   // Invoked when dynamic context parameters change for a resource type.
   void onDynamicContextUpdate(absl::string_view resource_type_url);
 
-  GrpcStream<RQ, RS> grpc_stream_;
+  // Multiplexes the stream to the primary and failover sources.
+  GrpcMuxFailover<RQ, RS> grpc_stream_;
 
   // Resource (N)ACKs we're waiting to send, stored in the order that they should be sent in. All
   // of our different resource types' ACKs are mixed together in this queue. See class for

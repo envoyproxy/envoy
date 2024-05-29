@@ -60,10 +60,42 @@ std::string convertToWildcard(const std::string& resource_name) {
 } // namespace
 
 GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node)
-    : grpc_stream_(this, std::move(grpc_mux_context.async_client_),
-                   grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
-                   grpc_mux_context.scope_, std::move(grpc_mux_context.backoff_strategy_),
-                   grpc_mux_context.rate_limit_settings_),
+    : grpc_stream_(
+          /*primary_stream_creator=*/
+          [&grpc_mux_context](
+              GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse>* callbacks)
+              -> GrpcStreamInterfacePtr<envoy::service::discovery::v3::DiscoveryRequest,
+                                        envoy::service::discovery::v3::DiscoveryResponse> {
+            return std::make_unique<GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
+                                               envoy::service::discovery::v3::DiscoveryResponse>>(
+                callbacks, std::move(grpc_mux_context.async_client_),
+                grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
+                grpc_mux_context.scope_, std::move(grpc_mux_context.backoff_strategy_),
+                grpc_mux_context.rate_limit_settings_);
+          },
+          /*failover_stream_creator=*/
+          grpc_mux_context.failover_async_client_
+              ? absl::make_optional(
+                    [&grpc_mux_context](
+                        GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse>*
+                            callbacks)
+                        -> GrpcStreamInterfacePtr<
+                            envoy::service::discovery::v3::DiscoveryRequest,
+                            envoy::service::discovery::v3::DiscoveryResponse> {
+                      return std::make_unique<
+                          GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
+                                     envoy::service::discovery::v3::DiscoveryResponse>>(
+                          callbacks, std::move(grpc_mux_context.failover_async_client_),
+                          grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
+                          grpc_mux_context.scope_,
+                          // TODO(adisuissa): the backoff strategy for the failover should
+                          // be the same as the primary source.
+                          std::make_unique<FixedBackOffStrategy>(500),
+                          grpc_mux_context.rate_limit_settings_);
+                    })
+              : absl::nullopt,
+          /*grpc_mux_callbacks=*/*this,
+          /*dispatch=*/grpc_mux_context.dispatcher_),
       local_info_(grpc_mux_context.local_info_), skip_subsequent_node_(skip_subsequent_node),
       config_validators_(std::move(grpc_mux_context.config_validators_)),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
@@ -566,8 +598,8 @@ public:
   std::string name() const override { return "envoy.config_mux.grpc_mux_factory"; }
   void shutdownAll() override { return GrpcMuxImpl::shutdownAll(); }
   std::shared_ptr<GrpcMux>
-  create(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-         Random::RandomGenerator&, Stats::Scope& scope,
+  create(Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
+         Event::Dispatcher& dispatcher, Random::RandomGenerator&, Stats::Scope& scope,
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
@@ -577,6 +609,7 @@ public:
     THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::move(async_client),
+        /*failover_async_client_=*/std::move(failover_async_client),
         /*dispatcher_=*/dispatcher,
         /*service_method_=*/
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(

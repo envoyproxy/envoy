@@ -27,7 +27,7 @@
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
-#include "source/extensions/config_subscription/grpc/grpc_stream.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_failover.h"
 
 #include "absl/container/node_hash_map.h"
 #include "xds/core/v3/resource_name.pb.h"
@@ -84,10 +84,10 @@ public:
                       ControlPlaneStats& control_plane_stats) override;
   void onWriteable() override;
 
-  GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
-             envoy::service::discovery::v3::DiscoveryResponse>&
+  GrpcStreamInterface<envoy::service::discovery::v3::DiscoveryRequest,
+                      envoy::service::discovery::v3::DiscoveryResponse>&
   grpcStreamForTest() {
-    return grpc_stream_;
+    return grpc_stream_.currentStreamForTest();
   }
 
 private:
@@ -257,8 +257,9 @@ private:
                                  ApiState& api_state, const std::string& type_url,
                                  const std::string& version_info, bool call_delegate);
 
-  GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
-             envoy::service::discovery::v3::DiscoveryResponse>
+  // Multiplexes the stream to the primary and failover sources.
+  GrpcMuxFailover<envoy::service::discovery::v3::DiscoveryRequest,
+                  envoy::service::discovery::v3::DiscoveryResponse>
       grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;

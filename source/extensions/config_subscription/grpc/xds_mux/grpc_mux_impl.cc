@@ -39,25 +39,47 @@ using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
 
 template <class S, class F, class RQ, class RS>
 GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory,
-                                       GrpcMuxContext& grpc_mux_content, bool skip_subsequent_node)
-    : grpc_stream_(this, std::move(grpc_mux_content.async_client_),
-                   grpc_mux_content.service_method_, grpc_mux_content.dispatcher_,
-                   grpc_mux_content.scope_, std::move(grpc_mux_content.backoff_strategy_),
-                   grpc_mux_content.rate_limit_settings_),
+                                       GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node)
+    : grpc_stream_(
+          /*primary_stream_creator=*/
+          [&grpc_mux_context](
+              GrpcStreamCallbacks<RS>* callbacks) -> GrpcStreamInterfacePtr<RQ, RS> {
+            return std::make_unique<GrpcStream<RQ, RS>>(
+                callbacks, std::move(grpc_mux_context.async_client_),
+                grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
+                grpc_mux_context.scope_, std::move(grpc_mux_context.backoff_strategy_),
+                grpc_mux_context.rate_limit_settings_);
+          },
+          /*failover_stream_creator=*/
+          grpc_mux_context.failover_async_client_
+              ? absl::make_optional([&grpc_mux_context](GrpcStreamCallbacks<RS>* callbacks)
+                                        -> GrpcStreamInterfacePtr<RQ, RS> {
+                  return std::make_unique<GrpcStream<RQ, RS>>(
+                      callbacks, std::move(grpc_mux_context.failover_async_client_),
+                      grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
+                      grpc_mux_context.scope_,
+                      // TODO(adisuissa): the backoff strategy for the failover should
+                      // be the same as the primary source.
+                      std::make_unique<FixedBackOffStrategy>(500),
+                      grpc_mux_context.rate_limit_settings_);
+                })
+              : absl::nullopt,
+          /*grpc_mux_callbacks=*/*this,
+          /*dispatch=*/grpc_mux_context.dispatcher_),
       subscription_state_factory_(std::move(subscription_state_factory)),
-      skip_subsequent_node_(skip_subsequent_node), local_info_(grpc_mux_content.local_info_),
+      skip_subsequent_node_(skip_subsequent_node), local_info_(grpc_mux_context.local_info_),
       dynamic_update_callback_handle_(
-          grpc_mux_content.local_info_.contextProvider().addDynamicContextUpdateCallback(
+          grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(
               [this](absl::string_view resource_type_url) {
                 onDynamicContextUpdate(resource_type_url);
                 return absl::OkStatus();
               })),
-      config_validators_(std::move(grpc_mux_content.config_validators_)),
-      xds_config_tracker_(grpc_mux_content.xds_config_tracker_),
-      xds_resources_delegate_(grpc_mux_content.xds_resources_delegate_),
-      eds_resources_cache_(std::move(grpc_mux_content.eds_resources_cache_)),
-      target_xds_authority_(grpc_mux_content.target_xds_authority_) {
-  THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("ads", grpc_mux_content.local_info_));
+      config_validators_(std::move(grpc_mux_context.config_validators_)),
+      xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
+      xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
+      eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
+      target_xds_authority_(grpc_mux_context.target_xds_authority_) {
+  THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("ads", grpc_mux_context.local_info_));
   AllMuxes::get().insert(this);
 }
 
@@ -410,8 +432,8 @@ public:
   std::string name() const override { return "envoy.config_mux.delta_grpc_mux_factory"; }
   void shutdownAll() override { return GrpcMuxDelta::shutdownAll(); }
   std::shared_ptr<GrpcMux>
-  create(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-         Random::RandomGenerator&, Stats::Scope& scope,
+  create(Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
+         Event::Dispatcher& dispatcher, Random::RandomGenerator&, Stats::Scope& scope,
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
@@ -421,6 +443,7 @@ public:
     THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::move(async_client),
+        /*failover_async_client_=*/std::move(failover_async_client),
         /*dispatcher_=*/dispatcher,
         /*service_method_=*/
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -448,8 +471,8 @@ public:
   std::string name() const override { return "envoy.config_mux.sotw_grpc_mux_factory"; }
   void shutdownAll() override { return GrpcMuxSotw::shutdownAll(); }
   std::shared_ptr<GrpcMux>
-  create(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-         Random::RandomGenerator&, Stats::Scope& scope,
+  create(Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
+         Event::Dispatcher& dispatcher, Random::RandomGenerator&, Stats::Scope& scope,
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
@@ -459,6 +482,7 @@ public:
     THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::move(async_client),
+        /*failover_async_client_=*/std::move(failover_async_client),
         /*dispatcher_=*/dispatcher,
         /*service_method_=*/
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(

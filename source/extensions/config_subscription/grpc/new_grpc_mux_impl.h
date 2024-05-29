@@ -17,7 +17,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/config_subscription/grpc/delta_subscription_state.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
-#include "source/extensions/config_subscription/grpc/grpc_stream.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_failover.h"
 #include "source/extensions/config_subscription/grpc/pausable_ack_queue.h"
 #include "source/extensions/config_subscription/grpc/watch_map.h"
 
@@ -78,10 +78,10 @@ public:
   // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
-  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
-             envoy::service::discovery::v3::DeltaDiscoveryResponse>&
+  GrpcStreamInterface<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+                      envoy::service::discovery::v3::DeltaDiscoveryResponse>&
   grpcStreamForTest() {
-    return grpc_stream_;
+    return grpc_stream_.currentStreamForTest();
   }
 
   struct SubscriptionStuff {
@@ -181,8 +181,9 @@ private:
   // the order of Envoy's dependency ordering).
   std::list<std::string> subscription_ordering_;
 
-  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
-             envoy::service::discovery::v3::DeltaDiscoveryResponse>
+  // Multiplexes the stream to the primary and failover sources.
+  GrpcMuxFailover<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+                  envoy::service::discovery::v3::DeltaDiscoveryResponse>
       grpc_stream_;
 
   const LocalInfo::LocalInfo& local_info_;
