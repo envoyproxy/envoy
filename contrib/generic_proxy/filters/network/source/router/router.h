@@ -153,7 +153,7 @@ public:
     max_retries_ = route_entry_ ? route_entry->retryPolicy().numRetries() : 1;
   }
 
-  std::list<UpstreamRequestPtr>& upstreamRequestsForTest() { return upstream_requests_; }
+  size_t upstreamRequestsSize() { return upstream_requests_.size(); }
 
   // Upstream::LoadBalancerContextBase
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override;
