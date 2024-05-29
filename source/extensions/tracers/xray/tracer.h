@@ -234,7 +234,7 @@ public:
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
 
   // TODO(#34412): This method is unimplemented for X-Ray.
-  std::string getSpanIdAsHex() const override { return EMPTY_STRING; };
+  std::string getSpanId() const override { return EMPTY_STRING; };
 
   /**
    * Creates a child span.

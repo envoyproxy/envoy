@@ -176,7 +176,7 @@ TEST_F(AccessLogTest, TraceId) {
   NiceMock<Tracing::MockSpan> active_span;
 
   EXPECT_CALL(active_span, getTraceIdAsHex()).WillOnce(Return("404142434445464748494a4b4c4d4e4f"));
-  EXPECT_CALL(active_span, getSpanIdAsHex()).WillOnce(Return("4041424344454647"));
+  EXPECT_CALL(active_span, getSpanId()).WillOnce(Return("4041424344454647"));
   expectLog(R"EOF(
       span_id: "QEFCQ0RFRkc="
       trace_id: "QEFCQ0RFRkdISUpLTE1OTw=="

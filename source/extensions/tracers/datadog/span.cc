@@ -142,7 +142,7 @@ std::string Span::getTraceIdAsHex() const {
   return absl::StrCat(absl::Hex(span_->id()));
 }
 
-std::string Span::getSpanIdAsHex() const {
+std::string Span::getSpanId() const {
   // TODO(#34412): This method is not yet implemented for Datadog.
   return EMPTY_STRING;
 }
