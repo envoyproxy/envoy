@@ -90,7 +90,7 @@ public:
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override { return handler_; }
-  // TODO: currently thrift decider with passthrough enabling relies on frame size in transport.
+  // TODO: currently the thrift decoder with passthrough enabling relies on frame size in transport.
   // However, unframed transport does not have frame size.
   // In theory we could know the frame size by looking at the end_stream flag in the future.
   bool passthroughEnabled() const override { return false; }

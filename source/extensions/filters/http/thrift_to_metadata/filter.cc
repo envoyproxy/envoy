@@ -174,6 +174,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
     handleAllOnMissing(config_->requestRules(), *decoder_callbacks_, request_processing_finished_);
     config_->rqstats().invalid_thrift_body_.inc();
+    return Http::FilterDataStatus::Continue;
   }
 
   return request_processing_finished_ ? Http::FilterDataStatus::Continue
@@ -237,6 +238,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
     handleAllOnMissing(config_->responseRules(), *encoder_callbacks_,
                        response_processing_finished_);
     config_->respstats().invalid_thrift_body_.inc();
+    return Http::FilterDataStatus::Continue;
   }
 
   return response_processing_finished_ ? Http::FilterDataStatus::Continue
@@ -288,6 +290,8 @@ FilterStatus Filter::messageBegin(MessageMetadataSharedPtr metadata) {
     processMetadata(metadata, config_->responseRules(), resp_handler_, *encoder_callbacks_,
                     config_->respstats(), response_processing_finished_);
   }
+
+  // We don't need to process the rest of the message.
   return FilterStatus::StopIteration;
 }
 

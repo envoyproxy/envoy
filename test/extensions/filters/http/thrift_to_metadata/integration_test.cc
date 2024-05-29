@@ -243,7 +243,7 @@ TEST_P(ThriftToMetadataIntegrationTest, MismatchedContentType) {
 
   const Http::TestRequestHeaderMapImpl rq_headers{{":scheme", "http"},
                                                   {":path", "/ping"},
-                                                  {":method", "GET"},
+                                                  {":method", "POST"},
                                                   {":authority", "host"},
                                                   {"Content-Type", "application/x-haha"}};
   Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
@@ -267,7 +267,12 @@ TEST_P(ThriftToMetadataIntegrationTest, MismatchedContentType) {
 TEST_P(ThriftToMetadataIntegrationTest, NoBody) {
   initializeFilter();
 
-  runTest(rq_headers_, "", resp_headers_, "");
+  const Http::TestRequestHeaderMapImpl rq_headers{{":scheme", "http"},
+                                                  {":path", "/ping"},
+                                                  {":method", "GET"},
+                                                  {":authority", "host"},
+                                                  {"Content-Type", "application/x-thrift"}};
+  runTest(rq_headers, "", resp_headers_, "");
 
   EXPECT_EQ(0UL, test_server_->counter("thrift_to_metadata.rq.success")->value());
   EXPECT_EQ(0UL, test_server_->counter("thrift_to_metadata.rq.mismatched_content_type")->value());
