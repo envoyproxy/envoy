@@ -132,10 +132,10 @@ public:
   virtual FrameFlags frameFlags() const { return {}; }
 };
 
-using StreamFramePtr = std::unique_ptr<StreamFrame>;
-using StreamFrameSharedPtr = std::shared_ptr<StreamFrame>;
+class CommonFrame : public StreamFrame {};
+using CommonFramePtr = std::unique_ptr<CommonFrame>;
 
-class StreamBase : public StreamFrame {
+class HeaderFrame : public StreamFrame {
 public:
   using IterateCallback = std::function<bool(absl::string_view key, absl::string_view val)>;
 
@@ -180,15 +180,18 @@ public:
   static constexpr absl::string_view name() { return "generic_proxy"; }
 };
 
+// Alias for backward compatibility.
+using StreamBase = HeaderFrame;
+
 /**
  * Interface of generic request. This is derived from StreamFrame that contains the request
- * specific information. First frame of the request MUST be a StreamRequest.
+ * specific information. First frame of the request MUST be a RequestHeaderFrame.
  *
- * NOTE: using interface that provided by the TraceContext as the interface of generic request here
- * to simplify the tracing integration. This is not a good design. This should be changed in the
- * future.
+ * NOTE: using interface that provided by the TraceContext as the interface of generic request
+ * here to simplify the tracing integration. This is not a good design. This should be changed
+ * in the future.
  */
-class StreamRequest : public StreamBase {
+class RequestHeaderFrame : public HeaderFrame {
 public:
   /**
    * Get request host.
@@ -217,12 +220,15 @@ public:
   virtual absl::string_view method() const { return {}; }
 };
 
-using StreamRequestPtr = std::unique_ptr<StreamRequest>;
-using StreamRequestSharedPtr = std::shared_ptr<StreamRequest>;
+using RequestHeaderFramePtr = std::unique_ptr<RequestHeaderFrame>;
+using RequestCommonFrame = CommonFrame;
+using RequestCommonFramePtr = std::unique_ptr<RequestCommonFrame>;
+
 // Alias for backward compatibility.
-using Request = StreamRequest;
+using StreamRequest = RequestHeaderFrame;
+using StreamRequestPtr = RequestHeaderFramePtr;
+using Request = RequestHeaderFrame;
 using RequestPtr = std::unique_ptr<Request>;
-using RequestSharedPtr = std::shared_ptr<Request>;
 
 enum class Event {
   Timeout,
@@ -264,9 +270,9 @@ private:
 
 /**
  * Interface of generic response. This is derived from StreamFrame that contains the response
- * specific information. First frame of the response MUST be a StreamResponse.
+ * specific information. First frame of the response MUST be a ResponseHeaderFrame.
  */
-class StreamResponse : public StreamBase {
+class ResponseHeaderFrame : public HeaderFrame {
 public:
   /**
    * Get response status.
@@ -276,26 +282,15 @@ public:
   virtual StreamStatus status() const { return {}; }
 };
 
-using StreamResponsePtr = std::unique_ptr<StreamResponse>;
-using StreamResponseSharedPtr = std::shared_ptr<StreamResponse>;
+using ResponseHeaderFramePtr = std::unique_ptr<ResponseHeaderFrame>;
+using ResponseCommonFrame = CommonFrame;
+using ResponseCommonFramePtr = std::unique_ptr<ResponseCommonFrame>;
+
 // Alias for backward compatibility.
-using Response = StreamResponse;
+using StreamResponse = ResponseHeaderFrame;
+using StreamResponsePtr = ResponseHeaderFramePtr;
+using Response = ResponseHeaderFrame;
 using ResponsePtr = std::unique_ptr<Response>;
-using ResponseSharedPtr = std::shared_ptr<Response>;
-
-template <class T> class StreamFramePtrHelper {
-public:
-  StreamFramePtrHelper(StreamFramePtr frame) : frame_(std::move(frame)) {
-    if (auto typed_frame_ptr = dynamic_cast<T*>(frame_.get()); typed_frame_ptr != nullptr) {
-      // If the frame is the expected type, wrap it in the typed frame unique pointer.
-      frame_.release();
-      typed_frame_ = std::unique_ptr<T>{typed_frame_ptr};
-    }
-  }
-
-  StreamFramePtr frame_;
-  std::unique_ptr<T> typed_frame_;
-};
 
 } // namespace GenericProxy
 } // namespace NetworkFilters

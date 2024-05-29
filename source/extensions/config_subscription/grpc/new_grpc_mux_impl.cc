@@ -46,6 +46,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
           grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(
               [this](absl::string_view resource_type_url) {
                 onDynamicContextUpdate(resource_type_url);
+                return absl::OkStatus();
               })),
       dispatcher_(grpc_mux_context.dispatcher_),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),

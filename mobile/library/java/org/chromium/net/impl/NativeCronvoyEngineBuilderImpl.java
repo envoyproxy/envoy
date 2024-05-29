@@ -45,11 +45,13 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mDnsCacheSaveIntervalSeconds = 1;
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
+  private boolean mUseCares = false;
+  private boolean mUseGro = false;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
   private final boolean mEnableInterfaceBinding = false;
-  private final boolean mEnableProxying = false;
+  private boolean mEnableProxying = false;
   private final int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 1;
   private final int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private final int mMaxConnectionsPerHost = 7;
@@ -59,6 +61,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private final boolean mEnablePlatformCertificatesValidation = true;
+  private String mUpstreamTlsSni = "";
   private final String mNodeId = "";
   private final String mNodeRegion = "";
   private final String mNodeZone = "";
@@ -84,6 +87,27 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
+   * Enable using the c_ares DNS resolver.
+   *
+   * @param enable If true, use c_ares.
+   */
+  public NativeCronvoyEngineBuilderImpl setUseCares(boolean enable) {
+    mUseCares = enable;
+    return this;
+  }
+
+  /**
+   * Specify whether to use UDP GRO for upstream QUIC/HTTP3 sockets, if GRO is available on the
+   * system.
+   *
+   * @param enable If true, use UDP GRO.
+   */
+  public NativeCronvoyEngineBuilderImpl setUseGro(boolean enable) {
+    mUseGro = enable;
+    return this;
+  }
+
+  /**
    * Set the DNS query timeout, in seconds, which ensures that DNS queries succeed or fail
    * within that time range. See the DnsCacheConfig.dns_query_timeout proto field for details.
    *
@@ -93,6 +117,16 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setDnsQueryTimeoutSeconds(int timeout) {
     mDnsQueryTimeoutSeconds = timeout;
+    return this;
+  }
+
+  /**
+   * Enable Android system proxying.
+   *
+   * @param enable If true, enable Android proxying; otherwise, don't.
+   */
+  public NativeCronvoyEngineBuilderImpl setEnableProxying(boolean enable) {
+    mEnableProxying = enable;
     return this;
   }
 
@@ -136,6 +170,16 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setRuntimeGuard(String feature, boolean value) {
     mRuntimeGuards.put(feature, value);
+    return this;
+  }
+
+  /**
+   * Sets the upstream TLS socket's SNI override. If empty, no SNI override will be configured.
+   *
+   * @param sni The SNI to override on the upstream HTTP/3 or HTTP/2 TLS socket.
+   */
+  public NativeCronvoyEngineBuilderImpl setUpstreamTlsSni(String sni) {
+    mUpstreamTlsSni = sni;
     return this;
   }
 
@@ -190,14 +234,14 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mEnableDrainPostDnsRefresh, quicEnabled(), quicConnectionOptions(),
+        mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mUseGro, quicConnectionOptions(),
         quicClientConnectionOptions(), quicHints(), quicCanonicalSuffixes(),
         mEnableGzipDecompression, brotliEnabled(), portMigrationEnabled(), mEnableSocketTag,
         mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
         platformFilterChain, stringAccessors, keyValueStores, mRuntimeGuards,
-        mEnablePlatformCertificatesValidation,
+        mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
         /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
         /*xdsPort=*/0, /*xdsGrpcInitialMetadata=*/Collections.emptyMap(),
         /*xdsSslRootCerts=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone,

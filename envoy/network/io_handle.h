@@ -132,6 +132,8 @@ public:
     // If true indicates a successful syscall, but the packet was dropped due to truncation. We do
     // not support receiving truncated packets.
     bool truncated_and_dropped_{false};
+    // The contents of the TOS byte in the IP header.
+    uint8_t tos_{0};
   };
 
   /**

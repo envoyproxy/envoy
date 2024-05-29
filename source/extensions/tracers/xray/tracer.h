@@ -230,8 +230,7 @@ public:
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
 
-  // TODO(#34412): This method is unimplemented for X-Ray.
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+  std::string getTraceId() const override { return trace_id_; };
 
   // TODO(#34412): This method is unimplemented for X-Ray.
   std::string getSpanId() const override { return EMPTY_STRING; };

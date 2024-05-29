@@ -10,15 +10,18 @@ namespace GenericProxy {
 
 class MockServerCodecCallbacks : public ServerCodecCallbacks {
 public:
-  MOCK_METHOD(void, onDecodingSuccess, (StreamFramePtr request));
+  MOCK_METHOD(void, onDecodingSuccess, (RequestHeaderFramePtr, absl::optional<StartTime>));
+  MOCK_METHOD(void, onDecodingSuccess, (RequestCommonFramePtr));
   MOCK_METHOD(void, onDecodingFailure, (absl::string_view));
-  MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
+  MOCK_METHOD(void, writeToConnection, (Buffer::Instance&));
+
   MOCK_METHOD(OptRef<Network::Connection>, connection, ());
 };
 
 class MockClientCodecCallbacks : public ClientCodecCallbacks {
 public:
-  MOCK_METHOD(void, onDecodingSuccess, (StreamFramePtr response));
+  MOCK_METHOD(void, onDecodingSuccess, (ResponseHeaderFramePtr, absl::optional<StartTime>));
+  MOCK_METHOD(void, onDecodingSuccess, (ResponseCommonFramePtr));
   MOCK_METHOD(void, onDecodingFailure, (absl::string_view));
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
   MOCK_METHOD(OptRef<Network::Connection>, connection, ());

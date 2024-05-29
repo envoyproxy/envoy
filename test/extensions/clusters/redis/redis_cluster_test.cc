@@ -141,8 +141,9 @@ protected:
     // makeRequest.
     pool_callbacks_ = cluster_->redis_discovery_session_.get();
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
-        [&](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) -> void {
+        [&](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) {
           membership_updated_.ready();
+          return absl::OkStatus();
         });
   }
 

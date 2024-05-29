@@ -4,7 +4,7 @@
 
 #include "source/common/common/assert.h"
 
-#include "library/common/data/utility.h"
+#include "library/common/bridge/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,7 +19,7 @@ TestAccessorFilterConfig::TestAccessorFilterConfig(
 
 Http::FilterHeadersStatus TestAccessorFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   RELEASE_ASSERT(config_->expectedString() ==
-                     Data::Utility::copyToString(
+                     Bridge::Utility::copyToString(
                          config_->accessor()->get_string(config_->accessor()->context)),
                  "accessed string is not equal to expected string");
   return Http::FilterHeadersStatus::Continue;

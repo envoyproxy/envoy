@@ -139,6 +139,14 @@ public:
     return atomic_ref.load();
   }
 
+  /**
+   * Returns whether the underlying pointer at the index is null.
+   *
+   * @param index the Index to look up.
+   * @return true if the underlying pointer at the index is null.
+   */
+  bool isNull(uint32_t index) const { return data_[index].load() == nullptr; }
+
 private:
   std::atomic<T*> data_[size];
   absl::Mutex mutex_;
@@ -166,6 +174,11 @@ public:
    * @return The new or already-existing T*, possibly nullptr if make_object returns nullptr.
    */
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
+
+  /**
+   * @return true if the underlying pointer is null.
+   */
+  bool isNull() const { return BaseClass::isNull(0); }
 };
 
 // We use platform-specific functions to determine whether the current thread is

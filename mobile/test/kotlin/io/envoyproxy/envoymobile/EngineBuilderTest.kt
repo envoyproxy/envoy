@@ -16,7 +16,7 @@ class EngineBuilderTest {
 
   @Test
   fun `adding log level builder uses log level for running Envoy`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.setLogLevel(LogLevel.DEBUG)
 
@@ -26,7 +26,7 @@ class EngineBuilderTest {
 
   @Test
   fun `enabling interface binding overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.enableInterfaceBinding(true)
 
@@ -36,7 +36,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying connection timeout overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.addConnectTimeoutSeconds(1234)
 
@@ -46,7 +46,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying min DNS refresh overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.addDNSMinRefreshSeconds(1234)
 
@@ -56,7 +56,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying DNS refresh overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.addDNSRefreshSeconds(1234)
 
@@ -66,7 +66,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying DNS failure refresh overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.addDNSFailureRefreshSeconds(1234, 5678)
 
@@ -77,7 +77,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying DNS query timeout overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.addDNSQueryTimeoutSeconds(1234)
 
@@ -87,7 +87,7 @@ class EngineBuilderTest {
 
   @Test
   fun `DNS cache is disabled by default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
 
     val engine = engineBuilder.build() as EngineImpl
@@ -96,7 +96,7 @@ class EngineBuilderTest {
 
   @Test
   fun `enabling DNS cache overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.enableDNSCache(true)
 
@@ -106,7 +106,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying H2 Ping idle interval overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(1234)
 
@@ -117,7 +117,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying H2 Ping timeout overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.addH2ConnectionKeepaliveTimeoutSeconds(1234)
 
@@ -127,7 +127,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying max connections per host overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.setMaxConnectionsPerHost(1234)
 
@@ -137,7 +137,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying stream idle timeout overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.addStreamIdleTimeoutSeconds(1234)
 
@@ -147,7 +147,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying per try idle timeout overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.addPerTryIdleTimeoutSeconds(5678)
 
@@ -157,7 +157,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying app version overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.addAppVersion("v1.2.3")
 
@@ -167,7 +167,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying app id overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.addAppId("com.envoymobile.android")
 
@@ -177,7 +177,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying native filters overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.addNativeFilter("name", "config")
 
@@ -196,7 +196,7 @@ class EngineBuilderTest {
     xdsBuilder.addClusterDiscoveryService(
       "xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz"
     )
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.setXds(xdsBuilder)
 
@@ -212,7 +212,7 @@ class EngineBuilderTest {
 
   @Test
   fun `specifying runtime guards work`() {
-    engineBuilder = EngineBuilder(Standard())
+    engineBuilder = EngineBuilder()
     engineBuilder
       .setRuntimeGuard("test_feature_false", true)
       .setRuntimeGuard("test_feature_true", false)

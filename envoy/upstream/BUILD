@@ -90,15 +90,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "load_balancer_type_interface",
-    hdrs = ["load_balancer_type.h"],
-    deps = [
-        "//source/common/protobuf",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "locality_lib",
     hdrs = ["locality.h"],
     deps = [
@@ -158,7 +149,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":health_check_host_monitor_interface",
-        ":load_balancer_type_interface",
         ":locality_lib",
         ":resource_manager_interface",
         "//envoy/common:callback",
@@ -184,7 +174,6 @@ envoy_cc_library(
     deps = [
         ":cluster_manager_interface",
         ":health_check_host_monitor_interface",
-        ":load_balancer_type_interface",
         ":locality_lib",
         ":resource_manager_interface",
         ":upstream_interface",

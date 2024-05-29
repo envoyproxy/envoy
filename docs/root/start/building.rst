@@ -6,8 +6,8 @@ Building
 
 The Envoy build system uses `Bazel <https://bazel.build/>`_.
 
-In order to ease initial building and for a quick start, we provide an Ubuntu 16 and a Windows based docker containers
-that have everything needed inside of it to build and *statically link* Envoy, see :repo:`ci/README.md`.
+In order to ease initial building and for a quick start, we provide a recent Ubuntu-based docker container
+that has everything needed inside of it to build and *statically link* Envoy, see :repo:`ci/README.md`.
 
 In order to build without using the Docker container, follow the instructions at :repo:`bazel/README.md`.
 
@@ -33,7 +33,9 @@ as the new tcmalloc code is not guaranteed to compile with lower versions of Cla
 Windows Target Requirements
 ---------------------------
 
-Envoy now suports Windows as a target platform. The requirements below only apply if you want to build the Windows
+.. include:: ../_include/windows_support_ended.rst
+
+Envoy supports Windows as a target platform. The requirements below only apply if you want to build the Windows
 native executable. If you want to build the Linux version of Envoy on Windows either with WSL or Linux containers
 please see the Linux requirements above.
 

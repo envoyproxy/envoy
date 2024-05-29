@@ -1486,26 +1486,28 @@ public class BidirectionalStreamTest {
   public void testErrorCodes() throws Exception {
     // Non-BidirectionalStream specific error codes.
     checkSpecificErrorCode(NetError.ERR_NAME_NOT_RESOLVED,
-                           NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, false);
+                           NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, "", false);
     checkSpecificErrorCode(NetError.ERR_INTERNET_DISCONNECTED,
-                           NetworkException.ERROR_INTERNET_DISCONNECTED, false);
-    checkSpecificErrorCode(NetError.ERR_NETWORK_CHANGED, NetworkException.ERROR_NETWORK_CHANGED,
+                           NetworkException.ERROR_INTERNET_DISCONNECTED, "bad error", false);
+    checkSpecificErrorCode(NetError.ERR_NETWORK_CHANGED, NetworkException.ERROR_NETWORK_CHANGED, "",
                            true);
     checkSpecificErrorCode(NetError.ERR_CONNECTION_CLOSED, NetworkException.ERROR_CONNECTION_CLOSED,
-                           true);
+                           "", true);
     checkSpecificErrorCode(NetError.ERR_CONNECTION_REFUSED,
-                           NetworkException.ERROR_CONNECTION_REFUSED, false);
+                           NetworkException.ERROR_CONNECTION_REFUSED, "", false);
     checkSpecificErrorCode(NetError.ERR_CONNECTION_RESET, NetworkException.ERROR_CONNECTION_RESET,
-                           true);
+                           "", true);
     checkSpecificErrorCode(NetError.ERR_CONNECTION_TIMED_OUT,
-                           NetworkException.ERROR_CONNECTION_TIMED_OUT, true);
-    checkSpecificErrorCode(NetError.ERR_TIMED_OUT, NetworkException.ERROR_TIMED_OUT, true);
+                           NetworkException.ERROR_CONNECTION_TIMED_OUT, "", true);
+    checkSpecificErrorCode(NetError.ERR_TIMED_OUT, NetworkException.ERROR_TIMED_OUT, "", true);
     checkSpecificErrorCode(NetError.ERR_ADDRESS_UNREACHABLE,
-                           NetworkException.ERROR_ADDRESS_UNREACHABLE, false);
+                           NetworkException.ERROR_ADDRESS_UNREACHABLE, "", false);
 
     // BidirectionalStream specific retryable error codes.
-    checkSpecificErrorCode(NetError.ERR_HTTP2_PING_FAILED, NetworkException.ERROR_OTHER, true);
-    checkSpecificErrorCode(NetError.ERR_QUIC_HANDSHAKE_FAILED, NetworkException.ERROR_OTHER, true);
+    checkSpecificErrorCode(NetError.ERR_HTTP2_PING_FAILED, NetworkException.ERROR_OTHER,
+                           "bad error", true);
+    checkSpecificErrorCode(NetError.ERR_QUIC_HANDSHAKE_FAILED, NetworkException.ERROR_OTHER, "",
+                           true);
   }
 
   // Returns the contents of byteBuffer, from its position() to its limit(),
@@ -1520,13 +1522,15 @@ public class BidirectionalStreamTest {
     return new String(contents);
   }
 
-  private static void checkSpecificErrorCode(NetError netError, int errorCode,
+  private static void checkSpecificErrorCode(NetError netError, int errorCode, String errorDetails,
                                              boolean immediatelyRetryable) throws Exception {
-    NetworkException exception =
-        new CronvoyBidirectionalStreamNetworkException("", errorCode, netError.getErrorCode());
+    CronvoyBidirectionalStreamNetworkException exception =
+        new CronvoyBidirectionalStreamNetworkException("", errorCode, netError.getErrorCode(),
+                                                       errorDetails);
     assertEquals(immediatelyRetryable, exception.immediatelyRetryable());
     assertEquals(netError.getErrorCode(), exception.getCronetInternalErrorCode());
     assertEquals(errorCode, exception.getErrorCode());
+    assertEquals(errorDetails, exception.getErrorDetails());
   }
 
   @Test

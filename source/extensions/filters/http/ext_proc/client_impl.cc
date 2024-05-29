@@ -14,21 +14,21 @@ ExternalProcessorClientImpl::ExternalProcessorClientImpl(Grpc::AsyncClientManage
 ExternalProcessorStreamPtr
 ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
                                    const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                                   const StreamInfo::StreamInfo& stream_info) {
+                                   const Http::AsyncClient::StreamOptions& options) {
   auto client_or_error =
       client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true);
   THROW_IF_STATUS_NOT_OK(client_or_error, throw);
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(client_or_error.value());
-  return ExternalProcessorStreamImpl::create(std::move(grpcClient), callbacks, stream_info);
+  return ExternalProcessorStreamImpl::create(std::move(grpcClient), callbacks, options);
 }
 
 ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-    ExternalProcessorCallbacks& callbacks, const StreamInfo::StreamInfo& stream_info) {
+    ExternalProcessorCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options) {
   auto stream =
       std::unique_ptr<ExternalProcessorStreamImpl>(new ExternalProcessorStreamImpl(callbacks));
 
-  if (stream->startStream(std::move(client), stream_info)) {
+  if (stream->startStream(std::move(client), options)) {
     return stream;
   }
   // Return nullptr on the start failure.
@@ -37,13 +37,10 @@ ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
 
 bool ExternalProcessorStreamImpl::startStream(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-    const StreamInfo::StreamInfo& stream_info) {
+    const Http::AsyncClient::StreamOptions& options) {
   client_ = std::move(client);
   auto descriptor = Protobuf::DescriptorPool::generated_pool()->FindMethodByName(kExternalMethod);
-  grpc_context_.stream_info = &stream_info;
-  Http::AsyncClient::StreamOptions options;
-  options.setParentContext(grpc_context_);
-  options.setBufferBodyForRetry(true);
+  grpc_context_ = options.parent_context;
   stream_ = client_.start(*descriptor, *this, options);
   // Returns true if the start succeeded and returns false on start failure.
   return stream_ != nullptr;

@@ -14,20 +14,49 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 /**
+ * The start time of the request or response that provided by the codec to the generic
+ * proxy filter. The generic proxy filter could use this to calculate the latency of
+ * the request or response.
+ */
+struct StartTime {
+  SystemTime start_time{};
+  MonotonicTime start_time_monotonic{};
+};
+
+/**
  * Callbacks of ServerCodec.
  */
 class ServerCodecCallbacks {
 public:
   virtual ~ServerCodecCallbacks() = default;
+
   /**
-   * If request decoding success then this method will be called.
-   * @param frame request frame from decoding. Frist frame should be StreamRequest
-   * frame.
-   * NOTE: This method will be called multiple times for the multiple frames request.
-   * FrameFlags and embedded StreamFlags could be used to correlate frames of same
-   * request.
+   * If request decoding success then this method will be called. This method should
+   * be called first for the whole request.
+   *
+   * @param header_frame request header frame from decoding.
+   * @param start_time optional start time of the request. If not provided, the generic
+   * proxy filter will use the current time as the start time of the request. This makes
+   * sense when the codec takes a long time to decode the request and the start time is
+   * not the time that calling the method.
+   *
+   * NOTE: This method will be called only once for the whole request.
    */
-  virtual void onDecodingSuccess(StreamFramePtr frame) PURE;
+  virtual void onDecodingSuccess(RequestHeaderFramePtr header_frame,
+                                 absl::optional<StartTime> start_time = {}) PURE;
+
+  /**
+   * If request decoding success and additional frames are received for the request then
+   * this method will be called. This method should be called after RequestHeaderFrame
+   * is handled.
+   *
+   * @param common_frame request common frame from decoding.
+   *
+   * NOTE: This method will be called multiple times for the multiple frames request.
+   * stream_id could be used to correlate frames of same request and end_stream could be
+   * used tell generic proxy filter if the request is completed.
+   */
+  virtual void onDecodingSuccess(RequestCommonFramePtr common_frame) PURE;
 
   /**
    * If request decoding failure then this method will be called.
@@ -41,6 +70,7 @@ public:
    * called. By this way, when some special data is received from peer, the custom
    * codec could handle it directly and write some reply to peer without notifying
    * the generic proxy filter.
+   *
    * @param buffer data to write.
    */
   virtual void writeToConnection(Buffer::Instance& buffer) PURE;
@@ -60,15 +90,32 @@ public:
   virtual ~ClientCodecCallbacks() = default;
 
   /**
-   * If response decoding success then this method will be called.
-   * @param frame response frame from decoding. Frist frame should be StreamResponse
-   * frame.
-   * NOTE: This method will be called multiple times for the multiple frames response.
-   * FrameFlags and embedded StreamFlags could be used to correlate frames of same
-   * request. And the StreamFlags could also be used to correlate the response with
-   * the request.
+   * If response decoding success then this method will be called. This method should
+   * be called first for the whole response.
+   *
+   * @param header_frame response frame from decoding.
+   * @param start_time optional start time of the response. If not provided, the generic
+   * proxy filter will use the current time as the start time of the response. This makes
+   * sense when the codec takes a long time to decode the response and the start time is
+   * not the time that calling the method.
+   *
+   * NOTE: This method will be called only once for the whole response.
    */
-  virtual void onDecodingSuccess(StreamFramePtr frame) PURE;
+  virtual void onDecodingSuccess(ResponseHeaderFramePtr header_frame,
+                                 absl::optional<StartTime> start_time = {}) PURE;
+
+  /**
+   * If response decoding success and additional frames are received for the response then
+   * this method will be called. This method should be called after ResponseHeaderFrame
+   * is handled.
+   *
+   * @param common_frame response frame from decoding.
+   *
+   * NOTE: This method will be called multiple times for the multiple frames request.
+   * stream_id could be used to correlate frames of same request and end_stream could be
+   * used tell generic proxy filter if the request is completed.
+   */
+  virtual void onDecodingSuccess(ResponseCommonFramePtr common_frame) PURE;
 
   /**
    * If response decoding failure then this method will be called.
