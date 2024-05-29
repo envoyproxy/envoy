@@ -130,6 +130,9 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, NoCredential) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
   EXPECT_EQ("User authentication failed. Missing username and password.", response->body());
+  EXPECT_EQ(
+      "Basic realm=\"http://host/\"",
+      response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
 }
 
 // Request without wrong password
@@ -149,6 +152,9 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, WrongPasswrod) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
   EXPECT_EQ("User authentication failed. Invalid username/password combination.", response->body());
+  EXPECT_EQ(
+      "Basic realm=\"http://host/\"",
+      response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
 }
 
 // Request with none-existed user
@@ -168,6 +174,9 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, NoneExistedUser) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
   EXPECT_EQ("User authentication failed. Invalid username/password combination.", response->body());
+  EXPECT_EQ(
+      "Basic realm=\"http://host/\"",
+      response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
 }
 
 // Request with existing username header
@@ -249,6 +258,9 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteEnabledInvalidCred
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
   EXPECT_EQ("User authentication failed. Invalid username/password combination.", response->body());
+  EXPECT_EQ(
+      "Basic realm=\"http://host/\"",
+      response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
 }
 
 } // namespace

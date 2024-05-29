@@ -2153,8 +2153,7 @@ TEST(SubstitutionFormatterTest, TraceIDFormatter) {
   std::string body;
 
   Tracing::MockSpan active_span;
-  EXPECT_CALL(active_span, getTraceIdAsHex())
-      .WillRepeatedly(Return("ae0046f9075194306d7de2931bd38ce3"));
+  EXPECT_CALL(active_span, getTraceId()).WillRepeatedly(Return("ae0046f9075194306d7de2931bd38ce3"));
 
   {
     HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
@@ -4072,7 +4071,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    const std::string format = "{{%PROTOCOL%}}   %RESP(not exist)%++%RESP(test)% "
+    const std::string format = "{{%PROTOCOL%}}   %RESP(not_exist)%++%RESP(test)% "
                                "%REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)%"
                                "\t@%TRAILER(THIRD)%@\t%TRAILER(TEST?TEST-2)%[]";
     FormatterImpl formatter(format, false);
@@ -4270,7 +4269,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
                                          body);
 
   {
-    const std::string format = "%PROTOCOL%|%RESP(not exist)%|"
+    const std::string format = "%PROTOCOL%|%RESP(not_exist)%|"
                                "%REQ(FIRST?SECOND)%|%RESP(FIRST?SECOND)%|"
                                "%TRAILER(THIRD)%|%TRAILER(TEST?TEST-2)%";
     FormatterImpl formatter(format, false);
@@ -4281,7 +4280,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
   }
 
   {
-    const std::string format = "%PROTOCOL%|%RESP(not exist)%|"
+    const std::string format = "%PROTOCOL%|%RESP(not_exist)%|"
                                "%REQ(FIRST?SECOND)%%RESP(FIRST?SECOND)%|"
                                "%TRAILER(THIRD)%|%TRAILER(TEST?TEST-2)%";
     FormatterImpl formatter(format, true);

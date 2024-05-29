@@ -135,7 +135,7 @@ void Span::setBaggage(absl::string_view, absl::string_view) {
   // not implemented
 }
 
-std::string Span::getTraceIdAsHex() const {
+std::string Span::getTraceId() const {
   if (!span_) {
     return std::string{};
   }

@@ -43,7 +43,7 @@ public:
   MOCK_METHOD(void, setSampled, (const bool sampled));
   MOCK_METHOD(void, setBaggage, (absl::string_view key, absl::string_view value));
   MOCK_METHOD(std::string, getBaggage, (absl::string_view key));
-  MOCK_METHOD(std::string, getTraceIdAsHex, (), (const));
+  MOCK_METHOD(std::string, getTraceId, (), (const));
 
   SpanPtr spawnChild(const Config& config, const std::string& name,
                      SystemTime start_time) override {

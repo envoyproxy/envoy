@@ -118,3 +118,17 @@ comes from the owning HTTP connection manager.
   signing_failed, Counter, Total requests for which signing failed (includes payload_signing_failed)
   payload_signing_added, Counter, Total requests for which the payload was buffered signing succeeded
   payload_signing_failed, Counter, Total requests for which the payload was buffered but signing failed
+
+In addition, when using the ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` reloadable feature, the following
+statistics are output under the ``aws.metadata_credentials_provider`` namespace:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :escape: '
+  :widths: 1, 1, 2
+
+  <provider_cluster>.credential_refreshes_performed, Counter, Total credential refreshes performed by this cluster
+  <provider_cluster>.credential_refreshes_failed, Counter, Total credential refreshes failed by this cluster. For example', this would be incremented if a WebIdentity token was expired
+  <provider_cluster>.credential_refreshes_succeeded, Counter, Total successful credential refreshes for this cluster. Successful refresh would indicate credentials are available for signing
+  <provider_cluster>.metadata_refresh_state, Gauge, 0 means the cluster is in initial refresh state', ie no successful credential refreshes have been performed. In 0 state the cluster will attempt credential refresh up to a maximum of once every 30 seconds. 1 means the cluster is in normal credential expiration based refresh state
+

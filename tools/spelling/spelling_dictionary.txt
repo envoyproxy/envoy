@@ -81,6 +81,7 @@ ETB
 ETX
 FS
 FIXME
+gperf
 HEXDIG
 HEXDIGIT
 HPE
@@ -1452,6 +1453,7 @@ viewport
 vip
 virtualhost
 virtualize
+virtualized
 vptr
 vtable
 vtt
@@ -1510,4 +1512,5 @@ PCIE
 EDNS
 CNAME
 NAT
+NXDOMAIN
 DNAT
