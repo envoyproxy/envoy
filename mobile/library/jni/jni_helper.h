@@ -144,6 +144,9 @@ public:
   /** Initializes the `JavaVM`. This function is typically called inside `JNI_OnLoad`. */
   static void initialize(JavaVM* java_vm);
 
+  /** Performs a clean up. This function is typically called inside `JNI_OnUnload`. */
+  static void finalize();
+
   /**
    * Adds the `jclass` object into a cache. This function is typically called inside `JNI_OnLoad`.
    *
