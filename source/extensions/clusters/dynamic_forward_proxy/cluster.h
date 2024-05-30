@@ -46,6 +46,8 @@ public:
   bool enableSubCluster() const override { return enable_sub_cluster_; }
   Upstream::HostConstSharedPtr chooseHost(absl::string_view host,
                                           Upstream::LoadBalancerContext* context) const;
+
+  // Extensions::Common::DynamicForwardProxy::DfpCluster
   std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
   createSubClusterConfig(const std::string& cluster_name, const std::string& host,
                          const int port) override;
@@ -85,10 +87,13 @@ private:
   using HostInfoMap = absl::flat_hash_map<std::string, HostInfo>;
 
   class LoadBalancer : public Upstream::LoadBalancer,
+                       public Extensions::Common::DynamicForwardProxy::DfpLb,
                        public Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks {
   public:
     LoadBalancer(const Cluster& cluster) : cluster_(cluster) {}
 
+    // DfpLb
+    Upstream::HostConstSharedPtr findHostByName(const std::string& host) const override;
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
     // Preconnecting not implemented.

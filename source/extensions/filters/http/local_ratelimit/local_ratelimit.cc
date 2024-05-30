@@ -51,10 +51,12 @@ FilterConfig::FilterConfig(
               ? absl::optional<Envoy::Runtime::FractionalPercent>(
                     Envoy::Runtime::FractionalPercent(config.filter_enforced(), runtime_))
               : absl::nullopt),
-      response_headers_parser_(
-          Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
-      request_headers_parser_(Envoy::Router::HeaderParser::configure(
-          config.request_headers_to_add_when_not_enforced())),
+      response_headers_parser_(THROW_OR_RETURN_VALUE(
+          Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
+          Router::HeaderParserPtr)),
+      request_headers_parser_(THROW_OR_RETURN_VALUE(
+          Envoy::Router::HeaderParser::configure(config.request_headers_to_add_when_not_enforced()),
+          Router::HeaderParserPtr)),
       stage_(static_cast<uint64_t>(config.stage())),
       has_descriptors_(!config.descriptors().empty()),
       enable_x_rate_limit_headers_(config.enable_x_ratelimit_headers() ==

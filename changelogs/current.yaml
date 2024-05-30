@@ -74,6 +74,9 @@ minor_behavior_changes:
 - area: quic
   change: |
     When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
+- area: filters
+  change: |
+    Set ``WWW-Authenticate`` header for 401 responses from the Basic Auth filter.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -197,6 +200,11 @@ new_features:
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting
     :ref:`health_check_config <envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.proxy_protocol_config>`.
+- area: access_log
+  change: |
+    added new ``access_log`` command operators to retrieve upstream connection information change: ``%UPSTREAM_PEER_URI_SAN%``,
+    ``%UPSTREAM_PEER_IP_SAN%``, ``%UPSTREAM_PEER_DNS_SAN%``, ``%UPSTREAM_LOCAL_URI_SAN%``, ``%UPSTREAM_LOCAL_DNS_SAN%``,
+    ``%UPSTREAM_LOCAL_IP_SAN%``.
 - area: open_telemetry
   change: |
     added :ref:`stat_prefix

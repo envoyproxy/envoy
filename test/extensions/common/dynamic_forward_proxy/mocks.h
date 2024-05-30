@@ -38,9 +38,10 @@ public:
     absl::optional<DnsHostInfoSharedPtr> host_info_;
   };
 
-  LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
-                                            bool is_proxy_request,
-                                            LoadDnsCacheEntryCallbacks& callbacks) override {
+  LoadDnsCacheEntryResult
+  loadDnsCacheEntryWithForceRefresh(absl::string_view host, uint16_t default_port,
+                                    bool is_proxy_request, bool,
+                                    LoadDnsCacheEntryCallbacks& callbacks) override {
     MockLoadDnsCacheEntryResult result =
         loadDnsCacheEntry_(host, default_port, is_proxy_request, callbacks);
     return {result.status_, LoadDnsCacheEntryHandlePtr{result.handle_}, result.host_info_};
