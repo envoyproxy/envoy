@@ -1355,18 +1355,17 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
   // Block the main thread by not calling waitForEndStream or closing the client's connection,
   // then wait for server to tear down connection due to too many retransmissions.
   int iterations = 0;
+  std::string contents = TestEnvironment::readFileToStringForTest(access_log_name_);
   while (iterations < 20) {
     timeSystem().advanceTimeWait(std::chrono::seconds(1));
     // check for deferred logs from connection teardown.
-    std::string contents = TestEnvironment::readFileToStringForTest(access_log_name_);
-    std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
-    if (entries.size() > 0) {
+    contents = TestEnvironment::readFileToStringForTest(access_log_name_);
+    if (!contents.empty()) {
       break;
     }
     iterations++;
   }
 
-  std::string contents = TestEnvironment::readFileToStringForTest(access_log_name_);
   std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
   EXPECT_EQ(entries.size(), 1);
   std::string log = entries[0];
