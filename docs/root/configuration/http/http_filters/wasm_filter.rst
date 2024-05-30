@@ -24,7 +24,7 @@ Example filter configuration:
 .. literalinclude:: ../../../start/sandboxes/_include/wasm-cc/envoy.yaml
     :language: yaml
     :lines: 24-49
-    :emphasize-lines: 4-21
+    :emphasize-lines: 5-21
     :linenos:
     :lineno-start: 24
     :caption: :download:`wasm envoy.yaml <../../../start/sandboxes/_include/wasm-cc/envoy.yaml>`
@@ -33,10 +33,10 @@ Example upstream filter configuration:
 
 .. literalinclude:: ../../../start/sandboxes/_include/wasm-cc/envoy.yaml
     :language: yaml
-    :lines: 98-138
-    :emphasize-lines: 21-38
+    :lines: 89-128
+    :emphasize-lines: 21-37
     :linenos:
-    :lineno-start: 98
+    :lineno-start: 89
     :caption: :download:`wasm envoy.yaml <../../../start/sandboxes/_include/wasm-cc/envoy.yaml>`
 
 The preceding snippets configures a filter from a Wasm binary on local disk.
