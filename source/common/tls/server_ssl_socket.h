@@ -44,7 +44,7 @@ public:
   bool implementsSecureTransport() const override;
 
   // Secret::SecretCallbacks
-  void onAddOrUpdateSecret() override;
+  absl::Status onAddOrUpdateSecret() override;
 
 private:
   Ssl::ContextManager& manager_;

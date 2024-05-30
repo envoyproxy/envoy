@@ -972,8 +972,8 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySdsNotReady) {
   // Set various callbacks to config.
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   server_context_config.setSecretUpdateCallback(
-      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
-  server_context_config.setSecretUpdateCallback([]() {});
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
+  server_context_config.setSecretUpdateCallback([]() { return absl::OkStatus(); });
 }
 
 // Validate that client context config with static TLS ticket encryption keys is created
@@ -1422,8 +1422,8 @@ TEST_F(ClientContextConfigImplTest, SecretNotReady) {
   // Set various callbacks to config.
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   client_context_config.setSecretUpdateCallback(
-      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
-  client_context_config.setSecretUpdateCallback([]() {});
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
+  client_context_config.setSecretUpdateCallback([]() { return absl::OkStatus(); });
 }
 
 // Validate client context config supports SDS, and is marked as not ready if dynamic
@@ -1453,8 +1453,8 @@ TEST_F(ClientContextConfigImplTest, ValidationContextNotReady) {
   // Set various callbacks to config.
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   client_context_config.setSecretUpdateCallback(
-      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
-  client_context_config.setSecretUpdateCallback([]() {});
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
+  client_context_config.setSecretUpdateCallback([]() { return absl::OkStatus(); });
 }
 
 // Validate that client context config with static TLS certificates is created successfully.
@@ -1858,8 +1858,8 @@ TEST_F(ServerContextConfigImplTest, SecretNotReady) {
   // Set various callbacks to config.
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   server_context_config.setSecretUpdateCallback(
-      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
-  server_context_config.setSecretUpdateCallback([]() {});
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
+  server_context_config.setSecretUpdateCallback([]() { return absl::OkStatus(); });
 }
 
 // Validate server context config supports SDS, and is marked as not ready if dynamic
@@ -1889,8 +1889,8 @@ TEST_F(ServerContextConfigImplTest, ValidationContextNotReady) {
   // Set various callbacks to config.
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   server_context_config.setSecretUpdateCallback(
-      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
-  server_context_config.setSecretUpdateCallback([]() {});
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
+  server_context_config.setSecretUpdateCallback([]() { return absl::OkStatus(); });
 }
 
 // TlsCertificate messages must have a cert for servers.

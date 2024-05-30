@@ -49,7 +49,7 @@ public:
   bool supportsAlpn() const override { return true; }
 
   // Secret::SecretCallbacks
-  void onAddOrUpdateSecret() override;
+  absl::Status onAddOrUpdateSecret() override;
 
   OptRef<const Ssl::ClientContextConfig> clientContextConfig() const override { return {*config_}; }
 

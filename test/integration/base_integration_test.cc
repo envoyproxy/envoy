@@ -166,7 +166,8 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
     auto& config_factory = Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::DownstreamTransportSocketConfigFactory>(
         "envoy.transport_sockets.quic");
-    return config_factory.createTransportSocketFactory(quic_config, factory_context_, server_names);
+    return config_factory.createTransportSocketFactory(quic_config, factory_context_, server_names)
+        .value();
   }
 }
 
@@ -611,15 +612,17 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::vector<std::string>& expected_resource_names,
     const std::vector<std::string>& expected_resource_names_added,
     const std::vector<std::string>& expected_resource_names_removed, bool expect_node,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
+    FakeStream* stream) {
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
     return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
-                                       expect_node, expected_error_code, expected_error_substring);
+                                       expect_node, expected_error_code, expected_error_substring,
+                                       stream);
   } else {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
-                                        expected_resource_names_removed, expected_error_code,
-                                        expected_error_substring, expect_node);
+                                        expected_resource_names_removed, stream,
+                                        expected_error_code, expected_error_substring, expect_node);
   }
 }
 
@@ -723,10 +726,13 @@ BaseIntegrationTest::createExplicitResourcesDeltaDiscoveryResponse(
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
-    const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
+    const std::vector<std::string>& expected_resource_unsubscriptions, FakeStream* xds_stream,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
     bool expect_node) {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+  if (xds_stream == nullptr) {
+    xds_stream = xds_stream_.get();
+  }
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
   // Verify all we care about node.

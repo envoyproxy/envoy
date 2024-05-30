@@ -62,7 +62,7 @@ class MockSecretCallbacks : public SecretCallbacks {
 public:
   MockSecretCallbacks();
   ~MockSecretCallbacks() override;
-  MOCK_METHOD(void, onAddOrUpdateSecret, ());
+  MOCK_METHOD(absl::Status, onAddOrUpdateSecret, ());
 };
 
 } // namespace Secret
