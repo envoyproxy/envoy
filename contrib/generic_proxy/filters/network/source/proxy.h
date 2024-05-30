@@ -76,7 +76,7 @@ public:
         time_source_(context.serverFactoryContext().timeSource()) {}
 
   // FilterConfig
-  RouteEntryConstSharedPtr routeEntry(const Request& request) const override {
+  RouteEntryConstSharedPtr routeEntry(const MatchInput& request) const override {
     auto config = std::static_pointer_cast<const RouteMatcher>(route_config_provider_->config());
     return config->routeEntry(request);
   }
