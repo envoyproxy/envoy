@@ -316,6 +316,7 @@ public:
         Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
     transport_socket_factory_.reset(static_cast<QuicClientTransportSocketFactory*>(
         config_factory.createTransportSocketFactory(quic_transport_socket_config, context)
+            .value()
             .release()));
     ASSERT(transport_socket_factory_->clientContextConfig());
   }

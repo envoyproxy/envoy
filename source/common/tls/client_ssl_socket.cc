@@ -34,7 +34,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPt
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats(stats_scope)),
       config_(std::move(config)),
       ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
-  config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
+  config_->setSecretUpdateCallback([this]() { return onAddOrUpdateSecret(); });
 }
 
 ClientSslSocketFactory::~ClientSslSocketFactory() { manager_.removeContext(ssl_ctx_); }
@@ -67,7 +67,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
 
 bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
-void ClientSslSocketFactory::onAddOrUpdateSecret() {
+absl::Status ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   auto ctx = manager_.createSslClientContext(stats_scope_, *config_);
   {
@@ -76,6 +76,7 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   }
   manager_.removeContext(ctx);
   stats_.ssl_context_update_by_sds_.inc();
+  return absl::OkStatus();
 }
 
 Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {

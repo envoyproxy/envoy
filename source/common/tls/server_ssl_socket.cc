@@ -35,7 +35,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats(stats_scope)),
       config_(std::move(config)), server_names_(server_names),
       ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
-  config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
+  config_->setSecretUpdateCallback([this]() { return onAddOrUpdateSecret(); });
 }
 
 ServerSslSocketFactory::~ServerSslSocketFactory() { manager_.removeContext(ssl_ctx_); }
@@ -65,7 +65,7 @@ Network::TransportSocketPtr ServerSslSocketFactory::createDownstreamTransportSoc
 
 bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
 
-void ServerSslSocketFactory::onAddOrUpdateSecret() {
+absl::Status ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   auto ctx = manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr);
   {
@@ -75,6 +75,7 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   manager_.removeContext(ctx);
 
   stats_.ssl_context_update_by_sds_.inc();
+  return absl::OkStatus();
 }
 
 } // namespace Tls

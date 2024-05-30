@@ -1375,7 +1375,7 @@ ClusterInfoImpl::extensionProtocolOptions(const std::string& name) const {
   return nullptr;
 }
 
-Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
+absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
     const envoy::config::cluster::v3::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
   // If the cluster config doesn't have a transport socket configured, override with the default
@@ -1474,12 +1474,15 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
           cluster_context.clusterManager(), cluster_context.messageValidationVisitor());
   transport_factory_context_->setInitManager(init_manager_);
 
-  auto socket_factory = createTransportSocketFactory(cluster, *transport_factory_context_);
-  auto* raw_factory_pointer = socket_factory.get();
+  auto socket_factory_or_error = createTransportSocketFactory(cluster, *transport_factory_context_);
+  THROW_IF_NOT_OK(socket_factory_or_error.status());
+  auto* raw_factory_pointer = socket_factory_or_error.value().get();
 
-  auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
-      cluster.transport_socket_matches(), *transport_factory_context_, socket_factory,
-      *stats_scope);
+  auto socket_matcher =
+      THROW_OR_RETURN_VALUE(TransportSocketMatcherImpl::create(
+                                cluster.transport_socket_matches(), *transport_factory_context_,
+                                socket_factory_or_error.value(), *stats_scope),
+                            std::unique_ptr<TransportSocketMatcherImpl>);
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
   auto& dispatcher = server_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
