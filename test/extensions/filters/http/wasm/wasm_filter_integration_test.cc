@@ -17,7 +17,12 @@ public:
   WasmFilterIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {}
 
-  void SetUp() override { setUpstreamProtocol(Http::CodecType::HTTP1); }
+  void SetUp() override {
+    setUpstreamProtocol(Http::CodecType::HTTP1);
+    // Wasm filters are expensive to setup and sometime default is not enough,
+    // It needs to increase timeout to avoid flaky tests
+    setListenersBoundTimeout(3 * TestUtility::DefaultTimeout);
+  }
 
   void TearDown() override { fake_upstream_connection_.reset(); }
 
@@ -80,7 +85,7 @@ public:
       request_encoder_ = &encoder_decoder.first;
       response = std::move(encoder_decoder.second);
       Buffer::OwnedImpl buffer(request_body);
-      request_encoder_->encodeData(buffer, true);
+      codec_client_->sendData(*request_encoder_, buffer, true);
     }
 
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
