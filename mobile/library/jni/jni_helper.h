@@ -190,6 +190,13 @@ public:
    */
   jfieldID getFieldId(jclass clazz, const char* name, const char* signature);
 
+  /**
+   * Gets the field ID for a static field of a class.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getstaticfieldid
+   */
+  jfieldID getStaticFieldId(jclass clazz, const char* name, const char* signature);
+
   /** A macro to create `Call<Type>Method` helper function. */
 #define DECLARE_GET_FIELD(JAVA_TYPE, JNI_TYPE)                                                     \
   JNI_TYPE get##JAVA_TYPE##Field(jobject object, jfieldID field_id);
