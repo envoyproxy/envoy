@@ -63,7 +63,7 @@ absl::StatusOr<absl::optional<std::string>> DnsResolverImpl::maybeBuildResolvers
   for (const auto& resolver : resolvers) {
     // This should be an IP address (i.e. not a pipe).
     if (resolver->ip() == nullptr) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           fmt::format("DNS resolver '{}' is not an IP address", resolver->asString()));
     }
     // Note that the ip()->port() may be zero if the port is not fully specified by the
@@ -312,11 +312,11 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
         const EnvoyException& e,
         {
           ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
-          dispatcher_.post([s = std::string(e.what())] { throwEnvoyExceptionOrPanic(s); });
+          dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
         },
         {
           ENVOY_LOG(critical, "Unknown exception in c-ares callback");
-          dispatcher_.post([] { throwEnvoyExceptionOrPanic("unknown"); });
+          dispatcher_.post([] { throw EnvoyException("unknown"); });
         });
   } else {
     ENVOY_LOG_EVENT(debug, "cares_dns_callback_cancelled",
