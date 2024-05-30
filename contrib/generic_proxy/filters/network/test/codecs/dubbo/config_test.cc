@@ -49,10 +49,10 @@ MessageMetadataSharedPtr createDubboResponse(DubboRequest& request, ResponseStat
 TEST(DubboRequestTest, DubboRequestTest) {
   DubboRequest request(createDubboRequst(false));
 
-  // Static atrributes test.
+  // Static attributes test.
   { EXPECT_EQ("dubbo", request.protocol()); }
 
-  // Basic atrributes test.
+  // Basic attributes test.
   {
     EXPECT_EQ("fake_service", request.host());
     EXPECT_EQ("fake_service", request.path());
@@ -85,7 +85,7 @@ TEST(DubboRequestTest, DubboRequestTest) {
 TEST(DubboResponseTest, DubboResponseTest) {
   DubboRequest request(createDubboRequst(false));
 
-  // Static atrributes test.
+  // Static attributes test.
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithValue));

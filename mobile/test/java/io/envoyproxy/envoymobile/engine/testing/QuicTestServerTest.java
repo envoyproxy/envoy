@@ -1,11 +1,11 @@
 package io.envoyproxy.envoymobile.engine.testing;
 
 import static com.google.common.truth.Truth.assertThat;
+import static io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification;
 
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
-import io.envoyproxy.envoymobile.Custom;
 import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.LogLevel;
 import io.envoyproxy.envoymobile.RequestMethod;
@@ -28,15 +28,6 @@ import org.robolectric.RobolectricTestRunner;
 
 @RunWith(RobolectricTestRunner.class)
 public class QuicTestServerTest {
-  private static final String HCM_TYPE =
-      "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
-
-  private static final String QUIC_UPSTREAM_TYPE =
-      "type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport";
-
-  private static final String CONFIG =
-      "static_resources { listeners { name: \"base_api_listener\" address { socket_address { address: \"0.0.0.0\" port_value: 10000 } } api_listener { api_listener { [type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager] { stat_prefix: \"api_hcm\" route_config { name: \"api_router\" virtual_hosts { name: \"api\" domains: \"*\" routes { match { prefix: \"/\" } route { cluster: \"h3_remote\" } } } } http_filters { name: \"envoy.router\" typed_config { [type.googleapis.com/envoy.extensions.filters.http.router.v3.Router] { } } } } } } } clusters { name: \"h3_remote\" type: STATIC connect_timeout { seconds: 10 } dns_lookup_family: V4_ONLY transport_socket { name: \"envoy.transport_sockets.quic\" typed_config { [type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport] { upstream_tls_context { sni: \"www.lyft.com\" } } } } load_assignment { cluster_name: \"h3_remote\" endpoints { lb_endpoints { endpoint { address { socket_address { address: \"127.0.0.1\" port_value: %s } } } } } } typed_extension_protocol_options { key: \"envoy.extensions.upstreams.http.v3.HttpProtocolOptions\" value { [type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions] { common_http_protocol_options { idle_timeout { seconds: 1 } } explicit_http_config { http3_protocol_options { } } } } } } } listener_manager { name: \"envoy.listener_manager_impl.api\" typed_config { [type.googleapis.com/envoy.config.listener.v3.ApiListenerManager] { } } }";
-
   private final Context appContext = ApplicationProvider.getApplicationContext();
   private Engine engine;
   private HttpTestServerFactory.HttpTestServer httpTestServer;
@@ -52,14 +43,13 @@ public class QuicTestServerTest {
     Map<String, String> headers = new HashMap<>();
     headers.put("Cache-Control", "max-age=0");
     headers.put("Content-Type", "text/plain");
-    headers.put("X-Original-Url", "https://test.example.com:6121/simple.txt");
     httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP3, headers,
                                                  "This is a simple text file served by QUIC.\n",
                                                  Collections.emptyMap());
+
     CountDownLatch latch = new CountDownLatch(1);
-    engine = new AndroidEngineBuilder(appContext,
-                                      new Custom(String.format(CONFIG, httpTestServer.getPort())))
-                 .setLogLevel(LogLevel.DEBUG)
+    engine = new AndroidEngineBuilder(appContext)
+                 .setLogLevel(LogLevel.TRACE)
                  .setLogger((level, message) -> {
                    System.out.print(message);
                    return null;
@@ -68,6 +58,13 @@ public class QuicTestServerTest {
                    latch.countDown();
                    return null;
                  })
+                 .addQuicCanonicalSuffix(".lyft.com")
+                 .addQuicHint("sni.lyft.com", httpTestServer.getPort())
+                 // We need to force set the upstream TLS SNI, since the alternate protocols cache
+                 // will use the SNI for the hostname lookup, and for certificate leaf node
+                 // matching.
+                 .setUpstreamTlsSni("sni.lyft.com")
+                 .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
                  .build();
     latch.await(); // Don't launch a request before initialization has completed.
   }
@@ -84,7 +81,7 @@ public class QuicTestServerTest {
         new RequestScenario()
             .setHttpMethod(RequestMethod.GET)
             .addHeader("no_trailers", "true")
-            .setUrl("https://test.example.com:" + httpTestServer.getPort() + "/simple.txt");
+            .setUrl("https://" + httpTestServer.getAddress() + "/simple.txt");
 
     Response response = sendRequest(requestScenario);
 

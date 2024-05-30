@@ -534,20 +534,6 @@ static envoy_data ios_get_string(const void *context) {
   }
 }
 
-- (int)runWithYAML:(NSString *)yaml
-            config:(EnvoyConfiguration *)config
-          logLevel:(NSString *)logLevel {
-  [self performRegistrationsForConfig:config];
-  [self startObservingLifecycleNotifications];
-
-  @try {
-    return _engine->run(yaml.UTF8String, logLevel.UTF8String);
-  } @catch (NSException *exception) {
-    [self logException:exception];
-    return kEnvoyFailure;
-  }
-}
-
 - (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks
                             explicitFlowControl:(BOOL)explicitFlowControl {
   return [[EnvoyHTTPStreamImpl alloc] initWithHandle:_engine->initStream()

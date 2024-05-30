@@ -17,7 +17,7 @@ public:
   Upstream::LoadBalancerFactorySharedPtr factory() override {
     return std::make_shared<LbFactory>(host_);
   }
-  void initialize() override {}
+  absl::Status initialize() override { return absl::OkStatus(); }
 
 private:
   class LbImpl : public Upstream::LoadBalancer {

@@ -204,6 +204,12 @@ public:
   static std::string urlEncodeQueryParameter(absl::string_view value);
 
   /**
+   * Exactly the same as above, but returns false when it finds a character that should be %-encoded
+   * but is not.
+   */
+  static bool queryParameterIsUrlEncoded(absl::string_view value);
+
+  /**
    * Decodes string view that represents URL in x-www-form-urlencoded query parameter.
    * @param encoded supplies string to be decoded.
    * @return std::string decoded string compliant with https://datatracker.ietf.org/doc/html/rfc3986

@@ -2,6 +2,8 @@ package test.java.integration;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import static org.junit.Assert.fail;
+
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
@@ -81,13 +83,17 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEqualTo("hello, world");
-    assertThat(response.getEnvoyError()).isNull();
-    assertThat(response.getNbResponseChunks()).isEqualTo(1);
-    assertThat(response.getStreamIntels().size()).isEqualTo(3);
-    assertThat(response.getStreamIntels().get(2).getAttemptCount()).isEqualTo(1);
-    assertThat(response.getFinalStreamIntel().getSentByteCount()).isEqualTo(75);
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+      assertThat(response.getBodyAsString()).isEqualTo("hello, world");
+      assertThat(response.getNbResponseChunks()).isEqualTo(1);
+      assertThat(response.getStreamIntels().size()).isEqualTo(3);
+      assertThat(response.getStreamIntels().get(2).getAttemptCount()).isEqualTo(1);
+      assertThat(response.getFinalStreamIntel().getSentByteCount()).isEqualTo(75);
+    }
   }
 
   @Test
@@ -103,13 +109,17 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEqualTo("hello, world");
-    assertThat(response.getEnvoyError()).isNull();
-    assertThat(response.getNbResponseChunks()).isEqualTo(1);
-    assertThat(response.getStreamIntels().size()).isEqualTo(3);
-    assertThat(response.getStreamIntels().get(2).getAttemptCount()).isEqualTo(1);
-    assertThat(response.getFinalStreamIntel().getSentByteCount()).isEqualTo(75);
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+      assertThat(response.getBodyAsString()).isEqualTo("hello, world");
+      assertThat(response.getNbResponseChunks()).isEqualTo(1);
+      assertThat(response.getStreamIntels().size()).isEqualTo(3);
+      assertThat(response.getStreamIntels().get(2).getAttemptCount()).isEqualTo(1);
+      assertThat(response.getFinalStreamIntel().getSentByteCount()).isEqualTo(75);
+    }
   }
 
   @Test
@@ -157,10 +167,14 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEqualTo("hello, world");
-    assertThat(response.getEnvoyError()).isNull();
-    assertThat(response.getNbResponseChunks()).isEqualTo(3); // response size: 12, buffer size: 4
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+      assertThat(response.getBodyAsString()).isEqualTo("hello, world");
+      assertThat(response.getNbResponseChunks()).isEqualTo(3); // response size: 12, buffer, size: 4
+    }
   }
 
   @Test
@@ -177,9 +191,13 @@ public class AndroidEngineExplicitFlowTest {
 
       Response response = sendRequest(requestScenario);
 
-      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-      assertThat(response.getBodyAsString()).isEqualTo("hello, world");
-      assertThat(response.getEnvoyError()).isNull();
+      if (response.getEnvoyError() != null) {
+        fail("Error code: " + response.getEnvoyError().getErrorCode() +
+             ", error message: " + response.getEnvoyError().getMessage());
+      } else {
+        assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+        assertThat(response.getBodyAsString()).isEqualTo("hello, world");
+      }
     }
   }
 
@@ -193,10 +211,14 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEmpty();
-    assertThat(response.getEnvoyError()).isNull();
-    assertThat(response.getNbResponseChunks()).isEqualTo(0);
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+      assertThat(response.getBodyAsString()).isEmpty();
+      assertThat(response.getNbResponseChunks()).isEqualTo(0);
+    }
   }
 
   @Test
@@ -212,10 +234,14 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEmpty();
-    assertThat(response.getEnvoyError()).isNull();
-    assertThat(response.isCancelled()).isTrue();
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+      assertThat(response.getBodyAsString()).isEmpty();
+      assertThat(response.isCancelled()).isTrue();
+    }
   }
 
   @Test
@@ -231,10 +257,14 @@ public class AndroidEngineExplicitFlowTest {
     Response response = sendRequest(requestScenario);
     Thread.sleep(100); // If the Stream processes a spurious onCancel callback, we will notice.
 
-    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEmpty();
-    assertThat(response.getEnvoyError()).isNull();
-    assertThat(response.isCancelled()).isFalse(); // EndStream was already reached - no callback.
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+      assertThat(response.getBodyAsString()).isEmpty();
+      assertThat(response.isCancelled()).isFalse(); // EndStream was already reached - no callback.
+    }
   }
 
   @Test
@@ -251,12 +281,14 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEqualTo("hello, world");
-    assertThat(response.getEnvoyError()).isNull();
-    // A "terminating" empty buffer is systematically sent through the setOnResponseData callback.
-    // See: https://github.com/envoyproxy/envoy-mobile/issues/1393
-    assertThat(response.getNbResponseChunks()).isEqualTo(4); // 5 bytes, 5 bytes, 2, and 0 bytes
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+      assertThat(response.getBodyAsString()).isEqualTo("hello, world");
+      assertThat(response.getNbResponseChunks()).isEqualTo(3); // 5 bytes, 5 bytes, 2 bytes.
+    }
   }
 
   @Test
@@ -273,12 +305,14 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEqualTo("hello, world");
-    assertThat(response.getEnvoyError()).isNull();
-    // A "terminating" empty buffer is systematically sent through the setOnResponseData callback.
-    // See: https://github.com/envoyproxy/envoy-mobile/issues/1393
-    assertThat(response.getNbResponseChunks()).isEqualTo(6); // 3&2 bytes, 3&2 bytes, 2, and 0 bytes
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+      assertThat(response.getBodyAsString()).isEqualTo("hello, world");
+      assertThat(response.getNbResponseChunks()).isEqualTo(5); // 3&2 bytes, 3&2 bytes, 2 bytes.
+    }
   }
 
   @Test
@@ -296,9 +330,13 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEqualTo(responseBody);
-    assertThat(response.getEnvoyError()).isNull();
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+      assertThat(response.getBodyAsString()).isEqualTo(responseBody);
+    }
   }
 
   // This was supposed to be a simple post, but because the stream is not properly closed, it
@@ -323,9 +361,13 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
-    assertThat(response.getEnvoyError()).isNull();
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+      assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
+    }
   }
 
   @Test
@@ -349,9 +391,13 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
-    assertThat(response.getEnvoyError()).isNull();
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+      assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
+    }
   }
 
   @Test
@@ -376,9 +422,13 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
-    assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
-    assertThat(response.getEnvoyError()).isNull();
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+      assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
+    }
   }
 
   @Test
@@ -391,9 +441,13 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.isCancelled()).isTrue();
-    assertThat(response.getRequestChunkSent()).isEqualTo(0);
-    assertThat(response.getEnvoyError()).isNull();
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.isCancelled()).isTrue();
+      assertThat(response.getRequestChunkSent()).isEqualTo(0);
+    }
   }
 
   @Test
@@ -407,9 +461,13 @@ public class AndroidEngineExplicitFlowTest {
 
     Response response = sendRequest(requestScenario);
 
-    assertThat(response.isCancelled()).isTrue();
-    assertThat(response.getRequestChunkSent()).isEqualTo(1);
-    assertThat(response.getEnvoyError()).isNull();
+    if (response.getEnvoyError() != null) {
+      fail("Error code: " + response.getEnvoyError().getErrorCode() +
+           ", error message: " + response.getEnvoyError().getMessage());
+    } else {
+      assertThat(response.isCancelled()).isTrue();
+      assertThat(response.getRequestChunkSent()).isEqualTo(1);
+    }
   }
 
   @Test
@@ -479,8 +537,13 @@ public class AndroidEngineExplicitFlowTest {
               return null;
             })
             .setOnResponseData((data, endStream, streamIntel) -> {
-              response.get().addBody(data);
-              response.get().addStreamIntel(streamIntel);
+              // Sometimes Envoy Mobile may send an empty data (0 byte) with `endStream` set to true
+              // to indicate an end of stream.
+              // See: https://github.com/envoyproxy/envoy-mobile/issues/1393
+              if (data.limit() > 0) {
+                response.get().addBody(data);
+                response.get().addStreamIntel(streamIntel);
+              }
               if (!endStream) {
                 if (requestScenario.waitOnReadData) {
                   try {

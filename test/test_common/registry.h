@@ -39,6 +39,8 @@ public:
     Registry::FactoryRegistry<Base>::rebuildFactoriesByTypeForTest();
   }
 
+  static void forceAllowDuplicates() { Registry::FactoryRegistry<Base>::allowDuplicates() = true; }
+
 private:
   Base& instance_;
   Base* original_{};

@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // populate `opentelemetry.proto.collector.v1.logs.ExportLogsServiceRequest.resource_logs <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto>`_.
 // In addition, the request start time is set in the dedicated field.
 // [#extension: envoy.access_loggers.open_telemetry]
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message OpenTelemetryAccessLogConfig {
   // [#comment:TODO(itamarkam): add 'filter_state_objects_to_log' to logs.]
   grpc.v3.CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
@@ -46,4 +46,9 @@ message OpenTelemetryAccessLogConfig {
   // See 'attributes' in the LogResource proto for more details.
   // Example: ``attributes { values { key: "user_agent" value { string_value: "%REQ(USER-AGENT)%" } } }``.
   opentelemetry.proto.common.v1.KeyValueList attributes = 3;
+
+  // Optional. Additional prefix to use on OpenTelemetry access logger stats. If empty, the stats will be rooted at
+  // ``access_logs.open_telemetry_access_log.``. If non-empty, stats will be rooted at
+  // ``access_logs.open_telemetry_access_log.<stat_prefix>.``.
+  string stat_prefix = 6;
 }

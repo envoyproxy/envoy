@@ -37,6 +37,7 @@ public:
   static std::unique_ptr<Socket::Options> buildReusePortOptions();
   static std::unique_ptr<Socket::Options> buildUdpGroOptions();
   static std::unique_ptr<Socket::Options> buildZeroSoLingerOptions();
+  static std::unique_ptr<Socket::Options> buildIpRecvTosOptions();
 };
 } // namespace Network
 } // namespace Envoy

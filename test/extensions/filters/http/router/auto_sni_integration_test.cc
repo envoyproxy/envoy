@@ -6,7 +6,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/tls/context_config_impl.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 #include "test/integration/http_integration.h"
 

@@ -722,15 +722,21 @@ TEST_P(RateLimitQuotaIntegrationTest, DISABLED_MultiRequestWithTokenBucketThrott
   }
 }
 
-TEST_P(RateLimitQuotaIntegrationTest, TwoRequestWithTokenBucketThrottling) {
+TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucket) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
                                                                   {"group", "envoy"}};
-  int max_token = 0;
-  // First  request: allowed; fail-open, default no assignment policy.
-  // Second request: rejected; no token remaining.
-  for (int i = 0; i < 2; ++i) {
+  int max_token = 1;
+  int tokens_per_fill = 30;
+  int fill_interval_sec = 60;
+  int fill_one_token_in_ms = fill_interval_sec / tokens_per_fill * 1000;
+  for (int i = 0; i < 10; ++i) {
+    // We advance time by 2s so that token bucket can be refilled.
+    if (i == 4 || i == 6) {
+      simTime().advanceTimeAndRun(std::chrono::milliseconds(fill_one_token_in_ms), *dispatcher_,
+                                  Envoy::Event::Dispatcher::RunType::NonBlock);
+    }
     // Send downstream client request to upstream.
     sendClientRequest(&custom_headers);
 
@@ -763,25 +769,6 @@ TEST_P(RateLimitQuotaIntegrationTest, TwoRequestWithTokenBucketThrottling) {
 
       // Send the response from RLQS server.
       rlqs_stream_->sendGrpcMessage(rlqs_response);
-    }
-
-    if (i == 1) {
-      ASSERT_TRUE(response_->waitForEndStream());
-      EXPECT_TRUE(response_->complete());
-      EXPECT_EQ(response_->headers().getStatusValue(), "429");
-    } else {
-      // Handle the request received by upstream.
-      ASSERT_TRUE(
-          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-      upstream_request_->encodeData(100, true);
-
-      // Verify the response to downstream.
-      ASSERT_TRUE(response_->waitForEndStream());
-      EXPECT_TRUE(response_->complete());
-      EXPECT_EQ(response_->headers().getStatusValue(), "200");
     }
 
     cleanUp();

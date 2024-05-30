@@ -11,7 +11,7 @@ import java.util.concurrent.Executor
  */
 class MockStreamPrototype(private val onStart: ((stream: MockStream) -> Unit)?) :
   StreamPrototype(MockEnvoyEngine()) {
-  override fun start(executor: Executor): Stream {
+  override fun start(executor: Executor?): Stream {
     val callbacks = createCallbacks(executor)
     val stream = MockStream(MockEnvoyHTTPStream(callbacks, false))
     onStart?.invoke(stream)

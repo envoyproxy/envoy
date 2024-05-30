@@ -51,9 +51,10 @@ void HotRestartingParent::Internal::handle(uint32_t worker_index,
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   socket_event_ = dispatcher.createFileEvent(
       main_rpc_stream_.domain_socket_,
-      [this](uint32_t events) -> void {
+      [this](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
         onSocketEvent();
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   dispatcher_ = dispatcher;

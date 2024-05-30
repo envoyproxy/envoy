@@ -15,7 +15,7 @@
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/api/external.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 
 #if defined(__APPLE__)
 #include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
@@ -87,6 +87,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
       .setForceAlwaysUsev6(true)
+      .setUseGroIfAvailable(true)
       .setDeviceOs("probably-ubuntu-on-CI");
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
@@ -112,6 +113,7 @@ TEST(TestConfig, ConfigIsApplied) {
 #endif
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
       "key: \"always_use_v6\" value { bool_value: true }",
+      "key: \"prefer_quic_client_udp_gro\" value { bool_value: true }",
       "key: \"test_feature_false\" value { bool_value: true }",
       "key: \"allow_client_socket_creation_failure\" value { bool_value: true }",
       "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
@@ -519,7 +521,7 @@ TEST(TestConfig, DISABLED_StringAccessors) {
   EXPECT_EQ(0, accessor->count());
   envoy_data data = c_accessor->get_string(c_accessor->context);
   EXPECT_EQ(1, accessor->count());
-  EXPECT_EQ(data_string, Data::Utility::copyToString(data));
+  EXPECT_EQ(data_string, Bridge::Utility::copyToString(data));
   release_envoy_data(data);
 }
 

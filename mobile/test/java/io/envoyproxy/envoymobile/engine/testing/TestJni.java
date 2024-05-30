@@ -6,11 +6,11 @@ import io.envoyproxy.envoymobile.engine.EnvoyConfiguration;
  * Wrapper class for test JNI functions
  */
 public final class TestJni {
-  public static String createYaml(EnvoyConfiguration envoyConfiguration) {
-    return nativeCreateYaml(envoyConfiguration.createBootstrap());
+  public static String createProtoString(EnvoyConfiguration envoyConfiguration) {
+    return nativeCreateProtoString(envoyConfiguration.createBootstrap());
   }
 
-  private static native String nativeCreateYaml(long bootstrap);
+  private static native String nativeCreateProtoString(long bootstrap);
 
   private TestJni() {}
 }

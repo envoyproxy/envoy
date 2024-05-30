@@ -42,7 +42,7 @@
 #include "source/common/tcp/conn_pool.h"
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
@@ -526,8 +526,10 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
   if (dyn_resources.has_cds_config() || !dyn_resources.cds_resources_locator().empty()) {
     std::unique_ptr<xds::core::v3::ResourceLocator> cds_resources_locator;
     if (!dyn_resources.cds_resources_locator().empty()) {
-      cds_resources_locator = std::make_unique<xds::core::v3::ResourceLocator>(
-          Config::XdsResourceIdentifier::decodeUrl(dyn_resources.cds_resources_locator()));
+      cds_resources_locator =
+          std::make_unique<xds::core::v3::ResourceLocator>(THROW_OR_RETURN_VALUE(
+              Config::XdsResourceIdentifier::decodeUrl(dyn_resources.cds_resources_locator()),
+              xds::core::v3::ResourceLocator));
     }
     cds_api_ = factory_.createCds(dyn_resources.cds_config(), cds_resources_locator.get(), *this);
     init_helper_.setCds(cds_api_.get());
@@ -604,14 +606,14 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
   cluster_data = active_clusters_.find(cluster.info()->name());
 
   if (cluster_data->second->thread_aware_lb_ != nullptr) {
-    cluster_data->second->thread_aware_lb_->initialize();
+    THROW_IF_NOT_OK(cluster_data->second->thread_aware_lb_->initialize());
   }
 
   // Now setup for cross-thread updates.
   // This is used by cluster types such as EDS clusters to drain the connection pools of removed
   // hosts.
   cluster_data->second->member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
-      [&cluster, this](const HostVector&, const HostVector& hosts_removed) -> void {
+      [&cluster, this](const HostVector&, const HostVector& hosts_removed) -> absl::Status {
         if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
             // This will drain all tcp and http connection pools.
@@ -628,6 +630,7 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
             postThreadLocalRemoveHosts(cluster, hosts_removed);
           }
         }
+        return absl::OkStatus();
       });
 
   // This is used by cluster types such as EDS clusters to update the cluster
@@ -668,6 +671,7 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
           postThreadLocalClusterUpdate(
               cm_cluster, ThreadLocalClusterUpdateParams(priority, hosts_added, hosts_removed));
         }
+        return absl::OkStatus();
       });
 
   // Finally, post updates cross-thread so the per-thread load balancers are ready. First we

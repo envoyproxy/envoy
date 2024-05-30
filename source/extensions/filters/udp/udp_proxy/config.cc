@@ -21,7 +21,9 @@ const std::string& TunnelResponseTrailers::key() {
 
 TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
                                          Server::Configuration::FactoryContext& context)
-    : header_parser_(Envoy::Router::HeaderParser::configure(config.headers_to_add())),
+    : header_parser_(
+          THROW_OR_RETURN_VALUE(Envoy::Router::HeaderParser::configure(config.headers_to_add()),
+                                Envoy::Router::HeaderParserPtr)),
       target_port_(config.default_target_port()), use_post_(config.use_post()),
       post_path_(config.post_path()),
       max_connect_attempts_(config.has_retry_options()
