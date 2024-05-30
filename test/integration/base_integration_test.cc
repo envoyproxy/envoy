@@ -107,7 +107,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOptions(
     uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(
+      *Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options,
       nullptr));

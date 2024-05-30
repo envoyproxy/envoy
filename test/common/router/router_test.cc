@@ -4588,7 +4588,7 @@ public:
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
-        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
   }
 
 protected:
@@ -6324,7 +6324,7 @@ TEST_F(RouterTest, RequestResponseSize) { testRequestResponse(false); }
 TEST_F(RouterTest, RequestResponseSizeWithTrailers) { testRequestResponse(true); }
 
 TEST_F(RouterTest, Http3DisabledForHttp11Proxies) {
-  auto address = Network::Utility::parseInternetAddressAndPort("127.0.0.1:20");
+  auto address = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:20");
   std::string hostname = "www.lyft.com";
   callbacks_.stream_info_.filterState()->setData(
       Network::Http11ProxyInfoFilterState::key(),

@@ -121,18 +121,18 @@ Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstream
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeTcpClientConnection() {
-  Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
-                                   ":" + std::to_string(lookupPort("http")));
+  Network::Address::InstanceConstSharedPtr address = *Network::Utility::resolveUrl(
+      "tcp://" + Network::Test::getLoopbackAddressUrlString(version_) + ":" +
+      std::to_string(lookupPort("http")));
   return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                              Network::Test::createRawBufferSocket(), nullptr,
                                              nullptr);
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
-  Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
-                                   ":" + std::to_string(lookupPort("http")));
+  Network::Address::InstanceConstSharedPtr address = *Network::Utility::resolveUrl(
+      "tcp://" + Network::Test::getLoopbackAddressUrlString(version_) + ":" +
+      std::to_string(lookupPort("http")));
   return dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_mtls_ssl_ctx_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
