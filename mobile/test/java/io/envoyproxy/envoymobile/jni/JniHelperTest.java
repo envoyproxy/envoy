@@ -164,12 +164,18 @@ public class JniHelperTest {
 
   @Test
   public void testGetFieldId() {
-    getFieldId(Foo.class, "field", "I");
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      getFieldId(Foo.class, "field", "I");
+    }
   }
 
   @Test
-  public void testGetStatocFieldId() {
-    getStaticFieldId(Foo.class, "staticField", "I");
+  public void testGetStaticFieldId() {
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      getStaticFieldId(Foo.class, "staticField", "I");
+    }
   }
 
   @Test
@@ -220,17 +226,26 @@ public class JniHelperTest {
 
   @Test
   public void testGetMethodId() {
-    getMethodId(Foo.class, "<init>", "()V");
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      getMethodId(Foo.class, "<init>", "()V");
+    }
   }
 
   @Test
   public void testGetStaticMethodId() {
-    getStaticMethodId(JniHelperTest.class, "staticVoidMethod", "()V");
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      getStaticMethodId(JniHelperTest.class, "staticVoidMethod", "()V");
+    }
   }
 
   @Test
   public void testFindClass() {
-    assertThat(findClass("java/lang/Exception")).isEqualTo(Exception.class);
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      assertThat(findClass("java/lang/Exception")).isEqualTo(Exception.class);
+    }
   }
 
   @Test
