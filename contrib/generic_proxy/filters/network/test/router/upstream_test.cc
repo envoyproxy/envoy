@@ -485,9 +485,6 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingFailureAndNoUpstreamConnectionC
 
   NiceMock<MockUpstreamRequestCallbacks> mock_upstream_request_callbacks_1;
   NiceMock<MockUpstreamRequestCallbacks> mock_upstream_request_callbacks_2;
-  // Only set one to ensure that even the the upstream request callbacks do not
-  // clean up the upstream, the upstream will do it itself.
-  mock_upstream_request_callbacks_1.upstream_ = generic_upstream.get();
 
   EXPECT_CALL(thread_local_cluster_.tcp_conn_pool_, newConnection(_));
 
@@ -514,10 +511,10 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingFailureAndNoUpstreamConnectionC
 
   EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
       .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
-        EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingFailure(_))
-            .WillOnce(testing::Invoke([&](absl::string_view) {
-              // Overriden the default behavior to avoid closing the upstream connection.
-            }));
+        // Upstream is not set into the mock upstream request callbacks. So the
+        // onDecodingFailure() will not clean up the upstream and will not result
+        // in the upstream connection clos.
+        EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingFailure(_));
         EXPECT_CALL(mock_upstream_request_callbacks_2, onDecodingFailure(_));
 
         cocec_callbacks_->onDecodingFailure("test");
@@ -541,9 +538,6 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingFailure) {
 
   NiceMock<MockUpstreamRequestCallbacks> mock_upstream_request_callbacks_1;
   NiceMock<MockUpstreamRequestCallbacks> mock_upstream_request_callbacks_2;
-  // Only set one to ensure that even the the upstream request callbacks do not
-  // clean up the upstream, the upstream will do it itself.
-  mock_upstream_request_callbacks_1.upstream_ = generic_upstream.get();
 
   EXPECT_CALL(thread_local_cluster_.tcp_conn_pool_, newConnection(_));
 
@@ -570,12 +564,52 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingFailure) {
 
   EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
       .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
-        EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingFailure(_));
+        std::vector<uint32_t> called_decoding_failure;
+        std::vector<uint32_t> called_connection_close;
+
         EXPECT_CALL(mock_upstream_connection_, close(_));
-        EXPECT_CALL(mock_upstream_request_callbacks_2, onConnectionClose(_));
+
+        ON_CALL(mock_upstream_request_callbacks_1, onDecodingFailure(_))
+            .WillByDefault(testing::Invoke([&](auto) {
+              called_decoding_failure.push_back(1);
+              generic_upstream->removeUpstreamRequest(1);
+              generic_upstream->cleanUp(true);
+            }));
+        ON_CALL(mock_upstream_request_callbacks_1, onConnectionClose(_))
+            .WillByDefault(testing::Invoke([&](auto) {
+              called_connection_close.push_back(1);
+              generic_upstream->removeUpstreamRequest(1);
+              // The onConnectionClose() is called when the upstream connection is closed.
+              // When the upstream connection is closed because the onDecodingFailure(),
+              // the upstream was already cleaned up. So, the cleanUp() here do anything.
+              generic_upstream->cleanUp(true);
+            }));
+        ON_CALL(mock_upstream_request_callbacks_2, onDecodingFailure(_))
+            .WillByDefault(testing::Invoke([&](auto) {
+              called_decoding_failure.push_back(2);
+              generic_upstream->removeUpstreamRequest(2);
+              generic_upstream->cleanUp(true);
+            }));
+        ON_CALL(mock_upstream_request_callbacks_2, onConnectionClose(_))
+            .WillByDefault(testing::Invoke([&](auto) {
+              called_connection_close.push_back(2);
+              generic_upstream->removeUpstreamRequest(2);
+              // The onConnectionClose() is called when the upstream connection is closed.
+              // When the upstream connection is closed because the onDecodingFailure(),
+              // the upstream was already cleaned up. So, the cleanUp() here do anything.
+              generic_upstream->cleanUp(true);
+            }));
         EXPECT_CALL(mock_downstream_connection_1_, close(_));
 
         cocec_callbacks_->onDecodingFailure("test");
+
+        EXPECT_EQ(1, called_decoding_failure.size());
+        EXPECT_EQ(1, called_connection_close.size());
+
+        // One of callbacks' onDecodingFailure() will be called first. And the other one's
+        // onConnectionClose() will be called then.
+        EXPECT_TRUE((called_decoding_failure[0] == 1 && called_connection_close[0] == 2) ||
+                    (called_decoding_failure[0] == 2 && called_connection_close[0] == 1));
       }));
 
   Buffer::OwnedImpl fake_buffer;

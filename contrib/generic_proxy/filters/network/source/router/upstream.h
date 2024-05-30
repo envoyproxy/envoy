@@ -348,7 +348,7 @@ private:
 
   Network::Connection& downstream_conn_;
   EventWatcher connection_event_watcher_;
-  absl::optional<bool> upstream_conn_ready_;
+  absl::optional<bool> upstream_conn_ok_;
 
   // This ensure the requests that are waiting upstream connectin will be list in the order in
   // which the requests were received. By this way, the protocols that require the requests and
@@ -358,8 +358,8 @@ private:
   // generic proxy will send requests to server in order. Finally, the upstream server of these
   // protocols will send respnoses in order. We also assume that the L7 filter chain of these
   // protocols will not change the processing order.
-  using LinkedHashMap = quiche::QuicheLinkedHashMap<uint64_t, UpstreamRequestCallbacks*>;
-  LinkedHashMap pending_requests_;
+  using LinkedAbslHashMap = quiche::QuicheLinkedHashMap<uint64_t, UpstreamRequestCallbacks*>;
+  LinkedAbslHashMap pending_requests_;
 };
 
 using OwnedGenericUpstreamBase = UpstreamBase<UniqueEncoderDecoder>;

@@ -165,10 +165,10 @@ void BoundGenericUpstream::onDownstreamConnectionEvent(Network::ConnectionEvent 
 void BoundGenericUpstream::appendUpstreamRequest(uint64_t stream_id,
                                                  UpstreamRequestCallbacks* pending_request) {
 
-  if (upstream_conn_ready_.has_value()) {
+  if (upstream_conn_ok_.has_value()) {
     // Upstream connection is already ready. If the upstream connection is failed then
     // all pending requests will be reset and no new upstream request will be created.
-    if (!upstream_conn_ready_.value()) {
+    if (!upstream_conn_ok_.value()) {
       return;
     }
 
@@ -236,11 +236,11 @@ void BoundGenericUpstream::onUpstreamSuccess() {
   // This should be called only once and all pending requests should be notified. After this is
   // called, the upstream connection is ready and new upstream requests should be notified directly.
 
-  ASSERT(!upstream_conn_ready_.has_value());
+  ASSERT(!upstream_conn_ok_.has_value());
   // encoder_decoder_ should be initialized after the upstream connection is ready and before the
   // onUpstreamSuccess() is called.
   ASSERT(encoder_decoder_ != nullptr);
-  upstream_conn_ready_ = true;
+  upstream_conn_ok_ = true;
 
   while (!pending_requests_.empty()) {
     auto it = pending_requests_.begin();
@@ -260,8 +260,8 @@ void BoundGenericUpstream::onUpstreamFailure(ConnectionPool::PoolFailureReason r
   // This should be called only once and all pending requests should be notified.
   // Then the downstream connection will be closed.
 
-  ASSERT(!upstream_conn_ready_.has_value());
-  upstream_conn_ready_ = false;
+  ASSERT(!upstream_conn_ok_.has_value());
+  upstream_conn_ok_ = false;
 
   while (!pending_requests_.empty()) {
     auto it = pending_requests_.begin();
