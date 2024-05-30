@@ -7,7 +7,7 @@ namespace Tls {
 
 Ssl::SelectionResult
 TlsCertificateSelectorImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
-                                             Ssl::CertSelectionCallbackSharedPtr cb) {
+                                             Ssl::CertSelectionCallbackPtr cb) {
   auto selection_ctx = cb_.lock();
   if (selection_ctx == nullptr) {
     IS_ENVOY_BUG("ContextSelectionCallback is gone early");

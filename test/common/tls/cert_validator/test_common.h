@@ -35,7 +35,7 @@ public:
   Ssl::ValidateStatus certificateValidationResult() const override { return validate_result_; }
   uint8_t certificateValidationAlert() const override { return SSL_AD_CERTIFICATE_UNKNOWN; }
 
-  Ssl::CertSelectionCallbackSharedPtr createCertSelectionCallback(SSL*) override { return nullptr; }
+  Ssl::CertSelectionCallbackPtr createCertSelectionCallback(SSL*) override { return nullptr; }
   void onCertSelectionCompleted(bool succeeded) override {
     cert_selection_result_ =
         succeeded ? Ssl::CertSelectionStatus::Successful : Ssl::CertSelectionStatus::Failed;

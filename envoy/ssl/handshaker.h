@@ -190,7 +190,7 @@ public:
   virtual void onCertSelectionResult(OptRef<const Ssl::TlsContext> selected_ctx, bool staple) PURE;
 };
 
-using CertSelectionCallbackSharedPtr = std::shared_ptr<CertSelectionCallback>;
+using CertSelectionCallbackPtr = std::unique_ptr<CertSelectionCallback>;
 
 class TlsCertificateSelector {
 public:
@@ -200,7 +200,7 @@ public:
    * select TLS context based on the client hello.
    */
   virtual SelectionResult selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
-                                           CertSelectionCallbackSharedPtr cb) PURE;
+                                           CertSelectionCallbackPtr cb) PURE;
 };
 
 using TlsCertificateSelectorPtr = std::unique_ptr<TlsCertificateSelector>;

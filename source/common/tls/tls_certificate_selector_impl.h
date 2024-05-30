@@ -24,7 +24,7 @@ public:
   TlsCertificateSelectorImpl(Ssl::ContextSelectionCallbackWeakPtr cb) : cb_(cb){};
 
   Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
-                                        Ssl::CertSelectionCallbackSharedPtr cb) override;
+                                        Ssl::CertSelectionCallbackPtr cb) override;
 
 private:
   Ssl::ContextSelectionCallbackWeakPtr cb_;

@@ -91,9 +91,9 @@ public:
   virtual uint8_t certificateValidationAlert() const PURE;
 
   /**
-   * @return CertSelectionCallbackSharedPtr a callback used to return the cert selection result.
+   * @return CertSelectionCallbackPtr a callback used to return the cert selection result.
    */
-  virtual CertSelectionCallbackSharedPtr createCertSelectionCallback(SSL* ssl) PURE;
+  virtual CertSelectionCallbackPtr createCertSelectionCallback(SSL* ssl) PURE;
 
   /**
    * Called after the cert selection completes.
