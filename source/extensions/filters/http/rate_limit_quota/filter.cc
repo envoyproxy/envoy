@@ -194,7 +194,6 @@ bool RateLimitQuotaFilter::shouldAllowRequest(const CachedBucket& cached_bucket)
     case RateLimitStrategy::DENY_ALL:
       return false;
     }
-    break;
   case RateLimitStrategy::kTokenBucket:
     // A TokenBucket assignment should always have its accompanying
     // TokenBucket implementation in the cache. If it's null instead, then
@@ -208,9 +207,7 @@ bool RateLimitQuotaFilter::shouldAllowRequest(const CachedBucket& cached_bucket)
     ENVOY_LOG(error, "Bug: an RLQS bucket is cached with a missing "
                      "quota_assignment_action or rate_limit_strategy causing the "
                      "filter to fail open.");
-    return true;
   }
-  // Not reachable.
   return true;
 }
 
