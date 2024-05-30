@@ -29,7 +29,7 @@ thread_local absl::flat_hash_map<
     static_jmethod_id_cache_map;
 thread_local absl::flat_hash_map<
     std::tuple<jclass, absl::string_view /* field */, absl::string_view>, jfieldID /* signature */>
-    jfield_id_cache;
+    jfield_id_cache_map;
 thread_local absl::flat_hash_map<
     std::tuple<jclass, absl::string_view /* field */, absl::string_view>, jfieldID /* signature */>
     static_jfield_id_cache_map;
@@ -53,6 +53,22 @@ jint JniHelper::getVersion() { return JNI_VERSION; }
 
 void JniHelper::initialize(JavaVM* java_vm) {
   java_vm_cache_.store(java_vm, std::memory_order_release);
+}
+
+void JniHelper::finalize() {
+  JNIEnv* env;
+  jint result = getJavaVm()->GetEnv(reinterpret_cast<void**>(&env), getVersion());
+  ASSERT(result == JNI_OK, "Unable to get JNIEnv from the JavaVM.");
+  // Clear the caches and delete the global references.
+  jmethod_id_cache_map.clear();
+  static_jmethod_id_cache_map.clear();
+  jfield_id_cache_map.clear();
+  static_jfield_id_cache_map.clear();
+  jclass_cache_map.clear();
+  for (const auto& clazz : jclass_cache_set) {
+    env->DeleteGlobalRef(clazz);
+  }
+  jclass_cache_set.clear();
 }
 
 void JniHelper::addClassToCache(const char* class_name) {
@@ -92,14 +108,14 @@ JNIEnv* JniHelper::getThreadLocalEnv() {
 JNIEnv* JniHelper::getEnv() { return env_; }
 
 jfieldID JniHelper::getFieldId(jclass clazz, const char* name, const char* signature) {
-  if (auto it = jfield_id_cache.find(
+  if (auto it = jfield_id_cache_map.find(
           std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
-      it != jfield_id_cache.end()) {
+      it != jfield_id_cache_map.end()) {
     return it->second;
   }
   jfieldID field_id = env_->GetFieldID(clazz, name, signature);
   jclass clazz_global_ref = addClassToCacheIfNotExist(env_, clazz);
-  jfield_id_cache.emplace(
+  jfield_id_cache_map.emplace(
       std::tuple<jclass, absl::string_view, absl::string_view>(clazz_global_ref, name, signature),
       field_id);
   rethrowException();
