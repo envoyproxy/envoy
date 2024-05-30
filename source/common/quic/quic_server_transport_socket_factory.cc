@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Quic {
 
-Network::DownstreamTransportSocketFactoryPtr
+absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
 QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
@@ -121,6 +121,7 @@ void QuicServerTransportSocketFactory::initialize() {
   config_->setSecretUpdateCallback([this]() {
     // The callback also updates config_ with the new secret.
     onSecretUpdated();
+    return absl::OkStatus();
   });
   if (!config_->alpnProtocols().empty()) {
     supported_alpns_ = absl::StrSplit(config_->alpnProtocols(), ',');
