@@ -246,6 +246,8 @@ type ConnectionCallback interface {
 	Write(buffer []byte, endStream bool)
 	// Close the connection.
 	Close(closeType ConnectionCloseType)
+	// EnableHalfClose only for upstream connection
+	EnableHalfClose(enabled bool)
 }
 
 type StateType int

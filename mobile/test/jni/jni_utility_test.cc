@@ -13,6 +13,20 @@
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
   Envoy::JNI::JniHelper::initialize(vm);
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/Object");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/Integer");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/ClassLoader");
+  Envoy::JNI::JniHelper::addClassToCache("java/nio/ByteBuffer");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/Throwable");
+  Envoy::JNI::JniHelper::addClassToCache("[B");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/Map$Entry");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/LinkedHashMap");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/HashMap");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/List");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/ArrayList");
+  Envoy::JNI::JniHelper::addClassToCache("io/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel");
+  Envoy::JNI::JniHelper::addClassToCache(
+      "io/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel");
   return Envoy::JNI::JniHelper::getVersion();
 }
 
@@ -63,7 +77,8 @@ Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_javaCppDirectByteBufferConvers
   Envoy::JNI::JniHelper jni_helper(env);
   auto cpp_buffer_instance =
       Envoy::JNI::javaDirectByteBufferToCppBufferInstance(jni_helper, java_byte_buffer, length);
-  return Envoy::JNI::cppBufferInstanceToJavaDirectByteBuffer(jni_helper, *cpp_buffer_instance)
+  return Envoy::JNI::cppBufferInstanceToJavaDirectByteBuffer(jni_helper, *cpp_buffer_instance,
+                                                             length)
       .release();
 }
 
@@ -73,7 +88,8 @@ Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_javaCppNonDirectByteBufferConv
   Envoy::JNI::JniHelper jni_helper(env);
   auto cpp_buffer_instance =
       Envoy::JNI::javaNonDirectByteBufferToCppBufferInstance(jni_helper, java_byte_buffer, length);
-  return Envoy::JNI::cppBufferInstanceToJavaNonDirectByteBuffer(jni_helper, *cpp_buffer_instance)
+  return Envoy::JNI::cppBufferInstanceToJavaNonDirectByteBuffer(jni_helper, *cpp_buffer_instance,
+                                                                length)
       .release();
 }
 
@@ -83,4 +99,23 @@ Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_getJavaExceptionMessage(JNIEnv
   Envoy::JNI::JniHelper jni_helper(env);
   std::string exception_message = Envoy::JNI::getJavaExceptionMessage(jni_helper, throwble);
   return Envoy::JNI::cppStringToJavaString(jni_helper, exception_message).release();
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_javaCppStreamIntelConversion(
+    JNIEnv* env, jclass, jobject java_stream_intel) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  auto cpp_stream_intel =
+      Envoy::JNI::javaStreamIntelToCppStreamIntel(jni_helper, java_stream_intel);
+  return Envoy::JNI::cppStreamIntelToJavaStreamIntel(jni_helper, cpp_stream_intel).release();
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_javaCppFinalStreamIntelConversion(
+    JNIEnv* env, jclass, jobject java_final_stream_intel) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  auto cpp_final_stream_intel =
+      Envoy::JNI::javaFinalStreamIntelToCppFinalStreamIntel(jni_helper, java_final_stream_intel);
+  return Envoy::JNI::cppFinalStreamIntelToJavaFinalStreamIntel(jni_helper, cpp_final_stream_intel)
+      .release();
 }

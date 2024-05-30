@@ -577,12 +577,15 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   SET_AND_RETURN_IF_NOT_OK(body_or_error.status(), creation_status);
   direct_response_body_ = body_or_error.value();
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
-    request_headers_parser_ =
-        HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
+    request_headers_parser_ = THROW_OR_RETURN_VALUE(
+        HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove()),
+        Router::HeaderParserPtr);
   }
   if (!route.response_headers_to_add().empty() || !route.response_headers_to_remove().empty()) {
-    response_headers_parser_ = HeaderParser::configure(route.response_headers_to_add(),
-                                                       route.response_headers_to_remove());
+    response_headers_parser_ =
+        THROW_OR_RETURN_VALUE(HeaderParser::configure(route.response_headers_to_add(),
+                                                      route.response_headers_to_remove()),
+                              Router::HeaderParserPtr);
   }
   if (route.has_metadata()) {
     metadata_ = std::make_unique<RouteMetadataPack>(route.metadata());
@@ -1465,12 +1468,16 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
       host_rewrite_(cluster.host_rewrite_literal()),
       cluster_header_name_(cluster.cluster_header()) {
   if (!cluster.request_headers_to_add().empty() || !cluster.request_headers_to_remove().empty()) {
-    request_headers_parser_ = HeaderParser::configure(cluster.request_headers_to_add(),
-                                                      cluster.request_headers_to_remove());
+    request_headers_parser_ =
+        THROW_OR_RETURN_VALUE(HeaderParser::configure(cluster.request_headers_to_add(),
+                                                      cluster.request_headers_to_remove()),
+                              Router::HeaderParserPtr);
   }
   if (!cluster.response_headers_to_add().empty() || !cluster.response_headers_to_remove().empty()) {
-    response_headers_parser_ = HeaderParser::configure(cluster.response_headers_to_add(),
-                                                       cluster.response_headers_to_remove());
+    response_headers_parser_ =
+        THROW_OR_RETURN_VALUE(HeaderParser::configure(cluster.response_headers_to_add(),
+                                                      cluster.response_headers_to_remove()),
+                              Router::HeaderParserPtr);
   }
 
   if (cluster.has_metadata_match()) {
@@ -1719,13 +1726,17 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
       include_is_timeout_retry_header_(virtual_host.include_is_timeout_retry_header()) {
   if (!virtual_host.request_headers_to_add().empty() ||
       !virtual_host.request_headers_to_remove().empty()) {
-    request_headers_parser_ = HeaderParser::configure(virtual_host.request_headers_to_add(),
-                                                      virtual_host.request_headers_to_remove());
+    request_headers_parser_ =
+        THROW_OR_RETURN_VALUE(HeaderParser::configure(virtual_host.request_headers_to_add(),
+                                                      virtual_host.request_headers_to_remove()),
+                              Router::HeaderParserPtr);
   }
   if (!virtual_host.response_headers_to_add().empty() ||
       !virtual_host.response_headers_to_remove().empty()) {
-    response_headers_parser_ = HeaderParser::configure(virtual_host.response_headers_to_add(),
-                                                       virtual_host.response_headers_to_remove());
+    response_headers_parser_ =
+        THROW_OR_RETURN_VALUE(HeaderParser::configure(virtual_host.response_headers_to_add(),
+                                                      virtual_host.response_headers_to_remove()),
+                              Router::HeaderParserPtr);
   }
 
   // Retry and Hedge policies must be set before routes, since they may use them.
@@ -2175,12 +2186,16 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
   }
 
   if (!config.request_headers_to_add().empty() || !config.request_headers_to_remove().empty()) {
-    request_headers_parser_ = HeaderParser::configure(config.request_headers_to_add(),
-                                                      config.request_headers_to_remove());
+    request_headers_parser_ =
+        THROW_OR_RETURN_VALUE(HeaderParser::configure(config.request_headers_to_add(),
+                                                      config.request_headers_to_remove()),
+                              Router::HeaderParserPtr);
   }
   if (!config.response_headers_to_add().empty() || !config.response_headers_to_remove().empty()) {
-    response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
-                                                       config.response_headers_to_remove());
+    response_headers_parser_ =
+        THROW_OR_RETURN_VALUE(HeaderParser::configure(config.response_headers_to_add(),
+                                                      config.response_headers_to_remove()),
+                              Router::HeaderParserPtr);
   }
 
   if (config.has_metadata()) {

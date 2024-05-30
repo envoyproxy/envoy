@@ -11,6 +11,8 @@
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
   Envoy::JNI::JniHelper::initialize(vm);
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/Exception");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/RuntimeException");
   return Envoy::JNI::JniHelper::getVersion();
 }
 
@@ -75,8 +77,7 @@ extern "C" JNIEXPORT jclass JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelper
     JNIEnv* env, jclass, jstring class_name) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::JNI::StringUtfUniquePtr class_name_ptr = jni_helper.getStringUtfChars(class_name, nullptr);
-  Envoy::JNI::LocalRefUniquePtr<jclass> clazz = jni_helper.findClass(class_name_ptr.get());
-  return clazz.release();
+  return jni_helper.findClass(class_name_ptr.get());
 }
 
 extern "C" JNIEXPORT jclass JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getObjectClass(

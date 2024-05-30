@@ -88,9 +88,11 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
       target_uri_(config.google_grpc().target_uri()), scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)),
-      metadata_parser_(Router::HeaderParser::configure(
-          config.initial_metadata(),
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)) {
+      metadata_parser_(THROW_OR_RETURN_VALUE(
+          Router::HeaderParser::configure(
+              config.initial_metadata(),
+              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
+          Router::HeaderParserPtr)) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive

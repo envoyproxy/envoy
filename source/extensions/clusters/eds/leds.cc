@@ -20,8 +20,9 @@ LedsSubscription::LedsSubscription(
       local_info_(factory_context.serverFactoryContext().localInfo()), cluster_name_(cluster_name),
       stats_scope_(cluster_stats_scope.createScope("leds.")),
       stats_({ALL_LEDS_STATS(POOL_COUNTER(*stats_scope_))}), callback_(callback) {
-  const xds::core::v3::ResourceLocator leds_resource_locator =
-      Config::XdsResourceIdentifier::decodeUrl(leds_config.leds_collection_name());
+  const xds::core::v3::ResourceLocator leds_resource_locator = THROW_OR_RETURN_VALUE(
+      Config::XdsResourceIdentifier::decodeUrl(leds_config.leds_collection_name()),
+      xds::core::v3::ResourceLocator);
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(

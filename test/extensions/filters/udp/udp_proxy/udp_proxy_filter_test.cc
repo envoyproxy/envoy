@@ -1697,7 +1697,7 @@ public:
       header->mutable_header()->set_value(header_to_add.value().value_);
     }
 
-    header_evaluator_ = Envoy::Router::HeaderParser::configure(headers_to_add);
+    header_evaluator_ = Envoy::Router::HeaderParser::configure(headers_to_add).value();
     config_ = std::make_unique<NiceMock<MockUdpTunnelingConfig>>(*header_evaluator_);
     upstream_ = std::make_unique<HttpUpstreamImpl>(callbacks_, *config_, stream_info_);
     upstream_->setTunnelCreationCallbacks(creation_callbacks_);
@@ -1943,7 +1943,7 @@ class TunnelingConnectionPoolImplTest : public testing::Test {
 public:
   void setup() {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers_to_add;
-    header_evaluator_ = Envoy::Router::HeaderParser::configure(headers_to_add);
+    header_evaluator_ = Envoy::Router::HeaderParser::configure(headers_to_add).value();
     config_ = std::make_unique<NiceMock<MockUdpTunnelingConfig>>(*header_evaluator_);
     stream_info_.downstream_connection_info_provider_->setConnectionID(0);
     session_access_logs_ = std::make_unique<std::vector<AccessLog::InstanceSharedPtr>>();

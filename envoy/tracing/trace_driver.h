@@ -15,7 +15,7 @@ class Span;
 using SpanPtr = std::unique_ptr<Span>;
 
 /**
- * The upstream sevice type.
+ * The upstream service type.
  */
 enum class ServiceType {
   // Service type is unknown.
@@ -133,9 +133,9 @@ public:
    * Retrieve the trace ID associated with this span.
    * The trace id may be generated for this span, propagated by parent spans, or
    * not created yet.
-   * @return trace ID as a hex string
+   * @return trace ID
    */
-  virtual std::string getTraceIdAsHex() const PURE;
+  virtual std::string getTraceId() const PURE;
 };
 
 /**
