@@ -68,9 +68,10 @@ TEST_P(CrashIntegrationTestAllProtocols, UnwindsTrackedObjectStack) {
   //  - ActiveStream
   //  - Http(1|2)::ConnectionImpl
   //  - Network::ConnectionImpl
-  const std::string death_string = GetParam().downstream_protocol == Http::CodecType::HTTP2
-                                       ? "ActiveStream.*Http2::ConnectionImpl.*ConnectionImpl"
-                                       : "ActiveStream.*Http1::ConnectionImpl.*ConnectionImpl";
+  const std::string death_string =
+      GetParam().downstream_protocol == Http::CodecType::HTTP2
+          ? "ActiveStream(.|\n)*Http2::ConnectionImpl(.|\n)*ConnectionImpl"
+          : "ActiveStream(.|\n)*Http1::ConnectionImpl(.|\n)*ConnectionImpl";
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
                death_string);
 }
@@ -93,7 +94,7 @@ TEST_P(CrashIntegrationTestAllProtocols, ResponseCrashDumpsTheCorrespondingReque
   // Check that we dump the downstream request
   EXPECT_DEATH(
       sendRequestAndWaitForResponse(default_request_headers_, 0, kill_response_headers, 1024),
-      "Dumping corresponding downstream request.*UpstreamRequest.*request_headers:");
+      "Dumping corresponding downstream request(.|\n)*UpstreamRequest(.|\n)*request_headers:");
 }
 
 TEST_P(CrashIntegrationTestAllProtocols, DecodeContinueDoesNotAddTrackedObjectIfExists) {
@@ -164,7 +165,7 @@ TEST_P(CrashIntegrationTestAllProtocols, DecodeContinueAddsCrashContextIfNoneExi
   //  - ActiveStream
   //  - Network::ConnectionImpl
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
-               "ActiveStream.*.*ConnectionImpl");
+               "ActiveStream(.|\n)*ConnectionImpl");
 }
 
 TEST_P(CrashIntegrationTestAllProtocols, EncodeContinueDoesNotAddTrackedObjectIfExists) {
@@ -231,7 +232,7 @@ TEST_P(CrashIntegrationTestAllProtocols, EncodeContinueAddsCrashContextIfNoneExi
   //  - ActiveStream
   //  - Network::ConnectionImpl
   EXPECT_DEATH(sendRequestAndWaitForResponse(default_request_headers_, 0, kill_response_headers, 0),
-               "ActiveStream.*.*ConnectionImpl");
+               "ActiveStream(.|\n)*ConnectionImpl");
 }
 
 #endif

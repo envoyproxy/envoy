@@ -136,6 +136,10 @@ public:
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in); }
   absl::string_view addressType() const override { return "default"; }
 
+  bool operator==(const Ipv4Instance& rhs) const {
+    return operator==(static_cast<const Instance&>(rhs));
+  }
+
   /**
    * Convenience function to convert an IPv4 address to canonical string format.
    * @note This works similarly to inet_ntop() but is faster.
