@@ -535,7 +535,8 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
       "envoy.transport_sockets.quic");
 
-  return config_factory.createTransportSocketFactory(quic_config, factory_context, server_names);
+  return config_factory.createTransportSocketFactory(quic_config, factory_context, server_names)
+      .value();
 }
 
 Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContext(

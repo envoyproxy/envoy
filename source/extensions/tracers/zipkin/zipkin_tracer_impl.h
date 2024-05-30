@@ -83,7 +83,7 @@ public:
   void setBaggage(absl::string_view, absl::string_view) override;
   std::string getBaggage(absl::string_view) override;
 
-  std::string getTraceIdAsHex() const override { return span_.traceIdAsHexString(); };
+  std::string getTraceId() const override { return span_.traceIdAsHexString(); };
 
   /**
    * @return a reference to the Zipkin::Span object.

@@ -26,7 +26,7 @@ public:
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
     Network::DownstreamTransportSocketFactoryPtr transport_socket_factory =
-        config_factory_.createTransportSocketFactory(proto_config, context_, {});
+        config_factory_.createTransportSocketFactory(proto_config, context_, {}).value();
     EXPECT_EQ(expect_early_data,
               static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory)
                   .earlyDataEnabled());

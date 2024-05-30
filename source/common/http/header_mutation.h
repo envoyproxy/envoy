@@ -14,13 +14,16 @@ using ProtoHeaderValueOption = envoy::config::core::v3::HeaderValueOption;
 
 class HeaderMutations : public HeaderEvaluator {
 public:
-  HeaderMutations(const ProtoHeaderMutatons& header_mutations);
+  static absl::StatusOr<std::unique_ptr<HeaderMutations>>
+  create(const ProtoHeaderMutatons& header_mutations);
 
   // Http::HeaderEvaluator
   void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
                        const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
+  HeaderMutations(const ProtoHeaderMutatons& header_mutations, absl::Status& creation_status);
+
   std::vector<std::unique_ptr<HeaderEvaluator>> header_mutations_;
 };
 

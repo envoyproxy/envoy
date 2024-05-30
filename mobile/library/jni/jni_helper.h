@@ -230,18 +230,11 @@ public:
   jmethodID getStaticMethodId(jclass clazz, const char* name, const char* signature);
 
   /**
-   * Finds the given `class_name` using Java classloader.
+   * Finds the given `class_name` using from the cache.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#findclass
    */
-  [[nodiscard]] LocalRefUniquePtr<jclass> findClass(const char* class_name);
-
-  /**
-   * Finds the given `class_name` from the cache.
-   *
-   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#findclass
-   */
-  [[nodiscard]] jclass findClassFromCache(const char* class_name);
+  [[nodiscard]] jclass findClass(const char* class_name);
 
   /**
    * Returns the class of a given `object`.

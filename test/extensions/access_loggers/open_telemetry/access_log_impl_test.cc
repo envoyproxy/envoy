@@ -175,7 +175,7 @@ TEST_F(AccessLogTest, TraceId) {
 
   NiceMock<Tracing::MockSpan> active_span;
 
-  EXPECT_CALL(active_span, getTraceIdAsHex()).WillOnce(Return("404142434445464748494a4b4c4d4e4f"));
+  EXPECT_CALL(active_span, getTraceId()).WillOnce(Return("404142434445464748494a4b4c4d4e4f"));
   expectLog(R"EOF(
       trace_id: "QEFCQ0RFRkdISUpLTE1OTw=="
       time_unix_nano: 3600000000000
@@ -195,7 +195,7 @@ TEST_F(AccessLogTest, ZipkinTraceId) {
 
   NiceMock<Tracing::MockSpan> active_span;
 
-  EXPECT_CALL(active_span, getTraceIdAsHex()).WillOnce(Return("0ccce09bf12e94df"));
+  EXPECT_CALL(active_span, getTraceId()).WillOnce(Return("0ccce09bf12e94df"));
   expectLog(R"EOF(
       trace_id: "AAAAAAAAAAAMzOCb8S6U3w=="
       time_unix_nano: 3600000000000

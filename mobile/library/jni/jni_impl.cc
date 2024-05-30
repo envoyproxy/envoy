@@ -21,6 +21,18 @@ using Envoy::Platform::EngineBuilder;
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
   Envoy::JNI::JniHelper::initialize(vm);
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/Object");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/Integer");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/ClassLoader");
+  Envoy::JNI::JniHelper::addClassToCache("java/nio/ByteBuffer");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/Throwable");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/UnsupportedOperationException");
+  Envoy::JNI::JniHelper::addClassToCache("[B");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/Map$Entry");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/LinkedHashMap");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/HashMap");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/List");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/ArrayList");
   Envoy::JNI::JniHelper::addClassToCache("io/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel");
   Envoy::JNI::JniHelper::addClassToCache(
       "io/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel");
@@ -229,15 +241,13 @@ jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoyHeaders& head
   // Create a "no operation" result:
   //  1. Tell the filter chain to continue the iteration.
   //  2. Return headers received on as method's input as part of the method's output.
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_object_array =
-      jni_helper.findClass("java/lang/Object");
+  jclass jcls_object_array = jni_helper.findClass("java/lang/Object");
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> noopResult =
-      jni_helper.newObjectArray(2, jcls_object_array.get(), NULL);
+      jni_helper.newObjectArray(2, jcls_object_array, NULL);
 
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_int = jni_helper.findClass("java/lang/Integer");
-  jmethodID jmid_intInit = jni_helper.getMethodId(jcls_int.get(), "<init>", "(I)V");
-  Envoy::JNI::LocalRefUniquePtr<jobject> j_status =
-      jni_helper.newObject(jcls_int.get(), jmid_intInit, 0);
+  jclass jcls_int = jni_helper.findClass("java/lang/Integer");
+  jmethodID jmid_intInit = jni_helper.getMethodId(jcls_int, "<init>", "(I)V");
+  Envoy::JNI::LocalRefUniquePtr<jobject> j_status = jni_helper.newObject(jcls_int, jmid_intInit, 0);
   // Set status to "0" (FilterHeadersStatus::Continue). Signal that the intent
   // is to continue the iteration of the filter chain.
   jni_helper.setObjectArrayElement(noopResult.get(), 0, j_status.get());

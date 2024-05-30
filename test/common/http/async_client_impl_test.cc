@@ -2094,8 +2094,9 @@ public:
   std::unique_ptr<Router::RetryPolicyImpl> retry_policy_;
   Regex::GoogleReEngine regex_engine_;
   std::unique_ptr<NullRouteImpl> route_impl_;
-  std::unique_ptr<Http::AsyncStreamImpl> stream_{
-      new Http::AsyncStreamImpl(client_, stream_callbacks_, AsyncClient::StreamOptions())};
+  std::unique_ptr<Http::AsyncStreamImpl> stream_ = std::move(
+      Http::AsyncStreamImpl::create(client_, stream_callbacks_, AsyncClient::StreamOptions())
+          .value());
   NullVirtualHost vhost_;
   NullCommonConfig config_;
 
@@ -2104,8 +2105,10 @@ public:
 
     TestUtility::loadFromYaml(yaml_config, retry_policy);
 
-    stream_ = std::make_unique<Http::AsyncStreamImpl>(
-        client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy));
+    stream_ = std::move(
+        Http::AsyncStreamImpl::create(client_, stream_callbacks_,
+                                      AsyncClient::StreamOptions().setRetryPolicy(retry_policy))
+            .value());
   }
 
   void setRetryPolicy(const std::string& yaml_config) {
@@ -2121,8 +2124,10 @@ public:
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
 
-    stream_ = std::make_unique<Http::AsyncStreamImpl>(
-        client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(*retry_policy_));
+    stream_ = std::move(
+        Http::AsyncStreamImpl::create(client_, stream_callbacks_,
+                                      AsyncClient::StreamOptions().setRetryPolicy(*retry_policy_))
+            .value());
   }
 
   const Router::RouteEntry& getRouteFromStream() { return *(stream_->route_->routeEntry()); }
