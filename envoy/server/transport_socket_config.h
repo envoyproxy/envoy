@@ -87,13 +87,13 @@ public:
    * @param config const Protobuf::Message& supplies the config message for the transport socket
    *        implementation.
    * @param context TransportSocketFactoryContext& supplies the transport socket's context.
-   * @return Network::UpstreamTransportSocketFactoryPtr the transport socket factory instance. The
-   * returned TransportSocketFactoryPtr should not be nullptr.
+   * @return absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> the transport socket factory
+   * instance or error status. The returned TransportSocketFactoryPtr should not be nullptr.
    *
    * @throw EnvoyException if the implementation is unable to produce a factory with the provided
    *        parameters.
    */
-  virtual Network::UpstreamTransportSocketFactoryPtr
+  virtual absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context) PURE;
 
@@ -113,13 +113,13 @@ public:
    * @param config const Protobuf::Message& supplies the config message for the transport socket
    *        implementation.
    * @param context TransportSocketFactoryContext& supplies the transport socket's context.
-   * @return Network::DownstreamTransportSocketFactoryPtr the transport socket factory instance. The
-   * returned TransportSocketFactoryPtr should not be nullptr.
+   * @return absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr> the transport socket
+   * factory instance. The returned TransportSocketFactoryPtr should not be nullptr.
    *
    * @throw EnvoyException if the implementation is unable to produce a factory with the provided
    *        parameters.
    */
-  virtual Network::DownstreamTransportSocketFactoryPtr
+  virtual absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) PURE;

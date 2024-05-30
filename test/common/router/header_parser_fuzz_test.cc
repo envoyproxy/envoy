@@ -13,7 +13,7 @@ DEFINE_PROTO_FUZZER(const test::common::router::TestCase& input) {
   try {
     TestUtility::validate(input);
     Router::HeaderParserPtr parser =
-        Router::HeaderParser::configure(input.headers_to_add(), input.headers_to_remove());
+        Router::HeaderParser::configure(input.headers_to_add(), input.headers_to_remove()).value();
     Http::TestRequestHeaderMapImpl request_header_map;
     Http::TestResponseHeaderMapImpl response_header_map;
     MockTimeSystem time_system_;

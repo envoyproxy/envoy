@@ -166,7 +166,8 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
     auto& config_factory = Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::DownstreamTransportSocketConfigFactory>(
         "envoy.transport_sockets.quic");
-    return config_factory.createTransportSocketFactory(quic_config, factory_context_, server_names);
+    return config_factory.createTransportSocketFactory(quic_config, factory_context_, server_names)
+        .value();
   }
 }
 
