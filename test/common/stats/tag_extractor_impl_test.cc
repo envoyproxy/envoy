@@ -349,12 +349,18 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   route_fqdn.name_ = tag_names.ROUTE;
   route_fqdn.value_ = "example.com.";
 
+  Tag route_keyword;
+  route_keyword.name_ = tag_names.ROUTE;
+  route_keyword.value_ = "some.route.example.com";
+
   regex_tester.testRegex("vhost.vhost_1.route.route_1.upstream_rq_total",
                          "vhost.route.upstream_rq_total", {vhost, route});
   regex_tester.testRegex("vhost.vhost_1.route.example.com.upstream_rq_total",
                          "vhost.route.upstream_rq_total", {vhost, route_domain});
   regex_tester.testRegex("vhost.vhost_1.route.example.com..upstream_rq_total",
                          "vhost.route.upstream_rq_total", {vhost, route_fqdn});
+  regex_tester.testRegex("vhost.vhost_1.route.some.route.example.com.upstream_rq_total",
+                         "vhost.route.upstream_rq_total", {vhost, route_keyword});
 
   // Listener http prefix
   Tag listener_http_prefix;
