@@ -58,24 +58,13 @@ Envoy supports generating this header using the :ref:`Proxy Protocol Transport S
 
 Here is an example config for setting up the socket:
 
-.. code-block:: yaml
-
-    clusters:
-    - name: service1
-      connect_timeout: 0.25s
-      type: strict_dns
-      lb_policy: round_robin
-      transport_socket:
-        name: envoy.transport_sockets.upstream_proxy_protocol
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.proxy_protocol.v3.ProxyProtocolUpstreamTransport
-          config:
-            version: V1
-          transport_socket:
-            name: envoy.transport_sockets.raw_buffer
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
-      ...
+.. literalinclude:: _include/proxy-protocol.yaml
+    :language: yaml
+    :lines: 19-29
+    :emphasize-lines: 3-11
+    :linenos:
+    :lineno-start: 19
+    :caption: :download:`proxy-protocol.yaml <_include/proxy-protocol.yaml>`
 
 There are several things to consider if you plan to use this socket in conjunction with the
 :ref:`HTTP connection manager <config_http_conn_man>`. There will be a performance hit as there will be no upstream connection

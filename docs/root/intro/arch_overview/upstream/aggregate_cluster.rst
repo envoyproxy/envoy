@@ -46,20 +46,13 @@ Example
 
 A sample aggregate cluster configuration could be:
 
-.. code-block:: yaml
-
-  name: aggregate_cluster
-  connect_timeout: 0.25s
-  lb_policy: CLUSTER_PROVIDED
-  cluster_type:
-    name: envoy.clusters.aggregate
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
-      clusters:
-      # cluster primary, secondary and tertiary should be defined outside.
-      - primary
-      - secondary
-      - tertiary
+.. literalinclude:: /_configs/upstream/aggregate-cluster.yaml
+    :language: yaml
+    :lines: 15-27
+    :emphasize-lines: 3-13
+    :linenos:
+    :lineno-start: 15
+    :caption: :download:`aggregate-cluster.yaml </_configs/upstream/aggregate-cluster.yaml>`
 
 Note: :ref:`PriorityLoad retry plugins <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>` won't
 work for aggregate cluster because the aggregate load balancer will override the *PriorityLoad*
