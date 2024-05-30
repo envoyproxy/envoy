@@ -121,13 +121,11 @@ paths:
     - source/common/grpc/google_grpc_utils.cc
     - source/common/tcp_proxy/tcp_proxy.cc
     - source/common/config/subscription_factory_impl.cc
-    - source/common/config/xds_resource.cc
     - source/common/filter/config_discovery_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
     - source/common/router/config_impl.cc
     - source/common/router/scoped_config_impl.cc
-    - source/common/router/header_parser.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc
     - source/common/filesystem/win32/directory_iterator_impl.cc
     - source/common/common/utility.cc
@@ -151,6 +149,7 @@ paths:
     - source/common/common/logger_delegates.cc
     - source/common/upstream/health_checker_event_logger.h
     - source/common/upstream/outlier_detection_impl.h
+    - source/common/grpc/async_client_impl.cc
     - source/common/ssl/certificate_validation_context_config_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
@@ -163,6 +162,7 @@ paths:
     - source/common/io/io_uring_worker_impl.cc
     - source/common/event/file_event_impl.cc
     - source/common/http/async_client_impl.cc
+    - source/common/grpc/google_async_client_impl.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:

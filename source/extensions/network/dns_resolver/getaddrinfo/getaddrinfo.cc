@@ -70,8 +70,8 @@ GetAddrInfoDnsResolver::processResponse(const PendingQuery& query,
   }
 
   std::list<DnsResponse> final_results;
-  switch (query.dns_lookup_family_)
-  case DnsLookupFamily::All: {
+  switch (query.dns_lookup_family_) {
+  case DnsLookupFamily::All:
     final_results = std::move(v4_results);
     final_results.splice(final_results.begin(), v6_results);
     break;
@@ -98,10 +98,10 @@ GetAddrInfoDnsResolver::processResponse(const PendingQuery& query,
     break;
   }
 
-    ENVOY_LOG(debug, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
-              accumulateToString<Network::DnsResponse>(final_results, [](const auto& dns_response) {
-                return dns_response.addrInfo().address_->asString();
-              }));
+  ENVOY_LOG(debug, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
+            accumulateToString<Network::DnsResponse>(final_results, [](const auto& dns_response) {
+              return dns_response.addrInfo().address_->asString();
+            }));
 
   return std::make_pair(ResolutionStatus::Success, final_results);
 }

@@ -9,11 +9,24 @@
 namespace Envoy {
 namespace Upstream {
 
+absl::StatusOr<std::unique_ptr<TransportSocketMatcherImpl>> TransportSocketMatcherImpl::create(
+    const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
+        socket_matches,
+    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<TransportSocketMatcherImpl>(new TransportSocketMatcherImpl(
+      socket_matches, factory_context, default_factory, stats_scope, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 TransportSocketMatcherImpl::TransportSocketMatcherImpl(
     const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
         socket_matches,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope)
+    Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope,
+    absl::Status& creation_status)
     : stats_scope_(stats_scope),
       default_match_("default", std::move(default_factory), generateStats("default")) {
   for (const auto& socket_match : socket_matches) {
@@ -22,9 +35,10 @@ TransportSocketMatcherImpl::TransportSocketMatcherImpl(
         Server::Configuration::UpstreamTransportSocketConfigFactory>(socket_config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         socket_config, factory_context.messageValidationVisitor(), config_factory);
-    FactoryMatch factory_match(
-        socket_match.name(), config_factory.createTransportSocketFactory(*message, factory_context),
-        generateStats(absl::StrCat(socket_match.name(), ".")));
+    auto factory_or_error = config_factory.createTransportSocketFactory(*message, factory_context);
+    SET_AND_RETURN_IF_NOT_OK(factory_or_error.status(), creation_status);
+    FactoryMatch factory_match(socket_match.name(), std::move(factory_or_error.value()),
+                               generateStats(absl::StrCat(socket_match.name(), ".")));
     for (const auto& kv : socket_match.match().fields()) {
       factory_match.label_set.emplace_back(kv.first, kv.second);
     }

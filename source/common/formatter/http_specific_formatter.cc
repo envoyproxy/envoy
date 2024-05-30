@@ -199,7 +199,7 @@ HeadersByteSizeFormatter::formatValueWithContext(const HttpFormatterContext& con
 
 ProtobufWkt::Value TraceIDFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                                             const StreamInfo::StreamInfo&) const {
-  auto trace_id = context.activeSpan().getTraceIdAsHex();
+  auto trace_id = context.activeSpan().getTraceId();
   if (trace_id.empty()) {
     return SubstitutionFormatUtils::unspecifiedValue();
   }
@@ -209,7 +209,7 @@ ProtobufWkt::Value TraceIDFormatter::formatValueWithContext(const HttpFormatterC
 absl::optional<std::string>
 TraceIDFormatter::formatWithContext(const HttpFormatterContext& context,
                                     const StreamInfo::StreamInfo&) const {
-  auto trace_id = context.activeSpan().getTraceIdAsHex();
+  auto trace_id = context.activeSpan().getTraceId();
   if (trace_id.empty()) {
     return absl::nullopt;
   }
