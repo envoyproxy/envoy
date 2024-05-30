@@ -15,7 +15,7 @@ constexpr const char* THREAD_NAME = "EnvoyMain";
 std::atomic<JavaVM*> java_vm_cache_;
 thread_local JNIEnv* jni_env_cache_ = nullptr;
 absl::flat_hash_map<absl::string_view, jclass> jclass_cache;
-// These caches are thread_local so to avoid the cost of using mutex.
+// These caches are thread_local to avoid the overhead of using mutex.
 thread_local absl::flat_hash_map<
     std::tuple<jclass, absl::string_view /* method */, absl::string_view /* signature */>,
     jmethodID>
