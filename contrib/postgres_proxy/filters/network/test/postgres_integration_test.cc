@@ -322,9 +322,8 @@ public:
     static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
     Network::DownstreamTransportSocketFactoryPtr tls_context =
         Network::DownstreamTransportSocketFactoryPtr{
-            Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-                std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()), {})
-                .value()};
+            *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+                std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()), {})};
 
     Network::TransportSocketPtr ts = tls_context->createDownstreamTransportSocket();
     // Synchronization object used to suspend execution
@@ -542,9 +541,8 @@ public:
     static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
     Network::UpstreamTransportSocketFactoryPtr tls_context =
         Network::UpstreamTransportSocketFactoryPtr{
-            Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
-                std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()))
-                .value()};
+            *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
+                std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()))};
 
     Network::TransportSocketOptionsConstSharedPtr options;
 

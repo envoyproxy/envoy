@@ -123,10 +123,9 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
 
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   if (!use_http3) {
-    return Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-               std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
-               std::vector<std::string>{})
-        .value();
+    return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+        std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
+        std::vector<std::string>{});
   }
   envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
   quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
@@ -138,8 +137,7 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   auto& config_factory = Config::Utility::getAndCheckFactoryByName<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
       "envoy.transport_sockets.quic");
-  return config_factory.createTransportSocketFactory(quic_config, mock_factory_ctx, server_names)
-      .value();
+  return *config_factory.createTransportSocketFactory(quic_config, mock_factory_ctx, server_names);
 }
 
 Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(
@@ -157,10 +155,9 @@ Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(
       tls_context, factory_context);
 
   static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
-  return Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-             std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
-             std::vector<std::string>{})
-      .value();
+  return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+      std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
+      std::vector<std::string>{});
 }
 Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port) {

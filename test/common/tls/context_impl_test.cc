@@ -112,10 +112,8 @@ public:
     }};
   }
   void loadConfig(ServerContextConfigImpl& cfg) {
-    Envoy::Ssl::ServerContextSharedPtr server_ctx(
-        manager_
-            .createSslServerContext(*store_.rootScope(), cfg, std::vector<std::string>{}, nullptr)
-            .value());
+    Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager_.createSslServerContext(
+        *store_.rootScope(), cfg, std::vector<std::string>{}, nullptr));
     auto cleanup = cleanUpHelper(server_ctx);
   }
 
@@ -156,7 +154,7 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
 
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr context(
-      manager_.createSslClientContext(*store_.rootScope(), cfg).value());
+      *manager_.createSslClientContext(*store_.rootScope(), cfg));
   auto cleanup = cleanUpHelper(context);
   // Calculate the days until test cert expires
   auto cert_expiry = TestUtility::parseTime(TEST_UNITTEST_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
@@ -178,7 +176,7 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr context(
-      manager_.createSslClientContext(*store_.rootScope(), cfg).value());
+      *manager_.createSslClientContext(*store_.rootScope(), cfg));
   auto cleanup = cleanUpHelper(context);
   EXPECT_EQ(absl::nullopt, context->daysUntilFirstCertExpires());
 }
@@ -200,7 +198,7 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(expired_yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr context(
-      manager_.createSslClientContext(*store_.rootScope(), cfg).value());
+      *manager_.createSslClientContext(*store_.rootScope(), cfg));
   EXPECT_EQ(manager_.daysUntilFirstCertExpires(), absl::nullopt);
 
   const std::string expiring_yaml = R"EOF(
@@ -218,7 +216,7 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   ClientContextConfigImpl expiring_cfg(expiring_context, factory_context_);
 
   Envoy::Ssl::ClientContextSharedPtr new_context(
-      manager_.createSslClientContext(*store_.rootScope(), expiring_cfg).value());
+      *manager_.createSslClientContext(*store_.rootScope(), expiring_cfg));
   manager_.removeContext(context);
 
   // Validate that when the context is updated, daysUntilFirstCertExpires reflects the current
@@ -231,7 +229,7 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   // Update the context again and validate daysUntilFirstCertExpires still reflects the current
   // expiry.
   Envoy::Ssl::ClientContextSharedPtr updated_context(
-      manager_.createSslClientContext(*store_.rootScope(), cfg).value());
+      *manager_.createSslClientContext(*store_.rootScope(), cfg));
   manager_.removeContext(new_context);
   auto cleanup = cleanUpHelper(updated_context);
 
@@ -257,7 +255,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
   Envoy::Ssl::ClientContextSharedPtr context(
-      manager_.createSslClientContext(*store_.rootScope(), cfg).value());
+      *manager_.createSslClientContext(*store_.rootScope(), cfg));
   auto cleanup = cleanUpHelper(context);
 
   // This is similar to the hack above, but right now we generate the ca_cert and it expires in 15
@@ -310,7 +308,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
   Envoy::Ssl::ClientContextSharedPtr context(
-      manager_.createSslClientContext(*store_.rootScope(), cfg).value());
+      *manager_.createSslClientContext(*store_.rootScope(), cfg));
   auto cleanup = cleanUpHelper(context);
   std::string ca_cert_json = absl::StrCat(R"EOF({
  "path": "{{ test_rundir }}/test/common/tls/test_data/san_dns3_cert.pem",
@@ -366,7 +364,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithIPSAN) {
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
   Envoy::Ssl::ClientContextSharedPtr context(
-      manager_.createSslClientContext(*store_.rootScope(), cfg).value());
+      *manager_.createSslClientContext(*store_.rootScope(), cfg));
   auto cleanup = cleanUpHelper(context);
   std::string ca_cert_json = absl::StrCat(R"EOF({
  "path": "{{ test_rundir }}/test/common/tls/test_data/san_ip_cert.pem",
@@ -426,7 +424,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
   Envoy::Ssl::ClientContextSharedPtr context(
-      manager_.createSslClientContext(*store_.rootScope(), cfg).value());
+      *manager_.createSslClientContext(*store_.rootScope(), cfg));
   auto cleanup = cleanUpHelper(context);
 
   std::string ca_cert_json =
@@ -459,7 +457,7 @@ TEST_F(SslContextImplTest, TestNoCert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext config;
   ClientContextConfigImpl cfg(config, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr context(
-      manager_.createSslClientContext(*store_.rootScope(), cfg).value());
+      *manager_.createSslClientContext(*store_.rootScope(), cfg));
   auto cleanup = cleanUpHelper(context);
   EXPECT_EQ(nullptr, context->getCaCertInformation());
   EXPECT_TRUE(context->getCertChainInformation().empty());
@@ -622,17 +620,15 @@ TEST_F(SslContextImplTest, MustHaveSubjectOrSAN) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
   EXPECT_THROW_WITH_REGEX(
-      manager_.createSslServerContext(*store_.rootScope(), server_context_config, {}, nullptr)
-          .value(),
+      *manager_.createSslServerContext(*store_.rootScope(), server_context_config, {}, nullptr),
       EnvoyException, "has neither subject CN nor SAN names");
 }
 
 class SslServerContextImplOcspTest : public SslContextImplTest {
 public:
   Envoy::Ssl::ServerContextSharedPtr loadConfig(ServerContextConfigImpl& cfg) {
-    return manager_
-        .createSslServerContext(*store_.rootScope(), cfg, std::vector<std::string>{}, nullptr)
-        .value();
+    return *manager_.createSslServerContext(*store_.rootScope(), cfg, std::vector<std::string>{},
+                                            nullptr);
   }
 
   Envoy::Ssl::ServerContextSharedPtr loadConfigYaml(const std::string& yaml) {
@@ -831,10 +827,8 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
 class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   void loadConfig(ServerContextConfigImpl& cfg) {
-    Envoy::Ssl::ServerContextSharedPtr server_ctx(
-        manager_
-            .createSslServerContext(*store_.rootScope(), cfg, std::vector<std::string>{}, nullptr)
-            .value());
+    Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager_.createSslServerContext(
+        *store_.rootScope(), cfg, std::vector<std::string>{}, nullptr));
     auto cleanup = cleanUpHelper(server_ctx);
   }
 
@@ -1226,7 +1220,7 @@ TEST_F(ClientContextConfigImplTest, RSA2048Cert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = manager_.createSslClientContext(*store.rootScope(), client_context_config).value();
+  auto context = *manager_.createSslClientContext(*store.rootScope(), client_context_config);
   auto cleanup = cleanUpHelper(context);
 }
 
@@ -1296,7 +1290,7 @@ TEST_F(ClientContextConfigImplTest, RSA3072Cert) {
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
   ContextManagerImpl manager(server_factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = manager_.createSslClientContext(*store.rootScope(), client_context_config).value();
+  auto context = *manager_.createSslClientContext(*store.rootScope(), client_context_config);
   auto cleanup = cleanUpHelper(context);
 }
 
@@ -1313,7 +1307,7 @@ TEST_F(ClientContextConfigImplTest, RSA4096Cert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = manager_.createSslClientContext(*store.rootScope(), client_context_config).value();
+  auto context = *manager_.createSslClientContext(*store.rootScope(), client_context_config);
   auto cleanup = cleanUpHelper(context);
 }
 
@@ -1330,7 +1324,7 @@ TEST_F(ClientContextConfigImplTest, P256EcdsaCert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = manager_.createSslClientContext(*store.rootScope(), client_context_config).value();
+  auto context = *manager_.createSslClientContext(*store.rootScope(), client_context_config);
   auto cleanup = cleanUpHelper(context);
 }
 
@@ -1909,11 +1903,8 @@ TEST_F(ServerContextConfigImplTest, TlsCertificateNonEmpty) {
   ContextManagerImpl manager(server_factory_context_);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(
-          manager
-              .createSslServerContext(*store.rootScope(), client_context_config,
-                                      std::vector<std::string>{}, nullptr)
-              .value()),
+      Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager.createSslServerContext(
+          *store.rootScope(), client_context_config, std::vector<std::string>{}, nullptr)),
       EnvoyException, "Server TlsCertificates must have a certificate specified");
 }
 
@@ -2036,11 +2027,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
   EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(
-          manager
-              .createSslServerContext(*store.rootScope(), server_context_config,
-                                      std::vector<std::string>{}, nullptr)
-              .value()),
+      Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager.createSslServerContext(
+          *store.rootScope(), server_context_config, std::vector<std::string>{}, nullptr)),
       EnvoyException, "Failed to get BoringSSL private key method from provider");
 }
 

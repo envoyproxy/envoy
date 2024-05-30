@@ -158,12 +158,10 @@ public:
         .Times(testing::AtLeast(1u))
         .WillRepeatedly(SaveArg<0>(&secret_update_callback_));
     EXPECT_CALL(*mock_context_config_, alpnProtocols()).WillRepeatedly(ReturnRef(alpn_));
-    transport_socket_factory_ =
-        QuicServerTransportSocketFactory::create(
-            true, listener_config_.listenerScope(),
-            std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_),
-            ssl_context_manager_, std::vector<std::string>{})
-            .value();
+    transport_socket_factory_ = *QuicServerTransportSocketFactory::create(
+        true, listener_config_.listenerScope(),
+        std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_), ssl_context_manager_,
+        std::vector<std::string>{});
     transport_socket_factory_->initialize();
     EXPECT_CALL(filter_chain_, name()).WillRepeatedly(Return(""));
   }
@@ -349,12 +347,10 @@ public:
 
     EXPECT_CALL(*mock_context_config_, setSecretUpdateCallback(_)).Times(testing::AtLeast(1u));
     EXPECT_CALL(*mock_context_config_, alpnProtocols()).WillRepeatedly(ReturnRef(alpn_));
-    transport_socket_factory_ =
-        QuicServerTransportSocketFactory::create(
-            true, listener_config_.listenerScope(),
-            std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_),
-            ssl_context_manager_, std::vector<std::string>{})
-            .value();
+    transport_socket_factory_ = *QuicServerTransportSocketFactory::create(
+        true, listener_config_.listenerScope(),
+        std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_), ssl_context_manager_,
+        std::vector<std::string>{});
     transport_socket_factory_->initialize();
     EXPECT_CALL(filter_chain_, name()).WillRepeatedly(Return(""));
   }

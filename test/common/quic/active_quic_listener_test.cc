@@ -119,11 +119,9 @@ protected:
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
         connection_handler_(*dispatcher_, absl::nullopt),
-        transport_socket_factory_(Quic::QuicServerTransportSocketFactory::create(
-                                      true, *store_.rootScope(),
-                                      std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
-                                      ssl_context_manager_, {})
-                                      .value()),
+        transport_socket_factory_(*Quic::QuicServerTransportSocketFactory::create(
+            true, *store_.rootScope(), std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
+            ssl_context_manager_, {})),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 

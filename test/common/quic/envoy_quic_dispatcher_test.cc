@@ -76,11 +76,9 @@ public:
             listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_, quic_stat_names_,
             crypto_stream_factory_, connection_id_generator_),
         connection_id_(quic::test::TestConnectionId(1)),
-        transport_socket_factory_(QuicServerTransportSocketFactory::create(
-                                      true, listener_config_.listenerScope(),
-                                      std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
-                                      ssl_context_manager_, {})
-                                      .value()) {
+        transport_socket_factory_(*QuicServerTransportSocketFactory::create(
+            true, listener_config_.listenerScope(),
+            std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_, {})) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
     EXPECT_CALL(*writer, WritePacket(_, _, _, _, _, _))

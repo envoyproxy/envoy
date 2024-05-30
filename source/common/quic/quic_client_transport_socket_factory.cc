@@ -46,7 +46,7 @@ QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
   auto factory_or_error = Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
       std::move(config), factory_context.sslContextManager(), factory_context.statsScope());
   SET_AND_RETURN_IF_NOT_OK(factory_or_error.status(), creation_status);
-  fallback_factory_ = std::move(factory_or_error.value());
+  fallback_factory_ = std::move(*factory_or_error);
   tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalQuicConfig>(); });
 }
 

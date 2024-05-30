@@ -572,9 +572,8 @@ public:
         tls_context, factory_context_);
 
     mock_host_description_->socket_factory_ =
-        Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
-            std::move(cfg), context_manager_, *stats_store_.rootScope())
-            .value();
+        *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
+            std::move(cfg), context_manager_, *stats_store_.rootScope());
     async_client_transport_socket_ =
         mock_host_description_->socket_factory_->createTransportSocket(nullptr, nullptr);
     FakeUpstreamConfig config(test_time_.timeSystem());
@@ -612,10 +611,9 @@ public:
         tls_context, factory_context_);
 
     static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
-    return Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-               std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
-               std::vector<std::string>{})
-        .value();
+    return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
+        std::vector<std::string>{});
   }
 
   bool use_client_cert_{};

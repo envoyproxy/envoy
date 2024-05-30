@@ -30,8 +30,8 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true),
       context.statsScope(), std::move(server_config), context.sslContextManager(), server_names);
   RETURN_IF_NOT_OK(factory_or_error.status());
-  factory_or_error.value()->initialize();
-  return std::move(factory_or_error.value());
+  (*factory_or_error)->initialize();
+  return std::move(*factory_or_error);
 }
 
 namespace {
@@ -116,7 +116,7 @@ QuicServerTransportSocketFactory::QuicServerTransportSocketFactory(
   if (handle_certs_with_shared_tls_code_) {
     auto ctx_or_error = createSslServerContext();
     SET_AND_RETURN_IF_NOT_OK(ctx_or_error.status(), creation_status);
-    ssl_ctx_ = ctx_or_error.value();
+    ssl_ctx_ = *ctx_or_error;
   }
 }
 
@@ -129,7 +129,7 @@ QuicServerTransportSocketFactory::createSslServerContext() const {
   auto context_or_error = manager_.createSslServerContext(stats_scope_, *config_, server_names_,
                                                           initializeQuicCertAndKey);
   RETURN_IF_NOT_OK(context_or_error.status());
-  return context_or_error.value();
+  return *context_or_error;
 }
 
 ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyConfigProto() {
@@ -183,9 +183,9 @@ absl::Status QuicServerTransportSocketFactory::onSecretUpdated() {
     RETURN_IF_NOT_OK(ctx_or_error.status());
     {
       absl::WriterMutexLock l(&ssl_ctx_mu_);
-      std::swap(ctx_or_error.value(), ssl_ctx_);
+      std::swap(*ctx_or_error, ssl_ctx_);
     }
-    manager_.removeContext(ctx_or_error.value());
+    manager_.removeContext(*ctx_or_error);
   }
 
   stats_.context_config_update_by_sds_.inc();

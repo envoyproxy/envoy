@@ -155,10 +155,9 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-    return Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-               std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
-               std::vector<std::string>{})
-        .value();
+    return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
+        std::vector<std::string>{});
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
@@ -167,8 +166,8 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
     auto& config_factory = Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::DownstreamTransportSocketConfigFactory>(
         "envoy.transport_sockets.quic");
-    return config_factory.createTransportSocketFactory(quic_config, factory_context_, server_names)
-        .value();
+    return *config_factory.createTransportSocketFactory(quic_config, factory_context_,
+                                                        server_names);
   }
 }
 
@@ -585,10 +584,9 @@ void BaseIntegrationTest::createXdsUpstream() {
         tls_context, factory_context_);
 
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
-    auto context = Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-                       std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
-                       std::vector<std::string>{})
-                       .value();
+    auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+        std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
+        std::vector<std::string>{});
     addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
   }
   xds_upstream_ = fake_upstreams_.back().get();
