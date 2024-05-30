@@ -454,7 +454,7 @@ private:
   const absl::optional<std::chrono::milliseconds> null_access_log_flush_interval_;
   const std::string profile_path_;
   Http::ConnectionManagerStats stats_;
-  OverloadManager& null_overload_manager_;
+  NullOverloadManager null_overload_manager_;
   // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
   // Admin case.
   Stats::IsolatedStoreImpl no_op_store_;
