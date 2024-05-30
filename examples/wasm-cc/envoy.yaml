@@ -81,11 +81,10 @@ static_resources:
       endpoints:
       - lb_endpoints:
         - endpoint:
-            hostname: httpbin.org
             address:
               socket_address:
-                address: httpbin.org
-                port_value: 443
+                address: web_service
+                port_value: 9000
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
@@ -98,11 +97,10 @@ static_resources:
       endpoints:
       - lb_endpoints:
         - endpoint:
-            hostname: httpbin.org
             address:
               socket_address:
-                address: httpbin.org
-                port_value: 443
+                address: web_service
+                port_value: 9000
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
