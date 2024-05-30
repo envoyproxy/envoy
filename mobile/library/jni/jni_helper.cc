@@ -4,7 +4,6 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
-#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace JNI {
@@ -16,23 +15,21 @@ constexpr const char* THREAD_NAME = "EnvoyMain";
 std::atomic<JavaVM*> java_vm_cache_;
 thread_local JNIEnv* jni_env_cache_ = nullptr;
 absl::flat_hash_map<absl::string_view, jclass> jclass_cache;
-absl::Mutex jmethod_id_cache_mutex;
-absl::flat_hash_map<
+// These caches are thread_local so to avoid the cost of using mutex.
+thread_local absl::flat_hash_map<
     std::tuple<jclass, absl::string_view /* method */, absl::string_view /* signature */>,
     jmethodID>
-    jmethod_id_cache ABSL_GUARDED_BY(jmethod_id_cache_mutex);
-absl::Mutex static_jmethod_id_cache_mutex;
-absl::flat_hash_map<std::tuple<jclass, absl::string_view /* method */, absl::string_view>,
-                    jmethodID /* signature */>
-    static_jmethod_id_cache ABSL_GUARDED_BY(static_jmethod_id_cache_mutex);
-absl::Mutex jfield_id_cache_mutex;
-absl::flat_hash_map<std::tuple<jclass, absl::string_view /* field */, absl::string_view>,
-                    jfieldID /* signature */>
-    jfield_id_cache ABSL_GUARDED_BY(jfield_id_cache_mutex);
-absl::Mutex static_jfield_id_cache_mutex;
-absl::flat_hash_map<std::tuple<jclass, absl::string_view /* field */, absl::string_view>,
-                    jfieldID /* signature */>
-    static_jfield_id_cache ABSL_GUARDED_BY(static_jfield_id_cache_mutex);
+    jmethod_id_cache;
+thread_local absl::flat_hash_map<
+    std::tuple<jclass, absl::string_view /* method */, absl::string_view>,
+    jmethodID /* signature */>
+    static_jmethod_id_cache;
+thread_local absl::flat_hash_map<
+    std::tuple<jclass, absl::string_view /* field */, absl::string_view>, jfieldID /* signature */>
+    jfield_id_cache;
+thread_local absl::flat_hash_map<
+    std::tuple<jclass, absl::string_view /* field */, absl::string_view>, jfieldID /* signature */>
+    static_jfield_id_cache;
 } // namespace
 
 jint JniHelper::getVersion() { return JNI_VERSION; }
@@ -77,7 +74,6 @@ JNIEnv* JniHelper::getThreadLocalEnv() {
 JNIEnv* JniHelper::getEnv() { return env_; }
 
 jfieldID JniHelper::getFieldId(jclass clazz, const char* name, const char* signature) {
-  absl::MutexLock lock(&jfield_id_cache_mutex);
   if (auto it = jfield_id_cache.find(
           std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
       it != jfield_id_cache.end()) {
@@ -91,7 +87,6 @@ jfieldID JniHelper::getFieldId(jclass clazz, const char* name, const char* signa
 }
 
 jfieldID JniHelper::getStaticFieldId(jclass clazz, const char* name, const char* signature) {
-  absl::MutexLock lock(&static_jfield_id_cache_mutex);
   if (auto it = static_jfield_id_cache.find(
           std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
       it != static_jfield_id_cache.end()) {
@@ -119,7 +114,6 @@ DEFINE_GET_FIELD(Double, jdouble)
 DEFINE_GET_FIELD(Boolean, jboolean)
 
 jmethodID JniHelper::getMethodId(jclass clazz, const char* name, const char* signature) {
-  absl::MutexLock lock(&jmethod_id_cache_mutex);
   if (auto it = jmethod_id_cache.find(
           std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
       it != jmethod_id_cache.end()) {
@@ -133,7 +127,6 @@ jmethodID JniHelper::getMethodId(jclass clazz, const char* name, const char* sig
 }
 
 jmethodID JniHelper::getStaticMethodId(jclass clazz, const char* name, const char* signature) {
-  absl::MutexLock lock(&static_jmethod_id_cache_mutex);
   if (auto it = static_jmethod_id_cache.find(
           std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
       it != static_jmethod_id_cache.end()) {
