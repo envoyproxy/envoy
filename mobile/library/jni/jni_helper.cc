@@ -3,6 +3,7 @@
 #include "source/common/common/assert.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -14,22 +15,38 @@ constexpr const char* THREAD_NAME = "EnvoyMain";
 // Non-const variables.
 std::atomic<JavaVM*> java_vm_cache_;
 thread_local JNIEnv* jni_env_cache_ = nullptr;
-absl::flat_hash_map<absl::string_view, jclass> jclass_cache;
-// These caches are thread_local to avoid the overhead of using mutex.
+absl::flat_hash_map<absl::string_view, jclass> jclass_cache_map;
+// The `jclass_cache_set` is a superset of `jclass_cache_map`. It contains `jclass` objects that are
+// retrieve dynamically via `GetObjectClass`.
+thread_local absl::flat_hash_set<jclass> jclass_cache_set;
 thread_local absl::flat_hash_map<
     std::tuple<jclass, absl::string_view /* method */, absl::string_view /* signature */>,
     jmethodID>
-    jmethod_id_cache;
+    jmethod_id_cache_map;
 thread_local absl::flat_hash_map<
     std::tuple<jclass, absl::string_view /* method */, absl::string_view>,
     jmethodID /* signature */>
-    static_jmethod_id_cache;
+    static_jmethod_id_cache_map;
 thread_local absl::flat_hash_map<
     std::tuple<jclass, absl::string_view /* field */, absl::string_view>, jfieldID /* signature */>
     jfield_id_cache;
 thread_local absl::flat_hash_map<
     std::tuple<jclass, absl::string_view /* field */, absl::string_view>, jfieldID /* signature */>
-    static_jfield_id_cache;
+    static_jfield_id_cache_map;
+
+/**
+ * This function checks if the `clazz` already exists in the `jclass` `GlobalRef` cache and creates
+ * a new `GlobalRef` if it does not already exist. This functions returns the `GlobalRef` of the
+ * specified `clazz`.
+ */
+jclass addClassToCacheIfNotExist(JNIEnv* env, jclass clazz) {
+  jclass java_class_global_ref = clazz;
+  if (auto it = jclass_cache_set.find(clazz); it == jclass_cache_set.end()) {
+    jclass global_ref = reinterpret_cast<jclass>(env->NewGlobalRef(clazz));
+    jclass_cache_set.emplace(global_ref);
+  }
+  return java_class_global_ref;
+}
 } // namespace
 
 jint JniHelper::getVersion() { return JNI_VERSION; }
@@ -43,7 +60,8 @@ void JniHelper::addClassToCache(const char* class_name) {
   jint result = getJavaVm()->GetEnv(reinterpret_cast<void**>(&env), getVersion());
   ASSERT(result == JNI_OK, "Unable to get JNIEnv from the JavaVM.");
   jclass java_class = reinterpret_cast<jclass>(env->NewGlobalRef(env->FindClass(class_name)));
-  jclass_cache.emplace(class_name, java_class);
+  jclass_cache_map.emplace(class_name, java_class);
+  jclass_cache_set.emplace(java_class);
 }
 
 JavaVM* JniHelper::getJavaVm() { return java_vm_cache_.load(std::memory_order_acquire); }
@@ -80,21 +98,25 @@ jfieldID JniHelper::getFieldId(jclass clazz, const char* name, const char* signa
     return it->second;
   }
   jfieldID field_id = env_->GetFieldID(clazz, name, signature);
+  jclass clazz_global_ref = addClassToCacheIfNotExist(env_, clazz);
   jfield_id_cache.emplace(
-      std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature), field_id);
+      std::tuple<jclass, absl::string_view, absl::string_view>(clazz_global_ref, name, signature),
+      field_id);
   rethrowException();
   return field_id;
 }
 
 jfieldID JniHelper::getStaticFieldId(jclass clazz, const char* name, const char* signature) {
-  if (auto it = static_jfield_id_cache.find(
+  if (auto it = static_jfield_id_cache_map.find(
           std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
-      it != static_jfield_id_cache.end()) {
+      it != static_jfield_id_cache_map.end()) {
     return it->second;
   }
   jfieldID field_id = env_->GetStaticFieldID(clazz, name, signature);
-  static_jfield_id_cache.emplace(
-      std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature), field_id);
+  jclass clazz_global_ref = addClassToCacheIfNotExist(env_, clazz);
+  static_jfield_id_cache_map.emplace(
+      std::tuple<jclass, absl::string_view, absl::string_view>(clazz_global_ref, name, signature),
+      field_id);
   rethrowException();
   return field_id;
 }
@@ -114,33 +136,37 @@ DEFINE_GET_FIELD(Double, jdouble)
 DEFINE_GET_FIELD(Boolean, jboolean)
 
 jmethodID JniHelper::getMethodId(jclass clazz, const char* name, const char* signature) {
-  if (auto it = jmethod_id_cache.find(
+  if (auto it = jmethod_id_cache_map.find(
           std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
-      it != jmethod_id_cache.end()) {
+      it != jmethod_id_cache_map.end()) {
     return it->second;
   }
   jmethodID method_id = env_->GetMethodID(clazz, name, signature);
-  jmethod_id_cache.emplace(
-      std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature), method_id);
+  jclass clazz_global_ref = addClassToCacheIfNotExist(env_, clazz);
+  jmethod_id_cache_map.emplace(
+      std::tuple<jclass, absl::string_view, absl::string_view>(clazz_global_ref, name, signature),
+      method_id);
   rethrowException();
   return method_id;
 }
 
 jmethodID JniHelper::getStaticMethodId(jclass clazz, const char* name, const char* signature) {
-  if (auto it = static_jmethod_id_cache.find(
+  if (auto it = static_jmethod_id_cache_map.find(
           std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
-      it != static_jmethod_id_cache.end()) {
+      it != static_jmethod_id_cache_map.end()) {
     return it->second;
   }
   jmethodID method_id = env_->GetStaticMethodID(clazz, name, signature);
-  static_jmethod_id_cache.emplace(
-      std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature), method_id);
+  jclass clazz_global_ref = addClassToCacheIfNotExist(env_, clazz);
+  static_jmethod_id_cache_map.emplace(
+      std::tuple<jclass, absl::string_view, absl::string_view>(clazz_global_ref, name, signature),
+      method_id);
   rethrowException();
   return method_id;
 }
 
 jclass JniHelper::findClass(const char* class_name) {
-  if (auto i = jclass_cache.find(class_name); i != jclass_cache.end()) {
+  if (auto i = jclass_cache_map.find(class_name); i != jclass_cache_map.end()) {
     return i->second;
   }
   ASSERT(false, absl::StrFormat("Unable to find class '%s'.", class_name));
