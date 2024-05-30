@@ -116,13 +116,7 @@ protected:
   quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;
   quic::QuicSpdyStream* CreateOutgoingUnidirectionalStream() override;
 
-  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-    return quic::HttpDatagramSupport::kRfc;
-#else
-    return quic::HttpDatagramSupport::kNone;
-#endif
-  }
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
 
   // QuicFilterManagerConnectionImpl
   bool hasDataToWrite() override;
@@ -147,6 +141,7 @@ private:
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   absl::optional<ConnectionMapPosition> position_;
   QuicConnectionStats& connection_stats_;
+  quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
 };
 
 } // namespace Quic
