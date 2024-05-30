@@ -43,6 +43,8 @@ envoy_cc_library(
     }) + [
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
         "@envoy//source/common/common:assert_lib",
     ],
 )
@@ -91,24 +93,6 @@ envoy_cc_library(
     ],
 )
 
-# Implementations of the "native" Java methods for AndroidJniLibrary.java
-envoy_cc_library(
-    name = "android_jni_impl_lib",
-    srcs = [
-        "android_jni_impl.cc",
-    ],
-    repository = "@envoy",
-    deps = [
-        ":android_network_utility_lib",
-        ":jni_helper_lib",
-        ":jni_impl_lib",
-        ":jni_utility_lib",
-        "//library/common:internal_engine_lib",
-    ],
-    # We need this to ensure that we link this into the .so even though there are no code references.
-    alwayslink = True,
-)
-
 # Library which contains all the JNI related targets.
 envoy_cc_library(
     name = "envoy_jni_lib",
@@ -118,7 +102,6 @@ envoy_cc_library(
     }),
     repository = "@envoy",
     deps = [
-        ":android_jni_impl_lib",
         ":android_network_utility_lib",
         ":jni_impl_lib",
         ":jni_utility_lib",
