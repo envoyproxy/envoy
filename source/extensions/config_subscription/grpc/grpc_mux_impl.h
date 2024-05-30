@@ -87,10 +87,25 @@ public:
   GrpcStreamInterface<envoy::service::discovery::v3::DiscoveryRequest,
                       envoy::service::discovery::v3::DiscoveryResponse>&
   grpcStreamForTest() {
-    return grpc_stream_.currentStreamForTest();
+    // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
+    // return grpc_stream_.currentStreamForTest() directly (defined in GrpcMuxFailover).
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+      return dynamic_cast<GrpcMuxFailover<envoy::service::discovery::v3::DiscoveryRequest,
+                                          envoy::service::discovery::v3::DiscoveryResponse>*>(
+                 grpc_stream_.get())
+          ->currentStreamForTest();
+    }
+    return *grpc_stream_.get();
   }
 
 private:
+  // Helper function to create the grpc_stream_ object.
+  // TODO(adisuissa): this should be removed when envoy.restart_features.xds_failover_support
+  // is deprecated.
+  std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DiscoveryRequest,
+                                      envoy::service::discovery::v3::DiscoveryResponse>>
+  createGrpcStreamObject(GrpcMuxContext& grpc_mux_context);
+
   void drainRequests();
   void setRetryTimer();
   void sendDiscoveryRequest(absl::string_view type_url);
@@ -258,8 +273,10 @@ private:
                                  const std::string& version_info, bool call_delegate);
 
   // Multiplexes the stream to the primary and failover sources.
-  GrpcMuxFailover<envoy::service::discovery::v3::DiscoveryRequest,
-                  envoy::service::discovery::v3::DiscoveryResponse>
+  // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
+  // convert from unique_ptr<GrpcStreamInterface> to GrpcMuxFailover directly.
+  std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DiscoveryRequest,
+                                      envoy::service::discovery::v3::DiscoveryResponse>>
       grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
