@@ -674,7 +674,7 @@ public:
       return;
     }
     if (branch < min_child_) {
-      // expand the vector backwards, by moving the existing vector onto
+      // Expand the vector backwards, by moving the existing vector onto
       // the end of a newly allocated one.
       std::vector<std::unique_ptr<TrieEntry>> new_children;
       new_children.reserve(min_child_ - branch + children_.size());
@@ -686,9 +686,9 @@ public:
       return;
     }
     if (branch >= min_child_ + children_.size()) {
-      // expand the vector forwards
+      // Expand the vector forwards.
       children_.resize(branch - min_child_ + 1);
-      // fall through to "insert" behavior.
+      // Fall through to "insert" behavior.
     }
     children_[branch - min_child_] = std::move(entry);
   }
