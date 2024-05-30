@@ -663,7 +663,7 @@ TEST_P(TcpListenerImplTest, ShouldOnlyAcceptTheMaxNumberOfConnectionsConfiguredP
   Server::ThreadLocalOverloadStateOptRef overload_state;
   const uint32_t max_connections_to_accept_per_socket_event = 1;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
-                               listener_callbacks, true, false,
+                               listener_callbacks, true, false, false,
                                max_connections_to_accept_per_socket_event, overload_state);
 
   // Create two client connections, they should get accepted.
