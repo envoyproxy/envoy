@@ -3,8 +3,6 @@ ARG ENVOY_VARIANT="${ENVOY_VARIANT:-dev}"
 
 
 FROM ${ENVOY_IMAGE}:${ENVOY_VARIANT} as envoy-base
-ARG ENVOY_CONFIG=envoy.yaml
-ENV ENVOY_CONFIG="$ENVOY_CONFIG"
 ENV DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
@@ -12,8 +10,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' | tee /etc/apt/apt.conf.d/keep-cache \
     && apt-get -qq update -y \
     && apt-get -qq install --no-install-recommends -y curl
-COPY --chmod=777 "$ENVOY_CONFIG" /etc/envoy.yaml
 CMD ["/usr/local/bin/envoy", "-c", "/etc/envoy.yaml"]
+ARG ENVOY_CONFIG=envoy.yaml
+ENV ENVOY_CONFIG="$ENVOY_CONFIG"
+COPY --chmod=777 "$ENVOY_CONFIG" /etc/envoy.yaml
+
 
 FROM envoy-base as envoy-admin
 ARG ENVOY_ADMIN_PORT=10001

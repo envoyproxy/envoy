@@ -47,6 +47,7 @@ The following sandboxes are available:
 
     brotli
     cache
+    cache-mirror
     cors
     csrf
     double-proxy

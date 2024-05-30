@@ -16,6 +16,7 @@ filegroup(
         exclude = [
             "cache/ci-responses.yaml",
             "cache/responses.yaml",
+            "cache-mirror/envoy.yaml",
             "dynamic-config-fs/**/*",
             "jaeger-native-tracing/*",
             "opentelemetry/otel-collector-config.yaml",
@@ -34,6 +35,7 @@ filegroup(
     name = "contrib_configs",
     srcs = glob(
         [
+            "cache-mirror/envoy.yaml",
             "golang-http/*.yaml",
             "golang-network/*.yaml",
             "mysql/*.yaml",
