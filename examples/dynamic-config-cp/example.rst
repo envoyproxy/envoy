@@ -61,7 +61,7 @@ configuration and you should see the cluster named ``xds_cluster`` configured fo
 
    $ curl -s http://localhost:19000/config_dump  | jq '.configs[1].static_clusters'
 
-.. literalinclude:: _include/dynamic-config-cp/response-config-cluster.json
+.. literalinclude:: /start/sandboxes/_include/dynamic-config-cp/_include/response-config-cluster.json
    :language: json
    :emphasize-lines: 10, 18-19
 
@@ -123,7 +123,7 @@ configuration, you should see it is configured with the ``example_proxy_cluster`
 
    $ curl -s http://localhost:19000/config_dump  | jq '.configs[1].dynamic_active_clusters'
 
-.. literalinclude:: _include/dynamic-config-cp/response-config-active-clusters.json
+.. literalinclude:: /start/sandboxes/_include/dynamic-config-cp/_include/response-config-active-clusters.json
    :language: json
    :emphasize-lines: 3, 11, 19-20
 
@@ -147,7 +147,7 @@ Step 7: Edit ``go`` file and restart the control plane
 ******************************************************
 
 The example setup starts the ``go-control-plane``
-service with a custom :download:`resource.go <_include/dynamic-config-cp/resource.go>` file which
+service with a custom :download:`resource.go </start/sandboxes/_include/dynamic-config-cp/resource.go>` file which
 specifies the configuration provided to Envoy.
 
 Update this to have Envoy proxy instead to ``service2``.
@@ -155,7 +155,7 @@ Update this to have Envoy proxy instead to ``service2``.
 Edit ``resource.go`` in the dynamic configuration example folder and change the ``UpstreamHost``
 from ``service1`` to ``service2``:
 
-.. literalinclude:: _include/dynamic-config-cp/resource.go
+.. literalinclude:: /start/sandboxes/_include/dynamic-config-cp/resource.go
    :language: go
    :lines: 34-43
    :lineno-start: 35
@@ -165,7 +165,7 @@ from ``service1`` to ``service2``:
 Further down in this file you must also change the configuration snapshot version number from
 ``"1"`` to ``"2"`` to ensure Envoy sees the configuration as newer:
 
-.. literalinclude:: _include/dynamic-config-cp/resource.go
+.. literalinclude:: /start/sandboxes/_include/dynamic-config-cp/resource.go
    :language: go
    :lineno-start: 175
    :lines: 174-186
@@ -198,7 +198,7 @@ is configured to proxy to ``service2``:
 
    $ curl -s http://localhost:19000/config_dump  | jq '.configs[1].dynamic_active_clusters'
 
-.. literalinclude:: _include/dynamic-config-cp/response-config-active-clusters-updated.json
+.. literalinclude:: /start/sandboxes/_include/dynamic-config-cp/_include/response-config-active-clusters-updated.json
    :language: json
    :emphasize-lines: 3, 11, 19-20
 
