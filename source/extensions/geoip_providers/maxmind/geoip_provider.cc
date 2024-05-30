@@ -170,6 +170,7 @@ void GeoipProvider::lookupInCityDb(
   if (config_->isLookupEnabledForHeader(config_->cityHeader()) ||
       config_->isLookupEnabledForHeader(config_->regionHeader()) ||
       config_->isLookupEnabledForHeader(config_->countryHeader())) {
+    absl::ReaderMutexLock lock(&city_db_mutex_);
     ASSERT(city_db_, "Maxmind city database is not initialised for performing lookups");
     int mmdb_error;
     const uint32_t n_prev_hits = lookup_result.size();
@@ -211,6 +212,7 @@ void GeoipProvider::lookupInAsnDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
+    absl::ReaderMutexLock lock(&isp_db_mutex_);
     RELEASE_ASSERT(isp_db_, "Maxmind asn database is not initialized for performing lookups");
     int mmdb_error;
     const uint32_t n_prev_hits = lookup_result.size();
@@ -238,7 +240,8 @@ void GeoipProvider::lookupInAnonDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (config_->isLookupEnabledForHeader(config_->anonHeader()) || config_->anonVpnHeader()) {
-    ASSERT(anon_db_, "Maxmind city database is not initialised for performing lookups");
+    absl::ReaderMutexLock lock(&anon_db_mutex_);
+    RELEASE_ASSERT(anon_db_, "Maxmind city database is not initialised for performing lookups");
     int mmdb_error;
     const uint32_t n_prev_hits = lookup_result.size();
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
@@ -296,31 +299,35 @@ MaxmindDbSharedPtr GeoipProvider::initMaxmindDb(const std::string& db_path,
   }
 }
 
-void GeoipProvider::mmdbReload(MaxmindDbSharedPtr& current_db, const MaxmindDbSharedPtr reloaded_db,
-                               absl::Mutex& mu, const absl::string_view& db_type) {
+absl::Status GeoipProvider::mmdbReload(const MaxmindDbSharedPtr reloaded_db,
+                              const absl::string_view& db_type) {
   if (reloaded_db) {
-    absl::MutexLock lock(&mu);
-    current_db = reloaded_db;
-    config_->incDbReloadSuccess(db_type);
+    if (db_type == CITY_DB_TYPE) {
+      absl::WriterMutexLock lock(&city_db_mutex_);
+      city_db_ = reloaded_db;
+      config_->incDbReloadSuccess(db_type);
+    } else if (db_type == ISP_DB_TYPE) {
+      absl::WriterMutexLock lock(&isp_db_mutex_);
+      isp_db_ = reloaded_db;
+      config_->incDbReloadSuccess(db_type);
+    } else if (db_type == ANON_DB_TYPE) {
+      absl::WriterMutexLock lock(&anon_db_mutex_);
+      anon_db_ = reloaded_db;
+      config_->incDbReloadSuccess(db_type);
+    } else {
+      ENVOY_LOG(error, "Unsupported maxmind db type {}", db_type);
+      return absl::InvalidArgumentError(fmt::format("Unsupported maxmind db type {}", db_type));
+    }
   } else {
     config_->incDbReloadError(db_type);
   }
+  return absl::OkStatus();
 }
 
 absl::Status GeoipProvider::onMaxmindDbUpdate(const std::string& db_path,
                                               const absl::string_view& db_type) {
   MaxmindDbSharedPtr reloaded_db = initMaxmindDb(db_path, db_type, true /* reload */);
-  if (db_type == CITY_DB_TYPE) {
-    mmdbReload(city_db_, reloaded_db, city_db_mutex_, CITY_DB_TYPE);
-  } else if (db_type == ISP_DB_TYPE) {
-    mmdbReload(isp_db_, reloaded_db, isp_db_mutex_, ISP_DB_TYPE);
-  } else if (db_type == ANON_DB_TYPE) {
-    mmdbReload(anon_db_, reloaded_db, anon_db_mutex_, ANON_DB_TYPE);
-  } else {
-    ENVOY_LOG(error, "Unsupported maxmind db type {}", db_type);
-    return absl::InvalidArgumentError(fmt::format("Unsupported maxmind db type {}", db_type));
-  }
-  return absl::OkStatus();
+  return mmdbReload(reloaded_db, db_type);
 }
 
 template <class... Params>

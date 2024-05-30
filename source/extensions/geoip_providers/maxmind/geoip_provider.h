@@ -106,11 +106,11 @@ private:
   // These three mutexes are never held at the same time. We signify this by requiring
   // that all three are 'acquired before' the others, since there is no exclusion annotation.
   mutable absl::Mutex city_db_mutex_ ABSL_ACQUIRED_BEFORE(isp_db_mutex_, anon_db_mutex_){};
-  MaxmindDbSharedPtr city_db_;
+  MaxmindDbSharedPtr city_db_ ABSL_GUARDED_BY(city_db_mutex_);
   mutable absl::Mutex isp_db_mutex_ ABSL_ACQUIRED_BEFORE(city_db_mutex_, anon_db_mutex_){};
-  MaxmindDbSharedPtr isp_db_;
+  MaxmindDbSharedPtr isp_db_ ABSL_GUARDED_BY(isp_db_mutex_);
   mutable absl::Mutex anon_db_mutex_ ABSL_ACQUIRED_BEFORE(city_db_mutex_, isp_db_mutex_){};
-  MaxmindDbSharedPtr anon_db_;
+  MaxmindDbSharedPtr anon_db_ ABSL_GUARDED_BY(anon_db_mutex_);
   Thread::ThreadPtr mmdb_reload_thread_;
   Event::DispatcherPtr mmdb_reload_dispatcher_;
   Filesystem::WatcherPtr mmdb_watcher_;
@@ -123,7 +123,7 @@ private:
   void lookupInAnonDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   absl::Status onMaxmindDbUpdate(const std::string& db_path, const absl::string_view& db_type);
-  void mmdbReload(MaxmindDbSharedPtr& old_db, const MaxmindDbSharedPtr reloaded_db, absl::Mutex& mu,
+  absl::Status mmdbReload(const MaxmindDbSharedPtr reloaded_db,
                   const absl::string_view& db_type)
       ABSL_LOCKS_EXCLUDED(city_db_mutex_, isp_db_mutex_, anon_db_mutex_);
   template <typename... Params>

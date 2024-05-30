@@ -35,15 +35,11 @@ public:
 };
 
 namespace {
-const std::string default_city_db_path =
+constexpr std::string default_city_db_path =
     "{{ test_rundir "
     "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb";
 
-const std::string default_updated_city_db_path =
-    "{{ test_rundir "
-    "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test-Updated.mmdb";
-
-const std::string default_city_config_yaml = R"EOF(
+constexpr std::string default_city_config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
         country: "x-geo-country"
@@ -52,30 +48,30 @@ const std::string default_city_config_yaml = R"EOF(
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
   )EOF";
 
-const std::string default_isp_db_path =
+constexpr std::string default_isp_db_path =
     "{{ test_rundir "
     "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb";
 
-const std::string default_updated_isp_db_path =
+constexpr std::string default_updated_isp_db_path =
     "{{ test_rundir "
     "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test-Updated.mmdb";
 
-const std::string default_isp_config_yaml = R"EOF(
+constexpr std::string default_isp_config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
         asn: "x-geo-asn"
     isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
   )EOF";
 
-const std::string default_anon_db_path =
+constexpr std::string default_anon_db_path =
     "{{ test_rundir "
     "}}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb";
 
-const std::string default_updated_anon_db_path =
+constexpr std::string default_updated_anon_db_path =
     "{{ test_rundir "
     "}}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test-Updated.mmdb";
 
-const std::string default_anon_config_yaml = R"EOF(
+constexpr std::string default_anon_config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
         is_anon: "x-geo-anon"
@@ -114,7 +110,7 @@ public:
     provider_ = provider_factory_->createGeoipProviderDriver(config, "prefix.", context_);
   }
 
-  void expectStats(const std::string& db_type, const uint32_t total_count = 1,
+  void expectStats(const absl::string_view& db_type, const uint32_t total_count = 1,
                    const uint32_t hit_count = 1, const uint32_t error_count = 0) {
     auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
     EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".total")).value(),
@@ -124,7 +120,7 @@ public:
               error_count);
   }
 
-  void expectReloadStats(const std::string& db_type, const uint32_t reload_success_count = 0,
+  void expectReloadStats(const absl::string_view& db_type, const uint32_t reload_success_count = 0,
                          const uint32_t reload_error_count = 0) {
     auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
     EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".db_reload_success")).value(),
@@ -415,26 +411,26 @@ TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
 struct MmdbReloadTestCase {
 
   MmdbReloadTestCase() = default;
-  MmdbReloadTestCase(const std::string& yaml_config, const std::string& db_type,
+  MmdbReloadTestCase(const std::string& yaml_config, const absl::string_view& db_type,
                      const std::string& source_db_file_path,
                      const std::string& reloaded_db_file_path,
-                     const std::string& expected_header_name,
-                     const std::string& expected_header_value,
-                     const std::string& expected_reloaded_header_value, const std::string& ip)
+                     const absl::string_view& expected_header_name,
+                     const absl::string_view& expected_header_value,
+                     const absl::string_view& expected_reloaded_header_value, const std::string& ip)
       : yaml_config_(yaml_config), db_type_(db_type), source_db_file_path_(source_db_file_path),
         reloaded_db_file_path_(reloaded_db_file_path), expected_header_name_(expected_header_name),
         expected_header_value_(expected_header_value),
         expected_reloaded_header_value_(expected_reloaded_header_value), ip_(ip) {}
   MmdbReloadTestCase(const MmdbReloadTestCase& rhs) = default;
 
-  std::string yaml_config_;
-  std::string db_type_;
-  std::string source_db_file_path_;
-  std::string reloaded_db_file_path_;
-  std::string expected_header_name_;
-  std::string expected_header_value_;
-  std::string expected_reloaded_header_value_;
-  std::string ip_;
+  const std::string yaml_config_;
+  absl::string_view db_type_;
+  const std::string source_db_file_path_;
+  const std::string reloaded_db_file_path_;
+  absl::string_view expected_header_name_;
+  absl::string_view expected_header_value_;
+  absl::string_view expected_reloaded_header_value_;
+  const std::string ip_;
 };
 
 class MmdbReloadImplTest : public ::testing::TestWithParam<MmdbReloadTestCase>,
