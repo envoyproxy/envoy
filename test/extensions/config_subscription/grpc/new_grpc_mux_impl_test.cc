@@ -28,6 +28,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -50,7 +51,7 @@ enum class LegacyOrUnified { Legacy, Unified };
 
 // We test some mux specific stuff below, other unit test coverage for singleton use of
 // NewGrpcMuxImpl is provided in [grpc_]subscription_impl_test.cc.
-class NewGrpcMuxImplTestBase : public testing::TestWithParam<LegacyOrUnified> {
+class NewGrpcMuxImplTestBase : public testing::TestWithParam<std::tuple<LegacyOrUnified, bool>> {
 public:
   NewGrpcMuxImplTestBase(LegacyOrUnified legacy_or_unified)
       : async_client_(new Grpc::MockAsyncClient()),
@@ -60,7 +61,12 @@ public:
         control_plane_stats_(Utility::generateControlPlaneStats(*stats_.rootScope())),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
-        should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified) {}
+        should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified) {
+    // Once "envoy.restart_features.xds_failover_support" is deprecated, the
+    // test should no longer be parameterized on the bool value.
+    scoped_runtime_.mergeValues({{"envoy.restart_features.xds_failover_support",
+                                  std::get<1>(GetParam()) ? "true" : "false"}});
+  }
 
   void setup() {
     auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
@@ -164,6 +170,7 @@ public:
 
   bool isUnifiedMuxTest() const { return should_use_unified_; }
 
+  TestScopedRuntime scoped_runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
   Grpc::MockAsyncClient* async_client_;
@@ -183,12 +190,14 @@ public:
 
 class NewGrpcMuxImplTest : public NewGrpcMuxImplTestBase {
 public:
-  NewGrpcMuxImplTest() : NewGrpcMuxImplTestBase(GetParam()) {}
+  NewGrpcMuxImplTest() : NewGrpcMuxImplTestBase(std::get<0>(GetParam())) {}
   Event::SimulatedTimeSystem time_system_;
 };
 
 INSTANTIATE_TEST_SUITE_P(NewGrpcMuxImplTest, NewGrpcMuxImplTest,
-                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+                         testing::Combine(testing::ValuesIn({LegacyOrUnified::Legacy,
+                                                             LegacyOrUnified::Unified}),
+                                          testing::Bool()));
 
 // Validate behavior when dynamic context parameters are updated.
 TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
