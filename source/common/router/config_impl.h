@@ -24,6 +24,7 @@
 
 #include "source/common/common/matchers.h"
 #include "source/common/common/packed_struct.h"
+#include "source/common/config/datasource.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/header_utility.h"
@@ -799,11 +800,8 @@ public:
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   const std::string& responseBody() const override {
-    absl::MutexLock lock(&direct_response_mutex_);
-    if (!direct_response_body_) {
-      return EMPTY_STRING;
-    }
-    return *direct_response_body_.get();
+    return direct_response_body_provider_ != nullptr ? direct_response_body_provider_->data()
+                                                     : EMPTY_STRING;
   }
 
   // Router::Route
@@ -1233,9 +1231,7 @@ private:
 
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
-  std::shared_ptr<std::string> direct_response_body_ ABSL_GUARDED_BY(direct_response_mutex_){};
-  mutable absl::Mutex direct_response_mutex_;
-  Filesystem::WatcherPtr direct_response_file_watcher_;
+  Envoy::Config::DataSource::DataSourceProviderPtr direct_response_body_provider_;
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;

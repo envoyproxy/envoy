@@ -60,6 +60,8 @@ public:
           auto* direct_response = route->mutable_direct_response();
           direct_response->set_status(200);
           direct_response->mutable_body()->set_filename(filename);
+          direct_response->mutable_body()->mutable_watched_directory()->set_path(
+              TestEnvironment::temporaryDirectory());
         });
 
     initialize();
