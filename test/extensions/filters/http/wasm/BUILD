@@ -83,7 +83,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    shard_count = 4,
+    shard_count = 16,
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",

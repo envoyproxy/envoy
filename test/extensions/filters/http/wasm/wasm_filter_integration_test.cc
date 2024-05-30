@@ -21,7 +21,7 @@ public:
     setUpstreamProtocol(Http::CodecType::HTTP1);
     // Wasm filters are expensive to setup and sometime default is not enough,
     // It needs to increase timeout to avoid flaky tests
-    setListenersBoundTimeout(3 * TestUtility::DefaultTimeout);
+    setListenersBoundTimeout(10 * TestUtility::DefaultTimeout);
   }
 
   void TearDown() override { fake_upstream_connection_.reset(); }
