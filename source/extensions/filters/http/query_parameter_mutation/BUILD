@@ -52,5 +52,6 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/query_parameter_mutation/v3:pkg_cc_proto",
     ],
 )

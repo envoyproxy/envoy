@@ -39,7 +39,6 @@ public:
 
 private:
   ConfigSharedPtr config_;
-  absl::InlinedVector<const Config*, 3> route_configs_{};
 };
 
 } // namespace QueryParameterMutation

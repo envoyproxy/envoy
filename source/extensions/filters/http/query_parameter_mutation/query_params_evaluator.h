@@ -1,9 +1,11 @@
 #pragma once
 
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/query_parameter_mutation/v3/config.pb.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/query_params.h"
@@ -21,9 +23,10 @@ using QueryParamsEvaluatorPtr = std::unique_ptr<QueryParamsEvaluator>;
 
 class QueryParamsEvaluator {
 public:
-  QueryParamsEvaluator(const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter>&
-                           query_params_to_add,
-                       const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove);
+  QueryParamsEvaluator(
+      const Protobuf::RepeatedPtrField<envoy::extensions::filters::http::query_parameter_mutation::
+                                           v3::QueryParameterValueOption>& query_params_to_add,
+      const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove);
 
   /**
    * Processes headers first through query parameter removals then through query parameter
@@ -39,7 +42,10 @@ protected:
   QueryParamsEvaluator() = default;
 
 private:
-  Http::Utility::QueryParamsVector query_params_to_add_;
+  std::vector<std::tuple<std::string, std::string,
+                         envoy::extensions::filters::http::query_parameter_mutation::v3::
+                             QueryParameterValueOption_QueryParameterAppendAction>>
+      query_params_to_add_;
   std::vector<std::string> query_params_to_remove_;
   Formatter::FormatterPtr formatter_;
 };

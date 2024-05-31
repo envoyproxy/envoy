@@ -29,6 +29,7 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.query_parameter_mutation"],
     deps = [
+        "//source/extensions/filters/http/query_parameter_mutation:config",
         "//source/extensions/filters/http/query_parameter_mutation:filter_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",

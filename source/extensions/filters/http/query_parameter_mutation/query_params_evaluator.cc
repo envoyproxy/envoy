@@ -15,12 +15,16 @@ namespace HttpFilters {
 namespace QueryParameterMutation {
 
 QueryParamsEvaluator::QueryParamsEvaluator(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter>& query_params_to_add,
+    const Protobuf::RepeatedPtrField<
+        envoy::extensions::filters::http::query_parameter_mutation::v3::QueryParameterValueOption>&
+        query_params_to_add,
     const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove) {
 
   formatter_ = std::make_unique<Formatter::FormatterImpl>("", true);
   for (const auto& query_param : query_params_to_add) {
-    query_params_to_add_.emplace_back(std::make_pair(query_param.key(), query_param.value()));
+    query_params_to_add_.emplace_back(std::make_tuple(query_param.query_parameter().key(),
+                                                      query_param.query_parameter().value(),
+                                                      query_param.append_action()));
   }
 
   for (const auto& val : query_params_to_remove) {
@@ -45,9 +49,33 @@ void QueryParamsEvaluator::evaluateQueryParams(Http::RequestHeaderMap& headers,
 
   // Add new desired query parameters.
   Formatter::HttpFormatterContext ctx{&headers};
-  for (const auto& [key, val] : query_params_to_add_) {
+  for (const auto& [key, val, append_action] : query_params_to_add_) {
     const auto formatter = std::make_unique<Formatter::FormatterImpl>(val, true);
-    query_params.add(key, formatter->formatWithContext(ctx, stream_info));
+    switch (append_action) {
+    case envoy::extensions::filters::http::query_parameter_mutation::v3::
+        QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD:
+      query_params.add(key, formatter->formatWithContext(ctx, stream_info));
+      break;
+    case envoy::extensions::filters::http::query_parameter_mutation::v3::
+        QueryParameterValueOption_QueryParameterAppendAction_ADD_IF_ABSENT:
+      if (!query_params.getFirstValue(key).has_value()) {
+        query_params.add(key, formatter->formatWithContext(ctx, stream_info));
+      }
+      break;
+    case envoy::extensions::filters::http::query_parameter_mutation::v3::
+        QueryParameterValueOption_QueryParameterAppendAction_OVERWRITE_IF_EXISTS_OR_ADD:
+      query_params.overwrite(key, val);
+      break;
+    case envoy::extensions::filters::http::query_parameter_mutation::v3::
+        QueryParameterValueOption_QueryParameterAppendAction_OVERWRITE_IF_EXISTS:
+      if (query_params.getFirstValue(key).has_value()) {
+        query_params.overwrite(key, val);
+      }
+      break;
+    default:
+      // should be unreachable.
+      break;
+    }
   }
 
   const auto new_path = query_params.replaceQueryString(headers.Path()->value());

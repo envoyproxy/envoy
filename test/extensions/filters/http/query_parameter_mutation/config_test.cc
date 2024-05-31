@@ -19,8 +19,10 @@ namespace QueryParameterMutation {
 TEST(ConfigTest, CreateFilter) {
   const std::string yaml = R"EOF(
 query_parameters_to_add:
-  - key: foo
-    value: bar
+  - append_action: APPEND_IF_EXISTS_OR_ADD
+    query_parameter:
+      key: foo
+      value: bar
 query_parameters_to_remove:
   - remove-me
   )EOF";

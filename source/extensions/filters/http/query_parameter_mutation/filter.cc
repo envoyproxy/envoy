@@ -25,18 +25,18 @@ void Config::evaluateQueryParams(Http::RequestHeaderMap& headers,
 Filter::Filter(ConfigSharedPtr config) : config_(config) {}
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  route_configs_ = Http::Utility::getAllPerFilterConfig<Config>(decoder_callbacks_);
+  const auto route_configs = Http::Utility::getAllPerFilterConfig<Config>(decoder_callbacks_);
 
   auto& stream_info = decoder_callbacks_->streamInfo();
   config_->evaluateQueryParams(headers, stream_info);
 
   const auto& virtual_host = decoder_callbacks_->route()->routeEntry()->virtualHost();
   if (virtual_host.routeConfig().mostSpecificHeaderMutationsWins()) {
-    for (auto config : route_configs_) {
+    for (auto config : route_configs) {
       config->evaluateQueryParams(headers, stream_info);
     }
   } else {
-    for (auto it = route_configs_.rbegin(); it != route_configs_.rend(); ++it) {
+    for (auto it = route_configs.rbegin(); it != route_configs.rend(); ++it) {
       (*it)->evaluateQueryParams(headers, stream_info);
     }
   }

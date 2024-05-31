@@ -25,10 +25,15 @@ public:
     return std::string(request_headers.getPathValue());
   }
 
-  void addParamToAdd(absl::string_view key, absl::string_view value) {
-    auto* query_param = query_params_to_add_.Add();
-    query_param->set_key(key);
-    query_param->set_value(value);
+  void addParamToAdd(absl::string_view key, absl::string_view value,
+                     envoy::extensions::filters::http::query_parameter_mutation::v3::
+                         QueryParameterValueOption_QueryParameterAppendAction append_action) {
+    auto* option = query_params_to_add_.Add();
+    option->set_append_action(append_action);
+    auto* qp = envoy::config::core::v3::QueryParameter::default_instance().New();
+    qp->set_key(key);
+    qp->set_value(value);
+    option->set_allocated_query_parameter(qp);
   }
 
   void addParamToRemove(absl::string_view key) {
@@ -42,7 +47,9 @@ public:
                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
-  Protobuf::RepeatedPtrField<envoy::config::core::v3::QueryParameter> query_params_to_add_;
+  Protobuf::RepeatedPtrField<
+      envoy::extensions::filters::http::query_parameter_mutation::v3::QueryParameterValueOption>
+      query_params_to_add_;
   Protobuf::RepeatedPtrField<std::string> query_params_to_remove_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
@@ -53,9 +60,95 @@ TEST_F(QueryParamsEvaluatorTest, EmptyConfigEvaluator) {
   EXPECT_EQ("/path?this=should&stay=the&exact=same", new_path);
 }
 
-TEST_F(QueryParamsEvaluatorTest, AddMultipleParams) {
-  addParamToAdd("foo", "value_1");
-  addParamToAdd("foo", "value_2");
+TEST_F(QueryParamsEvaluatorTest, AppendIfExistsOrAddWhenAbsent) {
+  addParamToAdd("foo", "value_new",
+                envoy::extensions::filters::http::query_parameter_mutation::v3::
+                    QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD);
+
+  const auto old_path = "/path";
+  const auto new_path = evaluateWithPath(old_path);
+  EXPECT_EQ("/path?foo=value_new", new_path);
+}
+
+TEST_F(QueryParamsEvaluatorTest, AppendIfExistsOrAddWhenPresent) {
+  addParamToAdd("foo", "value_new",
+                envoy::extensions::filters::http::query_parameter_mutation::v3::
+                    QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD);
+
+  const auto old_path = "/path?foo=value_old";
+  const auto new_path = evaluateWithPath(old_path);
+  EXPECT_EQ("/path?foo=value_old&foo=value_new", new_path);
+}
+
+TEST_F(QueryParamsEvaluatorTest, AddIfAbsentWhenAbsent) {
+  addParamToAdd("foo", "value",
+                envoy::extensions::filters::http::query_parameter_mutation::v3::
+                    QueryParameterValueOption_QueryParameterAppendAction_ADD_IF_ABSENT);
+
+  const auto old_path = "/path?";
+  const auto new_path = evaluateWithPath(old_path);
+  EXPECT_EQ("/path?foo=value", new_path);
+}
+
+TEST_F(QueryParamsEvaluatorTest, AddIfAbsentWhenPresent) {
+  addParamToAdd("foo", "value_new",
+                envoy::extensions::filters::http::query_parameter_mutation::v3::
+                    QueryParameterValueOption_QueryParameterAppendAction_ADD_IF_ABSENT);
+
+  const auto old_path = "/path?foo=value_old";
+  const auto new_path = evaluateWithPath(old_path);
+  EXPECT_EQ("/path?foo=value_old", new_path);
+}
+
+TEST_F(QueryParamsEvaluatorTest, OverWriteIfExistsOrAddWhenAbsent) {
+  addParamToAdd(
+      "foo", "value_new",
+      envoy::extensions::filters::http::query_parameter_mutation::v3::
+          QueryParameterValueOption_QueryParameterAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
+
+  const auto old_path = "/path";
+  const auto new_path = evaluateWithPath(old_path);
+  EXPECT_EQ("/path?foo=value_new", new_path);
+}
+
+TEST_F(QueryParamsEvaluatorTest, OverWriteIfExistsOrAddWhenPresent) {
+  addParamToAdd(
+      "foo", "value_new",
+      envoy::extensions::filters::http::query_parameter_mutation::v3::
+          QueryParameterValueOption_QueryParameterAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
+
+  const auto old_path = "/path?foo=value_old";
+  const auto new_path = evaluateWithPath(old_path);
+  EXPECT_EQ("/path?foo=value_new", new_path);
+}
+
+TEST_F(QueryParamsEvaluatorTest, OverWriteIfExistsWhenAbsent) {
+  addParamToAdd("foo", "value_new",
+                envoy::extensions::filters::http::query_parameter_mutation::v3::
+                    QueryParameterValueOption_QueryParameterAppendAction_OVERWRITE_IF_EXISTS);
+
+  const auto old_path = "/path";
+  const auto new_path = evaluateWithPath(old_path);
+  EXPECT_EQ("/path", new_path);
+}
+
+TEST_F(QueryParamsEvaluatorTest, OverWriteIfExistsWhenPresent) {
+  addParamToAdd("foo", "value_new",
+                envoy::extensions::filters::http::query_parameter_mutation::v3::
+                    QueryParameterValueOption_QueryParameterAppendAction_OVERWRITE_IF_EXISTS);
+
+  const auto old_path = "/path?foo=value_old";
+  const auto new_path = evaluateWithPath(old_path);
+  EXPECT_EQ("/path?foo=value_new", new_path);
+}
+
+TEST_F(QueryParamsEvaluatorTest, ChainMultipleParams) {
+  addParamToAdd("foo", "value_1",
+                envoy::extensions::filters::http::query_parameter_mutation::v3::
+                    QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD);
+  addParamToAdd("foo", "value_2",
+                envoy::extensions::filters::http::query_parameter_mutation::v3::
+                    QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD);
 
   const auto old_path = "/path?bar=123";
   const auto new_path = evaluateWithPath(old_path);
@@ -71,7 +164,9 @@ TEST_F(QueryParamsEvaluatorTest, RemoveMultipleParams) {
 }
 
 TEST_F(QueryParamsEvaluatorTest, AddEmptyValue) {
-  addParamToAdd("foo", "");
+  addParamToAdd("foo", "",
+                envoy::extensions::filters::http::query_parameter_mutation::v3::
+                    QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD);
 
   const auto old_path = "/path?bar=123";
   const auto new_path = evaluateWithPath(old_path);
@@ -79,7 +174,9 @@ TEST_F(QueryParamsEvaluatorTest, AddEmptyValue) {
 }
 
 TEST_F(QueryParamsEvaluatorTest, CommandSubstitution) {
-  addParamToAdd("start_time", "%START_TIME(%s)%");
+  addParamToAdd("start_time", "%START_TIME(%s)%",
+                envoy::extensions::filters::http::query_parameter_mutation::v3::
+                    QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD);
   setFilterData("variable", "substituted-value");
 
   const SystemTime start_time(std::chrono::seconds(1522796769));
@@ -91,7 +188,9 @@ TEST_F(QueryParamsEvaluatorTest, CommandSubstitution) {
 }
 
 TEST_F(QueryParamsEvaluatorTest, CommandSubstitutionFilterState) {
-  addParamToAdd("foo", "%FILTER_STATE(variable)%");
+  addParamToAdd("foo", "%FILTER_STATE(variable)%",
+                envoy::extensions::filters::http::query_parameter_mutation::v3::
+                    QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD);
   setFilterData("variable", "substituted-value");
 
   const auto old_path = "/path?bar=123";
