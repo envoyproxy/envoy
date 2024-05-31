@@ -119,9 +119,9 @@ protected:
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
         connection_handler_(*dispatcher_, absl::nullopt),
-        transport_socket_factory_(true, *store_.rootScope(),
-                                  std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
-                                  ssl_context_manager_, {}),
+        transport_socket_factory_(*Quic::QuicServerTransportSocketFactory::create(
+            true, *store_.rootScope(), std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
+            ssl_context_manager_, {})),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
@@ -245,7 +245,7 @@ protected:
           .WillOnce(ReturnRef(filter_factories_.back()));
       EXPECT_CALL(*filter_chain_, transportSocketFactory())
           .InSequence(seq)
-          .WillRepeatedly(ReturnRef(transport_socket_factory_));
+          .WillRepeatedly(ReturnRef(*transport_socket_factory_));
     }
   }
 
@@ -370,7 +370,7 @@ protected:
   // of elements are saved in expectations before new elements are added.
   std::list<Filter::NetworkFilterFactoriesList> filter_factories_;
   const Network::MockFilterChain* filter_chain_;
-  QuicServerTransportSocketFactory transport_socket_factory_;
+  std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
   quic::ParsedQuicVersion quic_version_;
   uint32_t connection_window_size_{1024u};
   uint32_t stream_window_size_{1024u};
