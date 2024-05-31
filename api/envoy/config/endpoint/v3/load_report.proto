@@ -61,7 +61,7 @@ message UpstreamLocalityStats {
   // [#not-implemented-hide:]
   uint64 total_new_connections = 10 [(xds.annotations.v3.field_status).work_in_progress = true];
 
-  // The total number of connections terminated abruptly (for example: due to
+  // The total number of connections terminated abruptly since the last report (for example: due to
   // connection refused, keepalive timeout). This information is aggregated over
   // all the upstream endpoints in the locality.
   // [#not-implemented-hide:]
