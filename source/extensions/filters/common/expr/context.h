@@ -53,6 +53,7 @@ constexpr absl::string_view Metadata = "metadata";
 
 // Per-request or per-connection filter state
 constexpr absl::string_view FilterState = "filter_state";
+constexpr absl::string_view UpstreamFilterState = "upstream_filter_state";
 
 // Connection properties
 constexpr absl::string_view Connection = "connection";

@@ -20,7 +20,7 @@ namespace Tls {
 ContextManagerImpl::ContextManagerImpl(Server::Configuration::CommonFactoryContext& factory_context)
     : factory_context_(factory_context) {}
 
-Envoy::Ssl::ClientContextSharedPtr
+absl::StatusOr<Envoy::Ssl::ClientContextSharedPtr>
 ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
                                            const Envoy::Ssl::ClientContextConfig& config) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
@@ -34,7 +34,7 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
   return context;
 }
 
-Envoy::Ssl::ServerContextSharedPtr ContextManagerImpl::createSslServerContext(
+absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> ContextManagerImpl::createSslServerContext(
     Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
     const std::vector<std::string>& server_names, Ssl::ContextAdditionalInitFunc additional_init) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();

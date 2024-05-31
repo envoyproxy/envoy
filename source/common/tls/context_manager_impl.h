@@ -29,10 +29,10 @@ public:
   ~ContextManagerImpl() override = default;
 
   // Ssl::ContextManager
-  Ssl::ClientContextSharedPtr
+  absl::StatusOr<Ssl::ClientContextSharedPtr>
   createSslClientContext(Stats::Scope& scope,
                          const Envoy::Ssl::ClientContextConfig& config) override;
-  Ssl::ServerContextSharedPtr
+  absl::StatusOr<Ssl::ServerContextSharedPtr>
   createSslServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                          const std::vector<std::string>& server_names,
                          Ssl::ContextAdditionalInitFunc additional_init) override;

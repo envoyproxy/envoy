@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "source/common/common/assert.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
@@ -19,7 +20,8 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats)
+    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats,
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(
@@ -33,6 +35,11 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
   }
 #endif
+  // If a factory is available, create a debug visitor and attach it to the connection.
+  if (debug_visitor_factory.has_value()) {
+    debug_visitor_ = debug_visitor_factory->createQuicConnectionDebugVisitor(this, streamInfo());
+    quic_connection_->set_debug_visitor(debug_visitor_.get());
+  }
 }
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {

@@ -34,8 +34,9 @@ class ClientSslSocketFactory : public Network::CommonUpstreamTransportSocketFact
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:
-  ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
-                         Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope);
+  static absl::StatusOr<std::unique_ptr<ClientSslSocketFactory>>
+  create(Envoy::Ssl::ClientContextConfigPtr config, Envoy::Ssl::ContextManager& manager,
+         Stats::Scope& stats_scope);
 
   ~ClientSslSocketFactory() override;
 
@@ -56,6 +57,10 @@ public:
   Envoy::Ssl::ClientContextSharedPtr sslCtx() override;
 
 private:
+  ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
+                         Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope,
+                         absl::Status& creation_status);
+
   Envoy::Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
   SslSocketFactoryStats stats_;

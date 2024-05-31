@@ -2313,6 +2313,38 @@ TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentialsWithMissingExpir
 TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  // Time 2018-01-02T05:04:05Z in unix_timestamp is 1.514869445E9
+  expectDocument(200, std::move(R"EOF(
+{
+  "AssumeRoleWithWebIdentityResponse": {
+    "AssumeRoleWithWebIdentityResult": {
+      "Credentials": {
+        "AccessKeyId": "akid",
+        "SecretAccessKey": "secret",
+        "SessionToken": "token",
+        "Expiration": 1.514869445E9
+      }
+    }
+  }
+}
+)EOF"));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(2)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
+}
+
+TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpirationIntegerFormat) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   // Time 2018-01-02T05:04:05Z in unix_timestamp is 1514869445
   expectDocument(200, std::move(R"EOF(
 {

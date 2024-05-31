@@ -714,9 +714,10 @@ public:
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
-        std::vector<std::string>{});
+    return Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+               std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
+               std::vector<std::string>{})
+        .value();
   }
 
   void TearDown() override {

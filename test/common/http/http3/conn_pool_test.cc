@@ -42,9 +42,10 @@ public:
     ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
     EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _))
         .WillRepeatedly(Return(ssl_context_));
-    factory_.emplace(std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
-                         new NiceMock<Ssl::MockClientContextConfig>),
-                     context_);
+    factory_ = *Quic::QuicClientTransportSocketFactory::create(
+        std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
+            new NiceMock<Ssl::MockClientContextConfig>),
+        context_);
     factory_->initialize();
   }
 
@@ -80,7 +81,7 @@ public:
   Network::Address::InstanceConstSharedPtr test_address_ =
       Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
-  absl::optional<Quic::QuicClientTransportSocketFactory> factory_;
+  std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   Ssl::ClientContextSharedPtr ssl_context_{new Ssl::MockClientContext()};
   Stats::IsolatedStoreImpl store_;
   Quic::QuicStatNames quic_stat_names_{store_.symbolTable()};
@@ -88,14 +89,17 @@ public:
   MockPoolConnectResultCallback connect_result_callback_;
   std::shared_ptr<Network::MockSocketOption> socket_option_{new Network::MockSocketOption()};
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
+  absl::Status creation_status_;
 };
 
 class MockQuicClientTransportSocketFactory : public Quic::QuicClientTransportSocketFactory {
 public:
   MockQuicClientTransportSocketFactory(
       Ssl::ClientContextConfigPtr config,
-      Server::Configuration::TransportSocketFactoryContext& factory_context)
-      : Quic::QuicClientTransportSocketFactory(std::move(config), factory_context) {}
+      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      absl::Status& creation_status)
+      : Quic::QuicClientTransportSocketFactory(std::move(config), factory_context,
+                                               creation_status) {}
 
   MOCK_METHOD(Envoy::Ssl::ClientContextSharedPtr, sslCtx, ());
 };
@@ -103,7 +107,7 @@ public:
 TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   MockQuicClientTransportSocketFactory factory{
       std::unique_ptr<Envoy::Ssl::ClientContextConfig>(new NiceMock<Ssl::MockClientContextConfig>),
-      context_};
+      context_, creation_status_};
 
   EXPECT_CALL(factory, sslCtx()).WillRepeatedly(Return(nullptr));
 
@@ -128,7 +132,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
 
   MockQuicClientTransportSocketFactory factory{
       std::unique_ptr<Envoy::Ssl::ClientContextConfig>(new NiceMock<Ssl::MockClientContextConfig>),
-      context_};
+      context_, creation_status_};
 
   Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
   EXPECT_CALL(factory, sslCtx())
