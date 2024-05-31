@@ -1021,7 +1021,6 @@ TEST_P(LoadShedPointIntegrationTest, ListenerAcceptDoesNotShedLoadWhenBypassed) 
   } else {
     test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_overload_reject", 1);
   }
-  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
