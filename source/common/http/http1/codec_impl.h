@@ -686,6 +686,8 @@ private:
   // True if the upstream connection is pointed at an HTTP/1.1 proxy, and
   // plaintext HTTP should be sent with fully qualified URLs.
   bool passing_through_proxy_ = false;
+
+  const bool force_reset_on_premature_upstream_half_close_{};
 };
 
 } // namespace Http1

@@ -648,7 +648,9 @@ public:
         proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
         filter_chain_factory_(filter_chain_factory),
         no_downgrade_to_canonical_name_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.no_downgrade_to_canonical_name")) {}
+            "envoy.reloadable_features.no_downgrade_to_canonical_name")),
+        allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
@@ -748,6 +750,9 @@ public:
   void decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
     state_.remote_decode_complete_ = end_stream;
     decodeHeaders(nullptr, headers, end_stream);
+    if (allow_upstream_half_close_) {
+      maybeCloseStream();
+    }
   }
 
   /**
@@ -758,6 +763,9 @@ public:
   void decodeData(Buffer::Instance& data, bool end_stream) {
     state_.remote_decode_complete_ = end_stream;
     decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
+    if (allow_upstream_half_close_) {
+      maybeCloseStream();
+    }
   }
 
   /**
@@ -767,6 +775,9 @@ public:
   void decodeTrailers(RequestTrailerMap& trailers) {
     state_.remote_decode_complete_ = true;
     decodeTrailers(nullptr, trailers);
+    if (allow_upstream_half_close_) {
+      maybeCloseStream();
+    }
   }
 
   /**
@@ -782,6 +793,8 @@ public:
    * @param end_stream whether encoding is complete.
    */
   void maybeEndEncode(bool end_stream);
+
+  void maybeCloseStream();
 
   virtual void sendLocalReply(Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
@@ -861,19 +874,24 @@ public:
   bool sawDownstreamReset() { return state_.saw_downstream_reset_; }
 
   virtual bool shouldLoadShed() { return false; };
+  bool allowUpstreamHalfClose() const { return allow_upstream_half_close_; }
 
 protected:
   struct State {
     State()
-        : remote_decode_complete_(false), remote_encode_complete_(false), local_complete_(false),
-          has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
-          is_grpc_request_(false), non_100_response_headers_encoded_(false),
-          under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
-          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
+        : remote_decode_complete_(false), remote_encode_complete_(false),
+          encoder_end_stream_(false), local_complete_(false), has_1xx_headers_(false),
+          created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
+          non_100_response_headers_encoded_(false), under_on_local_reply_(false),
+          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
+          saw_downstream_reset_(false), stream_closed_(false), force_close_stream_(false) {}
     uint32_t filter_call_state_{0};
 
-    bool remote_decode_complete_ : 1;
-    bool remote_encode_complete_ : 1;
+    bool remote_decode_complete_ : 1; // Set when decoder filter chain iteration has completed.
+    bool remote_encode_complete_ : 1; // Set when encoder filter chain iteration has completed.
+    bool encoder_end_stream_ : 1; // This is set the first time the end_stream is observed during
+                                  // encoder filter chain iteration and used to set the end_stream
+                                  // flag when resuming encoder filter chain iteration.
     bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
                               // A filter can still stop the stream from being complete as seen
                               // by the codec.
@@ -893,6 +911,11 @@ protected:
     bool decoder_filter_chain_aborted_ : 1;
     bool encoder_filter_chain_aborted_ : 1;
     bool saw_downstream_reset_ : 1;
+    bool stream_closed_ : 1; // Set when both remote_decode_complete_ and remote_encode_complete_ is
+                             // true observed for the first time and prevents ending the stream
+                             // multiple times. Only set when allow_upstream_half_close is enabled.
+    bool force_close_stream_ : 1; // Set to indicate that stream should be closed due to either
+                                  // local reply or error response from the server.
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield
@@ -1086,6 +1109,7 @@ private:
   State state_;
 
   const bool no_downgrade_to_canonical_name_{};
+  const bool allow_upstream_half_close_{};
 };
 
 // The DownstreamFilterManager has explicit handling to send local replies.

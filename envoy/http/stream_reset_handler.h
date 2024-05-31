@@ -36,7 +36,9 @@ enum class StreamResetReason {
   // Received payload did not conform to HTTP protocol.
   ProtocolError,
   // If the stream was locally reset by the Overload Manager.
-  OverloadManager
+  OverloadManager,
+  // If stream was locally reset due to HTTP/1 upstream half closing before downstream.
+  Http1PrematureUpstreamHalfClose,
 };
 
 /**

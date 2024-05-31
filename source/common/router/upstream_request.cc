@@ -69,7 +69,9 @@ public:
     state().decoder_filter_chain_aborted_ = true;
     state().encoder_filter_chain_aborted_ = true;
     state().remote_encode_complete_ = true;
+    state().encoder_end_stream_ = true;
     state().local_complete_ = true;
+    state().force_close_stream_ = true;
     // TODO(alyssawilk) this should be done through the router to play well with hedging.
     upstream_request_.parent_.callbacks()->sendLocalReply(code, body, modify_headers, grpc_status,
                                                           details);

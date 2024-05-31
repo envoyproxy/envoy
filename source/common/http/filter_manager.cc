@@ -903,16 +903,28 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
                                   FilterIterationStartState filter_iteration_start_state) {
   // Only do base state setting on the initial call. Subsequent calls for filtering do not touch
   // the base state.
-  ENVOY_STREAM_LOG(trace, "commonEncodePrefix end_stream: {}, isHalfCloseEnabled: {}", *this,
-                   end_stream, filter_manager_callbacks_.isHalfCloseEnabled());
+  ENVOY_STREAM_LOG(trace,
+                   "commonEncodePrefix end_stream: {}, isHalfCloseEnabled: {}, force_close: {}",
+                   *this, end_stream, filter_manager_callbacks_.isHalfCloseEnabled(),
+                   static_cast<bool>(state_.force_close_stream_));
   if (filter == nullptr) {
     // half close is enabled in case tcp proxying is done with http1 encoder. In this case, we
     // should not set the local_complete_ flag to true when end_stream is true.
     // setting local_complete_ to true will cause any data sent in the upstream direction to be
     // dropped.
-    if (end_stream && !filter_manager_callbacks_.isHalfCloseEnabled()) {
-      ASSERT(!state_.local_complete_);
-      state_.local_complete_ = true;
+    if (allow_upstream_half_close_) {
+      if (end_stream) {
+        state_.encoder_end_stream_ = true;
+        if (!filter_manager_callbacks_.isHalfCloseEnabled() || state_.force_close_stream_) {
+          ASSERT(!state_.local_complete_);
+          state_.local_complete_ = true;
+        }
+      }
+    } else {
+      if (end_stream && !filter_manager_callbacks_.isHalfCloseEnabled()) {
+        ASSERT(!state_.local_complete_);
+        state_.local_complete_ = true;
+      }
     }
     return encoder_filters_.begin();
   }
@@ -960,6 +972,8 @@ void DownstreamFilterManager::sendLocalReply(
   ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
   const bool is_grpc_request = state_.is_grpc_request_;
+  // Local reply closes the stream even if downstream is not half closed.
+  state_.force_close_stream_ = true;
 
   // Stop filter chain iteration if local reply was sent while filter decoding or encoding callbacks
   // are running.
@@ -1284,6 +1298,14 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
 
   const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
   state_.non_100_response_headers_encoded_ = true;
+  if (allow_upstream_half_close_) {
+    const uint64_t response_status = Http::Utility::getResponseStatus(headers);
+    if (!(Http::CodeUtility::is2xx(response_status) || Http::CodeUtility::is1xx(response_status))) {
+      // Even if upstream half close is enabled the stream is closed on error responses from the
+      // server.
+      state_.force_close_stream_ = true;
+    }
+  }
   filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
   if (state_.saw_downstream_reset_) {
     return;
@@ -1489,6 +1511,27 @@ void FilterManager::maybeEndEncode(bool end_stream) {
   if (end_stream) {
     ASSERT(!state_.remote_encode_complete_);
     state_.remote_encode_complete_ = true;
+    if (allow_upstream_half_close_) {
+      maybeCloseStream();
+    } else {
+      state_.stream_closed_ = true;
+      filter_manager_callbacks_.endStream();
+    }
+  }
+}
+
+void FilterManager::maybeCloseStream() {
+  ASSERT(allow_upstream_half_close_);
+  if (state_.stream_closed_) {
+    return;
+  }
+
+  // If upstream half close is enabled then close the stream either when force close
+  // is set (i.e local reply) or when both server and client half closed.
+  if (state_.remote_encode_complete_ &&
+      (state_.remote_decode_complete_ || state_.force_close_stream_)) {
+    state_.stream_closed_ = true;
+    ENVOY_STREAM_LOG(trace, "closing stream", *this);
     filter_manager_callbacks_.endStream();
   }
 }
@@ -1671,7 +1714,14 @@ Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
 Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
-bool ActiveStreamEncoderFilter::complete() { return parent_.state_.local_complete_; }
+bool ActiveStreamEncoderFilter::complete() {
+  // This is used for determining end_stream flag when iterating encoder filter chain.
+  // When the upstream half close is enabled the local complete may not be set when
+  // end stream is observed on the encode path in case upstream half closes before the
+  // downstream.
+  return parent_.allow_upstream_half_close_ ? parent_.state_.encoder_end_stream_
+                                            : parent_.state_.local_complete_;
+}
 bool ActiveStreamEncoderFilter::has1xxHeaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
 }
