@@ -18,6 +18,7 @@
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/server/configuration_impl.h"
+#include "source/server/process_context_impl.h"
 
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
@@ -49,6 +50,10 @@ namespace Quic {
 namespace {
 constexpr int kECT1 = 1; // This is an Explicit Congestion Notification
                          // code point defined in RFC3168.
+} // namespace
+
+namespace {
+class TestProcessObject : public ProcessObject {};
 } // namespace
 
 // A test quic listener that exits after processing one round of packets.
@@ -85,7 +90,7 @@ protected:
         listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
         packets_to_read_to_connection_count_ratio, /*receive_ecn=*/true,
         crypto_server_stream_factory, proof_source_factory, std::move(cid_generator),
-        testWorkerSelector);
+        testWorkerSelector, std::nullopt);
   }
 };
 
@@ -109,6 +114,10 @@ public:
   static envoy::config::core::v3::RuntimeFeatureFlag&
   runtimeEnabled(ActiveQuicListenerFactory* factory) {
     return factory->enabled_;
+  }
+  static EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef
+  debugVisitorFactory(ActiveQuicListenerFactory* factory) {
+    return factory->connection_debug_visitor_factory_;
   }
 };
 
@@ -653,6 +662,44 @@ TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {
                 ->config()
                 ->GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
   readFromClientSockets();
+}
+
+class ActiveQuicListenerFactoryTest : public testing::Test {
+protected:
+  std::unique_ptr<ActiveQuicListenerFactory>
+  createQuicListenerFactory(envoy::config::listener::v3::QuicProtocolOptions options,
+                            ProcessContextOptRef context) {
+    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1, quic_stat_names_,
+                                                       validation_visitor_, context);
+  }
+
+  Stats::SymbolTable symbol_table_;
+  QuicStatNames quic_stat_names_ = QuicStatNames(symbol_table_);
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+};
+
+TEST_F(ActiveQuicListenerFactoryTest, NoDebugVisitorConfigured) {
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  auto factory = createQuicListenerFactory(options, std::nullopt);
+  EXPECT_EQ(ActiveQuicListenerFactoryPeer::debugVisitorFactory(factory.get()), std::nullopt);
+}
+
+TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
+  TestProcessObject test_process_object;
+  ProcessContextImpl context(test_process_object);
+  envoy::config::listener::v3::QuicProtocolOptions quic_config;
+  quic_config.mutable_connection_debug_visitor_config()->set_name(
+      "envoy.quic.connection_debug_visitor.mock");
+  quic_config.mutable_connection_debug_visitor_config()->mutable_typed_config()->PackFrom(
+      test::common::config::DummyConfig());
+  auto listener_factory = createQuicListenerFactory(quic_config, context);
+  auto debug_visitor_factory =
+      ActiveQuicListenerFactoryPeer::debugVisitorFactory(listener_factory.get());
+  EXPECT_TRUE(debug_visitor_factory.has_value());
+  auto test_debug_visitor_factory =
+      dynamic_cast<TestEnvoyQuicConnectionDebugVisitorFactory*>(debug_visitor_factory.ptr());
+  EXPECT_TRUE(test_debug_visitor_factory->processContext().has_value());
+  EXPECT_EQ(&test_debug_visitor_factory->processContext().value().get(), &context);
 }
 
 } // namespace Quic

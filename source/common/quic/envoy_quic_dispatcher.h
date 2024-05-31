@@ -4,6 +4,7 @@
 
 #include "envoy/network/listener.h"
 
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/quic_stat_names.h"
@@ -63,7 +64,8 @@ public:
       Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
       Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-      quic::ConnectionIdGeneratorInterface& generator);
+      quic::ConnectionIdGeneratorInterface& generator,
+      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef&& debug_visitor_factory);
 
   // quic::QuicDispatcher
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
@@ -107,6 +109,7 @@ private:
   QuicDispatcherStats quic_stats_;
   QuicConnectionStats connection_stats_;
   bool current_packet_dispatch_success_;
+  EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory_;
 };
 
 } // namespace Quic

@@ -74,7 +74,7 @@ public:
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
             listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_, quic_stat_names_,
-            crypto_stream_factory_, connection_id_generator_),
+            crypto_stream_factory_, connection_id_generator_, std::nullopt),
         connection_id_(quic::test::TestConnectionId(1)),
         transport_socket_factory_(*QuicServerTransportSocketFactory::create(
             true, listener_config_.listenerScope(),
