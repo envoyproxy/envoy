@@ -125,7 +125,7 @@ jobs:
         # `--pinentry-mode=loopback` could be needed to ensure we
         # suppress the gpg prompt
         echo $GPG_KEY | base64 --decode > signing-key
-        gpg --default-key $GPG_DEFAULT_KEY --passphrase $GPG_PASSPHRASE --batch --import signing-key
+        gpg --passphrase $GPG_PASSPHRASE --batch --import signing-key
         shred signing-key
 
         gpg --default-key $GPG_DEFAULT_KEY --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab ${{ matrix.output }}.aar
