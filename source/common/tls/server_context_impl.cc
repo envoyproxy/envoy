@@ -669,21 +669,23 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
             static_cast<int>(selection_result));
 
   const auto result = tls_certificate_selector_->selectTlsContext(
-      ssl_client_hello, extended_socket_info->createCertSelectionCallback(ssl_client_hello->ssl));
+      ssl_client_hello, extended_socket_info->createCertSelectionCallback());
 
-  ENVOY_LOG(trace, "TLS context selection result: {}, after selectTlsContext",
-            static_cast<int>(extended_socket_info->certSelectionResult()));
+  ENVOY_LOG(trace,
+            "TLS context selection result: {}, after selectTlsContext, selection result status: {}",
+            static_cast<int>(extended_socket_info->certSelectionResult()),
+            static_cast<int>(result.status));
+  ASSERT(extended_socket_info->certSelectionResult() == Ssl::CertSelectionStatus::Pending,
+         "invalid selection result");
 
-  switch (result) {
-  case Ssl::SelectionResult::Continue:
-    RELEASE_ASSERT(extended_socket_info->certSelectionResult() ==
-                       Ssl::CertSelectionStatus::Successful,
-                   "missing onCertSelectionResult before continue");
+  switch (result.status) {
+  case Ssl::SelectionResult::SelectionStatus::Continue:
+    extended_socket_info->onCertSelectionCompleted(*result.selected_ctx, result.staple, false);
     return ssl_select_cert_success;
-  case Ssl::SelectionResult::Stop:
-    extended_socket_info->setCertSelectionAsync();
+  case Ssl::SelectionResult::SelectionStatus::Stop:
     return ssl_select_cert_retry;
-  case Ssl::SelectionResult::AbortHandshake:
+  case Ssl::SelectionResult::SelectionStatus::AbortHandshake:
+    extended_socket_info->onCertSelectionCompleted(OptRef<const Ssl::TlsContext>(), false, false);
     return ssl_select_cert_error;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;

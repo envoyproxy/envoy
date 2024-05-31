@@ -165,13 +165,21 @@ public:
   virtual SslCtxCb sslctxCb(HandshakerFactoryContext& handshaker_factory_context) const PURE;
 };
 
-enum class SelectionResult {
-  // Continue the TLS handshake.
-  Continue,
-  // Block the TLS handshake.
-  Stop,
-  // Abort the TLS handshake.
-  AbortHandshake
+struct SelectionResult {
+  enum class SelectionStatus {
+    // Continue the TLS handshake.
+    Continue,
+    // Block the TLS handshake.
+    Stop,
+    // Abort the TLS handshake.
+    AbortHandshake,
+  };
+  // If the value is Pending, the selection is asynchronous.
+  SelectionStatus status;
+  // It will be nullptr when status is Stop or AbortHandshake.
+  const Ssl::TlsContext* selected_ctx;
+  // Enable OCSP stapling response when it is true.
+  bool staple;
 };
 
 /**

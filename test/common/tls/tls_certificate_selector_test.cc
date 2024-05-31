@@ -93,11 +93,11 @@ public:
     ENVOY_LOG_MISC(info, "debug: select context");
 
     switch (mod_) {
-    case Ssl::SelectionResult::Continue:
+    case Ssl::SelectionResult::SelectionStatus::Continue:
       ENVOY_LOG_MISC(info, "debug: select cert done");
-      cb->onCertSelectionResult(getTlsContext(), false);
+      return {mod_, getTlsContext(), false};
       break;
-    case Ssl::SelectionResult::Stop:
+    case Ssl::SelectionResult::SelectionStatus::Stop:
       ENVOY_LOG_MISC(info, "debug: select cert async");
       cb_ = std::move(cb);
       cb_->dispatcher().post([this] { selectTlsContextAsync(); });
@@ -105,17 +105,17 @@ public:
     default:
       break;
     }
-    return mod_;
+    return {mod_, nullptr, false};
   };
 
   void selectTlsContextAsync() {
     ENVOY_LOG_MISC(info, "debug: select cert async done");
-    cb_->onCertSelectionResult(getTlsContext(), false);
+    cb_->onCertSelectionResult(*getTlsContext(), false);
   }
 
-  const Ssl::TlsContext& getTlsContext() { return ctx_.lock()->getTlsContexts()[0]; }
+  const Ssl::TlsContext* getTlsContext() { return &(ctx_.lock()->getTlsContexts()[0]); }
 
-  Ssl::SelectionResult mod_;
+  Ssl::SelectionResult::SelectionStatus mod_;
 
 private:
   Ssl::ContextSelectionCallbackWeakPtr ctx_;
@@ -150,7 +150,7 @@ public:
   std::string name() const override { return "test-tls-context-provider"; };
 
   CreateProviderHook selector_cb_;
-  Ssl::SelectionResult mod_;
+  Ssl::SelectionResult::SelectionStatus mod_;
 };
 
 Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
@@ -174,7 +174,7 @@ protected:
         {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   }
 
-  void testUtil(Ssl::SelectionResult mod) {
+  void testUtil(Ssl::SelectionResult::SelectionStatus mod) {
     const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -315,7 +315,7 @@ protected:
             connect_second_time();
           }));
     } else {
-      if (mod == Ssl::SelectionResult::AbortHandshake) {
+      if (mod == Ssl::SelectionResult::SelectionStatus::AbortHandshake) {
         EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
             .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
         EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
@@ -340,13 +340,17 @@ protected:
   Network::Address::IpVersion version_;
 };
 
-TEST_P(TlsCertificateSelectorFactoryTest, Continue) { testUtil(Ssl::SelectionResult::Continue); }
-
-TEST_P(TlsCertificateSelectorFactoryTest, Terminate) {
-  testUtil(Ssl::SelectionResult::AbortHandshake);
+TEST_P(TlsCertificateSelectorFactoryTest, Continue) {
+  testUtil(Ssl::SelectionResult::SelectionStatus::Continue);
 }
 
-TEST_P(TlsCertificateSelectorFactoryTest, Stop) { testUtil(Ssl::SelectionResult::Stop); }
+TEST_P(TlsCertificateSelectorFactoryTest, Terminate) {
+  testUtil(Ssl::SelectionResult::SelectionStatus::AbortHandshake);
+}
+
+TEST_P(TlsCertificateSelectorFactoryTest, Stop) {
+  testUtil(Ssl::SelectionResult::SelectionStatus::Stop);
+}
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TlsCertificateSelectorFactoryTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

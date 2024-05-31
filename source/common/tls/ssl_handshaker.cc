@@ -34,28 +34,10 @@ void CertSelectionCallbackImpl::onSslHandshakeCancelled() { extended_socket_info
 
 void CertSelectionCallbackImpl::onCertSelectionResult(OptRef<const Ssl::TlsContext> selected_ctx,
                                                       bool staple) {
-  auto succeeded = selected_ctx.has_value();
-  ENVOY_LOG(debug, "onCertSelectionResult: {}, {}", succeeded, staple);
   if (!extended_socket_info_.has_value()) {
-    ENVOY_LOG(debug, "extended socket info is gone, maybe connection terminated");
     return;
   }
-  if (succeeded) {
-    // Apply the selected context. This must be done before OCSP stapling below
-    // since applying the context can remove the previously-set OCSP response.
-    // This will only return NULL if memory allocation fails.
-    RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_, selected_ctx->ssl_ctx_.get()) != nullptr, "");
-
-    if (staple) {
-      // We avoid setting the OCSP response if the client didn't request it, but doing so is safe.
-      RELEASE_ASSERT(selected_ctx->ocsp_response_,
-                     "OCSP response must be present under OcspStapleAction::Staple");
-      auto& resp_bytes = selected_ctx->ocsp_response_->rawBytes();
-      const int rc = SSL_set_ocsp_response(ssl_, resp_bytes.data(), resp_bytes.size());
-      RELEASE_ASSERT(rc != 0, "");
-    }
-  }
-  extended_socket_info_->onCertSelectionCompleted(succeeded);
+  extended_socket_info_->onCertSelectionCompleted(selected_ctx, staple, true);
 }
 
 SslExtendedSocketInfoImpl::~SslExtendedSocketInfoImpl() {
@@ -96,13 +78,30 @@ Ssl::ValidateResultCallbackPtr SslExtendedSocketInfoImpl::createValidateResultCa
   return callback;
 }
 
-void SslExtendedSocketInfoImpl::onCertSelectionCompleted(bool succeeded) {
-  RELEASE_ASSERT(cert_selection_result_ != Ssl::CertSelectionStatus::Successful &&
-                     cert_selection_result_ != Ssl::CertSelectionStatus::Failed,
+void SslExtendedSocketInfoImpl::onCertSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx,
+                                                         bool staple, bool async) {
+  auto succeeded = selected_ctx.has_value();
+  RELEASE_ASSERT(cert_selection_result_ == Ssl::CertSelectionStatus::Pending,
                  "onCertSelectionCompleted twice");
-  const bool async = cert_selection_result_ == Ssl::CertSelectionStatus::Pending;
   cert_selection_result_ =
       succeeded ? Ssl::CertSelectionStatus::Successful : Ssl::CertSelectionStatus::Failed;
+  if (succeeded) {
+    // Apply the selected context. This must be done before OCSP stapling below
+    // since applying the context can remove the previously-set OCSP response.
+    // This will only return NULL if memory allocation fails.
+    RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_handshaker_.ssl(), selected_ctx->ssl_ctx_.get()) != nullptr,
+                   "");
+
+    if (staple) {
+      // We avoid setting the OCSP response if the client didn't request it, but doing so is safe.
+      RELEASE_ASSERT(selected_ctx->ocsp_response_,
+                     "OCSP response must be present under OcspStapleAction::Staple");
+      auto& resp_bytes = selected_ctx->ocsp_response_->rawBytes();
+      const int rc =
+          SSL_set_ocsp_response(ssl_handshaker_.ssl(), resp_bytes.data(), resp_bytes.size());
+      RELEASE_ASSERT(rc != 0, "");
+    }
+  }
   if (cert_selection_callback_.has_value()) {
     cert_selection_callback_.reset();
     // Resume handshake.
@@ -112,16 +111,11 @@ void SslExtendedSocketInfoImpl::onCertSelectionCompleted(bool succeeded) {
   }
 }
 
-void SslExtendedSocketInfoImpl::setCertSelectionAsync() {
-  RELEASE_ASSERT(cert_selection_result_ == Ssl::CertSelectionStatus::NotStarted,
-                 "unexpected cert selection result");
-  cert_selection_result_ = Ssl::CertSelectionStatus::Pending;
-}
-
-Ssl::CertSelectionCallbackPtr SslExtendedSocketInfoImpl::createCertSelectionCallback(SSL* ssl) {
+Ssl::CertSelectionCallbackPtr SslExtendedSocketInfoImpl::createCertSelectionCallback() {
   auto callback = std::make_unique<CertSelectionCallbackImpl>(
-      ssl, ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
+      ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
   cert_selection_callback_ = *callback;
+  cert_selection_result_ = Ssl::CertSelectionStatus::Pending;
   return callback;
 }
 

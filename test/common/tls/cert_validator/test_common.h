@@ -35,13 +35,10 @@ public:
   Ssl::ValidateStatus certificateValidationResult() const override { return validate_result_; }
   uint8_t certificateValidationAlert() const override { return SSL_AD_CERTIFICATE_UNKNOWN; }
 
-  Ssl::CertSelectionCallbackPtr createCertSelectionCallback(SSL*) override { return nullptr; }
-  void onCertSelectionCompleted(bool succeeded) override {
-    cert_selection_result_ =
-        succeeded ? Ssl::CertSelectionStatus::Successful : Ssl::CertSelectionStatus::Failed;
-  }
-  void setCertSelectionAsync() override {
-    cert_selection_result_ = Ssl::CertSelectionStatus::Pending;
+  Ssl::CertSelectionCallbackPtr createCertSelectionCallback() override { return nullptr; }
+  void onCertSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool, bool) override {
+    cert_selection_result_ = selected_ctx.has_value() ? Ssl::CertSelectionStatus::Successful
+                                                      : Ssl::CertSelectionStatus::Failed;
   }
   Ssl::CertSelectionStatus certSelectionResult() const override { return cert_selection_result_; }
 

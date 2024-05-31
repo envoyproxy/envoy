@@ -11,6 +11,9 @@
 namespace Envoy {
 namespace Ssl {
 
+// Opaque type defined and used by the ``ServerContext``.
+struct TlsContext;
+
 enum class ClientValidationStatus { NotValidated, NoClientCertificate, Validated, Failed };
 
 enum class ValidateStatus {
@@ -93,18 +96,14 @@ public:
   /**
    * @return CertSelectionCallbackPtr a callback used to return the cert selection result.
    */
-  virtual CertSelectionCallbackPtr createCertSelectionCallback(SSL* ssl) PURE;
+  virtual CertSelectionCallbackPtr createCertSelectionCallback() PURE;
 
   /**
    * Called after the cert selection completes.
    * @param succeeded true if the cert selection succeeded.
    */
-  virtual void onCertSelectionCompleted(bool succeeded) PURE;
-
-  /**
-   * Set the cert selection enter asynchronous status.
-   */
-  virtual void setCertSelectionAsync() PURE;
+  virtual void onCertSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool staple,
+                                        bool async) PURE;
 
   /**
    * @return CertSelectionStatus the cert selection status.

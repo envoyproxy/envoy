@@ -53,9 +53,9 @@ private:
 class CertSelectionCallbackImpl : public Ssl::CertSelectionCallback,
                                   protected Logger::Loggable<Logger::Id::connection> {
 public:
-  CertSelectionCallbackImpl(SSL* ssl, Event::Dispatcher& dispatcher,
+  CertSelectionCallbackImpl(Event::Dispatcher& dispatcher,
                             SslExtendedSocketInfoImpl& extended_socket_info)
-      : ssl_(ssl), dispatcher_(dispatcher), extended_socket_info_(extended_socket_info) {}
+      : dispatcher_(dispatcher), extended_socket_info_(extended_socket_info) {}
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
@@ -64,7 +64,6 @@ public:
   void onSslHandshakeCancelled();
 
 private:
-  SSL* ssl_;
   Event::Dispatcher& dispatcher_;
   OptRef<SslExtendedSocketInfoImpl> extended_socket_info_;
 };
@@ -86,9 +85,9 @@ public:
 
   void setCertificateValidationAlert(uint8_t alert) { cert_validation_alert_ = alert; }
 
-  Ssl::CertSelectionCallbackPtr createCertSelectionCallback(SSL* ssl) override;
-  void onCertSelectionCompleted(bool succeeded) override;
-  void setCertSelectionAsync() override;
+  Ssl::CertSelectionCallbackPtr createCertSelectionCallback() override;
+  void onCertSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool staple,
+                                bool async) override;
   Ssl::CertSelectionStatus certSelectionResult() const override { return cert_selection_result_; }
 
 private:
