@@ -19,7 +19,7 @@ using Envoy::Platform::EngineBuilder;
 
 // NOLINT(namespace-envoy)
 
-extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
   Envoy::JNI::JniHelper::initialize(vm);
   Envoy::JNI::JniHelper::addClassToCache("java/lang/Object");
   Envoy::JNI::JniHelper::addClassToCache("java/lang/Integer");
@@ -37,6 +37,10 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
   Envoy::JNI::JniHelper::addClassToCache(
       "io/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel");
   return Envoy::JNI::JniHelper::getVersion();
+}
+
+extern "C" JNIEXPORT void JNICALL JNI_OnUnload(JavaVM*, void* /* reserved */) {
+  Envoy::JNI::JniHelper::finalize();
 }
 
 extern "C" JNIEXPORT void JNICALL

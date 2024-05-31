@@ -166,7 +166,7 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
   message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
-  return config_factory.createTransportSocketFactory(quic_transport_socket_config, context);
+  return config_factory.createTransportSocketFactory(quic_transport_socket_config, context).value();
 }
 
 BufferingStreamDecoderPtr

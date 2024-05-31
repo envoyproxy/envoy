@@ -136,7 +136,8 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   auto& config_factory = Config::Utility::getAndCheckFactoryByName<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
       "envoy.transport_sockets.quic");
-  return config_factory.createTransportSocketFactory(quic_config, mock_factory_ctx, server_names);
+  return config_factory.createTransportSocketFactory(quic_config, mock_factory_ctx, server_names)
+      .value();
 }
 
 Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(

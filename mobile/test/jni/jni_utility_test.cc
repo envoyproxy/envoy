@@ -30,6 +30,10 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
   return Envoy::JNI::JniHelper::getVersion();
 }
 
+extern "C" JNIEXPORT void JNICALL JNI_OnUnload(JavaVM*, void* /* reserved */) {
+  Envoy::JNI::JniHelper::finalize();
+}
+
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_protoJavaByteArrayConversion(JNIEnv* env, jclass,
                                                                                jbyteArray source) {

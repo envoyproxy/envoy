@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -12,6 +13,9 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/listener_factory_context.h"
+#include "test/mocks/upstream/cluster_update_callbacks.h"
+#include "test/mocks/upstream/cluster_update_callbacks_handle.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
@@ -23,7 +27,6 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-using testing::Throw;
 
 namespace Envoy {
 namespace Extensions {
@@ -95,7 +98,7 @@ MATCHER_P(WithAttribute, expectedCluster, "") {
 
 class ConfigCredentialsProviderTest : public testing::Test {
 public:
-  ~ConfigCredentialsProviderTest() override {}
+  ~ConfigCredentialsProviderTest() override = default;
 };
 
 TEST_F(ConfigCredentialsProviderTest, ConfigShouldBeHonored) {
@@ -371,10 +374,13 @@ public:
   InstanceProfileCredentialsProviderTest()
       : api_(Api::createApiForTest(time_system_)), raw_metadata_fetcher_(new MockMetadataFetcher) {}
 
-  void setupProvider() {
+  void setupProvider(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                         MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                     std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+
     provider_ = std::make_shared<InstanceProfileCredentialsProvider>(
         *api_, context_,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
@@ -384,17 +390,19 @@ public:
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        "credentials_provider_cluster");
+        refresh_state, initialization_timer, "credentials_provider_cluster");
   }
 
-  void setupProviderWithContext() {
+  void
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                               MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                           std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
-      init_target_handle_ = target.createHandle("test");
+      init_target_ = target.createHandle("test");
     }));
 
-    setupProvider();
-    expected_duration_ = provider_->getCacheDuration();
-    init_target_handle_->initialize(init_watcher_);
+    setupProvider(refresh_state, initialization_timer);
+    init_target_->initialize(init_watcher_);
   }
 
   void expectSessionToken(const uint64_t status_code, const std::string&& token) {
@@ -454,7 +462,7 @@ public:
         }));
   }
 
-  void expectCredentialListingSecure(const uint64_t status_code,
+  void expectCredentialListingIMDSv2(const uint64_t status_code,
                                      const std::string&& instance_role) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
                                            {":authority", "169.254.169.254:80"},
@@ -514,7 +522,7 @@ public:
         }));
   }
 
-  void expectDocumentSecure(const uint64_t status_code,
+  void expectDocumentIMDSv2(const uint64_t status_code,
                             const std::string&& credential_document_value) {
     Http::TestRequestHeaderMapImpl headers{
         {":path", "/latest/meta-data/iam/security-credentials/doc1"},
@@ -555,308 +563,250 @@ public:
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   InstanceProfileCredentialsProviderPtr provider_;
-  Init::TargetHandlePtr init_target_handle_;
-  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
+  Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
+  Init::TargetHandlePtr init_target_;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
 };
 
-TEST_F(InstanceProfileCredentialsProviderTest, TestAddMissingCluster) {
-  // Setup without thread local cluster yet
-  envoy::config::cluster::v3::Cluster expected_cluster;
-  constexpr static const char* kStaticCluster = R"EOF(
-name: credentials_provider_cluster
-type: static
-connectTimeout: 2s
-lb_policy: ROUND_ROBIN
-loadAssignment:
-  clusterName: credentials_provider_cluster
-  endpoints:
-  - lbEndpoints:
-    - endpoint:
-        address:
-          socketAddress:
-            address: "169.254.169.254"
-            portValue: 80
-typed_extension_protocol_options:
-  envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-    "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-    explicit_http_config:
-      http_protocol_options:
-        accept_http_10: true
- )EOF";
-  MessageUtil::loadFromYaml(kStaticCluster, expected_cluster,
-                            ProtobufMessage::getNullValidationVisitor());
-
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cluster_manager_, addOrUpdateCluster(WithAttribute(expected_cluster), _))
-      .WillOnce(Return(true));
-
-  expectSessionToken(200, std::move("TOKEN"));
-  expectCredentialListingSecure(200, std::move(std::string("doc1")));
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  expectDocumentSecure(200, std::move(R"EOF(
- {
-   "AccessKeyId": "akid",
-   "SecretAccessKey": "secret",
-   "Token": "token"
- }
- )EOF"));
-
-  setupProviderWithContext();
-}
-
-TEST_F(InstanceProfileCredentialsProviderTest, TestClusterMissing) {
-  // Setup without thread local cluster
-  Http::RequestMessageImpl message;
-
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cluster_manager_, addOrUpdateCluster(WithName("credentials_provider_cluster"), _))
-      .WillOnce(Throw(EnvoyException("exeption message")));
-
-  // init_watcher ready is not called.
-  init_watcher_.expectReady().Times(0);
-  setupProvider();
-  // Below line is not testing anything, will just avoid asan failure with memory leak.
-  metadata_fetcher_.reset(raw_metadata_fetcher_);
-}
-
-TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(403 /*Forbidden*/, std::move(std::string()));
   expectCredentialListing(403 /*Forbidden*/, std::move(std::string()));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called once.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
   setupProviderWithContext();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingSecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv2) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move("TOKEN"));
-  expectCredentialListingSecure(401 /*Unauthorized*/, std::move(std::string()));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called once.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  // Unauthorized
+  expectCredentialListingIMDSv2(401, std::move(std::string()));
+
   setupProviderWithContext();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingIMDSv1) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move(std::string()));
   expectCredentialListing(200, std::move(std::string("")));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called once.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
   setupProviderWithContext();
-  // Cancel is called once for fetching once again as previous attempt wasn't a success.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingSecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingIMDSv2) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move("TOKEN"));
-  expectCredentialListingSecure(200, std::move(std::string("")));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called once.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  expectCredentialListingIMDSv2(200, std::move(std::string("")));
+
   setupProviderWithContext();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingIMDSv1) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move(std::string()));
   expectCredentialListing(200, std::move(std::string("\n")));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called once.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
   setupProviderWithContext();
-  // Cancel is called once for fetching once again as previous attempt wasn't a success.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingSecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingIMDSv2) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move("TOKEN"));
-  expectCredentialListingSecure(200, std::move(std::string("\n")));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called once.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  expectCredentialListingIMDSv2(200, std::move(std::string("\n")));
+
   setupProviderWithContext();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentIMDSv1) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move(std::string()));
   expectCredentialListing(200, std::move(std::string("doc1\ndoc2\ndoc3")));
-  expectDocument(401 /*Unauthorized*/, std::move(std::string()));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  // Unauthorized
+  expectDocument(401, std::move(std::string()));
+
   setupProviderWithContext();
-  // Cancel is called thrice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentSecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentIMDSv2) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move("TOKEN"));
-  expectCredentialListingSecure(200, std::move(std::string("doc1\ndoc2\ndoc3")));
-  expectDocumentSecure(401 /*Unauthorized*/, std::move(std::string()));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  expectCredentialListingIMDSv2(200, std::move(std::string("doc1\ndoc2\ndoc3")));
+  // Unauthorized
+  expectDocumentIMDSv2(401, std::move(std::string()));
+
   setupProviderWithContext();
-  // Cancel is called thrice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentIMDSv1) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move(std::string()));
   expectCredentialListing(200, std::move(std::string("doc1\ndoc2\ndoc3")));
   expectDocument(200, std::move(std::string()));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
   setupProviderWithContext();
-  // Cancel is called thrice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentSecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentIMDSv2) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move("TOKEN"));
-  expectCredentialListingSecure(200, std::move(std::string("doc1\ndoc2\ndoc3")));
-  expectDocumentSecure(200, std::move(std::string()));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  expectCredentialListingIMDSv2(200, std::move(std::string("doc1\ndoc2\ndoc3")));
+  expectDocumentIMDSv2(200, std::move(std::string()));
+
   setupProviderWithContext();
-  // Cancel is called thrice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentIMDSv1) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move(std::string()));
@@ -864,51 +814,51 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentUnsecure) {
   expectDocument(200, std::move(R"EOF(
  not json
  )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
   setupProviderWithContext();
-  // Cancel is called thrice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentSecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentIMDSv2) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move("TOKEN"));
-  expectCredentialListingSecure(200, std::move(std::string("doc1")));
-  expectDocumentSecure(200, std::move(R"EOF(
+  expectCredentialListingIMDSv2(200, std::move(std::string("doc1")));
+  expectDocumentIMDSv2(200, std::move(R"EOF(
  not json
  )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
   setupProviderWithContext();
-  // Cancel is called thrice
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesIMDSv1) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move(std::string()));
@@ -920,16 +870,17 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesUnsecure) {
    "Token": ""
  }
  )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
   setupProviderWithContext();
-  // Cancel is not called again as we don't expect any more call to fetch until timeout.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -937,28 +888,29 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesUnsecure) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesSecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesIMDSv2) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move("TOKEN"));
-  expectCredentialListingSecure(200, std::move(std::string("doc1")));
-  expectDocumentSecure(200, std::move(R"EOF(
+  expectCredentialListingIMDSv2(200, std::move(std::string("doc1")));
+  expectDocumentIMDSv2(200, std::move(R"EOF(
  {
    "AccessKeyId": "",
    "SecretAccessKey": "",
    "Token": ""
  }
  )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+
   setupProviderWithContext();
-  // Cancel is not called again as we don't expect any more call to fetch until timeout.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -966,7 +918,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesSecure) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationIMDSv1) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move(std::string()));
@@ -978,221 +930,146 @@ TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsUnsecure) {
    "Token": "token"
  }
  )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // Cancel is not called again as we don't expect any more call to fetch until timeout.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
-
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // We don't expect any more call to fetch again.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsSecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationIMDSv2) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move("TOKEN"));
-  expectCredentialListingSecure(200, std::move(std::string("doc1")));
-  expectDocumentSecure(200, std::move(R"EOF(
+  expectCredentialListingIMDSv2(200, std::move(std::string("doc1")));
+  expectDocumentIMDSv2(200, std::move(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
    "Token": "token"
  }
  )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started after fetch done from init.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // Cancel is not called again as we don't expect any more call to fetch until timeout.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
 
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // We don't expect any more call to fetch again.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("token", cached_credentials.sessionToken().value());
-}
-
-TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationUnsecure) {
-  // Setup timer.
-  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionToken(200, std::move(std::string()));
-  expectCredentialListing(200, std::move(std::string("doc1")));
-  expectDocument(200, std::move(R"EOF(
- {
-   "AccessKeyId": "akid",
-   "SecretAccessKey": "secret",
-   "Token": "token"
- }
- )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
-
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // Cancel is not called again as we don't expect any more call to fetch until timeout.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-
-  const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials.accessKeyId().value());
-  EXPECT_EQ("secret", credentials.secretAccessKey().value());
-  EXPECT_EQ("token", credentials.sessionToken().value());
-
-  expectSessionToken(200, std::move(std::string()));
-  expectCredentialListing(200, std::move(std::string("doc1")));
-  expectDocument(200, std::move(R"EOF(
+  expectSessionToken(200, std::move("TOKEN"));
+  expectCredentialListingIMDSv2(200, std::move(std::string("doc1")));
+  expectDocumentIMDSv2(200, std::move(R"EOF(
  {
    "AccessKeyId": "new_akid",
    "SecretAccessKey": "new_secret",
    "Token": "new_token1"
  }
  )EOF"));
-
-  // Expect timer to have expired but we would re-start the timer eventually after refresh.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  // Cancel will be called thrice back to back to back.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
-  time_system_.advanceTimeWait(std::chrono::minutes(61));
-  timer_->invokeCallback();
-
-  // We don't expect timer to be reset again for new fetch.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // Similarly we won't call fetch or cancel on metadata fetcher.
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-
-  const auto new_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", new_credentials.accessKeyId().value());
-  EXPECT_EQ("new_secret", new_credentials.secretAccessKey().value());
-  EXPECT_EQ("new_token1", new_credentials.sessionToken().value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationSecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1DuringStartup) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  expectSessionToken(403 /*Forbidden*/, std::move(std::string()));
+  expectCredentialListing(403 /*Forbidden*/, std::move(std::string()));
+
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                           std::chrono::seconds(2));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv2DuringStartup) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move("TOKEN"));
-  expectCredentialListingSecure(200, std::move(std::string("doc1")));
-  expectDocumentSecure(200, std::move(R"EOF(
- {
-   "AccessKeyId": "akid",
-   "SecretAccessKey": "secret",
-   "Token": "token"
- }
- )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Cancel is called twice.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
+  // Unauthorized
+  expectCredentialListingIMDSv2(401, std::move(std::string()));
 
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // Cancel is not called again as we don't expect any more call to fetch until timeout.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                           std::chrono::seconds(2));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials.accessKeyId().value());
-  EXPECT_EQ("secret", credentials.secretAccessKey().value());
-  EXPECT_EQ("token", credentials.sessionToken().value());
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
 
-  expectSessionToken(200, std::move("TOKEN"));
-  expectCredentialListingSecure(200, std::move(std::string("doc1")));
-  expectDocumentSecure(200, std::move(R"EOF(
- {
-   "AccessKeyId": "new_akid",
-   "SecretAccessKey": "new_secret",
-   "Token": "new_token1"
- }
- )EOF"));
-
-  // Expect timer to have expired but we would re-start the timer eventually after refresh.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  // Cancel will be called thrice back to back to back.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
-  time_system_.advanceTimeWait(std::chrono::minutes(61));
+  // Kick off a refresh
   timer_->invokeCallback();
 
-  // We don't expect timer to be reset again for new fetch.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // Similarly we won't call fetch or cancel on metadata fetcher.
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-
-  const auto new_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", new_credentials.accessKeyId().value());
-  EXPECT_EQ("new_secret", new_credentials.secretAccessKey().value());
-  EXPECT_EQ("new_token1", new_credentials.sessionToken().value());
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
+
+TEST_F(InstanceProfileCredentialsProviderTest,
+       FailedCredentialListingIMDSv1DuringStartupMaxRetries30s) {
+  // Setup timer.
+
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  expectSessionToken(403 /*Forbidden*/, std::move(std::string()));
+  expectCredentialListing(403 /*Forbidden*/, std::move(std::string()));
+
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                           std::chrono::seconds(16));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(16)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(32)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  // We max out at 32 seconds
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(32)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
 // End unit test for new option via Http Async client.
 
 // Begin unit test for deprecated option using Libcurl client.
@@ -1208,7 +1085,8 @@ public:
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
-        nullptr, "credentials_provider_cluster");
+        nullptr, MetadataFetcher::MetadataReceiver::RefreshState::Ready, std::chrono::seconds(2),
+        "credentials_provider_cluster");
   }
 
   void expectSessionToken(const absl::optional<std::string>& token) {
@@ -1228,7 +1106,7 @@ public:
     EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(listing));
   }
 
-  void expectCredentialListingSecure(const absl::optional<std::string>& listing) {
+  void expectCredentialListingIMDSv2(const absl::optional<std::string>& listing) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
                                            {":authority", "169.254.169.254:80"},
                                            {":scheme", "http"},
@@ -1246,7 +1124,7 @@ public:
     EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
   }
 
-  void expectDocumentSecure(const absl::optional<std::string>& document) {
+  void expectDocumentIMDSv2(const absl::optional<std::string>& document) {
     Http::TestRequestHeaderMapImpl headers{
         {":path", "/latest/meta-data/iam/security-credentials/doc1"},
         {":authority", "169.254.169.254:80"},
@@ -1262,7 +1140,7 @@ public:
   InstanceProfileCredentialsProviderPtr provider_;
 };
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListingUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListingIMDSv1) {
   setupProvider();
   expectSessionToken(absl::optional<std::string>());
   expectCredentialListing(absl::optional<std::string>());
@@ -1272,17 +1150,17 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListi
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListingSecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListingIMDSv2) {
   setupProvider();
   expectSessionToken("TOKEN");
-  expectCredentialListingSecure(absl::optional<std::string>());
+  expectCredentialListingIMDSv2(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListingUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListingIMDSv1) {
   setupProvider();
   expectSessionToken(absl::optional<std::string>());
   expectCredentialListing("");
@@ -1292,17 +1170,17 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListin
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListingSecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListingIMDSv2) {
   setupProvider();
   expectSessionToken("TOKEN");
-  expectCredentialListingSecure("\n");
+  expectCredentialListingIMDSv2("\n");
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialListingUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialListingIMDSv1) {
   setupProvider();
   expectSessionToken(absl::optional<std::string>());
   expectCredentialListing("\n");
@@ -1312,17 +1190,17 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialLi
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialListingSecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialListingIMDSv2) {
   setupProvider();
   expectSessionToken("TOKEN");
-  expectCredentialListingSecure("");
+  expectCredentialListingIMDSv2("");
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentIMDSv1) {
   setupProvider();
   expectSessionToken(absl::optional<std::string>());
   expectCredentialListing("doc1\ndoc2\ndoc3");
@@ -1333,18 +1211,18 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentUnsecu
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentSecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentIMDSv2) {
   setupProvider();
   expectSessionToken("TOKEN");
-  expectCredentialListingSecure("doc1\ndoc2\ndoc3");
-  expectDocumentSecure(absl::optional<std::string>());
+  expectCredentialListingIMDSv2("doc1\ndoc2\ndoc3");
+  expectDocumentIMDSv2(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MalformedDocumentUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MalformedDocumentIMDSv1) {
   setupProvider();
   expectSessionToken(absl::optional<std::string>());
   expectCredentialListing("doc1");
@@ -1357,11 +1235,11 @@ not json
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MalformedDocumentSecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MalformedDocumentIMDSv2) {
   setupProvider();
   expectSessionToken("TOKEN");
-  expectCredentialListingSecure("doc1");
-  expectDocumentSecure(R"EOF(
+  expectCredentialListingIMDSv2("doc1");
+  expectDocumentIMDSv2(R"EOF(
 not json
 )EOF");
   const auto credentials = provider_->getCredentials();
@@ -1370,7 +1248,7 @@ not json
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesIMDSv1) {
   setupProvider();
   expectSessionToken(absl::optional<std::string>());
   expectCredentialListing("doc1");
@@ -1387,11 +1265,11 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesUnsecure) 
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesSecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesIMDSv2) {
   setupProvider();
   expectSessionToken("TOKEN");
-  expectCredentialListingSecure("doc1");
-  expectDocumentSecure(R"EOF(
+  expectCredentialListingIMDSv2("doc1");
+  expectDocumentIMDSv2(R"EOF(
 {
   "AccessKeyId": "",
   "SecretAccessKey": "",
@@ -1404,7 +1282,7 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesSecure) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentialsUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentialsIMDSv1) {
   setupProvider();
   expectSessionToken(absl::optional<std::string>());
   expectCredentialListing("doc1");
@@ -1425,11 +1303,11 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentials
   EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentialsSecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentialsIMDSv2) {
   setupProvider();
   expectSessionToken("TOKEN");
-  expectCredentialListingSecure("doc1");
-  expectDocumentSecure(R"EOF(
+  expectCredentialListingIMDSv2("doc1");
+  expectDocumentIMDSv2(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1446,7 +1324,7 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentials
   EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationIMDSv1) {
   setupProvider();
   InSequence sequence;
   expectSessionToken(absl::optional<std::string>());
@@ -1478,12 +1356,12 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationU
   EXPECT_EQ("new_token", new_credentials.sessionToken().value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationSecure) {
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationIMDSv2) {
   setupProvider();
   InSequence sequence;
   expectSessionToken("TOKEN");
-  expectCredentialListingSecure("doc1");
-  expectDocumentSecure(R"EOF(
+  expectCredentialListingIMDSv2("doc1");
+  expectDocumentIMDSv2(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1496,8 +1374,8 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationS
   EXPECT_EQ("token", credentials.sessionToken().value());
   time_system_.advanceTimeWait(std::chrono::hours(2));
   expectSessionToken("TOKEN");
-  expectCredentialListingSecure("doc1");
-  expectDocumentSecure(R"EOF(
+  expectCredentialListingIMDSv2("doc1");
+  expectDocumentIMDSv2(R"EOF(
 {
   "AccessKeyId": "new_akid",
   "SecretAccessKey": "new_secret",
@@ -1510,7 +1388,6 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationS
   EXPECT_EQ("new_token", new_credentials.sessionToken().value());
 }
 // End unit test for deprecated option using Libcurl client.
-
 // Begin unit test for new option via Http Async client.
 class ContainerCredentialsProviderTest : public testing::Test {
 public:
@@ -1520,7 +1397,9 @@ public:
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
   }
 
-  void setupProvider() {
+  void setupProvider(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                         MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                     std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
@@ -1533,16 +1412,20 @@ public:
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        "169.254.170.2:80/path/to/doc", "auth_token", "credentials_provider_cluster");
+        "169.254.170.2:80/path/to/doc", refresh_state, initialization_timer, "auth_token",
+        "credentials_provider_cluster");
   }
 
-  void setupProviderWithContext() {
+  void
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                               MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                           std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
-      init_target_handle_ = target.createHandle("test");
+      init_target_ = target.createHandle("test");
     }));
-    setupProvider();
-    expected_duration_ = provider_->getCacheDuration();
-    init_target_handle_->initialize(init_watcher_);
+
+    setupProvider(refresh_state, initialization_timer);
+    init_target_->initialize(init_watcher_);
   }
 
   void expectDocument(const uint64_t status_code, const std::string&& document) {
@@ -1584,83 +1467,29 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   ContainerCredentialsProviderPtr provider_;
   Init::TargetHandlePtr init_target_handle_;
-  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
+  MetadataFetcher::MetadataReceiver::RefreshState refresh_state_;
+  Init::TargetHandlePtr init_target_;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
 };
 
-TEST_F(ContainerCredentialsProviderTest, TestAddMissingCluster) {
-  // Setup without thread local cluster yet
-  envoy::config::cluster::v3::Cluster expected_cluster;
-  constexpr static const char* kStaticCluster = R"EOF(
-name: credentials_provider_cluster
-type: static
-connectTimeout: 2s
-lb_policy: ROUND_ROBIN
-loadAssignment:
-  clusterName: credentials_provider_cluster
-  endpoints:
-  - lbEndpoints:
-    - endpoint:
-        address:
-          socketAddress:
-            address: "169.254.170.2"
-            portValue: 80
-typed_extension_protocol_options:
-  envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-    "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-    explicit_http_config:
-      http_protocol_options:
-        accept_http_10: true
- )EOF";
-  MessageUtil::loadFromYaml(kStaticCluster, expected_cluster,
-                            ProtobufMessage::getNullValidationVisitor());
-
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cluster_manager_, addOrUpdateCluster(WithAttribute(expected_cluster), _))
-      .WillOnce(Return(true));
-
-  expectDocument(200, std::move(R"EOF(
-{
-  "AccessKeyId": "akid",
-  "SecretAccessKey": "secret",
-  "Token": "token",
-  "Expiration": "2018-01-02T03:05:00Z"
-}
-)EOF"));
-
-  setupProviderWithContext();
-}
-
-TEST_F(ContainerCredentialsProviderTest, TestClusterMissing) {
-  // Setup without thread local cluster
-  Http::RequestMessageImpl message;
-
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cluster_manager_, addOrUpdateCluster(WithName("credentials_provider_cluster"), _))
-      .WillOnce(Throw(EnvoyException("exeption message")));
-  // init_watcher ready is not called.
-  init_watcher_.expectReady().Times(0);
-  setupProvider();
-  // Below line is not testing anything, will just avoid asan failure with memory leak.
-  metadata_fetcher_.reset(raw_metadata_fetcher_);
-}
-
 TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
+
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectDocument(403 /*Forbidden*/, std::move(std::string()));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
+  // Forbidden
+  expectDocument(403, std::move(std::string()));
 
-  // Cancel is called for fetching once again as previous attempt wasn't a success.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -1672,17 +1501,16 @@ TEST_F(ContainerCredentialsProviderTest, EmptyDocument) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectDocument(200, std::move(std::string()));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // Cancel is called for fetching once again as previous attempt wasn't a success.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -1697,17 +1525,16 @@ TEST_F(ContainerCredentialsProviderTest, MalformedDocument) {
   expectDocument(200, std::move(R"EOF(
 not json
 )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // Cancel is called for fetching once again as previous attempt wasn't a success.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -1727,69 +1554,21 @@ TEST_F(ContainerCredentialsProviderTest, EmptyValues) {
   "Expiration": ""
 }
 )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // Cancel is called for fetching once again as previous attempt wasn't a success with updating
-  // expiration time.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(ContainerCredentialsProviderTest, FullCachedCredentials) {
-  // Setup timer.
-  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectDocument(200, std::move(R"EOF(
-{
-  "AccessKeyId": "akid",
-  "SecretAccessKey": "secret",
-  "Token": "token",
-  "Expiration": "2018-01-02T03:05:00Z"
-}
-)EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
-
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // We don't expect any more call to cancel or fetch again.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-
-  const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials.accessKeyId().value());
-  EXPECT_EQ("secret", credentials.secretAccessKey().value());
-  EXPECT_EQ("token", credentials.sessionToken().value());
-
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // We don't expect any more call to cancel or fetch again.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
 TEST_F(ContainerCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
@@ -1801,106 +1580,76 @@ TEST_F(ContainerCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
   "Token": "token",
-  "Expiration": "2019-01-02T03:04:05Z"
+  "Expiration": "2018-01-02T05:04:05Z"
 }
 )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // We don't expect any more call to cancel or fetch again.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  // System time is set to Tue Jan  2 03:04:05 UTC 2018, so this credential expiry is in 2hrs
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(2)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
-
-  expectDocument(200, std::move(R"EOF(
-{
-  "AccessKeyId": "new_akid",
-  "SecretAccessKey": "new_secret",
-  "Token": "new_token",
-  "Expiration": "2019-01-02T03:04:05Z"
-}
-)EOF"));
-  // Expect timer to have expired but we would re-start the timer eventually after refresh.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  // Cancel will be called once more.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
-  time_system_.advanceTimeWait(std::chrono::minutes(61));
-  timer_->invokeCallback();
-
-  // We don't expect timer to be reset again for new fetch.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // Similarly we won't call fetch or cancel on metadata fetcher.
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(ContainerCredentialsProviderTest, TimestampCredentialExpiration) {
+TEST_F(ContainerCredentialsProviderTest, RefreshOnNormalCredentialExpirationNoExpirationProvided) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+
   expectDocument(200, std::move(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
-  "Token": "token",
-  "Expiration": "2018-01-02T03:04:05Z"
+  "Token": "token"
 }
 )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // Need to disable and restart timer since credentials are expired and fetched again
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
-  // We call cancel once.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  // No expiration so we will use the default cache duration timer
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
+}
 
-  // Cancel is called once.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  expectDocument(200, std::move(R"EOF(
-{
-  "AccessKeyId": "new_akid",
-  "SecretAccessKey": "new_secret",
-  "Token": "new_token",
-  "Expiration": "2019-01-02T03:04:05Z"
+TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocumentDuringStartup) {
+
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  // Forbidden
+  expectDocument(403, std::move(std::string()));
+
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                           std::chrono::seconds(2));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
-)EOF"));
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
-}
+
 // End unit test for new option via Http Async client.
 
 // Begin unit test for deprecated option using Libcurl client.
@@ -1912,13 +1661,16 @@ public:
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
   }
 
-  void setupProvider() {
+  void setupProvider(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                         MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                     std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     provider_ = std::make_shared<ContainerCredentialsProvider>(
         *api_, absl::nullopt,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
-        nullptr, "169.254.170.2:80/path/to/doc", "auth_token", "credentials_provider_cluster");
+        nullptr, "169.254.170.2:80/path/to/doc", refresh_state, initialization_timer, "auth_token",
+        "credentials_provider_cluster");
   }
 
   void expectDocument(const absl::optional<std::string>& document) {
@@ -2071,7 +1823,9 @@ public:
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
   }
 
-  void setupProvider() {
+  void setupProvider(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                         MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                     std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
@@ -2084,16 +1838,20 @@ public:
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        "169.254.170.23:80/v1/credentials", "", "credentials_provider_cluster");
+        "169.254.170.23:80/v1/credentials", refresh_state, initialization_timer, "",
+        "credentials_provider_cluster");
   }
 
-  void setupProviderWithContext() {
+  void
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                               MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                           std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
-      init_target_handle_ = target.createHandle("test");
+      init_target_ = target.createHandle("test");
     }));
-    setupProvider();
-    expected_duration_ = provider_->getCacheDuration();
-    init_target_handle_->initialize(init_watcher_);
+
+    setupProvider(refresh_state, initialization_timer);
+    init_target_->initialize(init_watcher_);
   }
 
   void expectDocument(const uint64_t status_code, const std::string&& document,
@@ -2136,9 +1894,10 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   ContainerCredentialsProviderPtr provider_;
   Init::TargetHandlePtr init_target_handle_;
-  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
+  Init::TargetHandlePtr init_target_;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
 };
 
 TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {
@@ -2162,22 +1921,17 @@ TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
   "Token": "token",
-  "Expiration": "2018-01-02T03:04:05Z"
+  "Expiration": "2018-01-02T04:04:05Z"
 }
 )EOF"),
                  TOKEN_FILE_CONTENTS);
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // Cancel is called for fetching once again as previous attempt wasn't a success with updating
-  // expiration time.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(1)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_EQ(credentials.accessKeyId().value(), "akid");
@@ -2193,7 +1947,9 @@ public:
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
   }
 
-  void setupProvider() {
+  void setupProvider(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                         MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                     std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
@@ -2208,19 +1964,25 @@ public:
         },
         TestEnvironment::writeStringToFileForTest("web_token_file", "web_token"),
         "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn", "role-session-name",
-        "credentials_provider_cluster");
+        refresh_state, initialization_timer, "credentials_provider_cluster");
   }
 
-  void setupProviderWithContext() {
+  void
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                               MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                           std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
-      init_target_handle_ = target.createHandle("test");
+      init_target_ = target.createHandle("test");
     }));
-    setupProvider();
-    expected_duration_ = provider_->getCacheDuration();
-    init_target_handle_->initialize(init_watcher_);
+
+    setupProvider(refresh_state, initialization_timer);
+    init_target_->initialize(init_watcher_);
   }
 
-  void setupProviderWithLibcurl() {
+  void
+  setupProviderWithLibcurl(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+                               MetadataFetcher::MetadataReceiver::RefreshState::Ready,
+                           std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<WebIdentityCredentialsProvider>(
         *api_, context_,
@@ -2233,7 +1995,7 @@ public:
         },
         TestEnvironment::writeStringToFileForTest("web_token_file", "web_token"),
         "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn", "role-session-name",
-        "credentials_provider_cluster");
+        refresh_state, initialization_timer, "credentials_provider_cluster");
   }
 
   void expectDocument(const uint64_t status_code, const std::string&& document) {
@@ -2279,93 +2041,30 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   WebIdentityCredentialsProviderPtr provider_;
   Init::TargetHandlePtr init_target_handle_;
-  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
+  Upstream::ClusterUpdateCallbacks* cb_{};
+  testing::NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<Upstream::MockThreadLocalCluster> test_cluster{};
+  Init::TargetHandlePtr init_target_;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
 };
-
-TEST_F(WebIdentityCredentialsProviderTest, TestAddMissingCluster) {
-  // Setup without thread local cluster yet
-  envoy::config::cluster::v3::Cluster expected_cluster;
-  constexpr static const char* kStaticCluster = R"EOF(
-name: credentials_provider_cluster
-type: logical_dns
-connectTimeout: 2s
-lb_policy: ROUND_ROBIN
-loadAssignment:
-  clusterName: credentials_provider_cluster
-  endpoints:
-  - lbEndpoints:
-    - endpoint:
-        address:
-          socketAddress:
-            address: "sts.region.amazonaws.com"
-            portValue: 443
-typed_extension_protocol_options:
-  envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-    "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-    explicit_http_config:
-      http_protocol_options:
-        accept_http_10: true
-transport_socket:
-  name: envoy.transport_sockets.tls
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
- )EOF";
-  MessageUtil::loadFromYaml(kStaticCluster, expected_cluster,
-                            ProtobufMessage::getNullValidationVisitor());
-
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cluster_manager_, addOrUpdateCluster(WithAttribute(expected_cluster), _))
-      .WillOnce(Return(true));
-
-  // Time 2018-01-02T03:05:00Z in unix_timestamp is 1514862300
-  expectDocument(200, std::move(R"EOF(
-{
-  "AssumeRoleWithWebIdentityResponse": {
-    "AssumeRoleWithWebIdentityResult": {
-      "Credentials": {
-        "AccessKeyId": "akid",
-        "SecretAccessKey": "secret",
-        "SessionToken": "token",
-        "Expiration": 1514862300
-      }
-    }
-  }
-}
-)EOF"));
-  setupProviderWithContext();
-}
-
-TEST_F(WebIdentityCredentialsProviderTest, TestClusterMissing) {
-  // Setup without thread local cluster
-  Http::RequestMessageImpl message;
-
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cluster_manager_, addOrUpdateCluster(WithName("credentials_provider_cluster"), _))
-      .WillOnce(Throw(EnvoyException("exeption message")));
-  // init_watcher ready is not called.
-  init_watcher_.expectReady().Times(0);
-  setupProvider();
-  // Below line is not testing anything, will just avoid asan failure with memory leak.
-  metadata_fetcher_.reset(raw_metadata_fetcher_);
-}
 
 TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocument) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectDocument(403 /*Forbidden*/, std::move(std::string()));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
+  // Forbidden
+  expectDocument(403, std::move(std::string()));
 
-  // Cancel is called for fetching once again as previous attempt wasn't a success.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -2377,17 +2076,16 @@ TEST_F(WebIdentityCredentialsProviderTest, EmptyDocument) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectDocument(200, std::move(std::string()));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // Cancel is called for fetching once again as previous attempt wasn't a success.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -2402,17 +2100,16 @@ TEST_F(WebIdentityCredentialsProviderTest, MalformedDocument) {
   expectDocument(200, std::move(R"EOF(
 not json
 )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // Cancel is called for fetching once again as previous attempt wasn't a success.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -2430,18 +2127,16 @@ TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponse) {
   }
 }
 )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // Cancel is called for fetching once again as previous attempt wasn't a success with updating
-  // expiration time.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -2459,18 +2154,16 @@ TEST_F(WebIdentityCredentialsProviderTest, NoCredentials) {
   }
 }
 )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // Cancel is called for fetching once again as previous attempt wasn't a success with updating
-  // expiration time.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -2490,76 +2183,21 @@ TEST_F(WebIdentityCredentialsProviderTest, EmptyCredentials) {
   }
 }
 )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // Cancel is called for fetching once again as previous attempt wasn't a success with updating
-  // expiration time.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentials) {
-  // Setup timer.
-  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  // Time 2018-01-02T03:05:00Z in unix_timestamp is 1514862300
-  expectDocument(200, std::move(R"EOF(
-{
-  "AssumeRoleWithWebIdentityResponse": {
-    "AssumeRoleWithWebIdentityResult": {
-      "Credentials": {
-        "AccessKeyId": "akid",
-        "SecretAccessKey": "secret",
-        "SessionToken": "token",
-        "Expiration": 1514862300
-      }
-    }
-  }
-}
-)EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
-
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // We don't expect any more call to cancel or fetch again.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-
-  const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials.accessKeyId().value());
-  EXPECT_EQ("secret", credentials.secretAccessKey().value());
-  EXPECT_EQ("token", credentials.sessionToken().value());
-
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // We don't expect any more call to cancel or fetch again.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, CredentialsWithWrongFormat) {
@@ -2578,18 +2216,16 @@ TEST_F(WebIdentityCredentialsProviderTest, CredentialsWithWrongFormat) {
   }
 }
 )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // Cancel is called for fetching once again as previous attempt wasn't a success with updating
-  // expiration time.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -2597,7 +2233,7 @@ TEST_F(WebIdentityCredentialsProviderTest, CredentialsWithWrongFormat) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentialsBadExpirationFormat) {
+TEST_F(WebIdentityCredentialsProviderTest, BadExpirationFormat) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   // Time 2018-01-02T03:04:05Z in unix_timestamp is 1514862245
@@ -2618,63 +2254,25 @@ TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentialsBadExpirationFor
   }
 }
 )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
   // No need to restart timer since credentials are fetched from cache.
   // Even though as per `Expiration` field (in wrong format) the credentials are expired
   // the credentials won't be refreshed until the next refresh period (1hr) or new expiration
   // value implicitly set to a value same as refresh interval.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // We don't expect any more call to cancel or fetch again.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  // bad expiration format will cause a refresh of 1 hour - 5s (3595 seconds) by default
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3595)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
-
-  // Time 2019-01-02T03:04:05Z in unix_timestamp is 1546398245
-  expectDocument(200, std::move(R"EOF(
-{
-  "AssumeRoleWithWebIdentityResponse": {
-    "AssumeRoleWithWebIdentityResult": {
-      "Credentials": {
-        "AccessKeyId": "new_akid",
-        "SecretAccessKey": "new_secret",
-        "SessionToken": "new_token",
-        "Expiration": "2019-01-02T03:04:05Z"
-      }
-    }
-  }
-}
-)EOF"));
-  // Expect timer to have expired but we would re-start the timer eventually after refresh.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  // Cancel will be called once more.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
-  time_system_.advanceTimeWait(std::chrono::minutes(61));
-  timer_->invokeCallback();
-
-  // We don't expect timer to be reset again for new fetch.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // Similarly we won't call fetch or cancel on metadata fetcher.
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentialsWithMissingExpiration) {
@@ -2696,67 +2294,26 @@ TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentialsWithMissingExpir
   }
 }
 )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
 
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  // The credentials won't be refreshed until the next refresh period (1hr) or new expiration
-  // value implicitly set to a value same as refresh interval.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // We don't expect any more call to cancel or fetch again.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+  setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  // No expiration should fall back to a one hour - 5s (3595s) refresh
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3595)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
-
-  // Time 2019-01-02T03:04:05Z in unix_timestamp is 1546398245
-  expectDocument(200, std::move(R"EOF(
-{
-  "AssumeRoleWithWebIdentityResponse": {
-    "AssumeRoleWithWebIdentityResult": {
-      "Credentials": {
-        "AccessKeyId": "new_akid",
-        "SecretAccessKey": "new_secret",
-        "SessionToken": "new_token"
-      }
-    }
-  }
-}
-)EOF"));
-  // Expect timer to have expired but we would re-start the timer eventually after refresh.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  // Cancel will be called once more.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
-  time_system_.advanceTimeWait(std::chrono::minutes(61));
-  timer_->invokeCallback();
-
-  // We don't expect timer to be reset again for new fetch.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // Similarly we won't call fetch or cancel on metadata fetcher.
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  // Time 2018-01-02T04:04:05Z in unix_timestamp is 1514865845
+  // Time 2018-01-02T05:04:05Z in unix_timestamp is 1514869445
   expectDocument(200, std::move(R"EOF(
 {
   "AssumeRoleWithWebIdentityResponse": {
@@ -2765,128 +2322,73 @@ TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) 
         "AccessKeyId": "akid",
         "SecretAccessKey": "secret",
         "SessionToken": "token",
-        "Expiration": 1514865845
+        "Expiration": 1514869445
       }
     }
   }
 }
 )EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
   setupProviderWithContext();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // No need to restart timer since credentials are fetched from cache.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // We don't expect any more call to cancel or fetch again.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(2)), nullptr));
 
-  const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials.accessKeyId().value());
-  EXPECT_EQ("secret", credentials.secretAccessKey().value());
-  EXPECT_EQ("token", credentials.sessionToken().value());
-  // Time 2019-01-02T03:05:00Z in unix_timestamp is 1546398300
-  expectDocument(200, std::move(R"EOF(
-{
-  "AssumeRoleWithWebIdentityResponse": {
-    "AssumeRoleWithWebIdentityResult": {
-      "Credentials": {
-        "AccessKeyId": "new_akid",
-        "SecretAccessKey": "new_secret",
-        "SessionToken": "new_token",
-        "Expiration": 1546398300
-      }
-    }
-  }
-}
-)EOF"));
-  // Expect timer to have expired but we would re-start the timer eventually after refresh.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  // Cancel will be called once more.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
-  time_system_.advanceTimeWait(std::chrono::minutes(61));
+  // Kick off a refresh
   timer_->invokeCallback();
 
-  // We don't expect timer to be reset again for new fetch.
-  EXPECT_CALL(*timer_, disableTimer()).Times(0);
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
-  // Similarly we won't call fetch or cancel on metadata fetcher.
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
-}
-
-TEST_F(WebIdentityCredentialsProviderTest, TimestampCredentialExpiration) {
-  // Setup timer.
-  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  // Time 2018-01-02T03:04:05Z in unix_timestamp is 1514862245
-  expectDocument(200, std::move(R"EOF(
-{
-  "AssumeRoleWithWebIdentityResponse": {
-    "AssumeRoleWithWebIdentityResult": {
-      "Credentials": {
-        "AccessKeyId": "akid",
-        "SecretAccessKey": "secret",
-        "SessionToken": "token",
-        "Expiration": 1514862245
-      }
-    }
-  }
-}
-)EOF"));
-  // init_watcher ready is called.
-  init_watcher_.expectReady();
-  // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
-  setupProviderWithContext();
-
-  // init_watcher ready is not called again.
-  init_watcher_.expectReady().Times(0);
-  // Need to disable and restart timer since credentials are expired and fetched again
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
-  // We call cancel once.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-
   const auto credentials = provider_->getCredentials();
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
+}
 
-  // Cancel is called once.
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  // Time 2019-01-02T03:04:05Z in unix_timestamp is 1546398245
+TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocumentDuringStartup) {
+
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  // Forbidden
+  expectDocument(403, std::move(std::string()));
+
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                           std::chrono::seconds(2));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponseDuringStartup) {
+
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectDocument(200, std::move(R"EOF(
 {
   "AssumeRoleWithWebIdentityResponse": {
-    "AssumeRoleWithWebIdentityResult": {
-      "Credentials": {
-        "AccessKeyId": "new_akid",
-        "SecretAccessKey": "new_secret",
-        "SessionToken": "new_token",
-        "Expiration": 1546398245
-      }
-    }
+    "UnexpectedResponse": ""
   }
 }
 )EOF"));
-  // Expect refresh timer to be stopped and started.
-  EXPECT_CALL(*timer_, disableTimer());
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
+
+  setupProviderWithContext(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                           std::chrono::seconds(2));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, LibcurlEnabled) {
@@ -2933,17 +2435,21 @@ public:
                 (Api::Api&, ServerFactoryContextOptRef,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, absl::string_view, absl::string_view, absl::string_view,
-                 absl::string_view, absl::string_view),
+                 absl::string_view, absl::string_view,
+                 MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds),
                 (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
                 (Api::Api&, ServerFactoryContextOptRef,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
-                 CreateMetadataFetcherCb, absl::string_view, absl::string_view, absl::string_view),
+                 CreateMetadataFetcherCb, absl::string_view, absl::string_view,
+                 MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
+                 absl::string_view),
                 (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
                 (Api::Api&, ServerFactoryContextOptRef,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
-                 CreateMetadataFetcherCb, absl::string_view),
+                 CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
+                 std::chrono::seconds, absl::string_view),
                 (const));
   };
 
@@ -2952,16 +2458,13 @@ public:
   Api::ApiPtr api_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+
   NiceMock<MockCredentialsProviderChainFactories> factories_;
 };
 
 TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  ENVOY_LOG_MISC(debug, "env var AWS_CONTAINER_CREDENTIALS_FULL_URI = {}",
-                 getenv("AWS_CONTAINER_CREDENTIALS_FULL_URI"));
-  ENVOY_LOG_MISC(debug, "env var AWS_CONTAINER_CREDENTIALS_RELATIVE_URI = {}",
-                 getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
 
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
@@ -2970,7 +2473,7 @@ TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
 TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _))
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _))
       .Times(0);
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
@@ -2979,7 +2482,7 @@ TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
 TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "false", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
 }
@@ -2987,8 +2490,8 @@ TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
 TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createContainerCredentialsProvider(Ref(*api_), _, _, _, _,
-                                                             "169.254.170.2:80/path/to/creds", ""));
+  EXPECT_CALL(factories_, createContainerCredentialsProvider(
+                              Ref(*api_), _, _, _, _, "169.254.170.2:80/path/to/creds", _, _, ""));
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
 }
@@ -2996,8 +2499,8 @@ TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
 TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createContainerCredentialsProvider(Ref(*api_), _, _, _, _,
-                                                             "http://host/path/to/creds", ""));
+  EXPECT_CALL(factories_, createContainerCredentialsProvider(
+                              Ref(*api_), _, _, _, _, "http://host/path/to/creds", _, _, ""));
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
 }
@@ -3006,8 +2509,9 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createContainerCredentialsProvider(
-                              Ref(*api_), _, _, _, _, "http://host/path/to/creds", "auth_token"));
+  EXPECT_CALL(factories_,
+              createContainerCredentialsProvider(Ref(*api_), _, _, _, _,
+                                                 "http://host/path/to/creds", _, _, "auth_token"));
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
 }
@@ -3015,7 +2519,7 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityRoleArn) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
 }
@@ -3028,8 +2532,8 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
   EXPECT_CALL(factories_,
               createWebIdentityCredentialsProvider(
                   Ref(*api_), _, _, _, _, "/path/to/web_token", "sts.region.amazonaws.com:443",
-                  "aws:iam::123456789012:role/arn", "1234567890000000"));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _));
+                  "aws:iam::123456789012:role/arn", "1234567890000000", _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
 
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
@@ -3040,11 +2544,11 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
   EXPECT_CALL(factories_,
               createWebIdentityCredentialsProvider(
                   Ref(*api_), _, _, _, _, "/path/to/web_token", "sts.region.amazonaws.com:443",
-                  "aws:iam::123456789012:role/arn", "role-session-name"));
+                  "aws:iam::123456789012:role/arn", "role-session-name", _, _));
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
 }

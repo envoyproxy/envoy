@@ -42,6 +42,7 @@ envoy_cc_library(
         "//conditions:default": [],
     }) + [
         "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@envoy//source/common/common:assert_lib",
     ],
 )

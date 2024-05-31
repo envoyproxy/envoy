@@ -190,6 +190,7 @@ resources:
       RELEASE_ASSERT(result, result.message());
     }
   }
+
   virtual void setOauthConfig() {
     // This config is same as when the 'auth_type: "URL_ENCODED_BODY"' is set as it's the default
     // value
@@ -480,8 +481,33 @@ TEST_P(OauthIntegrationTest, RefreshTokenFlow) {
   doRefreshTokenFlow("token_secret_1", "hmac_secret_1");
 }
 
-// Regression test(issue #22678) where (incorrectly)using server's init manager(initialized state)
-// to add init target by the secret manager led to the assertion failure.
+// Verify the behavior when the callback param is missing the state query param.
+TEST_P(OauthIntegrationTest, MissingStateParam) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/callback"}, {":scheme", "http"}, {":authority", "authority"}};
+  auto encoder_decoder = codec_client_->startRequest(headers);
+
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // We should get a 401 back since the request looked like a redirect request but did not
+  // contain the state param.
+  response->waitForHeaders();
+  EXPECT_EQ("401", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Regression test for issue #22678 where (incorrectly) using the server's init manager (which was
+// already in an initialized state) in the secret manager to add an init target led to an assertion
+// failure ("trying to add target to already initialized manager").
 TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
   on_server_init_function_ = [&]() {
     createLdsStream();
@@ -514,8 +540,8 @@ TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
                 - name: envoy.filters.http.router
         )EOF");
 
-    // dummy listener is being sent so that lds api gets marked as ready, which would
-    // led to server's init manager reach initialized state
+    // dummy listener is being sent so that lds api gets marked as ready, which
+    // leads to the server's init manager reaching initialized state
     sendLdsResponse({listener}, "initial");
   };
 
@@ -535,6 +561,7 @@ TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
     lds_connection_.reset();
   }
 }
+
 class OauthIntegrationTestWithBasicAuth : public OauthIntegrationTest {
   void setOauthConfig() override {
     config_helper_.prependFilter(TestEnvironment::substitute(R"EOF(
@@ -604,30 +631,6 @@ TEST_P(OauthIntegrationTestWithBasicAuth, AuthenticationFlow) {
   };
   initialize();
   doAuthenticationFlow("token_secret", "hmac_secret");
-}
-
-// Verify the behavior when the callback param is missing the state query param.
-TEST_P(OauthIntegrationTest, MissingStateParam) {
-  on_server_init_function_ = [&]() {
-    createLdsStream();
-    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
-  };
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"}, {":path", "/callback"}, {":scheme", "http"}, {":authority", "authority"}};
-  auto encoder_decoder = codec_client_->startRequest(headers);
-
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  // We should get an 401 back since the request looked like a redirect request but did not
-  // contain the state param.
-  response->waitForHeaders();
-  EXPECT_EQ("401", response->headers().getStatusValue());
-
-  cleanup();
 }
 
 } // namespace
