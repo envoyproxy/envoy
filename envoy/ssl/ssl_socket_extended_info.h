@@ -99,8 +99,9 @@ public:
   virtual CertSelectionCallbackPtr createCertSelectionCallback() PURE;
 
   /**
-   * Called after the cert selection completes.
-   * @param succeeded true if the cert selection succeeded.
+   * Called after the cert selection completes either synchronously or asynchronously.
+   * @param selected_ctx selected Ssl::TlsContext, it's empty when selection failed.
+   * @param async true if the validation is completed asynchronously.
    */
   virtual void onCertSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool staple,
                                         bool async) PURE;

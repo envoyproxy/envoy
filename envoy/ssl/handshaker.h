@@ -192,8 +192,9 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * Called when the cert selection completes.
-   * It's safe to call it even the SSL connection may be terminated early.
+   * Called when the asynchronous cert selection completes.
+   * @param selected_ctx selected Ssl::TlsContext, it's empty when selection failed.
+   * @param staple true when need to set OCSP response.
    */
   virtual void onCertSelectionResult(OptRef<const Ssl::TlsContext> selected_ctx, bool staple) PURE;
 };
@@ -218,7 +219,7 @@ public:
   virtual ~ContextSelectionCallback() = default;
 
   /**
-   * @return reference to the existing Tls Contexts.
+   * @return reference to the initialized Tls Contexts.
    */
   virtual const std::vector<TlsContext>& getTlsContexts() const PURE;
 };
