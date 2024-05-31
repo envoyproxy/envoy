@@ -17,6 +17,7 @@
 #include "source/common/version/version.h"
 #include "source/server/admin/admin_factory_context.h"
 #include "source/server/listener_manager_factory.h"
+#include "source/server/null_overload_manager.h"
 #include "source/server/overload_manager_impl.h"
 #include "source/server/regex_engine.h"
 #include "source/server/utils.h"
@@ -115,6 +116,7 @@ void ValidationInstance::initialize(const Options& options,
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
+  null_overload_manager_ = std::make_unique<NullOverloadManager>(threadLocal(), false);
   absl::Status creation_status = absl::OkStatus();
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
   THROW_IF_NOT_OK_REF(creation_status);
