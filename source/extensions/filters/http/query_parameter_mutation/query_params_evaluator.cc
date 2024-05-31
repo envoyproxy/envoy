@@ -14,10 +14,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace QueryParameterMutation {
 
+using Http::Utility::QueryParamsMulti;
+
 QueryParamsEvaluator::QueryParamsEvaluator(
-    const Protobuf::RepeatedPtrField<
-        envoy::extensions::filters::http::query_parameter_mutation::v3::QueryParameterValueOption>&
-        query_params_to_add,
+    const Protobuf::RepeatedPtrField<QueryParameterValueOptionProto>& query_params_to_add,
     const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove) {
 
   formatter_ = std::make_unique<Formatter::FormatterImpl>("", true);
@@ -39,8 +39,7 @@ void QueryParamsEvaluator::evaluateQueryParams(Http::RequestHeaderMap& headers,
   }
 
   absl::string_view path = headers.getPathValue();
-  Http::Utility::QueryParamsMulti query_params =
-      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+  QueryParamsMulti query_params = QueryParamsMulti::parseAndDecodeQueryString(path);
 
   // Remove desired query parameters.
   for (const auto& val : query_params_to_remove_) {
@@ -51,23 +50,19 @@ void QueryParamsEvaluator::evaluateQueryParams(Http::RequestHeaderMap& headers,
   Formatter::HttpFormatterContext ctx{&headers};
   for (const auto& [key, val, append_action] : query_params_to_add_) {
     const auto formatter = std::make_unique<Formatter::FormatterImpl>(val, true);
-    switch (append_action) {
-    case envoy::extensions::filters::http::query_parameter_mutation::v3::
-        QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD:
+    switch (AppendAction(append_action)) {
+    case AppendAction::AppendIfExistsOrAdd:
       query_params.add(key, formatter->formatWithContext(ctx, stream_info));
       break;
-    case envoy::extensions::filters::http::query_parameter_mutation::v3::
-        QueryParameterValueOption_QueryParameterAppendAction_ADD_IF_ABSENT:
+    case AppendAction::AddIfAbsent:
       if (!query_params.getFirstValue(key).has_value()) {
         query_params.add(key, formatter->formatWithContext(ctx, stream_info));
       }
       break;
-    case envoy::extensions::filters::http::query_parameter_mutation::v3::
-        QueryParameterValueOption_QueryParameterAppendAction_OVERWRITE_IF_EXISTS_OR_ADD:
+    case AppendAction::OverwriteIfExistsOrAdd:
       query_params.overwrite(key, val);
       break;
-    case envoy::extensions::filters::http::query_parameter_mutation::v3::
-        QueryParameterValueOption_QueryParameterAppendAction_OVERWRITE_IF_EXISTS:
+    case AppendAction::OverwriteIfExists:
       if (query_params.getFirstValue(key).has_value()) {
         query_params.overwrite(key, val);
       }

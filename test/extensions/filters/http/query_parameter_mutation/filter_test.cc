@@ -22,20 +22,17 @@ public:
     return {{Http::Headers::get().Path.get(), path}};
   }
 
-  void addQueryParamPair(
-      envoy::extensions::filters::http::query_parameter_mutation::v3::Config& proto_config,
-      absl::string_view key, absl::string_view value,
-      envoy::extensions::filters::http::query_parameter_mutation::v3::
-          QueryParameterValueOption_QueryParameterAppendAction append_action) {
+  void addQueryParamPair(FilterConfigProto& proto_config, absl::string_view key,
+                         absl::string_view value, AppendAction append_action) {
     auto* option = proto_config.mutable_query_parameters_to_add()->Add();
-    option->set_append_action(append_action);
+    option->set_append_action(static_cast<QueryParameterAppendActionProto>(append_action));
     auto* qp = envoy::config::core::v3::QueryParameter::default_instance().New();
     qp->set_key(key);
     qp->set_value(value);
     option->set_allocated_query_parameter(qp);
   }
 
-  envoy::extensions::filters::http::query_parameter_mutation::v3::Config proto_config_;
+  FilterConfigProto proto_config_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 };
 
@@ -73,10 +70,7 @@ TEST_F(FilterTest, RemoveQueryParameter) {
 }
 
 TEST_F(FilterTest, InverseHeaderMutationOrder) {
-  addQueryParamPair(
-      proto_config_, "foo", "global",
-      envoy::extensions::filters::http::query_parameter_mutation::v3::
-          QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD);
+  addQueryParamPair(proto_config_, "foo", "global", AppendAction::AppendIfExistsOrAdd);
   auto config = std::make_shared<Config>(proto_config_);
   auto filter = std::make_unique<Filter>(config);
   filter->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -84,11 +78,8 @@ TEST_F(FilterTest, InverseHeaderMutationOrder) {
   const auto path = "/path";
   auto request_headers = requestHeaders(path);
 
-  envoy::extensions::filters::http::query_parameter_mutation::v3::Config per_route_proto_config;
-  addQueryParamPair(
-      per_route_proto_config, "foo", "route",
-      envoy::extensions::filters::http::query_parameter_mutation::v3::
-          QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD);
+  FilterConfigProto per_route_proto_config;
+  addQueryParamPair(per_route_proto_config, "foo", "route", AppendAction::AppendIfExistsOrAdd);
   auto per_route_config = std::make_shared<Config>(per_route_proto_config);
 
   EXPECT_CALL(*decoder_callbacks_.route_, traversePerFilterConfig(_, _))
