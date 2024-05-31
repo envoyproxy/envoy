@@ -428,6 +428,7 @@ TEST_F(EdsTest, DualStackEndpoint) {
   EXPECT_CALL(dispatcher, createClientConnection_(hosts[0]->address(), _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       hosts[0]->createConnection(dispatcher, options, transport_socket_options);
