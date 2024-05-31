@@ -686,15 +686,12 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        Network::DnsResolverFactory& dns_resolver_factory =
-            createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-        auto resolver =
-            dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
-                .value();
-      },
-      EnvoyException, "DNS resolver 'foo' is not an IP address");
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  EXPECT_EQ(dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+                .status()
+                .message(),
+            "DNS resolver 'foo' is not an IP address");
 }
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
