@@ -51,7 +51,7 @@ public:
   const std::vector<absl::string_view>& supportedAlpnProtocols() const { return supported_alpns_; }
 
 protected:
-  virtual void onSecretUpdated() PURE;
+  virtual absl::Status onSecretUpdated() PURE;
   QuicTransportSocketFactoryStats stats_;
   // Populated during initialization.
   std::vector<absl::string_view> supported_alpns_;

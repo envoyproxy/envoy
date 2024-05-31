@@ -625,8 +625,10 @@ TEST_F(HdsTest, TestSocketContext) {
             std::make_unique<Network::MockTransportSocketFactory>();
 
         // set socket_matcher object in test scope.
-        socket_matcher = std::make_unique<Envoy::Upstream::TransportSocketMatcherImpl>(
-            params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope);
+        socket_matcher =
+            Envoy::Upstream::TransportSocketMatcherImpl::create(
+                params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope)
+                .value();
 
         // But still use the fake cluster_info_.
         return cluster_info_;
@@ -1114,8 +1116,10 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
             std::make_unique<Network::MockTransportSocketFactory>();
 
         // set socket_matcher object in test scope.
-        socket_matchers.push_back(std::make_unique<Envoy::Upstream::TransportSocketMatcherImpl>(
-            params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope));
+        socket_matchers.push_back(
+            Envoy::Upstream::TransportSocketMatcherImpl::create(
+                params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope)
+                .value());
 
         // But still use the fake cluster_info_.
         return cluster_info_;
