@@ -1022,7 +1022,6 @@ TEST_P(LoadShedPointIntegrationTest, ListenerAcceptDoesNotShedLoadWhenBypassed) 
   }
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(codec_client_->waitForDisconnect());
-  codec_client_->close();
 }
 
 } // namespace Envoy
