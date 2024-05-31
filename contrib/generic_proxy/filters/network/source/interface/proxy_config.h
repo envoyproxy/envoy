@@ -7,8 +7,8 @@
 #include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 #include "contrib/generic_proxy/filters/network/source/interface/route.h"
-#include "contrib/generic_proxy/filters/network/source/stats.h"
 #include "contrib/generic_proxy/filters/network/source/match_input.h"
+#include "contrib/generic_proxy/filters/network/source/stats.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -78,7 +78,7 @@ VirtualHostImpl::VirtualHostImpl(const ProtoVirtualHost& virtual_host_config,
   RouteActionContext action_context{context};
 
   Matcher::MatchTreeFactory<MatchInput, RouteActionContext> factory(action_context, context,
-                                                                 validation_visitor);
+                                                                    validation_visitor);
 
   matcher_ = factory.create(virtual_host_config.routes())();
 

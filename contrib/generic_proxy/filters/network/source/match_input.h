@@ -1,8 +1,10 @@
 #pragma once
 
-#include "contrib/generic_proxy/filters/network/source/interface/stream.h"
-#include "envoy/stream_info/stream_info.h"
 #include <cstdint>
+
+#include "envoy/stream_info/stream_info.h"
+
+#include "contrib/generic_proxy/filters/network/source/interface/stream.h"
 
 namespace Envoy {
 namespace Extensions {
