@@ -376,7 +376,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     }
     for (const auto& [key, value] : response->headers_to_append) {
       if (!checkAndApplyHeaderMutation(
-              Filters::Common::MutationRules::CheckOperation::SET, key, value,
+              Filters::Common::MutationRules::CheckOperation::APPEND, key, value,
               [this](Http::LowerCaseString key, absl::string_view value) {
                 const auto header_to_modify = request_headers_->get(key);
                 // TODO(dio): Add a flag to allow appending non-existent headers, without setting it
@@ -409,11 +409,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         ENVOY_STREAM_LOG(trace, "Ignoring invalid header removal '{}'.", *decoder_callbacks_, key);
         continue;
       }
-      // Check header mutation is valid according to configured decoder header mutation rules.
-      //
       // We don't allow removing any :-prefixed headers, nor Host, as removing them would make the
-      // request malformed (and now if `decoder_header_mutation_rules.disallow_is_error` == true,
-      // trying to remove those headers will cause the response to be rejected).
+      // request malformed. checkDecoderHeaderMutation also performs this check, however, so only
+      // perform this check explicitly if decoder header mutation rules is empty.
+      if (!config_->hasDecoderHeaderMutationRules() &&
+          !Http::HeaderUtility::isRemovableHeader(key)) {
+        ENVOY_STREAM_LOG(trace, "Ignoring invalid header removal '{}'.", *decoder_callbacks_, key);
+        continue;
+      }
+      // Check header mutation is valid according to configured decoder header mutation rules.
       Http::LowerCaseString lowercase_key(key);
       switch (config_->checkDecoderHeaderMutation(CheckOperation::REMOVE, lowercase_key,
                                                   EMPTY_STRING)) {

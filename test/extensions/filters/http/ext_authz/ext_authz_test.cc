@@ -484,32 +484,38 @@ public:
 
   void checkRequestHeadersFromOpts(const DecoderHeaderMutationRulesTestOpts& opts) {
     for (const auto& [key, value] : opts.allowed_headers_to_add) {
-      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), value);
+      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), value)
+          << "(key: '" << key << "')";
     }
     for (const auto& [key, _] : opts.disallowed_headers_to_add) {
-      EXPECT_FALSE(request_headers_.has(Http::LowerCaseString(key)));
+      EXPECT_FALSE(request_headers_.has(Http::LowerCaseString(key))) << "(key: '" << key << "')";
     }
 
     for (const auto& [key, value] : opts.allowed_headers_to_set) {
-      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), value);
+      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), value)
+          << "(key: '" << key << "')";
     }
     for (const auto& [key, _] : opts.disallowed_headers_to_set) {
-      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), "will not be overridden");
+      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), "will not be overridden")
+          << "(key: '" << key << "')";
     }
 
     for (const auto& [key, value] : opts.allowed_headers_to_append) {
       EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)),
-                absl::StrCat("will be appended to,", value));
+                absl::StrCat("will be appended to,", value))
+          << "(key: '" << key << "')";
     }
     for (const auto& [key, value] : opts.disallowed_headers_to_append) {
-      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), "will not be appended to");
+      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), "will not be appended to")
+          << "(key: '" << key << "')";
     }
 
     for (const auto& key : opts.allowed_headers_to_remove) {
-      EXPECT_FALSE(request_headers_.has(Http::LowerCaseString(key)));
+      EXPECT_FALSE(request_headers_.has(Http::LowerCaseString(key))) << "(key: '" << key << "')";
     }
     for (const auto& key : opts.disallowed_headers_to_remove) {
-      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), "will not be removed");
+      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), "will not be removed")
+          << "(key: '" << key << "')";
     }
   }
 
@@ -546,14 +552,12 @@ public:
   }
 };
 
-//  By default, the authz response may add, modify, or remove any header except for those prefixed
-//  x-envoy* or specific headers that may affect further filter processing. In the ext_authz config
-//  class, however, we override these defaults when the rule field is missing as to not break any
-//  existing users who don't have this configured.
+// If decoder_header_mutation_rules is empty, there should be no additional restrictions to
+// ext_authz header mutations.
 TEST_F(DecoderHeaderMutationRulesTest, EmptyConfig) {
   DecoderHeaderMutationRulesTestOpts opts;
   opts.allowed_headers_to_add = {{":authority", "google"}};
-  opts.allowed_headers_to_append = {{"normal", "one"}};
+  opts.allowed_headers_to_append = {{"normal", "one"}, {":fake-pseudo-header", "append me"}};
   opts.allowed_headers_to_set = {{"x-envoy-whatever", "override"}};
   opts.allowed_headers_to_remove = {"delete-me"};
   // These are not allowed not because of the header mutation rules config, but because ext_authz
@@ -567,9 +571,10 @@ TEST_F(DecoderHeaderMutationRulesTest, EmptyConfig) {
 TEST_F(DecoderHeaderMutationRulesTest, ExplicitDefaultConfig) {
   DecoderHeaderMutationRulesTestOpts opts;
   opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
-  opts.allowed_headers_to_add = {{":authority", "google"}};
+  opts.disallowed_headers_to_add = {{":authority", "google"}};
   opts.allowed_headers_to_append = {{"normal", "one"}};
-  opts.allowed_headers_to_set = {{"x-envoy-whatever", "override"}};
+  opts.disallowed_headers_to_append = {{":fake-pseudo-header", "append me"}};
+  opts.disallowed_headers_to_set = {{"x-envoy-whatever", "override"}};
   opts.allowed_headers_to_remove = {"delete-me"};
   // These are not allowed not because of the header mutation rules config, but because ext_authz
   // doesn't allow the removable of headers starting with `:` anyway.
@@ -611,6 +616,16 @@ TEST_F(DecoderHeaderMutationRulesTest, RejectResponseAppend) {
   runTest(opts);
 }
 
+TEST_F(DecoderHeaderMutationRulesTest, RejectResponseAppendPseudoheader) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.rules->mutable_disallow_is_error()->set_value(true);
+  opts.expect_reject_response = true;
+
+  opts.disallowed_headers_to_append = {{":fake-pseudo-header", "fail"}};
+  runTest(opts);
+}
+
 TEST_F(DecoderHeaderMutationRulesTest, RejectResponseSet) {
   DecoderHeaderMutationRulesTestOpts opts;
   opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
@@ -630,6 +645,16 @@ TEST_F(DecoderHeaderMutationRulesTest, RejectResponseRemove) {
   opts.expect_reject_response = true;
 
   opts.disallowed_headers_to_remove = {"cant-delete-me"};
+  runTest(opts);
+}
+
+TEST_F(DecoderHeaderMutationRulesTest, RejectResponseRemovePseudoHeader) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.rules->mutable_disallow_is_error()->set_value(true);
+  opts.expect_reject_response = true;
+
+  opts.disallowed_headers_to_remove = {":fake-pseudo-header"};
   runTest(opts);
 }
 

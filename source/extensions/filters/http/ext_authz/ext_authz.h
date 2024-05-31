@@ -75,8 +75,12 @@ public:
 
         status_on_error_(toErrorCode(config.status_on_error().code())),
         validate_mutations_(config.validate_mutations()), scope_(scope),
-        decoder_header_mutation_checker_(createDecoderHeaderMutationChecker(
-            config.decoder_header_mutation_rules(), factory_context.regexEngine())),
+        decoder_header_mutation_checker_(
+            config.has_decoder_header_mutation_rules()
+                ? absl::optional<Filters::Common::MutationRules::Checker>(
+                      Filters::Common::MutationRules::Checker(
+                          config.decoder_header_mutation_rules(), factory_context.regexEngine()))
+                : absl::nullopt),
         runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
         filter_enabled_(config.has_filter_enabled()
                             ? absl::optional<Runtime::FractionalPercent>(
@@ -168,7 +172,15 @@ public:
   Filters::Common::MutationRules::CheckResult
   checkDecoderHeaderMutation(const Filters::Common::MutationRules::CheckOperation& operation,
                              const Http::LowerCaseString& key, absl::string_view value) const {
-    return decoder_header_mutation_checker_.check(operation, key, value);
+    if (!decoder_header_mutation_checker_.has_value()) {
+      return Filters::Common::MutationRules::CheckResult::OK;
+    }
+    return decoder_header_mutation_checker_->check(operation, key, value);
+  }
+
+  // Used for headers_to_remove to avoid a redundant pseudo header check.
+  bool hasDecoderHeaderMutationRules() const {
+    return decoder_header_mutation_checker_.has_value();
   }
 
   Http::Code statusOnError() const { return status_on_error_; }
@@ -227,20 +239,6 @@ public:
   }
 
 private:
-  static Filters::Common::MutationRules::Checker createDecoderHeaderMutationChecker(
-      envoy::config::common::mutation_rules::v3::HeaderMutationRules rules,
-      Regex::Engine& regex_engine) {
-    // The mutation rules lib enables some restrictions by default. This could break existing users
-    // of ext_authz, so we override certain defaults when those rules are not set.
-    if (!rules.has_allow_all_routing()) {
-      rules.mutable_allow_all_routing()->set_value(true);
-    }
-    if (!rules.has_allow_envoy()) {
-      rules.mutable_allow_envoy()->set_value(true);
-    }
-    return Filters::Common::MutationRules::Checker(rules, regex_engine);
-  }
-
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
     if (code >= Http::Code::Continue && code <= Http::Code::NetworkAuthenticationRequired) {
@@ -275,7 +273,7 @@ private:
   const Http::Code status_on_error_;
   const bool validate_mutations_;
   Stats::Scope& scope_;
-  const Filters::Common::MutationRules::Checker decoder_header_mutation_checker_;
+  const absl::optional<Filters::Common::MutationRules::Checker> decoder_header_mutation_checker_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;
