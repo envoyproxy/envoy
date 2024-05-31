@@ -1012,6 +1012,7 @@ TEST_P(LoadShedPointIntegrationTest, ListenerAcceptDoesNotShedLoadWhenBypassed) 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
   codec_client_->close();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // on the other listener though, we should reject the connection
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http_2"))));
