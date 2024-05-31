@@ -37,6 +37,10 @@ absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& sour
           fmt::format("Unexpected DataSource::specifier_case(): {}", source.specifier_case()));
     }
   }
+  if (data.length() > max_size) {
+    return absl::InvalidArgumentError(
+        fmt::format("response body size is {} bytes; maximum is {}", data.length(), max_size));
+  }
   if (!allow_empty && data.empty()) {
     return absl::InvalidArgumentError("DataSource cannot be empty");
   }

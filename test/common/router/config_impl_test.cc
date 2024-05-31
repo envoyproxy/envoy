@@ -5674,10 +5674,6 @@ virtual_hosts:
   )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
-  auto* watcher = new Filesystem::MockWatcher();
-  EXPECT_CALL(factory_context_.dispatcher_, createFilesystemWatcher_())
-      .WillRepeatedly(Return(watcher));
-  EXPECT_CALL(*watcher, addWatch(_, _, _));
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
   EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
   {
