@@ -158,7 +158,7 @@ public:
         .Times(testing::AtLeast(1u))
         .WillRepeatedly(SaveArg<0>(&secret_update_callback_));
     EXPECT_CALL(*mock_context_config_, alpnProtocols()).WillRepeatedly(ReturnRef(alpn_));
-    transport_socket_factory_ = std::make_unique<QuicServerTransportSocketFactory>(
+    transport_socket_factory_ = *QuicServerTransportSocketFactory::create(
         true, listener_config_.listenerScope(),
         std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_), ssl_context_manager_,
         std::vector<std::string>{});
@@ -211,7 +211,7 @@ public:
           .WillRepeatedly(ReturnRef(pkey_));
     }
     ASSERT_TRUE(secret_update_callback_ != nullptr);
-    secret_update_callback_();
+    ASSERT_TRUE(secret_update_callback_().ok());
   }
 
 protected:
@@ -231,7 +231,7 @@ protected:
   Server::Configuration::MockServerFactoryContext factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{factory_context_};
   Ssl::MockServerContextConfig* mock_context_config_;
-  std::function<void()> secret_update_callback_;
+  std::function<absl::Status()> secret_update_callback_;
   std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
   Ssl::MockTlsCertificateConfig tls_cert_config_;
   Server::ListenerStats listener_stats_;
@@ -347,7 +347,7 @@ public:
 
     EXPECT_CALL(*mock_context_config_, setSecretUpdateCallback(_)).Times(testing::AtLeast(1u));
     EXPECT_CALL(*mock_context_config_, alpnProtocols()).WillRepeatedly(ReturnRef(alpn_));
-    transport_socket_factory_ = std::make_unique<QuicServerTransportSocketFactory>(
+    transport_socket_factory_ = *QuicServerTransportSocketFactory::create(
         true, listener_config_.listenerScope(),
         std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_), ssl_context_manager_,
         std::vector<std::string>{});

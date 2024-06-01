@@ -329,7 +329,7 @@ message SubjectAltNameMatcher {
   string oid = 3;
 }
 
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -343,6 +343,9 @@ message CertificateValidationContext {
     // For HTTP connections, the result of certificate verification can be used in route matching. (
     // see :ref:`validated <envoy_v3_api_field_config.route.v3.RouteMatch.TlsContextMatchOptions.validated>` ).
     ACCEPT_UNTRUSTED = 1;
+  }
+
+  message SystemRootCerts {
   }
 
   reserved 4, 5;
@@ -394,6 +397,12 @@ message CertificateValidationContext {
   // [#not-implemented-hide:]
   CertificateProviderPluginInstance ca_certificate_provider_instance = 13
       [(udpa.annotations.field_migrate).oneof_promotion = "ca_cert_source"];
+
+  // Use system root certs for validation.
+  // If present, system root certs are used only if neither of the ``trusted_ca``
+  // or ``ca_certificate_provider_instance`` fields are set.
+  // [#not-implemented-hide:]
+  SystemRootCerts system_root_certs = 17;
 
   // If specified, updates of a file-based ``trusted_ca`` source will be triggered
   // by this watch. This allows explicit control over the path watched, by
