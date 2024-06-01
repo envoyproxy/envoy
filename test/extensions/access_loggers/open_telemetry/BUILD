@@ -43,6 +43,7 @@ envoy_extension_cc_test(
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
@@ -89,18 +90,36 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "substitution_formatter_test",
     srcs = ["substitution_formatter_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
     extension_names = ["envoy.access_loggers.open_telemetry"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/router:string_accessor_lib",
+        "//source/extensions/formatter/cel:cel_lib",
+        "//source/extensions/formatter/cel:config",
         "//source/extensions/access_loggers/open_telemetry:substitution_formatter_lib",
+        "//source/extensions/access_loggers/open_telemetry:config",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
         "@opentelemetry_proto//:logs_cc_proto",
-    ],
+    ]+ select(
+        {
+            "//bazel:windows_x86_64": [],
+            "//conditions:default": [
+                "@com_google_cel_cpp//parser",
+            ],
+        },
+    ),
 )
 
 envoy_cc_benchmark_binary(
