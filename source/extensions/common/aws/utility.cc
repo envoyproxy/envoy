@@ -236,7 +236,7 @@ Utility::joinCanonicalHeaderNames(const std::map<std::string, std::string>& cano
 std::string Utility::getSTSEndpoint(absl::string_view region) {
 
   // Handle the scenario where we are using SigV4A and a region set has been provided
-  // SigV4A region sets are comma seperated and may include wildcard
+  // SigV4A region sets are comma separated and may include wildcard
 
   absl::string_view single_region;
 
