@@ -314,6 +314,7 @@ message SubjectAltNameMatcher {
     DNS = 2;
     URI = 3;
     IP_ADDRESS = 4;
+    OTHER_NAME = 5;
   }
 
   // Specification of type of SAN. Note that the default enum value is an invalid choice.
@@ -321,6 +322,9 @@ message SubjectAltNameMatcher {
 
   // Matcher for SAN value.
   type.matcher.v3.StringMatcher matcher = 2 [(validate.rules).message = {required: true}];
+
+  // OID Value for SAN if OTHER_NAME SAN type is used
+  string oid = 3;
 }
 
 // [#next-free-field: 17]

@@ -226,6 +226,10 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
     }
     break;
   }
+  case GEN_OTHERNAME:
+    str = general_name->d.otherName->value->value.asn1_string;
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    break;
   }
   return san;
 }
