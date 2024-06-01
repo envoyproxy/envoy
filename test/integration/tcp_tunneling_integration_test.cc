@@ -1,3 +1,4 @@
+#include <chrono>
 #include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -735,6 +736,11 @@ public:
 
           auto* listener = bootstrap.mutable_static_resources()->add_listeners();
           listener->set_name("tcp_proxy");
+
+          if (downstream_buffer_limit_ != 0) {
+            listener->mutable_per_connection_buffer_limit_bytes()->set_value(
+                downstream_buffer_limit_);
+          }
           auto* socket_address = listener->mutable_address()->mutable_socket_address();
           socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
           socket_address->set_port_value(0);
@@ -846,16 +852,16 @@ public:
 
     upstream_request_->encodeData(response_size, false);
     ASSERT_TRUE(tcp_client_->waitForData(response_size));
+    //  Finally close and clean up.
 
-    // Finally close and clean up.
     tcp_client_->close();
     if (upstreamProtocol() == Http::CodecType::HTTP1) {
       ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     } else {
-      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_, TestUtility::DefaultTimeout));
+      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
     }
   }
-
+  int downstream_buffer_limit_{0};
   IntegrationTcpClientPtr tcp_client_;
 };
 
@@ -916,10 +922,10 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamHttpFiltersPauseAndResume) {
 }
 
 TEST_P(TcpTunnelingIntegrationTest, FlowControlOnAndGiantBody) {
-  ENVOY_LOG_MISC(warn, "manually lowering logs to error");
-  LogLevelSetter save_levels(spdlog::level::trace);
-  config_helper_.setBufferLimits(1024, 1024);
+  downstream_buffer_limit_ = 1024;
+  config_helper_.setBufferLimits(1024, 2024);
   initialize();
+
   testGiantRequestAndResponse(10 * 1024 * 1024, 10 * 1024 * 1024);
 }
 

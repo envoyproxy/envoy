@@ -441,9 +441,7 @@ bool CombinedUpstream::readDisable(bool disable) {
   if (upstream_requests_.empty()) {
     return false;
   }
-  if (disable) {
-    upstream_requests_.front()->onAboveWriteBufferHighWatermark();
-  }
+  upstream_requests_.front()->readDisableOrDefer(disable);
   return true;
 }
 
