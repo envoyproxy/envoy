@@ -47,6 +47,7 @@ envoy_extension_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
         "@opentelemetry_proto//:logs_cc_proto",
@@ -103,16 +104,16 @@ envoy_extension_cc_test(
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/router:string_accessor_lib",
+        "//source/extensions/access_loggers/open_telemetry:config",
+        "//source/extensions/access_loggers/open_telemetry:substitution_formatter_lib",
         "//source/extensions/formatter/cel:cel_lib",
         "//source/extensions/formatter/cel:config",
-        "//source/extensions/access_loggers/open_telemetry:substitution_formatter_lib",
-        "//source/extensions/access_loggers/open_telemetry:config",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
-        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
         "@opentelemetry_proto//:logs_cc_proto",
-    ]+ select(
+    ] + select(
         {
             "//bazel:windows_x86_64": [],
             "//conditions:default": [
