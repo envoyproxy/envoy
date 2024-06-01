@@ -323,7 +323,9 @@ message SubjectAltNameMatcher {
   // Matcher for SAN value.
   type.matcher.v3.StringMatcher matcher = 2 [(validate.rules).message = {required: true}];
 
-  // OID Value for SAN if OTHER_NAME SAN type is used
+  // OID Value if OTHER_NAME SAN type is used. For example, UPN OID is 1.3.6.1.4.1.311.20.2.3
+  // Reference: http://oid-info.com/get/1.3.6.1.4.1.311.20.2.3
+  // If set for SAN types other than OTHER_NAME, it will be ignored
   string oid = 3;
 }
 
