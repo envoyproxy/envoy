@@ -31,8 +31,9 @@ minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: grpc
   change: |
-    Changes in ``AsyncStreamImpl`` now propagate tracing context headers in bidirectional streams when using
-    :ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>`. Previously, tracing context headers
+    Changes in ``AsyncStreamImpl`` and ``GoogleAsyncStreamImpl`` now propagate tracing context headers in bidirectional streams when using
+    :ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>` or
+    :ref:`Google C++ gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>`. Previously, tracing context headers
     were not being set when calling external services such as ``ext_proc``.
 - area: tracers
   change: |

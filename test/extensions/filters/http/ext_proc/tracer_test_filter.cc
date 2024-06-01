@@ -14,6 +14,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+const Tracing::TraceContextHandler& traceParentHeader() {
+  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "traceparent");
+}
+
 struct ExpectedSpan {
   std::string operation_name;
   bool sampled;
@@ -58,7 +62,9 @@ public:
   void setOperation(absl::string_view operation_name) { operation_name_ = operation_name; }
   void setSampled(bool do_sample) { sampled_ = do_sample; }
 
-  void injectContext(Tracing::TraceContext&, const Tracing::UpstreamContext&) {
+  void injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
+    std::string traceparent_header_value = "1";
+    traceParentHeader().setRefKey(trace_context, traceparent_header_value);
     context_injected_ = true;
   }
   void setBaggage(absl::string_view, absl::string_view) { /* not implemented */
