@@ -664,16 +664,7 @@ typed_config:
     cleanup();
   }
 
-  void cleanup() {
-    codec_client_->close();
-
-    if (fake_upstream_connection_ != nullptr) {
-      AssertionResult result = fake_upstream_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_upstream_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
-  }
+  void cleanup() { cleanupUpstreamAndDownstream(); }
 
   void testDynamicMetadata(std::string path) {
     initializeBasicFilter(BASIC, "*", true);
