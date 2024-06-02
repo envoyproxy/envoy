@@ -238,7 +238,7 @@ std::string Utility::getSTSEndpoint(absl::string_view region) {
   // Handle the scenario where we are using SigV4A and a region set has been provided
   // SigV4A region sets are comma separated and may include wildcard
 
-  absl::string_view single_region;
+  std::string single_region;
 
   // If we contain a comma or asterisk it looks like a region set
   if (absl::StrContains(region, ",") || (absl::StrContains(region, "*"))) {
