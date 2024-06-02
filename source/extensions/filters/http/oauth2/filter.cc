@@ -569,13 +569,13 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
   if (config_->useRefreshToken()) {
     ::google::jwt_verify::Jwt jwt;
     if (jwt.parseFromString(refresh_token) == ::google::jwt_verify::Status::Ok && jwt.exp_ != 0) {
-      const std::chrono::seconds expirationFromJwt = std::chrono::seconds{jwt.exp_};
+      const std::chrono::seconds expiration_from_jwt = std::chrono::seconds{jwt.exp_};
       const std::chrono::seconds now =
           std::chrono::time_point_cast<std::chrono::seconds>(time_source_.systemTime())
               .time_since_epoch();
 
-      if (now < expirationFromJwt) {
-        const auto expiration_epoch = expirationFromJwt - now;
+      if (now < expiration_from_jwt) {
+        const auto expiration_epoch = expiration_from_jwt - now;
         return std::to_string(expiration_epoch.count());
       } else {
         ENVOY_LOG(debug, "The expiration time in the refresh token is less than the current time");
@@ -596,13 +596,13 @@ std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
   if (!id_token.empty()) {
     ::google::jwt_verify::Jwt jwt;
     if (jwt.parseFromString(id_token) == ::google::jwt_verify::Status::Ok && jwt.exp_ != 0) {
-      const std::chrono::seconds expirationFromJwt = std::chrono::seconds{jwt.exp_};
+      const std::chrono::seconds expiration_from_jwt = std::chrono::seconds{jwt.exp_};
       const std::chrono::seconds now =
           std::chrono::time_point_cast<std::chrono::seconds>(time_source_.systemTime())
               .time_since_epoch();
 
-      if (now < expirationFromJwt) {
-        const auto expiration_epoch = expirationFromJwt - now;
+      if (now < expiration_from_jwt) {
+        const auto expiration_epoch = expiration_from_jwt - now;
         return std::to_string(expiration_epoch.count());
       } else {
         ENVOY_LOG(debug, "The expiration time in the id token is less than the current time");

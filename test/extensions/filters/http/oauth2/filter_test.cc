@@ -2086,7 +2086,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensIdTokenExpiresInFromJwt) {
   };
   filter_->decodeHeaders(request_headers, false);
 
-  const std::string idToken =
+  const std::string id_token =
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
       "eyJ1bmlxdWVfbmFtZSI6ImFsZXhjZWk4OCIsInN1YiI6ImFsZXhjZWk4OCIsImp0aSI6IjQ5ZTFjMzc1IiwiYXVkIjoi"
       "dGVzdCIsIm5iZiI6MTcwNzQxNDYzNSwiZXhwIjoyNTU0NDE2MDAwLCJpYXQiOjE3MDc0MTQ2MzYsImlzcyI6ImRvdG5l"
@@ -2102,7 +2102,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensIdTokenExpiresInFromJwt) {
       {Http::Headers::get().SetCookie.get(),
        "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "IdToken=" + idToken + ";path=/;Max-Age=2554415000;secure;HttpOnly"},
+       "IdToken=" + id_token + ";path=/;Max-Age=2554415000;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "RefreshToken=refresh-token;path=/;Max-Age=1200;secure;HttpOnly"},
       {Http::Headers::get().Location.get(), ""},
@@ -2110,7 +2110,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensIdTokenExpiresInFromJwt) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
 
-  filter_->onGetAccessTokenSuccess("access_code", idToken, "refresh-token",
+  filter_->onGetAccessTokenSuccess("access_code", id_token, "refresh-token",
                                    std::chrono::seconds(600));
 }
 
@@ -2150,7 +2150,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensExpiredIdToken) {
   };
   filter_->decodeHeaders(request_headers, false);
 
-  const std::string idToken =
+  const std::string id_token =
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
       "eyJ1bmlxdWVfbmFtZSI6ImFsZXhjZWk4OCIsInN1YiI6ImFsZXhjZWk4OCIsImp0aSI6IjQ5ZTFjMzc1IiwiYXVkIjoi"
       "dGVzdCIsIm5iZiI6MTcwNzQxNDYzNSwiZXhwIjoyNTU0NDE2MDAwLCJpYXQiOjE3MDc0MTQ2MzYsImlzcyI6ImRvdG5l"
@@ -2166,7 +2166,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensExpiredIdToken) {
       {Http::Headers::get().SetCookie.get(),
        "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "IdToken=" + idToken + ";path=/;Max-Age=0;secure;HttpOnly"},
+       "IdToken=" + id_token + ";path=/;Max-Age=0;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "RefreshToken=refresh-token;path=/;Max-Age=1200;secure;HttpOnly"},
       {Http::Headers::get().Location.get(), ""},
@@ -2174,7 +2174,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensExpiredIdToken) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
 
-  filter_->onGetAccessTokenSuccess("access_code", idToken, "refresh-token",
+  filter_->onGetAccessTokenSuccess("access_code", id_token, "refresh-token",
                                    std::chrono::seconds(600));
 }
 
@@ -2216,7 +2216,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensNoExpClaimInIdToken) {
   };
   filter_->decodeHeaders(request_headers, false);
 
-  const std::string idToken =
+  const std::string id_token =
       "eyJhbGciOiJIUzI1NiJ9."
       "eyJSb2xlIjoiQWRtaW4iLCJJc3N1ZXIiOiJJc3N1ZXIiLCJVc2VybmFtZSI6IkphdmFJblVzZSIsImlhdCI6MTcwODA2"
       "NDcyOH0.92H-X2Oa4ECNmFLZBWBHP0BJyEHDprLkEIc2JBJYwkI";
@@ -2231,7 +2231,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensNoExpClaimInIdToken) {
       {Http::Headers::get().SetCookie.get(),
        "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "IdToken=" + idToken + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "IdToken=" + id_token + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "RefreshToken=refresh-token;path=/;Max-Age=1200;secure;HttpOnly"},
       {Http::Headers::get().Location.get(), ""},
@@ -2239,7 +2239,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensNoExpClaimInIdToken) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
 
-  filter_->onGetAccessTokenSuccess("access_code", idToken, "refresh-token",
+  filter_->onGetAccessTokenSuccess("access_code", id_token, "refresh-token",
                                    std::chrono::seconds(600));
 }
 
