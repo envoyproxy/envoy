@@ -24,8 +24,10 @@ ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
                                              absl::optional<uint32_t> worker_index,
-                                             OverloadManager& overload_manager)
+                                             OverloadManager& overload_manager,
+                                             OverloadManager& null_overload_manager)
     : worker_index_(worker_index), dispatcher_(dispatcher), overload_manager_(overload_manager),
+      null_overload_manager_(null_overload_manager),
       per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false) {}
 
 void ConnectionHandlerImpl::incNumConnections() { ++num_handler_connections_; }
@@ -74,10 +76,18 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         local_registry->createActiveInternalListener(*this, config, dispatcher());
     // TODO(soulxu): support multiple internal addresses in listener in the future.
     ASSERT(config.listenSocketFactories().size() == 1);
-    details->addActiveListener(config, config.listenSocketFactories()[0]->localAddress(),
-                               listener_reject_fraction_, disable_listeners_,
-                               std::move(internal_listener), overload_manager_);
+    details->addActiveListener(
+        config, config.listenSocketFactories()[0]->localAddress(), listener_reject_fraction_,
+        disable_listeners_, std::move(internal_listener),
+        config.shouldBypassOverloadManager() ? null_overload_manager_ : overload_manager_);
   } else if (config.listenSocketFactories()[0]->socketType() == Network::Socket::Type::Stream) {
+    auto overload_state =
+        config.shouldBypassOverloadManager()
+            ? (null_overload_manager_
+                   ? makeOptRef(null_overload_manager_->getThreadLocalOverloadState())
+                   : absl::nullopt)
+            : (overload_manager_ ? makeOptRef(overload_manager_->getThreadLocalOverloadState())
+                                 : absl::nullopt);
     for (auto& socket_factory : config.listenSocketFactories()) {
       auto address = socket_factory->localAddress();
       // worker_index_ doesn't have a value on the main thread for the admin server.
@@ -86,10 +96,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           std::make_unique<ActiveTcpListener>(
               *this, config, runtime, random,
               socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0),
-              address, config.connectionBalancer(*address),
-              overload_manager_ ? makeOptRef(overload_manager_->getThreadLocalOverloadState())
-                                : absl::nullopt),
-          overload_manager_);
+              address, config.connectionBalancer(*address), overload_state),
+          config.shouldBypassOverloadManager() ? null_overload_manager_ : overload_manager_);
     }
   } else {
     ASSERT(config.udpListenerConfig().has_value(), "UDP listener factory is not initialized.");
@@ -101,7 +109,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
               runtime, *worker_index_, *this, socket_factory->getListenSocket(*worker_index_),
               dispatcher_, config),
-          overload_manager_);
+          config.shouldBypassOverloadManager() ? null_overload_manager_ : overload_manager_);
     }
   }
 
@@ -271,7 +279,7 @@ void ConnectionHandlerImpl::disableListeners() {
   disable_listeners_ = true;
   for (auto& iter : listener_map_by_tag_) {
     iter.second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
-      if (listener.listener() != nullptr) {
+      if (listener.listener() != nullptr && !listener.listener()->shouldBypassOverloadManager()) {
         listener.pauseListening();
       }
     });
@@ -282,7 +290,7 @@ void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
   for (auto& iter : listener_map_by_tag_) {
     iter.second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
-      if (listener.listener() != nullptr) {
+      if (listener.listener() != nullptr && !listener.listener()->shouldBypassOverloadManager()) {
         listener.resumeListening();
       }
     });
@@ -292,12 +300,12 @@ void ConnectionHandlerImpl::enableListeners() {
 void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction) {
   listener_reject_fraction_ = reject_fraction;
   for (auto& iter : listener_map_by_tag_) {
-    iter.second->invokeListenerMethod(
-        [&reject_fraction](Network::ConnectionHandler::ActiveListener& listener) {
-          if (listener.listener() != nullptr) {
-            listener.listener()->setRejectFraction(reject_fraction);
-          }
-        });
+    iter.second->invokeListenerMethod([&reject_fraction](
+                                          Network::ConnectionHandler::ActiveListener& listener) {
+      if (listener.listener() != nullptr && !listener.listener()->shouldBypassOverloadManager()) {
+        listener.listener()->setRejectFraction(reject_fraction);
+      }
+    });
   }
 }
 
@@ -357,8 +365,8 @@ Network::ListenerPtr ConnectionHandlerImpl::createListener(
     Server::ThreadLocalOverloadStateOptRef overload_state) {
   return std::make_unique<Network::TcpListenerImpl>(
       dispatcher(), random, runtime, std::move(socket), cb, config.bindToPort(),
-      config.ignoreGlobalConnLimit(), config.maxConnectionsToAcceptPerSocketEvent(),
-      overload_state);
+      config.ignoreGlobalConnLimit(), config.shouldBypassOverloadManager(),
+      config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 }
 
 Network::BalancedConnectionHandlerOptRef

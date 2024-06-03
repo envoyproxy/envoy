@@ -162,6 +162,11 @@ public:
    * @return whether the listener is a Quic listener.
    */
   virtual bool isQuic() const PURE;
+
+  /**
+   * @return bool whether the listener should bypass overload manager actions
+   */
+  virtual bool shouldBypassOverloadManager() const PURE;
 };
 
 using ListenerInfoConstSharedPtr = std::shared_ptr<const ListenerInfo>;
@@ -291,6 +296,11 @@ public:
    * limit.
    */
   virtual bool ignoreGlobalConnLimit() const PURE;
+
+  /**
+   * @return bool whether the listener should bypass overload manager actions
+   */
+  virtual bool shouldBypassOverloadManager() const PURE;
 };
 
 /**
@@ -467,6 +477,11 @@ public:
    */
   virtual void
   configureLoadShedPoints(Server::LoadShedPointProvider& load_shed_point_provider) PURE;
+
+  /**
+   * Check whether the listener should bypass overload manager actions
+   */
+  virtual bool shouldBypassOverloadManager() const PURE;
 };
 
 using ListenerPtr = std::unique_ptr<Listener>;

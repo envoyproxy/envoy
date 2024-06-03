@@ -176,7 +176,7 @@ public:
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
     helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
-                                          init_manager_, overload_manager_,
+                                          init_manager_, overload_manager_, null_overload_manager_,
                                           [this] { start_workers_.ready(); });
   }
 
@@ -186,6 +186,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
+  NiceMock<MockOverloadManager> null_overload_manager_;
   Init::ManagerImpl init_manager_{""};
   ReadyWatcher start_workers_;
   std::unique_ptr<RunHelper> helper_;

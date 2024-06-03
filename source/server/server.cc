@@ -607,6 +607,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = createOverloadManager();
+  null_overload_manager_ = createNullOverloadManager();
 
   maybeCreateHeapShrinker();
 
@@ -865,7 +866,7 @@ void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      Init::Manager& init_manager, OverloadManager& overload_manager,
-                     std::function<void()> post_init_cb)
+                     OverloadManager& null_overload_manager, std::function<void()> post_init_cb)
     : init_watcher_("RunHelper", [&instance, post_init_cb]() {
         if (!instance.isShutdown()) {
           post_init_cb();
@@ -900,6 +901,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // Start overload manager before workers.
   overload_manager.start();
+  null_overload_manager.start();
 
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
@@ -941,11 +943,12 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 void InstanceBase::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
-  const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
-                                    access_log_manager_, init_manager_, overloadManager(), [this] {
-                                      notifyCallbacksForStage(Stage::PostInit);
-                                      startWorkers();
-                                    });
+  const auto run_helper =
+      RunHelper(*this, options_, *dispatcher_, clusterManager(), access_log_manager_, init_manager_,
+                overloadManager(), nullOverloadManager(), [this] {
+                  notifyCallbacksForStage(Stage::PostInit);
+                  startWorkers();
+                });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");

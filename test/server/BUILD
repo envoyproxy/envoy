@@ -273,6 +273,7 @@ envoy_cc_test(
         "//envoy/registry",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/resource_monitors/common:factory_base_lib",
+        "//source/server:null_overload_manager_lib",
         "//source/server:overload_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
@@ -283,6 +284,17 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "null_overload_manager_test",
+    srcs = ["null_overload_manager_test.cc"],
+    deps = [
+        "//source/server:null_overload_manager_lib",
+        "//source/server:overload_manager_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
     ],
 )
 

@@ -472,6 +472,7 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(bool, isQuic, (), (const));
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
 };
 
 class MockListenerConfig : public ListenerConfig {
@@ -498,6 +499,7 @@ public:
   MOCK_METHOD(uint32_t, maxConnectionsToAcceptPerSocketEvent, (), (const));
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(bool, ignoreGlobalConnLimit, (), (const));
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
 
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return empty_access_logs_;
@@ -524,6 +526,7 @@ public:
   MOCK_METHOD(void, disable, ());
   MOCK_METHOD(void, setRejectFraction, (UnitFloat));
   MOCK_METHOD(void, configureLoadShedPoints, (Server::LoadShedPointProvider&));
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
 };
 
 class MockConnectionHandler : public virtual ConnectionHandler {
@@ -655,6 +658,7 @@ public:
   MOCK_METHOD(Api::IoCallUint64Result, send, (const UdpSendData&));
   MOCK_METHOD(Api::IoCallUint64Result, flush, ());
   MOCK_METHOD(void, activateRead, ());
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
 
   Event::MockDispatcher dispatcher_;
 };

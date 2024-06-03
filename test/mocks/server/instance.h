@@ -37,6 +37,8 @@ public:
   MOCK_METHOD(Envoy::MutexTracer*, mutexTracer, ());
   MOCK_METHOD(const Options&, options, ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
+  MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(Runtime::Loader&, runtime, ());
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(bool, isShutdown, ());
@@ -89,6 +91,7 @@ public:
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
+  testing::NiceMock<MockOverloadManager> null_overload_manager_;
   Singleton::ManagerPtr singleton_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;

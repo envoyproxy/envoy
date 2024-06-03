@@ -16,5 +16,9 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: listener
+  change: |
+    Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
+    to bypass the overload manager for a listener. When set to true, the listener will not be subject to overload protection.
 
 deprecated:

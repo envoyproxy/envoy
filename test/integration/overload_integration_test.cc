@@ -28,6 +28,24 @@ protected:
     initialize();
     updateResource(0);
   }
+
+  void initializeWithBypassOverloadManager(
+      const envoy::config::overload::v3::OverloadAction& overload_action) {
+    setupOverloadManagerConfig(overload_action);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      listener->set_bypass_overload_manager(true);
+      auto* new_listener = bootstrap.mutable_static_resources()->add_listeners();
+      new_listener->CopyFrom(*listener);
+      new_listener->set_name("http_2");
+      new_listener->set_bypass_overload_manager(false);
+    });
+    initialize();
+    updateResource(0);
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, OverloadIntegrationTest,
@@ -176,6 +194,44 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("202", response->headers().getStatusValue());
+  codec_client_->close();
+}
+
+TEST_P(OverloadIntegrationTest, BypassOverloadManagerTest) {
+  initializeWithBypassOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.stop_accepting_requests"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.9
+    )EOF"));
+
+  // Put envoy in overloaded state and validate that it doesn't drop new requests
+  // because we chose to bypass the overload manager on this listener.
+  updateResource(1);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(0U, response->body().size());
+  codec_client_->close();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http_2"))));
+  response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  // Verify that no local overload header is added by default
+  EXPECT_EQ(true, response->headers().get(Http::Headers::get().EnvoyLocalOverloaded).empty());
+  EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
 }
 
@@ -452,6 +508,24 @@ protected:
     setupOverloadManagerConfig(config);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    initialize();
+    updateResource(0);
+  }
+  void
+  initializeWithBypassOverloadManager(const envoy::config::overload::v3::LoadShedPoint& config) {
+    setupOverloadManagerConfig(config);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      listener->set_bypass_overload_manager(true);
+      // add a listener that doesn't bypass overload manager.
+      auto* new_listener = bootstrap.mutable_static_resources()->add_listeners();
+      new_listener->CopyFrom(*listener);
+      new_listener->set_name("http_2");
+      new_listener->set_bypass_overload_manager(false);
     });
     initialize();
     updateResource(0);

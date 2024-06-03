@@ -476,6 +476,7 @@ envoy_cc_library(
         ":guarddog_lib",
         ":server_base_lib",
         "//source/common/memory:heap_shrinker_lib",
+        "//source/server:null_overload_manager_lib",
         "//source/server:overload_manager_lib",
     ],
 )

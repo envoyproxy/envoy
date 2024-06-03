@@ -38,7 +38,7 @@ public:
 
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index);
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index,
-                        OverloadManager& overload_manager);
+                        OverloadManager& overload_manager, OverloadManager& null_overload_manager);
 
   // Network::ConnectionHandler
   uint64_t numConnections() const override { return num_handler_connections_; }
@@ -154,6 +154,7 @@ private:
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
   OptRef<OverloadManager> overload_manager_;
+  OptRef<OverloadManager> null_overload_manager_;
   const std::string per_handler_stat_prefix_;
   // Declare before its users ActiveListenerDetails.
   std::atomic<uint64_t> num_handler_connections_{};
@@ -171,8 +172,10 @@ class ConnectionHandlerFactoryImpl : public ConnectionHandlerFactory {
 public:
   std::unique_ptr<ConnectionHandler>
   createConnectionHandler(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index,
-                          OverloadManager& overload_manager) override {
-    return std::make_unique<ConnectionHandlerImpl>(dispatcher, worker_index, overload_manager);
+                          OverloadManager& overload_manager,
+                          OverloadManager& null_overload_manager) override {
+    return std::make_unique<ConnectionHandlerImpl>(dispatcher, worker_index, overload_manager,
+                                                   null_overload_manager);
   }
   std::unique_ptr<ConnectionHandler>
   createConnectionHandler(Event::Dispatcher& dispatcher,

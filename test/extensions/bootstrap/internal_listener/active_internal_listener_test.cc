@@ -344,6 +344,7 @@ public:
       open_connections_.setMax(num_connections);
     }
     void clearMaxConnections() { open_connections_.resetMax(); }
+    bool shouldBypassOverloadManager() const override { return false; }
 
     ConnectionHandlerTest& parent_;
     std::shared_ptr<NiceMock<Network::MockListenSocket>> socket_;

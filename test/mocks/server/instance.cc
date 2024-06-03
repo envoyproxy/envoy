@@ -45,6 +45,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, mutexTracer()).WillByDefault(Return(nullptr));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
+  ON_CALL(*this, nullOverloadManager()).WillByDefault(ReturnRef(null_overload_manager_));
   ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
   ON_CALL(*this, statsConfig()).WillByDefault(ReturnRef(*stats_config_));
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));

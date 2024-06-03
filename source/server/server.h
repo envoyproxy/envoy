@@ -155,7 +155,7 @@ public:
   RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
             Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
             Init::Manager& init_manager, OverloadManager& overload_manager,
-            std::function<void()> workers_start_cb);
+            OverloadManager& null_overload_manager, std::function<void()> workers_start_cb);
 
 private:
   Init::WatcherImpl init_watcher_;
@@ -200,6 +200,7 @@ public:
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
+  OverloadManager& nullOverloadManager() override { return server_.nullOverloadManager(); }
   bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
 
   // Configuration::TransportSocketFactoryContext
@@ -250,6 +251,7 @@ public:
 
   virtual void maybeCreateHeapShrinker() PURE;
   virtual std::unique_ptr<OverloadManager> createOverloadManager() PURE;
+  virtual std::unique_ptr<OverloadManager> createNullOverloadManager() PURE;
   virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
 
   void run() override;
@@ -273,6 +275,7 @@ public:
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
+  OverloadManager& nullOverloadManager() override { return *null_overload_manager_; }
   Runtime::Loader& runtime() override;
   void shutdown() override;
   bool isShutdown() final { return shutdown_; }
@@ -400,6 +403,7 @@ private:
   Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManager> overload_manager_;
+  std::unique_ptr<OverloadManager> null_overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;

@@ -407,6 +407,7 @@ private:
     }
     Init::Manager& initManager() override { return *init_manager_; }
     bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
+    bool shouldBypassOverloadManager() const override { return true; }
 
     AdminImpl& parent_;
     const std::string name_;
