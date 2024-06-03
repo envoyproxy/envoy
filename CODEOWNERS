@@ -25,7 +25,7 @@
 # original_src common extension
 extensions/filters/common/original_src @klarose @mattklein123
 # dubbo_proxy extension
-/*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan @wbpcode
+/*/extensions/filters/network/dubbo_proxy @zyfjeff @wbpcode
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
@@ -64,7 +64,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # tracers.xray extension
 /*/extensions/tracers/xray @suniltheta @mattklein123
 # tracers.skywalking extension
-/*/extensions/tracers/skywalking @wbpcode @lizan @Shikugawa
+/*/extensions/tracers/skywalking @wbpcode @Shikugawa
 # tracers.opentelemetry extension
 /*/extensions/tracers/opentelemetry @alexanderellis @htuch
 # quic extension
@@ -99,7 +99,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # http inspector
 /*/extensions/filters/listener/http_inspector @yxue @lizan
 # attribute context
-/*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan @tyxia
+/*/extensions/filters/common/expr @kyessenov @yangminzhu @tyxia
 # webassembly access logger extensions
 /*/extensions/access_loggers/wasm @mpwarres @lizan
 # webassembly bootstrap extensions
@@ -386,7 +386,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
 /contrib/squash/ @yuval-k @alyssawilk
 /contrib/kafka/ @mattklein123 @adamkotwasinski
-/contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan
+/contrib/rocketmq_proxy/ @aaron-ai @lizhanhui
 /contrib/mysql_proxy/ @rshriram @venilnoronha
 /contrib/postgres_proxy/ @fabriziomello @cpakulski
 /contrib/sxg/ @cpapazian @alyssawilk

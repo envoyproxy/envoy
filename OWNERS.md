@@ -19,9 +19,6 @@ routing PRs, questions, etc. to the right place.
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
     (metadata, etc.), and macOS build.
-* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
-  * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), Bazel, build
-    issues, and CI in general.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TLS, TCP proxy, listeners, and HTTP proxy/connection pooling.
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
@@ -105,6 +102,7 @@ without further review.
 * JP Simard ([jpsim](https://github.com/jpsim)) (jp@lyft.com)
 * Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
 * Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
+* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
 
 # Friends of Envoy
 
