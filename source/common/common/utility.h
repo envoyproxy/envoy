@@ -714,7 +714,7 @@ template <class Value> struct TrieLookupTable {
   bool add(absl::string_view key, Value value, bool overwrite_existing = true) {
     TrieEntry<Value>* current = &root_;
     for (uint8_t c : key) {
-      if (!(*current)[c]) {
+      if ((*current)[c] == nullptr) {
         current->set(c, std::make_unique<TrieEntry<Value>>());
       }
       current = (*current)[c];
