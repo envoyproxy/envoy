@@ -659,7 +659,7 @@ template <class Value> class TrieEntry {
 public:
   Value value_{};
   const TrieEntry* operator[](uint8_t i) const {
-    if (i >= min_child_ && i < min_child_ + children_.size()) {
+    if (i >= min_child_ && i < (min_child_ + children_.size())) {
       return children_[i - min_child_].get();
     }
     return nullptr;
@@ -685,7 +685,7 @@ public:
       children_ = std::move(new_children);
       return;
     }
-    if (branch >= min_child_ + children_.size()) {
+    if (branch >= (min_child_ + children_.size())) {
       // Expand the vector forwards.
       children_.resize(branch - min_child_ + 1);
       // Fall through to "insert" behavior.
