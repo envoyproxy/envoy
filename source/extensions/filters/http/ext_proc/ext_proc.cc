@@ -335,15 +335,6 @@ void Filter::closeStream() {
 void Filter::deferredCloseStream() {
   config_->threadLocalStreamManager().deferredErase(this, filter_callbacks_->dispatcher());
 }
-// void Filter::onDestroy() {
-//   ENVOY_LOG(debug, "onDestroy");
-//   // Make doubly-sure we no longer use the stream, as
-//   // per the filter contract.
-//   processing_complete_ = true;
-//   closeStream();
-//   decoding_state_.stopMessageTimer();
-//   encoding_state_.stopMessageTimer();
-// }
 
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "onDestroy");
@@ -354,8 +345,10 @@ void Filter::onDestroy() {
   encoding_state_.stopMessageTimer();
 
   if (config_->observabilityMode()) {
+    // Deferred close the stream in observability mode only.
     deferredCloseStream();
   } else {
+    // Immediate close the stream.
     closeStream();
   }
 }
@@ -394,11 +387,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
   mergePerRouteConfig();
 
-  // onHeaders() function will only be called when external processor wants headers to be sent.
-  // External processor may still close the stream to indicate that no more messages are needed.
-  // In this case, `processing_complete_` will be true and sending message is skipped at openStream
-  // above.
-  // Send headers in observaibility mode if external processor wants headers to be sent, i.e.,
+  // Send headers in observability mode if external processor wants headers to be sent, i.e.,
   // sendHeaders() is true.
   if (decoding_state_.sendHeaders() && config_->observabilityMode()) {
     return sendHeadersInObservabilityMode(headers, decoding_state_, end_stream);
@@ -607,17 +596,6 @@ Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers
   stats_.stream_msgs_sent_.inc();
 
   return FilterHeadersStatus::Continue;
-
-  // if (end_stream) {
-  //   state.setPaused(true);
-  //   // Timeout is needed when filter is waiting for the response from external processor.
-  //   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
-  //   config_->messageTimeout(),
-  //                            ProcessorState::CallbackState::HeadersCallback);
-  //   return FilterHeadersStatus::StopIteration;
-  // } else {
-  //   return FilterHeadersStatus::Continue;
-  // }
 }
 
 Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& data,
@@ -646,19 +624,6 @@ Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& dat
   }
 
   return FilterDataStatus::Continue;
-
-  // if (end_stream) {
-  //   // But we need to stop iteration and buffer for the last chunk.
-  //   state.setPaused(true);
-  //   // TODO(tyxia) if we pause, then timeout is needed.
-  //   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
-  //                              config_->messageTimeout(),
-  //                              ProcessorState::CallbackState::StreamedBodyCallback);
-  //   return FilterDataStatus::StopIterationAndBuffer;
-  //   // If it is end of stream, timeout needs to be implemented
-  // } else {
-  //   return FilterDataStatus::Continue;
-  // }
 }
 
 std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& state) {
@@ -705,12 +670,8 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
       // Fall through
       break;
     }
-
     sendTrailers(state, trailers);
     return FilterTrailersStatus::Continue;
-    // state.setPaused(true);
-
-    // return FilterTrailersStatus::StopIteration;
   }
 
   bool body_delivered = state.completeBodyAvailable();
@@ -1013,11 +974,7 @@ void Filter::setDecoderDynamicMetadata(const ProcessingResponse& response) {
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   if (config_->observabilityMode()) {
-    // TODO(tyxia) Last bit of message need to be paused!!!
-    // Or last message needs to be complied with timeout
-    // decoding_state_.continueIfNecessary();
-    // encoding_state_.continueIfNecessary();
-    ENVOY_LOG(trace, "Ignoring received message  when observability mode is enabled");
+    ENVOY_LOG(trace, "Ignoring received message when observability mode is enabled");
     // Ignore additional messages in the observability mode.
     return;
   }
@@ -1340,9 +1297,7 @@ void DeferredDeletableStream::deferredClose(Envoy::Event::Dispatcher& dispatcher
     // Close the stream.
     if (stream_) {
       ENVOY_LOG(debug, "Calling deferred close on stream");
-      // if (stream_->close()) {
-      // } else {
-      // }
+      // TODO(tyxia) Deferred close stats??
       stream_->close();
       stream_.reset();
     } else {
