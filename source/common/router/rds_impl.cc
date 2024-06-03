@@ -175,6 +175,31 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     }
   });
 }
+RouteConfigProviderSharedPtr RdsFactoryImpl::createRdsRouteConfigProvider(
+    const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
+    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+    Init::Manager& init_manager, ProtoTraitsImpl& proto_traits,
+    Rds::RouteConfigProviderManager& manager) {
+  auto provider = manager.addDynamicProvider(
+      rds, rds.route_config_name(), init_manager,
+      [&factory_context, &rds, &stat_prefix, &manager, &proto_traits](uint64_t manager_identifier) {
+        auto config_update =
+            std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits, factory_context);
+        auto resource_decoder = std::make_shared<
+            Envoy::Config::OpaqueResourceDecoderImpl<envoy::config::route::v3::RouteConfiguration>>(
+            factory_context.messageValidationContext().dynamicValidationVisitor(), "name");
+        auto subscription = std::make_shared<RdsRouteConfigSubscription>(
+            std::move(config_update), std::move(resource_decoder), rds, manager_identifier,
+            factory_context, stat_prefix, manager);
+        auto provider =
+            std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription), factory_context);
+        return std::make_pair(provider, &provider->subscription().initTarget());
+      });
+  ASSERT(dynamic_cast<RouteConfigProvider*>(provider.get()));
+  return std::static_pointer_cast<RouteConfigProvider>(provider);
+}
+
+REGISTER_FACTORY(RdsFactoryImpl, RdsFactory);
 
 } // namespace Router
 } // namespace Envoy
