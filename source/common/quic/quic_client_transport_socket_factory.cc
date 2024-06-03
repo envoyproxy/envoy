@@ -13,7 +13,7 @@
 namespace Envoy {
 namespace Quic {
 
-Network::UpstreamTransportSocketFactoryPtr
+absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config,
     Server::Configuration::TransportSocketFactoryContext& context) {

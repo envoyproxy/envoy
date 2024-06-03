@@ -11,6 +11,9 @@
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
+namespace {
+constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(3);
+} // namespace
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
@@ -173,6 +176,7 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
                                                         server_->serverFactoryContext().scope(),
                                                         server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
+          engine_running_.Notify();
           callbacks_->on_engine_running_();
         });
   } // mutex_
@@ -211,6 +215,10 @@ envoy_status_t InternalEngine::terminate() {
   if (!main_thread_->joinable()) {
     return ENVOY_FAILURE;
   }
+
+  // Wait until the Engine is ready before calling terminate to avoid assertion failures.
+  // TODO(fredyw): Fix this without having to wait.
+  ASSERT(engine_running_.WaitForNotificationWithTimeout(ENGINE_RUNNING_TIMEOUT));
 
   // We need to be sure that MainCommon is finished being constructed so we can dispatch shutdown.
   {

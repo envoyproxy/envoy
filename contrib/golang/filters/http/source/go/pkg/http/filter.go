@@ -33,7 +33,7 @@ package http
 import "C"
 import (
 	"fmt"
-	"runtime"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -129,10 +129,13 @@ func (r *httpRequest) sendPanicReply(details string) {
 
 func (r *httpRequest) RecoverPanic() {
 	if e := recover(); e != nil {
-		const size = 64 << 10
-		buf := make([]byte, size)
-		buf = buf[:runtime.Stack(buf, false)]
-		api.LogErrorf("http: panic serving: %v\n%s", e, buf)
+		buf := debug.Stack()
+
+		if e == errRequestFinished || e == errFilterDestroyed {
+			api.LogInfof("http: panic serving: %v (Client may cancel the request prematurely)\n%s", e, buf)
+		} else {
+			api.LogErrorf("http: panic serving: %v\n%s", e, buf)
+		}
 
 		switch e {
 		case errRequestFinished, errFilterDestroyed:

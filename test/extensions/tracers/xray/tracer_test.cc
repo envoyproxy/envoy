@@ -386,8 +386,8 @@ TEST_F(XRayTracerTest, GetTraceId) {
   auto span = tracer.createNonSampledSpan(absl::nullopt /*headers*/);
   span->finishSpan();
 
-  // This method is unimplemented and a noop.
-  EXPECT_EQ(span->getTraceIdAsHex(), "");
+  // Trace ID is always generated
+  EXPECT_NE(span->getTraceId(), "");
 }
 
 TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {

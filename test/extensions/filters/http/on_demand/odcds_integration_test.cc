@@ -320,10 +320,11 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
   odcds_stream_->startGrpcStream();
 
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
-                                           odcds_stream_));
+                                           odcds_stream_.get()));
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_);
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
+      Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
+  EXPECT_TRUE(
+      compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_.get()));
 
   waitForNextUpstreamRequest(new_cluster_upstream_idx_);
   // Send response headers, and end_stream if there is no response body.
@@ -362,10 +363,11 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredCluster)
   odcds_stream_->startGrpcStream();
 
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
-                                           odcds_stream_));
+                                           odcds_stream_.get()));
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_);
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
+      Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
+  EXPECT_TRUE(
+      compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_.get()));
 
   waitForNextUpstreamRequest(new_cluster_upstream_idx_);
   // Send response headers, and end_stream if there is no response body.
@@ -409,7 +411,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
   odcds_stream_->startGrpcStream();
 
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
-                                           odcds_stream_));
+                                           odcds_stream_.get()));
   // not sending a response to trigger the timeout
 
   ASSERT_TRUE(response->waitForEndStream());
@@ -443,10 +445,11 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryForNonexistentCluster) {
   odcds_stream_->startGrpcStream();
 
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
-                                           odcds_stream_));
+                                           odcds_stream_.get()));
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {}, {"new_cluster"}, "1", odcds_stream_);
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
+      Config::TypeUrl::get().Cluster, {}, {"new_cluster"}, "1", odcds_stream_.get());
+  EXPECT_TRUE(
+      compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_.get()));
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});
@@ -869,11 +872,11 @@ key:
     odcds_stream_->startGrpcStream();
 
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
-                                             odcds_stream_));
+                                             odcds_stream_.get()));
     sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_);
+        Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
     EXPECT_TRUE(
-        compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
+        compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_.get()));
 
     waitForNextUpstreamRequest(new_cluster_upstream_idx_);
     // Send response headers, and end_stream if there is no response body.

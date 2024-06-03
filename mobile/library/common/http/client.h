@@ -190,7 +190,11 @@ private:
     void latchError();
 
   private:
-    bool hasBufferedData() { return response_data_.get() && response_data_->length() != 0; }
+    bool hasDataToSend() {
+      return (
+          (response_data_ && response_data_->length() != 0) ||
+          (remote_end_stream_received_ && !remote_end_stream_forwarded_ && !response_trailers_));
+    }
 
     void sendDataToBridge(Buffer::Instance& data, bool end_stream);
     void sendTrailersToBridge(const ResponseTrailerMap& trailers);

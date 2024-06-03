@@ -7,6 +7,7 @@
 #include "source/common/common/posix/thread_impl.h"
 #include "source/common/common/thread.h"
 
+#include "absl/synchronization/notification.h"
 #include "absl/types/optional.h"
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
@@ -163,6 +164,7 @@ private:
   // instructions scheduled on the main_thread_ need to have a longer lifetime.
   Thread::PosixThreadPtr main_thread_{nullptr}; // Empty placeholder to be populated later.
   bool terminated_{false};
+  absl::Notification engine_running_;
 };
 
 } // namespace Envoy
