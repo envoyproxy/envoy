@@ -189,11 +189,12 @@ bool RateLimitQuotaFilter::shouldAllowRequest(const CachedBucket& cached_bucket)
   case RateLimitStrategy::kBlanketRule:
     switch (rate_limit_strategy.blanket_rule()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-    case RateLimitStrategy::ALLOW_ALL:
-      return true;
     case RateLimitStrategy::DENY_ALL:
       return false;
+    case RateLimitStrategy::ALLOW_ALL:
+      break;
     }
+    return true;
   case RateLimitStrategy::kTokenBucket:
     // A TokenBucket assignment should always have its accompanying
     // TokenBucket implementation in the cache. If it's null instead, then
