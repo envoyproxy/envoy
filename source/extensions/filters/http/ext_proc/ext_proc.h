@@ -145,19 +145,47 @@ private:
   std::unique_ptr<Filters::Common::MutationRules::Checker> rule_checker_;
 };
 
+class ThreadLocalStreamManager;
+inline constexpr uint32_t DEFAULT_CLOSE_TIMEOUT_MS = 30000;
+
+// Deferred deleteable stream wrapper.
+struct DeferredDeletableStream : public Logger::Loggable<Logger::Id::ext_proc> {
+  explicit DeferredDeletableStream(ExternalProcessorStreamPtr stream,
+                                   ThreadLocalStreamManager& stream_manager)
+      : stream_(std::move(stream)), parent(stream_manager) {}
+
+  void deferredClose(Envoy::Event::Dispatcher& dispatcher, Filter* filter);
+
+  ExternalProcessorStreamPtr stream_;
+  Event::TimerPtr derferred_close_timer;
+  ThreadLocalStreamManager& parent;
+};
+
+using DeferredDeletableStreamPtr = std::unique_ptr<DeferredDeletableStream>;
+
 class ThreadLocalStreamManager : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
-  // Store the ExternalProcessorStreamPtr in the map and return its raw pointer.
+  // Store the ExternalProcessorStreamPtr (as a wrapper object) in the map and return its raw
+  // pointer.
   ExternalProcessorStream* store(Filter* filter, ExternalProcessorStreamPtr stream) {
-    stream_manager_[filter] = std::move(stream);
-    return stream_manager_[filter].get();
+    stream_manager_[filter] = std::make_unique<DeferredDeletableStream>(std::move(stream), *this);
+    return stream_manager_[filter]->stream_.get();
   }
 
   void erase(Filter* filter) { stream_manager_.erase(filter); }
 
+  void deferredErase(Filter* filter, Envoy::Event::Dispatcher& dispatcher) {
+    auto it = stream_manager_.find(filter);
+    if (it == stream_manager_.end()) {
+      return;
+    }
+
+    it->second->deferredClose(dispatcher, filter);
+  }
+
 private:
-  // Map of ExternalProcessorStreamPtrs with filter pointer as key.
-  absl::flat_hash_map<Filter*, ExternalProcessorStreamPtr> stream_manager_;
+  // Map of DeferredDeletableStreamPtrs with filter pointer as key.
+  absl::flat_hash_map<Filter*, DeferredDeletableStreamPtr> stream_manager_;
 };
 
 class FilterConfig {
@@ -169,6 +197,7 @@ public:
                Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
                Server::Configuration::CommonFactoryContext& context)
       : failure_mode_allow_(config.failure_mode_allow()),
+        observability_mode_(config.observability_mode()),
         route_cache_action_(config.route_cache_action()), message_timeout_(message_timeout),
         max_message_timeout_ms_(max_message_timeout_ms),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
@@ -209,6 +238,8 @@ public:
   }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
+
+  bool observabilityMode() const { return observability_mode_; }
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
@@ -270,6 +301,7 @@ private:
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
   const bool failure_mode_allow_;
+  const bool observability_mode_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
       route_cache_action_;
   const std::chrono::milliseconds message_timeout_;
@@ -408,6 +440,14 @@ public:
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
 
+  Http::FilterHeadersStatus
+  sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers, ProcessorState& state,
+                                 bool end_stream);
+  Http::FilterDataStatus sendDataInObservabilityMode(Buffer::Instance& data, ProcessorState& state,
+                                                     bool end_stream);
+
+  void deferredCloseStream();
+
   envoy::service::ext_proc::v3::ProcessingRequest
   setupBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
   void sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
@@ -476,6 +516,7 @@ private:
   std::vector<std::string> untyped_forwarding_namespaces_{};
   std::vector<std::string> typed_forwarding_namespaces_{};
   std::vector<std::string> untyped_receiving_namespaces_{};
+  Http::StreamFilterCallbacks* filter_callbacks_;
 };
 
 extern std::string responseCaseToString(
