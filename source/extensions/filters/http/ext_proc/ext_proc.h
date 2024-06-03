@@ -147,7 +147,7 @@ private:
 
 class ThreadLocalStreamManager;
 // TODO(tyxia) Make it configurable.
-inline constexpr uint32_t DEFAULT_CLOSE_TIMEOUT_MS = 30000;
+inline constexpr uint32_t DEFAULT_CLOSE_TIMEOUT_MS = 500;
 
 // Deferred deletable stream wrapper.
 struct DeferredDeletableStream : public Logger::Loggable<Logger::Id::ext_proc> {

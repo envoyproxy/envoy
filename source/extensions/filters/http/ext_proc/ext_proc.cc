@@ -344,6 +344,10 @@ void Filter::onDestroy() {
   decoding_state_.stopMessageTimer();
   encoding_state_.stopMessageTimer();
 
+  if (stream_ != nullptr) {
+    stream_->notifyFilterDestroy();
+  }
+
   if (config_->observabilityMode()) {
     // Deferred close the stream in observability mode only.
     deferredCloseStream();

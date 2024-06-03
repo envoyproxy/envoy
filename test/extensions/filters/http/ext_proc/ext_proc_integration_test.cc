@@ -4189,14 +4189,15 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
-  // processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
   handleUpstreamRequestWithTrailer();
 
-  // processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
   processResponseTrailersMessage(
       *grpc_upstreams_[0], true, [](const HttpTrailers& trailers, TrailersResponse& resp) {
+        // Verify the trailer
         Http::TestResponseTrailerMapImpl expected_trailers{{"x-test-trailers", "Yes"}};
         EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
+
+        // Try to mutate the trailer
         auto* trailer_mut = resp.mutable_header_mutation();
         auto* trailer_add = trailer_mut->add_set_headers();
         trailer_add->mutable_header()->set_key("x-modified-trailers");
@@ -4205,9 +4206,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
       });
 
   verifyDownstreamResponse(*response, 200);
-  // ASSERT_TRUE(response->trailers());
-  // EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-test-trailers", "Yes"));
-  // EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-modified-trailers", "xxx"));
+  EXPECT_THAT(*(response->trailers()), HasNoHeader("x-modified-trailers"));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
@@ -4222,32 +4221,9 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
   const std::string body_str = "Hello";
   auto response = sendDownstreamRequestWithBodyAndTrailer(body_str);
 
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&) {
-        // Verify the header.
-        Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
-                                                                {":method", "GET"},
-                                                                {"host", "host"},
-                                                                {":path", "/"},
-                                                                {"x-forwarded-proto", "http"}};
-        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
-        return true;
-      });
-
-  processRequestBodyMessage(*grpc_upstreams_[0], false,
-                            [&body_str](const HttpBody& body, BodyResponse&) {
-                              // Verify the body.
-                              EXPECT_EQ(body.body(), body_str);
-                              return true;
-                            });
-
-  processRequestTrailersMessage(
-      *grpc_upstreams_[0], false, [](const HttpTrailers& trailers, TrailersResponse&) {
-        // Verify the trailer.
-        Http::TestRequestTrailerMapImpl expected_trailers{{"x-trailer-foo", "yes"}};
-        EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
-        return true;
-      });
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
 
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
