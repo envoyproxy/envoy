@@ -22,7 +22,7 @@ public:
       std::pair<std::string, std::vector<Address::CidrRange>> ip_tags;
       ip_tags.first = fmt::format("tag_{0}", i);
       for (const auto& j : cidr_range_strings[i]) {
-        ip_tags.second.push_back(Address::CidrRange::create(j));
+        ip_tags.second.push_back(*Address::CidrRange::create(j));
       }
       output.push_back(ip_tags);
     }
@@ -329,7 +329,7 @@ TEST_F(LcTrieTest, ExclusiveNestedPrefixesWithCatchAll) {
 // when using the default fill factor.
 TEST_F(LcTrieTest, MaximumEntriesExceptionDefault) {
   static const size_t num_prefixes = 1 << 19;
-  Address::CidrRange address = Address::CidrRange::create("10.0.0.1/8");
+  Address::CidrRange address = *Address::CidrRange::create("10.0.0.1/8");
   std::vector<Address::CidrRange> prefixes;
   prefixes.reserve(num_prefixes);
   for (size_t i = 0; i < num_prefixes; i++) {
@@ -355,7 +355,7 @@ TEST_F(LcTrieTest, MaximumEntriesExceptionOverride) {
   for (size_t i = 0; i < 16; i++) {
     for (size_t j = 0; j < 16; j++) {
       for (size_t k = 0; k < 32; k++) {
-        prefixes.emplace_back(Address::CidrRange::create(fmt::format("10.{}.{}.{}/8", i, j, k)));
+        prefixes.emplace_back(*Address::CidrRange::create(fmt::format("10.{}.{}.{}/8", i, j, k)));
       }
     }
   }
