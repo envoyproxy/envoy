@@ -2824,7 +2824,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
@@ -2878,7 +2878,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
   cp1->idle_cb_();
   cp1->idle_cb_ = nullptr;
@@ -2912,7 +2912,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
                TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
@@ -2980,7 +2980,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
@@ -3076,7 +3076,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
   cp1->idle_cb_();
   cp1->idle_cb_ = nullptr;
@@ -3134,7 +3134,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
                TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
@@ -3924,7 +3924,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveDefaultPriority) {
   EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
 
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
@@ -3957,7 +3957,8 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveDefaultPriority) {
   // crash.
   dns_timer_->invokeCallback();
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
+               TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
 }
@@ -4017,7 +4018,7 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolDestroyWithDraining) {
   EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
 
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   MockConnPoolWithDestroy* mock_cp = new MockConnPoolWithDestroy();
@@ -4042,7 +4043,8 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolDestroyWithDraining) {
   // Remove the first host, this should lead to the cp being drained.
   dns_timer_->invokeCallback();
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
+               TestUtility::makeDnsResponse({}));
 
   // The drained callback might get called when the CP is being destroyed.
   EXPECT_CALL(*mock_cp, onDestroy()).WillOnce(Invoke(drained_cb));

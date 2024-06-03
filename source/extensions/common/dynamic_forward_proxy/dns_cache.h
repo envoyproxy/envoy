@@ -72,6 +72,11 @@ public:
    * TTL policy
    */
   virtual void touch() PURE;
+
+  /**
+   * Returns details about the last resolution.
+   */
+  virtual std::string details() PURE;
 };
 
 using DnsHostInfoSharedPtr = std::shared_ptr<DnsHostInfo>;

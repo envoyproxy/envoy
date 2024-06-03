@@ -97,7 +97,8 @@ public:
    * @param status supplies the final status of the resolution.
    * @param response supplies the list of resolved IP addresses and TTLs.
    */
-  using ResolveCb = std::function<void(ResolutionStatus status, std::list<DnsResponse>&& response)>;
+  using ResolveCb = std::function<void(ResolutionStatus status, std::string details,
+                                       std::list<DnsResponse>&& response)>;
 
   /**
    * Initiate an async DNS resolution.

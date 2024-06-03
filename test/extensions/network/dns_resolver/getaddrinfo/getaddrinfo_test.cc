@@ -109,7 +109,7 @@ TEST_F(GetAddrInfoDnsImplTest, LocalhostResolve) {
 
   resolver_->resolve(
       "localhost", DnsLookupFamily::All,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+      [this](DnsResolver::ResolutionStatus status, std::string, std::list<DnsResponse>&& response) {
         verifyRealGaiResponse(status, std::move(response));
         dispatcher_->exit();
       });
@@ -121,15 +121,15 @@ TEST_F(GetAddrInfoDnsImplTest, Cancel) {
   // See https://github.com/envoyproxy/envoy/issues/28504.
   DISABLE_UNDER_WINDOWS;
 
-  auto query =
-      resolver_->resolve("localhost", DnsLookupFamily::All,
-                         [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) { FAIL(); });
+  auto query = resolver_->resolve(
+      "localhost", DnsLookupFamily::All,
+      [](DnsResolver::ResolutionStatus, std::string, std::list<DnsResponse>&&) { FAIL(); });
 
   query->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
 
   resolver_->resolve(
       "localhost", DnsLookupFamily::All,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+      [this](DnsResolver::ResolutionStatus status, std::string, std::list<DnsResponse>&& response) {
         verifyRealGaiResponse(status, std::move(response));
         dispatcher_->exit();
       });
@@ -142,14 +142,15 @@ TEST_F(GetAddrInfoDnsImplTest, Failure) {
 
   EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
       .WillOnce(Return(Api::SysCallIntResult{EAI_FAIL, 0}));
-  resolver_->resolve(
-      "localhost", DnsLookupFamily::All,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
-        EXPECT_TRUE(response.empty());
+  resolver_->resolve("localhost", DnsLookupFamily::All,
+                     [this](DnsResolver::ResolutionStatus status, std::string details,
+                            std::list<DnsResponse>&& response) {
+                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
+                       EXPECT_EQ("Non-recoverable failure in name resolution", details);
+                       EXPECT_TRUE(response.empty());
 
-        dispatcher_->exit();
-      });
+                       dispatcher_->exit();
+                     });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
@@ -161,7 +162,7 @@ TEST_F(GetAddrInfoDnsImplTest, NoData) {
       .WillOnce(Return(Api::SysCallIntResult{EAI_NODATA, 0}));
   resolver_->resolve(
       "localhost", DnsLookupFamily::All,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+      [this](DnsResolver::ResolutionStatus status, std::string, std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
         EXPECT_TRUE(response.empty());
 
@@ -178,7 +179,7 @@ TEST_F(GetAddrInfoDnsImplTest, NoName) {
       .WillOnce(Return(Api::SysCallIntResult{EAI_NONAME, 0}));
   resolver_->resolve(
       "localhost", DnsLookupFamily::All,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+      [this](DnsResolver::ResolutionStatus status, std::string, std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
         EXPECT_TRUE(response.empty());
 
@@ -198,7 +199,7 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainAndSuccess) {
       .WillOnce(Return(Api::SysCallIntResult{0, 0}));
   resolver_->resolve(
       "localhost", DnsLookupFamily::All,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+      [this](DnsResolver::ResolutionStatus status, std::string, std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
         EXPECT_TRUE(response.empty());
 
@@ -220,9 +221,9 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainThenCancel) {
         dispatcher_->exit();
         return Api::SysCallIntResult{EAI_AGAIN, 0};
       }));
-  query =
-      resolver_->resolve("localhost", DnsLookupFamily::All,
-                         [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) { FAIL(); });
+  query = resolver_->resolve(
+      "localhost", DnsLookupFamily::All,
+      [](DnsResolver::ResolutionStatus, std::string, std::list<DnsResponse>&&) { FAIL(); });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   resolver_.reset();
@@ -237,7 +238,7 @@ TEST_F(GetAddrInfoDnsImplTest, All) {
 
   resolver_->resolve(
       "localhost", DnsLookupFamily::All,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+      [this](DnsResolver::ResolutionStatus status, std::string, std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
         EXPECT_EQ(2, response.size());
         EXPECT_EQ("[[::1]:0, 127.0.0.1:0]",
@@ -260,7 +261,7 @@ TEST_F(GetAddrInfoDnsImplTest, V4Only) {
 
   resolver_->resolve(
       "localhost", DnsLookupFamily::V4Only,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+      [this](DnsResolver::ResolutionStatus status, std::string, std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[127.0.0.1:0]",
@@ -283,7 +284,7 @@ TEST_F(GetAddrInfoDnsImplTest, V6Only) {
 
   resolver_->resolve(
       "localhost", DnsLookupFamily::V6Only,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+      [this](DnsResolver::ResolutionStatus status, std::string, std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[[::1]:0]",
@@ -306,7 +307,7 @@ TEST_F(GetAddrInfoDnsImplTest, V4Preferred) {
 
   resolver_->resolve(
       "localhost", DnsLookupFamily::V4Preferred,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+      [this](DnsResolver::ResolutionStatus status, std::string, std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[127.0.0.1:0]",
@@ -329,7 +330,7 @@ TEST_F(GetAddrInfoDnsImplTest, V4PreferredNoV4) {
 
   resolver_->resolve(
       "localhost", DnsLookupFamily::V4Preferred,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+      [this](DnsResolver::ResolutionStatus status, std::string, std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[[::1]:0]",
@@ -352,7 +353,7 @@ TEST_F(GetAddrInfoDnsImplTest, Auto) {
 
   resolver_->resolve(
       "localhost", DnsLookupFamily::Auto,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+      [this](DnsResolver::ResolutionStatus status, std::string, std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[[::1]:0]",
@@ -375,7 +376,7 @@ TEST_F(GetAddrInfoDnsImplTest, AutoNoV6) {
 
   resolver_->resolve(
       "localhost", DnsLookupFamily::Auto,
-      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+      [this](DnsResolver::ResolutionStatus status, std::string, std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[127.0.0.1:0]",

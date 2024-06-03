@@ -111,6 +111,8 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_{{":authority", "foo"}};
   NiceMock<Upstream::MockBasicResourceLimit> pending_requests_;
+  std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo> host_info_{
+      new NiceMock<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>()};
 };
 
 // Default port 80 if upstream TLS not configured.
@@ -554,8 +556,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
   InSequence s;
 
   // Setup test host
-  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
+  host_info_->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
@@ -569,10 +570,10 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
       .WillOnce(Invoke([&](absl::string_view, uint16_t, bool,
                            ProxyFilter::LoadDnsCacheEntryCallbacks&) {
-        return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
+        return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info_};
       }));
 
-  EXPECT_CALL(*host_info, address()).Times(2).WillRepeatedly(Return(host_info->address_));
+  EXPECT_CALL(*host_info_, address()).Times(2).WillRepeatedly(Return(host_info_->address_));
 
   // Host was resolved successfully, so continue filter iteration.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -605,8 +606,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   InSequence s;
 
   // Setup test host
-  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
+  host_info_->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
@@ -620,10 +620,10 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
       .WillOnce(Invoke([&](absl::string_view, uint16_t, bool,
                            ProxyFilter::LoadDnsCacheEntryCallbacks&) {
-        return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
+        return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info_};
       }));
 
-  EXPECT_CALL(*host_info, address()).Times(2).WillRepeatedly(Return(host_info->address_));
+  EXPECT_CALL(*host_info_, address()).Times(2).WillRepeatedly(Return(host_info_->address_));
 
   // Host was resolved successfully, so continue filter iteration.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -640,7 +640,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
 
   // Verify the data
   EXPECT_TRUE(updated_address_obj->address_);
-  EXPECT_EQ(updated_address_obj->address_->asStringView(), host_info->address_->asStringView());
+  EXPECT_EQ(updated_address_obj->address_->asStringView(), host_info_->address_->asStringView());
 
   filter_->onDestroy();
 }
@@ -656,8 +656,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   InSequence s;
 
   // Setup test host
-  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-  host_info->address_ = nullptr;
+  host_info_->address_ = nullptr;
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
@@ -668,13 +667,13 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
       .WillOnce(Invoke([&](absl::string_view, uint16_t, bool,
                            ProxyFilter::LoadDnsCacheEntryCallbacks&) {
-        return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
+        return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info_};
       }));
 
-  EXPECT_CALL(*host_info, address());
+  EXPECT_CALL(*host_info_, address());
   EXPECT_CALL(callbacks_,
               sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS resolution failure"), _, _,
-                             Eq("dns_resolution_failure")));
+                             Eq("dns_resolution_failure{}")));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
