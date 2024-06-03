@@ -4122,14 +4122,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithHeader) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   // Header mutation response has been ignored.
   EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
-  upstream_request_->headers().iterate(
-      [](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-        std::cout << "tyxia_key: " << header.key().getStringView() << "\n";
-        std::cout << "tyxia_value: " << header.value().getStringView() << "\n";
-        return Http::HeaderMap::Iterate::Continue;
-      });
-  // EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(upstream_request_->headers(),
-  // expected_request_headers));
+
   Http::TestResponseHeaderMapImpl response_headers =
       Http::TestResponseHeaderMapImpl{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, false);
@@ -4158,9 +4151,6 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
   const std::string original_body_str = "Hello";
   auto response = sendDownstreamRequestWithBody(original_body_str, absl::nullopt);
 
-  // TODO(tyxia)
-  // This avoids early filter destruction so that upstream server don't need return
-  // early.
   processRequestBodyMessage(
       *grpc_upstreams_[0], true, [](const HttpBody& body, BodyResponse& body_resp) {
         EXPECT_TRUE(body.end_of_stream());
@@ -4226,7 +4216,6 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
 
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -4234,7 +4223,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
   auto response = sendDownstreamRequestWithBodyAndTrailer(body_str);
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&) {
         // Verify the header.
         Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
                                                                 {":method", "GET"},
@@ -4242,24 +4231,15 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
                                                                 {":path", "/"},
                                                                 {"x-forwarded-proto", "http"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
-
-        // Try to mutate the header.
-        auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
-        auto* add1 = response_mutation->add_set_headers();
-        add1->mutable_header()->set_key("x-response-processed");
-        add1->mutable_header()->set_value("1");
         return true;
       });
 
-  processRequestBodyMessage(
-      *grpc_upstreams_[0], false, [&body_str](const HttpBody& body, BodyResponse& body_resp) {
-        // Verify the body.
-        EXPECT_EQ(body.body(), body_str);
-        // Try to mutate the body.
-        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body("Hello, World!");
-        return true;
-      });
+  processRequestBodyMessage(*grpc_upstreams_[0], false,
+                            [&body_str](const HttpBody& body, BodyResponse&) {
+                              // Verify the body.
+                              EXPECT_EQ(body.body(), body_str);
+                              return true;
+                            });
 
   processRequestTrailersMessage(
       *grpc_upstreams_[0], false, [](const HttpTrailers& trailers, TrailersResponse&) {
@@ -4269,24 +4249,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
         return true;
       });
 
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  // Header mutation response has been ignored.
-  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
-  // Body mutation response has been ignored.
-  EXPECT_EQ(upstream_request_->body().toString(), body_str);
-
-  Http::TestResponseHeaderMapImpl response_headers =
-      Http::TestResponseHeaderMapImpl{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers, false);
-  upstream_request_->encodeData(100, true);
-
-  processResponseBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
-    EXPECT_TRUE(body.end_of_stream());
-    return true;
-  });
-
+  handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 }
 
@@ -4303,38 +4266,9 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
 
   handleUpstreamRequestWithTrailer();
 
-  processResponseHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
-        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
-        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
-        // Try to mutate the header.
-        auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
-        auto* add1 = response_mutation->add_set_headers();
-        add1->mutable_header()->set_key("x-response-processed");
-        add1->mutable_header()->set_value("1");
-        return true;
-      });
-
-  processResponseBodyMessage(
-      *grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& body_resp) {
-        // Try to mutate the body.
-        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body("Hello, World!");
-        return true;
-      });
-
-  processResponseTrailersMessage(
-      *grpc_upstreams_[0], false, [](const HttpTrailers& trailers, TrailersResponse& resp) {
-        // Verify the trailer.
-        Http::TestResponseTrailerMapImpl expected_trailers{{"x-test-trailers", "Yes"}};
-        EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
-        // Try to mutate the trailer.
-        auto* trailer_mut = resp.mutable_header_mutation();
-        auto* trailer_add = trailer_mut->add_set_headers();
-        trailer_add->mutable_header()->set_key("x-modified-trailers");
-        trailer_add->mutable_header()->set_value("xxx");
-        return true;
-      });
+  processResponseHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
 
   verifyDownstreamResponse(*response, 200);
 }

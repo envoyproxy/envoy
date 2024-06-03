@@ -146,7 +146,7 @@ private:
 };
 
 class ThreadLocalStreamManager;
-// TODO(tyxia) Make it configureable
+// TODO(tyxia) Make it configurable.
 inline constexpr uint32_t DEFAULT_CLOSE_TIMEOUT_MS = 30000;
 
 // Deferred deletable stream wrapper.
