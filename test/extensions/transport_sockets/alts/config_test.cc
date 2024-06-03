@@ -31,7 +31,7 @@ TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   )EOF";
   TestUtility::loadFromYaml(yaml, *config);
 
-  auto socket_factory = factory.createTransportSocketFactory(*config, factory_context);
+  auto socket_factory = factory.createTransportSocketFactory(*config, factory_context).value();
 
   EXPECT_NE(nullptr, socket_factory);
   EXPECT_TRUE(socket_factory->implementsSecureTransport());
@@ -52,7 +52,7 @@ TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   )EOF";
   TestUtility::loadFromYaml(yaml, *config);
 
-  auto socket_factory = factory.createTransportSocketFactory(*config, factory_context, {});
+  auto socket_factory = factory.createTransportSocketFactory(*config, factory_context, {}).value();
 
   EXPECT_NE(nullptr, socket_factory);
   EXPECT_TRUE(socket_factory->implementsSecureTransport());

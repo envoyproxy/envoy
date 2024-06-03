@@ -13,9 +13,11 @@ envoy_cc_library(
     name = "router_lib",
     srcs = [
         "router.cc",
+        "upstream.cc",
     ],
     hdrs = [
         "router.h",
+        "upstream.h",
     ],
     deps = [
         "//contrib/generic_proxy/filters/network/source:tracing_lib",
@@ -30,6 +32,7 @@ envoy_cc_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:tracer_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
+        "@com_github_google_quiche//:quiche_common_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/router/v3:pkg_cc_proto",
     ],
 )

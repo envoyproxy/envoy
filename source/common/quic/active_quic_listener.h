@@ -8,6 +8,7 @@
 #include "envoy/server/process_context.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_connection_id_generator_factory.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
@@ -39,7 +40,8 @@ public:
                      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
                      QuicConnectionIdGeneratorPtr&& cid_generator,
-                     QuicConnectionIdWorkerSelector worker_selector);
+                     QuicConnectionIdWorkerSelector worker_selector,
+                     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory);
 
   ~ActiveQuicListener() override;
 
@@ -140,6 +142,7 @@ private:
       crypto_server_stream_factory_;
   absl::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
       proof_source_factory_;
+  EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef connection_debug_visitor_factory_;
   EnvoyQuicConnectionIdGeneratorFactoryPtr quic_cid_generator_factory_;
   EnvoyQuicServerPreferredAddressConfigPtr server_preferred_address_config_;
   quic::QuicConfig quic_config_;

@@ -114,6 +114,7 @@ envoy_cc_test(
     srcs = ["rds_impl_test.cc"],
     deps = [
         "//source/common/config:utility_lib",
+        "//source/common/http:rds_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
         "//source/server/admin:admin_lib",
@@ -160,6 +161,7 @@ envoy_cc_test(
         "//source/common/config:null_grpc_mux_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
+        "//source/common/http:rds_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/server/admin:admin_lib",

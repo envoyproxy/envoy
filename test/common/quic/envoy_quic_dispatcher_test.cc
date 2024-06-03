@@ -74,17 +74,17 @@ public:
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
             listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_, quic_stat_names_,
-            crypto_stream_factory_, connection_id_generator_),
+            crypto_stream_factory_, connection_id_generator_, std::nullopt),
         connection_id_(quic::test::TestConnectionId(1)),
-        transport_socket_factory_(true, listener_config_.listenerScope(),
-                                  std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
-                                  ssl_context_manager_, {}) {
+        transport_socket_factory_(*QuicServerTransportSocketFactory::create(
+            true, listener_config_.listenerScope(),
+            std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_, {})) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
     EXPECT_CALL(*writer, WritePacket(_, _, _, _, _, _))
         .WillRepeatedly(Return(quic::WriteResult(quic::WRITE_STATUS_OK, 0)));
     EXPECT_CALL(proof_source_->filterChain(), transportSocketFactory())
-        .WillRepeatedly(ReturnRef(transport_socket_factory_));
+        .WillRepeatedly(ReturnRef(*transport_socket_factory_));
   }
 
   void SetUp() override {
@@ -254,7 +254,7 @@ protected:
   EnvoyQuicDispatcher envoy_quic_dispatcher_;
   quic::QuicConnectionId connection_id_;
   testing::NiceMock<Ssl::MockContextManager> ssl_context_manager_;
-  QuicServerTransportSocketFactory transport_socket_factory_;
+  std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicDispatcherTests, EnvoyQuicDispatcherTest,

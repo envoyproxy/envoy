@@ -421,7 +421,8 @@ TEST_F(ODCDTest, TestAllocateWithLocator) {
       "static_cluster");
 
   auto locator =
-      Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.config.cluster.v3.Cluster/bar");
+      Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.config.cluster.v3.Cluster/bar")
+          .value();
   auto handle = cluster_manager_->allocateOdCdsApi(config, locator, mock_visitor);
   EXPECT_NE(handle, nullptr);
 }
@@ -613,7 +614,7 @@ class AlpnTestConfigFactory
     : public Envoy::Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory {
 public:
   std::string name() const override { return "envoy.transport_sockets.alpn"; }
-  Network::UpstreamTransportSocketFactoryPtr
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message&,
                                Server::Configuration::TransportSocketFactoryContext&) override {
     return std::make_unique<AlpnSocketFactory>();
@@ -740,7 +741,6 @@ TEST_F(ClusterManagerImplTest, AdsCluster) {
   const std::string yaml = R"EOF(
   dynamic_resources:
     ads_config:
-      transport_api_version: V3
       api_type: GRPC
       set_node_on_first_message_only: true
       grpc_services:
@@ -773,7 +773,6 @@ TEST_F(ClusterManagerImplTest, AdsClusterStartsMuxOnlyOnce) {
   const std::string yaml = R"EOF(
   dynamic_resources:
     ads_config:
-      transport_api_version: V3
       api_type: GRPC
       set_node_on_first_message_only: true
       grpc_services:
@@ -1010,10 +1009,8 @@ static_resources:
     type: eds
     eds_cluster_config:
       eds_config:
-        resource_api_version: V3
         api_config_source:
           api_type: GRPC
-          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: static_cluster

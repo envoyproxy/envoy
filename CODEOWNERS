@@ -293,6 +293,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Thrift
 /*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
 /*/extensions/health_checkers/thrift @zuercher @JuniorHsu
+# Thrift to metadata
+/*/extensions/filters/http/thrift_to_metadata @JuniorHsu @zuercher
 # IP tagging
 /*/extensions/filters/http/ip_tagging @alyssawilk @JuniorHsu
 # Header to metadata

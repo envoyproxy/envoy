@@ -16,6 +16,10 @@ behavior_changes:
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
     requests and responses. This behavior can be reverted by setting the feature to false.
+- area: http2
+  change: |
+    Passes HTTP/2 DATA frames through a different codec API. This behavior can be temporarily disabled by setting the runtime
+    feature ``envoy.reloadable_features.http2_use_visitor_for_data`` to false.
 - area: proxy_protocol
   change: |
     Populate typed metadata by default in proxy protocol listener. Typed metadata can be consumed as
@@ -63,9 +67,21 @@ minor_behavior_changes:
     ``%UPSTREAM_REMOTE_PORT%`` and ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%`` access log format specifiers.
     This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.upstream_remote_address_use_connection`` to false.
+- area: http
+  change: |
+    Changing header validation checks in the substitution format utility and CEL code to do RCF complaint header validation.
+    This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.consistent_header_validation`` to false.
 - area: quic
   change: |
     When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
+- area: config
+  change: |
+    In xDS configuration, the :ref:`AUTO <envoy_v3_api_enum_value_config.core.v3.ApiVersion.AUTO>` value now means
+    :ref:`V3 <envoy_v3_api_enum_value_config.core.v3.ApiVersion.V3>`. :ref:`AUTO <envoy_v3_api_enum_value_config.core.v3.ApiVersion.AUTO>`
+    is the default value of the enum, so this field may be omitted from all configurations now.
+- area: filters
+  change: |
+    Set ``WWW-Authenticate`` header for 401 responses from the Basic Auth filter.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -107,6 +123,10 @@ bug_fixes:
   change: |
     Handle ``append_action`` from :ref:`external authorization service <envoy_v3_api_msg_service.auth.v3.CheckResponse>`
     that was ignored.
+- area: oauth2
+  change: |
+    Fixed a bug that would cause Envoy to crash when recieving an Oauth callback while the Oauth upstream is unhealthy
+    (e.g. due to DNS issues).
 - area: http
   change: |
     Fix BalsaParser resetting state too early, guarded by default-true
@@ -140,6 +160,9 @@ removed_config_or_runtime:
 - area: router
   change: |
     Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
+- area: jwt
+  change: |
+    Removed ``envoy.reloadable_features.token_passed_entirely`` runtime flag and legacy code paths.
 
 new_features:
 - area: hot_restart
@@ -189,6 +212,11 @@ new_features:
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting
     :ref:`health_check_config <envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.proxy_protocol_config>`.
+- area: access_log
+  change: |
+    added new ``access_log`` command operators to retrieve upstream connection information change: ``%UPSTREAM_PEER_URI_SAN%``,
+    ``%UPSTREAM_PEER_IP_SAN%``, ``%UPSTREAM_PEER_DNS_SAN%``, ``%UPSTREAM_LOCAL_URI_SAN%``, ``%UPSTREAM_LOCAL_DNS_SAN%``,
+    ``%UPSTREAM_LOCAL_IP_SAN%``.
 - area: open_telemetry
   change: |
     added :ref:`stat_prefix

@@ -4,7 +4,9 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
+import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel;
 
 /**
  * Wrapper class for EnvoyHTTPFilter for receiving JNI calls.
@@ -54,7 +56,7 @@ class JvmFilterContext {
     assert headerUtility.validateCount(headerCount);
     final Map<String, List<String>> headers = headerUtility.retrieveHeaders();
     return toJniFilterHeadersStatus(
-        filter.onRequestHeaders(headers, endStream, new EnvoyStreamIntelImpl(streamIntel)));
+        filter.onRequestHeaders(headers, endStream, new EnvoyStreamIntel(streamIntel)));
   }
 
   /**
@@ -70,7 +72,7 @@ class JvmFilterContext {
     // be destroyed after calling this callback.
     ByteBuffer copiedData = ByteBuffers.copy(data);
     return toJniFilterDataStatus(
-        filter.onRequestData(copiedData, endStream, new EnvoyStreamIntelImpl(streamIntel)));
+        filter.onRequestData(copiedData, endStream, new EnvoyStreamIntel(streamIntel)));
   }
 
   /**
@@ -84,7 +86,7 @@ class JvmFilterContext {
     assert headerUtility.validateCount(trailerCount);
     final Map<String, List<String>> trailers = headerUtility.retrieveHeaders();
     return toJniFilterTrailersStatus(
-        filter.onRequestTrailers(trailers, new EnvoyStreamIntelImpl(streamIntel)));
+        filter.onRequestTrailers(trailers, new EnvoyStreamIntel(streamIntel)));
   }
 
   /**
@@ -99,7 +101,7 @@ class JvmFilterContext {
     assert headerUtility.validateCount(headerCount);
     final Map<String, List<String>> headers = headerUtility.retrieveHeaders();
     return toJniFilterHeadersStatus(
-        filter.onResponseHeaders(headers, endStream, new EnvoyStreamIntelImpl(streamIntel)));
+        filter.onResponseHeaders(headers, endStream, new EnvoyStreamIntel(streamIntel)));
   }
 
   /**
@@ -115,7 +117,7 @@ class JvmFilterContext {
     // be destroyed after calling this callback.
     ByteBuffer copiedData = ByteBuffers.copy(data);
     return toJniFilterDataStatus(
-        filter.onResponseData(copiedData, endStream, new EnvoyStreamIntelImpl(streamIntel)));
+        filter.onResponseData(copiedData, endStream, new EnvoyStreamIntel(streamIntel)));
   }
 
   /**
@@ -129,7 +131,7 @@ class JvmFilterContext {
     assert headerUtility.validateCount(trailerCount);
     final Map<String, List<String>> trailers = headerUtility.retrieveHeaders();
     return toJniFilterTrailersStatus(
-        filter.onResponseTrailers(trailers, new EnvoyStreamIntelImpl(streamIntel)));
+        filter.onResponseTrailers(trailers, new EnvoyStreamIntel(streamIntel)));
   }
 
   /**
@@ -160,7 +162,7 @@ class JvmFilterContext {
       trailers = trailerUtility.retrieveHeaders();
     }
     return toJniFilterResumeStatus(filter.onResumeRequest(headers, copiedData, trailers, endStream,
-                                                          new EnvoyStreamIntelImpl(streamIntel)));
+                                                          new EnvoyStreamIntel(streamIntel)));
   }
 
   /**
@@ -191,7 +193,7 @@ class JvmFilterContext {
       trailers = trailerUtility.retrieveHeaders();
     }
     return toJniFilterResumeStatus(filter.onResumeResponse(headers, copiedData, trailers, endStream,
-                                                           new EnvoyStreamIntelImpl(streamIntel)));
+                                                           new EnvoyStreamIntel(streamIntel)));
   }
 
   /**
@@ -225,8 +227,8 @@ class JvmFilterContext {
   public Object onError(int errorCode, byte[] message, int attemptCount, long[] streamIntel,
                         long[] finalStreamIntel) {
     String errorMessage = new String(message);
-    filter.onError(errorCode, errorMessage, attemptCount, new EnvoyStreamIntelImpl(streamIntel),
-                   new EnvoyFinalStreamIntelImpl(finalStreamIntel));
+    filter.onError(errorCode, errorMessage, attemptCount, new EnvoyStreamIntel(streamIntel),
+                   new EnvoyFinalStreamIntel(finalStreamIntel));
     return null;
   }
 
@@ -238,8 +240,7 @@ class JvmFilterContext {
    * @return Object,     not used in HTTP filters.
    */
   public Object onCancel(long[] streamIntel, long[] finalStreamIntel) {
-    filter.onCancel(new EnvoyStreamIntelImpl(streamIntel),
-                    new EnvoyFinalStreamIntelImpl(finalStreamIntel));
+    filter.onCancel(new EnvoyStreamIntel(streamIntel), new EnvoyFinalStreamIntel(finalStreamIntel));
     return null;
   }
 
@@ -251,8 +252,8 @@ class JvmFilterContext {
    * @return Object,     not used in HTTP filters.
    */
   public Object onComplete(long[] streamIntel, long[] finalStreamIntel) {
-    filter.onComplete(new EnvoyStreamIntelImpl(streamIntel),
-                      new EnvoyFinalStreamIntelImpl(finalStreamIntel));
+    filter.onComplete(new EnvoyStreamIntel(streamIntel),
+                      new EnvoyFinalStreamIntel(finalStreamIntel));
     return null;
   }
 

@@ -34,7 +34,7 @@ private:
   Server::Configuration::TransportSocketFactoryContext& factory_context_;
 };
 
-Network::UpstreamTransportSocketFactoryPtr
+absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 UpstreamTapSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
@@ -45,8 +45,9 @@ UpstreamTapSocketConfigFactory::createTransportSocketFactory(
       Server::Configuration::UpstreamTransportSocketConfigFactory>(outer_config.transport_socket());
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
-  auto inner_transport_factory =
+  auto factory_or_error =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
+  RETURN_IF_STATUS_NOT_OK(factory_or_error);
 
   auto& server_context = context.serverFactoryContext();
   return std::make_unique<TapSocketFactory>(
@@ -54,10 +55,10 @@ UpstreamTapSocketConfigFactory::createTransportSocketFactory(
       std::make_unique<SocketTapConfigFactoryImpl>(
           server_context.mainThreadDispatcher().timeSource(), context),
       server_context.admin(), server_context.singletonManager(), server_context.threadLocal(),
-      server_context.mainThreadDispatcher(), std::move(inner_transport_factory));
+      server_context.mainThreadDispatcher(), std::move(factory_or_error.value()));
 }
 
-Network::DownstreamTransportSocketFactoryPtr
+absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
 DownstreamTapSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
@@ -69,15 +70,16 @@ DownstreamTapSocketConfigFactory::createTransportSocketFactory(
       outer_config.transport_socket());
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
-  auto inner_transport_factory = inner_config_factory.createTransportSocketFactory(
-      *inner_factory_config, context, server_names);
+  auto factory_or_error = inner_config_factory.createTransportSocketFactory(*inner_factory_config,
+                                                                            context, server_names);
+  RETURN_IF_STATUS_NOT_OK(factory_or_error);
   auto& server_context = context.serverFactoryContext();
   return std::make_unique<DownstreamTapSocketFactory>(
       outer_config,
       std::make_unique<SocketTapConfigFactoryImpl>(
           server_context.mainThreadDispatcher().timeSource(), context),
       server_context.admin(), server_context.singletonManager(), server_context.threadLocal(),
-      server_context.mainThreadDispatcher(), std::move(inner_transport_factory));
+      server_context.mainThreadDispatcher(), std::move(factory_or_error.value()));
 }
 
 ProtobufTypes::MessagePtr TapSocketConfigFactory::createEmptyConfigProto() {
