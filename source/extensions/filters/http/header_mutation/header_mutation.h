@@ -30,9 +30,10 @@ public:
       : request_mutations_(config.request_mutations()),
         response_mutations_(config.response_mutations()),
         query_params_evaluator_(std::make_unique<QueryParamsEvaluator>(
-          config.query_parameters_to_add(), config.query_parameters_to_remove())) {}
+            config.query_parameters_to_add(), config.query_parameters_to_remove())) {}
 
-  void mutateRequestHeaders(Http::RequestHeaderMap& headers, const Formatter::HttpFormatterContext& ctx,
+  void mutateRequestHeaders(Http::RequestHeaderMap& headers,
+                            const Formatter::HttpFormatterContext& ctx,
                             const StreamInfo::StreamInfo& stream_info) const;
   void mutateResponseHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& ctx,
                              const StreamInfo::StreamInfo& stream_info) const;

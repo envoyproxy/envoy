@@ -20,8 +20,8 @@ namespace HeaderMutation {
 
 using QueryParameterValueOptionProto =
     envoy::extensions::filters::http::header_mutation::v3::QueryParameterValueOption;
-using QueryParameterAppendActionProto = envoy::extensions::filters::http::header_mutation::
-    v3::QueryParameterValueOption_QueryParameterAppendAction;
+using QueryParameterAppendActionProto = envoy::extensions::filters::http::header_mutation::v3::
+    QueryParameterValueOption_QueryParameterAppendAction;
 
 enum class AppendAction {
   AppendIfExistsOrAdd = envoy::extensions::filters::http::header_mutation::v3::

@@ -166,7 +166,7 @@ TEST_F(QueryParamsEvaluatorTest, CommandSubstitutionFilterState) {
   EXPECT_EQ("/path?bar=123&foo=\"substituted-value\"", new_path);
 }
 
-} // namespace QueryParameterMutation
+} // namespace HeaderMutation
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
