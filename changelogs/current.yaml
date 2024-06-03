@@ -224,8 +224,8 @@ new_features:
     configuration to support additional stat prefix for the OpenTelemetry logger.
 - area: http
   change: |
-    Add query parameter capabilities to :ref:` Header Mutation Filter<envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
-    for adding/removing query parameters on a request.
+    Add query parameter capabilities to :ref:` Header Mutation Filter
+    <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>` for adding/removing query parameters on a request.
 
 deprecated:
 - area: tracing
