@@ -53,7 +53,7 @@ SanMatcherPtr createStringSanMatcher(
     // Invalid/Empty OID returns a nullptr from OBJ_txt2obj
     bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj(matcher.oid().c_str(), 0));
     if (oid == nullptr) {
-      PANIC("Invalid OID for OtherName SAN");
+      return nullptr;
     };
     return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher.matcher(),
                                                             context, std::move(oid))};
