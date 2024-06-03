@@ -2,9 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.header_mutation.v3;
 
-import "envoy/config/core/v3/base.proto";
-
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
+import "envoy/config/core/v3/base.proto";
 
 import "udpa/annotations/status.proto";
 
