@@ -700,6 +700,8 @@ private:
 
 /**
  * A trie used for faster lookup with lookup time at most equal to the size of the key.
+ *
+ * Type of Value must be empty-constructable and moveable, e.g. smart pointers.
  */
 template <class Value> struct TrieLookupTable {
 
