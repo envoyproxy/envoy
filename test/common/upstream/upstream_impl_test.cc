@@ -1624,9 +1624,11 @@ TEST_F(HostImplTest, CreateConnection) {
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(dispatcher, createClientConnection_(_, _, _, _)).WillOnce(Return(connection));
   EXPECT_CALL(*connection, connectionInfoSetter());
+  EXPECT_CALL(*connection, streamInfo());
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   EXPECT_EQ(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
@@ -1664,11 +1666,13 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
   EXPECT_NE(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
@@ -1712,12 +1716,14 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   // The underlying connection should be created to the proxy address.
   EXPECT_CALL(dispatcher, createClientConnection_(proxy_address, _, _, _))
       .WillOnce(Return(connection));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be a raw connection to the proxy address rather
   // than a happy eyeballs connection.
   EXPECT_EQ(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
@@ -1768,11 +1774,13 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   EXPECT_CALL(dispatcher, createClientConnection_(address_list[1], _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
   EXPECT_NE(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
@@ -1820,11 +1828,13 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
   EXPECT_NE(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, HealthFlags) {

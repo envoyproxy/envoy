@@ -495,6 +495,7 @@ TEST(UtilityTest, JsonStringFound) {
       Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
   EXPECT_EQ(expiration, "testvalue");
 }
+
 TEST(UtilityTest, JsonStringNotFound) {
   auto test_json = Json::Factory::loadFromStringNoThrow("{\"no_access_key_id\":\"testvalue\"}");
   EXPECT_TRUE(test_json.ok());
@@ -502,12 +503,14 @@ TEST(UtilityTest, JsonStringNotFound) {
       Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
   EXPECT_EQ(expiration, "notfound");
 }
+
 TEST(UtilityTest, JsonIntegerFound) {
   auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":5}");
   EXPECT_TRUE(test_json.ok());
   const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
   EXPECT_EQ(expiration, 5);
 }
+
 TEST(UtilityTest, JsonIntegerNotFound) {
   auto test_json = Json::Factory::loadFromStringNoThrow("{\"noexpiration\":5}");
   EXPECT_TRUE(test_json.ok());
@@ -515,6 +518,34 @@ TEST(UtilityTest, JsonIntegerNotFound) {
   // Should return default value
   EXPECT_EQ(expiration, 0);
 }
+
+// Check we handle double formatted integer > 0
+TEST(UtilityTest, JsonIntegerExponent) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":1.714449238E9}");
+  EXPECT_TRUE(test_json.ok());
+  auto value_or_error = test_json.value()->getValue("expiration");
+  EXPECT_TRUE(value_or_error.ok());
+  EXPECT_FALSE(absl::holds_alternative<int64_t>(value_or_error.value()));
+  EXPECT_TRUE(absl::holds_alternative<double>(value_or_error.value()));
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  // Should return default value
+  EXPECT_EQ(expiration, 1714449238);
+}
+
+// Check we handle double formatted integer < 0
+TEST(UtilityTest, JsonIntegerExponentInvalid) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":-0.17144492389}");
+  EXPECT_TRUE(test_json.ok());
+  auto value_or_error = test_json.value()->getValue("expiration");
+  EXPECT_TRUE(value_or_error.ok());
+  EXPECT_FALSE(absl::holds_alternative<int64_t>(value_or_error.value()));
+  EXPECT_TRUE(absl::holds_alternative<double>(value_or_error.value()));
+  const auto expiration =
+      Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 9999);
+  // Should return default value
+  EXPECT_EQ(expiration, 9999);
+}
+
 } // namespace
 } // namespace Aws
 } // namespace Common

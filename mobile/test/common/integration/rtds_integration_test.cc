@@ -1,6 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
+#include "source/common/router/rds_impl.h"
+
 #include "test/common/integration/xds_integration_test.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
@@ -18,6 +20,7 @@ public:
     setUpstreamProtocol(Http::CodecType::HTTP1);
 
     XdsIntegrationTest::initialize();
+    Router::forceRegisterRdsFactoryImpl();
 
     default_request_headers_.setScheme("http");
     initializeXdsStream();

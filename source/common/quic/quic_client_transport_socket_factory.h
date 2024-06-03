@@ -9,9 +9,9 @@ namespace Quic {
 class QuicClientTransportSocketFactory : public Network::CommonUpstreamTransportSocketFactory,
                                          public QuicTransportSocketFactoryBase {
 public:
-  QuicClientTransportSocketFactory(
-      Ssl::ClientContextConfigPtr config,
-      Server::Configuration::TransportSocketFactoryContext& factory_context);
+  static absl::StatusOr<std::unique_ptr<QuicClientTransportSocketFactory>>
+  create(Ssl::ClientContextConfigPtr config,
+         Server::Configuration::TransportSocketFactoryContext& factory_context);
 
   void initialize() override;
   bool implementsSecureTransport() const override { return true; }
@@ -43,8 +43,13 @@ public:
   std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig() override;
 
 protected:
+  QuicClientTransportSocketFactory(
+      Ssl::ClientContextConfigPtr config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      absl::Status& creation_status);
+
   // fallback_factory_ will update the context.
-  void onSecretUpdated() override {}
+  absl::Status onSecretUpdated() override { return absl::OkStatus(); }
 
   // The cache in the QuicCryptoClientConfig is not thread-safe, so crypto_config_ needs to
   // be a thread local object. client_context lets the thread local object determine if the crypto

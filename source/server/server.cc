@@ -262,9 +262,9 @@ void InstanceBase::updateServerStats() {
   server_stats_->memory_physical_size_.set(Memory::Stats::totalPhysicalBytes());
   if (!options().hotRestartDisabled()) {
     server_stats_->parent_connections_.set(parent_stats.parent_connections_);
-    server_stats_->total_connections_.set(listener_manager_->numConnections() +
-                                          parent_stats.parent_connections_);
   }
+  server_stats_->total_connections_.set(listener_manager_->numConnections() +
+                                        parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires().value_or(0));
 
@@ -1122,8 +1122,9 @@ Network::DnsResolverSharedPtr InstanceBase::getOrCreateDnsResolver() {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDnsResolverFactoryFromProto(bootstrap_, typed_dns_resolver_config);
-    dns_resolver_ =
-        dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
+    dns_resolver_ = THROW_OR_RETURN_VALUE(
+        dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config),
+        Network::DnsResolverSharedPtr);
   }
   return dns_resolver_;
 }

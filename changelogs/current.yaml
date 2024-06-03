@@ -118,6 +118,10 @@ bug_fixes:
   change: |
     Handle ``append_action`` from :ref:`external authorization service <envoy_v3_api_msg_service.auth.v3.CheckResponse>`
     that was ignored.
+- area: oauth2
+  change: |
+    Fixed a bug that would cause Envoy to crash when recieving an Oauth callback while the Oauth upstream is unhealthy
+    (e.g. due to DNS issues).
 - area: http
   change: |
     Fix BalsaParser resetting state too early, guarded by default-true
@@ -151,6 +155,9 @@ removed_config_or_runtime:
 - area: router
   change: |
     Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
+- area: jwt
+  change: |
+    Removed ``envoy.reloadable_features.token_passed_entirely`` runtime flag and legacy code paths.
 
 new_features:
 - area: hot_restart

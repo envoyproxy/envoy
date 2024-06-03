@@ -64,7 +64,7 @@ protected:
         absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":30"));
     Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
     EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _)).WillOnce(Return(context));
-    factory_ = std::make_unique<Quic::QuicClientTransportSocketFactory>(
+    factory_ = *Quic::QuicClientTransportSocketFactory::create(
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
             new NiceMock<Ssl::MockClientContextConfig>),
         context_);

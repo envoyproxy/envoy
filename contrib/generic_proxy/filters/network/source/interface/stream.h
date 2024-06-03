@@ -175,9 +175,6 @@ public:
    * @param key The metadata key of string view type.
    */
   virtual void erase(absl::string_view /*key*/) {}
-
-  // Used for matcher.
-  static constexpr absl::string_view name() { return "generic_proxy"; }
 };
 
 // Alias for backward compatibility.
