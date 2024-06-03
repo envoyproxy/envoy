@@ -207,6 +207,7 @@ bool RateLimitQuotaFilter::shouldAllowRequest(const CachedBucket& cached_bucket)
     ENVOY_LOG(error, "Bug: an RLQS bucket is cached with a missing "
                      "quota_assignment_action or rate_limit_strategy causing the "
                      "filter to fail open.");
+    break;
   }
   return true;
 }
