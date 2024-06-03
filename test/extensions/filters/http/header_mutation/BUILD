@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -52,5 +53,15 @@ envoy_extension_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/strings:str_format",
+    ],
+)
+
+envoy_cc_test(
+    name = "query_params_evaluator_test",
+    srcs = ["query_params_evaluator_test.cc"],
+    deps = [
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/http/header_mutation:query_params_evaluator_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )

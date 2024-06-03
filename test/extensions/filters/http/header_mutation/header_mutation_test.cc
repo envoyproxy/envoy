@@ -80,6 +80,13 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           key: "flag-header-6"
           value: "flag-header-6-value"
         append_action: "OVERWRITE_IF_EXISTS"
+    query_parameters_to_add:
+    - append_action: APPEND_IF_EXISTS_OR_ADD
+      query_parameter:
+        key: route-param
+        value: route-value
+    query_parameters_to_remove:
+    - route-remove-me
   )EOF";
 
   const std::string config_yaml = R"EOF(
@@ -92,6 +99,13 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
         append_action: "ADD_IF_ABSENT"
     response_mutations:
     - remove: "global-flag-header"
+    query_parameters_to_add:
+    - append_action: APPEND_IF_EXISTS_OR_ADD
+      query_parameter:
+        key: global-param
+        value: global-value
+    query_parameters_to_remove:
+    - global-remove-me
   )EOF";
 
   PerRouteProtoConfig per_route_proto_config;
@@ -128,7 +142,7 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           {"flag-header-4", "flag-header-4-value-old"},
           {"flag-header-6", "flag-header-6-value-old"},
           {":method", "GET"},
-          {":path", "/"},
+          {":path", "/?global-remove-me=true&route-remove-me=true"},
           {":scheme", "http"},
           {":authority", "host"}};
 
@@ -148,6 +162,7 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
       EXPECT_FALSE(headers.has("flag-header-5"));
       // 'flag-header-6' was present and should be overwritten.
       EXPECT_EQ("flag-header-6-value", headers.get_("flag-header-6"));
+      EXPECT_EQ("/?global-param=global-value&route-param=route-value", headers.get_(":path"));
     }
 
     // Case where the decodeHeaders() is not called and the encodeHeaders() is called.

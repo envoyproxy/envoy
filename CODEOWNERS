@@ -327,7 +327,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # String matching extensions
 /*/extensions/string_matcher/ @ggreenway @UNOWNED
 # Header mutation
-/*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
+/*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu @derekargueta
 # Health checkers
 /*/extensions/health_checkers/grpc @zuercher @botengyao
 /*/extensions/health_checkers/http @zuercher @botengyao
