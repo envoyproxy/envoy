@@ -37,8 +37,6 @@ For example: January 25, 2020: ``0.3.1.20200125``.
 GPG Key
 ======================
 
-NOTE: The `gpg` commands below may require running with `sudo`.
-
 To update the GPG key, use the following steps:
 
 1. Generate a new GPG public/private key pair and follow the interactive prompt.
