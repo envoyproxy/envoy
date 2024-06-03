@@ -2318,7 +2318,8 @@ TEST_P(QuicHttpIntegrationTest, UnsetSendDisableActiveMigration) {
 }
 
 // Validate that debug visitors are attached to connections when configured.
-TEST_P(QuicHttpIntegrationTest, ConnectionDebugVisitor) {
+// TODO(https://github.com/envoyproxy/envoy/issues/34492) deflake and enable
+TEST_P(QuicHttpIntegrationTest, DISABLED_ConnectionDebugVisitor) {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto debug_visitor_config = bootstrap.mutable_static_resources()
