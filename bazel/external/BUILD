@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-exports_files(["boringssl_fips.genrule_cmd"])
+exports_files(["boringssl_fips.genrule_cmd", "aws_lc.genrule_cmd"])
 
 # Use a wrapper cc_library with an empty source source file to force
 # compilation of other cc_library targets that only list *.a sources.

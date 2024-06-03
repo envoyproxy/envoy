@@ -10,6 +10,7 @@ PROTOBUF_VERSION = "29.3"
 PROTOC_VERSIONS = dict(
     linux_aarch_64 = "6427349140e01f06e049e707a58709a4f221ae73ab9a0425bc4a00c8d0e1ab32",
     linux_x86_64 = "3e866620c5be27664f3d2fa2d656b5f3e09b5152b42f1bedbf427b333e90021a",
+    linux_ppcle_64 = "0e9894ec2e3992b14d183e7ceac16465d6a6ee73e1d234695d80e6d1e947014c",
     osx_aarch_64 = "2b8a3403cd097f95f3ba656e14b76c732b6b26d7f183330b11e36ef2bc028765",
     osx_x86_64 = "9a788036d8f9854f7b03c305df4777cf0e54e5b081e25bf15252da87e0e90875",
     win64 = "57ea59e9f551ad8d71ffaa9b5cfbe0ca1f4e720972a1db7ec2d12ab44bff9383",
@@ -161,6 +162,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-fips/boringssl-0c6f40132b828e92ba365c6b7680e32820c63fa7.tar.xz"],
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2022-06-13",
+        cpe = "cpe:2.3:a:google:boringssl:*",
+    ),
+    aws_lc = dict(
+        project_name = "AWS libcrypto (AWS-LC)",
+        project_desc = "OpenSSL compatible general-purpose crypto library",
+        project_url = "https://github.com/aws/aws-lc",
+        version = "e7bd0732f4287f1ff974b6c78ee0e8873a0b586d",
+        sha256 = "e32769bf19e17d8bf6d65238ef2925732daeb92cfe362aa347352bbbd97bf622",
+        strip_prefix = "aws-lc-{version}",
+        urls = ["https://github.com/aws/aws-lc/archive/{version}.tar.gz"],
+        use_category = ["controlplane", "dataplane_core"],
+        release_date = "2025-02-05",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     aspect_bazel_lib = dict(
