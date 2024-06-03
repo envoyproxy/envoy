@@ -212,7 +212,7 @@ new_features:
     configuration to support additional stat prefix for the OpenTelemetry logger.
 - area: ratelimit
   change: |
-    Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>` 
+    Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>`
     by setting ``envoy.ratelimit.hits_addend`` to the desired value.
 
 deprecated:
