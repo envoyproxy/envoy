@@ -351,6 +351,22 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "disable_http3_on_linux_ppc",
+    match_all = [
+        ":disable_http3",
+        ":linux_ppc",
+    ],
+)
+
+selects.config_setting_group(
+    name = "disable_http3_on_windows_x86_64",
+    match_all = [
+        ":disable_http3",
+        ":windows_x86_64",
+    ],
+)
+
 config_setting(
     name = "disable_admin_html",
     values = {"define": "admin_html=disabled"},
