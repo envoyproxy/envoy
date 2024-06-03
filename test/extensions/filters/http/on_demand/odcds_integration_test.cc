@@ -86,10 +86,8 @@ public:
   createOdCdsConfigSource(absl::string_view cluster_name) {
     envoy::config::core::v3::ConfigSource source;
     TestUtility::loadFromYaml(fmt::format(R"EOF(
-      resource_api_version: V3
       api_config_source:
         api_type: DELTA_GRPC
-        transport_api_version: V3
         grpc_services:
           envoy_grpc:
             cluster_name: {}
@@ -102,7 +100,6 @@ public:
   static envoy::config::core::v3::ConfigSource createAdsOdCdsConfigSource() {
     envoy::config::core::v3::ConfigSource source;
     TestUtility::loadFromYaml(R"EOF(
-      resource_api_version: V3
       ads: {}
 )EOF",
                               source);
@@ -784,10 +781,8 @@ key:
               "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
               odcds:
                 source:
-                  resource_api_version: V3
                   api_config_source:
                     api_type: DELTA_GRPC
-                    transport_api_version: V3
                     grpc_services:
                       envoy_grpc:
                         cluster_name: odcds_cluster
@@ -804,10 +799,8 @@ key:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
                 odcds:
                   source:
-                    resource_api_version: V3
                     api_config_source:
                       api_type: DELTA_GRPC
-                      transport_api_version: V3
                       grpc_services:
                         envoy_grpc:
                           cluster_name: odcds_cluster
