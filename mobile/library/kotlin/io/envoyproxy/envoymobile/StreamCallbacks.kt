@@ -13,7 +13,7 @@ import java.util.concurrent.Executor
  *
  * `StreamCallbacks` are bridged through to `EnvoyHTTPCallbacks` to communicate with the engine.
  */
-internal class StreamCallbacks {
+class StreamCallbacks {
   var onHeaders:
     ((headers: ResponseHeaders, endStream: Boolean, streamIntel: StreamIntel) -> Unit)? =
     null
@@ -29,7 +29,7 @@ internal class StreamCallbacks {
  * Class responsible for bridging between the platform-level `StreamCallbacks` and the engine's
  * `EnvoyHTTPCallbacks`.
  */
-internal class EnvoyHTTPCallbacksAdapter(
+class EnvoyHTTPCallbacksAdapter(
   private val executor: Executor?,
   private val callbacks: StreamCallbacks
 ) : EnvoyHTTPCallbacks {
