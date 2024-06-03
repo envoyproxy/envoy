@@ -158,5 +158,14 @@ void ValidationInstance::shutdown() {
   dispatcher_->shutdown();
 }
 
+Network::DnsResolverSharedPtr ValidationInstance::dnsResolver() {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::DnsResolverFactory& dns_resolver_factory =
+      Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
+  return THROW_OR_RETURN_VALUE(
+      dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config),
+      Network::DnsResolverSharedPtr);
+}
+
 } // namespace Server
 } // namespace Envoy

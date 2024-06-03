@@ -74,6 +74,11 @@ minor_behavior_changes:
 - area: quic
   change: |
     When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
+- area: config
+  change: |
+    In xDS configuration, the :ref:`AUTO <envoy_v3_api_enum_value_config.core.v3.ApiVersion.AUTO>` value now means
+    :ref:`V3 <envoy_v3_api_enum_value_config.core.v3.ApiVersion.V3>`. :ref:`AUTO <envoy_v3_api_enum_value_config.core.v3.ApiVersion.AUTO>`
+    is the default value of the enum, so this field may be omitted from all configurations now.
 - area: filters
   change: |
     Set ``WWW-Authenticate`` header for 401 responses from the Basic Auth filter.
@@ -155,6 +160,9 @@ removed_config_or_runtime:
 - area: router
   change: |
     Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
+- area: jwt
+  change: |
+    Removed ``envoy.reloadable_features.token_passed_entirely`` runtime flag and legacy code paths.
 
 new_features:
 - area: hot_restart

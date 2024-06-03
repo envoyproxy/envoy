@@ -14,6 +14,8 @@ envoy_mobile_kt_library(
         "MockStreamClient.kt",
         "MockStreamPrototype.kt",
     ],
-    associates = ["//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib"],
     visibility = ["//visibility:public"],
+    deps = [
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
 )

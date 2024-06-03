@@ -8,7 +8,6 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/container/btree_map.h"
@@ -330,15 +329,7 @@ absl::string_view ExtractorImpl::extractJWT(absl::string_view value_str,
   }
 
   // There should be two dots (periods; 0x2e) inside the string, but we don't verify that here
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.token_passed_entirely")) {
-    return value_str.substr(starting);
-  }
-
-  auto ending = value_str.find_first_not_of(ConstantBase64UrlEncodingCharsPlusDot, starting);
-  if (ending == value_str.npos) { // Base64Url-encoded string occupies the rest of the line
-    return value_str.substr(starting);
-  }
-  return value_str.substr(starting, ending - starting);
+  return value_str.substr(starting);
 }
 
 void ExtractorImpl::sanitizeHeaders(Http::HeaderMap& headers) const {

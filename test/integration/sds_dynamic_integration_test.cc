@@ -1019,10 +1019,8 @@ public:
 
       // Set up the Bootstrap's CDS config to fetch from the CDS cluster.
       const std::string cds_yaml = R"EOF(
-    resource_api_version: V3
     api_config_source:
       api_type: GRPC
-      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: cds_cluster

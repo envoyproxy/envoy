@@ -87,7 +87,6 @@ public:
     )EOF";
 
     const std::string grpc_config = R"EOF(
-    transport_api_version: V3
     failure_mode_allow_header_add: true
     grpc_service:
       envoy_grpc:
@@ -206,7 +205,6 @@ public:
     InSequence s;
 
     initialize(R"(
-        transport_api_version: V3
         grpc_service:
           envoy_grpc:
             cluster_name: "ext_authz_server"
@@ -435,7 +433,6 @@ TEST_F(HttpFilterTest, StatsWithPrefix) {
 
   initialize(fmt::format(R"EOF(
   stat_prefix: "{}"
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -482,7 +479,6 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -521,7 +517,6 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -565,7 +560,6 @@ TEST_F(HttpFilterTest, ErrorFailOpen) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -603,7 +597,6 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -648,7 +641,6 @@ TEST_F(HttpFilterTest, ErrorOpenWithHeaderAddClose) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -686,7 +678,6 @@ TEST_F(HttpFilterTest, ImmediateErrorOpenWithHeaderAddClose) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -728,7 +719,6 @@ TEST_F(HttpFilterTest, ImmediateErrorOpenWithHeaderAddClose) {
 // Check a bad configuration results in validation exception.
 TEST_F(HttpFilterTest, BadConfig) {
   const std::string filter_config = R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc: {}
   failure_mode_allow: true
@@ -746,7 +736,6 @@ TEST_F(HttpFilterTest, RequestDataIsTooLarge) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -776,7 +765,6 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -824,7 +812,6 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -887,7 +874,6 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -921,7 +907,6 @@ TEST_F(HttpFilterTest, AuthWithRequestData) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -965,7 +950,6 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1013,7 +997,6 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
 
   // N.B. encode_raw_headers is set to true.
   initialize(R"EOF(
-  transport_api_version: V3
   encode_raw_headers: true
   grpc_service:
     envoy_grpc:
@@ -1058,7 +1041,6 @@ TEST_F(HttpFilterTest, HeaderOnlyRequest) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1083,7 +1065,6 @@ TEST_F(HttpFilterTest, UpgradeWebsocketRequest) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1113,7 +1094,6 @@ TEST_F(HttpFilterTest, H2UpgradeRequest) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1143,7 +1123,6 @@ TEST_F(HttpFilterTest, HeaderOnlyRequestWithStream) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1179,7 +1158,6 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   request_headers_.addCopy("remove-me", "upstream-should-not-see-me");
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1236,7 +1214,6 @@ TEST_F(HttpFilterTest, ClearCache) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1282,7 +1259,6 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1326,7 +1302,6 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1370,7 +1345,6 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1414,7 +1388,6 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1453,7 +1426,6 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1493,7 +1465,6 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1531,7 +1502,6 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
 // Verifies that specified metadata is passed along in the check request
 TEST_F(HttpFilterTest, MetadataContext) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1629,7 +1599,6 @@ TEST_F(HttpFilterTest, MetadataContext) {
 // Verifies that specified connection metadata is passed along in the check request
 TEST_F(HttpFilterTest, ConnectionMetadataContext) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1765,7 +1734,6 @@ TEST_F(HttpFilterTest, ConnectionMetadataContext) {
 // Verifies that specified route metadata is passed along in the check request
 TEST_F(HttpFilterTest, RouteMetadataContext) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1933,7 +1901,6 @@ TEST_F(HttpFilterTest, RouteMetadataContext) {
 // Test that filter can be disabled via the filter_enabled field.
 TEST_F(HttpFilterTest, FilterDisabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1958,7 +1925,6 @@ TEST_F(HttpFilterTest, FilterDisabled) {
 // Test that filter can be enabled via the filter_enabled field.
 TEST_F(HttpFilterTest, FilterEnabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1986,7 +1952,6 @@ TEST_F(HttpFilterTest, FilterEnabled) {
 // Test that filter can be disabled via the filter_enabled_metadata field.
 TEST_F(HttpFilterTest, MetadataDisabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2019,7 +1984,6 @@ TEST_F(HttpFilterTest, MetadataDisabled) {
 // Test that filter can be enabled via the filter_enabled_metadata field.
 TEST_F(HttpFilterTest, MetadataEnabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2056,7 +2020,6 @@ TEST_F(HttpFilterTest, MetadataEnabled) {
 // is disabled.
 TEST_F(HttpFilterTest, FilterEnabledButMetadataDisabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2101,7 +2064,6 @@ TEST_F(HttpFilterTest, FilterEnabledButMetadataDisabled) {
 // is disabled.
 TEST_F(HttpFilterTest, FilterDisabledButMetadataEnabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2146,7 +2108,6 @@ TEST_F(HttpFilterTest, FilterDisabledButMetadataEnabled) {
 // is enabled.
 TEST_F(HttpFilterTest, FilterEnabledAndMetadataEnabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2193,7 +2154,6 @@ TEST_F(HttpFilterTest, FilterEnabledAndMetadataEnabled) {
 // Test that filter can deny for protected path when filter is disabled via filter_enabled field.
 TEST_F(HttpFilterTest, FilterDenyAtDisable) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2227,7 +2187,6 @@ TEST_F(HttpFilterTest, FilterDenyAtDisable) {
 // Test that filter allows for protected path when filter is disabled via filter_enabled field.
 TEST_F(HttpFilterTest, FilterAllowAtDisable) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2352,7 +2311,6 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
 
   auto test_disable = [&](bool disabled) {
     initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2436,7 +2394,6 @@ TEST_P(HttpFilterTestParam, OkResponse) {
 
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcService) {
   initialize(R"EOF(
-    transport_api_version: V3
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
@@ -2447,7 +2404,6 @@ TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcService) {
 
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpService) {
   initialize(R"EOF(
-    transport_api_version: V3
     http_service:
       server_uri:
         uri: "ext_authz:9000"
@@ -2466,7 +2422,6 @@ TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpService) {
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcServiceWithAllowedHeaders) {
   const Http::LowerCaseString foo{"foo"};
   initialize(R"EOF(
-    transport_api_version: V3
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
@@ -2483,7 +2438,6 @@ TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcServiceWithAllowedHeader
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcServiceWithDisallowedHeaders) {
   const Http::LowerCaseString foo{"foo"};
   initialize(R"EOF(
-    transport_api_version: V3
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
@@ -2500,7 +2454,6 @@ TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcServiceWithDisallowedHea
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithAllowedHeaders) {
   const Http::LowerCaseString foo{"foo"};
   initialize(R"EOF(
-    transport_api_version: V3
     http_service:
       server_uri:
         uri: "ext_authz:9000"
@@ -2524,7 +2477,6 @@ TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithAllowedHeader
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithDisallowedHeaders) {
   const Http::LowerCaseString foo{"foo"};
   initialize(R"EOF(
-    transport_api_version: V3
     http_service:
       server_uri:
         uri: "ext_authz:9000"
@@ -2544,7 +2496,6 @@ TEST_P(HttpFilterTestParam,
        DEPRECATED_FEATURE_TEST(RequestHeaderMatchersForHttpServiceWithLegacyAllowedHeaders)) {
   const Http::LowerCaseString foo{"foo"};
   initialize(R"EOF(
-    transport_api_version: V3
     http_service:
       server_uri:
         uri: "ext_authz:9000"
@@ -2915,7 +2866,6 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401) {
 // Test that a denied response results in the connection closing with a 401 response to the client.
 TEST_P(HttpFilterTestParam, DeniedResponseWith401NoClusterResponseCodeStats) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -3133,7 +3083,6 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -3195,7 +3144,6 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -3249,7 +3197,6 @@ TEST_F(HttpFilterTest, EmittingMetadataWhenError) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -3358,7 +3305,6 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsWorks) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -3415,7 +3361,6 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsOverrideWorks) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -3480,7 +3425,6 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
 
   auto test_disable_request_body_buffering = [&](bool bypass) {
     initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"

@@ -10,7 +10,6 @@ android_library(
     name = "envoy_engine_lib",
     srcs = [
         "AndroidEngineImpl.java",
-        "AndroidJniLibrary.java",
         "AndroidNetworkMonitor.java",
         "AndroidProxyMonitor.java",
         "UpstreamHttpProtocol.java",
