@@ -431,6 +431,9 @@ TEST_P(LocalRateLimitFilterIntegrationTest, BasicTestPerRouteAndRds) {
   cleanUpXdsConnection();
 }
 
+#ifdef NDEBUG
+// This test is disabled in debug mode because it will violate the ASSERT in
+// singleton manager.
 TEST_P(LocalRateLimitFilterIntegrationTest, TestLocalClusterRateLimit) {
   initializeFilterWithLocalCluster(filter_config_with_local_cluster_rate_limit_,
                                    initial_local_cluster_endpoints_);
@@ -465,6 +468,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, TestLocalClusterRateLimit) {
 
   cleanUpXdsConnection();
 }
+#endif
 
 } // namespace
 } // namespace Envoy
