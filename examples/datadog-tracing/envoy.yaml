@@ -30,7 +30,7 @@ static_resources:
                     %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \
                     \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\" \
                     \"%RESP(X-AMZN-RequestId)%\" \"%REQ(X-DATADOG-TRACE-ID)%\" \"%REQ(X-DATADOG-PARENT-ID)%\"\n"
-          codec_type: auto
+          codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
             request_headers_to_add:
@@ -62,8 +62,8 @@ static_resources:
   clusters:
   - name: service1
     connect_timeout: 0.250s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: service1
       endpoints:
@@ -75,8 +75,8 @@ static_resources:
                 port_value: 8080
   - name: datadog_agent
     connect_timeout: 1s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: datadog_agent
       endpoints:
