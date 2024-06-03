@@ -741,7 +741,6 @@ TEST_F(ClusterManagerImplTest, AdsCluster) {
   const std::string yaml = R"EOF(
   dynamic_resources:
     ads_config:
-      transport_api_version: V3
       api_type: GRPC
       set_node_on_first_message_only: true
       grpc_services:
@@ -774,7 +773,6 @@ TEST_F(ClusterManagerImplTest, AdsClusterStartsMuxOnlyOnce) {
   const std::string yaml = R"EOF(
   dynamic_resources:
     ads_config:
-      transport_api_version: V3
       api_type: GRPC
       set_node_on_first_message_only: true
       grpc_services:
@@ -1011,10 +1009,8 @@ static_resources:
     type: eds
     eds_cluster_config:
       eds_config:
-        resource_api_version: V3
         api_config_source:
           api_type: GRPC
-          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: static_cluster
