@@ -3,16 +3,15 @@ package org.chromium.net.impl;
 import static org.chromium.net.impl.Errors.mapEnvoyMobileErrorToNetError;
 import static org.junit.Assert.assertEquals;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
-
 import io.envoyproxy.envoymobile.engine.UpstreamHttpProtocol;
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
 
 import org.chromium.net.impl.Errors.NetError;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.robolectric.RobolectricTestRunner;
 
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class ErrorsTest {
 
   @Test
