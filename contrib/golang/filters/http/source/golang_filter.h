@@ -188,6 +188,18 @@ private:
   EncodingProcessorState encoding_state_;
 };
 
+// Wrapper HttpRequestInternal to DeferredDeletable.
+// Since we want keep httpRequest at the top of the HttpRequestInternal,
+// so, HttpRequestInternal can not inherit the virtual class DeferredDeletable.
+class HttpRequestInternalWrapper : public Envoy::Event::DeferredDeletable {
+public:
+  HttpRequestInternalWrapper(HttpRequestInternal* req) : req_(req) {}
+  ~HttpRequestInternalWrapper() override { delete req_; }
+
+private:
+  HttpRequestInternal* req_;
+};
+
 /**
  * See docs/configuration/http_filters/golang_extension_filter.rst
  */
@@ -283,6 +295,7 @@ public:
   bool isProcessingInGo() {
     return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();
   }
+  void deferredDeleteRequest(HttpRequestInternal* req);
 
 private:
   bool hasDestroyed() {

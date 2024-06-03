@@ -1404,6 +1404,20 @@ bool Filter::initRequest() {
   return false;
 }
 
+void Filter::deferredDeleteRequest(HttpRequestInternal* req) {
+  ASSERT(req == req_, "invalid request pointer");
+  auto& dispatcher = getDispatcher();
+  if (dispatcher.isThreadSafe()) {
+    auto r = std::make_unique<HttpRequestInternalWrapper>(req);
+    dispatcher.deferredDelete(std::move(r));
+  } else {
+    dispatcher.post([&dispatcher, req] {
+      auto r = std::make_unique<HttpRequestInternalWrapper>(req);
+      dispatcher.deferredDelete(std::move(r));
+    });
+  }
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId() {

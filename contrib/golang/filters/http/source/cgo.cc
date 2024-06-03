@@ -287,7 +287,19 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   // req is used by go, so need to use raw memory and then it is safe to release at the gc finalize
   // phase of the go object.
   auto req = reinterpret_cast<HttpRequestInternal*>(r);
-  delete req;
+  auto weak_filter = req->weakFilter();
+  if (auto filter = weak_filter.lock()) {
+    // Finalize must happens after onDestory, that means Filter is marked as destroyed.
+    // When filter is still existing, it could happens in very low rate, since Golang GC
+    // finalizer delays execution.
+    // Now, the race is there might be filter method running, i.e. continueStatusInternal may invoke
+    // onDestroy, and check state in request after it.
+    // So, we'd better to defer delete the request.
+    filter->deferredDeleteRequest(req);
+  } else {
+    // It's safe to delete directly since filter is not existing.
+    delete req;
+  }
 }
 
 void envoyGoConfigHttpFinalize(void* c) {
