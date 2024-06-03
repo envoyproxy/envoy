@@ -18,10 +18,9 @@ namespace Quic {
 class QuicServerTransportSocketFactory : public Network::DownstreamTransportSocketFactory,
                                          public QuicTransportSocketFactoryBase {
 public:
-  QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
-                                   Ssl::ServerContextConfigPtr config,
-                                   Envoy::Ssl::ContextManager& manager,
-                                   const std::vector<std::string>& server_names);
+  static absl::StatusOr<std::unique_ptr<QuicServerTransportSocketFactory>>
+  create(bool enable_early_data, Stats::Scope& store, Ssl::ServerContextConfigPtr config,
+         Envoy::Ssl::ContextManager& manager, const std::vector<std::string>& server_names);
   ~QuicServerTransportSocketFactory() override;
 
   // Network::DownstreamTransportSocketFactory
@@ -52,10 +51,16 @@ public:
   bool handleCertsWithSharedTlsCode() const { return handle_certs_with_shared_tls_code_; }
 
 protected:
-  void onSecretUpdated() override;
+  QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
+                                   Ssl::ServerContextConfigPtr config,
+                                   Envoy::Ssl::ContextManager& manager,
+                                   const std::vector<std::string>& server_names,
+                                   absl::Status& creation_status);
+
+  absl::Status onSecretUpdated() override;
 
 private:
-  Envoy::Ssl::ServerContextSharedPtr createSslServerContext() const;
+  absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> createSslServerContext() const;
 
   const bool handle_certs_with_shared_tls_code_;
   Envoy::Ssl::ContextManager& manager_;

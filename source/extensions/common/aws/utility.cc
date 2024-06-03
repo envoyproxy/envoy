@@ -1,5 +1,8 @@
 #include "source/extensions/common/aws/utility.h"
 
+#include <cstdint>
+#include <limits>
+
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/empty_string.h"
@@ -473,12 +476,24 @@ int64_t Utility::getIntegerFromJsonOrDefault(Json::ObjectSharedPtr json_object,
                                              const int64_t integer_default) {
   absl::StatusOr<Envoy::Json::ValueType> value_or_error;
   value_or_error = json_object->getValue(integer_value);
-  if ((!value_or_error.ok()) || (!absl::holds_alternative<int64_t>(value_or_error.value()))) {
-
+  if (!value_or_error.ok() || ((!absl::holds_alternative<double>(value_or_error.value())) &&
+                               (!absl::holds_alternative<int64_t>(value_or_error.value())))) {
     ENVOY_LOG_MISC(error, "Unable to retrieve integer value from json: {}", integer_value);
     return integer_default;
   }
-  return absl::get<int64_t>(value_or_error.value());
+  auto json_integer = value_or_error.value();
+  // Handle double formatted integers IE exponent format such as 1.714449238E9
+  if (auto* double_integer = absl::get_if<double>(&json_integer)) {
+    if (*double_integer < 0) {
+      ENVOY_LOG_MISC(error, "Integer {} less than 0: {}", integer_value, *double_integer);
+      return integer_default;
+    } else {
+      return int64_t(*double_integer);
+    }
+  } else {
+    // Standard integer
+    return absl::get<int64_t>(json_integer);
+  }
 }
 
 } // namespace Aws
