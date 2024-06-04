@@ -333,6 +333,7 @@ void Filter::closeStream() {
 }
 
 void Filter::deferredCloseStream() {
+  ENVOY_LOG(debug, "Calling deferred close on stream");
   config_->threadLocalStreamManager().deferredErase(this, filter_callbacks_->dispatcher());
 }
 
@@ -349,10 +350,10 @@ void Filter::onDestroy() {
   }
 
   if (config_->observabilityMode()) {
-    // Deferred close the stream in observability mode only.
+    // Perform deferred close on the stream in observability mode only.
     deferredCloseStream();
   } else {
-    // Immediate close the stream.
+    // Perform Immediate close on the stream otherwise.
     closeStream();
   }
 }
@@ -391,8 +392,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
   mergePerRouteConfig();
 
-  // Send headers in observability mode if external processor wants headers to be sent, i.e.,
-  // sendHeaders() is true.
+  // Send headers in observability mode.
   if (decoding_state_.sendHeaders() && config_->observabilityMode()) {
     return sendHeadersInObservabilityMode(headers, decoding_state_, end_stream);
   }
@@ -830,6 +830,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   stats_.stream_msgs_sent_.inc();
 }
 
+// TODO(tyxia) Add logging support for observability mode.
 void Filter::logGrpcStreamInfo() {
   if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
     const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();
