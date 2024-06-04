@@ -46,7 +46,7 @@ TEST(SanMatcherConfigTest, TestValidSanType) {
   }
 }
 
-// Verify that Invalid OID for OtherName SAN results in a panic.
+// Verify that setting Invalid OID for OtherName SAN results in a panic.
 TEST(SanMatcherConfigTest, TestInvalidOidOtherNameSanType) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher san_matcher;
@@ -54,7 +54,7 @@ TEST(SanMatcherConfigTest, TestInvalidOidOtherNameSanType) {
   san_matcher.set_oid("1.3.6.1.4.1.311.20.2.ffff");
   san_matcher.set_san_type(
       envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::OTHER_NAME);
-  EXPECT_DEATH(createStringSanMatcher(san_matcher, context), "Invalid OID for OtherName SAN");
+  EXPECT_EQ(createStringSanMatcher(san_matcher, context), nullptr);
 }
 
 TEST(SanMatcherConfigTest, UnspecifiedSanType) {
