@@ -1,6 +1,6 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
-load("@envoy_mobile//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
 load("@envoy_mobile//bazel:kotlin_test.bzl", "envoy_mobile_android_test")
+load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -373,7 +373,7 @@ envoy_mobile_android_test(
     ],
 )
 
-envoy_mobile_kt_library(
+kt_android_library(
     name = "test_utilities",
     srcs = [
         "TestUtilities.kt",
