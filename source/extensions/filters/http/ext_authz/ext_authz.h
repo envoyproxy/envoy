@@ -395,19 +395,11 @@ public:
 
 private:
   // Convenience function for the following:
-  //
-  // 1. If `validate_mutations` is set to true, validate header key and value & reject response if
-  // validation fails,
-  // 2. Check that mutation is allowed by `decoder_header_mutation_rules` config. Reject the
-  // response if configured to do so.
-  // 3. If the mutation passed checks (and mutation_func is not null), call
-  // mutation_func(key, value).
-  //
-  // Returns false if the response has been rejected.
-  bool checkAndApplyHeaderMutation(
-      Filters::Common::MutationRules::CheckOperation operation, absl::string_view key,
-      absl::string_view value,
-      const std::function<void(Http::LowerCaseString, absl::string_view)> mutation_func);
+  // 1. If `validate_mutations` is set to true, validate header key and value.
+  // 2. If `decoder_header_mutation_rules` is set, check that mutation is allowed.
+  Filters::Common::MutationRules::CheckResult validateAndCheckDecoderHeaderMutation(
+    Filters::Common::MutationRules::CheckOperation operation, absl::string_view key,
+    absl::string_view value) const;
 
   // Called when the filter is configured to reject invalid responses & the authz response contains
   // invalid header or query parameters. Sends a local response with the configured rejection status

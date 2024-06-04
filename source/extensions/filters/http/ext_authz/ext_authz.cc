@@ -291,34 +291,15 @@ void Filter::onDestroy() {
   }
 }
 
-bool Filter::checkAndApplyHeaderMutation(
+CheckResult Filter::validateAndCheckDecoderHeaderMutation(
     Filters::Common::MutationRules::CheckOperation operation, absl::string_view key,
-    absl::string_view value,
-    const std::function<void(Http::LowerCaseString, absl::string_view)> mutation_func) {
+    absl::string_view value) const {
   if (config_->validateMutations() && (!Http::HeaderUtility::headerNameIsValid(key) ||
                                        !Http::HeaderUtility::headerValueIsValid(value))) {
-    ENVOY_STREAM_LOG(trace, "Rejecting invalid header '{}':'{}'.", *decoder_callbacks_, key, value);
-    rejectResponse();
-    return false;
+    return CheckResult::FAIL;
   }
   // Check header mutation is valid according to configured decoder mutation rules.
-  Http::LowerCaseString lowercase_key(key);
-  switch (config_->checkDecoderHeaderMutation(operation, lowercase_key, value)) {
-  case CheckResult::OK:
-    ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
-    if (mutation_func != nullptr) {
-      mutation_func(lowercase_key, value);
-    }
-    break;
-  case CheckResult::IGNORE:
-    ENVOY_STREAM_LOG(trace, "Ignoring invalid header '{}':'{}'.", *decoder_callbacks_, key, value);
-    break;
-  case CheckResult::FAIL:
-    ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_, key, value);
-    rejectResponse();
-    return false;
-  }
-  return true;
+  return config_->checkDecoderHeaderMutation(operation, Http::LowerCaseString(key), value);
 }
 
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
@@ -357,45 +338,77 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     ENVOY_STREAM_LOG(trace,
                      "ext_authz filter added header(s) to the request:", *decoder_callbacks_);
     for (const auto& [key, value] : response->headers_to_set) {
-      if (!checkAndApplyHeaderMutation(Filters::Common::MutationRules::CheckOperation::SET, key,
-                                       value,
-                                       [this](Http::LowerCaseString key, absl::string_view value) {
-                                         request_headers_->setCopy(key, value);
-                                       })) {
+      CheckResult check_result = validateAndCheckDecoderHeaderMutation(
+          Filters::Common::MutationRules::CheckOperation::SET, key, value);
+      switch (check_result) {
+      case CheckResult::OK:
+        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
+        request_headers_->setCopy(Http::LowerCaseString(key), value);
+        break;
+      case CheckResult::IGNORE:
+        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to set '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        break;
+      case CheckResult::FAIL:
+        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to set '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        rejectResponse();
         return;
       }
     }
     for (const auto& [key, value] : response->headers_to_add) {
-      if (!checkAndApplyHeaderMutation(Filters::Common::MutationRules::CheckOperation::SET, key,
-                                       value,
-                                       [this](Http::LowerCaseString key, absl::string_view value) {
-                                         request_headers_->addCopy(key, value);
-                                       })) {
+      CheckResult check_result = validateAndCheckDecoderHeaderMutation(
+          Filters::Common::MutationRules::CheckOperation::SET, key, value);
+      switch (check_result) {
+      case CheckResult::OK:
+        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
+        request_headers_->addCopy(Http::LowerCaseString(key), value);
+        break;
+      case CheckResult::IGNORE:
+        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to add '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        break;
+      case CheckResult::FAIL:
+        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to add '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        rejectResponse();
         return;
       }
     }
     for (const auto& [key, value] : response->headers_to_append) {
-      if (!checkAndApplyHeaderMutation(
-              Filters::Common::MutationRules::CheckOperation::APPEND, key, value,
-              [this](Http::LowerCaseString key, absl::string_view value) {
-                const auto header_to_modify = request_headers_->get(key);
-                // TODO(dio): Add a flag to allow appending non-existent headers, without setting it
-                // first (via `headers_to_add`). For example, given:
-                // 1. Original headers {"original": "true"}
-                // 2. Response headers from the authorization servers {{"append": "1"}, {"append":
-                // "2"}}
-                //
-                // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the
-                // intended combined headers: {{"original": "true"}, {"append": "1"}, {"append":
-                // "2"}}) to the request to upstream server by only sets `headers_to_append`.
-                if (!header_to_modify.empty()) {
-                  ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key.get(), value);
-                  // The current behavior of appending is by combining entries with the same key,
-                  // into one entry. The value of that combined entry is separated by ",".
-                  // TODO(dio): Consider to use addCopy instead.
-                  request_headers_->appendCopy(key, value);
-                }
-              })) {
+      CheckResult check_result = validateAndCheckDecoderHeaderMutation(
+          Filters::Common::MutationRules::CheckOperation::APPEND, key, value);
+      switch (check_result) {
+      case CheckResult::OK: {
+        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
+        Http::LowerCaseString lowercase_key(key);
+        const auto header_to_modify = request_headers_->get(lowercase_key);
+        // TODO(dio): Add a flag to allow appending non-existent headers, without setting it
+        // first (via `headers_to_add`). For example, given:
+        // 1. Original headers {"original": "true"}
+        // 2. Response headers from the authorization servers {{"append": "1"}, {"append":
+        // "2"}}
+        //
+        // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the
+        // intended combined headers: {{"original": "true"}, {"append": "1"}, {"append":
+        // "2"}}) to the request to upstream server by only sets `headers_to_append`.
+        if (!header_to_modify.empty()) {
+          ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
+          // The current behavior of appending is by combining entries with the same key,
+          // into one entry. The value of that combined entry is separated by ",".
+          // TODO(dio): Consider to use addCopy instead.
+          request_headers_->appendCopy(lowercase_key, value);
+        }
+        break;
+      }
+      case CheckResult::IGNORE:
+        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to append '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        break;
+      case CheckResult::FAIL:
+        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to append '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        rejectResponse();
         return;
       }
     }
