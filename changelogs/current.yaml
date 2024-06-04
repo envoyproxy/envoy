@@ -1,13 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+date: June 4, 2024
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: router
   change: |
     Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happends. This is
