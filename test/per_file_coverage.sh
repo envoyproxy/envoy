@@ -66,6 +66,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/health_checkers/grpc:92.1"
 "source/extensions/config_subscription/rest:94.7"
 "source/extensions/matching/input_matchers/cel_matcher:91.3" #Death tests don't report LCOV
+"source/extensions/quic/connection_debug_visitor:26" # https://github.com/envoyproxy/envoy/issues/34492
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
