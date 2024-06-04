@@ -1,7 +1,7 @@
 .. _install_sandboxes_datadog:
 
 Datadog tracing
-==============
+===============
 
 .. sidebar:: Requirements
 
@@ -13,13 +13,13 @@ Datadog tracing
 The Datadog tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
 capabilities using `Datadog <https://datadoghq.com/>`_ as the tracing provider.
 
-This example includes a Datadog Agent which will forward to Datadog's backend traces sent from envoy and the upstream `http` service.
+This example includes a Datadog Agent which will forward to Datadog's backend traces sent from Envoy and the upstream `http` service.
 
 The ``envoy`` service is exposed on port ``10000`` and the request flow is as follow:
 
     User -> ``envoy`` -> ``http``
 
-The Envoy proxy is configured (:download:`envoy.yaml <_include/datadog/envoy.yaml>`) to generate and propagate tracing context to upstream services and also to
+The Envoy proxy is configured (:download:`envoy.yaml <_include/datadog-tracing/envoy.yaml>`) to generate and propagate tracing context to upstream services and also to
 report tracing data to the Datadog Agent through an Envoy cluster nammed ``datadog_agent``.
 
 Each span records the latency of upstream API calls as well as information needed to correlate the span with other related spans (e.g., the trace ID).
@@ -47,7 +47,7 @@ To build this sandbox example, and start the example services run the following 
     datadog-tracing-http-1       "node --require dd-t…"           running      0.0.0.0:8080->8080/tcp
 
 Step 2: Make a request to ``http``
-***************************************
+**********************************
 
 Now send a request to the ``http`` service, by calling http://localhost:10000.
 
@@ -80,10 +80,11 @@ Step 3: View the traces in Datadog UI
 
 Log in your Datadog account and navigate to APM tracing page.
 
+.. image:: /start/sandboxes/_static/datadog-ui-landing.png
+
 Click on any of the trace with the service name ``envoy``. From here you can explore the paths taken by the requests, as well as the latency incurred at each hop,
 and other contextual information.
 
-.. image:: /start/sandboxes/_static/datadog-ui-landing.png
 .. image:: /start/sandboxes/_static/datadog-ui-trace.png
 
 Note the Datadog tracer identifies the Envoy proxies by the name provided in the ``tracing/provider/typed_config/service_name`` configuration.
