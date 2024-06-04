@@ -61,7 +61,7 @@ jobs:
           args: >-
             test
             --config=mobile-remote-ci-cc-xds-enabled
-            //test/common/... //test/cc/...
+            //test/common/integration/...
         - name: Running C++ tests with full protos enabled
           target: cc-tests-full-protos-enabled
           args: >-
