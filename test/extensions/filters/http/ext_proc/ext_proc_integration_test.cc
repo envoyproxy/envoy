@@ -9,6 +9,7 @@
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/extensions/filters/http/ext_proc/config.h"
+#include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
@@ -47,6 +48,7 @@ using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
 using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
+using Extensions::HttpFilters::ExternalProcessing::DEFAULT_CLOSE_TIMEOUT_MS;
 
 using Http::LowerCaseString;
 
@@ -4177,6 +4179,8 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
   });
 
   verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithWrongBodyMode) {
@@ -4193,6 +4197,8 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithWrongBodyMode) {
 
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
@@ -4223,6 +4229,8 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
 
   verifyDownstreamResponse(*response, 200);
   EXPECT_THAT(*(response->trailers()), HasNoHeader("x-modified-trailers"));
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
@@ -4243,6 +4251,8 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
 
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
@@ -4263,6 +4273,8 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
   processResponseTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
 
   verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
 }
 
 } // namespace Envoy
