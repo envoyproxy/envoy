@@ -19,8 +19,8 @@ The ``envoy`` service is exposed on port ``10000`` and the request flow is as fo
 
     User -> ``envoy`` -> ``http``
 
-The Envoy proxy is configured (:download:`envoy.yaml <_include/datadog/envoy.yaml>`) to generate and propagate tracing context to upstream services and also to 
-report tracing data to the Datadog Agent through an Envoy cluster nammed ``datadog_agent``. 
+The Envoy proxy is configured (:download:`envoy.yaml <_include/datadog/envoy.yaml>`) to generate and propagate tracing context to upstream services and also to
+report tracing data to the Datadog Agent through an Envoy cluster nammed ``datadog_agent``.
 
 Each span records the latency of upstream API calls as well as information needed to correlate the span with other related spans (e.g., the trace ID).
 
@@ -35,7 +35,7 @@ To build this sandbox example, and start the example services run the following 
 
     $ pwd
     envoy/examples/datadog-tracing
-    $ export DD_API_KEY=<YOUR_API_KEY> 
+    $ export DD_API_KEY=<YOUR_API_KEY>
     $ docker compose pull
     $ docker compose up --build -d
     $ docker compose ps
@@ -102,4 +102,3 @@ You can also explore the map graph to view relationships between nodes and the p
 
    `OpenTelemetry tracing <https://opentelemetry.io/>`
       OpenTelemetry tracing sandbox.
-
