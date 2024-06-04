@@ -1297,19 +1297,22 @@ void Filter::mergePerRouteConfig() {
   }
 }
 
-void DeferredDeletableStream::deferredClose(Envoy::Event::Dispatcher& dispatcher, Filter* filter) {
-  derferred_close_timer = dispatcher.createTimer([this, filter] {
-    // Close the stream.
-    if (stream_) {
-      ENVOY_LOG(debug, "Calling deferred close on stream");
-      stream_->close();
-      stream_.reset();
-    } else {
-      ENVOY_LOG(debug, "Stream already closed");
-    }
-    parent.erase(filter);
-  });
+void DeferredDeletableStream::closeStreamOnTimer(Filter* filter) {
+  // Close the stream.
+  if (stream_) {
+    ENVOY_LOG(debug, "Closing the stream");
+    stream_->close();
+    stream_.reset();
+  } else {
+    ENVOY_LOG(debug, "Stream already closed");
+  }
 
+  // Erase this entry from the map.
+  parent.erase(filter);
+}
+
+void DeferredDeletableStream::deferredClose(Envoy::Event::Dispatcher& dispatcher, Filter* filter) {
+  derferred_close_timer = dispatcher.createTimer([this, filter] { closeStreamOnTimer(filter); });
   derferred_close_timer->enableTimer(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
 }
 
