@@ -1302,7 +1302,6 @@ void DeferredDeletableStream::deferredClose(Envoy::Event::Dispatcher& dispatcher
     // Close the stream.
     if (stream_) {
       ENVOY_LOG(debug, "Calling deferred close on stream");
-      // TODO(tyxia) Deferred close stats??
       stream_->close();
       stream_.reset();
     } else {

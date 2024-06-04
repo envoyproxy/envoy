@@ -4179,6 +4179,22 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithWrongBodyMode) {
+  proto_config_.set_observability_mode(true);
+
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  const std::string original_body_str = "Hello";
+  auto response = sendDownstreamRequestWithBody(original_body_str, absl::nullopt);
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
   proto_config_.set_observability_mode(true);
 

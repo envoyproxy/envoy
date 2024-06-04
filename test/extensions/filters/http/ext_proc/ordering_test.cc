@@ -1159,6 +1159,7 @@ TEST_F(ObservabilityModeFastFailOrderingTest, GrpcErrorIgnoredOnStartRequestHead
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
 }
 
+// gRPC failure while opening stream with only request body enabled in streaming mode
 TEST_F(ObservabilityModeFastFailOrderingTest, GrpcErrorOnStartRequestBodyStreaming) {
   initialize([](ExternalProcessor& cfg) {
     cfg.set_observability_mode(true);
