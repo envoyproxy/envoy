@@ -55,6 +55,7 @@ TEST_P(AdminInstanceTest, Getters) {
   EXPECT_EQ(nullptr, admin_.tracer());
   EXPECT_FALSE(admin_.streamErrorOnInvalidHttpMessaging());
   EXPECT_FALSE(admin_.schemeToSet().has_value());
+  EXPECT_FALSE(admin_.shouldSchemeMatchUpstream());
   EXPECT_EQ(admin_.pathWithEscapedSlashesAction(),
             envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager::KEEP_UNCHANGED);

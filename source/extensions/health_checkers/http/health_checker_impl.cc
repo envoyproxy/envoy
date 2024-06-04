@@ -268,7 +268,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       *request_headers,
       // Here there is no downstream connection so scheme will be based on
       // upstream crypto
-      host_->transportSocketFactory().implementsSecureTransport());
+      false, host_->transportSocketFactory().implementsSecureTransport(), true);
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource(),
                                          local_connection_info_provider_,
                                          StreamInfo::FilterState::LifeSpan::FilterChain);

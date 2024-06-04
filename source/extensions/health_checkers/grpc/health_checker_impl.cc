@@ -224,7 +224,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
       headers_message->headers(),
       // Here there is no downstream connection so scheme will be based on
       // upstream crypto
-      host_->transportSocketFactory().implementsSecureTransport());
+      false, host_->transportSocketFactory().implementsSecureTransport(), true);
 
   auto status = request_encoder_->encodeHeaders(headers_message->headers(), false);
   // Encoding will only fail if required headers are missing.
