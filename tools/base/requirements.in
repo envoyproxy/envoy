@@ -5,7 +5,7 @@ aio.core>=0.10.2
 aiohttp>=3.8.1
 aioquic>=0.9.21
 cffi>=1.15.0
-clang-format==14.0.6
+clang-format==18.1.6
 clang-tidy==14.0.6
 colorama
 coloredlogs
