@@ -4,6 +4,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -75,9 +76,11 @@ void JniHelper::addClassToCache(const char* class_name) {
   JNIEnv* env;
   jint result = getJavaVm()->GetEnv(reinterpret_cast<void**>(&env), getVersion());
   ASSERT(result == JNI_OK, "Unable to get JNIEnv from the JavaVM.");
-  jclass java_class = reinterpret_cast<jclass>(env->NewGlobalRef(env->FindClass(class_name)));
-  jclass_cache_map.emplace(class_name, java_class);
-  jclass_cache_set.emplace(java_class);
+  jclass java_class = env->FindClass(class_name);
+  ASSERT(java_class != nullptr, absl::StrFormat("Unable to find class '%s'.", class_name));
+  jclass java_class_global_ref = reinterpret_cast<jclass>(env->NewGlobalRef(java_class));
+  jclass_cache_map.emplace(class_name, java_class_global_ref);
+  jclass_cache_set.emplace(java_class_global_ref);
 }
 
 JavaVM* JniHelper::getJavaVm() { return java_vm_cache_.load(std::memory_order_acquire); }

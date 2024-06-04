@@ -741,7 +741,6 @@ TEST_F(ClusterManagerImplTest, AdsCluster) {
   const std::string yaml = R"EOF(
   dynamic_resources:
     ads_config:
-      transport_api_version: V3
       api_type: GRPC
       set_node_on_first_message_only: true
       grpc_services:
@@ -774,7 +773,6 @@ TEST_F(ClusterManagerImplTest, AdsClusterStartsMuxOnlyOnce) {
   const std::string yaml = R"EOF(
   dynamic_resources:
     ads_config:
-      transport_api_version: V3
       api_type: GRPC
       set_node_on_first_message_only: true
       grpc_services:
@@ -1011,10 +1009,8 @@ static_resources:
     type: eds
     eds_cluster_config:
       eds_config:
-        resource_api_version: V3
         api_config_source:
           api_type: GRPC
-          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: static_cluster
@@ -1410,7 +1406,7 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(factory_.dispatcher_,
               createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
+                  PointeesEq(*Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
   create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
@@ -1445,7 +1441,7 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(factory_.dispatcher_,
               createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
+                  PointeesEq(*Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(factory_.dispatcher_, deleteInDispatcherThread(_));
   create(parseBootstrapFromV3Yaml(yaml));

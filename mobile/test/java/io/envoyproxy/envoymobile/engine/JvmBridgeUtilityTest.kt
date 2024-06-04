@@ -2,7 +2,10 @@ package io.envoyproxy.envoymobile.engine
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class JvmBridgeUtilityTest {
   @Test
   fun `retrieveHeaders produces a Map with all headers provided via passHeaders`() {

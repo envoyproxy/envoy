@@ -3,7 +3,7 @@ package io.envoyproxy.envoymobile
 import java.lang.IllegalArgumentException
 
 /** Represents an HTTP request method. */
-enum class RequestMethod(internal val stringValue: String) {
+enum class RequestMethod(val stringValue: String) {
   DELETE("DELETE"),
   GET("GET"),
   HEAD("HEAD"),
@@ -14,7 +14,7 @@ enum class RequestMethod(internal val stringValue: String) {
   TRACE("TRACE");
 
   companion object {
-    internal fun enumValue(stringRepresentation: String): RequestMethod {
+    fun enumValue(stringRepresentation: String): RequestMethod {
       return when (stringRepresentation) {
         "DELETE" -> DELETE
         "GET" -> GET

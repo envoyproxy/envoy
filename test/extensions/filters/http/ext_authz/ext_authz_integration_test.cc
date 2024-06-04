@@ -855,7 +855,6 @@ public:
   const std::string case_sensitive_header_value_{"Case-Sensitive"};
   // TODO: mutation rule
   const std::string legacy_default_config_ = R"EOF(
-  transport_api_version: V3
   disallowed_headers:
     patterns:
     - prefix: allowed-prefix-denied
@@ -890,7 +889,6 @@ public:
         - prefix: x-append
   )EOF";
   const std::string default_config_ = R"EOF(
-  transport_api_version: V3
   allowed_headers:
     patterns:
     - exact: X-Case-Sensitive-Header
@@ -1457,7 +1455,6 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
 
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
     const std::string ext_authz_config = R"EOF(
-  transport_api_version: V3
   http_service:
     server_uri:
       uri: "ext_authz:9000"

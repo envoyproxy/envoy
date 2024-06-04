@@ -36,6 +36,10 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
   Envoy::JNI::JniHelper::addClassToCache("io/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel");
   Envoy::JNI::JniHelper::addClassToCache(
       "io/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel");
+  Envoy::JNI::JniHelper::addClassToCache(
+      "io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary");
+  Envoy::JNI::JniHelper::addClassToCache(
+      "io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult");
   return Envoy::JNI::JniHelper::getVersion();
 }
 
@@ -1348,29 +1352,6 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   return result;
 }
 
-static void jvm_add_test_root_certificate(const uint8_t* cert, size_t len) {
-  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
-      Envoy::JNI::findClass("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
-  jmethodID jmid_addTestRootCertificate = jni_helper.getStaticMethodId(
-      jcls_AndroidNetworkLibrary.get(), "addTestRootCertificate", "([B)V");
-
-  Envoy::JNI::LocalRefUniquePtr<jbyteArray> cert_array =
-      Envoy::JNI::byteArrayToJavaByteArray(jni_helper, cert, len);
-  jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary.get(), jmid_addTestRootCertificate,
-                                  cert_array.get());
-}
-
-static void jvm_clear_test_root_certificate() {
-  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
-      Envoy::JNI::findClass("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
-  jmethodID jmid_clearTestRootCertificates = jni_helper.getStaticMethodId(
-      jcls_AndroidNetworkLibrary.get(), "clearTestRootCertificates", "()V");
-
-  jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary.get(), jmid_clearTestRootCertificates);
-}
-
 extern "C" JNIEXPORT jobject JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_callCertificateVerificationFromNative(
     JNIEnv* env, jclass, jobjectArray certChain, jbyteArray jauthType, jbyteArray jhost) {
@@ -1388,15 +1369,28 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_callCertificateVerificationFrom
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_callAddTestRootCertificateFromNative(
-    JNIEnv* env, jclass, jbyteArray jcert) {
+    JNIEnv* env, jclass, jbyteArray java_cert) {
   Envoy::JNI::JniHelper jni_helper(env);
-  std::vector<uint8_t> cert;
-  Envoy::JNI::javaByteArrayToByteVector(jni_helper, jcert, &cert);
-  jvm_add_test_root_certificate(cert.data(), cert.size());
+  std::vector<uint8_t> cpp_cert;
+  Envoy::JNI::javaByteArrayToByteVector(jni_helper, java_cert, &cpp_cert);
+  jclass java_android_network_library_class =
+      jni_helper.findClass("io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary");
+  jmethodID java_add_test_root_certificate_method_id = jni_helper.getStaticMethodId(
+      java_android_network_library_class, "addTestRootCertificate", "([B)V");
+  Envoy::JNI::LocalRefUniquePtr<jbyteArray> cert_array =
+      Envoy::JNI::byteArrayToJavaByteArray(jni_helper, cpp_cert.data(), cpp_cert.size());
+  jni_helper.callStaticVoidMethod(java_android_network_library_class,
+                                  java_add_test_root_certificate_method_id, cert_array.get());
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_callClearTestRootCertificateFromNative(JNIEnv*,
                                                                                         jclass) {
-  jvm_clear_test_root_certificate();
+  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
+  jclass java_android_network_library_class =
+      jni_helper.findClass("io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary");
+  jmethodID java_clear_test_root_certificates_method_id = jni_helper.getStaticMethodId(
+      java_android_network_library_class, "clearTestRootCertificates", "()V");
+  jni_helper.callStaticVoidMethod(java_android_network_library_class,
+                                  java_clear_test_root_certificates_method_id);
 }
