@@ -1,4 +1,4 @@
-name: Mobile/Core
+name: Mobile/CC
 
 permissions:
   contents: read
@@ -30,22 +30,23 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/_load.yml
     with:
-      check-name: mobile-core
+      check-name: mobile-cc
 
-  unit-tests:
+  cc-tests:
     permissions:
       contents: read
       packages: read
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-core }}
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-cc }}
     needs: load
+    name: cc-tests
     uses: ./.github/workflows/_mobile_container_ci.yml
     with:
       args: >-
         test
-        --config=mobile-remote-ci-core
-        //test/common/... //test/cc/...
+        --config=mobile-remote-ci-cc
+        //test/cc/... //test/common/...
       request: ${{ needs.load.outputs.request }}
-      target: unit-tests
+      target: cc-tests
       timeout-minutes: 120
 
   request:
@@ -58,10 +59,10 @@ jobs:
     if: >-
       ${{ always()
           && github.event.workflow_run.conclusion == 'success'
-          && fromJSON(needs.load.outputs.request).run.mobile-core }}
+          && fromJSON(needs.load.outputs.request).run.mobile-cc }}
     needs:
     - load
-    - unit-tests
+    - cc-tests
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}
