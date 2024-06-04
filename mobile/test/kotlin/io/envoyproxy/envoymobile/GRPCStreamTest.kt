@@ -9,7 +9,10 @@ import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class GRPCStreamTest {
   private val message1 = ByteBuffer.wrap(byteArrayOf(0x0, 0x1, 0x2, 0x3, 0x4, 0x5))
 

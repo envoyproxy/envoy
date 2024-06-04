@@ -197,6 +197,10 @@ new_features:
     <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
     in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>`
     for disabling appending of the ``-shadow`` suffix to the shadowed host/authority header.
+- area: http
+  change: |
+    Added field :ref:`match_upstream <envoy_v3_api_field_config.core.v3.SchemeHeaderTransformation.match_upstream>`,
+    which, when set to true, will set the downstream request ``:scheme`` to match the upstream transport protocol.
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
@@ -226,6 +230,10 @@ new_features:
     added :ref:`stat_prefix
     <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.stat_prefix>`
     configuration to support additional stat prefix for the OpenTelemetry logger.
+- area: listener
+  change: |
+    Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
+    to bypass the overload manager for a listener. When set to true, the listener will not be subject to overload protection.
 
 deprecated:
 - area: tracing

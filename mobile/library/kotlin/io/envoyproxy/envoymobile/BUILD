@@ -1,6 +1,5 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@envoy_mobile//bazel:android_artifacts.bzl", "android_artifacts")
-load("@envoy_mobile//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
 load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_library")
 load("@rules_detekt//detekt:defs.bzl", "detekt")
 
@@ -65,7 +64,7 @@ kt_android_library(
     ],
 )
 
-envoy_mobile_kt_library(
+kt_android_library(
     name = "envoy_interfaces_lib",
     srcs = glob([
         "Engine.kt",

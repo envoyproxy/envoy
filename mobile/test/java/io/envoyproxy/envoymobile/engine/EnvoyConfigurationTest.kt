@@ -12,6 +12,8 @@ import io.envoyproxy.envoymobile.engine.testing.TestJni
 import java.nio.ByteBuffer
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import java.util.regex.Pattern
 
 class TestFilter : EnvoyHTTPFilter {
@@ -63,6 +65,7 @@ class TestEnvoyHTTPFilterFactory(name : String) : EnvoyHTTPFilterFactory {
  }
 }
 
+@RunWith(RobolectricTestRunner::class)
 class EnvoyConfigurationTest {
 
   fun buildTestEnvoyConfiguration(
