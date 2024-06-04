@@ -1,5 +1,4 @@
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
-load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 
 # This is the magic function which helps get the name of the native library
 # from the native dependency. In general, the bazel cc_binary rules will
@@ -19,24 +18,6 @@ def native_lib_name(native_dep):
     else:
         lib_name = native_dep.split(".so")[0]
     return lib_name
-
-def envoy_mobile_kt_library(name, visibility = None, srcs = [], deps = [], exports = [], associates = []):
-    # These source files must be re-exported to the kotlin custom library rule to ensure their
-    # inclusion. This is used to work around testing visibility.
-    native.filegroup(
-        name = name + "_srcs",
-        srcs = srcs,
-        visibility = visibility,
-    )
-
-    kt_jvm_library(
-        name = name,
-        srcs = srcs,
-        deps = deps,
-        exports = exports,
-        associates = associates,
-        visibility = visibility,
-    )
 
 # Basic macro which uses a genrule to generate a jnilib file from an so file
 #

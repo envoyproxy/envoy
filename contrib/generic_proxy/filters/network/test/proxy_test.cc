@@ -142,8 +142,10 @@ TEST_F(FilterConfigTest, RouteEntry) {
   EXPECT_CALL(*route_matcher_, routeEntry(_)).WillOnce(Return(mock_route_entry_));
 
   FakeStreamCodecFactory::FakeRequest fake_request;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  const MatchInput match_input(fake_request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ(filter_config_->routeEntry(fake_request).get(), mock_route_entry_.get());
+  EXPECT_EQ(filter_config_->routeEntry(match_input).get(), mock_route_entry_.get());
 }
 
 /**

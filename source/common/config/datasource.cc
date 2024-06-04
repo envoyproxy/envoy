@@ -10,6 +10,46 @@ namespace Envoy {
 namespace Config {
 namespace DataSource {
 
+namespace {
+/**
+ * Read contents of the file.
+ * @param path file path.
+ * @param api reference to the Api.
+ * @param allow_empty return an empty string if the file is empty.
+ * @param max_size max size limit of file to read, default 0 means no limit, and if the file data
+ * would exceed the limit, it will return an error status.
+ * @return std::string with file contents. or an error status if the file does not exist or
+ * cannot be read.
+ */
+absl::StatusOr<std::string> readFile(const std::string& path, Api::Api& api, bool allow_empty,
+                                     uint64_t max_size) {
+  auto& file_system = api.fileSystem();
+
+  if (max_size > 0) {
+    if (!file_system.fileExists(path)) {
+      return absl::InvalidArgumentError(fmt::format("file {} does not exist", path));
+    }
+    const ssize_t size = file_system.fileSize(path);
+    if (size < 0) {
+      return absl::InvalidArgumentError(absl::StrCat("cannot determine size of file ", path));
+    }
+    if (static_cast<uint64_t>(size) > max_size) {
+      return absl::InvalidArgumentError(
+          fmt::format("file {} size is {} bytes; maximum is {}", path, size, max_size));
+    }
+  }
+
+  auto file_content_or_error = file_system.fileReadToEnd(path);
+  RETURN_IF_STATUS_NOT_OK(file_content_or_error);
+
+  if (!allow_empty && file_content_or_error.value().empty()) {
+    return absl::InvalidArgumentError(fmt::format("file {} is empty", path));
+  }
+
+  return file_content_or_error.value();
+}
+} // namespace
+
 absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& source,
                                  bool allow_empty, Api::Api& api, uint64_t max_size) {
   std::string data;
@@ -41,34 +81,6 @@ absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& sour
     return absl::InvalidArgumentError("DataSource cannot be empty");
   }
   return data;
-}
-
-absl::StatusOr<std::string> readFile(const std::string& path, Api::Api& api, bool allow_empty,
-                                     uint64_t max_size) {
-  auto& file_system = api.fileSystem();
-
-  if (max_size > 0) {
-    if (!file_system.fileExists(path)) {
-      return absl::InvalidArgumentError(fmt::format("file {} does not exist", path));
-    }
-    const ssize_t size = file_system.fileSize(path);
-    if (size < 0) {
-      return absl::InvalidArgumentError(absl::StrCat("cannot determine size of file ", path));
-    }
-    if (static_cast<uint64_t>(size) > max_size) {
-      return absl::InvalidArgumentError(
-          fmt::format("file {} size is {} bytes; maximum is {}", path, size, max_size));
-    }
-  }
-
-  auto file_content_or_error = file_system.fileReadToEnd(path);
-  RETURN_IF_STATUS_NOT_OK(file_content_or_error);
-
-  if (!allow_empty && file_content_or_error.value().empty()) {
-    return absl::InvalidArgumentError(fmt::format("file {} is empty", path));
-  }
-
-  return file_content_or_error.value();
 }
 
 absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source) {

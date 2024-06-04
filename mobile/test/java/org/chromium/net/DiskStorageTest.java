@@ -7,7 +7,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import java.io.BufferedReader;
 import java.io.File;
@@ -27,12 +26,13 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Test CronetEngine disk storage.
  */
 @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1578")
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class DiskStorageTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 

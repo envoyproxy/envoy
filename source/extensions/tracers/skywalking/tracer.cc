@@ -42,6 +42,7 @@ void Span::setSampled(bool do_sample) {
 void Span::log(SystemTime, const std::string& event) { span_entity_->addLog(EMPTY_STRING, event); }
 
 void Span::finishSpan() {
+  span_entity_->setSpanLayer(skywalking::v3::SpanLayer::Http);
   span_entity_->endSpan();
   parent_tracer_.sendSegment(tracing_context_);
 }

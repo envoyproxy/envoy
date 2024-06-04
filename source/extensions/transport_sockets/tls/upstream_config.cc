@@ -21,8 +21,8 @@ UpstreamSslSocketFactory::createTransportSocketFactory(
           const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&>(
           message, context.messageValidationVisitor()),
       context);
-  return std::make_unique<ClientSslSocketFactory>(
-      std::move(client_config), context.sslContextManager(), context.statsScope());
+  return ClientSslSocketFactory::create(std::move(client_config), context.sslContextManager(),
+                                        context.statsScope());
 }
 
 ProtobufTypes::MessagePtr UpstreamSslSocketFactory::createEmptyConfigProto() {
