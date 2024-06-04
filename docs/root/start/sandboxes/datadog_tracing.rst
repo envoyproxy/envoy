@@ -87,7 +87,7 @@ and other contextual information.
 
 .. image:: /start/sandboxes/_static/datadog-ui-trace.png
 
-Note the Datadog tracer identifies the Envoy proxies by the name provided in the ``tracing/provider/typed_config/service_name`` configuration.
+Note the Datadog tracer identifies the Envoy proxies by the name provided in the ``tracing.provider.typed_config.service_name`` configuration.
 
 You can also explore the map graph to view relationships between nodes and the path of traces.
 
