@@ -10,6 +10,11 @@
 #
 # In each case this script will add file and line information to any backtrace log
 # lines found and echo back all non-Backtrace lines untouched.
+#
+# This has been found to work best if the envoy binary was built with gcc, and with
+# bazel option -c dbg
+# This can be used to decode a stack trace produced by a non-debug gcc build, if
+# the debug build passed to stack_decode.py is otherwise identical.
 
 import re
 import subprocess
@@ -25,6 +30,9 @@ def decode_stacktrace_log(object_file, input_source, address_offset=0):
     #     [backtrace] [bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
     backtrace_marker = "\[backtrace\] [^\s]+"
     # Match something like:
+    #     ${backtrace_marker} Address mapping: 010c0000-02a77000
+    offset_re = re.compile("%s Address mapping: ([0-9A-Fa-f]+)-([0-9A-Fa-f]+)" % backtrace_marker)
+    # Match something like:
     #     ${backtrace_marker} #10: SYMBOL [0xADDR]
     # or:
     #     ${backtrace_marker} #10: [0xADDR]
@@ -38,6 +46,11 @@ def decode_stacktrace_log(object_file, input_source, address_offset=0):
             line = input_source.readline()
             if line == "":
                 return  # EOF
+            offset_match = offset_re.search(line)
+            if offset_match:
+                address_offset = int(offset_match.groups()[0], 16)
+                sys.stdout.write("%s (used as address offset)\n" % line.strip())
+                continue
             stackaddr_match = stackaddr_re.search(line)
             if not stackaddr_match:
                 stackaddr_match = asan_re.search(line)

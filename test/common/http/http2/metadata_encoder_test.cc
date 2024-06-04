@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "http2_frame.h"
-#include "quiche/http2/adapter/callback_visitor.h"
 #include "quiche/http2/adapter/data_source.h"
 #include "quiche/http2/adapter/mock_http2_visitor.h"
 #include "quiche/http2/adapter/nghttp2_adapter.h"

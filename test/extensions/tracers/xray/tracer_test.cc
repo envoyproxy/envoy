@@ -386,8 +386,8 @@ TEST_F(XRayTracerTest, GetTraceId) {
   auto span = tracer.createNonSampledSpan(absl::nullopt /*headers*/);
   span->finishSpan();
 
-  // This method is unimplemented and a noop.
-  EXPECT_EQ(span->getTraceIdAsHex(), "");
+  // Trace ID is always generated
+  EXPECT_NE(span->getTraceId(), "");
 }
 
 TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
@@ -508,7 +508,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
                                absl::nullopt /*headers*/,
                                absl::nullopt /*client_ip from x-forwarded-for header*/);
   Tracing::TestTraceContextImpl request_headers{};
-  span->injectContext(request_headers, nullptr);
+  span->injectContext(request_headers, Tracing::UpstreamContext());
   auto header = request_headers.get(xRayTraceHeader().key());
   ASSERT_FALSE(!header.has_value());
   EXPECT_NE(header.value().find("Root="), absl::string_view::npos);
@@ -526,7 +526,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
                 server_.api().randomGenerator()};
   auto span = tracer.createNonSampledSpan(absl::nullopt /*headers*/);
   Tracing::TestTraceContextImpl request_headers{};
-  span->injectContext(request_headers, nullptr);
+  span->injectContext(request_headers, Tracing::UpstreamContext());
   auto header = request_headers.get(xRayTraceHeader().key());
   ASSERT_FALSE(!header.has_value());
   EXPECT_NE(header.value().find("Root="), absl::string_view::npos);

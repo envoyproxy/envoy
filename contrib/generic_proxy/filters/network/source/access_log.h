@@ -9,8 +9,8 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 struct FormatterContext {
-  const Request* request_{};
-  const Response* response_{};
+  const RequestHeaderFrame* request_{};
+  const ResponseHeaderFrame* response_{};
 
   static constexpr absl::string_view category() { return "generic_proxy"; }
 };
@@ -34,6 +34,38 @@ using AccessLogInstanceFactory = AccessLog::AccessLogInstanceFactoryBase<Formatt
 // File access log for generic proxy.
 using FileAccessLog = FileAccessLogBase<FormatterContext>;
 using FileAccessLogFactory = FileAccessLogFactoryBase<FormatterContext>;
+
+class StringValueFormatterProvider : public FormatterProvider {
+public:
+  using ValueExtractor = std::function<absl::optional<std::string>(const FormatterContext&,
+                                                                   const StreamInfo::StreamInfo&)>;
+
+  StringValueFormatterProvider(ValueExtractor f, absl::optional<size_t> max_length = absl::nullopt)
+      : value_extractor_(f), max_length_(max_length) {}
+
+  // FormatterProvider
+  absl::optional<std::string>
+  formatWithContext(const FormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const FormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
+
+private:
+  ValueExtractor value_extractor_;
+  absl::optional<size_t> max_length_;
+};
+
+class GenericStatusCodeFormatterProvider : public FormatterProvider {
+public:
+  GenericStatusCodeFormatterProvider() = default;
+
+  // FormatterProvider
+  absl::optional<std::string> formatWithContext(const FormatterContext& context,
+                                                const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValueWithContext(const FormatterContext& context,
+                                            const StreamInfo::StreamInfo&) const override;
+};
 
 } // namespace GenericProxy
 } // namespace NetworkFilters

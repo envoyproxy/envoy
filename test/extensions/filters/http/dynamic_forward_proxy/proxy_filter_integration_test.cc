@@ -6,8 +6,10 @@
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/ssl_socket.h"
 
+#include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/registry.h"
 
 using testing::HasSubstr;
 
@@ -31,6 +33,8 @@ public:
                                     filename_);
     setUpstreamProtocol(Http::CodecType::HTTP1);
   }
+
+  void initialize() override { initializeWithArgs(); }
 
   void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
                           const std::string& override_auto_sni_header = "",
@@ -105,8 +109,20 @@ name: stream-info-to-headers-filter
     } else {
       ASSERT(upstreamProtocol() == Http::CodecType::HTTP2);
       protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+      if (low_stream_limits_) {
+        protocol_options.mutable_explicit_http_config()
+            ->mutable_http2_protocol_options()
+            ->mutable_max_concurrent_streams()
+            ->set_value(1);
+      }
     }
     ConfigHelper::setProtocolOptions(cluster_, protocol_options);
+
+    if (low_stream_limits_) {
+      envoy::config::cluster::v3::CircuitBreakers* circuit_breakers =
+          cluster_.mutable_circuit_breakers();
+      circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
+    }
 
     if (upstream_tls_) {
       envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
@@ -157,6 +173,9 @@ typed_config:
     HttpIntegrationTest::initialize();
     test_server_->waitForCounterEq("cluster_manager.cluster_added", 1);
     test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+
+    default_request_headers_.setHost(
+        fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
   }
 
   void createUpstreams() override {
@@ -212,8 +231,6 @@ typed_config:
 
     initializeWithArgs(1024, 1024, "", typed_dns_resolver_config);
     codec_client_ = makeHttpConnection(lookupPort("http"));
-    default_request_headers_.setHost(
-        fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
 
     auto response = sendRequestAndWaitForResponse(default_request_headers_, 1024,
                                                   default_response_headers_, 1024);
@@ -259,7 +276,40 @@ typed_config:
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("dns_resolution_failure"));
   }
 
+  void multipleRequestsMaybeReresolve(bool reresolve) {
+    if (reresolve) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.reresolve_if_no_connections",
+                                        "true");
+    }
+    initialize();
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    // Send the first request / response pair.
+    IntegrationStreamDecoderPtr response1 =
+        codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response1->waitForEndStream());
+
+    // Close the upstream connection and wait for it to be detected.
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    fake_upstream_connection_.reset();
+    test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+
+    IntegrationStreamDecoderPtr response2 =
+        codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response2->waitForEndStream());
+    if (reresolve) {
+      EXPECT_EQ(2, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+    } else {
+      EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+    }
+  }
+
   bool upstream_tls_{};
+  bool low_stream_limits_{};
   std::string upstream_cert_name_{"upstreamlocalhost"};
   CdsHelper cds_helper_;
   envoy::config::cluster::v3::Cluster cluster_;
@@ -361,6 +411,65 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
         "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF");
 }
 
+TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
+  autonomous_upstream_ = true;
+  initializeWithArgs(1024, 1024, "", "");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+}
+
+TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  std::string resolver_config = R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
+
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  upstream_tls_ = false;
+  autonomous_upstream_ = true;
+  initializeWithArgs(1024, 1024, "", resolver_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Kick off the first request.
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  // Wait fo the query to kick off
+  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
+  // Start the next request before unblocking the resolve.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  Network::TestResolver::unblockResolve();
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+}
+
 // Currently if the first DNS resolution fails, the filter will continue with
 // a null address. Make sure this mode fails gracefully.
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) { requestWithUnknownDomainTest(); }
@@ -392,12 +501,12 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainAndNoCaching) {
                                                        {":scheme", "http"},
                                                        {":authority", "doesnotexist.example.com"}};
 
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
 
-  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("dns_resolution_failure"));
@@ -600,6 +709,24 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   checkSimpleRequestSuccess(0, 0, response.get());
+}
+
+TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithTooLongSni) {
+  upstream_tls_ = true;
+  initializeWithArgs(1024, 1024, "x-host");
+  std::string too_long_sni(300, 'a');
+  ASSERT_EQ(too_long_sni.size(), 300); // Validate that the expected constructor was run.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "localhost"},
+                                                       {"x-host", too_long_sni}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  // TODO(ggreenway): validate (in access logs probably) that failure reason is set appropriately.
 }
 
 // Verify that auto-SAN verification fails with an incorrect certificate.
@@ -832,26 +959,11 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
 
 TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
   upstream_tls_ = false; // config below uses bootstrap, tls config is in cluster_
+  // Ensure we only have one connection upstream, one request active at a time.
+  low_stream_limits_ = true;
 
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
-
-  // Ensure we only have one connection upstream, one request active at a time.
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    envoy::config::bootstrap::v3::Bootstrap::StaticResources* static_resources =
-        bootstrap.mutable_static_resources();
-    envoy::config::cluster::v3::Cluster* cluster = static_resources->mutable_clusters(0);
-    envoy::config::cluster::v3::CircuitBreakers* circuit_breakers =
-        cluster->mutable_circuit_breakers();
-    circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
-    ConfigHelper::HttpProtocolOptions protocol_options;
-    protocol_options.mutable_explicit_http_config()
-        ->mutable_http2_protocol_options()
-        ->mutable_max_concurrent_streams()
-        ->set_value(1);
-    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
-                                     protocol_options);
-  });
 
   // Start sending the request, but ensure no end stream will be sent, so the
   // stream will stay in use.
@@ -892,6 +1004,15 @@ TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
   ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(response2->complete());
   EXPECT_EQ("200", response2->headers().getStatusValue());
+  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
+}
+
+TEST_P(ProxyFilterIntegrationTest, MultipleRequestsForceRefreshOff) {
+  multipleRequestsMaybeReresolve(false);
+}
+
+TEST_P(ProxyFilterIntegrationTest, MultipleRequestsForceRefreshOn) {
+  multipleRequestsMaybeReresolve(true);
 }
 
 // Test Envoy CONNECT request termination works with dynamic forward proxy config.
@@ -937,15 +1058,8 @@ TEST_P(ProxyFilterIntegrationTest, ConnectRequestWithDFPConfig) {
 TEST_P(ProxyFilterIntegrationTest, TestQueueingBasedOnCircuitBreakers) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP1);
-  upstream_tls_ = false; // config below uses bootstrap, tls config is in cluster_
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    for (int i = 0; i < static_resources->clusters_size(); ++i) {
-      auto* cluster = static_resources->mutable_clusters(i);
-      auto* per_host_thresholds = cluster->mutable_circuit_breakers()->add_per_host_thresholds();
-      per_host_thresholds->mutable_max_connections()->set_value(1);
-    }
-  });
+  auto* per_host_thresholds = cluster_.mutable_circuit_breakers()->add_per_host_thresholds();
+  per_host_thresholds->mutable_max_connections()->set_value(1);
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -997,12 +1111,12 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterWithUnknownDomain) {
                                                        {":scheme", "http"},
                                                        {":authority", "doesnotexist.example.com"}};
 
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("no_healthy_upstream"));
 
-  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("no_healthy_upstream"));

@@ -88,9 +88,11 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
       target_uri_(config.google_grpc().target_uri()), scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)),
-      metadata_parser_(Router::HeaderParser::configure(
-          config.initial_metadata(),
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)) {
+      metadata_parser_(THROW_OR_RETURN_VALUE(
+          Router::HeaderParser::configure(
+              config.initial_metadata(),
+              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
+          Router::HeaderParserPtr)) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
@@ -166,7 +168,8 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
     : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
       service_full_name_(service_full_name), method_name_(method_name), callbacks_(callbacks),
       options_(options), unused_stream_info_(Http::Protocol::Http2, dispatcher_.timeSource(),
-                                             Network::ConnectionInfoProviderSharedPtr{}) {}
+                                             Network::ConnectionInfoProviderSharedPtr{},
+                                             StreamInfo::FilterState::LifeSpan::FilterChain) {}
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
@@ -465,7 +468,12 @@ void GoogleAsyncRequestImpl::cancel() {
 
 void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   Tracing::HttpTraceContext trace_context(metadata);
-  current_span_->injectContext(trace_context, nullptr);
+  Tracing::UpstreamContext upstream_context(nullptr,                          // host_
+                                            nullptr,                          // cluster_
+                                            Tracing::ServiceType::GoogleGrpc, // service_type_
+                                            true                              // async_client_span_
+  );
+  current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

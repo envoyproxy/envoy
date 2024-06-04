@@ -85,8 +85,7 @@ void Span::log(SystemTime, const std::string&) {
 
 void Span::finishSpan() { span_.reset(); }
 
-void Span::injectContext(Tracing::TraceContext& trace_context,
-                         const Upstream::HostDescriptionConstSharedPtr&) {
+void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   if (!span_) {
     return;
   }
@@ -136,7 +135,7 @@ void Span::setBaggage(absl::string_view, absl::string_view) {
   // not implemented
 }
 
-std::string Span::getTraceIdAsHex() const {
+std::string Span::getTraceId() const {
   if (!span_) {
     return std::string{};
   }

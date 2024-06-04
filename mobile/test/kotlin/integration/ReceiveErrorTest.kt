@@ -9,10 +9,10 @@ import io.envoyproxy.envoymobile.FilterHeadersStatus
 import io.envoyproxy.envoymobile.FilterTrailersStatus
 import io.envoyproxy.envoymobile.FinalStreamIntel
 import io.envoyproxy.envoymobile.GRPCRequestHeadersBuilder
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
@@ -21,8 +21,6 @@ import java.util.concurrent.TimeUnit
 import org.junit.Assert.fail
 import org.junit.Test
 
-private const val PBF_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
 private const val LOCAL_ERROR_FILTER_TYPE =
   "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
 private const val FILTER_NAME = "error_validation_filter"
@@ -85,16 +83,14 @@ class ReceiveErrorTest {
         .build()
 
     val engine =
-      EngineBuilder(Standard())
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .addPlatformFilter(
           name = FILTER_NAME,
           factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
         )
-        .addNativeFilter(
-          "envoy.filters.http.platform_bridge",
-          "{'@type': $PBF_TYPE, platform_filter_name: $FILTER_NAME}"
-        )
-        .addNativeFilter("envoy.filters.http.local_error", "{'@type': $LOCAL_ERROR_FILTER_TYPE}")
+        .addNativeFilter("envoy.filters.http.local_error", "[$LOCAL_ERROR_FILTER_TYPE]{}")
         .build()
 
     var errorCode: Int? = null

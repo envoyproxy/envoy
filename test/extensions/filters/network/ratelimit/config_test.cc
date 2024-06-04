@@ -38,7 +38,6 @@ TEST(RateLimitFilterConfigTest, CorrectProto) {
        value: my_value
   timeout: 2s
   rate_limit_service:
-    transport_api_version: V3
     grpc_service:
       envoy_grpc:
         cluster_name: ratelimit_cluster

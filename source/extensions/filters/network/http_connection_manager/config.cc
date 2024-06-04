@@ -33,8 +33,7 @@
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/quic/server_connection_factory.h"
-#include "source/common/router/rds_impl.h"
-#include "source/common/router/scoped_rds.h"
+#include "source/common/router/route_provider_manager.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
@@ -211,6 +210,7 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
+static const std::string srds_factory_name = "envoy.srds_factory.default";
 
 Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
   auto& server_context = context.serverFactoryContext();
@@ -227,15 +227,19 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
           SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&server_context] {
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(server_context.admin());
           });
-
-  Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager =
-      server_context.singletonManager().getTyped<Router::ScopedRoutesConfigProviderManager>(
+  std::shared_ptr<Envoy::Config::ConfigProviderManager> scoped_routes_config_provider_manager =
+      server_context.singletonManager().getTyped<Envoy::Config::ConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager),
-          [&server_context, route_config_provider_manager] {
-            return std::make_shared<Router::ScopedRoutesConfigProviderManager>(
-                server_context.admin(), *route_config_provider_manager);
+          [&server_context, route_config_provider_manager]()
+              -> std::shared_ptr<Envoy::Config::ConfigProviderManager> {
+            auto srds_factory =
+                Envoy::Config::Utility::getFactoryByName<Router::SrdsFactory>(srds_factory_name);
+            if (srds_factory) {
+              return srds_factory->createScopedRoutesConfigProviderManager(
+                  server_context, *route_config_provider_manager);
+            }
+            return nullptr;
           });
-
   auto tracer_manager = Tracing::TracerManagerImpl::singleton(context);
 
   std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
@@ -251,7 +255,7 @@ absl::StatusOr<std::shared_ptr<HttpConnectionManagerConfig>> Utility::createConf
         proto_config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
-    Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+    Config::ConfigProviderManager* scoped_routes_config_provider_manager,
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager) {
   absl::Status creation_status = absl::OkStatus();
@@ -281,7 +285,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   auto filter_config = THROW_OR_RETURN_VALUE(
       Utility::createConfig(proto_config, context, *singletons.date_provider_,
                             *singletons.route_config_provider_manager_,
-                            *singletons.scoped_routes_config_provider_manager_,
+                            singletons.scoped_routes_config_provider_manager_.get(),
                             *singletons.tracer_manager_,
                             *singletons.filter_config_provider_manager_),
       std::shared_ptr<HttpConnectionManagerConfig>);
@@ -293,11 +297,14 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   return [singletons, filter_config, &context,
           clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
     auto& server_context = context.serverFactoryContext();
+    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+                                                    ? server_context.nullOverloadManager()
+                                                    : server_context.overloadManager();
 
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
-        *filter_config, context.drainDecision(), server_context.api().randomGenerator(),
+        filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
-        server_context.clusterManager(), server_context.overloadManager(),
+        server_context.clusterManager(), overload_manager,
         server_context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
@@ -337,7 +344,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
-    Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+    Config::ConfigProviderManager* scoped_routes_config_provider_manager,
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
@@ -348,7 +355,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       internal_address_config_(createInternalAddressConfig(config, creation_status)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
-      route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),
       http3_options_(Http3::Utility::initializeAndValidateOptions(
@@ -522,23 +528,34 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     early_header_mutation_extensions_.push_back(std::move(extension));
   }
 
+  auto srds_factory =
+      Envoy::Config::Utility::getFactoryByName<Router::SrdsFactory>(srds_factory_name);
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers
   // will be managed by the scoped routing logic instead.
   switch (config.route_specifier_case()) {
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRds:
+    route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
+        // At the creation of a RDS route config provider, the factory_context's initManager is
+        // always valid, though the init manager may go away later when the listener goes away.
+        config.rds(), context_.serverFactoryContext(), stats_prefix_, context_.initManager());
+    break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRouteConfig:
-    route_config_provider_ = Router::RouteConfigProviderUtil::create(
-        config, context_.serverFactoryContext(), context_.messageValidationVisitor(),
-        context_.initManager(), stats_prefix_, route_config_provider_manager_);
+    route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
+        config.route_config(), context_.serverFactoryContext(),
+        context_.messageValidationVisitor());
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kScopedRoutes:
-    scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
-        config, context_.serverFactoryContext(), context_.initManager(), stats_prefix_,
-        scoped_routes_config_provider_manager_);
-    scope_key_builder_ = Router::ScopedRoutesConfigProviderUtil::createScopeKeyBuilder(config);
+    if (!srds_factory || !scoped_routes_config_provider_manager_) {
+      creation_status = absl::InvalidArgumentError("SRDS configured but not compiled in");
+      return;
+    }
+    scoped_routes_config_provider_ =
+        srds_factory->createConfigProvider(config, context_.serverFactoryContext(), stats_prefix_,
+                                           *scoped_routes_config_provider_manager_);
+    scope_key_builder_ = srds_factory->createScopeKeyBuilder(config);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:
@@ -838,7 +855,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   auto filter_config = THROW_OR_RETURN_VALUE(
       Utility::createConfig(proto_config, context, *singletons.date_provider_,
                             *singletons.route_config_provider_manager_,
-                            *singletons.scoped_routes_config_provider_manager_,
+                            singletons.scoped_routes_config_provider_manager_.get(),
                             *singletons.tracer_manager_,
                             *singletons.filter_config_provider_manager_),
       std::shared_ptr<HttpConnectionManagerConfig>);
@@ -850,11 +867,14 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   return [singletons, filter_config, &context, clear_hop_by_hop_headers](
              Network::ReadFilterCallbacks& read_callbacks) -> Http::ApiListenerPtr {
     auto& server_context = context.serverFactoryContext();
+    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+                                                    ? server_context.nullOverloadManager()
+                                                    : server_context.overloadManager();
 
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
-        *filter_config, context.drainDecision(), server_context.api().randomGenerator(),
+        filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
-        server_context.clusterManager(), server_context.overloadManager(),
+        server_context.clusterManager(), overload_manager,
         server_context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);

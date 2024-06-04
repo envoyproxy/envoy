@@ -126,7 +126,6 @@ envoy_cc_test(
     external_deps = ["abseil_optional"],
     deps = [
         "//source/common/config:api_version_lib",
-        "//source/common/config:stats_utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",
@@ -200,6 +199,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -223,6 +223,7 @@ envoy_cc_test(
     deps = [
         ":xds_test_utility_lib",
         "//source/common/config:xds_resource_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

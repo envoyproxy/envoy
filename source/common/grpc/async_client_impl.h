@@ -43,6 +43,7 @@ public:
   }
 
 private:
+  const uint32_t max_recv_message_length_;
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
   // The host header value in the http transport.
@@ -86,6 +87,9 @@ public:
   bool hasResetStream() const { return http_reset_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_->streamInfo(); }
 
+protected:
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+
 private:
   void streamError(Status::GrpcStatus grpc_status, const std::string& message);
   void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, EMPTY_STRING); }
@@ -94,11 +98,16 @@ private:
   void trailerResponse(absl::optional<Status::GrpcStatus> grpc_status,
                        const std::string& grpc_message);
 
+  // Deliver notification and update span when the connection closes.
+  void notifyRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message);
+
   Event::Dispatcher* dispatcher_{};
   Http::RequestMessagePtr headers_message_;
   AsyncClientImpl& parent_;
   std::string service_full_name_;
   std::string method_name_;
+  Tracing::SpanPtr current_span_;
+
   RawAsyncStreamCallbacks& callbacks_;
   Http::AsyncClient::StreamOptions options_;
   bool http_reset_{};

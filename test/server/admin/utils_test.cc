@@ -23,10 +23,13 @@ protected:
 TEST_F(UtilsTest, HistogramMode) {
   Utility::HistogramBucketsMode histogram_buckets_mode = Utility::HistogramBucketsMode::Cumulative;
   EXPECT_TRUE(Utility::histogramBucketsParam(query_, histogram_buckets_mode).ok());
-  EXPECT_EQ(Utility::HistogramBucketsMode::NoBuckets, histogram_buckets_mode);
+  EXPECT_EQ(Utility::HistogramBucketsMode::Unset, histogram_buckets_mode);
   query_.overwrite("histogram_buckets", "none");
   EXPECT_TRUE(Utility::histogramBucketsParam(query_, histogram_buckets_mode).ok());
-  EXPECT_EQ(Utility::HistogramBucketsMode::NoBuckets, histogram_buckets_mode);
+  EXPECT_EQ(Utility::HistogramBucketsMode::Summary, histogram_buckets_mode);
+  query_.overwrite("histogram_buckets", "summary");
+  EXPECT_TRUE(Utility::histogramBucketsParam(query_, histogram_buckets_mode).ok());
+  EXPECT_EQ(Utility::HistogramBucketsMode::Summary, histogram_buckets_mode);
   query_.overwrite("histogram_buckets", "cumulative");
   EXPECT_TRUE(Utility::histogramBucketsParam(query_, histogram_buckets_mode).ok());
   EXPECT_EQ(Utility::HistogramBucketsMode::Cumulative, histogram_buckets_mode);
@@ -40,7 +43,7 @@ TEST_F(UtilsTest, HistogramMode) {
   absl::Status status = Utility::histogramBucketsParam(query_, histogram_buckets_mode);
   EXPECT_FALSE(status.ok());
   EXPECT_THAT(status.ToString(),
-              HasSubstr("usage: /stats?histogram_buckets=(cumulative|disjoint|none)"));
+              HasSubstr("usage: /stats?histogram_buckets=(cumulative|disjoint|detailed|summary)"));
 }
 
 TEST_F(UtilsTest, QueryParam) {

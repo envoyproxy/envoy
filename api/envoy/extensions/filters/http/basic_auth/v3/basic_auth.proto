@@ -42,3 +42,11 @@ message BasicAuth {
   string forward_username_header = 2
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 }
+
+// Extra settings that may be added to per-route configuration for
+// a virtual host or a cluster.
+message BasicAuthPerRoute {
+  // Username-password pairs for this route.
+  config.core.v3.DataSource users = 1
+      [(validate.rules).message = {required: true}, (udpa.annotations.sensitive) = true];
+}

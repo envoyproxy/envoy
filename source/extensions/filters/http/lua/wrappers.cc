@@ -170,6 +170,16 @@ int StreamInfoWrapper::luaDynamicMetadata(lua_State* state) {
   return 1;
 }
 
+int ConnectionStreamInfoWrapper::luaConnectionDynamicMetadata(lua_State* state) {
+  if (connection_dynamic_metadata_wrapper_.get() != nullptr) {
+    connection_dynamic_metadata_wrapper_.pushStack();
+  } else {
+    connection_dynamic_metadata_wrapper_.reset(
+        ConnectionDynamicMetadataMapWrapper::create(state, *this), true);
+  }
+  return 1;
+}
+
 int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
   const auto& ssl = stream_info_.downstreamAddressProvider().sslConnection();
   if (ssl != nullptr) {
@@ -218,7 +228,29 @@ DynamicMetadataMapIterator::DynamicMetadataMapIterator(DynamicMetadataMapWrapper
 
 StreamInfo::StreamInfo& DynamicMetadataMapWrapper::streamInfo() { return parent_.stream_info_; }
 
+ConnectionDynamicMetadataMapIterator::ConnectionDynamicMetadataMapIterator(
+    ConnectionDynamicMetadataMapWrapper& parent)
+    : parent_{parent}, current_{parent_.streamInfo().dynamicMetadata().filter_metadata().begin()} {}
+
+const StreamInfo::StreamInfo& ConnectionDynamicMetadataMapWrapper::streamInfo() {
+  return parent_.connection_stream_info_;
+}
+
 int DynamicMetadataMapIterator::luaPairsIterator(lua_State* state) {
+  if (current_ == parent_.streamInfo().dynamicMetadata().filter_metadata().end()) {
+    parent_.iterator_.reset();
+    return 0;
+  }
+
+  lua_pushlstring(state, current_->first.data(), current_->first.size());
+  Filters::Common::Lua::MetadataMapHelper::createTable(state, current_->second.fields());
+
+  current_++;
+  return 2;
+}
+
+int ConnectionDynamicMetadataMapIterator::luaConnectionDynamicMetadataPairsIterator(
+    lua_State* state) {
   if (current_ == parent_.streamInfo().dynamicMetadata().filter_metadata().end()) {
     parent_.iterator_.reset();
     return 0;
@@ -271,6 +303,30 @@ int DynamicMetadataMapWrapper::luaPairs(lua_State* state) {
 
   iterator_.reset(DynamicMetadataMapIterator::create(state, *this), true);
   lua_pushcclosure(state, DynamicMetadataMapIterator::static_luaPairsIterator, 1);
+  return 1;
+}
+
+int ConnectionDynamicMetadataMapWrapper::luaConnectionDynamicMetadataGet(lua_State* state) {
+  const char* filter_name = luaL_checkstring(state, 2);
+  const auto& metadata = streamInfo().dynamicMetadata().filter_metadata();
+  const auto filter_it = metadata.find(filter_name);
+  if (filter_it == metadata.end()) {
+    return 0;
+  }
+
+  Filters::Common::Lua::MetadataMapHelper::createTable(state, filter_it->second.fields());
+  return 1;
+}
+
+int ConnectionDynamicMetadataMapWrapper::luaConnectionDynamicMetadataPairs(lua_State* state) {
+  if (iterator_.get() != nullptr) {
+    luaL_error(state, "cannot create a second iterator before completing the first");
+  }
+
+  iterator_.reset(ConnectionDynamicMetadataMapIterator::create(state, *this), true);
+  lua_pushcclosure(
+      state, ConnectionDynamicMetadataMapIterator::static_luaConnectionDynamicMetadataPairsIterator,
+      1);
   return 1;
 }
 

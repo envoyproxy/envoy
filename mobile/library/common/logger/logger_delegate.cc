@@ -14,9 +14,9 @@ void EventTrackingDelegate::logWithStableName(absl::string_view stable_name, abs
   }
 
   (*event_tracker_)
-      ->on_track({{"name", "event_log"},
-                  {"log_name", std::string(stable_name)},
-                  {"message", std::string(msg)}});
+      ->on_track_({{"name", "event_log"},
+                   {"log_name", std::string(stable_name)},
+                   {"message", std::string(msg)}});
 }
 
 LambdaDelegate::LambdaDelegate(std::unique_ptr<EnvoyLogger> logger,
@@ -27,12 +27,12 @@ LambdaDelegate::LambdaDelegate(std::unique_ptr<EnvoyLogger> logger,
 
 LambdaDelegate::~LambdaDelegate() {
   restoreDelegate();
-  logger_->on_exit();
+  logger_->on_exit_();
 }
 
 void LambdaDelegate::log(absl::string_view msg, const spdlog::details::log_msg& log_msg) {
   // Logger::Levels is simply an alias to spdlog::level::level_enum, so we can safely cast it.
-  logger_->on_log(static_cast<Logger::Levels>(log_msg.level), std::string(msg));
+  logger_->on_log_(static_cast<Logger::Levels>(log_msg.level), std::string(msg));
 }
 
 DefaultDelegate::DefaultDelegate(absl::Mutex& mutex, DelegatingLogSinkSharedPtr log_sink)

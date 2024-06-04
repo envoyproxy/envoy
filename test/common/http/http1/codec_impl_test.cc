@@ -47,6 +47,8 @@ namespace Envoy {
 namespace Http {
 namespace {
 
+constexpr absl::string_view kNullCharacter("\0", 1);
+
 std::string testParamToString(const ::testing::TestParamInfo<Http1ParserImpl>& info) {
   return TestUtility::http1ParserImplToString(info.param);
 }
@@ -195,6 +197,11 @@ public:
   void expectTrailersTest(bool enable_trailers);
 
   void testServerAllowChunkedContentLength(uint32_t content_length, bool allow_chunked_length);
+
+  void testRequestWithValueExpectSuccess(absl::string_view value, absl::string_view expected_value);
+  void testRequestWithValueExpectFailure(absl::string_view value,
+                                         absl::string_view expected_error_details,
+                                         absl::string_view expected_error_message);
 
   // Send the request, and validate the received request headers.
   // Then send a response just to clean up.
@@ -1522,10 +1529,10 @@ TEST_P(Http1ServerConnectionImplTest, HeaderMutateEmbeddedNul) {
     MockRequestDecoder decoder;
     EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-    Buffer::OwnedImpl buffer(absl::StrCat(
-        example_input.substr(0, n), absl::string_view("\0", 1), example_input.substr(n),
-        // TODO(#21245): Fix BalsaParser to process headers before final "\r\n".
-        parser_impl_ == Http1ParserImpl::BalsaParser ? "\r\n" : ""));
+    Buffer::OwnedImpl buffer(
+        absl::StrCat(example_input.substr(0, n), kNullCharacter, example_input.substr(n),
+                     // TODO(#21245): Fix BalsaParser to process headers before final "\r\n".
+                     parser_impl_ == Http1ParserImpl::BalsaParser ? "\r\n" : ""));
     EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
     auto status = codec_->dispatch(buffer);
     EXPECT_FALSE(status.ok()) << n;
@@ -1553,8 +1560,8 @@ TEST_P(Http1ServerConnectionImplTest, TrailerMutateEmbeddedNul) {
     MockRequestDecoder decoder;
     EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-    Buffer::OwnedImpl buffer(absl::StrCat(headers_and_body, trailers.substr(0, n),
-                                          absl::string_view("\0", 1), trailers.substr(n), "\r\n"));
+    Buffer::OwnedImpl buffer(absl::StrCat(headers_and_body, trailers.substr(0, n), kNullCharacter,
+                                          trailers.substr(n), "\r\n"));
     EXPECT_CALL(decoder, decodeHeaders_).Times(testing::AnyNumber());
     EXPECT_CALL(decoder, decodeData).Times(testing::AnyNumber());
     EXPECT_CALL(decoder, sendLocalReply);
@@ -2549,6 +2556,9 @@ public:
   Http::ClientConnectionPtr codec_;
 
   void testClientAllowChunkedContentLength(uint32_t content_length, bool allow_chunked_length);
+  void testRequestWithValueExpectSuccess(absl::string_view value, absl::string_view expected_value);
+  void testRequestWithValueExpectFailure(absl::string_view value,
+                                         absl::string_view expected_error_message);
 
 protected:
   Stats::TestUtil::TestStore store_;
@@ -4880,35 +4890,158 @@ TEST_P(Http1ClientConnectionImplTest, ObsFold) {
   // SPELLCHECKER(on)
 }
 
-TEST_P(Http1ServerConnectionImplTest, ValueWithNullCharacter) {
+void Http1ServerConnectionImplTest::testRequestWithValueExpectSuccess(
+    absl::string_view value, absl::string_view expected_value) {
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "GET"},
+      {"key", std::string(expected_value)},
+  };
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+
+  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\n"
+                                        "key: ",
+                                        value, "\r\n\r\n"));
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+}
+
+void Http1ServerConnectionImplTest::testRequestWithValueExpectFailure(
+    absl::string_view value, absl::string_view expected_error_details,
+    absl::string_view expected_error_message) {
   initialize();
 
   StrictMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _,
-                                        "http1.invalid_characters"));
-  } else {
-    EXPECT_CALL(decoder,
-                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
-  }
+  EXPECT_CALL(decoder,
+              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, expected_error_details));
 
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\n"
-                                        "key: value has ",
-                                        absl::string_view("\0", 1),
-                                        "null character\r\n"
-                                        "\r\n"));
+                                        "key: ",
+                                        value, "\r\n\r\n"));
   auto status = codec_->dispatch(buffer);
   EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), absl::StrCat("http/1.1 protocol error: ", expected_error_message));
+}
+
+TEST_P(Http1ServerConnectionImplTest, ValueStartsWithNullCharacter) {
+  const std::string value = absl::StrCat(kNullCharacter, "value starts with null character");
+
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
+    testRequestWithValueExpectFailure(value, "http1.invalid_characters",
+                                      "header value contains invalid chars");
   } else {
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+    testRequestWithValueExpectFailure(value, "http1.invalid_characters",
+                                      "header value contains invalid chars");
   }
 }
 
-TEST_P(Http1ClientConnectionImplTest, ValueWithNullCharacter) {
+TEST_P(Http1ServerConnectionImplTest, ValueWithNullCharacterInTheMiddle) {
+  const std::string value =
+      absl::StrCat("value has", kNullCharacter, "null character in the middle");
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    testRequestWithValueExpectFailure(value, "http1.invalid_characters",
+                                      "header value contains invalid chars");
+  } else {
+    testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_INVALID_HEADER_TOKEN");
+  }
+}
+
+TEST_P(Http1ServerConnectionImplTest, ValueEndsWithNullCharacter) {
+  const std::string value = absl::StrCat("value ends in null character", kNullCharacter);
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    testRequestWithValueExpectFailure(value, "http1.invalid_characters",
+                                      "header value contains invalid chars");
+  } else {
+    testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_INVALID_HEADER_TOKEN");
+  }
+}
+
+TEST_P(Http1ServerConnectionImplTest, ValueStartsWithCR) {
+  const absl::string_view value = "\r value starts with carriage return";
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    const absl::string_view expected_value = "value starts with carriage return";
+    testRequestWithValueExpectSuccess(value, expected_value);
+  } else {
+#ifdef ENVOY_ENABLE_UHV
+    testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_INVALID_HEADER_TOKEN");
+#else
+    testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_STRICT");
+#endif
+  }
+}
+
+TEST_P(Http1ServerConnectionImplTest, ValueWithCRInTheMiddle) {
+  const absl::string_view value = "value has \r carriage return in the middle";
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    const absl::string_view expected_value = "value has  carriage return in the middle";
+    testRequestWithValueExpectSuccess(value, expected_value);
+  } else {
+    testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_LF_EXPECTED");
+  }
+}
+
+TEST_P(Http1ServerConnectionImplTest, ValueEndsWithCR) {
+  const absl::string_view value = "value ends in carriage return \r";
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    const absl::string_view expected_value = "value ends in carriage return";
+    testRequestWithValueExpectSuccess(value, expected_value);
+  } else {
+    testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_LF_EXPECTED");
+  }
+}
+
+TEST_P(Http1ServerConnectionImplTest, ValueStartsWithLF) {
+  const absl::string_view value = "\n value starts with line feed";
+  const absl::string_view expected_value = "value starts with line feed";
+  testRequestWithValueExpectSuccess(value, expected_value);
+}
+
+TEST_P(Http1ServerConnectionImplTest, ValueWithLFInTheMiddle) {
+  const absl::string_view value = "value has \n line feed in the middle";
+  const absl::string_view expected_value = "value has  line feed in the middle";
+  testRequestWithValueExpectSuccess(value, expected_value);
+}
+
+TEST_P(Http1ServerConnectionImplTest, ValueEndsWithLF) {
+  const absl::string_view value = "value ends in line feed \n";
+  const absl::string_view expected_value = "value ends in line feed";
+  testRequestWithValueExpectSuccess(value, expected_value);
+}
+
+void Http1ClientConnectionImplTest::testRequestWithValueExpectSuccess(
+    absl::string_view value, absl::string_view expected_value) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  TestResponseHeaderMapImpl expected_headers{
+      {":status", "200"},
+      {"key", std::string(expected_value)},
+  };
+  EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+
+  Buffer::OwnedImpl response(absl::StrCat("HTTP/1.1 200 OK\r\n"
+                                          "key: ",
+                                          value, "\r\n\r\n"));
+  auto status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
+}
+
+void Http1ClientConnectionImplTest::testRequestWithValueExpectFailure(
+    absl::string_view value, absl::string_view expected_error_message) {
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;
@@ -4917,19 +5050,97 @@ TEST_P(Http1ClientConnectionImplTest, ValueWithNullCharacter) {
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   Buffer::OwnedImpl response(absl::StrCat("HTTP/1.1 200 OK\r\n"
-                                          "key: value has ",
-                                          absl::string_view("\0", 1),
-                                          "null character\r\n"
-                                          "Content-Length: 0\r\n"
-                                          "\r\n"));
-
+                                          "key: ",
+                                          value, "\r\n\r\n"));
   auto status = codec_->dispatch(response);
   EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), absl::StrCat("http/1.1 protocol error: ", expected_error_message));
+}
+
+TEST_P(Http1ClientConnectionImplTest, ValueStartsWithNullCharacter) {
+  const std::string value = absl::StrCat(kNullCharacter, "value starts with null character");
+
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
+    testRequestWithValueExpectFailure(value, "header value contains invalid chars");
   } else {
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+    testRequestWithValueExpectFailure(value, "header value contains invalid chars");
   }
+}
+
+TEST_P(Http1ClientConnectionImplTest, ValueWithNullCharacterInTheMiddle) {
+  const std::string value =
+      absl::StrCat("value has", kNullCharacter, "null character in the middle");
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    testRequestWithValueExpectFailure(value, "header value contains invalid chars");
+  } else {
+    testRequestWithValueExpectFailure(value, "HPE_INVALID_HEADER_TOKEN");
+  }
+}
+
+TEST_P(Http1ClientConnectionImplTest, ValueEndsWithNullCharacter) {
+  const std::string value = absl::StrCat("value ends in null character", kNullCharacter);
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    testRequestWithValueExpectFailure(value, "header value contains invalid chars");
+  } else {
+    testRequestWithValueExpectFailure(value, "HPE_INVALID_HEADER_TOKEN");
+  }
+}
+
+TEST_P(Http1ClientConnectionImplTest, ValueStartsWithCR) {
+  const absl::string_view value = "\r value starts with carriage return";
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    const absl::string_view expected_value = "value starts with carriage return";
+    testRequestWithValueExpectSuccess(value, expected_value);
+  } else {
+#ifdef ENVOY_ENABLE_UHV
+    testRequestWithValueExpectFailure(value, "HPE_INVALID_HEADER_TOKEN");
+#else
+    testRequestWithValueExpectFailure(value, "HPE_STRICT");
+#endif
+  }
+}
+
+TEST_P(Http1ClientConnectionImplTest, ValueWithCRInTheMiddle) {
+  const absl::string_view value = "value has \r carriage return in the middle";
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    const absl::string_view expected_value = "value has  carriage return in the middle";
+    testRequestWithValueExpectSuccess(value, expected_value);
+  } else {
+    testRequestWithValueExpectFailure(value, "HPE_LF_EXPECTED");
+  }
+}
+
+TEST_P(Http1ClientConnectionImplTest, ValueEndsWithCR) {
+  const absl::string_view value = "value ends in carriage return \r";
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    const absl::string_view expected_value = "value ends in carriage return";
+    testRequestWithValueExpectSuccess(value, expected_value);
+  } else {
+    testRequestWithValueExpectFailure(value, "HPE_LF_EXPECTED");
+  }
+}
+
+TEST_P(Http1ClientConnectionImplTest, ValueStartsWithLF) {
+  const absl::string_view value = "\n value starts with line feed";
+  const absl::string_view expected_value = "value starts with line feed";
+  testRequestWithValueExpectSuccess(value, expected_value);
+}
+
+TEST_P(Http1ClientConnectionImplTest, ValueWithLFInTheMiddle) {
+  const absl::string_view value = "value has \n line feed in the middle";
+  const absl::string_view expected_value = "value has  line feed in the middle";
+  testRequestWithValueExpectSuccess(value, expected_value);
+}
+
+TEST_P(Http1ClientConnectionImplTest, ValueEndsWithLF) {
+  const absl::string_view value = "value ends in line feed \n";
+  const absl::string_view expected_value = "value ends in line feed";
+  testRequestWithValueExpectSuccess(value, expected_value);
 }
 
 } // namespace Http

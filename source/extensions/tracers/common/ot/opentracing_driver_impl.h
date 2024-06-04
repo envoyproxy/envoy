@@ -38,7 +38,7 @@ public:
   void setTag(absl::string_view name, const absl::string_view) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void injectContext(Tracing::TraceContext& trace_context,
-                     const Upstream::HostDescriptionConstSharedPtr&) override;
+                     const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool) override;
@@ -46,7 +46,9 @@ public:
   void setBaggage(absl::string_view key, absl::string_view value) override;
 
   // TODO: This method is unimplemented for OpenTracing.
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+  // This won't be implemented because OpenTracing was deprecated.
+  // We should remove this method in the future?
+  std::string getTraceId() const override { return EMPTY_STRING; };
 
 private:
   OpenTracingDriver& driver_;

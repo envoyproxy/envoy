@@ -39,7 +39,6 @@ import org.robolectric.RobolectricTestRunner
 class ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest {
   init {
     JniLibrary.loadTestLibrary()
-    JniLibrary.load()
   }
 
   private lateinit var httpProxyTestServer: HttpProxyTestServerFactory.HttpProxyTestServer
@@ -71,7 +70,8 @@ class ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest {
     val builder = AndroidEngineBuilder(context)
     val engine =
       builder
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .enableProxying(true)
         .setOnEngineRunning { onEngineRunningLatch.countDown() }
         .build()

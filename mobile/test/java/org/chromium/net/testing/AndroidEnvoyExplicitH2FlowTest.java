@@ -15,7 +15,8 @@ import io.envoyproxy.envoymobile.RequestHeaders;
 import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.Stream;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.engine.JniLibrary;
+
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
@@ -34,7 +35,7 @@ public class AndroidEnvoyExplicitH2FlowTest {
 
   @BeforeClass
   public static void loadJniLibrary() {
-    AndroidJniLibrary.loadTestLibrary();
+    JniLibrary.loadTestLibrary();
   }
 
   @Before
@@ -43,7 +44,11 @@ public class AndroidEnvoyExplicitH2FlowTest {
     Context appContext = ApplicationProvider.getApplicationContext();
     engine = new AndroidEngineBuilder(appContext)
                  .setTrustChainVerification(ACCEPT_UNTRUSTED)
-                 .addLogLevel(LogLevel.DEBUG)
+                 .setLogLevel(LogLevel.DEBUG)
+                 .setLogger((level, message) -> {
+                   System.out.print(message);
+                   return null;
+                 })
                  .setOnEngineRunning(() -> {
                    latch.countDown();
                    return null;

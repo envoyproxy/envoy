@@ -24,8 +24,8 @@ bool ConsumerGroupMember::expired() const {
          connection_manager_->config().transientObjectLifeSpan().count();
 }
 
-ConnectionManager::ConnectionManager(Config& config, TimeSource& time_source)
-    : config_(config), time_source_(time_source), stats_(config.stats()) {}
+ConnectionManager::ConnectionManager(const ConfigSharedPtr& config, TimeSource& time_source)
+    : config_(config), time_source_(time_source), stats_(config_->stats()) {}
 
 Envoy::Network::FilterStatus ConnectionManager::onData(Envoy::Buffer::Instance& data,
                                                        bool end_stream) {
@@ -137,7 +137,7 @@ void ConnectionManager::purgeDirectiveTable() {
   for (auto it = ack_directive_table_.begin(); it != ack_directive_table_.end();) {
     auto duration = current - it->second.creation_time_;
     if (std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() >
-        config_.transientObjectLifeSpan().count()) {
+        config_->transientObjectLifeSpan().count()) {
       ack_directive_table_.erase(it++);
     } else {
       it++;

@@ -13,6 +13,7 @@ envoy_mobile_android_test(
         "CronetBidirectionalStateTest.java",
         "CronvoyEngineTest.java",
         "CronvoyLoggerTest.java",
+        "ErrorsTest.java",
         "UrlRequestCallbackTester.java",
     ],
     exec_properties = {
@@ -31,6 +32,7 @@ envoy_mobile_android_test(
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
+        "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
         "//library/java/io/envoyproxy/envoymobile/utilities",
         "//library/java/org/chromium/net",
         "//library/java/org/chromium/net/impl:cronvoy",

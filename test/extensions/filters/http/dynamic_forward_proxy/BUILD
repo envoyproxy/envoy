@@ -1,6 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -43,6 +45,25 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "test_resolver_proto",
+    srcs = ["test_resolver.proto"],
+)
+
+envoy_cc_test_library(
+    name = "test_resolver_lib",
+    srcs = ["test_resolver.cc"],
+    hdrs = ["test_resolver.h"],
+    deps = [
+        ":test_resolver_proto_cc_proto",
+        "//envoy/network:dns_resolver_interface",
+        "//envoy/registry",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
+    ],
+    alwayslink = 1,
+)
+
 envoy_extension_cc_test(
     name = "proxy_filter_integration_test",
     size = "large",
@@ -55,6 +76,7 @@ envoy_extension_cc_test(
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     tags = ["fails_on_clang_cl"],
     deps = [
+        ":test_resolver_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",

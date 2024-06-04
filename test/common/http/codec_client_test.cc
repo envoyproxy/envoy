@@ -489,7 +489,9 @@ TEST_F(CodecClientTest, ResponseHeaderValidationFailsWithConnectionClosure) {
 class CodecNetworkTest : public Event::TestUsingSimulatedTime,
                          public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource(), nullptr) {
+  CodecNetworkTest()
+      : api_(Api::createApiForTest()),
+        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::Connection) {
     dispatcher_ = api_->allocateDispatcher("test_thread");
     auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
@@ -501,6 +503,7 @@ public:
     upstream_listener_ = std::make_unique<Network::TcpListenerImpl>(
         *dispatcher_, api_->randomGenerator(), runtime_, std::move(socket), listener_callbacks_,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.shouldBypassOverloadManager(),
         listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);

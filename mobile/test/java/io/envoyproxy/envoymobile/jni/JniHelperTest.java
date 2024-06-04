@@ -18,6 +18,7 @@ public class JniHelperTest {
   // Native methods for testing.
   //================================================================================
   public static native void getFieldId(Class<?> clazz, String name, String signature);
+  public static native void getStaticFieldId(Class<?> clazz, String name, String signature);
   public static native byte getByteField(Class<?> clazz, Object instance, String name,
                                          String signature);
   public static native char getCharField(Class<?> clazz, Object instance, String name,
@@ -42,6 +43,8 @@ public class JniHelperTest {
   public static native Class<?> getObjectClass(Object object);
   public static native Object newObject(Class<?> clazz, String name, String signature);
   public static native void throwNew(String className, String message);
+  public static native boolean exceptionOccurred(Class<?> clazz, String name, String signature);
+  public static native boolean exceptionClear(Class<?> clazz, String name, String signature);
   public static native int getArrayLength(int[] array);
   public static native byte[] newByteArray(int length);
   public static native char[] newCharArray(int length);
@@ -149,11 +152,30 @@ public class JniHelperTest {
   public static void staticVoidMethod() {}
   public static String staticObjectMethod() { return "Hello"; }
 
-  static class Foo { private final int field = 1; }
+  //================================================================================
+  // Methods used for Exception* tests.
+  //================================================================================
+  public static void alwaysThrow() { throw new RuntimeException("Test"); }
+
+  static class Foo {
+    private final int field = 1;
+    private static int staticField = 2;
+  }
 
   @Test
   public void testGetFieldId() {
-    getFieldId(Foo.class, "field", "I");
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      getFieldId(Foo.class, "field", "I");
+    }
+  }
+
+  @Test
+  public void testGetStaticFieldId() {
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      getStaticFieldId(Foo.class, "staticField", "I");
+    }
   }
 
   @Test
@@ -204,17 +226,26 @@ public class JniHelperTest {
 
   @Test
   public void testGetMethodId() {
-    getMethodId(Foo.class, "<init>", "()V");
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      getMethodId(Foo.class, "<init>", "()V");
+    }
   }
 
   @Test
   public void testGetStaticMethodId() {
-    getStaticMethodId(JniHelperTest.class, "staticVoidMethod", "()V");
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      getStaticMethodId(JniHelperTest.class, "staticVoidMethod", "()V");
+    }
   }
 
   @Test
   public void testFindClass() {
-    assertThat(findClass("java/lang/Exception")).isEqualTo(Exception.class);
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      assertThat(findClass("java/lang/Exception")).isEqualTo(Exception.class);
+    }
   }
 
   @Test
@@ -233,6 +264,18 @@ public class JniHelperTest {
     RuntimeException exception =
         assertThrows(RuntimeException.class, () -> throwNew("java/lang/RuntimeException", "Test"));
     assertThat(exception).hasMessageThat().contains("Test");
+  }
+
+  @Test
+  public void testExceptionOccurred() {
+    RuntimeException exception = assertThrows(
+        RuntimeException.class, () -> exceptionOccurred(JniHelperTest.class, "alwaysThrow", "()V"));
+    assertThat(exception).hasMessageThat().contains("Test");
+  }
+
+  @Test
+  public void testExceptionClear() {
+    assertThat(exceptionClear(JniHelperTest.class, "alwaysThrow", "()V")).isTrue();
   }
 
   @Test

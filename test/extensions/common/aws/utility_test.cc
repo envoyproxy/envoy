@@ -9,12 +9,9 @@
 
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::ElementsAre;
 using testing::NiceMock;
 using testing::Pair;
-using testing::Return;
-using testing::Throw;
 
 namespace Envoy {
 namespace Extensions {
@@ -411,43 +408,49 @@ TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
   EXPECT_EQ("", names);
 }
 
-// Verify that we don't add a thread local cluster if it already exists.
-TEST(UtilityTest, ThreadLocalClusterExistsAlready) {
-  NiceMock<Upstream::MockThreadLocalCluster> cluster_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
-  EXPECT_CALL(cm_, addOrUpdateCluster(_, _)).Times(0);
-  EXPECT_TRUE(Utility::addInternalClusterStatic(cm_, "cluster_name",
-                                                envoy::config::cluster::v3::Cluster::STATIC, ""));
-}
-
-// Verify that if thread local cluster doesn't exist we can create a new one.
-TEST(UtilityTest, AddStaticClusterSuccess) {
-  NiceMock<Upstream::MockClusterManager> cm_;
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
-  EXPECT_TRUE(Utility::addInternalClusterStatic(
-      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:80"));
-}
-
-// Handle exception when adding thread local cluster fails.
-TEST(UtilityTest, AddStaticClusterFailure) {
-  NiceMock<Upstream::MockClusterManager> cm_;
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _))
-      .WillOnce(Throw(EnvoyException("exeption message")));
-  EXPECT_FALSE(Utility::addInternalClusterStatic(
-      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:80"));
+// Verify that createInternalCluster returns correctly
+TEST(UtilityTest, CreateStaticClusterSuccess) {
+  auto cluster = Utility::createInternalClusterStatic(
+      "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:443");
+  EXPECT_EQ(cluster.load_assignment()
+                .endpoints(0)
+                .lb_endpoints(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .address(),
+            "127.0.0.1");
+  EXPECT_EQ(cluster.load_assignment()
+                .endpoints(0)
+                .lb_endpoints(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .port_value(),
+            443);
 }
 
 // Verify that for uri argument in addInternalClusterStatic port value is optional
 // and can contain request path which will be ignored.
-TEST(UtilityTest, AddStaticClusterSuccessEvenWithMissingPort) {
-  NiceMock<Upstream::MockClusterManager> cm_;
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
-  EXPECT_TRUE(Utility::addInternalClusterStatic(
-      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1/something"));
+TEST(UtilityTest, CreateStaticClusterSuccessEvenWithMissingPort) {
+  auto cluster = Utility::createInternalClusterStatic(
+      "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1/something");
+  EXPECT_EQ(cluster.load_assignment()
+                .endpoints(0)
+                .lb_endpoints(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .address(),
+            "127.0.0.1");
+  EXPECT_EQ(cluster.load_assignment()
+                .endpoints(0)
+                .lb_endpoints(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .port_value(),
+            80);
 }
 
 // The region is simply interpolated into sts.{}.amazonaws.com for most regions
@@ -483,6 +486,64 @@ TEST(UtilityTest, GetGovCloudSTSEndpoints) {
   // No difference between fips vs non-fips endpoints in GovCloud.
   EXPECT_EQ("sts.us-gov-east-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-east-1"));
   EXPECT_EQ("sts.us-gov-west-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-west-1"));
+}
+
+TEST(UtilityTest, JsonStringFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"access_key_id\":\"testvalue\"}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration =
+      Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
+  EXPECT_EQ(expiration, "testvalue");
+}
+
+TEST(UtilityTest, JsonStringNotFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"no_access_key_id\":\"testvalue\"}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration =
+      Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
+  EXPECT_EQ(expiration, "notfound");
+}
+
+TEST(UtilityTest, JsonIntegerFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":5}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  EXPECT_EQ(expiration, 5);
+}
+
+TEST(UtilityTest, JsonIntegerNotFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"noexpiration\":5}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  // Should return default value
+  EXPECT_EQ(expiration, 0);
+}
+
+// Check we handle double formatted integer > 0
+TEST(UtilityTest, JsonIntegerExponent) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":1.714449238E9}");
+  EXPECT_TRUE(test_json.ok());
+  auto value_or_error = test_json.value()->getValue("expiration");
+  EXPECT_TRUE(value_or_error.ok());
+  EXPECT_FALSE(absl::holds_alternative<int64_t>(value_or_error.value()));
+  EXPECT_TRUE(absl::holds_alternative<double>(value_or_error.value()));
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  // Should return default value
+  EXPECT_EQ(expiration, 1714449238);
+}
+
+// Check we handle double formatted integer < 0
+TEST(UtilityTest, JsonIntegerExponentInvalid) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":-0.17144492389}");
+  EXPECT_TRUE(test_json.ok());
+  auto value_or_error = test_json.value()->getValue("expiration");
+  EXPECT_TRUE(value_or_error.ok());
+  EXPECT_FALSE(absl::holds_alternative<int64_t>(value_or_error.value()));
+  EXPECT_TRUE(absl::holds_alternative<double>(value_or_error.value()));
+  const auto expiration =
+      Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 9999);
+  // Should return default value
+  EXPECT_EQ(expiration, 9999);
 }
 
 } // namespace

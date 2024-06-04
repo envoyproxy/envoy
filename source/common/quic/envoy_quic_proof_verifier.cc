@@ -7,6 +7,7 @@
 
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/utility.h"
 
 #include "quiche/quic/core/crypto/certificate_view.h"

@@ -1,5 +1,7 @@
 #include "source/common/json/json_streamer.h"
 
+#include <type_traits>
+
 #include "source/common/buffer/buffer_util.h"
 #include "source/common/json/json_sanitizer.h"
 
@@ -82,6 +84,12 @@ void Streamer::Level::addNumber(int64_t number) {
   streamer_.addNumber(number);
 }
 
+void Streamer::Level::addBool(bool b) {
+  ASSERT_THIS_IS_TOP_LEVEL;
+  nextField();
+  streamer_.addBool(b);
+}
+
 void Streamer::Level::addString(absl::string_view str) {
   ASSERT_THIS_IS_TOP_LEVEL;
   nextField();
@@ -131,16 +139,29 @@ void Streamer::Map::addEntries(const Entries& entries) {
 void Streamer::Level::addValue(const Value& value) {
   switch (value.index()) {
   case 0:
+    static_assert(std::is_same<decltype(absl::get<0>(value)), const absl::string_view&>::value,
+                  "value at index 0 must be an absl::string_vlew");
     addString(absl::get<absl::string_view>(value));
     break;
   case 1:
+    static_assert(std::is_same<decltype(absl::get<1>(value)), const double&>::value,
+                  "value at index 1 must be a double");
     addNumber(absl::get<double>(value));
     break;
   case 2:
+    static_assert(std::is_same<decltype(absl::get<2>(value)), const uint64_t&>::value,
+                  "value at index 2 must be a uint64_t");
     addNumber(absl::get<uint64_t>(value));
     break;
   case 3:
+    static_assert(std::is_same<decltype(absl::get<3>(value)), const int64_t&>::value,
+                  "value at index 3 must be an int64_t");
     addNumber(absl::get<int64_t>(value));
+    break;
+  case 4:
+    static_assert(std::is_same<decltype(absl::get<4>(value)), const bool&>::value,
+                  "value at index 4 must be a bool");
+    addBool(absl::get<bool>(value));
     break;
   default:
     IS_ENVOY_BUG(absl::StrCat("addValue invalid index: ", value.index()));
@@ -165,6 +186,8 @@ void Streamer::addNumber(double number) {
 void Streamer::addNumber(uint64_t number) { response_.addFragments({absl::StrCat(number)}); }
 
 void Streamer::addNumber(int64_t number) { response_.addFragments({absl::StrCat(number)}); }
+
+void Streamer::addBool(bool b) { response_.addFragments({b ? "true" : "false"}); }
 
 void Streamer::addSanitized(absl::string_view prefix, absl::string_view str,
                             absl::string_view suffix) {

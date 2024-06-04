@@ -38,7 +38,6 @@ import org.robolectric.RobolectricTestRunner
 class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
   init {
     JniLibrary.loadTestLibrary()
-    JniLibrary.load()
   }
 
   private lateinit var httpProxyTestServer: HttpProxyTestServerFactory.HttpProxyTestServer
@@ -72,7 +71,8 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
     val builder = AndroidEngineBuilder(context)
     val engine =
       builder
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .enableProxying(true)
         .setOnEngineRunning { onEngineRunningLatch.countDown() }
         .build()

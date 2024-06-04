@@ -1,23 +1,24 @@
 **Summary of changes**:
 
-* Envoy Mobile can now be built without C++ exceptions using the `--define=envoy_exceptions=disabled` Bazel flag.
-* Add the logical `OR` operation to value matchers.
-* Add xDS support for Envoy Mobile Android (AAR) library.
-* Add configurable HTTP status when a global rate limit service fails.
-* Opentelemetry tracer: add support for environment resource detector.
-* Added HTTP basic auth extension.
-* Add support for ext_authz to send route metadata.
-* Allow per route body buffering configuration in ext_authz.
-* Datadog: honor extracted sampling decisions to avoid dropping samples.
-* gRPC side streams: make idle connection timeout configurable.
-* Support CEL expressions in ext_proc for extraction of request or response atributes.
-* HTTP: clear hop by hop `Transfer-Encoding` header.
-* Redis: Add support for the `WATCH` and `GETDEL` commands.
-* Adds strict mode for stateful session filter, that rejects requests if destination host is not available.
-* Internal redirects: support passing headers from response to request.
-* Add implementation of the `drop_overload` Cluster API.
-* HTTP/2: discard the `Host` header when `:authority` is present.
-* grpc_http1_bridge: add `<ignore_query_params>` option.
-* Access Log: Add `EMIT_TIME` command operator.
-* ECDS now supports composite filter.
-* Enable new oghttp2 codec for HTTP/2 connections.
+* Removed the Swift/C++ interop layer in Envoy Mobile.
+* Addd retry policy to ext_proc.
+* Added HTTP downstream remote reset response flag.
+* Added support for the Fluentd access logger.
+* Introduced `MemoryAllocatorManager` to configure heap memory release rate.
+* Envoy Mobile added `CONNECT` Proxy support for iOS.
+* Redis: support echo command.
+* Envoy Mobile setting QUIC newtowrk idle timeout to 30 seconds.
+* Sending server preferred address to non-QUICHE clients.
+* Avoid concatenation of JWT duplicated headers.
+* HTTP: Keep `Transfer-Encoding` header for `trailers`.
+* Envoy Mobile setting the socket receive buffer to 1MB for QUIC.
+* Added `FULL_SCAN` support to least-request load-balancing algorithm.
+* aws_lambda and ext_proc filters can be used as an upstream filter.
+* Hosts marked as draining in and EDS update are now excluded.
+* Envoy Mobile supports log-levels.
+* Added support for URI tempate matching for RBAC.
+* Fixed load balancing initialization bug.
+* Supporting `%UPSTREAM_CONNECTION_ID%` in access logs.
+* Added request and response attributes support to ext_proc.
+* Added support sending dynamic metadata to ext_proc.
+* Re-enable the nghttp2 codec for HTTP/2 connections by default.

@@ -67,6 +67,7 @@ class AdminImpl : public Admin,
                   public Network::FilterChainFactory,
                   public Http::FilterChainFactory,
                   public Http::ConnectionManagerConfig,
+                  public std::enable_shared_from_this<AdminImpl>,
                   Logger::Loggable<Logger::Id::admin> {
 public:
   AdminImpl(const std::string& profile_path, Server::Instance& server,
@@ -402,6 +403,7 @@ private:
     }
     Init::Manager& initManager() override { return *init_manager_; }
     bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
+    bool shouldBypassOverloadManager() const override { return true; }
 
     AdminImpl& parent_;
     const std::string name_;

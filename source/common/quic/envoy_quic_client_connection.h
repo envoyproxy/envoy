@@ -74,7 +74,7 @@ public:
   // Network::UdpPacketProcessor
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
-                     Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos) override;
   uint64_t maxDatagramSize() const override;
   void onDatagramsDropped(uint32_t) override {
     // TODO(mattklein123): Emit a stat for this.

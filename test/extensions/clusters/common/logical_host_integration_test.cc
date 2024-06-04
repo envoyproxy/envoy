@@ -18,11 +18,13 @@ public:
         registered_dns_factory_(dns_resolver_factory_) {}
 
   void createUpstreams() override { HttpIntegrationTest::createUpstreams(); }
+  struct address {
+    uint32_t address_;
+    absl::string_view first_address_string_;
+  };
 
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
-  uint32_t address_ = 0;
-  std::string first_address_string_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, LogicalHostIntegrationTest,
@@ -33,37 +35,40 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, LogicalHostIntegrationTest,
 // The test is by mocking the DNS resolver to return multiple different
 // addresses, also config dns_refresh_rate to be extremely fast.
 TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
+  auto address_ptr = std::make_shared<address>();
+  address_ptr->address_ = 0;
   // first_address_string_ is used to make connections. It needs
   // to match with the IpVersion of the test.
   if (version_ == Network::Address::IpVersion::v4) {
-    first_address_string_ = "127.0.0.1";
+    address_ptr->first_address_string_ = "127.0.0.1";
   } else {
-    first_address_string_ = "::1";
+    address_ptr->first_address_string_ = "::1";
   }
 
   auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .WillRepeatedly(testing::Return(dns_resolver));
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
-      .WillRepeatedly(
-          Invoke([&](const std::string&, Network::DnsLookupFamily,
-                     Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
+      .WillRepeatedly(Invoke(
+          [address_ptr](const std::string&, Network::DnsLookupFamily,
+                        Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
+            const uint32_t address = address_ptr->address_;
             // Keep changing the returned addresses to force address update.
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                          TestUtility::makeDnsResponse({
                              // The only significant address is the first one; the other ones are
                              // just used to populate a list whose maintenance is race-prone.
-                             first_address_string_,
-                             absl::StrCat("127.0.0.", address_),
-                             absl::StrCat("127.0.0.", address_ + 1),
-                             absl::StrCat("127.0.0.", address_ + 2),
-                             absl::StrCat("127.0.0.", address_ + 3),
-                             absl::StrCat("127.0.0.", address_ + 4),
-                             absl::StrCat("127.0.0.", address_ + 5),
-                             absl::StrCat("127.0.0.", address_ + 6),
-                             absl::StrCat("127.0.0.", address_ + 7),
-                             absl::StrCat("127.0.0.", address_ + 8),
-                             absl::StrCat("127.0.0.", address_ + 9),
+                             std::string(address_ptr->first_address_string_),
+                             absl::StrCat("127.0.0.", address),
+                             absl::StrCat("127.0.0.", address + 1),
+                             absl::StrCat("127.0.0.", address + 2),
+                             absl::StrCat("127.0.0.", address + 3),
+                             absl::StrCat("127.0.0.", address + 4),
+                             absl::StrCat("127.0.0.", address + 5),
+                             absl::StrCat("127.0.0.", address + 6),
+                             absl::StrCat("127.0.0.", address + 7),
+                             absl::StrCat("127.0.0.", address + 8),
+                             absl::StrCat("127.0.0.", address + 9),
                              "::2",
                              "::3",
                              "::4",
@@ -73,7 +78,7 @@ TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
                              "::8",
                              "::9",
                          }));
-            address_ = (address_ + 1) % 128;
+            address_ptr->address_ = (address + 1) % 128;
             return nullptr;
           }));
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {

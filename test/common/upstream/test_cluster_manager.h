@@ -174,7 +174,7 @@ public:
         new TestClusterManagerImpl(bootstrap, factory, context, stats, tls, runtime, local_info,
                                    log_manager, main_thread_dispatcher, admin, validation_context,
                                    api, http_context, grpc_context, router_context, server)};
-    THROW_IF_NOT_OK(cluster_manager->init(bootstrap));
+    THROW_IF_NOT_OK(cluster_manager->initialize(bootstrap));
     return cluster_manager;
   }
 

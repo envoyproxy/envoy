@@ -45,10 +45,12 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
+  static absl::StatusOr<absl::optional<std::string>>
+  maybeBuildResolversCsv(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
+
   DnsResolverImpl(
       const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
-      Event::Dispatcher& dispatcher,
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+      Event::Dispatcher& dispatcher, absl::optional<std::string> resolvers_csv,
       Stats::Scope& root_scope);
   ~DnsResolverImpl() override;
 
@@ -168,9 +170,6 @@ private:
     int optmask_;
   };
 
-  static absl::optional<std::string>
-  maybeBuildResolversCsv(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
-
   // Callback for events on sockets tracked in events_.
   void onEventCallback(os_fd_t fd, uint32_t events);
   // c-ares callback when a socket state changes, indicating that libevent
@@ -195,6 +194,7 @@ private:
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
   const bool use_resolvers_as_fallback_;
+  const uint32_t udp_max_queries_;
   const absl::optional<std::string> resolvers_csv_;
   const bool filter_unroutable_families_;
   Stats::ScopeSharedPtr scope_;

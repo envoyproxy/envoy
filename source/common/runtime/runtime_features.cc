@@ -33,13 +33,13 @@ RUNTIME_GUARD(envoy_reloadable_features_abort_filter_chain_on_stream_reset);
 RUNTIME_GUARD(envoy_reloadable_features_avoid_zombie_streams);
 RUNTIME_GUARD(envoy_reloadable_features_check_mep_on_first_eject);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
-RUNTIME_GUARD(envoy_reloadable_features_convert_legacy_lb_config);
-RUNTIME_GUARD(envoy_reloadable_features_copy_response_code_to_downstream_stream_info);
+RUNTIME_GUARD(envoy_reloadable_features_consistent_header_validation);
 RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
-RUNTIME_GUARD(envoy_reloadable_features_detect_and_raise_rst_tcp_connection);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_first_resolve_complete);
+RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
+RUNTIME_GUARD(envoy_reloadable_features_dns_reresolve_on_eai_again);
 RUNTIME_GUARD(envoy_reloadable_features_edf_lb_host_scheduler_init_fix);
 RUNTIME_GUARD(envoy_reloadable_features_edf_lb_locality_scheduler_init_fix);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
@@ -51,14 +51,16 @@ RUNTIME_GUARD(envoy_reloadable_features_exclude_host_in_eds_status_draining);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_send_original_xff);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_http1_reverse_bridge_change_http_status);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_http1_reverse_bridge_handle_empty_response);
-RUNTIME_GUARD(envoy_reloadable_features_handle_uppercase_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_hmac_base64_encoding_only);
+RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_delay_reset);
 RUNTIME_GUARD(envoy_reloadable_features_http1_connection_close_header_in_redirect);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year.
 RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http2_decode_metadata_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
-RUNTIME_GUARD(envoy_reloadable_features_http2_skip_callback_visitor);
+// Ignore the automated "remove this flag" issue: we should keep this for 1 year.
+RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
+RUNTIME_GUARD(envoy_reloadable_features_http2_use_visitor_for_data);
 RUNTIME_GUARD(envoy_reloadable_features_http2_validate_authority_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http_allow_partial_urls_in_referer);
 RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply);
@@ -67,7 +69,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_route_connect_proxy_by_default);
 RUNTIME_GUARD(envoy_reloadable_features_immediate_response_use_filter_mutation_rule);
 RUNTIME_GUARD(envoy_reloadable_features_locality_routing_use_new_routing_logic);
-RUNTIME_GUARD(envoy_reloadable_features_lowercase_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_no_downgrade_to_canonical_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_full_scan_certs_on_sni_mismatch);
@@ -76,10 +77,9 @@ RUNTIME_GUARD(envoy_reloadable_features_oauth_make_token_cookie_httponly);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_use_standard_max_age_value);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_use_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
-RUNTIME_GUARD(envoy_reloadable_features_prefer_quic_client_udp_gro);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_status_mapping_more_core_response_flags);
-RUNTIME_GUARD(envoy_reloadable_features_proxy_status_upstream_request_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_quic_fix_filter_manager_uaf);
+RUNTIME_GUARD(envoy_reloadable_features_quic_receive_ecn);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
@@ -91,29 +91,31 @@ RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_ssl_transport_failure_reason_format);
 RUNTIME_GUARD(envoy_reloadable_features_stateful_session_encode_ttl_in_cookie);
 RUNTIME_GUARD(envoy_reloadable_features_stop_decode_metadata_on_local_reply);
+RUNTIME_GUARD(envoy_reloadable_features_strict_duration_validation);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_tunneling_send_downstream_fin_on_upstream_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_allow_negative_field_ids);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
-RUNTIME_GUARD(envoy_reloadable_features_token_passed_entirely);
+RUNTIME_GUARD(envoy_reloadable_features_udp_socket_apply_aggregated_read_limit);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_allow_connect_with_2xx);
+RUNTIME_GUARD(envoy_reloadable_features_upstream_remote_address_use_connection);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_wait_for_response_headers_before_disabling_read);
-RUNTIME_GUARD(envoy_reloadable_features_use_cluster_cache_for_alt_protocols_filter);
 RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
+RUNTIME_GUARD(envoy_reloadable_features_use_typed_metadata_in_proxy_protocol_listener);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_grpc_header_before_log_grpc_status);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
+RUNTIME_GUARD(envoy_reloadable_features_xdstp_path_avoid_colon_encoding);
 RUNTIME_GUARD(envoy_restart_features_allow_client_socket_creation_failure);
+RUNTIME_GUARD(envoy_restart_features_allow_slot_destroy_on_worker_threads);
 RUNTIME_GUARD(envoy_restart_features_quic_handle_certs_with_shared_tls_code);
 RUNTIME_GUARD(envoy_restart_features_send_goaway_for_premature_rst_streams);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
+RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
-// TODO(birenroy) Flip this to true after resolving issues.
-// Ignore the automated "remove this flag" issue: we should keep this for 1 year.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // Execution context is optional and must be enabled explicitly.
 // See https://github.com/envoyproxy/envoy/issues/32012.
 FALSE_RUNTIME_GUARD(envoy_restart_features_enable_execution_context);
@@ -149,10 +151,14 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
 // TODO(pksohn): enable after fixing https://github.com/envoyproxy/envoy/issues/29930
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
-// TODO(#31276): flip this to true after some test time.
-FALSE_RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 // TODO(panting): flip this to true after some test time.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
+// TODO(#33474) removed it once GRO packet dropping is fixed.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_prefer_quic_client_udp_gro);
+// TODO(alyssar) evaluate and either make this a config knob or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_null_addresses);
+// TODO(alyssar) evaluate and either make this a config knob or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_if_no_connections);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.

@@ -44,6 +44,7 @@ envoy_cc_test_library(
         ":config_cc_proto",
         "//source/common/init:manager_lib",
         "//source/common/listener_manager:listener_manager_lib",
+        "//source/common/tls:server_context_lib",
         "//source/extensions/common/matcher:trie_matcher_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/matcher:matcher_mocks",

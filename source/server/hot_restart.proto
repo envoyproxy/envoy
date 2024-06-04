@@ -26,6 +26,8 @@ message HotRestartMessage {
       bytes payload = 4;
       uint32 worker_index = 5;
     }
+    message TestConnection {
+    }
     oneof request {
       PassListenSocket pass_listen_socket = 1;
       ShutdownAdmin shutdown_admin = 2;
@@ -33,6 +35,7 @@ message HotRestartMessage {
       DrainListeners drain_listeners = 4;
       Terminate terminate = 5;
       ForwardedUdpPacket forwarded_udp_packet = 6;
+      TestConnection test_connection = 7;
     }
   }
 

@@ -156,7 +156,7 @@ struct AggregateThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalanc
 
   // Upstream::ThreadAwareLoadBalancer
   Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
-  void initialize() override {}
+  absl::Status initialize() override { return absl::OkStatus(); }
 
   std::shared_ptr<AggregateLoadBalancerFactory> factory_;
 };

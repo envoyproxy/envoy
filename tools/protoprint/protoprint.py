@@ -14,7 +14,6 @@ import io
 import os
 import pathlib
 import re
-import shutil
 import subprocess
 from collections import deque
 from functools import cached_property

@@ -10,16 +10,19 @@ namespace GenericProxy {
 
 class MockServerCodecCallbacks : public ServerCodecCallbacks {
 public:
-  MOCK_METHOD(void, onDecodingSuccess, (StreamFramePtr request));
-  MOCK_METHOD(void, onDecodingFailure, ());
-  MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
+  MOCK_METHOD(void, onDecodingSuccess, (RequestHeaderFramePtr, absl::optional<StartTime>));
+  MOCK_METHOD(void, onDecodingSuccess, (RequestCommonFramePtr));
+  MOCK_METHOD(void, onDecodingFailure, (absl::string_view));
+  MOCK_METHOD(void, writeToConnection, (Buffer::Instance&));
+
   MOCK_METHOD(OptRef<Network::Connection>, connection, ());
 };
 
 class MockClientCodecCallbacks : public ClientCodecCallbacks {
 public:
-  MOCK_METHOD(void, onDecodingSuccess, (StreamFramePtr response));
-  MOCK_METHOD(void, onDecodingFailure, ());
+  MOCK_METHOD(void, onDecodingSuccess, (ResponseHeaderFramePtr, absl::optional<StartTime>));
+  MOCK_METHOD(void, onDecodingSuccess, (ResponseCommonFramePtr));
+  MOCK_METHOD(void, onDecodingFailure, (absl::string_view));
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
   MOCK_METHOD(OptRef<Network::Connection>, connection, ());
   MOCK_METHOD(OptRef<const Upstream::ClusterInfo>, upstreamCluster, (), (const));
@@ -28,6 +31,7 @@ public:
 class MockEncodingCallbacks : public EncodingCallbacks {
 public:
   MOCK_METHOD(void, onEncodingSuccess, (Buffer::Instance & buffer, bool end_stream));
+  MOCK_METHOD(void, onEncodingFailure, (absl::string_view));
   MOCK_METHOD(OptRef<const RouteEntry>, routeEntry, (), (const));
 };
 

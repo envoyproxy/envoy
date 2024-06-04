@@ -8,7 +8,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/network/address_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/redis/crc16.h"
 #include "source/extensions/filters/network/common/redis/client.h"
@@ -235,7 +235,7 @@ public:
 
   // Upstream::ThreadAwareLoadBalancer
   Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
-  void initialize() override{};
+  absl::Status initialize() override { return absl::OkStatus(); }
 
 private:
   Upstream::LoadBalancerFactorySharedPtr factory_;

@@ -17,6 +17,7 @@
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 #include "source/server/admin/stats_request.h"
 #include "source/server/configuration_impl.h"
+#include "source/server/null_overload_manager.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -181,11 +182,12 @@ TEST_P(AdminInstanceTest, Help) {
       filter: Regular expression (Google re2) for filtering stats
       format: Format to use; One of (html, active-html, text, json)
       type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
-      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, detailed, none)
+      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, detailed, summary)
   /stats/prometheus: print server stats in prometheus format
       usedonly: Only include stats that have been written by system since restart
       text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)
       filter: Regular expression (Google re2) for filtering stats
+      histogram_buckets: Histogram bucket display mode; One of (cumulative, summary)
   /stats/recentlookups: Show recent stat-name lookups
   /stats/recentlookups/clear (POST): clear list of stat-name lookups and counter
   /stats/recentlookups/disable (POST): disable recording of reset stat-name lookup names
@@ -303,7 +305,7 @@ public:
   AdminImpl::NullScopedRouteConfigProvider& scopedRouteConfigProvider() {
     return scoped_route_config_provider_;
   }
-  NullOverloadManager& overloadManager() { return admin_.null_overload_manager_; }
+  OverloadManager& overloadManager() { return admin_.null_overload_manager_; }
   NullOverloadManager::OverloadState& overloadState() { return overload_state_; }
   AdminImpl::AdminListenSocketFactory& socketFactory() { return socket_factory_; }
   AdminImpl::AdminListener& listener() { return listener_; }

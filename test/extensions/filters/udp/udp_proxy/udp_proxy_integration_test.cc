@@ -333,6 +333,10 @@ TEST_P(UdpProxyIntegrationTest, DownstreamDrop) {
 
 // Verify upstream drops are handled correctly with stats.
 TEST_P(UdpProxyIntegrationTest, UpstreamDrop) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
+    return;
+  }
   setup(1);
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(

@@ -5,7 +5,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "source/common/common/utility.h"
-#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/event/real_time_system.h"
@@ -13,10 +12,12 @@
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/admin/admin_factory_context.h"
 #include "source/server/listener_manager_factory.h"
+#include "source/server/null_overload_manager.h"
 #include "source/server/overload_manager_impl.h"
 #include "source/server/regex_engine.h"
 #include "source/server/utils.h"
@@ -101,7 +102,9 @@ void ValidationInstance::initialize(const Options& options,
   regex_engine_ = createRegexEngine(
       bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
 
-  Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags());
+  auto producer_or_error =
+      Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
+  THROW_IF_STATUS_NOT_OK(producer_or_error, throw);
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
     *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
   }
@@ -113,6 +116,7 @@ void ValidationInstance::initialize(const Options& options,
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
+  null_overload_manager_ = std::make_unique<NullOverloadManager>(threadLocal(), false);
   absl::Status creation_status = absl::OkStatus();
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
   THROW_IF_NOT_OK_REF(creation_status);
@@ -154,6 +158,15 @@ void ValidationInstance::shutdown() {
   }
   thread_local_.shutdownThread();
   dispatcher_->shutdown();
+}
+
+Network::DnsResolverSharedPtr ValidationInstance::dnsResolver() {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::DnsResolverFactory& dns_resolver_factory =
+      Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
+  return THROW_OR_RETURN_VALUE(
+      dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config),
+      Network::DnsResolverSharedPtr);
 }
 
 } // namespace Server

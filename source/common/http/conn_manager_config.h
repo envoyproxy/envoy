@@ -545,5 +545,7 @@ public:
    */
   virtual bool addProxyProtocolConnectionState() const PURE;
 };
+
+using ConnectionManagerConfigSharedPtr = std::shared_ptr<ConnectionManagerConfig>;
 } // namespace Http
 } // namespace Envoy

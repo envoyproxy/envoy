@@ -105,7 +105,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
   }
 }
 
-void SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
+absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
   // Use a generic lambda to be compatible with BoringSSL before and after
   // https://boringssl-review.googlesource.com/c/boringssl/+/56190
   bssl::UniquePtr<STACK_OF(X509_NAME)> list(
@@ -121,10 +121,11 @@ void SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
 
     bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
     if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
-      throw EnvoyException(absl::StrCat("Failed to load trusted client CA certificate"));
+      return absl::InvalidArgumentError("Failed to load trusted client CA certificate");
     }
   }
   SSL_CTX_set_client_CA_list(ctx, list.release());
+  return absl::OkStatus();
 }
 
 void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
@@ -141,7 +142,7 @@ void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
   }
 }
 
-int SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) {
+absl::StatusOr<int> SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) {
   return SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 }
 

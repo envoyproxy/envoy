@@ -24,8 +24,8 @@ public:
                          bool was_any_or_top_level) PURE;
 };
 
-void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,
-                     bool recurse_into_any);
+absl::Status traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,
+                             bool recurse_into_any);
 
 } // namespace ProtobufMessage
 } // namespace Envoy
