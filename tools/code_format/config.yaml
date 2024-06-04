@@ -152,6 +152,7 @@ paths:
     - source/common/config/watched_directory.cc
     - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
+    - source/server/hot_restarting_parent.cc
     - source/common/io/io_uring_worker_impl.cc
     - source/common/event/file_event_impl.cc
     - source/common/http/async_client_impl.cc

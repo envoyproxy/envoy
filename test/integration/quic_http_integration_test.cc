@@ -202,7 +202,7 @@ public:
       uint32_t port, const std::string& host,
       const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr) {
     // Setting socket options is not supported.
-    server_addr_ = Network::Utility::resolveUrl(
+    server_addr_ = *Network::Utility::resolveUrl(
         fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
     Network::Address::InstanceConstSharedPtr local_addr =
         Network::Test::getCanonicalLoopbackAddress(version_);

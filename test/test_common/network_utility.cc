@@ -60,7 +60,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
                                                     Socket::Type type) {
-  auto instance = Utility::parseInternetAddressAndPort(addr_port);
+  auto instance = Utility::parseInternetAddressAndPortNoThrow(addr_port);
   if (instance != nullptr) {
     instance = findOrCheckFreePort(instance, type);
   } else {
