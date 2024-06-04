@@ -239,6 +239,7 @@ build:mobile-remote-ci-macos --config=remote
 
 build:mobile-remote-ci --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci --config=remote-ci
+build:mobile-remote-ci --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 build:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --build_tests_only
@@ -267,13 +268,9 @@ build:mobile-remote-ci-macos-swift --@envoy//bazel:http3=False
 build:mobile-remote-ci-core --config=mobile-remote-ci
 build:mobile-remote-ci-core --define=envoy_full_protos=disabled
 test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
-test:mobile-remote-ci-core --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-ios --config=mobile-test-ios
-
-#TODO(alyssar) remove this build
-build:mobile-remote-ci-macos-ios-admin --config=mobile-remote-ci-macos-ios
 
 build:mobile-remote-ci-macos-ios-swift --config=mobile-remote-ci-macos-ios
 test:mobile-remote-ci-macos-ios-swift --build_tests_only
