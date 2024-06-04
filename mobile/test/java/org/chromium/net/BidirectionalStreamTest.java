@@ -18,7 +18,6 @@ import android.os.ConditionVariable;
 import android.os.Process;
 import android.util.Log;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import org.chromium.net.impl.CronvoyBidirectionalStreamNetworkException;
@@ -42,6 +41,7 @@ import org.chromium.net.testing.MetricsTestUtil.TestRequestFinishedListener;
 import org.chromium.net.testing.TestBidirectionalStreamCallback.FailureType;
 import org.chromium.net.testing.TestBidirectionalStreamCallback.ResponseStep;
 import org.chromium.net.impl.CronvoyUrlResponseInfoImpl;
+import org.robolectric.RobolectricTestRunner;
 
 import java.nio.ByteBuffer;
 import java.util.AbstractMap;
@@ -56,7 +56,7 @@ import java.util.regex.Pattern;
 /**
  * Test functionality of BidirectionalStream interface.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class BidirectionalStreamTest {
 
   private static final String TAG = BidirectionalStreamTest.class.getSimpleName();

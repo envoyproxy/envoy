@@ -7,7 +7,6 @@ import static org.chromium.net.testing.CronetTestRule.SERVER_KEY_PKCS8_PEM;
 
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.LogLevel;
@@ -27,8 +26,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class AndroidEnvoyExplicitH2FlowTest {
 
   private Engine engine;

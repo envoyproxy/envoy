@@ -177,6 +177,7 @@ protected:
     listener_ = std::make_unique<Network::TcpListenerImpl>(
         *dispatcher_, api_->randomGenerator(), runtime_, socket_, listener_callbacks_,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.shouldBypassOverloadManager(),
         listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
@@ -1889,6 +1890,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   listener_ = std::make_unique<Network::TcpListenerImpl>(
       *dispatcher_, api_->randomGenerator(), runtime_, socket_, listener_callbacks_,
       listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+      listener_config.shouldBypassOverloadManager(),
       listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 
   client_connection_ = dispatcher_->createClientConnection(
@@ -3445,6 +3447,7 @@ public:
     listener_ = std::make_unique<Network::TcpListenerImpl>(
         *dispatcher_, api_->randomGenerator(), runtime_, socket_, listener_callbacks_,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.shouldBypassOverloadManager(),
         listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 
     client_connection_ = dispatcher_->createClientConnection(

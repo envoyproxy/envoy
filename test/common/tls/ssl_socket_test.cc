@@ -337,7 +337,7 @@ Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                     Random::RandomGenerator& rng, Event::Dispatcher& dispatcher) {
   return std::make_unique<Network::TcpListenerImpl>(
       dispatcher, rng, runtime, socket, cb, listener_config.bindToPort(),
-      listener_config.ignoreGlobalConnLimit(),
+      listener_config.ignoreGlobalConnLimit(), listener_config.shouldBypassOverloadManager(),
       listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 }
 
@@ -736,8 +736,10 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   auto server_cfg =
       std::make_unique<ServerContextConfigImpl>(tls_context, transport_socket_factory_context);
 
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
+  auto factory_or_error = ServerSslSocketFactory::create(
       std::move(server_cfg), manager, *server_stats_store.rootScope(), server_names);
+  THROW_IF_NOT_OK(factory_or_error.status());
+  auto server_ssl_socket_factory = std::move(*factory_or_error);
 
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
@@ -757,8 +759,10 @@ void testUtilV2(const TestUtilOptionsV2& options) {
 
   auto client_cfg =
       std::make_unique<ClientContextConfigImpl>(options.clientCtxProto(), client_factory_context);
-  auto client_ssl_socket_factory = *ClientSslSocketFactory::create(std::move(client_cfg), manager,
-                                                                   *client_stats_store.rootScope());
+  auto client_factory_or_error = ClientSslSocketFactory::create(std::move(client_cfg), manager,
+                                                                *client_stats_store.rootScope());
+  THROW_IF_NOT_OK(client_factory_or_error.status());
+  auto client_ssl_socket_factory = std::move(*client_factory_or_error);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory->createTransportSocket(options.transportSocketOptions(), nullptr),
@@ -994,6 +998,7 @@ protected:
     return std::make_unique<Network::TcpListenerImpl>(
         dispatcher, api_->randomGenerator(), runtime, std::move(socket), cb,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.shouldBypassOverloadManager(),
         listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
   }
 

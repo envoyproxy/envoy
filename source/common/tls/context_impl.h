@@ -62,12 +62,12 @@ struct TlsContext {
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr getPrivateKeyMethodProvider() {
     return private_key_method_provider_;
   }
-  void loadCertificateChain(const std::string& data, const std::string& data_path);
-  void loadPrivateKey(const std::string& data, const std::string& data_path,
-                      const std::string& password);
-  void loadPkcs12(const std::string& data, const std::string& data_path,
-                  const std::string& password);
-  void checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
+  absl::Status loadCertificateChain(const std::string& data, const std::string& data_path);
+  absl::Status loadPrivateKey(const std::string& data, const std::string& data_path,
+                              const std::string& password);
+  absl::Status loadPkcs12(const std::string& data, const std::string& data_path,
+                          const std::string& password);
+  absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
 };
 } // namespace Ssl
 
@@ -118,7 +118,7 @@ protected:
 
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
               Server::Configuration::CommonFactoryContext& factory_context,
-              Ssl::ContextAdditionalInitFunc additional_init);
+              Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
 
   /**
    * The global SSL-library index used for storing a pointer to the context
@@ -129,8 +129,9 @@ protected:
   // A SSL_CTX_set_custom_verify callback for asynchronous cert validation.
   static enum ssl_verify_result_t customVerifyCallback(SSL* ssl, uint8_t* out_alert);
 
-  bool parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl);
-  std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
+  bool parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl, absl::Status& parse_status);
+  std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols,
+                                          absl::Status& parse_status);
 
   void incCounter(const Stats::StatName name, absl::string_view value,
                   const Stats::StatName fallback) const;
