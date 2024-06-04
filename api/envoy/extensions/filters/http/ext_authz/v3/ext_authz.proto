@@ -267,7 +267,7 @@ message ExtAuthz {
   // continuing decoding / forwarding upstream.
   //
   // If set to anything, enables header mutation checking against configured rules. Note that
-  // :ref:`HeaderMutationRules <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutationRules>`
+  // :ref:`HeaderMutationRules <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutationRules>`
   // has defaults that change ext_authz behavior. Also note that if this field is set to anything,
   // ext_authz can no longer append to :-prefixed headers.
   //
