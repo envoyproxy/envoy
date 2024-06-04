@@ -123,8 +123,8 @@ public:
 
   ThriftToMetadataStats& rqstats() { return rqstats_; }
   ThriftToMetadataStats& respstats() { return respstats_; }
-  bool doRequestMetadata() const { return !request_rules_.empty(); }
-  bool doResponseMetadata() const { return !response_rules_.empty(); }
+  bool shouldParseRequestMetadata() const { return !request_rules_.empty(); }
+  bool shouldParseResponseMetadata() const { return !response_rules_.empty(); }
   const Rules& requestRules() const { return request_rules_; }
   const Rules& responseRules() const { return response_rules_; }
   bool contentTypeAllowed(absl::string_view) const;

@@ -135,7 +135,7 @@ bool FilterConfig::contentTypeAllowed(absl::string_view content_type) const {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  if (!config_->doRequestMetadata()) {
+  if (!config_->shouldParseRequestMetadata()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -156,7 +156,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  if (!config_->doRequestMetadata() || request_processing_finished_) {
+  if (!config_->shouldParseRequestMetadata() || request_processing_finished_) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -182,7 +182,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
-  if (!config_->doRequestMetadata() || request_processing_finished_) {
+  if (!config_->shouldParseRequestMetadata() || request_processing_finished_) {
     return Http::FilterTrailersStatus::Continue;
   }
 
@@ -197,7 +197,7 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
-  if (!config_->doResponseMetadata()) {
+  if (!config_->shouldParseResponseMetadata()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -219,7 +219,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 }
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (!config_->doResponseMetadata() || response_processing_finished_) {
+  if (!config_->shouldParseResponseMetadata() || response_processing_finished_) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -246,7 +246,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
-  if (!config_->doResponseMetadata() || response_processing_finished_) {
+  if (!config_->shouldParseResponseMetadata() || response_processing_finished_) {
     return Http::FilterTrailersStatus::Continue;
   }
 
@@ -318,7 +318,7 @@ void Filter::handleOnPresent(ProtobufWkt::Value&& value, const Rule& rule, Struc
     return;
   }
 
-  auto& on_present_keyval = rule.rule().on_present();
+  const auto& on_present_keyval = rule.rule().on_present();
   applyKeyValue(on_present_keyval.has_value() ? on_present_keyval.value() : std::move(value),
                 on_present_keyval, struct_map);
 }
