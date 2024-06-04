@@ -3,12 +3,11 @@ package org.chromium.net.impl;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
-
 import org.chromium.net.impl.CronvoyBidirectionalState.NextAction;
 import org.chromium.net.impl.CronvoyBidirectionalState.Event;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * These tests have little intrinsic value in regards with code maintenance and fighting regression
@@ -18,7 +17,7 @@ import org.junit.runner.RunWith;
  * <p>The Event sequence in each of these tests is deemed a plausible one. In some cases, a given
  * Event might not be strictly necessary to make the tests pass, but would be realistic.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class CronetBidirectionalStateTest {
 
   private final CronvoyBidirectionalState mCronetBidirectionalState =

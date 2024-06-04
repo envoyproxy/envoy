@@ -33,6 +33,22 @@ inline bool tooManyPreconnects(size_t num_preconnect_picks, uint32_t healthy_hos
   return num_preconnect_picks >= healthy_hosts;
 }
 
+// Distributes load between priorities based on the per priority availability and the normalized
+// total availability. Load is assigned to each priority according to how available each priority is
+// adjusted for the normalized total availability.
+//
+// @param per_priority_load vector of loads that should be populated.
+// @param per_priority_availability the percentage availability of each priority, used to determine
+// how much load each priority can handle.
+// @param total_load the amount of load that may be distributed. Will be updated with the amount of
+// load remaining after distribution.
+// @param normalized_total_availability the total availability, up to a max of 100. Used to
+// scale the load when the total availability is less than 100%.
+// @return the first available priority and the remaining load
+std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
+                                          const PriorityAvailability& per_priority_availability,
+                                          size_t total_load, size_t normalized_total_availability);
+
 class LoadBalancerConfigHelper {
 public:
   template <class LegacyProto>

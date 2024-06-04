@@ -1,11 +1,11 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
-load("@envoy_mobile//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
+load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_library")
 
 licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
 
-envoy_mobile_kt_library(
+kt_android_library(
     name = "mocks_lib",
     srcs = [
         "MockEnvoyEngine.kt",
