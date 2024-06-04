@@ -368,13 +368,13 @@ selects.config_setting_group(
 )
 
 bool_flag(
-    name = "always_true_flag",
+    name = "enabled",
     build_setting_default = True,
     visibility = ["//visibility:private"],
 )
 
 bool_flag(
-    name = "always_false_flag",
+    name = "disabled",
     build_setting_default = False,
     visibility = ["//visibility:private"],
 )
@@ -383,8 +383,8 @@ bool_flag(
 alias(
     name = "enable_http3_setting",
     actual = select({
-        ":disable_http3": ":always_false_flag",
-        "//conditions:default": ":always_true_flag",
+        ":disable_http3": ":disabled",
+        "//conditions:default": ":enabled",
     }),
 )
 
