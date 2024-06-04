@@ -88,7 +88,7 @@ protected:
                                              const Grpc::GrpcServiceConfigWithHashKey&,
                                              const Envoy::Http::AsyncClient::StreamOptions&) {
     stream_callbacks_ = &callbacks;
-    auto stream = std::make_unique<MockStream>();
+    auto stream = std::make_unique<NiceMock<MockStream>>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
     EXPECT_CALL(*stream, streamInfo()).WillRepeatedly(ReturnRef(async_client_stream_info_));
     EXPECT_CALL(*stream, close());
