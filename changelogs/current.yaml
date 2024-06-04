@@ -210,6 +210,11 @@ new_features:
     added :ref:`stat_prefix
     <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.stat_prefix>`
     configuration to support additional stat prefix for the OpenTelemetry logger.
+- area: open_telemetry
+  change: |
+    added :ref:`formatters
+    <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.formatters>`
+    configuration to support extension formatter for the OpenTelemetry logger.
 
 deprecated:
 - area: tracing
