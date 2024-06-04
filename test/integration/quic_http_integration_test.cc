@@ -1352,8 +1352,9 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
   waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  // Block the main thread by not calling waitForEndStream or closing the client's connection,
-  // then wait for server to tear down connection due to too many retransmissions.
+  // Prevent the client's dispatcher from running by not calling waitForEndStream or closing the
+  // client's connection, then wait for server to tear down connection due to too many
+  // retransmissions.
   int iterations = 0;
   std::string contents = TestEnvironment::readFileToStringForTest(access_log_name_);
   while (iterations < 20) {
