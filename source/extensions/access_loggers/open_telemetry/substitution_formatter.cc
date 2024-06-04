@@ -22,7 +22,7 @@ namespace OpenTelemetry {
 
 OpenTelemetryFormatter::OpenTelemetryFormatter(
     const ::opentelemetry::proto::common::v1::KeyValueList& format_mapping,
-    const std::vector<Formatter::CommandParserBasePtr<Formatter::HttpFormatterContext>>& commands)
+    const std::vector<Formatter::CommandParserPtr>& commands)
     : kv_list_output_format_(FormatBuilder(commands).toFormatMapValue(format_mapping)) {}
 
 OpenTelemetryFormatter::OpenTelemetryFormatMapWrapper

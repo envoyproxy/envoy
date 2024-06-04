@@ -53,7 +53,7 @@ std::unique_ptr<OpenTelemetryFormatter> makeOpenTelemetryFormatter() {
           string_value: '%REQ(USER-AGENT)%'
   )EOF";
   TestUtility::loadFromYaml(format_yaml, otel_log_format);
-  std::vector<Formatter::CommandParserBasePtr<Formatter::HttpFormatterContext>> commands = {};
+  std::vector<Formatter::CommandParserPtr> commands = {};
   return std::make_unique<OpenTelemetryFormatter>(otel_log_format, commands);
 }
 

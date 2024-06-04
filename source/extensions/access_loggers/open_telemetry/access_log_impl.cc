@@ -60,7 +60,7 @@ AccessLog::AccessLog(
     ::Envoy::AccessLog::FilterPtr&& filter,
     envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
     ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-    const std::vector<Formatter::CommandParserBasePtr<Formatter::HttpFormatterContext>>& commands)
+    const std::vector<Formatter::CommandParserPtr>& commands)
     : Common::ImplBase(std::move(filter)), tls_slot_(tls.allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)) {
 

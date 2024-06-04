@@ -28,7 +28,7 @@ class OpenTelemetryFormatter {
 public:
   OpenTelemetryFormatter(
       const ::opentelemetry::proto::common::v1::KeyValueList& format_mapping,
-      const std::vector<Formatter::CommandParserBasePtr<Formatter::HttpFormatterContext>>&
+      const std::vector<Formatter::CommandParserPtr>&
           commands);
 
   ::opentelemetry::proto::common::v1::KeyValueList
@@ -66,7 +66,7 @@ private:
   class FormatBuilder {
   public:
     explicit FormatBuilder(
-        const std::vector<Formatter::CommandParserBasePtr<Formatter::HttpFormatterContext>>&
+        const std::vector<Formatter::CommandParserPtr>&
             commands)
         : commands_(commands) {}
     std::vector<Formatter::FormatterProviderPtr>
@@ -77,7 +77,7 @@ private:
         const ::opentelemetry::proto::common::v1::ArrayValue& list_value_format) const;
 
   private:
-    const std::vector<Formatter::CommandParserBasePtr<Formatter::HttpFormatterContext>>& commands_;
+    const std::vector<Formatter::CommandParserPtr>& commands_;
   };
 
   // Methods for doing the actual formatting.
