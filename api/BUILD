@@ -300,6 +300,7 @@ proto_library(
         "//envoy/extensions/outlier_detection_monitors/consecutive_errors/v3:pkg",
         "//envoy/extensions/path/match/uri_template/v3:pkg",
         "//envoy/extensions/path/rewrite/uri_template/v3:pkg",
+        "//envoy/extensions/quic/connection_debug_visitor/v3:pkg",
         "//envoy/extensions/quic/connection_id_generator/v3:pkg",
         "//envoy/extensions/quic/crypto_stream/v3:pkg",
         "//envoy/extensions/quic/proof_source/v3:pkg",

@@ -38,375 +38,41 @@ ReasonViewAndFlag resetReasonToViewAndFlag(StreamResetReason reason) {
   return ReasonViewAndFlags[static_cast<uint32_t>(reason)];
 }
 
-constexpr absl::string_view RouterFilterName = "envoy.filters.generic.router";
-
 } // namespace
 
-GenericUpstream::~GenericUpstream() {
-  // In case we doesn't clean up the pending connecting request.
-  if (tcp_pool_handle_ != nullptr) {
-    // Clear the data first.
-    auto local_handle = tcp_pool_handle_;
-    tcp_pool_handle_ = nullptr;
-
-    local_handle->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
-  }
-}
-
-void GenericUpstream::initialize() {
-  if (!initialized_) {
-    initialized_ = true;
-    tcp_pool_handle_ = tcp_pool_data_.newConnection(*this);
-  }
-}
-
-void GenericUpstream::cleanUp(bool close_connection) {
-  ENVOY_LOG(debug, "generic proxy upstream manager: clean up upstream (close: {})",
-            close_connection);
-
-  if (close_connection && owned_conn_data_ != nullptr) {
-    ENVOY_LOG(debug, "generic proxy upstream request: close upstream connection");
-    ASSERT(tcp_pool_handle_ == nullptr);
-
-    // Clear the data first to avoid re-entering this function in the close callback.
-    auto local_data = std::move(owned_conn_data_);
-    owned_conn_data_.reset();
-
-    local_data->connection().close(Network::ConnectionCloseType::FlushWrite);
-  }
-
-  if (tcp_pool_handle_ != nullptr) {
-    ENVOY_LOG(debug, "generic proxy upstream manager: cacel upstream connection");
-    ASSERT(owned_conn_data_ == nullptr);
-
-    // Clear the data first.
-    auto local_handle = tcp_pool_handle_;
-    tcp_pool_handle_ = nullptr;
-
-    local_handle->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
-  }
-}
-
-void GenericUpstream::onPoolFailure(ConnectionPool::PoolFailureReason reason,
-                                    absl::string_view transport_failure_reason,
-                                    Upstream::HostDescriptionConstSharedPtr host) {
-  ENVOY_LOG(debug, "generic proxy upstream manager: on upstream connection failure (host: {})",
-            host != nullptr ? host->address()->asStringView() : absl::string_view{});
-
-  tcp_pool_handle_ = nullptr;
-  mayUpdateUpstreamHost(std::move(host));
-
-  onPoolFailureImpl(reason, transport_failure_reason);
-}
-
-void GenericUpstream::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
-                                  Upstream::HostDescriptionConstSharedPtr host) {
-  ASSERT(host != nullptr);
-  ENVOY_LOG(debug, "generic proxy upstream manager: on upstream connection ready (host: {})",
-            host->address()->asStringView());
-
-  tcp_pool_handle_ = nullptr;
-  mayUpdateUpstreamHost(std::move(host));
-
-  owned_conn_data_ = std::move(conn_data);
-  owned_conn_data_->addUpstreamCallbacks(*this);
-
-  onPoolSuccessImpl();
-}
-
-void GenericUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
-  if (data.length() == 0) {
-    return;
-  }
-
-  client_codec_->decode(data, end_stream);
-}
-
-void GenericUpstream::writeToConnection(Buffer::Instance& buffer) {
-  if (owned_conn_data_ != nullptr &&
-      owned_conn_data_->connection().state() == Network::Connection::State::Open) {
-    owned_conn_data_->connection().write(buffer, false);
-  }
-}
-
-OptRef<Network::Connection> GenericUpstream::connection() {
-  if (owned_conn_data_ != nullptr &&
-      owned_conn_data_->connection().state() == Network::Connection::State::Open) {
-    return {owned_conn_data_->connection()};
-  }
-  return {};
-}
-
-BoundGenericUpstream::BoundGenericUpstream(const CodecFactory& codec_factory,
-                                           Envoy::Upstream::TcpPoolData&& tcp_pool_data,
-                                           Network::Connection& downstream_connection)
-    : GenericUpstream(std::move(tcp_pool_data), codec_factory.createClientCodec()),
-      downstream_connection_(downstream_connection) {
-
-  connection_event_watcher_ = std::make_unique<EventWatcher>(*this);
-  downstream_connection_.addConnectionCallbacks(*connection_event_watcher_);
-}
-
-void BoundGenericUpstream::onDownstreamConnectionEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::RemoteClose) {
-    // The event should be handled first by the generic proxy first. So all pending
-    // requests will be cleaned up by the downstream connection close event.
-    ASSERT(waiting_upstream_requests_.empty());
-    ASSERT(waiting_response_requests_.empty());
-
-    // Close upstream connection and this will trigger the upstream connection close event.
-    cleanUp(true);
-  }
-}
-
-void BoundGenericUpstream::insertUpstreamRequest(uint64_t stream_id,
-                                                 UpstreamRequest* pending_request) {
-  if (waiting_response_requests_.contains(stream_id) ||
-      waiting_upstream_requests_.contains(stream_id)) {
-    ENVOY_LOG(error, "generic proxy: stream_id {} already registered", stream_id);
-    // Close downstream connection because we treat this as request decoding failure.
-    // The downstream closing will trigger the upstream connection closing.
-    downstream_connection_.close(Network::ConnectionCloseType::FlushWrite);
-    return;
-  }
-
-  if (upstream_connection_ready_.has_value()) {
-    // Upstream connection is already ready. If the upstream connection is failed then
-    // all pending requests will be reset and no new upstream request will be created.
-    if (!upstream_connection_ready_.value()) {
-      return;
-    }
-
-    waiting_response_requests_[stream_id] = pending_request;
-    pending_request->onUpstreamSuccess();
-  } else {
-    waiting_upstream_requests_[stream_id] = pending_request;
-
-    // Try to initialize the upstream connection after there is at least one pending request.
-    // If the upstream connection is already initialized, this is a no-op.
-    initialize();
-  }
-}
-
-void BoundGenericUpstream::removeUpstreamRequest(uint64_t stream_id) {
-  waiting_upstream_requests_.erase(stream_id);
-  waiting_response_requests_.erase(stream_id);
-}
-
-void BoundGenericUpstream::onEventImpl(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::Connected ||
-      event == Network::ConnectionEvent::ConnectedZeroRtt) {
-    return;
-  }
-
-  while (!waiting_response_requests_.empty()) {
-    auto it = waiting_response_requests_.begin();
-    auto cb = it->second;
-    waiting_response_requests_.erase(it);
-
-    cb->onConnectionClose(event);
-  }
-
-  // If the downstream connection is not closed, close it.
-  if (downstream_connection_.state() == Network::Connection::State::Open) {
-    downstream_connection_.close(Network::ConnectionCloseType::FlushWrite);
-  }
-}
-
-void BoundGenericUpstream::cleanUp(bool close_connection) {
-  // Shared upstream manager never release the connection back to the pool
-  // because the connection is bound to the downstream connection.
-  if (!close_connection || prevent_clean_up_) {
-    return;
-  }
-  // Only actually do the cleanup when we want to close the connection.
-  GenericUpstream::cleanUp(true);
-}
-
-void BoundGenericUpstream::onPoolSuccessImpl() {
-  // This should be called only once and all pending requests should be notified.
-  // After this is called, the upstream connection is ready and new upstream requests
-  // should be notified directly.
-
-  ASSERT(!upstream_connection_ready_.has_value());
-  upstream_connection_ready_ = true;
-
-  ASSERT(waiting_response_requests_.empty());
-
-  while (!waiting_upstream_requests_.empty()) {
-    auto it = waiting_upstream_requests_.begin();
-    auto cb = it->second;
-
-    // Insert it to the waiting response list and remove it from the waiting upstream list.
-    waiting_response_requests_[it->first] = cb;
-    waiting_upstream_requests_.erase(it);
-
-    // Now, notify the upstream request that the upstream connection is ready.
-    cb->onUpstreamSuccess();
-  }
-}
-
-void BoundGenericUpstream::onPoolFailureImpl(ConnectionPool::PoolFailureReason reason,
-                                             absl::string_view transport_failure_reason) {
-  // This should be called only once and all pending requests should be notified.
-  // Then the downstream connection will be closed.
-
-  ASSERT(!upstream_connection_ready_.has_value());
-  upstream_connection_ready_ = false;
-
-  ASSERT(waiting_response_requests_.empty());
-
-  while (!waiting_upstream_requests_.empty()) {
-    auto it = waiting_upstream_requests_.begin();
-    auto cb = it->second;
-
-    // Remove it from the waiting upstream list.
-    waiting_upstream_requests_.erase(it);
-
-    // Now, notify the upstream request that the upstream connection is failed.
-    cb->onUpstreamFailure(reason, transport_failure_reason);
-  }
-
-  // If the downstream connection is not closed, close it.
-  downstream_connection_.close(Network::ConnectionCloseType::FlushWrite);
-}
-
-void BoundGenericUpstream::onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
-                                             absl::optional<StartTime> start_time) {
-  const uint64_t stream_id = response_header_frame->frameFlags().streamFlags().streamId();
-  const bool end_stream = response_header_frame->frameFlags().endStream();
-
-  auto it = waiting_response_requests_.find(stream_id);
-  if (it == waiting_response_requests_.end()) {
-    ENVOY_LOG(error, "generic proxy: id {} not found for frame", stream_id);
-    return;
-  }
-
-  auto cb = it->second;
-
-  // If the response is end, remove the callback from the map.
-  if (end_stream) {
-    waiting_response_requests_.erase(it);
-  }
-
-  return cb->onDecodingSuccess(std::move(response_header_frame), std::move(start_time));
-}
-
-void BoundGenericUpstream::onDecodingSuccess(ResponseCommonFramePtr response_common_frame) {
-  const uint64_t stream_id = response_common_frame->frameFlags().streamFlags().streamId();
-  const bool end_stream = response_common_frame->frameFlags().endStream();
-
-  auto it = waiting_response_requests_.find(stream_id);
-  if (it == waiting_response_requests_.end()) {
-    ENVOY_LOG(error, "generic proxy: id {} not found for frame", stream_id);
-    return;
-  }
-
-  auto cb = it->second;
-
-  // If the response is end, remove the callback from the map.
-  if (end_stream) {
-    waiting_response_requests_.erase(it);
-  }
-
-  return cb->onDecodingSuccess(std::move(response_common_frame));
-}
-
-void BoundGenericUpstream::onDecodingFailure(absl::string_view reason) {
-  ENVOY_LOG(error, "generic proxy bound upstream manager: decoding failure ({})", reason);
-
-  // Prevent the clean up to ensure the connection will not be closed by the following
-  // upstream request reset.
-  prevent_clean_up_ = true;
-
-  while (!waiting_response_requests_.empty()) {
-    auto it = waiting_response_requests_.begin();
-    auto upstream_request = it->second;
-    waiting_response_requests_.erase(it);
-    upstream_request->onDecodingFailure(reason);
-  }
-
-  // Now to clean up the connection after all upstream requests are reset.
-  prevent_clean_up_ = false;
-  cleanUp(true);
-}
-
-OwnedGenericUpstream::OwnedGenericUpstream(const CodecFactory& codec_factory,
-                                           Envoy::Upstream::TcpPoolData&& tcp_pool_data)
-    : GenericUpstream(std::move(tcp_pool_data), codec_factory.createClientCodec()) {}
-
-void OwnedGenericUpstream::insertUpstreamRequest(uint64_t, UpstreamRequest* pending_request) {
-  upstream_request_ = pending_request;
-  initialize();
-}
-
-void OwnedGenericUpstream::onEventImpl(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::Connected ||
-      event == Network::ConnectionEvent::ConnectedZeroRtt) {
-    return;
-  }
-  ASSERT(upstream_request_ != nullptr);
-  upstream_request_->onConnectionClose(event);
-}
-
-void OwnedGenericUpstream::onPoolSuccessImpl() {
-  ASSERT(upstream_request_ != nullptr);
-  upstream_request_->onUpstreamSuccess();
-}
-
-void OwnedGenericUpstream::onPoolFailureImpl(ConnectionPool::PoolFailureReason reason,
-                                             absl::string_view transport_failure_reason) {
-  ASSERT(upstream_request_ != nullptr);
-  upstream_request_->onUpstreamFailure(reason, transport_failure_reason);
-}
-
-void OwnedGenericUpstream::onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
-                                             absl::optional<StartTime> start_time) {
-  ASSERT(upstream_request_ != nullptr);
-  upstream_request_->onDecodingSuccess(std::move(response_header_frame), std::move(start_time));
-}
-void OwnedGenericUpstream::onDecodingSuccess(ResponseCommonFramePtr response_common_frame) {
-  ASSERT(upstream_request_ != nullptr);
-  upstream_request_->onDecodingSuccess(std::move(response_common_frame));
-}
-void OwnedGenericUpstream::onDecodingFailure(absl::string_view reason) {
-  ASSERT(upstream_request_ != nullptr);
-  upstream_request_->onDecodingFailure(reason);
-}
-
-UpstreamRequest::UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr generic_upstream)
+UpstreamRequest::UpstreamRequest(RouterFilter& parent, StreamFlags stream_flags,
+                                 GenericUpstreamSharedPtr generic_upstream)
     : parent_(parent), generic_upstream_(std::move(generic_upstream)),
       stream_info_(parent.time_source_, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain),
-      upstream_info_(std::make_shared<StreamInfo::UpstreamInfoImpl>()) {
+      upstream_info_(std::make_shared<StreamInfo::UpstreamInfoImpl>()),
+      stream_id_(stream_flags.streamId()), expects_response_(!stream_flags.oneWayStream()) {
 
   // Host is known at this point and set the initial upstream host.
   onUpstreamHostSelected(generic_upstream_->upstreamHost());
 
+  auto filter_callbacks = parent_.callbacks_;
+  ASSERT(filter_callbacks != nullptr);
+
   // Set the upstream info for the stream info.
   stream_info_.setUpstreamInfo(upstream_info_);
-  parent_.callbacks_->streamInfo().setUpstreamInfo(upstream_info_);
-  stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
+  filter_callbacks->streamInfo().setUpstreamInfo(upstream_info_);
+  stream_info_.healthCheck(filter_callbacks->streamInfo().healthCheck());
   stream_info_.setUpstreamClusterInfo(parent_.cluster_);
 
-  // Set request options.
-  auto options = parent_.request_stream_->frameFlags().streamFlags();
-  stream_id_ = options.streamId();
-  expects_response_ = !options.oneWayStream();
-
   // Set tracing config.
-  tracing_config_ = parent_.callbacks_->tracingConfig();
-  if (tracing_config_.has_value() && tracing_config_->spawnUpstreamSpan()) {
-    span_ = parent_.callbacks_->activeSpan().spawnChild(
-        tracing_config_.value().get(),
-        absl::StrCat("router ", parent_.cluster_->observabilityName(), " egress"),
-        parent.time_source_.systemTime());
+  tracing_config_ = filter_callbacks->tracingConfig();
+  if (!tracing_config_.has_value() || !tracing_config_->spawnUpstreamSpan()) {
+    return;
   }
+  span_ = filter_callbacks->activeSpan().spawnChild(
+      tracing_config_.value().get(),
+      absl::StrCat("router ", parent_.cluster_->observabilityName(), " egress"),
+      parent.time_source_.systemTime());
 }
 
 void UpstreamRequest::startStream() {
   connecting_start_time_ = parent_.time_source_.monotonicTime();
-  generic_upstream_->insertUpstreamRequest(stream_id_, this);
+  generic_upstream_->appendUpstreamRequest(stream_id_, this);
 }
 
 void UpstreamRequest::resetStream(StreamResetReason reason, absl::string_view reason_detail) {
@@ -522,7 +188,6 @@ OptRef<const RouteEntry> UpstreamRequest::routeEntry() const {
 void UpstreamRequest::onUpstreamFailure(ConnectionPool::PoolFailureReason reason,
                                         absl::string_view transport_failure_reason) {
   ENVOY_LOG(debug, "upstream request: tcp connection (bound or owned) failure");
-  onUpstreamHostSelected(generic_upstream_->upstreamHost());
   onUpstreamConnectionReady();
 
   if (reason == ConnectionPool::PoolFailureReason::Overflow) {
@@ -535,7 +200,6 @@ void UpstreamRequest::onUpstreamFailure(ConnectionPool::PoolFailureReason reason
 void UpstreamRequest::onUpstreamSuccess() {
   ENVOY_LOG(debug, "upstream request: {} tcp connection has ready",
             parent_.config_->bindUpstreamConnection() ? "bound" : "owned");
-  onUpstreamHostSelected(generic_upstream_->upstreamHost());
   onUpstreamConnectionReady();
 
   const auto upstream_host = upstream_info_->upstream_host_.get();
@@ -598,10 +262,14 @@ void UpstreamRequest::onDecodingSuccess(ResponseCommonFramePtr response_common_f
 }
 
 void UpstreamRequest::onDecodingFailure(absl::string_view reason) {
-  // Decoding failure after the response is complete, close the connection.
-  // This should only happen when some special cases, for example:
-  // The HTTP response is complete but the request is not fully sent.
-  // The codec will throw an error after the response is complete.
+  // Decoding failure after the response is complete, close the connection manually.
+  // Note the removeUpstreamRequest() has already been called and the upstream was
+  // already cleaned up. But it is still safe to call cleanUp() again to force the
+  // upstream connection to be closed.
+  //
+  // This should only happen when some special cases, for example: The HTTP response
+  // is complete but the request is not fully sent. The codec will throw an error
+  // after the response is complete.
   if (reset_or_response_complete_) {
     generic_upstream_->cleanUp(true);
     return;
@@ -647,7 +315,8 @@ void UpstreamRequest::encodeBufferToUpstream(Buffer::Instance& buffer) {
   ENVOY_LOG(trace, "proxying {} bytes", buffer.length());
 
   ASSERT(generic_upstream_ != nullptr);
-  generic_upstream_->writeToConnection(buffer);
+  ASSERT(generic_upstream_->upstreamConnection().has_value());
+  generic_upstream_->upstreamConnection()->write(buffer, false);
 }
 
 void RouterFilter::onResponseStart(ResponseHeaderFramePtr response_header_frame) {
@@ -760,7 +429,8 @@ void RouterFilter::kickOffNewUpstreamRequest() {
 
   auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
-    completeAndSendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"), {});
+    completeAndSendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"), {},
+                              StreamInfo::CoreResponseFlag::NoClusterFound);
     return;
   }
 
@@ -773,50 +443,17 @@ void RouterFilter::kickOffNewUpstreamRequest() {
     return;
   }
 
-  GenericUpstreamSharedPtr generic_upstream;
-
-  if (config_->bindUpstreamConnection()) {
-    // If the upstream connection binding is enabled.
-
-    const auto* const_downstream_connection = callbacks_->connection();
-    ASSERT(const_downstream_connection != nullptr);
-    auto downstream_connection = const_cast<Network::Connection*>(const_downstream_connection);
-
-    auto* bound_upstream =
-        downstream_connection->streamInfo().filterState()->getDataMutable<BoundGenericUpstream>(
-            RouterFilterName);
-    if (bound_upstream == nullptr) {
-      // The upstream connection is not bound yet and create a new bound upstream connection.
-      auto pool_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-      if (!pool_data.has_value()) {
-        completeAndSendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"), {},
-                                  StreamInfo::CoreResponseFlag::NoHealthyUpstream);
-        return;
-      }
-      auto new_bound_upstream = std::make_shared<BoundGenericUpstream>(
-          callbacks_->codecFactory(), std::move(pool_data.value()), *downstream_connection);
-      bound_upstream = new_bound_upstream.get();
-      downstream_connection->streamInfo().filterState()->setData(
-          RouterFilterName, std::move(new_bound_upstream),
-          StreamInfo::FilterState::StateType::Mutable,
-          StreamInfo::FilterState::LifeSpan::Connection);
-    }
-
-    ASSERT(bound_upstream != nullptr);
-    generic_upstream = bound_upstream->shared_from_this();
-  } else {
-    // Upstream connection binding is disabled and create a new upstream connection.
-    auto pool_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-    if (!pool_data.has_value()) {
-      completeAndSendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"), {},
-                                StreamInfo::CoreResponseFlag::NoHealthyUpstream);
-      return;
-    }
-    generic_upstream = std::make_shared<OwnedGenericUpstream>(callbacks_->codecFactory(),
-                                                              std::move(pool_data.value()));
+  GenericUpstreamSharedPtr generic_upstream = generic_upstream_factory_->createGenericUpstream(
+      *thread_local_cluster, this, const_cast<Network::Connection&>(*callbacks_->connection()),
+      callbacks_->codecFactory(), config_->bindUpstreamConnection());
+  if (generic_upstream == nullptr) {
+    completeAndSendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"), {},
+                              StreamInfo::CoreResponseFlag::NoHealthyUpstream);
+    return;
   }
 
-  auto upstream_request = std::make_unique<UpstreamRequest>(*this, std::move(generic_upstream));
+  auto upstream_request = std::make_unique<UpstreamRequest>(
+      *this, request_stream_->frameFlags().streamFlags(), std::move(generic_upstream));
   auto raw_upstream_request = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   raw_upstream_request->startStream();

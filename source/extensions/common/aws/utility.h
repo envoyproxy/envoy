@@ -188,7 +188,8 @@ public:
 
   /**
    * @brief Return an integer value from a json object key, or a default it not found. Does not
-   * throw exceptions.
+   * throw exceptions. Will correctly handle json exponent formatted integers as well as standard
+   * format.
    *
    * @return Integer value or default
    */

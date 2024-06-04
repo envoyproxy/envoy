@@ -109,29 +109,22 @@ jobs:
     - name: 'Configure gpg signing'
       env:
         GPG_KEY: ${{ secrets.EM_GPG_KEY }}
-        GPG_KEY_NAME: ${{ secrets.EM_GPG_KEY_NAME }}
         GPG_PASSPHRASE: ${{ secrets.EM_GPG_PASSPHRASE }}
       run: |
         # https://github.com/keybase/keybase-issues/issues/2798
         export GPG_TTY=$(tty)
-        # The key ID C9ADE25A75333454 was obtained from a previous
-        # run of the Mobile Release job. The key ID is consistent
-        # between runs. Hard-coding the key ID is more straightforward
-        # than using `list-secret-keys` to parse out the correct
-        # key ID.
-        export GPG_DEFAULT_KEY=C9ADE25A75333454
         # Import gpg keys and warm the passphrase to avoid the gpg
         # passphrase prompt when initating a deploy
         # `--pinentry-mode=loopback` could be needed to ensure we
         # suppress the gpg prompt
         echo $GPG_KEY | base64 --decode > signing-key
-        gpg --default-key $GPG_DEFAULT_KEY --passphrase $GPG_PASSPHRASE --batch --import signing-key
+        gpg --passphrase $GPG_PASSPHRASE --batch --import signing-key
         shred signing-key
 
-        gpg --default-key $GPG_DEFAULT_KEY --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab ${{ matrix.output }}.aar
-        gpg --default-key $GPG_DEFAULT_KEY --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab ${{ matrix.output }}-pom.xml
-        gpg --default-key $GPG_DEFAULT_KEY --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab ${{ matrix.output }}-javadoc.jar
-        gpg --default-key $GPG_DEFAULT_KEY --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab ${{ matrix.output }}-sources.jar
+        gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab ${{ matrix.output }}.aar
+        gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab ${{ matrix.output }}-pom.xml
+        gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab ${{ matrix.output }}-javadoc.jar
+        gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab ${{ matrix.output }}-sources.jar
     - name: 'Release to sonatype repository'
       env:
         READWRITE_USER: ${{ secrets.EM_SONATYPE_USER }}

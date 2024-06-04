@@ -56,17 +56,6 @@ jobs:
             build
             --config=mobile-remote-ci-cc-no-exceptions
             //test/performance:test_binary_size //library/cc/...
-        - name: Running C++ test
-          target: cc-test
-          args: >-
-            test
-            --config=mobile-remote-ci-cc-test
-          entrypoint: |
-            #!/bin/bash -e
-            export PATH=/opt/llvm/bin:$PATH
-            cd /source/mobile
-            EXTRA_ARGS=$(bazel query //test/cc/... + //test/common/... except //test/common/integration:client_integration_test)
-            exec "$@" $EXTRA_ARGS
 
   build:
     permissions:

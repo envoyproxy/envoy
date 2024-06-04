@@ -297,11 +297,14 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   return [singletons, filter_config, &context,
           clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
     auto& server_context = context.serverFactoryContext();
+    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+                                                    ? server_context.nullOverloadManager()
+                                                    : server_context.overloadManager();
 
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
-        server_context.clusterManager(), server_context.overloadManager(),
+        server_context.clusterManager(), overload_manager,
         server_context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
@@ -651,6 +654,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (!config.scheme_header_transformation().scheme_to_overwrite().empty()) {
     scheme_to_set_ = config.scheme_header_transformation().scheme_to_overwrite();
+
+    if (config.scheme_header_transformation().match_upstream()) {
+      ENVOY_LOG(warn, "match_upstream and scheme_to_overwrite both set, using scheme_to_overwrite");
+    }
+    should_scheme_match_upstream_ = false;
+  } else {
+    should_scheme_match_upstream_ = config.scheme_header_transformation().match_upstream();
   }
 
   if (!config.server_name().empty()) {
@@ -864,11 +874,14 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   return [singletons, filter_config, &context, clear_hop_by_hop_headers](
              Network::ReadFilterCallbacks& read_callbacks) -> Http::ApiListenerPtr {
     auto& server_context = context.serverFactoryContext();
+    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+                                                    ? server_context.nullOverloadManager()
+                                                    : server_context.overloadManager();
 
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
-        server_context.clusterManager(), server_context.overloadManager(),
+        server_context.clusterManager(), overload_manager,
         server_context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);

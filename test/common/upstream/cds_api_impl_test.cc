@@ -91,7 +91,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 )EOF";
@@ -265,7 +264,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
@@ -273,7 +271,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 )EOF";
@@ -299,7 +296,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
@@ -307,7 +303,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 )EOF";
@@ -340,7 +335,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
@@ -348,7 +342,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 )EOF";

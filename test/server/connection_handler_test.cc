@@ -180,6 +180,7 @@ public:
     }
     Init::Manager& initManager() override { return *init_manager_; }
     bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
+    bool shouldBypassOverloadManager() const override { return false; }
     void setMaxConnections(const uint32_t num_connections) {
       open_connections_.setMax(num_connections);
     }
@@ -294,6 +295,7 @@ public:
     MOCK_METHOD(Api::IoCallUint64Result, send, (const Network::UdpSendData&), (override));
     MOCK_METHOD(Api::IoCallUint64Result, flush, (), (override));
     MOCK_METHOD(void, activateRead, (), (override));
+    MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const, override));
 
   private:
     ConnectionHandlerTest& parent_;

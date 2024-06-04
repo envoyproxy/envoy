@@ -34,20 +34,20 @@ enum class CertVerifyStatus : int {
 };
 
 bool jvmCertIsIssuedByKnownRoot(JniHelper& jni_helper, jobject result) {
-  LocalRefUniquePtr<jclass> jcls_AndroidCertVerifyResult =
-      findClass("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
+  jclass jcls_AndroidCertVerifyResult =
+      jni_helper.findClass("io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult");
   jmethodID jmid_isIssuedByKnownRoot =
-      jni_helper.getMethodId(jcls_AndroidCertVerifyResult.get(), "isIssuedByKnownRoot", "()Z");
+      jni_helper.getMethodId(jcls_AndroidCertVerifyResult, "isIssuedByKnownRoot", "()Z");
   ASSERT(jmid_isIssuedByKnownRoot);
   bool is_issued_by_known_root = jni_helper.callBooleanMethod(result, jmid_isIssuedByKnownRoot);
   return is_issued_by_known_root;
 }
 
 CertVerifyStatus jvmCertGetStatus(JniHelper& jni_helper, jobject j_result) {
-  LocalRefUniquePtr<jclass> jcls_AndroidCertVerifyResult =
-      findClass("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
+  jclass jcls_AndroidCertVerifyResult =
+      jni_helper.findClass("io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult");
   jmethodID jmid_getStatus =
-      jni_helper.getMethodId(jcls_AndroidCertVerifyResult.get(), "getStatus", "()I");
+      jni_helper.getMethodId(jcls_AndroidCertVerifyResult, "getStatus", "()I");
   ASSERT(jmid_getStatus);
   CertVerifyStatus result =
       static_cast<CertVerifyStatus>(jni_helper.callIntMethod(j_result, jmid_getStatus));
@@ -56,10 +56,10 @@ CertVerifyStatus jvmCertGetStatus(JniHelper& jni_helper, jobject j_result) {
 
 LocalRefUniquePtr<jobjectArray> jvmCertGetCertificateChainEncoded(JniHelper& jni_helper,
                                                                   jobject result) {
-  LocalRefUniquePtr<jclass> jcls_AndroidCertVerifyResult =
-      findClass("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
-  jmethodID jmid_getCertificateChainEncoded = jni_helper.getMethodId(
-      jcls_AndroidCertVerifyResult.get(), "getCertificateChainEncoded", "()[[B");
+  jclass jcls_AndroidCertVerifyResult =
+      jni_helper.findClass("io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult");
+  jmethodID jmid_getCertificateChainEncoded =
+      jni_helper.getMethodId(jcls_AndroidCertVerifyResult, "getCertificateChainEncoded", "()[[B");
   LocalRefUniquePtr<jobjectArray> certificate_chain =
       jni_helper.callObjectMethod<jobjectArray>(result, jmid_getCertificateChainEncoded);
   return certificate_chain;
@@ -107,10 +107,10 @@ LocalRefUniquePtr<jobject> callJvmVerifyX509CertChain(JniHelper& jni_helper,
                                                       const std::vector<std::string>& cert_chain,
                                                       std::string auth_type,
                                                       absl::string_view hostname) {
-  LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
-      findClass("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
+  jclass jcls_AndroidNetworkLibrary =
+      jni_helper.findClass("io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary");
   jmethodID jmid_verifyServerCertificates = jni_helper.getStaticMethodId(
-      jcls_AndroidNetworkLibrary.get(), "verifyServerCertificates",
+      jcls_AndroidNetworkLibrary, "verifyServerCertificates",
       "([[B[B[B)Lio/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult;");
   LocalRefUniquePtr<jobjectArray> chain_byte_array =
       vectorStringToJavaArrayOfByteArray(jni_helper, cert_chain);
@@ -118,7 +118,7 @@ LocalRefUniquePtr<jobject> callJvmVerifyX509CertChain(JniHelper& jni_helper,
   LocalRefUniquePtr<jbyteArray> host_string = byteArrayToJavaByteArray(
       jni_helper, reinterpret_cast<const uint8_t*>(hostname.data()), hostname.length());
   LocalRefUniquePtr<jobject> result = jni_helper.callStaticObjectMethod(
-      jcls_AndroidNetworkLibrary.get(), jmid_verifyServerCertificates, chain_byte_array.get(),
+      jcls_AndroidNetworkLibrary, jmid_verifyServerCertificates, chain_byte_array.get(),
       auth_string.get(), host_string.get());
   return result;
 }

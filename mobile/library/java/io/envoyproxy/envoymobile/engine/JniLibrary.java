@@ -23,6 +23,7 @@ public class JniLibrary {
     if (System.getProperty("envoy_jni_library_name") != null) {
       envoyLibraryName = System.getProperty("envoy_jni_library_name");
     }
+    load();
   }
 
   // Load and initialize Envoy and its dependencies, but only once.

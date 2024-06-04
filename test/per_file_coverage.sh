@@ -6,7 +6,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.2"
 "source/common/api:84.5" # flaky due to posix: be careful adjusting
 "source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
-"source/common/common/posix:89.4" # No easy way to test pthread_create failure.
 "source/common/config:95.6"
 "source/common/crypto:95.5"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV

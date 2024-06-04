@@ -205,7 +205,8 @@ void ActiveStream::continueDecoding() {
   }
 
   if (cached_route_entry_ == nullptr) {
-    cached_route_entry_ = parent_.config_->routeEntry(*request_stream_);
+    const MatchInput match_input(*request_stream_, stream_info_, MatchAction::RouteAction);
+    cached_route_entry_ = parent_.config_->routeEntry(match_input);
     if (cached_route_entry_ != nullptr) {
       auto* cluster =
           parent_.cluster_manager_.getThreadLocalCluster(cached_route_entry_->clusterName());
