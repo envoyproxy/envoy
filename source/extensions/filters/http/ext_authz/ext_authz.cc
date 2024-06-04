@@ -406,8 +406,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                          key, value);
         break;
       case CheckResult::FAIL:
-        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to append '{}':'{}'.", *decoder_callbacks_,
-                         key, value);
+        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to append '{}':'{}'.",
+                         *decoder_callbacks_, key, value);
         rejectResponse();
         return;
       }

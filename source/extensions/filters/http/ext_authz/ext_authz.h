@@ -397,9 +397,9 @@ private:
   // Convenience function for the following:
   // 1. If `validate_mutations` is set to true, validate header key and value.
   // 2. If `decoder_header_mutation_rules` is set, check that mutation is allowed.
-  Filters::Common::MutationRules::CheckResult validateAndCheckDecoderHeaderMutation(
-    Filters::Common::MutationRules::CheckOperation operation, absl::string_view key,
-    absl::string_view value) const;
+  Filters::Common::MutationRules::CheckResult
+  validateAndCheckDecoderHeaderMutation(Filters::Common::MutationRules::CheckOperation operation,
+                                        absl::string_view key, absl::string_view value) const;
 
   // Called when the filter is configured to reject invalid responses & the authz response contains
   // invalid header or query parameters. Sends a local response with the configured rejection status
