@@ -964,7 +964,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   auto factory =
-      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context_);
+      *Quic::QuicClientTransportSocketFactory::create(std::move(config), factory_context_);
   factory->initialize();
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
@@ -1008,7 +1008,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   EXPECT_CALL(factory_context_.context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context));
   auto factory =
-      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context_);
+      *Quic::QuicClientTransportSocketFactory::create(std::move(config), factory_context_);
   factory->initialize();
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);

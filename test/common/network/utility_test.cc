@@ -61,56 +61,56 @@ StatusOr<Interface> getLocalNetworkInterface() {
 }
 
 TEST(NetworkUtility, resolveUrl) {
-  EXPECT_THROW(Utility::resolveUrl("foo"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("abc://foo"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("tcp://1.2.3.4:1234/"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("tcp://127.0.0.1:8001/"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("tcp://127.0.0.1:0/foo"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("tcp://127.0.0.1:"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("tcp://192.168.3.3"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("tcp://192.168.3.3.3:0"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("tcp://192.168.3:0"), EnvoyException);
+  EXPECT_FALSE(Utility::resolveUrl("foo").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("abc://foo").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("tcp://1.2.3.4:1234/").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("tcp://127.0.0.1:8001/").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("tcp://127.0.0.1:0/foo").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("tcp://127.0.0.1:").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("tcp://192.168.3.3").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("tcp://192.168.3.3.3:0").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("tcp://192.168.3:0").status().ok());
 
-  EXPECT_THROW(Utility::resolveUrl("udp://1.2.3.4:1234/"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("udp://127.0.0.1:8001/"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("udp://127.0.0.1:0/foo"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("udp://127.0.0.1:"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("udp://192.168.3.3"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("udp://192.168.3.3.3:0"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("udp://192.168.3:0"), EnvoyException);
+  EXPECT_FALSE(Utility::resolveUrl("udp://1.2.3.4:1234/").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("udp://127.0.0.1:8001/").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("udp://127.0.0.1:0/foo").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("udp://127.0.0.1:").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("udp://192.168.3.3").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("udp://192.168.3.3.3:0").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("udp://192.168.3:0").status().ok());
 
-  EXPECT_THROW(Utility::resolveUrl("tcp://[::1]"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("tcp://[:::1]:1"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("tcp://foo:0"), EnvoyException);
+  EXPECT_FALSE(Utility::resolveUrl("tcp://[::1]").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("tcp://[:::1]:1").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("tcp://foo:0").status().ok());
 
-  EXPECT_THROW(Utility::resolveUrl("udp://[::1]"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("udp://[:::1]:1"), EnvoyException);
-  EXPECT_THROW(Utility::resolveUrl("udp://foo:0"), EnvoyException);
+  EXPECT_FALSE(Utility::resolveUrl("udp://[::1]").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("udp://[:::1]:1").status().ok());
+  EXPECT_FALSE(Utility::resolveUrl("udp://foo:0").status().ok());
 
-  EXPECT_EQ("", Utility::resolveUrl("unix://")->asString());
-  EXPECT_EQ("foo", Utility::resolveUrl("unix://foo")->asString());
-  EXPECT_EQ("tmp", Utility::resolveUrl("unix://tmp")->asString());
-  EXPECT_EQ("tmp/server", Utility::resolveUrl("unix://tmp/server")->asString());
+  EXPECT_EQ("", (*Utility::resolveUrl("unix://"))->asString());
+  EXPECT_EQ("foo", (*Utility::resolveUrl("unix://foo"))->asString());
+  EXPECT_EQ("tmp", (*Utility::resolveUrl("unix://tmp"))->asString());
+  EXPECT_EQ("tmp/server", (*Utility::resolveUrl("unix://tmp/server"))->asString());
 
-  EXPECT_EQ("1.2.3.4:1234", Utility::resolveUrl("tcp://1.2.3.4:1234")->asString());
-  EXPECT_EQ("0.0.0.0:0", Utility::resolveUrl("tcp://0.0.0.0:0")->asString());
-  EXPECT_EQ("127.0.0.1:0", Utility::resolveUrl("tcp://127.0.0.1:0")->asString());
+  EXPECT_EQ("1.2.3.4:1234", (*Utility::resolveUrl("tcp://1.2.3.4:1234"))->asString());
+  EXPECT_EQ("0.0.0.0:0", (*Utility::resolveUrl("tcp://0.0.0.0:0"))->asString());
+  EXPECT_EQ("127.0.0.1:0", (*Utility::resolveUrl("tcp://127.0.0.1:0"))->asString());
 
-  EXPECT_EQ("[::1]:1", Utility::resolveUrl("tcp://[::1]:1")->asString());
-  EXPECT_EQ("[::]:0", Utility::resolveUrl("tcp://[::]:0")->asString());
-  EXPECT_EQ("[1::2:3]:4", Utility::resolveUrl("tcp://[1::2:3]:4")->asString());
-  EXPECT_EQ("[a::1]:0", Utility::resolveUrl("tcp://[a::1]:0")->asString());
-  EXPECT_EQ("[a:b:c:d::]:0", Utility::resolveUrl("tcp://[a:b:c:d::]:0")->asString());
+  EXPECT_EQ("[::1]:1", (*Utility::resolveUrl("tcp://[::1]:1"))->asString());
+  EXPECT_EQ("[::]:0", (*Utility::resolveUrl("tcp://[::]:0"))->asString());
+  EXPECT_EQ("[1::2:3]:4", (*Utility::resolveUrl("tcp://[1::2:3]:4"))->asString());
+  EXPECT_EQ("[a::1]:0", (*Utility::resolveUrl("tcp://[a::1]:0"))->asString());
+  EXPECT_EQ("[a:b:c:d::]:0", (*Utility::resolveUrl("tcp://[a:b:c:d::]:0"))->asString());
 
-  EXPECT_EQ("1.2.3.4:1234", Utility::resolveUrl("udp://1.2.3.4:1234")->asString());
-  EXPECT_EQ("0.0.0.0:0", Utility::resolveUrl("udp://0.0.0.0:0")->asString());
-  EXPECT_EQ("127.0.0.1:0", Utility::resolveUrl("udp://127.0.0.1:0")->asString());
+  EXPECT_EQ("1.2.3.4:1234", (*Utility::resolveUrl("udp://1.2.3.4:1234"))->asString());
+  EXPECT_EQ("0.0.0.0:0", (*Utility::resolveUrl("udp://0.0.0.0:0"))->asString());
+  EXPECT_EQ("127.0.0.1:0", (*Utility::resolveUrl("udp://127.0.0.1:0"))->asString());
 
-  EXPECT_EQ("[::1]:1", Utility::resolveUrl("udp://[::1]:1")->asString());
-  EXPECT_EQ("[::]:0", Utility::resolveUrl("udp://[::]:0")->asString());
-  EXPECT_EQ("[1::2:3]:4", Utility::resolveUrl("udp://[1::2:3]:4")->asString());
-  EXPECT_EQ("[a::1]:0", Utility::resolveUrl("udp://[a::1]:0")->asString());
-  EXPECT_EQ("[a:b:c:d::]:0", Utility::resolveUrl("udp://[a:b:c:d::]:0")->asString());
+  EXPECT_EQ("[::1]:1", (*Utility::resolveUrl("udp://[::1]:1"))->asString());
+  EXPECT_EQ("[::]:0", (*Utility::resolveUrl("udp://[::]:0"))->asString());
+  EXPECT_EQ("[1::2:3]:4", (*Utility::resolveUrl("udp://[1::2:3]:4"))->asString());
+  EXPECT_EQ("[a::1]:0", (*Utility::resolveUrl("udp://[a::1]:0"))->asString());
+  EXPECT_EQ("[a:b:c:d::]:0", (*Utility::resolveUrl("udp://[a:b:c:d::]:0"))->asString());
 }
 
 TEST(NetworkUtility, urlFromDatagramAddress) {
@@ -119,7 +119,7 @@ TEST(NetworkUtility, urlFromDatagramAddress) {
       "udp://[::1]:1", "udp://[a:b:c:d::]:0", "udp://1.2.3.4:1234", "unix://foo", "unix://",
   };
   for (const std::string& url : urls) {
-    EXPECT_EQ(url, Utility::urlFromDatagramAddress(*Utility::resolveUrl(url)));
+    EXPECT_EQ(url, Utility::urlFromDatagramAddress(**Utility::resolveUrl(url)));
   }
 }
 
@@ -209,17 +209,6 @@ TEST(NetworkUtility, ParseInternetAddress) {
 }
 
 TEST(NetworkUtility, ParseInternetAddressAndPort) {
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3.4"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3.4:"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3.4::1"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3.4:-1"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort(":1"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort(" :1"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3:1"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3.4]:2"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3.4:65536"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3.4:8008/"), EnvoyException);
-
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3.4"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3.4::1"));
@@ -231,32 +220,10 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:65536"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:8008/"));
 
-  EXPECT_EQ("0.0.0.0:0", Utility::parseInternetAddressAndPort("0.0.0.0:0")->asString());
-  EXPECT_EQ("255.255.255.255:65535",
-            Utility::parseInternetAddressAndPort("255.255.255.255:65535")->asString());
-  EXPECT_EQ("127.0.0.1:0", Utility::parseInternetAddressAndPort("127.0.0.1:0")->asString());
-
   EXPECT_EQ("0.0.0.0:0", Utility::parseInternetAddressAndPortNoThrow("0.0.0.0:0")->asString());
   EXPECT_EQ("255.255.255.255:65535",
             Utility::parseInternetAddressAndPortNoThrow("255.255.255.255:65535")->asString());
   EXPECT_EQ("127.0.0.1:0", Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:0")->asString());
-
-  EXPECT_THROW(Utility::parseInternetAddressAndPort(""), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("::1"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("::"), EnvoyException);
-
-  // TODO(#24326): make windows getaddrinfo more strict. See above example.
-#ifndef WIN32
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("[[::]]:1"), EnvoyException);
-#endif
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("[::]:1]:2"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("]:[::1]:2"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("[1.2.3.4:0"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("[1.2.3.4]:0"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("[::]:"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("[::]:-1"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("[::]:bogus"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddressAndPort("[1::1]:65536"), EnvoyException);
 
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow(""));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("::1"));
@@ -274,10 +241,6 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[::]:-1"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[::]:bogus"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[1::1]:65536"));
-
-  EXPECT_EQ("[::]:0", Utility::parseInternetAddressAndPort("[::]:0")->asString());
-  EXPECT_EQ("[1::1]:65535", Utility::parseInternetAddressAndPort("[1::1]:65535")->asString());
-  EXPECT_EQ("[::1]:0", Utility::parseInternetAddressAndPort("[::1]:0")->asString());
 
   EXPECT_EQ("[::]:0", Utility::parseInternetAddressAndPortNoThrow("[::]:0")->asString());
   EXPECT_EQ("[1::1]:65535",
@@ -658,79 +621,6 @@ TEST(NetworkUtility, ProtobufAddressSocketType) {
     envoy::config::core::v3::Address proto_address;
     proto_address.mutable_pipe();
     EXPECT_EQ(Socket::Type::Stream, Utility::protobufAddressSocketType(proto_address));
-  }
-}
-
-TEST(PortRangeListTest, Errors) {
-  {
-    std::string port_range_str = "a1";
-    std::list<PortRange> port_range_list;
-    EXPECT_THROW(Utility::parsePortRangeList(port_range_str, port_range_list), EnvoyException);
-  }
-
-  {
-    std::string port_range_str = "1A";
-    std::list<PortRange> port_range_list;
-    EXPECT_THROW(Utility::parsePortRangeList(port_range_str, port_range_list), EnvoyException);
-  }
-
-  {
-    std::string port_range_str = "1_1";
-    std::list<PortRange> port_range_list;
-    EXPECT_THROW(Utility::parsePortRangeList(port_range_str, port_range_list), EnvoyException);
-  }
-
-  {
-    std::string port_range_str = "1,1X1";
-    std::list<PortRange> port_range_list;
-    EXPECT_THROW(Utility::parsePortRangeList(port_range_str, port_range_list), EnvoyException);
-  }
-
-  {
-    std::string port_range_str = "1,1*1";
-    std::list<PortRange> port_range_list;
-    EXPECT_THROW(Utility::parsePortRangeList(port_range_str, port_range_list), EnvoyException);
-  }
-}
-
-static Address::Ipv4Instance makeFromPort(uint32_t port) { return {"0.0.0.0", port}; }
-
-TEST(PortRangeListTest, Normal) {
-  {
-    std::string port_range_str = "1";
-    std::list<PortRange> port_range_list;
-
-    Utility::parsePortRangeList(port_range_str, port_range_list);
-    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(1), port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(2), port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(Address::PipeInstance("/foo"), port_range_list));
-  }
-
-  {
-    std::string port_range_str = "1024-2048";
-    std::list<PortRange> port_range_list;
-
-    Utility::parsePortRangeList(port_range_str, port_range_list);
-    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(1024), port_range_list));
-    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(2048), port_range_list));
-    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(1536), port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(1023), port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(2049), port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(0), port_range_list));
-  }
-
-  {
-    std::string port_range_str = "1,10-100,1000-10000,65535";
-    std::list<PortRange> port_range_list;
-
-    Utility::parsePortRangeList(port_range_str, port_range_list);
-    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(1), port_range_list));
-    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(50), port_range_list));
-    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(5000), port_range_list));
-    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(65535), port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(2), port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(200), port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(20000), port_range_list));
   }
 }
 

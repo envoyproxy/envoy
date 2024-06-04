@@ -145,6 +145,11 @@ public:
   virtual OverloadManager& overloadManager() PURE;
 
   /**
+   * @return the server's null overload manager in case we want to skip overloading the server.
+   */
+  virtual OverloadManager& nullOverloadManager() PURE;
+
+  /**
    * @return the server's secret manager
    */
   virtual Secret::SecretManager& secretManager() PURE;

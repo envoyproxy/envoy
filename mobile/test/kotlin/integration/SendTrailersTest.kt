@@ -16,6 +16,8 @@ import org.junit.After
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 private const val MATCHER_TRAILER_NAME = "test-trailer"
 private const val MATCHER_TRAILER_VALUE = "test.code"
@@ -30,6 +32,7 @@ private const val ASSERTION_FILTER_TEXT_PROTO =
   }
 """
 
+@RunWith(RobolectricTestRunner::class)
 class SendTrailersTest {
   init {
     JniLibrary.loadTestLibrary()

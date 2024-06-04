@@ -37,19 +37,6 @@ absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& sour
                                  bool allow_empty, Api::Api& api, uint64_t max_size = 0);
 
 /**
- * Read contents of the file.
- * @param path file path.
- * @param api reference to the Api.
- * @param allow_empty return an empty string if the file is empty.
- * @param max_size max size limit of file to read, default 0 means no limit, and if the file data
- * would exceed the limit, it will return an error status.
- * @return std::string with file contents. or an error status if the file does not exist or
- * cannot be read.
- */
-absl::StatusOr<std::string> readFile(const std::string& path, Api::Api& api, bool allow_empty,
-                                     uint64_t max_size = 0);
-
-/**
  * @param source data source.
  * @return absl::optional<std::string> path to DataSource if a filename, otherwise absl::nullopt.
  */

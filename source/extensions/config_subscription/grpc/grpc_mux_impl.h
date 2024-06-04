@@ -27,7 +27,7 @@
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
-#include "source/extensions/config_subscription/grpc/grpc_stream.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_failover.h"
 
 #include "absl/container/node_hash_map.h"
 #include "xds/core/v3/resource_name.pb.h"
@@ -84,13 +84,28 @@ public:
                       ControlPlaneStats& control_plane_stats) override;
   void onWriteable() override;
 
-  GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
-             envoy::service::discovery::v3::DiscoveryResponse>&
+  GrpcStreamInterface<envoy::service::discovery::v3::DiscoveryRequest,
+                      envoy::service::discovery::v3::DiscoveryResponse>&
   grpcStreamForTest() {
-    return grpc_stream_;
+    // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
+    // return grpc_stream_.currentStreamForTest() directly (defined in GrpcMuxFailover).
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+      return dynamic_cast<GrpcMuxFailover<envoy::service::discovery::v3::DiscoveryRequest,
+                                          envoy::service::discovery::v3::DiscoveryResponse>*>(
+                 grpc_stream_.get())
+          ->currentStreamForTest();
+    }
+    return *grpc_stream_.get();
   }
 
 private:
+  // Helper function to create the grpc_stream_ object.
+  // TODO(adisuissa): this should be removed when envoy.restart_features.xds_failover_support
+  // is deprecated.
+  std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DiscoveryRequest,
+                                      envoy::service::discovery::v3::DiscoveryResponse>>
+  createGrpcStreamObject(GrpcMuxContext& grpc_mux_context);
+
   void drainRequests();
   void setRetryTimer();
   void sendDiscoveryRequest(absl::string_view type_url);
@@ -257,8 +272,11 @@ private:
                                  ApiState& api_state, const std::string& type_url,
                                  const std::string& version_info, bool call_delegate);
 
-  GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
-             envoy::service::discovery::v3::DiscoveryResponse>
+  // Multiplexes the stream to the primary and failover sources.
+  // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
+  // convert from unique_ptr<GrpcStreamInterface> to GrpcMuxFailover directly.
+  std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DiscoveryRequest,
+                                      envoy::service::discovery::v3::DiscoveryResponse>>
       grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
