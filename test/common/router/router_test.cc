@@ -4572,7 +4572,7 @@ makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
   }
   policy.mutable_trace_sampled()->set_value(trace_sampled);
 
-  return std::make_shared<ShadowPolicyImpl>(policy);
+  return THROW_OR_RETURN_VALUE(ShadowPolicyImpl::create(policy), std::shared_ptr<ShadowPolicyImpl>);
 }
 
 } // namespace
