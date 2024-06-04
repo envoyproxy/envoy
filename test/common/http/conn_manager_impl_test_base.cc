@@ -83,6 +83,7 @@ public:
     return parent_.serverHeaderTransformation();
   }
   const absl::optional<std::string>& schemeToSet() const override { return parent_.schemeToSet(); }
+  bool shouldSchemeMatchUpstream() const override { return parent_.shouldSchemeMatchUpstream(); }
   ConnectionManagerStats& stats() override { return parent_.stats(); }
   ConnectionManagerTracingStats& tracingStats() override { return parent_.tracingStats(); }
   bool useRemoteAddress() const override { return parent_.useRemoteAddress(); }
