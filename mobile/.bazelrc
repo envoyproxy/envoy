@@ -276,9 +276,6 @@ test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
 build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-ios --config=mobile-test-ios
 
-#TODO(alyssar) remove this build
-build:mobile-remote-ci-macos-ios-admin --config=mobile-remote-ci-macos-ios
-
 build:mobile-remote-ci-macos-ios-swift --config=mobile-remote-ci-macos-ios
 test:mobile-remote-ci-macos-ios-swift --build_tests_only
 

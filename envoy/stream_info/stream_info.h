@@ -958,6 +958,20 @@ public:
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 
   /**
+   * Checked by routing filters before forwarding a request upstream.
+   * @return to override the scheme header to match the upstream transport
+   * protocol at routing filters.
+   */
+  virtual bool shouldSchemeMatchUpstream() const PURE;
+
+  /**
+   * Called if a filter decides that the scheme should match the upstream transport protocol
+   * @param should_match_upstream true to hint to routing filters to override the scheme header
+   * to match the upstream transport protocol.
+   */
+  virtual void setShouldSchemeMatchUpstream(bool should_match_upstream) PURE;
+
+  /**
    * Checked by streams after finishing serving the request.
    * @return bool true if the connection should be drained once this stream has
    * finished sending and receiving.

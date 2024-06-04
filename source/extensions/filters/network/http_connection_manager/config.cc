@@ -654,6 +654,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (!config.scheme_header_transformation().scheme_to_overwrite().empty()) {
     scheme_to_set_ = config.scheme_header_transformation().scheme_to_overwrite();
+
+    if (config.scheme_header_transformation().match_upstream()) {
+      ENVOY_LOG(warn, "match_upstream and scheme_to_overwrite both set, using scheme_to_overwrite");
+    }
+    should_scheme_match_upstream_ = false;
+  } else {
+    should_scheme_match_upstream_ = config.scheme_header_transformation().match_upstream();
   }
 
   if (!config.server_name().empty()) {
