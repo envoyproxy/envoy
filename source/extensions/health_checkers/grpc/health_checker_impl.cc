@@ -62,8 +62,9 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
       random_generator_(random),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "grpc.health.v1.Health.Check")),
-      request_headers_parser_(
-          Router::HeaderParser::configure(config.grpc_health_check().initial_metadata())) {
+      request_headers_parser_(THROW_OR_RETURN_VALUE(
+          Router::HeaderParser::configure(config.grpc_health_check().initial_metadata()),
+          Router::HeaderParserPtr)) {
   if (!config.grpc_health_check().service_name().empty()) {
     service_name_ = config.grpc_health_check().service_name();
   }

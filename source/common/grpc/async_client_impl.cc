@@ -21,9 +21,11 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), max_receive_message_length, 0)),
       cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
       host_name_(config.envoy_grpc().authority()), time_source_(time_source),
-      metadata_parser_(Router::HeaderParser::configure(
-          config.initial_metadata(),
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)),
+      metadata_parser_(THROW_OR_RETURN_VALUE(
+          Router::HeaderParser::configure(
+              config.initial_metadata(),
+              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
+          Router::HeaderParserPtr)),
       retry_policy_(
           config.has_retry_policy()
               ? absl::optional<envoy::config::route::v3::

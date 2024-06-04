@@ -11,9 +11,9 @@
 #include "contrib/generic_proxy/filters/network/test/mocks/codec.h"
 #include "contrib/generic_proxy/filters/network/test/mocks/filter.h"
 #include "contrib/generic_proxy/filters/network/test/mocks/route.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::ByMove;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -25,21 +25,47 @@ namespace GenericProxy {
 namespace Router {
 namespace {
 
-#define ONLY_RUN_TEST_WITH_PARAM(param)                                                            \
-  if (GetParam() != param) {                                                                       \
-    return;                                                                                        \
+class MockGenericUpstream : public GenericUpstream {
+public:
+  MockGenericUpstream() {
+    ON_CALL(*this, appendUpstreamRequest(_, _))
+        .WillByDefault(
+            Invoke([this](uint64_t stream_id, UpstreamRequestCallbacks* pending_request) {
+              requests_[stream_id] = pending_request;
+            }));
+    ON_CALL(*this, removeUpstreamRequest(_)).WillByDefault(Invoke([this](uint64_t stream_id) {
+      requests_.erase(stream_id);
+    }));
+    ON_CALL(*this, upstreamConnection())
+        .WillByDefault(Return(makeOptRef<Network::Connection>(mock_upstream_connection_)));
+    ON_CALL(*this, upstreamHost()).WillByDefault(Return(host_description_));
+    ON_CALL(*this, clientCodec()).WillByDefault(ReturnRef(mock_client_codec_));
   }
 
-struct TestParameters {
-  bool operator!=(const TestParameters& other) const {
-    return with_tracing != other.with_tracing || bind_upstream != other.bind_upstream;
-  }
+  MOCK_METHOD(void, appendUpstreamRequest,
+              (uint64_t stream_id, UpstreamRequestCallbacks* pending_request));
+  MOCK_METHOD(void, removeUpstreamRequest, (uint64_t stream_id));
+  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, (), (const));
+  MOCK_METHOD(ClientCodec&, clientCodec, ());
+  MOCK_METHOD(OptRef<Network::Connection>, upstreamConnection, ());
+  MOCK_METHOD(void, cleanUp, (bool close_connection));
 
-  bool with_tracing{};
-  bool bind_upstream{};
+  std::shared_ptr<Upstream::MockHostDescription> host_description_ =
+      std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  NiceMock<Network::MockClientConnection> mock_upstream_connection_;
+  absl::flat_hash_map<uint32_t, UpstreamRequestCallbacks*> requests_;
+  NiceMock<MockClientCodec> mock_client_codec_{};
 };
 
-class RouterFilterTest : public testing::TestWithParam<TestParameters> {
+class MockGenericUpstreamFactory : public GenericUpstreamFactory {
+public:
+  MOCK_METHOD(GenericUpstreamSharedPtr, createGenericUpstream,
+              (Upstream::ThreadLocalCluster&, Upstream::LoadBalancerContext*, Network::Connection&,
+               const CodecFactory&, bool),
+              (const));
+};
+
+class RouterFilterTest : public testing::Test {
 public:
   RouterFilterTest() {
     // Common mock calls.
@@ -54,20 +80,18 @@ public:
     factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {cluster_name_});
 
-    auto parameter = GetParam();
-
     mock_downstream_connection_.stream_info_.filter_state_ =
         std::make_shared<StreamInfo::FilterStateImpl>(
             StreamInfo::FilterState::LifeSpan::Connection);
-
-    envoy::extensions::filters::network::generic_proxy::router::v3::Router router_config;
-    router_config.set_bind_upstream_connection(parameter.bind_upstream);
-    config_ = std::make_shared<Router::RouterConfig>(router_config);
-    with_tracing_ = parameter.with_tracing;
   }
 
-  void setup(FrameFlags frame_flags = FrameFlags{}) {
-    filter_ = std::make_shared<Router::RouterFilter>(config_, factory_context_);
+  void setup(FrameFlags frame_flags = FrameFlags{}, bool bound_upstream_connection = false) {
+    envoy::extensions::filters::network::generic_proxy::router::v3::Router router_config;
+    router_config.set_bind_upstream_connection(bound_upstream_connection);
+    config_ = std::make_shared<Router::RouterConfig>(router_config);
+
+    filter_ =
+        std::make_shared<Router::RouterFilter>(config_, factory_context_, &mock_upstream_factory_);
     filter_->setDecoderFilterCallbacks(mock_filter_callback_);
 
     request_ = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
@@ -85,202 +109,40 @@ public:
         ->getDataMutable<BoundGenericUpstream>("envoy.filters.generic.router");
   }
 
-  void expectCreateConnection() {
-    creating_connection_++;
-    // New connection and response decoder will be created for this upstream request.
-    auto client_codec = std::make_unique<NiceMock<MockClientCodec>>();
-    mock_client_codec_ = client_codec.get();
-    EXPECT_CALL(mock_codec_factory_, createClientCodec())
-        .WillOnce(Return(ByMove(std::move(client_codec))));
-    EXPECT_CALL(*mock_client_codec_, setCodecCallbacks(_))
-        .WillOnce(Invoke([this](ClientCodecCallbacks& cb) { client_cb_ = &cb; }));
-
-    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
-                    .tcp_conn_pool_,
-                newConnection(_));
+  void notifyUpstreamFailure(Tcp::ConnectionPool::PoolFailureReason reason) {
+    ASSERT(filter_->upstreamRequestsSize() != 0);
+    mock_generic_upstream_->requests_.begin()->second->onUpstreamFailure(reason, "");
   }
 
-  void expectCancelConnect() {
-    if (creating_connection_ > 0) {
-      creating_connection_--;
-
-      // Only cancel the connection if it is owned by the upstream request. If the connection is
-      // bound to the downstream connection, then this won't be called.
-      if (!config_->bindUpstreamConnection()) {
-        EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
-                        .tcp_conn_pool_.handles_.back(),
-                    cancel(_));
-      }
-    }
-  }
-
-  void expectUpstreamConnectionClose() {
-    EXPECT_CALL(mock_upstream_connection_, close(Network::ConnectionCloseType::FlushWrite));
-  }
-
-  void notifyPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason) {
-    if (creating_connection_ > 0) {
-      creating_connection_--;
-
-      if (config_->bindUpstreamConnection()) {
-        EXPECT_TRUE(!boundUpstreamConnection()->waitingUpstreamRequestsForTest().empty());
-        EXPECT_TRUE(boundUpstreamConnection()->waitingResponseRequestsForTest().empty());
-        EXPECT_CALL(mock_downstream_connection_, close(Network::ConnectionCloseType::FlushWrite));
-      }
-
-      factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-          .poolFailure(reason);
-
-      if (config_->bindUpstreamConnection()) {
-        EXPECT_TRUE(boundUpstreamConnection()->waitingUpstreamRequestsForTest().empty());
-        EXPECT_TRUE(boundUpstreamConnection()->waitingResponseRequestsForTest().empty());
-      }
-    }
-  }
-
-  void notifyPoolReady(bool encoding_success = true) {
-    if (creating_connection_ > 0) {
-      creating_connection_--;
-
-      if (config_->bindUpstreamConnection()) {
-        EXPECT_TRUE(!boundUpstreamConnection()->waitingUpstreamRequestsForTest().empty());
-        EXPECT_TRUE(boundUpstreamConnection()->waitingResponseRequestsForTest().empty());
-      }
-
-      if (!encoding_success) {
-        EXPECT_CALL(mock_upstream_connection_, write(_, _)).Times(0);
-      } else {
-        EXPECT_CALL(mock_upstream_connection_, write(_, _)).Times(testing::AtLeast(1));
-      }
-
-      factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-          .poolReady(mock_upstream_connection_);
-
-      if (config_->bindUpstreamConnection()) {
-        EXPECT_TRUE(boundUpstreamConnection()->waitingUpstreamRequestsForTest().empty());
-      }
-    }
-  }
-
-  void notifyConnectionClose(Network::ConnectionEvent event) {
-    ASSERT(!filter_->upstreamRequestsForTest().empty());
-    auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-
-    if (config_->bindUpstreamConnection()) {
-      EXPECT_TRUE(boundUpstreamConnection()->waitingUpstreamRequestsForTest().empty());
-      EXPECT_TRUE(!boundUpstreamConnection()->waitingResponseRequestsForTest().empty());
-      EXPECT_CALL(mock_downstream_connection_, close(Network::ConnectionCloseType::FlushWrite));
-    }
-
-    upstream_request->generic_upstream_->onEvent(event);
-
-    if (config_->bindUpstreamConnection()) {
-      EXPECT_TRUE(boundUpstreamConnection()->waitingUpstreamRequestsForTest().empty());
-      EXPECT_TRUE(boundUpstreamConnection()->waitingResponseRequestsForTest().empty());
-    }
+  void notifyUpstreamSuccess() {
+    ASSERT(filter_->upstreamRequestsSize() != 0);
+    mock_generic_upstream_->requests_.begin()->second->onUpstreamSuccess();
   }
 
   void notifyDecodingSuccess(ResponseHeaderFramePtr&& response,
                              absl::optional<StartTime> start_time = {}) {
-    ASSERT(!filter_->upstreamRequestsForTest().empty());
-
-    auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-    auto stream_frame = std::make_shared<ResponseHeaderFramePtr>(std::move(response));
-
-    EXPECT_CALL(*mock_client_codec_, decode(BufferStringEqual("test_1"), _))
-        .WillOnce(Invoke(
-            [this, resp = std::move(stream_frame), start_time](Buffer::Instance& buffer, bool) {
-              buffer.drain(buffer.length());
-
-              const bool end_stream = (*resp)->frameFlags().endStream();
-              int pending_request_size = 0;
-              if (config_->bindUpstreamConnection()) {
-                pending_request_size =
-                    boundUpstreamConnection()->waitingResponseRequestsForTest().size();
-              }
-
-              client_cb_->onDecodingSuccess(std::move(*resp), start_time);
-
-              if (config_->bindUpstreamConnection()) {
-                EXPECT_EQ(pending_request_size - (end_stream ? 1 : 0),
-                          boundUpstreamConnection()->waitingResponseRequestsForTest().size());
-              }
-            }));
-
-    Buffer::OwnedImpl test_buffer;
-    test_buffer.add("test_1");
-
-    upstream_request->generic_upstream_->onUpstreamData(test_buffer, false);
+    ASSERT(filter_->upstreamRequestsSize() != 0);
+    mock_generic_upstream_->requests_.begin()->second->onDecodingSuccess(std::move(response),
+                                                                         start_time);
   }
+
   void notifyDecodingSuccess(ResponseCommonFramePtr&& response) {
-    ASSERT(!filter_->upstreamRequestsForTest().empty());
-
-    auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-    auto stream_frame = std::make_shared<ResponseCommonFramePtr>(std::move(response));
-
-    EXPECT_CALL(*mock_client_codec_, decode(BufferStringEqual("test_1"), _))
-        .WillOnce(Invoke([this, resp = std::move(stream_frame)](Buffer::Instance& buffer, bool) {
-          buffer.drain(buffer.length());
-
-          const bool end_stream = (*resp)->frameFlags().endStream();
-          int pending_request_size = 0;
-          if (config_->bindUpstreamConnection()) {
-            pending_request_size =
-                boundUpstreamConnection()->waitingResponseRequestsForTest().size();
-          }
-
-          client_cb_->onDecodingSuccess(std::move(*resp));
-
-          if (config_->bindUpstreamConnection()) {
-            EXPECT_EQ(pending_request_size - (end_stream ? 1 : 0),
-                      boundUpstreamConnection()->waitingResponseRequestsForTest().size());
-          }
-        }));
-
-    Buffer::OwnedImpl test_buffer;
-    test_buffer.add("test_1");
-
-    upstream_request->generic_upstream_->onUpstreamData(test_buffer, false);
+    ASSERT(filter_->upstreamRequestsSize() != 0);
+    mock_generic_upstream_->requests_.begin()->second->onDecodingSuccess(std::move(response));
   }
 
   void notifyDecodingFailure(absl::string_view reason) {
-    ASSERT(!filter_->upstreamRequestsForTest().empty());
-
-    auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-
-    if (config_->bindUpstreamConnection()) {
-      // If upstream connection binding is enabled, the downstream connection will be closed
-      // when the upstream connection is closed and will clean up all active streams and
-      // L7 filter chains.
-      EXPECT_CALL(mock_downstream_connection_, close(Network::ConnectionCloseType::FlushWrite))
-          .WillOnce(Invoke([this](Network::ConnectionCloseType) { filter_->onDestroy(); }));
-    }
-
-    EXPECT_CALL(mock_upstream_connection_, close(Network::ConnectionCloseType::FlushWrite))
-        .WillOnce(Invoke([upstream_request](Network::ConnectionCloseType) {
-          // Mock clean up closing.
-          upstream_request->generic_upstream_->onEvent(Network::ConnectionEvent::LocalClose);
-        }));
-
-    EXPECT_CALL(*mock_client_codec_, decode(BufferStringEqual("test_1"), _))
-        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) {
-          buffer.drain(buffer.length());
-          client_cb_->onDecodingFailure(reason);
-        }));
-
-    Buffer::OwnedImpl test_buffer;
-    test_buffer.add("test_1");
-
-    upstream_request->generic_upstream_->onUpstreamData(test_buffer, false);
+    ASSERT(filter_->upstreamRequestsSize() != 0);
+    mock_generic_upstream_->requests_.begin()->second->onDecodingFailure(reason);
   }
 
-  void expectNewUpstreamRequest() {
-    if (boundUpstreamConnection() == nullptr) {
-      // Upstream binding is disabled or not set up yet, try to create a new connection.
-      expectCreateConnection();
-    }
+  void notifyConnectionClose(Network::ConnectionEvent event) {
+    ASSERT(filter_->upstreamRequestsSize() != 0);
+    mock_generic_upstream_->requests_.begin()->second->onConnectionClose(event);
+  }
 
-    if (with_tracing_) {
+  void expectNewUpstreamRequest(bool with_tracing = false) {
+    if (with_tracing) {
       EXPECT_CALL(mock_filter_callback_, tracingConfig())
           .WillOnce(Return(OptRef<const Tracing::Config>{tracing_config_}));
       EXPECT_CALL(tracing_config_, spawnUpstreamSpan()).WillOnce(Return(true));
@@ -293,15 +155,37 @@ public:
       EXPECT_CALL(mock_filter_callback_, tracingConfig())
           .WillOnce(Return(OptRef<const Tracing::Config>{}));
     }
+
+    EXPECT_CALL(mock_upstream_factory_, createGenericUpstream(_, _, _, _, _))
+        .WillOnce(Return(mock_generic_upstream_));
+    EXPECT_CALL(*mock_generic_upstream_, appendUpstreamRequest(_, _));
+  }
+
+  void expectInjectContextToUpstreamRequest() { EXPECT_CALL(*child_span_, injectContext(_, _)); }
+  void expectFinalizeUpstreamSpanAny() {
+    EXPECT_CALL(*child_span_, setTag(_, _)).Times(testing::AnyNumber());
+    EXPECT_CALL(*child_span_, finishSpan());
+  }
+  void expectFinalizeUpstreamSpanWithError() {
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamAddress, _));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().PeerAddress, _));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Error, "true"));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, _));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ResponseFlags, "-"));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
+    EXPECT_CALL(*child_span_,
+                setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
+    EXPECT_CALL(*child_span_, finishSpan());
   }
 
   /**
    * Kick off a new upstream request.
    */
-  void kickOffNewUpstreamRequest() {
-    expectNewUpstreamRequest();
+  void kickOffNewUpstreamRequest(bool with_tracing = false) {
+    expectNewUpstreamRequest(with_tracing);
     EXPECT_EQ(filter_->onStreamDecoded(*request_), FilterStatus::StopIteration);
-    EXPECT_EQ(1, filter_->upstreamRequestsForTest().size());
+    EXPECT_EQ(1, filter_->upstreamRequestsSize());
   }
 
   void verifyMetadataMatchCriteria() {
@@ -351,14 +235,14 @@ public:
   const std::string cluster_name_ = "cluster_0";
 
   NiceMock<MockDecoderFilterCallback> mock_filter_callback_;
+  NiceMock<MockCodecFactory> mock_codec_factory_;
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info_;
 
   NiceMock<Network::MockServerConnection> mock_downstream_connection_;
-  NiceMock<Network::MockClientConnection> mock_upstream_connection_;
 
-  NiceMock<MockCodecFactory> mock_codec_factory_;
-
-  NiceMock<MockClientCodec>* mock_client_codec_{};
+  NiceMock<MockGenericUpstreamFactory> mock_upstream_factory_;
+  std::shared_ptr<MockGenericUpstream> mock_generic_upstream_ =
+      std::make_shared<NiceMock<MockGenericUpstream>>();
 
   ClientCodecCallbacks* client_cb_{};
 
@@ -378,25 +262,7 @@ public:
   uint32_t creating_connection_{};
 };
 
-std::vector<TestParameters> getTestParameters() {
-  std::vector<TestParameters> ret;
-
-  ret.push_back({false, false});
-  ret.push_back({true, true});
-
-  return ret;
-}
-
-std::string testParameterToString(const testing::TestParamInfo<TestParameters>& params) {
-  return fmt::format("with_tracing_{}_bind_upstream_{}",
-                     params.param.with_tracing ? "true" : "false",
-                     params.param.bind_upstream ? "true" : "false");
-}
-
-INSTANTIATE_TEST_SUITE_P(GenericRoute, RouterFilterTest, testing::ValuesIn(getTestParameters()),
-                         testParameterToString);
-
-TEST_P(RouterFilterTest, OnStreamDecodedAndNoRouteEntry) {
+TEST_F(RouterFilterTest, OnStreamDecodedAndNoRouteEntry) {
   setup();
 
   EXPECT_CALL(mock_filter_callback_, routeEntry()).WillOnce(Return(nullptr));
@@ -412,7 +278,7 @@ TEST_P(RouterFilterTest, OnStreamDecodedAndNoRouteEntry) {
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, NoUpstreamCluster) {
+TEST_F(RouterFilterTest, NoUpstreamCluster) {
   setup();
 
   EXPECT_CALL(mock_filter_callback_, routeEntry()).WillOnce(Return(&mock_route_entry_));
@@ -433,7 +299,7 @@ TEST_P(RouterFilterTest, NoUpstreamCluster) {
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamClusterMaintainMode) {
+TEST_F(RouterFilterTest, UpstreamClusterMaintainMode) {
   setup();
 
   EXPECT_CALL(mock_filter_callback_, routeEntry()).WillOnce(Return(&mock_route_entry_));
@@ -462,7 +328,7 @@ TEST_P(RouterFilterTest, UpstreamClusterMaintainMode) {
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamClusterNoHealthyUpstream) {
+TEST_F(RouterFilterTest, UpstreamClusterNoHealthyUpstream) {
   setup();
 
   EXPECT_CALL(mock_filter_callback_, routeEntry()).WillOnce(Return(&mock_route_entry_));
@@ -474,10 +340,9 @@ TEST_P(RouterFilterTest, UpstreamClusterNoHealthyUpstream) {
   factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
       {cluster_name});
 
-  // No conn pool.
-  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
-              tcpConnPool(_, _))
-      .WillOnce(Return(absl::nullopt));
+  // No valid upstream.
+  EXPECT_CALL(mock_upstream_factory_, createGenericUpstream(_, _, _, _, _))
+      .WillOnce(Return(nullptr));
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
       .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
@@ -492,9 +357,12 @@ TEST_P(RouterFilterTest, UpstreamClusterNoHealthyUpstream) {
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, KickOffNormalUpstreamRequest) {
+TEST_F(RouterFilterTest, KickOffNormalUpstreamRequest) {
   setup();
   kickOffNewUpstreamRequest();
+
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
 
   cleanUp();
 
@@ -502,7 +370,7 @@ TEST_P(RouterFilterTest, KickOffNormalUpstreamRequest) {
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, KickOffNormalUpstreamRequestAndTimeout) {
+TEST_F(RouterFilterTest, KickOffNormalUpstreamRequestAndTimeout) {
   setup();
 
   mock_route_entry_.timeout_ = std::chrono::milliseconds(1000);
@@ -513,9 +381,12 @@ TEST_P(RouterFilterTest, KickOffNormalUpstreamRequestAndTimeout) {
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
       .WillOnce(Invoke([this](Status status, absl::string_view, ResponseUpdateFunction) {
         // All pending requests will be cleaned up.
-        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+        EXPECT_EQ(0, filter_->upstreamRequestsSize());
         EXPECT_EQ(status.message(), "timeout");
       }));
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
+
   response_timeout_->invokeCallback();
 
   cleanUp();
@@ -524,160 +395,144 @@ TEST_P(RouterFilterTest, KickOffNormalUpstreamRequestAndTimeout) {
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
+TEST_F(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
   setup();
-  kickOffNewUpstreamRequest();
-
-  if (with_tracing_) {
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamAddress, _));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().PeerAddress, _));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Error, "true"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "local_reset"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ResponseFlags, "-"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
-    EXPECT_CALL(*child_span_,
-                setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
-
-    EXPECT_CALL(*child_span_, finishSpan());
-  }
-
-  expectCancelConnect();
+  kickOffNewUpstreamRequest(true);
+  expectFinalizeUpstreamSpanWithError();
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
       .WillOnce(Invoke([this](Status status, absl::string_view, ResponseUpdateFunction) {
-        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+        EXPECT_EQ(0, filter_->upstreamRequestsSize());
         EXPECT_EQ(status.message(), "local_reset");
       }));
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
 
-  filter_->upstreamRequestsForTest().begin()->get()->resetStream(StreamResetReason::LocalReset, {});
-  EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+  notifyConnectionClose(Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(0, filter_->upstreamRequestsSize());
 
   // Mock downstream closing.
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolFailureConnctionOverflow) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolFailureConnctionOverflow) {
   setup();
-  kickOffNewUpstreamRequest();
-
-  if (with_tracing_) {
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamAddress, _));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().PeerAddress, _));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Error, "true"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "overflow"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ResponseFlags, "-"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
-    EXPECT_CALL(*child_span_,
-                setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
-    EXPECT_CALL(*child_span_, finishSpan());
-  }
+  kickOffNewUpstreamRequest(true);
+  expectFinalizeUpstreamSpanWithError();
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
       .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
         EXPECT_EQ(status.message(), "overflow");
       }));
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
 
-  notifyPoolFailure(ConnectionPool::PoolFailureReason::Overflow);
+  notifyUpstreamFailure(ConnectionPool::PoolFailureReason::Overflow);
 
   // Mock downstream closing.
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolFailureConnctionTimeout) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolFailureConnctionTimeout) {
   setup();
-  kickOffNewUpstreamRequest();
+  kickOffNewUpstreamRequest(true);
+  expectFinalizeUpstreamSpanWithError();
 
-  if (with_tracing_) {
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamAddress, _));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().PeerAddress, _));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Error, "true"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "connection_failure"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ResponseFlags, "-"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
-    EXPECT_CALL(*child_span_,
-                setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
-    EXPECT_CALL(*child_span_, finishSpan());
-  }
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
+        EXPECT_EQ(status.message(), "connection_failure");
+      }));
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
+
+  notifyUpstreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  EXPECT_EQ(0, filter_->upstreamRequestsSize());
+
+  // Mock downstream closing.
+  mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(RouterFilterTest, UpstreamRequestPoolFailureConnctionTimeoutAndWithRetryNoBound) {
+  setup();
+  RetryPolicy retry_policy{2};
+  EXPECT_CALL(mock_route_entry_, retryPolicy()).WillRepeatedly(ReturnRef(retry_policy));
+
+  kickOffNewUpstreamRequest(true);
+  expectFinalizeUpstreamSpanWithError();
+
+  // Retry, expect new upstream request to be kicked off.
+  expectNewUpstreamRequest();
+
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
+
+  notifyUpstreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  // Retry.
+  EXPECT_EQ(1, filter_->upstreamRequestsSize());
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
       .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
         EXPECT_EQ(status.message(), "connection_failure");
       }));
 
-  notifyPoolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
-  EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
 
-  // Mock downstream closing.
-  mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-}
+  notifyUpstreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolFailureConnctionTimeoutAndWithRetry) {
-  setup();
-  RetryPolicy retry_policy{2};
-  EXPECT_CALL(mock_route_entry_, retryPolicy()).WillRepeatedly(ReturnRef(retry_policy));
-
-  kickOffNewUpstreamRequest();
-
-  if (with_tracing_) {
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamAddress, _));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().PeerAddress, _));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Error, "true"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "connection_failure"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ResponseFlags, "-"));
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamCluster, "fake_cluster"));
-    EXPECT_CALL(*child_span_,
-                setTag(Tracing::Tags::get().UpstreamClusterName, "observability_name"));
-    EXPECT_CALL(*child_span_, finishSpan());
-  }
-
-  const bool bound_upstream_connection = GetParam().bind_upstream;
-  if (bound_upstream_connection) {
-    // No try if upstream connection is bound to downstream connection.
-    EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
-        .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
-          EXPECT_EQ(status.message(), "connection_failure");
-        }));
-  } else {
-    // Retry, expect new upstream request to be kicked off.
-    expectNewUpstreamRequest();
-  }
-
-  notifyPoolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
-
-  if (bound_upstream_connection) {
-    // No retry.
-    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
-  } else {
-    // Retry.
-    EXPECT_EQ(1, filter_->upstreamRequestsForTest().size());
-
-    EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
-        .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
-          EXPECT_EQ(status.message(), "connection_failure");
-        }));
-
-    notifyPoolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
-    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
-  }
+  EXPECT_EQ(0, filter_->upstreamRequestsSize());
 
   cleanUp();
   // Mock downstream closing.
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndExpectNoResponse) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolFailureConnctionTimeoutAndWithRetryWithBound) {
+  setup({}, true);
+  RetryPolicy retry_policy{2};
+  EXPECT_CALL(mock_route_entry_, retryPolicy()).WillRepeatedly(ReturnRef(retry_policy));
+
+  kickOffNewUpstreamRequest(true);
+  expectFinalizeUpstreamSpanWithError();
+
+  // No try if upstream connection is bound to downstream connection.
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
+        EXPECT_EQ(status.message(), "connection_failure");
+      }));
+
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
+
+  notifyUpstreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  // No retry.
+  EXPECT_EQ(0, filter_->upstreamRequestsSize());
+
+  cleanUp();
+  // Mock downstream closing.
+  mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndExpectNoResponse) {
   setup(FrameFlags(StreamFlags(0, true, false, false), true));
-  kickOffNewUpstreamRequest();
+  kickOffNewUpstreamRequest(true);
 
   EXPECT_CALL(mock_filter_callback_, completeDirectly()).WillOnce(Invoke([this]() -> void {
-    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+    EXPECT_EQ(0, filter_->upstreamRequestsSize());
   }));
 
-  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+  EXPECT_CALL(*mock_generic_upstream_, upstreamConnection());
+  EXPECT_CALL(mock_generic_upstream_->mock_upstream_connection_, write(_, _))
+      .WillOnce(Invoke(
+          [](Buffer::Instance& buffer, bool) -> void { EXPECT_EQ(buffer.toString(), "hello"); }));
+
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(false));
+
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
@@ -685,27 +540,22 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndExpectNoResponse) {
         callback.onEncodingSuccess(buffer, true);
       }));
 
-  if (with_tracing_) {
-    // Request complete directly.
-    EXPECT_CALL(*child_span_, injectContext(_, _));
-    EXPECT_CALL(*child_span_, setTag(_, _)).Times(testing::AnyNumber());
-    EXPECT_CALL(*child_span_, finishSpan());
-  }
+  expectInjectContextToUpstreamRequest();
+  expectFinalizeUpstreamSpanAny();
 
-  notifyPoolReady();
-  EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+  notifyUpstreamSuccess();
+
+  EXPECT_EQ(0, filter_->upstreamRequestsSize());
 
   // Mock downstream closing.
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButConnectionErrorBeforeResponse) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButConnectionErrorBeforeResponse) {
   setup();
   kickOffNewUpstreamRequest();
 
-  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-
-  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
@@ -713,15 +563,16 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButConnectionErrorBeforeRespons
         callback.onEncodingSuccess(buffer, true);
       }));
 
-  notifyPoolReady();
-
-  EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
+  notifyUpstreamSuccess();
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
       .WillOnce(Invoke([this](Status status, absl::string_view, ResponseUpdateFunction) {
-        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+        EXPECT_EQ(0, filter_->upstreamRequestsSize());
         EXPECT_EQ(status.message(), "local_reset");
       }));
+
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
 
   // Mock connection close event.
   notifyConnectionClose(Network::ConnectionEvent::LocalClose);
@@ -730,13 +581,11 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButConnectionErrorBeforeRespons
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButConnectionTerminationBeforeResponse) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButConnectionTerminationBeforeResponse) {
   setup();
   kickOffNewUpstreamRequest();
 
-  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-
-  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
@@ -744,15 +593,16 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButConnectionTerminationBeforeR
         callback.onEncodingSuccess(buffer, true);
       }));
 
-  notifyPoolReady();
-
-  EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
+  notifyUpstreamSuccess();
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
       .WillOnce(Invoke([this](Status status, absl::string_view, ResponseUpdateFunction) {
-        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+        EXPECT_EQ(0, filter_->upstreamRequestsSize());
         EXPECT_EQ(status.message(), "connection_termination");
       }));
+
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
 
   // Mock connection close event.
   notifyConnectionClose(Network::ConnectionEvent::RemoteClose);
@@ -761,13 +611,11 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButConnectionTerminationBeforeR
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButStreamDestroyBeforeResponse) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButStreamDestroyBeforeResponse) {
   setup();
   kickOffNewUpstreamRequest();
 
-  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-
-  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
@@ -775,11 +623,10 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButStreamDestroyBeforeResponse)
         callback.onEncodingSuccess(buffer, true);
       }));
 
-  notifyPoolReady();
+  notifyUpstreamSuccess();
 
-  EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
-
-  expectUpstreamConnectionClose();
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
 
   filter_->onDestroy();
   // Do nothing for the second call.
@@ -789,53 +636,49 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButStreamDestroyBeforeResponse)
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponse) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponse) {
   setup();
-  kickOffNewUpstreamRequest();
+  kickOffNewUpstreamRequest(true);
 
-  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
+  EXPECT_CALL(*mock_generic_upstream_, upstreamConnection());
+  EXPECT_CALL(mock_generic_upstream_->mock_upstream_connection_, write(_, _))
+      .WillOnce(Invoke([](Buffer::Instance& buffer, bool) -> void {
+        EXPECT_EQ(buffer.toString(), "helloxxxxxx");
+      }));
 
-  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
         Buffer::OwnedImpl buffer;
-        buffer.add("hello");
+        buffer.add("helloxxxxxx");
         // Expect response.
         callback.onEncodingSuccess(buffer, true);
       }));
 
-  if (with_tracing_) {
-    // Inject tracing context.
-    EXPECT_CALL(*child_span_, injectContext(_, _));
-  }
+  expectInjectContextToUpstreamRequest();
 
-  notifyPoolReady();
+  notifyUpstreamSuccess();
 
-  EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
-
-  if (with_tracing_) {
-    EXPECT_CALL(*child_span_, setTag(_, _)).Times(testing::AnyNumber());
-    EXPECT_CALL(*child_span_, finishSpan());
-  }
+  expectFinalizeUpstreamSpanAny();
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(false));
 
   EXPECT_CALL(mock_filter_callback_, onResponseStart(_)).WillOnce(Invoke([this](ResponsePtr) {
     // When the response is sent to callback, the upstream request should be removed.
-    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+    EXPECT_EQ(0, filter_->upstreamRequestsSize());
   }));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  notifyDecodingSuccess(std::move(response));
+  notifyDecodingSuccess(std::move(response), {});
 
   // Mock downstream closing.
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithStartTime) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithStartTime) {
   setup();
-  kickOffNewUpstreamRequest();
+  kickOffNewUpstreamRequest(true);
 
-  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-
-  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
@@ -843,23 +686,17 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithStartTime) {
         callback.onEncodingSuccess(buffer, true);
       }));
 
-  if (with_tracing_) {
-    // Inject tracing context.
-    EXPECT_CALL(*child_span_, injectContext(_, _));
-  }
+  expectInjectContextToUpstreamRequest();
 
-  notifyPoolReady();
+  notifyUpstreamSuccess();
 
-  EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
-
-  if (with_tracing_) {
-    EXPECT_CALL(*child_span_, setTag(_, _)).Times(testing::AnyNumber());
-    EXPECT_CALL(*child_span_, finishSpan());
-  }
+  expectFinalizeUpstreamSpanAny();
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(false));
 
   EXPECT_CALL(mock_filter_callback_, onResponseStart(_)).WillOnce(Invoke([this](ResponsePtr) {
     // When the response is sent to callback, the upstream request should be removed.
-    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+    EXPECT_EQ(0, filter_->upstreamRequestsSize());
   }));
 
   StartTime start_time;
@@ -879,41 +716,32 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithStartTime) {
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseAndTimeout) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseAndTimeout) {
   setup();
 
   mock_route_entry_.timeout_ = std::chrono::milliseconds(1000);
   expectResponseTimerCreate();
 
-  kickOffNewUpstreamRequest();
+  kickOffNewUpstreamRequest(true);
 
-  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-
-  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
         // Expect response.
         callback.onEncodingSuccess(buffer, true);
       }));
+  expectInjectContextToUpstreamRequest();
 
-  if (with_tracing_) {
-    // Inject tracing context.
-    EXPECT_CALL(*child_span_, injectContext(_, _));
-  }
+  notifyUpstreamSuccess();
 
-  notifyPoolReady();
-
-  EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
-
-  if (with_tracing_) {
-    EXPECT_CALL(*child_span_, setTag(_, _)).Times(testing::AnyNumber());
-    EXPECT_CALL(*child_span_, finishSpan());
-  }
+  expectFinalizeUpstreamSpanAny();
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(false));
 
   EXPECT_CALL(mock_filter_callback_, onResponseStart(_)).WillOnce(Invoke([this](ResponsePtr) {
     // When the response is sent to callback, the upstream request should be removed.
-    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+    EXPECT_EQ(0, filter_->upstreamRequestsSize());
   }));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
@@ -923,66 +751,10 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseAndTimeout) {
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseAndMultipleRequest) {
-  for (size_t i = 0; i < 5; i++) {
-    setup(FrameFlags(StreamFlags(i)));
-
-    // Expect immediate encoding.
-    if (GetParam().bind_upstream && i > 0) {
-      EXPECT_CALL(*mock_client_codec_, encode(_, _))
-          .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
-            Buffer::OwnedImpl buffer;
-            buffer.add("hello");
-            // Expect response.
-            callback.onEncodingSuccess(buffer, true);
-          }));
-    }
-
-    kickOffNewUpstreamRequest();
-
-    // Expect encoding after pool ready.
-    if (!GetParam().bind_upstream || i == 0) {
-      EXPECT_CALL(*mock_client_codec_, encode(_, _))
-          .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
-            Buffer::OwnedImpl buffer;
-            buffer.add("hello");
-            // Expect response.
-            callback.onEncodingSuccess(buffer, true);
-          }));
-    }
-
-    auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-
-    notifyPoolReady();
-
-    EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
-
-    EXPECT_CALL(mock_filter_callback_, onResponseStart(_)).WillOnce(Invoke([this](ResponsePtr) {
-      // When the response is sent to callback, the upstream request should be removed.
-      EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
-    }));
-
-    auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-    response->stream_frame_flags_ = FrameFlags(StreamFlags(i));
-    notifyDecodingSuccess(std::move(response));
-
-    cleanUp();
-  }
-  // Mock downstream closing.
-  mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-}
-
-TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) {
   // There are multiple frames in the request.
   setup(FrameFlags(StreamFlags(0, false, false, true), /*end_stream*/ false));
-  kickOffNewUpstreamRequest();
-
-  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-
-  if (with_tracing_) {
-    // Inject tracing context.
-    EXPECT_CALL(*child_span_, injectContext(_, _));
-  }
+  kickOffNewUpstreamRequest(true);
 
   auto frame_1 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   frame_1->stream_frame_flags_ = FrameFlags(StreamFlags(0, false, false, true), false);
@@ -990,7 +762,7 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
   // This only store the frame and does nothing else because the pool is not ready yet.
   filter_->onRequestCommonFrame(std::move(frame_1));
 
-  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
       .Times(2)
       .WillRepeatedly(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
         Buffer::OwnedImpl buffer;
@@ -998,12 +770,12 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
         // Expect response.
         callback.onEncodingSuccess(buffer, false);
       }));
+  expectInjectContextToUpstreamRequest();
 
   // This will trigger two frames to be sent.
-  notifyPoolReady();
-  EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
+  notifyUpstreamSuccess();
 
-  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
@@ -1017,10 +789,9 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
   // frames are already sent.
   filter_->onRequestCommonFrame(std::move(frame_2));
 
-  if (with_tracing_) {
-    EXPECT_CALL(*child_span_, setTag(_, _)).Times(testing::AnyNumber());
-    EXPECT_CALL(*child_span_, finishSpan());
-  }
+  expectFinalizeUpstreamSpanAny();
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(false));
 
   EXPECT_CALL(mock_filter_callback_, onResponseStart(_));
   EXPECT_CALL(mock_filter_callback_, onResponseFrame(_))
@@ -1028,14 +799,15 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
       .WillRepeatedly(Invoke([this](ResponseCommonFramePtr frame) {
         // When the entire response is sent to callback, the upstream request should be removed.
         if (frame->frameFlags().endStream()) {
-          EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+          EXPECT_EQ(0, filter_->upstreamRequestsSize());
         } else {
-          EXPECT_EQ(1, filter_->upstreamRequestsForTest().size());
+          EXPECT_EQ(1, filter_->upstreamRequestsSize());
         }
       }));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   response->stream_frame_flags_ = FrameFlags(StreamFlags(0, false, false, false), false);
+
   notifyDecodingSuccess(std::move(response));
 
   auto response_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
@@ -1050,13 +822,11 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithDrainCloseSetInResponse) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithDrainCloseSetInResponse) {
   setup();
   kickOffNewUpstreamRequest();
 
-  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-
-  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
@@ -1064,21 +834,15 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithDrainCloseSetInR
         callback.onEncodingSuccess(buffer, true);
       }));
 
-  if (with_tracing_) {
-    // Inject tracing context.
-    EXPECT_CALL(*child_span_, injectContext(_, _));
-  }
+  notifyUpstreamSuccess();
 
-  notifyPoolReady();
-
-  EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
 
   EXPECT_CALL(mock_filter_callback_, onResponseStart(_)).WillOnce(Invoke([this](ResponsePtr) {
     // When the response is sent to callback, the upstream request should be removed.
-    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+    EXPECT_EQ(0, filter_->upstreamRequestsSize());
   }));
-
-  EXPECT_CALL(mock_upstream_connection_, close(Network::ConnectionCloseType::FlushWrite));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   response->stream_frame_flags_ = FrameFlags(StreamFlags(0, false, true, false), true);
@@ -1088,13 +852,11 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithDrainCloseSetInR
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
   setup();
   kickOffNewUpstreamRequest();
 
-  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
-
-  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
@@ -1102,16 +864,17 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
         callback.onEncodingSuccess(buffer, true);
       }));
 
-  notifyPoolReady();
-
-  EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
+  notifyUpstreamSuccess();
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
       .WillOnce(Invoke([this](Status status, absl::string_view data, ResponseUpdateFunction) {
-        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+        EXPECT_EQ(0, filter_->upstreamRequestsSize());
         EXPECT_TRUE(status.message() == "protocol_error");
         EXPECT_EQ(data, "decoding-failure");
       }));
+
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
 
   notifyDecodingFailure("decoding-failure");
 
@@ -1119,42 +882,45 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndRequestEncodingFailure) {
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndRequestEncodingFailure) {
   setup();
   kickOffNewUpstreamRequest();
 
-  EXPECT_CALL(*mock_client_codec_, encode(_, _))
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
         callback.onEncodingFailure("encoding-failure");
       }));
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
       .WillOnce(Invoke([this](Status status, absl::string_view data, ResponseUpdateFunction) {
-        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+        EXPECT_EQ(0, filter_->upstreamRequestsSize());
         EXPECT_TRUE(status.message() == "protocol_error");
         EXPECT_EQ(data, "encoding-failure");
       }));
 
-  notifyPoolReady(false);
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
+
+  notifyUpstreamSuccess();
 
   // Mock downstream closing.
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(RouterFilterTest, LoadBalancerContextDownstreamConnection) {
+TEST_F(RouterFilterTest, LoadBalancerContextDownstreamConnection) {
   setup();
   EXPECT_CALL(mock_filter_callback_, connection());
   filter_->downstreamConnection();
 }
 
-TEST_P(RouterFilterTest, LoadBalancerContextNoMetadataMatchCriteria) {
+TEST_F(RouterFilterTest, LoadBalancerContextNoMetadataMatchCriteria) {
   setup();
 
   // No metadata match criteria by default.
   EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
 }
 
-TEST_P(RouterFilterTest, LoadBalancerContextMetadataMatchCriteria) {
+TEST_F(RouterFilterTest, LoadBalancerContextMetadataMatchCriteria) {
   setup();
   verifyMetadataMatchCriteria();
 }

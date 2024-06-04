@@ -35,7 +35,6 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
-#include "source/common/memory/stats.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_interface.h"
@@ -263,9 +262,9 @@ void InstanceBase::updateServerStats() {
   server_stats_->memory_physical_size_.set(Memory::Stats::totalPhysicalBytes());
   if (!options().hotRestartDisabled()) {
     server_stats_->parent_connections_.set(parent_stats.parent_connections_);
-    server_stats_->total_connections_.set(listener_manager_->numConnections() +
-                                          parent_stats.parent_connections_);
   }
+  server_stats_->total_connections_.set(listener_manager_->numConnections() +
+                                        parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires().value_or(0));
 
@@ -529,6 +528,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
                                   server_stats_->dynamic_unknown_fields_,
                                   server_stats_->wip_protos_);
 
+  memory_allocator_manager_ = std::make_unique<Memory::AllocatorManager>(
+      *api_, *stats_store_.rootScope(), bootstrap_.memory_allocator_manager());
+
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
@@ -754,9 +756,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
       !bootstrap_.dynamic_resources().lds_resources_locator().empty()) {
     std::unique_ptr<xds::core::v3::ResourceLocator> lds_resources_locator;
     if (!bootstrap_.dynamic_resources().lds_resources_locator().empty()) {
-      lds_resources_locator =
-          std::make_unique<xds::core::v3::ResourceLocator>(Config::XdsResourceIdentifier::decodeUrl(
-              bootstrap_.dynamic_resources().lds_resources_locator()));
+      lds_resources_locator = std::make_unique<xds::core::v3::ResourceLocator>(
+          THROW_OR_RETURN_VALUE(Config::XdsResourceIdentifier::decodeUrl(
+                                    bootstrap_.dynamic_resources().lds_resources_locator()),
+                                xds::core::v3::ResourceLocator));
     }
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(),
                                     lds_resources_locator.get());
