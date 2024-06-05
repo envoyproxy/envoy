@@ -502,7 +502,7 @@ TEST_P(ClientTest, EnvoyLocalError) {
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag(StreamInfo::UpstreamRemoteReset));
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag(StreamInfo::DnsResolutionFailed));
   stream_info_.setAttemptCount(123);
-  stream_info_.protocol(Protocol::Http3);
+  EXPECT_CALL(stream_info_, protocol()).WillRepeatedly(Return(Http::Protocol::Http3));
   response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalConnectionFailure);
   ASSERT_EQ(callbacks_called.on_headers_calls_, 0);
   // Ensure that the callbacks on the EnvoyStreamCallbacks were called.
