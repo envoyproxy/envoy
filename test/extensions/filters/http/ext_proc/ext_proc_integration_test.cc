@@ -4138,6 +4138,8 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithHeader) {
       });
 
   verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {

@@ -353,7 +353,7 @@ void Filter::onDestroy() {
     // Perform deferred close on the stream in observability mode only.
     deferredCloseStream();
   } else {
-    // Perform Immediate close on the stream otherwise.
+    // Perform immediate close on the stream otherwise.
     closeStream();
   }
 }
@@ -980,7 +980,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   if (config_->observabilityMode()) {
     ENVOY_LOG(trace, "Ignoring received message when observability mode is enabled");
-    // Ignore additional messages in the observability mode.
+    // Ignore response messages in the observability mode.
     return;
   }
 

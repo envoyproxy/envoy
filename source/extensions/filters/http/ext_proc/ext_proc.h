@@ -167,8 +167,8 @@ using DeferredDeletableStreamPtr = std::unique_ptr<DeferredDeletableStream>;
 
 class ThreadLocalStreamManager : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
-  // Store the ExternalProcessorStreamPtr (as a wrapper object) in the map and return its raw
-  // pointer.
+  // Store the ExternalProcessorStreamPtr (as a wrapper object) in the map and return the raw
+  // pointer of ExternalProcessorStream.
   ExternalProcessorStream* store(Filter* filter, ExternalProcessorStreamPtr stream) {
     stream_manager_[filter] = std::make_unique<DeferredDeletableStream>(std::move(stream), *this);
     return stream_manager_[filter]->stream_.get();
@@ -442,14 +442,6 @@ public:
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
 
-  Http::FilterHeadersStatus
-  sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers, ProcessorState& state,
-                                 bool end_stream);
-  Http::FilterDataStatus sendDataInObservabilityMode(Buffer::Instance& data, ProcessorState& state,
-                                                     bool end_stream);
-
-  void deferredCloseStream();
-
   envoy::service::ext_proc::v3::ProcessingRequest
   setupBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
   void sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
@@ -487,6 +479,13 @@ private:
   void addDynamicMetadata(const ProcessorState& state,
                           envoy::service::ext_proc::v3::ProcessingRequest& req);
   void addAttributes(ProcessorState& state, envoy::service::ext_proc::v3::ProcessingRequest& req);
+
+  Http::FilterHeadersStatus
+  sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers, ProcessorState& state,
+                                 bool end_stream);
+  Http::FilterDataStatus sendDataInObservabilityMode(Buffer::Instance& data, ProcessorState& state,
+                                                     bool end_stream);
+  void deferredCloseStream();
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
