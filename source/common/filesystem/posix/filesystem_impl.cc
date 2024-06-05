@@ -339,8 +339,7 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   // platform in the future, growing these or relaxing some constraints (e.g.
   // there are valid reasons to go via /proc for file paths).
   // TODO(htuch): Optimize this as a hash lookup if we grow any further.
-  if (canonical_path.return_value_ == "/dev" ||
-      canonical_path.return_value_ == "/sys" ||
+  if (canonical_path.return_value_ == "/dev" || canonical_path.return_value_ == "/sys" ||
       canonical_path.return_value_ == "/proc") {
     return true;
   }
