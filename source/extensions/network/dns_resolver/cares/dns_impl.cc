@@ -28,8 +28,7 @@ namespace Network {
 
 DnsResolverImpl::DnsResolverImpl(
     const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
-    Event::Dispatcher& dispatcher,
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+    Event::Dispatcher& dispatcher, absl::optional<std::string> resolvers_csv,
     Stats::Scope& root_scope)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
@@ -37,7 +36,7 @@ DnsResolverImpl::DnsResolverImpl(
       use_resolvers_as_fallback_(config.use_resolvers_as_fallback()),
       udp_max_queries_(
           static_cast<uint32_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, udp_max_queries, 0))),
-      resolvers_csv_(maybeBuildResolversCsv(resolvers)),
+      resolvers_csv_(resolvers_csv),
       filter_unroutable_families_(config.filter_unroutable_families()),
       scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
   AresOptions options = defaultAresOptions();
@@ -53,7 +52,7 @@ CaresDnsResolverStats DnsResolverImpl::generateCaresDnsResolverStats(Stats::Scop
   return {ALL_CARES_DNS_RESOLVER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
-absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
+absl::StatusOr<absl::optional<std::string>> DnsResolverImpl::maybeBuildResolversCsv(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
   if (resolvers.empty()) {
     return absl::nullopt;
@@ -64,7 +63,7 @@ absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
   for (const auto& resolver : resolvers) {
     // This should be an IP address (i.e. not a pipe).
     if (resolver->ip() == nullptr) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           fmt::format("DNS resolver '{}' is not an IP address", resolver->asString()));
     }
     // Note that the ip()->port() may be zero if the port is not fully specified by the
@@ -313,11 +312,11 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
         const EnvoyException& e,
         {
           ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
-          dispatcher_.post([s = std::string(e.what())] { throwEnvoyExceptionOrPanic(s); });
+          dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
         },
         {
           ENVOY_LOG(critical, "Unknown exception in c-ares callback");
-          dispatcher_.post([] { throwEnvoyExceptionOrPanic("unknown"); });
+          dispatcher_.post([] { throw EnvoyException("unknown"); });
         });
   } else {
     ENVOY_LOG_EVENT(debug, "cares_dns_callback_cancelled",
@@ -557,26 +556,29 @@ public:
         new envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig()};
   }
 
-  DnsResolverSharedPtr createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
-                                         const envoy::config::core::v3::TypedExtensionConfig&
-                                             typed_dns_resolver_config) const override {
+  absl::StatusOr<DnsResolverSharedPtr>
+  createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
+                    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config)
+      const override {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
 
     ASSERT(dispatcher.isThreadSafe());
     // Only c-ares DNS factory will call into this function.
     // Directly unpack the typed config to a c-ares object.
-    THROW_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares));
+    RETURN_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares));
     if (!cares.resolvers().empty()) {
       const auto& resolver_addrs = cares.resolvers();
       resolvers.reserve(resolver_addrs.size());
       for (const auto& resolver_addr : resolver_addrs) {
         auto address_or_error = Network::Address::resolveProtoAddress(resolver_addr);
-        THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+        RETURN_IF_STATUS_NOT_OK(address_or_error);
         resolvers.push_back(std::move(address_or_error.value()));
       }
     }
-    return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, resolvers,
+    auto csv_or_error = DnsResolverImpl::maybeBuildResolversCsv(resolvers);
+    RETURN_IF_NOT_OK(csv_or_error.status());
+    return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, csv_or_error.value(),
                                                       api.rootScope());
   }
 

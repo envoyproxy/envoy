@@ -1,6 +1,5 @@
 load("@build_bazel_rules_android//android:rules.bzl", "android_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
-load("@rules_java//java:defs.bzl", "java_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -10,7 +9,6 @@ android_library(
     name = "envoy_engine_lib",
     srcs = [
         "AndroidEngineImpl.java",
-        "AndroidJniLibrary.java",
         "AndroidNetworkMonitor.java",
         "AndroidProxyMonitor.java",
         "UpstreamHttpProtocol.java",
@@ -27,7 +25,7 @@ android_library(
     ],
 )
 
-java_library(
+android_library(
     name = "envoy_base_engine_lib",
     srcs = [
         "ByteBuffers.java",

@@ -1,9 +1,14 @@
 #include "mocks.h"
 
+using testing::_;
+
 namespace Envoy {
 namespace Ssl {
 
-MockContextManager::MockContextManager() = default;
+MockContextManager::MockContextManager() {
+  ON_CALL(*this, createSslClientContext(_, _)).WillByDefault(testing::Return(nullptr));
+  ON_CALL(*this, createSslServerContext(_, _, _, _)).WillByDefault(testing::Return(nullptr));
+}
 MockContextManager::~MockContextManager() = default;
 
 MockConnectionInfo::MockConnectionInfo() = default;

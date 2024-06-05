@@ -16,30 +16,6 @@
 namespace Envoy {
 namespace JNI {
 
-void setClassLoader(jobject class_loader);
-
-/**
- * Finds a class with a given name using a class loader provided with the use
- * of `setClassLoader` function. The class loader is supposed to come from
- * application's context and should be associated with project's code - Java classes
- * defined by the project. For finding classes of Java built in-types use
- * `env->FindClass(...)` method instead as it is lighter to use.
- *
- * Read more about why you cannot use `env->FindClass(...)` to look for Java classes
- * defined by the project and a pattern used by the implementation of `findClass` helper
- * method at https://developer.android.com/training/articles/perf-jni#native-libraries.
- *
- * The method works on Android targets only as the `setClassLoader` method is not
- * called by JVM-only targets.
- *
- * @param class_name, the name of the class to find (i.e.
- * "io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary").
- *
- * @return jclass, the class with a provided `class_name` or NULL if
- *         it couldn't be found.
- */
-LocalRefUniquePtr<jclass> findClass(const char* class_name);
-
 void jniDeleteGlobalRef(void* context);
 
 void jniDeleteConstGlobalRef(const void* context);

@@ -19,6 +19,7 @@
 #include "contrib/envoy/extensions/filters/network/generic_proxy/v3/route.pb.validate.h"
 #include "contrib/generic_proxy/filters/network/source/interface/route.h"
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
+#include "contrib/generic_proxy/filters/network/source/match_input.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -87,9 +88,9 @@ private:
   RouteEntryConstSharedPtr route_;
 };
 
-class RouteActionValidationVisitor : public Matcher::MatchTreeValidationVisitor<Request> {
+class RouteActionValidationVisitor : public Matcher::MatchTreeValidationVisitor<MatchInput> {
 public:
-  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Request>&,
+  absl::Status performDataInputValidation(const Matcher::DataInputFactory<MatchInput>&,
                                           absl::string_view) override {
     return absl::OkStatus();
   }
@@ -110,7 +111,7 @@ public:
 class NullRouteMatcherImpl : public RouteMatcher {
 public:
   // RouteMatcher
-  RouteEntryConstSharedPtr routeEntry(const Request&) const override { return nullptr; }
+  RouteEntryConstSharedPtr routeEntry(const MatchInput&) const override { return nullptr; }
 };
 
 class VirtualHostImpl : Logger::Loggable<Envoy::Logger::Id::filter> {
@@ -119,12 +120,12 @@ public:
                   Envoy::Server::Configuration::ServerFactoryContext& context,
                   bool validate_clusters_default = false);
 
-  RouteEntryConstSharedPtr routeEntry(const Request& request) const;
+  RouteEntryConstSharedPtr routeEntry(const MatchInput& request) const;
   absl::string_view name() const { return name_; }
 
 private:
   std::string name_;
-  Matcher::MatchTreeSharedPtr<Request> matcher_;
+  Matcher::MatchTreeSharedPtr<MatchInput> matcher_;
 };
 using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
 
@@ -134,7 +135,7 @@ public:
                    Envoy::Server::Configuration::ServerFactoryContext& context,
                    bool validate_clusters_default = false);
 
-  RouteEntryConstSharedPtr routeEntry(const Request& request) const override;
+  RouteEntryConstSharedPtr routeEntry(const MatchInput& request) const override;
 
   absl::string_view name() const { return name_; }
 
@@ -146,7 +147,7 @@ private:
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
 
-  const VirtualHostImpl* findVirtualHost(const Request& request) const;
+  const VirtualHostImpl* findVirtualHost(const MatchInput& request) const;
 
   std::string name_;
 

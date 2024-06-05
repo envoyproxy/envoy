@@ -1,5 +1,6 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "absl/time/time.h"
@@ -40,6 +41,17 @@ TEST(Evaluator, Print) {
 
   absl::Status status = absl::UnimplementedError("unimplemented");
   EXPECT_EQ(print(CelValue::CreateError(&status)), "CelError value");
+}
+
+TEST(Evaluator, Activation) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  info.upstreamInfo()->setUpstreamFilterState(filter_state);
+  ProtobufWkt::Arena arena;
+  const auto activation = createActivation(nullptr, info, nullptr, nullptr, nullptr);
+  EXPECT_TRUE(activation->FindValue("filter_state", &arena).has_value());
+  EXPECT_TRUE(activation->FindValue("upstream_filter_state", &arena).has_value());
 }
 
 } // namespace

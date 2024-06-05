@@ -259,7 +259,7 @@ TEST_F(ThriftFilterConfigTest, ThriftProxyTrds) {
   const std::string config_yaml = R"EOF(
 stat_prefix: ingress
 trds:
-  config_source: { resource_api_version: V3, ads: {} }
+  config_source: { ads: {} }
   route_config_name: test_route
 )EOF";
 
@@ -296,7 +296,7 @@ stat_prefix: ingress
 route_config:
   name: local_route
 trds:
-  config_source: { resource_api_version: V3, ads: {} }
+  config_source: { ads: {} }
   route_config_name: test_route
 )EOF";
 
@@ -311,8 +311,7 @@ TEST_F(ThriftFilterConfigTest, ThriftProxyTrdsApiConfigSource) {
 stat_prefix: ingress
 trds:
   config_source:
-    resource_api_version: V3
-    api_config_source: { api_type: GRPC, transport_api_version: V3 }
+    api_config_source: { api_type: GRPC }
   route_config_name: test_route
 )EOF";
 

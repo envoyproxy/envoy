@@ -484,7 +484,6 @@ TEST_P(EdsTest, ShouldMergeAddingHosts) {
         eds_config:
           api_config_source:
             api_type: REST
-            transport_api_version: V3
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -556,7 +555,6 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
         eds_config:
           api_config_source:
             api_type: REST
-            transport_api_version: V3
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -629,7 +627,6 @@ TEST_P(EdsTest, ShouldNotHaveRemovedHosts) {
         eds_config:
           api_config_source:
             api_type: REST
-            transport_api_version: V3
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -702,7 +699,6 @@ TEST_P(EdsTest, ShouldHaveHostThatWasAddedAfterRemoval) {
         eds_config:
           api_config_source:
             api_type: REST
-            transport_api_version: V3
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -779,7 +775,6 @@ TEST_P(EdsTest, MultiplePrioritiesShouldMergeCorrectly) {
         eds_config:
           api_config_source:
             api_type: REST
-            transport_api_version: V3
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -852,7 +847,6 @@ TEST_P(EdsTest, ActiveClusterGetsUpdated) {
         eds_config:
           api_config_source:
             api_type: REST
-            transport_api_version: V3
             cluster_names:
             - eds
             refresh_delay: 1s

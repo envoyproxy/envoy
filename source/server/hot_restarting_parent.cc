@@ -140,7 +140,8 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
   HotRestartMessage wrapped_reply;
   wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(-1);
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::resolveUrl(request.pass_listen_socket().address());
+      THROW_OR_RETURN_VALUE(Network::Utility::resolveUrl(request.pass_listen_socket().address()),
+                            Network::Address::InstanceConstSharedPtr);
 
   for (const auto& listener : server_->listenerManager().listeners()) {
     for (auto& socket_factory : listener.get().listenSocketFactories()) {

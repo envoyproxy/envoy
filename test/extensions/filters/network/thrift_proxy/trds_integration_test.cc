@@ -27,7 +27,6 @@ admin:
       port_value: 0
 dynamic_resources:
   ads_config:
-    transport_api_version: V3
     api_type: GRPC
     grpc_services:
       envoy_grpc:
@@ -78,7 +77,6 @@ static_resources:
             stat_prefix: thrift_stats
             trds:
               config_source:
-                resource_api_version: V3
                 ads: {{}}
               route_config_name: test_route
 

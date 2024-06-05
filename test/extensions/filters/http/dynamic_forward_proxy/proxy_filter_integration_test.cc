@@ -276,6 +276,38 @@ typed_config:
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("dns_resolution_failure"));
   }
 
+  void multipleRequestsMaybeReresolve(bool reresolve) {
+    if (reresolve) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.reresolve_if_no_connections",
+                                        "true");
+    }
+    initialize();
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    // Send the first request / response pair.
+    IntegrationStreamDecoderPtr response1 =
+        codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response1->waitForEndStream());
+
+    // Close the upstream connection and wait for it to be detected.
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    fake_upstream_connection_.reset();
+    test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+
+    IntegrationStreamDecoderPtr response2 =
+        codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response2->waitForEndStream());
+    if (reresolve) {
+      EXPECT_EQ(2, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+    } else {
+      EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+    }
+  }
+
   bool upstream_tls_{};
   bool low_stream_limits_{};
   std::string upstream_cert_name_{"upstreamlocalhost"};
@@ -972,6 +1004,15 @@ TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
   ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(response2->complete());
   EXPECT_EQ("200", response2->headers().getStatusValue());
+  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
+}
+
+TEST_P(ProxyFilterIntegrationTest, MultipleRequestsForceRefreshOff) {
+  multipleRequestsMaybeReresolve(false);
+}
+
+TEST_P(ProxyFilterIntegrationTest, MultipleRequestsForceRefreshOn) {
+  multipleRequestsMaybeReresolve(true);
 }
 
 // Test Envoy CONNECT request termination works with dynamic forward proxy config.
