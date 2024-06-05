@@ -87,16 +87,19 @@ Admin::RequestPtr ClustersHandler::makeRequest(AdminStream& admin_stream) {
   if (code != Http::Code::OK) {
     return Admin::makeStaticTextRequest(response, code);
   }
+  Admin::RequestPtr request{nullptr};
   switch (params.format_) {
+  case ClustersParams::Format::Unknown:
+    request = Admin::makeStaticTextRequest("unknown format type", Http::Code::BadRequest);
   case ClustersParams::Format::Text:
-    return std::make_unique<TextClustersRequest>(ClustersRequest::DefaultChunkLimit, server_,
-                                                 params);
+    request =
+        std::make_unique<TextClustersRequest>(ClustersRequest::DefaultChunkLimit, server_, params);
   case ClustersParams::Format::Json:
-    return std::make_unique<JsonClustersRequest>(ClustersRequest::DefaultChunkLimit, server_,
-                                                 params);
-  default:
-    return Admin::makeStaticTextRequest("unknown format type", Http::Code::BadRequest);
+    request =
+        std::make_unique<JsonClustersRequest>(ClustersRequest::DefaultChunkLimit, server_, params);
   }
+  ASSERT(request != nullptr);
+  return request;
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
