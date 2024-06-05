@@ -79,10 +79,10 @@ void Fetch::sendRequest(absl::string_view url_string) {
               << final_intel.stream_end_ms - final_intel.stream_start_ms << "ms\n";
     request_finished.Notify();
   };
-  stream_callbacks.on_error_ = [&request_finished](EnvoyError error, envoy_stream_intel,
+  stream_callbacks.on_error_ = [&request_finished](const EnvoyError& error, envoy_stream_intel,
                                                    envoy_final_stream_intel final_intel) {
     std::cerr << "Request failed after " << final_intel.stream_end_ms - final_intel.stream_start_ms
-              << "ms with error message: " << error.message << "\n";
+              << "ms with error message: " << error.message_ << "\n";
     request_finished.Notify();
   };
   stream_callbacks.on_cancel_ = [&request_finished](envoy_stream_intel,
