@@ -282,7 +282,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     auto const& host = result.host_info_;
     latchTime(decoder_callbacks_, DNS_END);
     if (!host.has_value() || !host.value()->address()) {
-      onDnsResolutionFail(host.has_value() ? *host : nullptr);
+      onDnsResolutionFail(host);
       return Http::FilterHeadersStatus::StopIteration;
     }
     addHostAddressToFilterState(host.value()->address());
@@ -388,7 +388,7 @@ void ProxyFilter::onClusterInitTimeout() {
 }
 
 void ProxyFilter::onDnsResolutionFail(
-    const Common::DynamicForwardProxy::DnsHostInfoSharedPtr host) {
+    absl::optional<Common::DynamicForwardProxy::DnsHostInfoSharedPtr> host) {
   if (isProxying()) {
     decoder_callbacks_->continueDecoding();
     return;
@@ -398,10 +398,10 @@ void ProxyFilter::onDnsResolutionFail(
       StreamInfo::CoreResponseFlag::DnsResolutionFailed);
   std::string details = "";
   if ((Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_details"))) {
-    if (!host) {
+    if (!host.has_value() || !(*host)) {
       details = "no_host";
     } else {
-      details = StringUtil::replaceAllEmptySpace(host->details());
+      details = StringUtil::replaceAllEmptySpace((*host)->details());
       ASSERT(details != "not_resolved");
     }
   }

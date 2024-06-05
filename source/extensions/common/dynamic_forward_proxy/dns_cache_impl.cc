@@ -447,6 +447,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     address_changed = true;
     stats_.host_address_changed_.inc();
   } else if (current_address == nullptr) {
+    // We only set details here if current address is null because but
+    // non-null->null resolutions we don't update the address so will use a
+    // previously resolved address + details.
     primary_host_info->host_info_->setDetails(details);
   }
 

@@ -74,7 +74,8 @@ public:
   virtual void touch() PURE;
 
   /**
-   * Returns details about the last resolution.
+   * Returns details about the resolution which resulted in the addresses above.
+   * This includes both success and failure details.
    */
   virtual std::string details() PURE;
 };
