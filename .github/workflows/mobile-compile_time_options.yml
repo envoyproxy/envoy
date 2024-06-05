@@ -56,6 +56,18 @@ jobs:
             build
             --config=mobile-remote-ci-cc-no-exceptions
             //test/performance:test_binary_size //library/cc/...
+        - name: Running C++ tests with xDS enabled
+          target: cc-tests-xds-enabled
+          args: >-
+            test
+            --config=mobile-remote-ci-cc-xds-enabled
+            //test/common/integration/...
+        - name: Running C++ tests with full protos enabled
+          target: cc-tests-full-protos-enabled
+          args: >-
+            test
+            --config=mobile-remote-ci-cc-full-protos-enabled
+            //test/common/... //test/cc/...
 
   build:
     permissions:

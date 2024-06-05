@@ -22,6 +22,7 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::ContainsRegex;
+using testing::Eq;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -476,8 +477,9 @@ TEST_P(ClientTest, EnvoyLocalError) {
   stream_callbacks.on_error_ = [&](EnvoyError error, envoy_stream_intel,
                                    envoy_final_stream_intel) -> void {
     EXPECT_EQ(error.error_code, ENVOY_CONNECTION_FAILURE);
-    EXPECT_THAT(error.message,
-                ContainsRegex("RESPONSE_CODE: 503|ERROR_CODE: 2|DETAILS: failed miserably"));
+    EXPECT_THAT(
+        error.message,
+        Eq("RESPONSE_CODE: 503|ERROR_CODE: 2|RESPONSE_FLAGS: 4,26|DETAILS: failed miserably"));
     EXPECT_EQ(error.attempt_count, 123);
     callbacks_called.on_error_calls_++;
   };
@@ -498,6 +500,8 @@ TEST_P(ClientTest, EnvoyLocalError) {
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   stream_info_.setResponseCode(503);
   stream_info_.setResponseCodeDetails("failed miserably");
+  stream_info_.setResponseFlag(StreamInfo::ResponseFlag(StreamInfo::UpstreamRemoteReset));
+  stream_info_.setResponseFlag(StreamInfo::ResponseFlag(StreamInfo::DnsResolutionFailed));
   stream_info_.setAttemptCount(123);
   response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalConnectionFailure);
   ASSERT_EQ(callbacks_called.on_headers_calls_, 0);
