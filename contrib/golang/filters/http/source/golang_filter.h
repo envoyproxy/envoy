@@ -242,8 +242,6 @@ public:
   CAPIStatus getStringProperty(absl::string_view path, uint64_t* value_data, int* value_len,
                                GoInt32* rc);
 
-  CAPIStatus getSpanInfo(spanInfo* spanInfo);
-
 private:
   bool hasDestroyed() {
     Thread::LockGuard lock(mutex_);

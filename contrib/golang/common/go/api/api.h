@@ -13,12 +13,6 @@ typedef struct { // NOLINT(modernize-use-using)
   uint64_t len;
 } Cstring;
 
-typedef struct spanInfo {
-  Cstring trace_id;
-  Cstring span_id;
-  int sampled;
-} spanInfo;
-
 typedef struct { // NOLINT(modernize-use-using)
   Cstring plugin_name;
   uint64_t configId;
@@ -112,7 +106,6 @@ CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* na
 CAPIStatus envoyGoFilterHttpIncrementMetric(void* c, uint32_t metric_id, int64_t offset);
 CAPIStatus envoyGoFilterHttpGetMetric(void* c, uint32_t metric_id, uint64_t* value);
 CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t value);
-CAPIStatus envoyGoFilterHttpGetSpanInfo(void* r, spanInfo* span_info);
 
 // downstream
 CAPIStatus envoyGoFilterDownstreamClose(void* wrapper, int close_type);

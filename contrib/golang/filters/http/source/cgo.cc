@@ -112,12 +112,6 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* bod
       });
 }
 
-CAPIStatus envoyGoFilterHttpGetSpanInfo(void* r, spanInfo* span_info) {
-  return envoyGoFilterHandlerWrapper(r, [span_info](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-    return filter->getSpanInfo(span_info);
-  });
-}
-
 // unsafe API, without copy memory from c to go.
 CAPIStatus envoyGoFilterHttpGetHeader(void* r, void* key_data, int key_len, uint64_t* value_data,
                                       int* value_len) {

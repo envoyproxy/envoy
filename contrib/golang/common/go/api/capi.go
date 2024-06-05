@@ -19,15 +19,6 @@ package api
 
 import "unsafe"
 
-type SpanInfo struct {
-	// The trace ID of the active span.
-	TraceID string
-	// The span ID of the active span.
-	SpanID string
-	// Whether the span is selected for export.
-	Sampled bool
-}
-
 type HttpCAPI interface {
 	ClearRouteCache(r unsafe.Pointer)
 	HttpContinue(r unsafe.Pointer, status uint64)
@@ -72,8 +63,6 @@ type HttpCAPI interface {
 	HttpIncrementMetric(c unsafe.Pointer, metricId uint32, offset int64)
 	HttpGetMetric(c unsafe.Pointer, metricId uint32) uint64
 	HttpRecordMetric(c unsafe.Pointer, metricId uint32, value uint64)
-
-	HttpGetSpanInfo(r unsafe.Pointer) SpanInfo
 }
 
 type NetworkCAPI interface {

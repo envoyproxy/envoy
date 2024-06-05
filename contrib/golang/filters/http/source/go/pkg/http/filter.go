@@ -292,10 +292,6 @@ func (s *streamInfo) WorkerID() uint32 {
 	return uint32(s.request.req.worker_id)
 }
 
-func (s *streamInfo) GetSpanInfo() api.SpanInfo {
-	return cAPI.HttpGetSpanInfo(unsafe.Pointer(s.request))
-}
-
 type filterState struct {
 	request *httpRequest
 }
