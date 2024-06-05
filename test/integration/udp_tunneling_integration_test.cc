@@ -429,7 +429,7 @@ typed_config:
     HttpIntegrationTest::initialize();
 
     const uint32_t port = lookupPort("udp_proxy");
-    listener_address_ = Network::Utility::resolveUrl(
+    listener_address_ = *Network::Utility::resolveUrl(
         fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
     client_ = std::make_unique<Network::Test::UdpSyncPeer>(version_);

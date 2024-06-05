@@ -435,9 +435,9 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   char addr4str[INET_ADDRSTRLEN];
   // we pick a port that isn't 53 as the default resolve.conf might be
   // set to point to localhost.
-  auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:54");
+  auto addr4 = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:54");
   char addr6str[INET6_ADDRSTRLEN];
-  auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
+  auto addr6 = Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:54");
 
   // convert the address and options into typed_dns_resolver_config
   envoy::config::core::v3::Address dns_resolvers;
@@ -539,11 +539,11 @@ TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
   char addr4str[INET_ADDRSTRLEN];
   // we pick a port that isn't 53 as the default resolve.conf might be
   // set to point to localhost.
-  auto addr4_a = Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
-  auto addr4_b = Network::Utility::parseInternetAddressAndPort("5.6.7.8:81");
+  auto addr4_a = Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80");
+  auto addr4_b = Network::Utility::parseInternetAddressAndPortNoThrow("5.6.7.8:81");
   char addr6str[INET6_ADDRSTRLEN];
-  auto addr6_a = Network::Utility::parseInternetAddressAndPort("[::2]:90");
-  auto addr6_b = Network::Utility::parseInternetAddressAndPort("[::3]:91");
+  auto addr6_a = Network::Utility::parseInternetAddressAndPortNoThrow("[::2]:90");
+  auto addr6_b = Network::Utility::parseInternetAddressAndPortNoThrow("[::3]:91");
 
   // convert the address and options into typed_dns_resolver_config
   envoy::config::core::v3::Address dns_resolvers;
@@ -886,7 +886,7 @@ public:
         EXPECT_CALL(os_sys_calls, getifaddrs(_))
             .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
               for (uint32_t i = 0; i < ifaddrs.size(); i++) {
-                auto addr = Network::Utility::parseInternetAddressAndPort(ifaddrs[i]);
+                auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(ifaddrs[i]);
                 vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
               }
               return {0, 0};

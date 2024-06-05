@@ -156,6 +156,7 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
 
   GrpcMuxContext grpc_mux_context{
       /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client),
+      /*failover_async_client_=*/nullptr,
       /*dispatcher_=*/dispatcher,
       /*service_method_=*/*method_descriptor,
       /*local_info_=*/local_info,

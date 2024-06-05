@@ -79,7 +79,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
   Network::Address::InstanceConstSharedPtr test_address_ =
-      Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
+      *Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   Ssl::ClientContextSharedPtr ssl_context_{new Ssl::MockClientContext()};

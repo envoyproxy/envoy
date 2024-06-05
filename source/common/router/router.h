@@ -119,11 +119,13 @@ public:
 
   /**
    * Set the :scheme header using the best information available. In order this is
+   * - whether the upstream connection is using TLS if use_upstream is true
    * - existing scheme header if valid
    * - x-forwarded-proto header if valid
-   * - security of downstream connection
+   * - whether the downstream connection is using TLS
    */
-  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure);
+  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_ssl,
+                                bool upstream_ssl, bool use_upstream);
 
   /**
    * Determine whether a request should be shadowed.
