@@ -89,7 +89,9 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_EQ("", span->getBaggage("FakeStringAndNothingToDo"));
     span->setOperation("FakeStringAndNothingToDo");
     span->setBaggage("FakeStringAndNothingToDo", "FakeStringAndNothingToDo");
+    // These methods are unimplemented and a noop.
     ASSERT_EQ(span->getTraceId(), segment_context->traceId());
+    ASSERT_EQ(span->getSpanId(), "");
     // Test whether the basic functions of Span are normal.
     EXPECT_FALSE(span->spanEntity()->skipAnalysis());
     span->setSampled(false);

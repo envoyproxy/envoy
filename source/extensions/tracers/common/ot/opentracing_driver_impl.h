@@ -50,6 +50,9 @@ public:
   // We should remove this method in the future?
   std::string getTraceId() const override { return EMPTY_STRING; };
 
+  // TODO: This method is unimplemented for OpenTracing.
+  std::string getSpanId() const override { return EMPTY_STRING; };
+
 private:
   OpenTracingDriver& driver_;
   opentracing::FinishSpanOptions finish_options_;

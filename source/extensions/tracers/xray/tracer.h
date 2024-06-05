@@ -233,6 +233,9 @@ public:
   // TODO: This method is unimplemented for X-Ray.
   std::string getTraceId() const override { return trace_id_; };
 
+  // TODO: This method is unimplemented for X-Ray.
+  std::string getSpanId() const override { return EMPTY_STRING; };
+
   /**
    * Creates a child span.
    * In X-Ray terms this creates a sub-segment and sets its parent ID to the current span's ID.

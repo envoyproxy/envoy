@@ -721,11 +721,12 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   EXPECT_EQ("", span5->getBaggage("baggage_key"));
 
   // ====
-  // Test trace id noop
+  // Test trace and span id noop
   // ====
   Tracing::SpanPtr span6 = driver_->startSpan(config_, request_headers_, stream_info_,
                                               operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_EQ(span6->getTraceId(), "0000000000000000");
+  EXPECT_EQ(span6->getSpanId(), "0000000000000000");
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {

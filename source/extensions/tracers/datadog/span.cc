@@ -142,6 +142,13 @@ std::string Span::getTraceId() const {
   return absl::StrCat(absl::Hex(span_->id()));
 }
 
+std::string Span::getSpanId() const {
+  if (!span_) {
+    return std::string{};
+  }
+  return absl::StrCat(absl::Hex(span_->id()));
+}
+
 } // namespace Datadog
 } // namespace Tracers
 } // namespace Extensions

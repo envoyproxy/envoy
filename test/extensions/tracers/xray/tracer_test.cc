@@ -388,6 +388,7 @@ TEST_F(XRayTracerTest, GetTraceId) {
 
   // Trace ID is always generated
   EXPECT_NE(span->getTraceId(), "");
+  EXPECT_EQ(span->getSpanId(), "");
 }
 
 TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {

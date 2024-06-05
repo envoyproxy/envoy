@@ -391,6 +391,11 @@ TEST_F(DatadogTracerSpanTest, GetTraceId) {
   EXPECT_EQ("cafebabe", span.getTraceId());
 }
 
+TEST_F(DatadogTracerSpanTest, GetSpanId) {
+  Span span{std::move(span_)};
+  EXPECT_EQ("cafebabe", span.getSpanId());
+}
+
 TEST_F(DatadogTracerSpanTest, NoOpMode) {
   // `Span::finishSpan` destroys its `datadog::tracing::Span` member.
   // Subsequently, methods called on the `Span` do nothing.
@@ -430,6 +435,7 @@ TEST_F(DatadogTracerSpanTest, NoOpMode) {
   EXPECT_EQ("", span.getBaggage("foo"));
   span.setBaggage("foo", "bar");
   EXPECT_EQ("", span.getTraceId());
+  EXPECT_EQ("", span.getSpanId());
 }
 
 } // namespace

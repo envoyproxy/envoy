@@ -82,6 +82,8 @@ public:
 
   std::string getTraceId() const override;
 
+  std::string getSpanId() const override;
+
 private:
   ::opencensus::trace::Span span_;
   const envoy::config::trace::v3::OpenCensusConfig& oc_config_;
@@ -239,6 +241,11 @@ void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::Up
 std::string Span::getTraceId() const {
   const auto& ctx = span_.context();
   return ctx.trace_id().ToHex();
+}
+
+std::string Span::getSpanId() const {
+  const auto& ctx = span_.context();
+  return ctx.span_id().ToHex();
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& /*config*/, const std::string& name,

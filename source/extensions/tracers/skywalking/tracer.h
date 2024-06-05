@@ -89,6 +89,7 @@ public:
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getTraceId() const override { return tracing_context_->traceId(); }
+  std::string getSpanId() const override { return EMPTY_STRING; }
 
   const TracingContextPtr tracingContext() { return tracing_context_; }
   const TracingSpanPtr spanEntity() { return span_entity_; }

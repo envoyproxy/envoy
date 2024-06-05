@@ -73,6 +73,10 @@ public:
     /* not implemented */
     return EMPTY_STRING;
   };
+  std::string getSpanId() const {
+    /* not implemented */
+    return EMPTY_STRING;
+  };
 
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& operation_name,
                               SystemTime) {
