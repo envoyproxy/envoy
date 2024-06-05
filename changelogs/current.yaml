@@ -69,7 +69,7 @@ minor_behavior_changes:
     ``envoy.reloadable_features.upstream_remote_address_use_connection`` to false.
 - area: access_log
   change: |
-    The ``%CEL%`` formatter support call functions
+    The ``%CEL%`` formatter support call functions.
 - area: http
   change: |
     Changing header validation checks in the substitution format utility and CEL code to do RCF complaint header validation.
