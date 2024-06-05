@@ -79,13 +79,14 @@ void ExternalProcessorStreamImpl::onReceiveTrailingMetadata(Http::ResponseTraile
 void ExternalProcessorStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                                 const std::string& message) {
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
+  stream_closed_ = true;
+
   if (!callbacks_.has_value()) {
     ENVOY_LOG(debug, "Underlying filter object has been destroyed.");
     return;
   }
 
   callbacks_->logGrpcStreamInfo();
-  stream_closed_ = true;
   if (status == Grpc::Status::Ok) {
     callbacks_->onGrpcClose();
   } else {
