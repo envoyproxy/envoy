@@ -102,6 +102,10 @@ void AccessLog::emitLog(const Formatter::HttpFormatterContext& log_context,
     auto trace_id = absl::StrCat(Hex::uint64ToHex(0), trace_id_hex);
     *log_entry.mutable_trace_id() = absl::HexStringToBytes(trace_id);
   }
+  std::string span_id_hex = log_context.activeSpan().getSpanId();
+  if (!span_id_hex.empty()) {
+    *log_entry.mutable_span_id() = absl::HexStringToBytes(span_id_hex);
+  }
 
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));
 }

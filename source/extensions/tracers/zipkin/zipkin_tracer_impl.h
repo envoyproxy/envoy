@@ -85,6 +85,9 @@ public:
 
   std::string getTraceId() const override { return span_.traceIdAsHexString(); };
 
+  // TODO(#34412): This method is unimplemented for Zipkin.
+  std::string getSpanId() const override { return EMPTY_STRING; };
+
   /**
    * @return a reference to the Zipkin::Span object.
    */
