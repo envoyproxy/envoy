@@ -41,9 +41,8 @@ TEST(EngineTest, SetLogger) {
   stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
     stream_complete.Notify();
   };
-  stream_callbacks.on_error_ = [&](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {
-    stream_complete.Notify();
-  };
+  stream_callbacks.on_error_ = [&](const EnvoyError&, envoy_stream_intel,
+                                   envoy_final_stream_intel) { stream_complete.Notify(); };
   stream_callbacks.on_cancel_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
     stream_complete.Notify();
   };
@@ -89,9 +88,8 @@ TEST(EngineTest, SetEngineCallbacks) {
   stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
     stream_complete.Notify();
   };
-  stream_callbacks.on_error_ = [&](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {
-    stream_complete.Notify();
-  };
+  stream_callbacks.on_error_ = [&](const EnvoyError&, envoy_stream_intel,
+                                   envoy_final_stream_intel) { stream_complete.Notify(); };
   stream_callbacks.on_cancel_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
     stream_complete.Notify();
   };
@@ -160,9 +158,8 @@ TEST(EngineTest, DontWaitForOnEngineRunning) {
   stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
     stream_complete.Notify();
   };
-  stream_callbacks.on_error_ = [&](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {
-    stream_complete.Notify();
-  };
+  stream_callbacks.on_error_ = [&](const EnvoyError&, envoy_stream_intel,
+                                   envoy_final_stream_intel) { stream_complete.Notify(); };
   stream_callbacks.on_cancel_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
     stream_complete.Notify();
   };
