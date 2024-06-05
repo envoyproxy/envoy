@@ -53,10 +53,10 @@ public:
 
 private:
   Network::Address::InstanceConstSharedPtr addr_;
-  Stats::TestUtil::TestStore stats_store_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Envoy::Network::MockConnection> connection_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Stats::TestUtil::TestStore stats_store_;
 };
 
 DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::rbac::RbacTestCase& input) {
@@ -67,6 +67,8 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::rbac::RbacTestCase& 
     return;
   }
 
+  // This is static to avoid recreating all the mocks between each fuzz test. The class is
+  // stateless; it just stores mocks and uses them when you call newFilter().
   static ReusableFilterFactory filter_factory;
   absl::StatusOr<std::unique_ptr<RoleBasedAccessControlFilter>> filter =
       filter_factory.newFilter(input.config());
