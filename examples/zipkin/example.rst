@@ -112,11 +112,11 @@ and other contextual information.
 
 Note that Zipkin identifies the Envoy proxies by the name provided in the bootstrap ``node/cluster`` configuration.
 
-.. image:: /start/sandboxes/_static/zipkin-ui.png
+.. image:: /start/sandboxes/_include/zipkin/_static/zipkin-ui.png
 
 You can also explore the Zipkin dependency UI to view relationships between nodes and the path of traces.
 
-.. image:: /start/sandboxes/_static/zipkin-ui-dependency.png
+.. image:: /start/sandboxes/_include/zipkin/_static/zipkin-ui-dependency.png
 
 .. seealso::
 

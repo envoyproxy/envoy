@@ -109,15 +109,15 @@ You should see the Skywalking dashboard.
 You may need to wait a moment for the traces to be added, but clicking on ``General Service > Services``, you
 should see the Envoy services listed.
 
-.. image:: /start/sandboxes/_static/skywalking-services.png
+.. image:: /start/sandboxes/_include/skywalking/_static/skywalking-services.png
 
 From here you can explore the metrics and views that skywalking offers, such as the ``Topology``:
 
-.. image:: /start/sandboxes/_static/skywalking-topology.png
+.. image:: /start/sandboxes/_include/skywalking/_static/skywalking-topology.png
 
 You can also view tracing information for the requests that you made:
 
-.. image:: /start/sandboxes/_static/skywalking-trace.png
+.. image:: /start/sandboxes/_include/skywalking/_static/skywalking-trace.png
 
 .. seealso::
 
