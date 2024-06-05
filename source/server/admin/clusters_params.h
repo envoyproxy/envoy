@@ -15,8 +15,6 @@ struct ClustersParams {
     Json,
   };
 
-  ClustersParams() = default;
-
   Http::Code parse(absl::string_view url, Buffer::Instance& response);
 
   Format format_{Format::Text};
