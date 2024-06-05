@@ -1,6 +1,6 @@
 load("@build_bazel_rules_android//android:rules.bzl", "android_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
-load("@envoy_mobile//bazel:kotlin_test.bzl", "envoy_mobile_android_test")
+load("@envoy_mobile//bazel:envoy_mobile_android_test.bzl", "envoy_mobile_android_test")
 
 licenses(["notice"])  # Apache 2
 

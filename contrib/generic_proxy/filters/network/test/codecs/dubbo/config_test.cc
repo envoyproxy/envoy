@@ -243,15 +243,15 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
   // Encode response.
   {
 
-    MockEncodingCallbacks encoding_callbacks;
+    MockEncodingContext encoding_context;
     DubboRequest request(createDubboRequst(false));
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithValue));
 
     EXPECT_CALL(*raw_serializer, serializeRpcResponse(_, _));
-    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, _));
+    EXPECT_CALL(callbacks, writeToConnection(_));
 
-    server_codec.encode(response, encoding_callbacks);
+    EXPECT_TRUE(server_codec.encode(response, encoding_context).ok());
   }
 
   {
@@ -368,26 +368,26 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
 
   // Encode normal request.
   {
-    MockEncodingCallbacks encoding_callbacks;
+    MockEncodingContext encoding_context;
 
     DubboRequest request(createDubboRequst(false));
 
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _));
-    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, _));
+    EXPECT_CALL(callbacks, writeToConnection(_));
 
-    client_codec.encode(request, encoding_callbacks);
+    EXPECT_TRUE(client_codec.encode(request, encoding_context).ok());
   }
 
   // Encode one-way request.
   {
-    MockEncodingCallbacks encoding_callbacks;
+    MockEncodingContext encoding_context;
 
     DubboRequest request(createDubboRequst(true));
 
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _));
-    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, _));
+    EXPECT_CALL(callbacks, writeToConnection(_));
 
-    client_codec.encode(request, encoding_callbacks);
+    EXPECT_TRUE(client_codec.encode(request, encoding_context).ok());
   }
 }
 
