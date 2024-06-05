@@ -78,6 +78,18 @@ DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
     return;
   }
 
+  // config.providers.value.remote_jwks.http_uri.uri gets packed into a LowerCaseString in the
+  // filter. If URI is not a valid LowerCaseString, it will crash the fuzzer. Note that the PGV
+  // well-known regex for URI is not implemented in C++, otherwise we could add a PGV rule instead
+  // of doing this check manually.
+  for (const auto& provider : input.config().providers()) {
+    absl::string_view uri = std::get<1>(provider).remote_jwks().http_uri().uri();
+    if (!Http::validHeaderString(uri)) {
+      ENVOY_LOG_MISC(debug, "Provider '{}' has an invalid URI: '{}'", std::get<0>(provider), uri);
+      return;
+    }
+  }
+
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
