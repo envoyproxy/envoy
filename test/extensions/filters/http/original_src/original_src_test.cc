@@ -50,7 +50,7 @@ public:
 
   void setAddressToReturn(const std::string& address) {
     callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-        Network::Utility::resolveUrl(address));
+        *Network::Utility::resolveUrl(address));
   }
 
 protected:

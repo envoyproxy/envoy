@@ -91,7 +91,6 @@ public:
     callbacks_.onDecodingFailure();
   }
 
-private:
   GenericProxy::ClientCodecCallbacks& callbacks_;
 };
 
@@ -102,8 +101,8 @@ public:
 
   void setCodecCallbacks(GenericProxy::ServerCodecCallbacks& callbacks) override;
   void decode(Envoy::Buffer::Instance& buffer, bool end_stream) override;
-  void encode(const GenericProxy::StreamFrame& frame,
-              GenericProxy::EncodingCallbacks& callbacks) override;
+  GenericProxy::EncodingResult encode(const GenericProxy::StreamFrame& frame,
+                                      GenericProxy::EncodingContext& ctx) override;
   GenericProxy::ResponsePtr respond(absl::Status, absl::string_view,
                                     const GenericProxy::Request&) override;
 
@@ -123,8 +122,8 @@ public:
 
   void setCodecCallbacks(GenericProxy::ClientCodecCallbacks& callbacks) override;
   void decode(Envoy::Buffer::Instance& buffer, bool end_stream) override;
-  void encode(const GenericProxy::StreamFrame& frame,
-              GenericProxy::EncodingCallbacks& callbacks) override;
+  GenericProxy::EncodingResult encode(const GenericProxy::StreamFrame& frame,
+                                      GenericProxy::EncodingContext& ctx) override;
 
   Envoy::Buffer::OwnedImpl request_buffer_;
   Envoy::Buffer::OwnedImpl response_buffer_;

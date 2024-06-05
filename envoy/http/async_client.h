@@ -47,7 +47,9 @@ public:
    */
   enum class FailureReason {
     // The stream has been reset.
-    Reset
+    Reset,
+    // The stream exceeds the response buffer limit.
+    ExceedResponseBufferLimit
   };
 
   /**
@@ -316,6 +318,11 @@ public:
       return *this;
     }
 
+    StreamOptions& setDiscardResponseBody(bool discard) {
+      discard_response_body = discard;
+      return *this;
+    }
+
     StreamOptions& setIsShadowSuffixDisabled(bool d) {
       is_shadow_suffixed_disabled = d;
       return *this;
@@ -380,6 +387,7 @@ public:
     bool is_shadow{false};
 
     bool is_shadow_suffixed_disabled{false};
+    bool discard_response_body{false};
 
     // The parent span that child spans are created under to trace egress requests/responses.
     // If not set, requests will not be traced.

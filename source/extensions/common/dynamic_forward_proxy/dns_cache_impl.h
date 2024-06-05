@@ -54,15 +54,16 @@ public:
 
   ~DnsCacheImpl() override;
   static DnsCacheStats generateDnsCacheStats(Stats::Scope& scope);
-  static Network::DnsResolverSharedPtr selectDnsResolver(
+  static absl::StatusOr<Network::DnsResolverSharedPtr> selectDnsResolver(
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
       Event::Dispatcher& main_thread_dispatcher,
       Server::Configuration::CommonFactoryContext& context);
 
   // DnsCache
-  LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
-                                            bool is_proxy_lookup,
-                                            LoadDnsCacheEntryCallbacks& callbacks) override;
+  LoadDnsCacheEntryResult
+  loadDnsCacheEntryWithForceRefresh(absl::string_view host, uint16_t default_port,
+                                    bool is_proxy_lookup, bool force_refresh,
+                                    LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   void iterateHostMap(IterateHostMapCb cb) override;
   absl::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) override;
@@ -221,7 +222,7 @@ private:
   void runRemoveCallbacks(const std::string& host);
   void notifyThreads(const std::string& host, const DnsHostInfoImplSharedPtr& resolved_info);
   void onReResolveAlarm(const std::string& host);
-  void removeHost(const std::string& host, const PrimaryHostInfo& host_info);
+  void removeHost(const std::string& host, const PrimaryHostInfo& host_info, bool update_threads);
   void onResolveTimeout(const std::string& host);
   PrimaryHostInfo& getPrimaryHost(const std::string& host);
 

@@ -149,25 +149,11 @@ public:
 };
 
 /**
- * Callback of request/response frame.
+ * Context of stream that will be used to encode request/response frame.
  */
-class EncodingCallbacks {
+class EncodingContext {
 public:
-  virtual ~EncodingCallbacks() = default;
-
-  /**
-   * If encoding success then this method will be called to write the data to upstream
-   * or downstream connection and notify the generic proxy if the encoding is completed.
-   * @param buffer encoding result buffer.
-   * @param end_stream if last frame is encoded.
-   */
-  virtual void onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) PURE;
-
-  /**
-   * If encoding failure then this method will be called.
-   * @param reason the reason of encoding failure.
-   */
-  virtual void onEncodingFailure(absl::string_view reason = {}) PURE;
+  virtual ~EncodingContext() = default;
 
   /**
    * The route that the request is matched to. This is optional when encoding the response
@@ -178,6 +164,8 @@ public:
    */
   virtual OptRef<const RouteEntry> routeEntry() const PURE;
 };
+
+using EncodingResult = absl::StatusOr<uint64_t>;
 
 } // namespace GenericProxy
 } // namespace NetworkFilters

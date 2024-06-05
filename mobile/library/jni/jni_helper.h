@@ -144,6 +144,9 @@ public:
   /** Initializes the `JavaVM`. This function is typically called inside `JNI_OnLoad`. */
   static void initialize(JavaVM* java_vm);
 
+  /** Performs a clean up. This function is typically called inside `JNI_OnUnload`. */
+  static void finalize();
+
   /**
    * Adds the `jclass` object into a cache. This function is typically called inside `JNI_OnLoad`.
    *
@@ -190,6 +193,13 @@ public:
    */
   jfieldID getFieldId(jclass clazz, const char* name, const char* signature);
 
+  /**
+   * Gets the field ID for a static field of a class.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getstaticfieldid
+   */
+  jfieldID getStaticFieldId(jclass clazz, const char* name, const char* signature);
+
   /** A macro to create `Call<Type>Method` helper function. */
 #define DECLARE_GET_FIELD(JAVA_TYPE, JNI_TYPE)                                                     \
   JNI_TYPE get##JAVA_TYPE##Field(jobject object, jfieldID field_id);
@@ -230,18 +240,11 @@ public:
   jmethodID getStaticMethodId(jclass clazz, const char* name, const char* signature);
 
   /**
-   * Finds the given `class_name` using Java classloader.
+   * Finds the given `class_name` using from the cache.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#findclass
    */
-  [[nodiscard]] LocalRefUniquePtr<jclass> findClass(const char* class_name);
-
-  /**
-   * Finds the given `class_name` from the cache.
-   *
-   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#findclass
-   */
-  [[nodiscard]] jclass findClassFromCache(const char* class_name);
+  [[nodiscard]] jclass findClass(const char* class_name);
 
   /**
    * Returns the class of a given `object`.

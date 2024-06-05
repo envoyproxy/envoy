@@ -177,6 +177,7 @@ protected:
     listener_ = std::make_unique<Network::TcpListenerImpl>(
         *dispatcher_, api_->randomGenerator(), runtime_, socket_, listener_callbacks_,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.shouldBypassOverloadManager(),
         listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
@@ -1889,6 +1890,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   listener_ = std::make_unique<Network::TcpListenerImpl>(
       *dispatcher_, api_->randomGenerator(), runtime_, socket_, listener_callbacks_,
       listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+      listener_config.shouldBypassOverloadManager(),
       listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 
   client_connection_ = dispatcher_->createClientConnection(
@@ -3445,6 +3447,7 @@ public:
     listener_ = std::make_unique<Network::TcpListenerImpl>(
         *dispatcher_, api_->randomGenerator(), runtime_, socket_, listener_callbacks_,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.shouldBypassOverloadManager(),
         listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 
     client_connection_ = dispatcher_->createClientConnection(
@@ -3527,10 +3530,10 @@ TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
   if (GetParam() == Network::Address::IpVersion::v4) {
     // Connecting to 255.255.255.255 will cause a perm error and not ECONNREFUSED which is a
     // different path in libevent. Make sure this doesn't crash.
-    address = Utility::resolveUrl("tcp://255.255.255.255:1");
+    address = *Utility::resolveUrl("tcp://255.255.255.255:1");
   } else {
     // IPv6 reserved multicast address.
-    address = Utility::resolveUrl("tcp://[ff00::]:1");
+    address = *Utility::resolveUrl("tcp://[ff00::]:1");
   }
   ClientConnectionPtr connection =
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
@@ -3545,7 +3548,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   // Connecting to an invalid port on localhost will cause ECONNREFUSED which is a different code
   // path from other errors. Test this also.
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
-      Utility::resolveUrl(
+      *Utility::resolveUrl(
           fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
       nullptr);
@@ -3561,7 +3564,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefusedWithTransportError) {
   auto transport_socket = std::make_unique<NiceMock<MockTransportSocket>>();
   EXPECT_CALL(*transport_socket, failureReason()).WillRepeatedly(Return("custom error"));
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
-      Utility::resolveUrl(
+      *Utility::resolveUrl(
           fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
       Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr, nullptr);
   connection->connect();
@@ -3588,7 +3591,7 @@ TEST_F(PipeClientConnectionImplTest, SkipSocketOptions) {
   auto options = std::make_shared<Socket::Options>();
   options->emplace_back(option);
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
-      Utility::resolveUrl("unix://" + path_), Network::Address::InstanceConstSharedPtr(),
+      *Utility::resolveUrl("unix://" + path_), Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), options, nullptr);
   connection->close(ConnectionCloseType::NoFlush);
 }
@@ -3596,7 +3599,7 @@ TEST_F(PipeClientConnectionImplTest, SkipSocketOptions) {
 // Validate we skip setting source address.
 TEST_F(PipeClientConnectionImplTest, SkipSourceAddress) {
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
-      Utility::resolveUrl("unix://" + path_), Utility::resolveUrl("tcp://1.2.3.4:5"),
+      *Utility::resolveUrl("unix://" + path_), *Utility::resolveUrl("tcp://1.2.3.4:5"),
       Network::Test::createRawBufferSocket(), nullptr, nullptr);
   connection->close(ConnectionCloseType::NoFlush);
 }
@@ -3639,7 +3642,7 @@ protected:
     Address::InstanceConstSharedPtr address;
     switch (GetParam()) {
     case Address::Type::Pipe:
-      address = Utility::resolveUrl("unix://" + path_);
+      address = *Utility::resolveUrl("unix://" + path_);
       break;
     case Address::Type::Ip:
     default:

@@ -19,12 +19,32 @@ using Envoy::Platform::EngineBuilder;
 
 // NOLINT(namespace-envoy)
 
-extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
   Envoy::JNI::JniHelper::initialize(vm);
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/Object");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/Integer");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/ClassLoader");
+  Envoy::JNI::JniHelper::addClassToCache("java/nio/ByteBuffer");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/Throwable");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/UnsupportedOperationException");
+  Envoy::JNI::JniHelper::addClassToCache("[B");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/Map$Entry");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/LinkedHashMap");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/HashMap");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/List");
+  Envoy::JNI::JniHelper::addClassToCache("java/util/ArrayList");
   Envoy::JNI::JniHelper::addClassToCache("io/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel");
   Envoy::JNI::JniHelper::addClassToCache(
       "io/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel");
+  Envoy::JNI::JniHelper::addClassToCache(
+      "io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary");
+  Envoy::JNI::JniHelper::addClassToCache(
+      "io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult");
   return Envoy::JNI::JniHelper::getVersion();
+}
+
+extern "C" JNIEXPORT void JNICALL JNI_OnUnload(JavaVM*, void* /* reserved */) {
+  Envoy::JNI::JniHelper::finalize();
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -229,15 +249,13 @@ jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoyHeaders& head
   // Create a "no operation" result:
   //  1. Tell the filter chain to continue the iteration.
   //  2. Return headers received on as method's input as part of the method's output.
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_object_array =
-      jni_helper.findClass("java/lang/Object");
+  jclass jcls_object_array = jni_helper.findClass("java/lang/Object");
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> noopResult =
-      jni_helper.newObjectArray(2, jcls_object_array.get(), NULL);
+      jni_helper.newObjectArray(2, jcls_object_array, NULL);
 
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_int = jni_helper.findClass("java/lang/Integer");
-  jmethodID jmid_intInit = jni_helper.getMethodId(jcls_int.get(), "<init>", "(I)V");
-  Envoy::JNI::LocalRefUniquePtr<jobject> j_status =
-      jni_helper.newObject(jcls_int.get(), jmid_intInit, 0);
+  jclass jcls_int = jni_helper.findClass("java/lang/Integer");
+  jmethodID jmid_intInit = jni_helper.getMethodId(jcls_int, "<init>", "(I)V");
+  Envoy::JNI::LocalRefUniquePtr<jobject> j_status = jni_helper.newObject(jcls_int, jmid_intInit, 0);
   // Set status to "0" (FilterHeadersStatus::Continue). Signal that the intent
   // is to continue the iteration of the filter chain.
   jni_helper.setObjectArrayElement(noopResult.get(), 0, j_status.get());
@@ -823,7 +841,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
     jni_helper.getEnv()->DeleteGlobalRef(java_stream_callbacks_global_ref);
   };
   stream_callbacks.on_error_ = [java_stream_callbacks_global_ref](
-                                   Envoy::EnvoyError error, envoy_stream_intel stream_intel,
+                                   const Envoy::EnvoyError& error, envoy_stream_intel stream_intel,
                                    envoy_final_stream_intel final_stream_intel) {
     Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
     auto java_stream_intel = Envoy::JNI::cppStreamIntelToJavaStreamIntel(jni_helper, stream_intel);
@@ -834,10 +852,10 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
         java_stream_callbacks_class.get(), "onError",
         "(ILjava/lang/String;ILio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;"
         "Lio/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel;)V");
-    auto java_error_message = Envoy::JNI::cppStringToJavaString(jni_helper, error.message);
+    auto java_error_message = Envoy::JNI::cppStringToJavaString(jni_helper, error.message_);
     jni_helper.callVoidMethod(java_stream_callbacks_global_ref, java_on_error_method_id,
-                              static_cast<jint>(error.error_code), java_error_message.get(),
-                              error.attempt_count.value_or(-1), java_stream_intel.get(),
+                              static_cast<jint>(error.error_code_), java_error_message.get(),
+                              error.attempt_count_.value_or(-1), java_stream_intel.get(),
                               java_final_stream_intel.get());
     // on_error_ is a terminal callback, delete the java_stream_callbacks_global_ref.
     jni_helper.getEnv()->DeleteGlobalRef(java_stream_callbacks_global_ref);
@@ -1334,29 +1352,6 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   return result;
 }
 
-static void jvm_add_test_root_certificate(const uint8_t* cert, size_t len) {
-  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
-      Envoy::JNI::findClass("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
-  jmethodID jmid_addTestRootCertificate = jni_helper.getStaticMethodId(
-      jcls_AndroidNetworkLibrary.get(), "addTestRootCertificate", "([B)V");
-
-  Envoy::JNI::LocalRefUniquePtr<jbyteArray> cert_array =
-      Envoy::JNI::byteArrayToJavaByteArray(jni_helper, cert, len);
-  jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary.get(), jmid_addTestRootCertificate,
-                                  cert_array.get());
-}
-
-static void jvm_clear_test_root_certificate() {
-  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
-      Envoy::JNI::findClass("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
-  jmethodID jmid_clearTestRootCertificates = jni_helper.getStaticMethodId(
-      jcls_AndroidNetworkLibrary.get(), "clearTestRootCertificates", "()V");
-
-  jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary.get(), jmid_clearTestRootCertificates);
-}
-
 extern "C" JNIEXPORT jobject JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_callCertificateVerificationFromNative(
     JNIEnv* env, jclass, jobjectArray certChain, jbyteArray jauthType, jbyteArray jhost) {
@@ -1374,15 +1369,28 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_callCertificateVerificationFrom
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_callAddTestRootCertificateFromNative(
-    JNIEnv* env, jclass, jbyteArray jcert) {
+    JNIEnv* env, jclass, jbyteArray java_cert) {
   Envoy::JNI::JniHelper jni_helper(env);
-  std::vector<uint8_t> cert;
-  Envoy::JNI::javaByteArrayToByteVector(jni_helper, jcert, &cert);
-  jvm_add_test_root_certificate(cert.data(), cert.size());
+  std::vector<uint8_t> cpp_cert;
+  Envoy::JNI::javaByteArrayToByteVector(jni_helper, java_cert, &cpp_cert);
+  jclass java_android_network_library_class =
+      jni_helper.findClass("io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary");
+  jmethodID java_add_test_root_certificate_method_id = jni_helper.getStaticMethodId(
+      java_android_network_library_class, "addTestRootCertificate", "([B)V");
+  Envoy::JNI::LocalRefUniquePtr<jbyteArray> cert_array =
+      Envoy::JNI::byteArrayToJavaByteArray(jni_helper, cpp_cert.data(), cpp_cert.size());
+  jni_helper.callStaticVoidMethod(java_android_network_library_class,
+                                  java_add_test_root_certificate_method_id, cert_array.get());
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_callClearTestRootCertificateFromNative(JNIEnv*,
                                                                                         jclass) {
-  jvm_clear_test_root_certificate();
+  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
+  jclass java_android_network_library_class =
+      jni_helper.findClass("io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary");
+  jmethodID java_clear_test_root_certificates_method_id = jni_helper.getStaticMethodId(
+      java_android_network_library_class, "clearTestRootCertificates", "()V");
+  jni_helper.callStaticVoidMethod(java_android_network_library_class,
+                                  java_clear_test_root_certificates_method_id);
 }

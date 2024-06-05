@@ -35,13 +35,13 @@ public:
   /**
    * Builds a ClientContext from a ClientContextConfig.
    */
-  virtual ClientContextSharedPtr createSslClientContext(Stats::Scope& scope,
-                                                        const ClientContextConfig& config) PURE;
+  virtual absl::StatusOr<ClientContextSharedPtr>
+  createSslClientContext(Stats::Scope& scope, const ClientContextConfig& config) PURE;
 
   /**
    * Builds a ServerContext from a ServerContextConfig.
    */
-  virtual ServerContextSharedPtr
+  virtual absl::StatusOr<ServerContextSharedPtr>
   createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
                          const std::vector<std::string>& server_names,
                          ContextAdditionalInitFunc additional_init) PURE;

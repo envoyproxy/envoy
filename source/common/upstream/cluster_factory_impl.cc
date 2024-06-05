@@ -65,7 +65,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   return factory->create(cluster, context);
 }
 
-Network::DnsResolverSharedPtr
+absl::StatusOr<Network::DnsResolverSharedPtr>
 ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Cluster& cluster,
                                           ClusterFactoryContext& context) {
   // We make this a shared pointer to deal with the distinct ownership

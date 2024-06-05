@@ -7,6 +7,7 @@
 #include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 #include "contrib/generic_proxy/filters/network/source/interface/route.h"
+#include "contrib/generic_proxy/filters/network/source/match_input.h"
 #include "contrib/generic_proxy/filters/network/source/stats.h"
 
 namespace Envoy {
@@ -24,7 +25,7 @@ public:
    * @param request request.
    * @return RouteEntryConstSharedPtr route entry.
    */
-  virtual RouteEntryConstSharedPtr routeEntry(const Request& request) const PURE;
+  virtual RouteEntryConstSharedPtr routeEntry(const MatchInput& request) const PURE;
 
   /**
    * Get codec factory for  decoding/encoding of request/response.

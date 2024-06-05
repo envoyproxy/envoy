@@ -441,9 +441,7 @@ bool CombinedUpstream::readDisable(bool disable) {
   if (upstream_requests_.empty()) {
     return false;
   }
-  if (disable) {
-    upstream_requests_.front()->onAboveWriteBufferHighWatermark();
-  }
+  upstream_requests_.front()->readDisableOrDefer(disable);
   return true;
 }
 
@@ -537,20 +535,5 @@ void CombinedUpstream::doneWriting() {
     onResetEncoder(Network::ConnectionEvent::LocalClose);
   }
 }
-
-void CombinedUpstream::onResetStream(Http::StreamResetReason, absl::string_view) {
-  read_half_closed_ = true;
-  write_half_closed_ = true;
-  onResetEncoder(Network::ConnectionEvent::LocalClose);
-}
-
-void CombinedUpstream::onAboveWriteBufferHighWatermark() {
-  upstream_callbacks_.onAboveWriteBufferHighWatermark();
-}
-
-void CombinedUpstream::onBelowWriteBufferLowWatermark() {
-  upstream_callbacks_.onBelowWriteBufferLowWatermark();
-}
-
 } // namespace TcpProxy
 } // namespace Envoy

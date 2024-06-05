@@ -16,30 +16,6 @@
 namespace Envoy {
 namespace JNI {
 
-void setClassLoader(jobject class_loader);
-
-/**
- * Finds a class with a given name using a class loader provided with the use
- * of `setClassLoader` function. The class loader is supposed to come from
- * application's context and should be associated with project's code - Java classes
- * defined by the project. For finding classes of Java built in-types use
- * `env->FindClass(...)` method instead as it is lighter to use.
- *
- * Read more about why you cannot use `env->FindClass(...)` to look for Java classes
- * defined by the project and a pattern used by the implementation of `findClass` helper
- * method at https://developer.android.com/training/articles/perf-jni#native-libraries.
- *
- * The method works on Android targets only as the `setClassLoader` method is not
- * called by JVM-only targets.
- *
- * @param class_name, the name of the class to find (i.e.
- * "io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary").
- *
- * @return jclass, the class with a provided `class_name` or NULL if
- *         it couldn't be found.
- */
-LocalRefUniquePtr<jclass> findClass(const char* class_name);
-
 void jniDeleteGlobalRef(void* context);
 
 void jniDeleteConstGlobalRef(const void* context);
@@ -134,12 +110,12 @@ LocalRefUniquePtr<jstring> cppStringToJavaString(JniHelper& jni_helper,
 /** Converts from C++'s map-type<std::string, std::string> to Java `HashMap<String, String>`. */
 template <typename MapType>
 LocalRefUniquePtr<jobject> cppMapToJavaMap(JniHelper& jni_helper, const MapType& cpp_map) {
-  auto java_map_class = jni_helper.findClass("java/util/HashMap");
-  auto java_map_init_method_id = jni_helper.getMethodId(java_map_class.get(), "<init>", "(I)V");
+  jclass java_map_class = jni_helper.findClass("java/util/HashMap");
+  auto java_map_init_method_id = jni_helper.getMethodId(java_map_class, "<init>", "(I)V");
   auto java_map_put_method_id = jni_helper.getMethodId(
-      java_map_class.get(), "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+      java_map_class, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
   auto java_map_object =
-      jni_helper.newObject(java_map_class.get(), java_map_init_method_id, cpp_map.size());
+      jni_helper.newObject(java_map_class, java_map_init_method_id, cpp_map.size());
   for (const auto& [cpp_key, cpp_value] : cpp_map) {
     auto java_key = cppStringToJavaString(jni_helper, cpp_key);
     auto java_value = cppStringToJavaString(jni_helper, cpp_value);

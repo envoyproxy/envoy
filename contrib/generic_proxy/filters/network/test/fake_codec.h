@@ -178,7 +178,7 @@ public:
       }
     }
 
-    void encode(const StreamFrame& response, EncodingCallbacks& callback) override {
+    EncodingResult encode(const StreamFrame& response, EncodingContext&) override {
       std::string buffer;
       buffer.reserve(512);
       buffer += "FAKE-RSP|";
@@ -212,7 +212,11 @@ public:
       encoding_buffer_.writeBEInt<uint32_t>(buffer.size());
       encoding_buffer_.add(buffer);
 
-      callback.onEncodingSuccess(encoding_buffer_, response.frameFlags().endStream());
+      const uint64_t encoded_size = encoding_buffer_.length();
+
+      callback_->writeToConnection(encoding_buffer_);
+
+      return encoded_size;
     }
 
     ResponsePtr respond(Status status, absl::string_view, const Request&) override {
@@ -332,7 +336,7 @@ public:
       }
     }
 
-    void encode(const StreamFrame& request, EncodingCallbacks& callback) override {
+    EncodingResult encode(const StreamFrame& request, EncodingContext&) override {
       std::string buffer;
       buffer.reserve(512);
       buffer += "FAKE-REQ|";
@@ -366,7 +370,11 @@ public:
       encoding_buffer_.writeBEInt<uint32_t>(buffer.size());
       encoding_buffer_.add(buffer);
 
-      callback.onEncodingSuccess(encoding_buffer_, request.frameFlags().endStream());
+      const uint64_t encoded_size = encoding_buffer_.length();
+
+      callback_->writeToConnection(encoding_buffer_);
+
+      return encoded_size;
     }
 
     absl::optional<uint32_t> message_size_;

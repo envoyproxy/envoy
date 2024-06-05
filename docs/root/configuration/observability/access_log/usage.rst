@@ -1182,6 +1182,42 @@ UDP
   UPSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
+%UPSTREAM_PEER_URI_SAN%
+  HTTP/TCP/THRIFT
+    The URIs present in the SAN of the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_PEER_DNS_SAN%
+  HTTP/TCP/THRIFT
+    The DNS names present in the SAN of the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_PEER_IP_SAN%
+  HTTP/TCP/THRIFT
+    The ip addresses present in the SAN of the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_LOCAL_URI_SAN%
+  HTTP/TCP/THRIFT
+    The URIs present in the SAN of the local certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_LOCAL_DNS_SAN%
+  HTTP/TCP/THRIFT
+    The DNS names present in the SAN of the local certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_LOCAL_IP_SAN%
+  HTTP/TCP/THRIFT
+    The ip addresses present in the SAN of the local certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
 %HOSTNAME%
   The system hostname.
 
