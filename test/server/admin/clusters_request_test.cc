@@ -108,9 +108,9 @@ protected:
     ON_CALL(*mock_cluster.info_, addedViaApi()).WillByDefault(Return(true));
     cluster_info_maps_.active_clusters_.emplace(name, std::ref(mock_cluster));
 
-    Network::Address::InstanceConstSharedPtr address =
+    absl::StatusOr<Network::Address::InstanceConstSharedPtr> address =
         Network::Utility::resolveUrl("tcp://1.2.3.4:80");
-    ON_CALL(*mock_host_, address()).WillByDefault(Return(address));
+    ON_CALL(*mock_host_, address()).WillByDefault(Return(address.value()));
     Upstream::MockHostSet* host_set = mock_cluster.priority_set_.getMockHostSet(0);
 
     ON_CALL(*mock_host_, counters()).WillByDefault(Return(counters_));
