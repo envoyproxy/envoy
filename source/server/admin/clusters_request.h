@@ -86,33 +86,33 @@ private:
   void render(std::reference_wrapper<const Upstream::Cluster> cluster, Buffer::Instance& response);
   void drainBufferIntoResponse(Buffer::Instance& response);
   void finalize(Buffer::Instance& response);
-  void addAddress(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host,
+  void addAddress(Json::Streamer::Map& map_json, const Upstream::HostSharedPtr& host,
                   Buffer::Instance& response);
-  void addMapEntries(Json::Streamer::Map* raw_map_ptr, Buffer::Instance& response,
+  void addMapEntries(Json::Streamer::Map& map_json, Buffer::Instance& response,
                      std::vector<Json::Streamer::Map::NameValue>& entries);
-  void addCircuitBreakers(Json::Streamer::Map* raw_clusters_map_ptr,
+  void addCircuitBreakers(Json::Streamer::Map& map_json,
                           Upstream::ClusterInfoConstSharedPtr cluster_info,
                           Buffer::Instance& response);
   void addCircuitBreakerForPriority(const envoy::config::core::v3::RoutingPriority& priority,
-                                    Json::Streamer::Array* raw_map_ptr, Buffer::Instance& response,
+                                    Json::Streamer::Array& array_json, Buffer::Instance& response,
                                     Upstream::ResourceManager& resource_manager);
-  void addEjectionThresholds(Json::Streamer::Map* raw_clusters_map_ptr,
+  void addEjectionThresholds(Json::Streamer::Map& map_json,
                              const Upstream::Cluster& unwrapped_cluster,
                              Buffer::Instance& response);
-  void addHostStatuses(Json::Streamer::Map* raw_clusters_map_ptr,
-                       const Upstream::Cluster& unwrapped_cluster, Buffer::Instance& response);
-  void processHostSet(Json::Streamer::Array* raw_hosts_statuses_ptr,
-                      const Upstream::HostSetPtr& host_set, Buffer::Instance& response);
-  void processHost(Json::Streamer::Array* raw_host_statuses_ptr,
-                   const Upstream::HostSharedPtr& host, Buffer::Instance& response);
-  void buildHostStats(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host,
+  void addHostStatuses(Json::Streamer::Map& map_json, const Upstream::Cluster& unwrapped_cluster,
+                       Buffer::Instance& response);
+  void processHostSet(Json::Streamer::Array& array_json, const Upstream::HostSetPtr& host_set,
                       Buffer::Instance& response);
-  void setHealthFlags(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host,
-                      Buffer::Instance& response);
-  void setLocality(Json::Streamer::Map* raw_host_ptr, const Upstream::HostSharedPtr& host,
+  void processHost(Json::Streamer::Array& map_json, const Upstream::HostSharedPtr& host,
                    Buffer::Instance& response);
-  void setSuccessRate(Json::Streamer::Map* raw_host_statuses_ptr,
-                      const Upstream::HostSharedPtr& host, Buffer::Instance& response);
+  void buildHostStats(Json::Streamer::Map& map_json, const Upstream::HostSharedPtr& host,
+                      Buffer::Instance& response);
+  void setHealthFlags(Json::Streamer::Map& map_json, const Upstream::HostSharedPtr& host,
+                      Buffer::Instance& response);
+  void setLocality(Json::Streamer::Map& map_json, const Upstream::HostSharedPtr& host,
+                   Buffer::Instance& response);
+  void setSuccessRate(Json::Streamer::Map& map_json, const Upstream::HostSharedPtr& host,
+                      Buffer::Instance& response);
   void setHostname(const Upstream::HostSharedPtr& host,
                    std::vector<Json::Streamer::Map::NameValue>& top_level_entries);
   void loadHealthFlagMap(

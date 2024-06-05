@@ -200,46 +200,46 @@ void JsonClustersRequest::render(std::reference_wrapper<const Upstream::Cluster>
     top_level_entries.emplace_back("eds_service_name", eds_service_name);
   }
 
-  addCircuitBreakers(cluster_map.get(), cluster_info, response);
-  addEjectionThresholds(cluster_map.get(), cluster.get(), response);
+  addCircuitBreakers(*cluster_map.get(), cluster_info, response);
+  addEjectionThresholds(*cluster_map.get(), cluster.get(), response);
   if (bool added_via_api = cluster_info->addedViaApi(); added_via_api) {
     top_level_entries.emplace_back("added_via_api", added_via_api);
   }
-  addMapEntries(cluster_map.get(), response, top_level_entries);
-  addHostStatuses(cluster_map.get(), cluster, response);
+  addMapEntries(*cluster_map.get(), response, top_level_entries);
+  addHostStatuses(*cluster_map.get(), cluster, response);
 }
 
-void JsonClustersRequest::addHostStatuses(Json::Streamer::Map* raw_clusters_map_ptr,
+void JsonClustersRequest::addHostStatuses(Json::Streamer::Map& map_json,
                                           const Upstream::Cluster& unwrapped_cluster,
                                           Buffer::Instance& response) {
-  raw_clusters_map_ptr->addKey("host_statuses");
-  Json::Streamer::ArrayPtr host_statuses_ptr = raw_clusters_map_ptr->addArray();
+  map_json.addKey("host_statuses");
+  Json::Streamer::ArrayPtr host_statuses_ptr = map_json.addArray();
   for (const Upstream::HostSetPtr& host_set :
        unwrapped_cluster.prioritySet().hostSetsPerPriority()) {
-    processHostSet(host_statuses_ptr.get(), host_set, response);
+    processHostSet(*host_statuses_ptr.get(), host_set, response);
   }
 }
 
-void JsonClustersRequest::processHostSet(Json::Streamer::Array* raw_host_statuses_ptr,
+void JsonClustersRequest::processHostSet(Json::Streamer::Array& array_json,
                                          const Upstream::HostSetPtr& host_set,
                                          Buffer::Instance& response) {
   for (const Upstream::HostSharedPtr& host : host_set->hosts()) {
-    processHost(raw_host_statuses_ptr, host, response);
+    processHost(array_json, host, response);
   }
 }
 
-void JsonClustersRequest::processHost(Json::Streamer::Array* raw_host_statuses_ptr,
+void JsonClustersRequest::processHost(Json::Streamer::Array& array_json,
                                       const Upstream::HostSharedPtr& host,
                                       Buffer::Instance& response) {
   Buffer::OwnedImpl buffer;
-  Json::Streamer::MapPtr host_ptr = raw_host_statuses_ptr->addMap();
+  Json::Streamer::MapPtr host_ptr = array_json.addMap();
   std::vector<Json::Streamer::Map::NameValue> host_config;
   setHostname(host, host_config);
-  addAddress(host_ptr.get(), host, buffer);
-  setLocality(host_ptr.get(), host, buffer);
-  buildHostStats(host_ptr.get(), host, buffer);
-  setHealthFlags(host_ptr.get(), host, buffer);
-  setSuccessRate(host_ptr.get(), host, buffer);
+  addAddress(*host_ptr.get(), host, buffer);
+  setLocality(*host_ptr.get(), host, buffer);
+  buildHostStats(*host_ptr.get(), host, buffer);
+  setHealthFlags(*host_ptr.get(), host, buffer);
+  setSuccessRate(*host_ptr.get(), host, buffer);
 
   if (uint64_t weight = host->weight(); weight) {
     host_config.emplace_back("weight", weight);
@@ -252,7 +252,7 @@ void JsonClustersRequest::processHost(Json::Streamer::Array* raw_host_statuses_p
     response.move(buffer);
   }
   if (!host_config.empty()) {
-    addMapEntries(host_ptr.get(), response, host_config);
+    addMapEntries(*host_ptr.get(), response, host_config);
   }
 }
 
@@ -263,7 +263,7 @@ void JsonClustersRequest::setHostname(const Upstream::HostSharedPtr& host,
   }
 }
 
-void JsonClustersRequest::setSuccessRate(Json::Streamer::Map* raw_host_statuses_ptr,
+void JsonClustersRequest::setSuccessRate(Json::Streamer::Map& map_json,
                                          const Upstream::HostSharedPtr& host,
                                          Buffer::Instance& response) {
 
@@ -276,21 +276,21 @@ void JsonClustersRequest::setSuccessRate(Json::Streamer::Map* raw_host_statuses_
   }
 
   if (external_success_rate >= 0.0) {
-    raw_host_statuses_ptr->addKey("success_rate");
-    Json::Streamer::MapPtr success_rate_map = raw_host_statuses_ptr->addMap();
+    map_json.addKey("success_rate");
+    Json::Streamer::MapPtr success_rate_map = map_json.addMap();
     std::vector<Json::Streamer::Map::NameValue> success_rate{{"value", external_success_rate}};
-    addMapEntries(success_rate_map.get(), response, success_rate);
+    addMapEntries(*success_rate_map.get(), response, success_rate);
   }
   if (local_success_rate >= 0.0) {
-    raw_host_statuses_ptr->addKey("local_origin_success_rate");
-    Json::Streamer::MapPtr local_origin_map = raw_host_statuses_ptr->addMap();
+    map_json.addKey("local_origin_success_rate");
+    Json::Streamer::MapPtr local_origin_map = map_json.addMap();
     std::vector<Json::Streamer::Map::NameValue> local_origin_success_rate{
         {"value", local_success_rate}};
-    addMapEntries(local_origin_map.get(), response, local_origin_success_rate);
+    addMapEntries(*local_origin_map.get(), response, local_origin_success_rate);
   }
 }
 
-void JsonClustersRequest::setLocality(Json::Streamer::Map* raw_host_ptr,
+void JsonClustersRequest::setLocality(Json::Streamer::Map& map_json,
                                       const Upstream::HostSharedPtr& host,
                                       Buffer::Instance& response) {
 
@@ -298,8 +298,8 @@ void JsonClustersRequest::setLocality(Json::Streamer::Map* raw_host_ptr,
       host->locality().sub_zone().empty()) {
     return;
   }
-  raw_host_ptr->addKey("locality");
-  Json::Streamer::MapPtr locality_ptr = raw_host_ptr->addMap();
+  map_json.addKey("locality");
+  Json::Streamer::MapPtr locality_ptr = map_json.addMap();
   std::vector<Json::Streamer::Map::NameValue> locality;
   if (const std::string& region = host->locality().region(); !region.empty()) {
     locality.emplace_back("region", region);
@@ -310,30 +310,30 @@ void JsonClustersRequest::setLocality(Json::Streamer::Map* raw_host_ptr,
   if (const std::string& sub_zone = host->locality().sub_zone(); !sub_zone.empty()) {
     locality.emplace_back("sub_zone", sub_zone);
   }
-  addMapEntries(locality_ptr.get(), response, locality);
+  addMapEntries(*locality_ptr.get(), response, locality);
 }
 
-void JsonClustersRequest::addAddress(Json::Streamer::Map* raw_host_ptr,
+void JsonClustersRequest::addAddress(Json::Streamer::Map& map_json,
                                      const Upstream::HostSharedPtr& host,
                                      Buffer::Instance& response) {
   switch (host->address()->type()) {
   case Network::Address::Type::Pipe: {
     if (const std::string& path = host->address()->asString(); !path.empty()) {
-      raw_host_ptr->addKey("address");
-      Json::Streamer::MapPtr address_ptr = raw_host_ptr->addMap();
+      map_json.addKey("address");
+      Json::Streamer::MapPtr address_ptr = map_json.addMap();
       address_ptr->addKey("pipe");
       Json::Streamer::MapPtr pipe_ptr = address_ptr->addMap();
       std::vector<Json::Streamer::Map::NameValue> pipe{
           {"pipe", host->address()->asString()},
       };
-      addMapEntries(pipe_ptr.get(), response, pipe);
+      addMapEntries(*pipe_ptr.get(), response, pipe);
     }
     break;
   }
   case Network::Address::Type::Ip: {
     if (!host->address()->ip()->addressAsString().empty() || host->address()->ip()->port()) {
-      raw_host_ptr->addKey("address");
-      Json::Streamer::MapPtr address_ptr = raw_host_ptr->addMap();
+      map_json.addKey("address");
+      Json::Streamer::MapPtr address_ptr = map_json.addMap();
       address_ptr->addKey("socket_address");
       Json::Streamer::MapPtr socket_address_ptr = address_ptr->addMap();
       std::vector<Json::Streamer::Map::NameValue> socket_address;
@@ -343,17 +343,17 @@ void JsonClustersRequest::addAddress(Json::Streamer::Map* raw_host_ptr,
       if (uint64_t port = uint64_t(host->address()->ip()->port()); port) {
         socket_address.emplace_back("port_value", port);
       }
-      addMapEntries(socket_address_ptr.get(), response, socket_address);
+      addMapEntries(*socket_address_ptr.get(), response, socket_address);
     }
     break;
   }
   case Network::Address::Type::EnvoyInternal: {
     if (!host->address()->envoyInternalAddress()->addressId().empty() ||
         !host->address()->envoyInternalAddress()->endpointId().empty()) {
-      raw_host_ptr->addKey("address");
-      Json::Streamer::MapPtr address_ptr = raw_host_ptr->addMap();
-      raw_host_ptr->addKey("envoy_internal_address");
-      Json::Streamer::MapPtr envoy_internal_address_ptr = raw_host_ptr->addMap();
+      map_json.addKey("address");
+      Json::Streamer::MapPtr address_ptr = map_json.addMap();
+      map_json.addKey("envoy_internal_address");
+      Json::Streamer::MapPtr envoy_internal_address_ptr = map_json.addMap();
       std::vector<Json::Streamer::Map::NameValue> envoy_internal_address;
       if (const std::string& server_listener_name =
               host->address()->envoyInternalAddress()->addressId();
@@ -364,21 +364,21 @@ void JsonClustersRequest::addAddress(Json::Streamer::Map* raw_host_ptr,
           !endpoint_id.empty()) {
         envoy_internal_address.emplace_back("endpoint_id", endpoint_id);
       }
-      addMapEntries(envoy_internal_address_ptr.get(), response, envoy_internal_address);
+      addMapEntries(*envoy_internal_address_ptr.get(), response, envoy_internal_address);
     }
     break;
   }
   }
 }
 
-void JsonClustersRequest::buildHostStats(Json::Streamer::Map* raw_host_ptr,
+void JsonClustersRequest::buildHostStats(Json::Streamer::Map& map_json,
                                          const Upstream::HostSharedPtr& host,
                                          Buffer::Instance& response) {
   if (host->counters().empty() && host->gauges().empty()) {
     return;
   }
-  raw_host_ptr->addKey("stats");
-  Json::Streamer::ArrayPtr stats_ptr = raw_host_ptr->addArray();
+  map_json.addKey("stats");
+  Json::Streamer::ArrayPtr stats_ptr = map_json.addArray();
   for (const auto& [counter_name, counter] : host->counters()) {
     if (counter_name.empty() || counter.get().value() == 0) {
       continue;
@@ -393,7 +393,7 @@ void JsonClustersRequest::buildHostStats(Json::Streamer::Map* raw_host_ptr,
       counter_object.emplace_back("value", value);
     }
     Json::Streamer::MapPtr stats_obj_ptr = stats_ptr->addMap();
-    addMapEntries(stats_obj_ptr.get(), response, counter_object);
+    addMapEntries(*stats_obj_ptr.get(), response, counter_object);
   }
   for (const auto& [gauge_name, gauge] : host->gauges()) {
     if (gauge_name.empty() || gauge.get().value() == 0) {
@@ -408,11 +408,11 @@ void JsonClustersRequest::buildHostStats(Json::Streamer::Map* raw_host_ptr,
       gauge_object.emplace_back("value", value);
     }
     Json::Streamer::MapPtr stats_obj_ptr = stats_ptr->addMap();
-    addMapEntries(stats_obj_ptr.get(), response, gauge_object);
+    addMapEntries(*stats_obj_ptr.get(), response, gauge_object);
   }
 }
 
-void JsonClustersRequest::setHealthFlags(Json::Streamer::Map* raw_host_ptr,
+void JsonClustersRequest::setHealthFlags(Json::Streamer::Map& map_json,
                                          const Upstream::HostSharedPtr& host,
                                          Buffer::Instance& response) {
   absl::btree_map<absl::string_view, absl::variant<bool, absl::string_view>> flag_map;
@@ -424,8 +424,8 @@ void JsonClustersRequest::setHealthFlags(Json::Streamer::Map* raw_host_ptr,
   if (flag_map.empty()) {
     return;
   }
-  raw_host_ptr->addKey("health_status");
-  Json::Streamer::MapPtr health_flags_ptr = raw_host_ptr->addMap();
+  map_json.addKey("health_status");
+  Json::Streamer::MapPtr health_flags_ptr = map_json.addMap();
   std::vector<Json::Streamer::Map::NameValue> flags;
   for (const auto& [name, flag_value] : flag_map) {
     if (name == "eds_health_status") {
@@ -438,7 +438,7 @@ void JsonClustersRequest::setHealthFlags(Json::Streamer::Map* raw_host_ptr,
       }
     }
   }
-  addMapEntries(health_flags_ptr.get(), response, flags);
+  addMapEntries(*health_flags_ptr.get(), response, flags);
 }
 
 void JsonClustersRequest::loadHealthFlagMap(
@@ -505,56 +505,55 @@ void JsonClustersRequest::loadHealthFlagMap(
   }
 }
 
-void JsonClustersRequest::addEjectionThresholds(Json::Streamer::Map* raw_clusters_map_ptr,
+void JsonClustersRequest::addEjectionThresholds(Json::Streamer::Map& map_json,
                                                 const Upstream::Cluster& unwrapped_cluster,
                                                 Buffer::Instance& response) {
   const Upstream::Outlier::Detector* outlier_detector = unwrapped_cluster.outlierDetector();
   if (outlier_detector != nullptr &&
       outlier_detector->successRateEjectionThreshold(
           Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin) > 0.0) {
-    raw_clusters_map_ptr->addKey("success_rate_ejection_threshold");
-    Json::Streamer::MapPtr success_rate_map_ptr = raw_clusters_map_ptr->addMap();
+    map_json.addKey("success_rate_ejection_threshold");
+    Json::Streamer::MapPtr success_rate_map_ptr = map_json.addMap();
     std::vector<Json::Streamer::Map::NameValue> success_rate_ejection_threshold;
     success_rate_ejection_threshold.emplace_back(
         "value",
         double(outlier_detector->successRateEjectionThreshold(
             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
-    addMapEntries(success_rate_map_ptr.get(), response, success_rate_ejection_threshold);
+    addMapEntries(*success_rate_map_ptr.get(), response, success_rate_ejection_threshold);
   }
   if (outlier_detector != nullptr &&
       outlier_detector->successRateEjectionThreshold(
           Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin) > 0.0) {
-    raw_clusters_map_ptr->addKey("local_origin_success_rate_ejection_threshold");
-    Json::Streamer::MapPtr local_success_rate_map_ptr = raw_clusters_map_ptr->addMap();
+    map_json.addKey("local_origin_success_rate_ejection_threshold");
+    Json::Streamer::MapPtr local_success_rate_map_ptr = map_json.addMap();
     std::vector<Json::Streamer::Map::NameValue> local_origin_success_rate_ejection_threshold;
     local_origin_success_rate_ejection_threshold.emplace_back(
         "value", double(outlier_detector->successRateEjectionThreshold(
                      Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
-    addMapEntries(local_success_rate_map_ptr.get(), response,
+    addMapEntries(*local_success_rate_map_ptr.get(), response,
                   local_origin_success_rate_ejection_threshold);
   }
 }
 
-void JsonClustersRequest::addCircuitBreakers(Json::Streamer::Map* raw_clusters_map_ptr,
+void JsonClustersRequest::addCircuitBreakers(Json::Streamer::Map& raw_clusters_map_ptr,
                                              Upstream::ClusterInfoConstSharedPtr cluster_info,
                                              Buffer::Instance& response) {
-  raw_clusters_map_ptr->addKey("circuit_breakers");
-  Json::Streamer::MapPtr circuit_breakers = raw_clusters_map_ptr->addMap();
+  raw_clusters_map_ptr.addKey("circuit_breakers");
+  Json::Streamer::MapPtr circuit_breakers = raw_clusters_map_ptr.addMap();
   circuit_breakers->addKey("thresholds");
   Json::Streamer::ArrayPtr thresholds = circuit_breakers->addArray();
-  addCircuitBreakerForPriority(envoy::config::core::v3::RoutingPriority::DEFAULT, thresholds.get(),
+  addCircuitBreakerForPriority(envoy::config::core::v3::RoutingPriority::DEFAULT, *thresholds.get(),
                                response,
                                cluster_info->resourceManager(Upstream::ResourcePriority::Default));
-  addCircuitBreakerForPriority(envoy::config::core::v3::RoutingPriority::HIGH, thresholds.get(),
+  addCircuitBreakerForPriority(envoy::config::core::v3::RoutingPriority::HIGH, *thresholds.get(),
                                response,
                                cluster_info->resourceManager(Upstream::ResourcePriority::High));
 }
 
 void JsonClustersRequest::addCircuitBreakerForPriority(
-    const envoy::config::core::v3::RoutingPriority& priority,
-    Json::Streamer::Array* raw_thresholds_ptr, Buffer::Instance& response,
-    Upstream::ResourceManager& resource_manager) {
-  Json::Streamer::MapPtr threshold = raw_thresholds_ptr->addMap();
+    const envoy::config::core::v3::RoutingPriority& priority, Json::Streamer::Array& array_json,
+    Buffer::Instance& response, Upstream::ResourceManager& resource_manager) {
+  Json::Streamer::MapPtr threshold = array_json.addMap();
   std::vector<Json::Streamer::Map::NameValue> entries{
       {"priority",
        priority == envoy::config::core::v3::RoutingPriority::DEFAULT ? "DEFAULT" : "HIGH"}};
@@ -571,7 +570,7 @@ void JsonClustersRequest::addCircuitBreakerForPriority(
   if (uint64_t max_retries = resource_manager.retries().max(); max_retries) {
     entries.emplace_back("max_retries", max_retries);
   }
-  addMapEntries(threshold.get(), response, entries);
+  addMapEntries(*threshold.get(), response, entries);
 }
 
 // Json::Streamer holds a reference to a Buffer::Instance reference but the API for Request
@@ -584,10 +583,9 @@ void JsonClustersRequest::drainBufferIntoResponse(Buffer::Instance& response) {
   }
 }
 
-void JsonClustersRequest::addMapEntries(Json::Streamer::Map* raw_map_ptr,
-                                        Buffer::Instance& response,
+void JsonClustersRequest::addMapEntries(Json::Streamer::Map& map_json, Buffer::Instance& response,
                                         std::vector<Json::Streamer::Map::NameValue>& entries) {
-  raw_map_ptr->addEntries(entries);
+  map_json.addEntries(entries);
   drainBufferIntoResponse(response);
 }
 
