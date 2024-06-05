@@ -410,8 +410,8 @@ public:
   std::string name() const override { return "envoy.config_mux.delta_grpc_mux_factory"; }
   void shutdownAll() override { return GrpcMuxDelta::shutdownAll(); }
   std::shared_ptr<GrpcMux>
-  create(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-         Random::RandomGenerator&, Stats::Scope& scope,
+  create(Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
+         Event::Dispatcher& dispatcher, Random::RandomGenerator&, Stats::Scope& scope,
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
@@ -421,6 +421,7 @@ public:
     THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::move(async_client),
+        /*failover_async_client=*/std::move(failover_async_client),
         /*dispatcher_=*/dispatcher,
         /*service_method_=*/
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -448,8 +449,8 @@ public:
   std::string name() const override { return "envoy.config_mux.sotw_grpc_mux_factory"; }
   void shutdownAll() override { return GrpcMuxSotw::shutdownAll(); }
   std::shared_ptr<GrpcMux>
-  create(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-         Random::RandomGenerator&, Stats::Scope& scope,
+  create(Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
+         Event::Dispatcher& dispatcher, Random::RandomGenerator&, Stats::Scope& scope,
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
@@ -459,6 +460,7 @@ public:
     THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::move(async_client),
+        /*failover_async_client_=*/std::move(failover_async_client),
         /*dispatcher_=*/dispatcher,
         /*service_method_=*/
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
