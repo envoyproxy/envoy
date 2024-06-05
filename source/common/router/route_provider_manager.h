@@ -19,7 +19,6 @@
 #include "envoy/router/route_config_update_receiver.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -37,7 +36,6 @@
 #include "source/common/rds/route_config_provider_manager.h"
 #include "source/common/rds/route_config_update_receiver_impl.h"
 #include "source/common/rds/static_route_config_provider_impl.h"
-#include "source/common/router/vhds.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
@@ -75,6 +73,18 @@ private:
 };
 
 using RouteConfigProviderManagerImplPtr = std::unique_ptr<RouteConfigProviderManagerImpl>;
+
+// Allows loose coupling of this file and rds.h
+class RdsFactory : public Envoy::Config::UntypedFactory {
+public:
+  std::string category() const override { return "envoy.rds_factory"; }
+
+  virtual RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
+      const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
+      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      Init::Manager& init_manager, ProtoTraitsImpl& proto_traits,
+      Rds::RouteConfigProviderManager& manager) PURE;
+};
 
 } // namespace Router
 } // namespace Envoy

@@ -1,5 +1,6 @@
 #include "source/common/quic/active_quic_listener.h"
 
+#include <utility>
 #include <vector>
 
 #include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator.pb.h"
@@ -12,6 +13,7 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
@@ -34,7 +36,8 @@ ActiveQuicListener::ActiveQuicListener(
     uint32_t packets_to_read_to_connection_count_ratio, bool receive_ecn,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
-    QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector)
+    QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           std::make_unique<Network::UdpListenerImpl>(
@@ -87,7 +90,7 @@ ActiveQuicListener::ActiveQuicListener(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
-      *connection_id_generator_);
+      *connection_id_generator_, std::move(debug_visitor_factory));
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
@@ -285,6 +288,16 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   proof_source_factory_ = Config::Utility::getAndCheckFactory<EnvoyQuicProofSourceFactoryInterface>(
       proof_source_config);
 
+  // Initialize connection debug visitor factory if one is configured.
+  if (config.has_connection_debug_visitor_config()) {
+    connection_debug_visitor_factory_ =
+        Config::Utility::getAndCheckFactory<EnvoyQuicConnectionDebugVisitorFactoryInterface>(
+            config.connection_debug_visitor_config());
+    if (connection_debug_visitor_factory_.has_value()) {
+      connection_debug_visitor_factory_->setContext(context_);
+    }
+  }
+
   // Initialize connection ID generator factory.
   envoy::config::core::v3::TypedExtensionConfig cid_generator_config;
   if (!config.has_connection_id_generator_config()) {
@@ -400,7 +413,8 @@ ActiveQuicListenerFactory::createActiveQuicListener(
       runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, receive_ecn_, crypto_server_stream_factory,
-      proof_source_factory, std::move(cid_generator), worker_selector_);
+      proof_source_factory, std::move(cid_generator), worker_selector_,
+      connection_debug_visitor_factory_);
 }
 
 } // namespace Quic

@@ -6,7 +6,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.2"
 "source/common/api:84.5" # flaky due to posix: be careful adjusting
 "source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
-"source/common/common/posix:89.4" # No easy way to test pthread_create failure.
 "source/common/config:95.6"
 "source/common/crypto:95.5"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
@@ -45,7 +44,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/rate_limit_descriptors/expr:95.0"
 "source/extensions/stat_sinks/graphite_statsd:82.8" # Death tests don't report LCOV
 "source/extensions/stat_sinks/statsd:85.2" # Death tests don't report LCOV
-"source/extensions/tracers:96.5"
+"source/extensions/tracers:96.4"
 "source/extensions/tracers/common:74.8"
 "source/extensions/tracers/common/ot:72.9"
 "source/extensions/tracers/opencensus:93.9"

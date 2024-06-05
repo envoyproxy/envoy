@@ -21,13 +21,13 @@ void addHostInfo(NiceMock<Upstream::MockHost>& host, const std::string& hostname
                  const std::string& healthcheck_address_url, int weight, int priority) {
   ON_CALL(host, locality()).WillByDefault(ReturnRef(locality));
 
-  Network::Address::InstanceConstSharedPtr address = Network::Utility::resolveUrl(address_url);
+  Network::Address::InstanceConstSharedPtr address = *Network::Utility::resolveUrl(address_url);
   ON_CALL(host, address()).WillByDefault(Return(address));
   ON_CALL(host, hostname()).WillByDefault(ReturnRef(hostname));
 
   ON_CALL(host, hostnameForHealthChecks()).WillByDefault(ReturnRef(hostname_for_healthcheck));
   Network::Address::InstanceConstSharedPtr healthcheck_address =
-      Network::Utility::resolveUrl(healthcheck_address_url);
+      *Network::Utility::resolveUrl(healthcheck_address_url);
   ON_CALL(host, healthCheckAddress()).WillByDefault(Return(healthcheck_address));
 
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();

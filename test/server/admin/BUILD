@@ -58,6 +58,7 @@ envoy_cc_test(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/server:null_overload_manager_lib",
         "//source/server/admin:admin_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",

@@ -29,7 +29,8 @@ public:
     Network::DnsResolverFactory& dns_resolver_factory =
         createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
     resolver_ =
-        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+            .value();
 
     // NOP for coverage.
     resolver_->resetNetworking();

@@ -53,16 +53,21 @@ std::string Utility::urlFromDatagramAddress(const Address::Instance& addr) {
   }
 }
 
-Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
+absl::StatusOr<Address::InstanceConstSharedPtr> Utility::resolveUrl(const std::string& url) {
+  Address::InstanceConstSharedPtr address{};
   if (urlIsTcpScheme(url)) {
-    return parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
+    address = parseInternetAddressAndPortNoThrow(url.substr(TCP_SCHEME.size()));
   } else if (urlIsUdpScheme(url)) {
-    return parseInternetAddressAndPort(url.substr(UDP_SCHEME.size()));
+    address = parseInternetAddressAndPortNoThrow(url.substr(UDP_SCHEME.size()));
   } else if (urlIsUnixScheme(url)) {
     return std::make_shared<Address::PipeInstance>(url.substr(UNIX_SCHEME.size()));
   } else {
-    throwEnvoyExceptionOrPanic(absl::StrCat("unknown protocol scheme: ", url));
+    return absl::InvalidArgumentError(absl::StrCat("unknown protocol scheme: ", url));
   }
+  if (!address) {
+    return absl::InvalidArgumentError(absl::StrCat("malformed IP address: ", url));
+  }
+  return address;
 }
 
 StatusOr<Socket::Type> Utility::socketTypeFromUrl(const std::string& url) {
@@ -160,7 +165,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string&
   const Address::InstanceConstSharedPtr address =
       parseInternetAddressNoThrow(ip_address, port, v6only);
   if (address == nullptr) {
-    throwWithMalformedIp(ip_address);
+    throwEnvoyExceptionOrPanic(absl::StrCat("malformed IP address: ", ip_address));
   }
   return address;
 }
@@ -208,26 +213,11 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
   return nullptr;
 }
 
-Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::string& ip_address,
-                                                                     bool v6only) {
-
-  const Address::InstanceConstSharedPtr address =
-      parseInternetAddressAndPortNoThrow(ip_address, v6only);
-  if (address == nullptr) {
-    throwWithMalformedIp(ip_address);
-  }
-  return address;
-}
-
 Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Address::Ip& ip) {
   if (ip.version() == Address::IpVersion::v4) {
     return std::make_shared<Address::Ipv4Instance>(ip.addressAsString(), ip.port());
   }
   return std::make_shared<Address::Ipv6Instance>(ip.addressAsString(), ip.port());
-}
-
-void Utility::throwWithMalformedIp(absl::string_view ip_address) {
-  throwEnvoyExceptionOrPanic(absl::StrCat("malformed IP address: ", ip_address));
 }
 
 // TODO(hennna): Currently getLocalAddress does not support choosing between
@@ -426,45 +416,6 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
   UNREFERENCED_PARAMETER(sock);
   return nullptr;
 #endif
-}
-
-void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>& list) {
-  const auto ranges = StringUtil::splitToken(string, ",");
-  for (const auto& s : ranges) {
-    const std::string s_string{s};
-    std::stringstream ss(s_string);
-    uint32_t min = 0;
-    uint32_t max = 0;
-
-    if (absl::StrContains(s, '-')) {
-      char dash = 0;
-      ss >> min;
-      ss >> dash;
-      ss >> max;
-    } else {
-      ss >> min;
-      max = min;
-    }
-
-    if (s.empty() || (min > 65535) || (max > 65535) || ss.fail() || !ss.eof()) {
-      throwEnvoyExceptionOrPanic(fmt::format("invalid port number or range '{}'", s_string));
-    }
-
-    list.emplace_back(PortRange(min, max));
-  }
-}
-
-bool Utility::portInRangeList(const Address::Instance& address, const std::list<PortRange>& list) {
-  if (address.type() != Address::Type::Ip) {
-    return false;
-  }
-
-  for (const PortRange& p : list) {
-    if (p.contains(address.ip()->port())) {
-      return true;
-    }
-  }
-  return false;
 }
 
 absl::uint128 Utility::Ip6ntohl(const absl::uint128& address) {

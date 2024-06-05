@@ -296,15 +296,19 @@ Filter::StreamOpenState Filter::openStream() {
                        .setParentContext(grpc_context)
                        .setBufferBodyForRetry(true);
 
-    stream_ = client_->start(*this, config_with_hash_key_, options);
+    ExternalProcessorStreamPtr stream_object =
+        client_->start(*this, config_with_hash_key_, options);
+
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       // Asserts that `stream_` is nullptr since it is not valid to be used any further
       // beyond this point.
-      ASSERT(stream_ == nullptr);
+      ASSERT(stream_object == nullptr);
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
     stats_.streams_started_.inc();
+
+    stream_ = config_->threadLocalStreamManager().store(this, std::move(stream_object));
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
@@ -320,7 +324,8 @@ void Filter::closeStream() {
     if (stream_->close()) {
       stats_.streams_closed_.inc();
     }
-    stream_.reset();
+    stream_ = nullptr;
+    config_->threadLocalStreamManager().erase(this);
   } else {
     ENVOY_LOG(debug, "Stream already closed");
   }

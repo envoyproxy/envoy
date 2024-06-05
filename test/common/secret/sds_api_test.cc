@@ -159,10 +159,8 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   init_manager_.add(*sds_api.initTarget());
   initialize();
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
-  auto handle = sds_api.addUpdateCallback([&secret_callback]() {
-    secret_callback.onAddOrUpdateSecret();
-    return absl::OkStatus();
-  });
+  auto handle = sds_api.addUpdateCallback(
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
 
   std::string yaml =
       R"EOF(
@@ -222,10 +220,8 @@ protected:
         []() {}, mock_dispatcher_, *api_);
     init_manager_.add(*sds_api_->initTarget());
     initialize();
-    handle_ = sds_api_->addUpdateCallback([this]() {
-      secret_callback_.onAddOrUpdateSecret();
-      return absl::OkStatus();
-    });
+    handle_ =
+        sds_api_->addUpdateCallback([this]() { return secret_callback_.onAddOrUpdateSecret(); });
   }
 
   void onConfigUpdate(const std::string& cert_value, const std::string& key_value) {
@@ -296,10 +292,8 @@ protected:
         []() {}, mock_dispatcher_, *api_);
     init_manager_.add(*sds_api_->initTarget());
     initialize();
-    handle_ = sds_api_->addUpdateCallback([this]() {
-      secret_callback_.onAddOrUpdateSecret();
-      return absl::OkStatus();
-    });
+    handle_ =
+        sds_api_->addUpdateCallback([this]() { return secret_callback_.onAddOrUpdateSecret(); });
   }
 
   void onConfigUpdate(const std::string& trusted_ca_path, const std::string& trusted_ca_value,
@@ -584,10 +578,8 @@ TEST_F(SdsApiTest, DeltaUpdateSuccess) {
   init_manager_.add(*sds_api.initTarget());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
-  auto handle = sds_api.addUpdateCallback([&secret_callback]() {
-    secret_callback.onAddOrUpdateSecret();
-    return absl::OkStatus();
-  });
+  auto handle = sds_api.addUpdateCallback(
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
 
   std::string yaml =
       R"EOF(
@@ -629,10 +621,8 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   init_manager_.add(*sds_api.initTarget());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
-  auto handle = sds_api.addUpdateCallback([&secret_callback]() {
-    secret_callback.onAddOrUpdateSecret();
-    return absl::OkStatus();
-  });
+  auto handle = sds_api.addUpdateCallback(
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
 
   std::string yaml =
       R"EOF(
@@ -683,10 +673,8 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   init_manager_.add(*sds_api.initTarget());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
-  auto handle = sds_api.addUpdateCallback([&secret_callback]() {
-    secret_callback.onAddOrUpdateSecret();
-    return absl::OkStatus();
-  });
+  auto handle = sds_api.addUpdateCallback(
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
   NiceMock<MockCvcValidationCallback> validation_callback;
   auto validation_handle = sds_api.addValidationCallback(
       [&validation_callback](
@@ -780,10 +768,8 @@ TEST_F(SdsApiTest, GenericSecretSdsApiTest) {
   init_manager_.add(*sds_api.initTarget());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
-  auto handle = sds_api.addUpdateCallback([&secret_callback]() {
-    secret_callback.onAddOrUpdateSecret();
-    return absl::OkStatus();
-  });
+  auto handle = sds_api.addUpdateCallback(
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
   NiceMock<MockGenericSecretValidationCallback> validation_callback;
   auto validation_handle = sds_api.addValidationCallback(
       [&validation_callback](

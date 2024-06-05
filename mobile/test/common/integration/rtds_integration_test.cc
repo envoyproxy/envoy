@@ -1,6 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
+#include "source/common/router/rds_impl.h"
+
 #include "test/common/integration/xds_integration_test.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
@@ -18,6 +20,7 @@ public:
     setUpstreamProtocol(Http::CodecType::HTTP1);
 
     XdsIntegrationTest::initialize();
+    Router::forceRegisterRdsFactoryImpl();
 
     default_request_headers_.setScheme("http");
     initializeXdsStream();
@@ -97,12 +100,14 @@ INSTANTIATE_TEST_SUITE_P(
                      // Envoy Mobile's xDS APIs only support state-of-the-world, not delta.
                      testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw)));
 
-TEST_P(RtdsIntegrationTest, RtdsReloadWithDfpMixedScheme) {
+// https://github.com/envoyproxy/envoy/issues/34537
+TEST_P(RtdsIntegrationTest, DISABLED_RtdsReloadWithDfpMixedScheme) {
   TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"dfp_mixed_scheme", true}});
   runReloadTest();
 }
 
-TEST_P(RtdsIntegrationTest, RtdsReloadWithoutDfpMixedScheme) {
+// https://github.com/envoyproxy/envoy/issues/34537
+TEST_P(RtdsIntegrationTest, DISABLED_RtdsReloadWithoutDfpMixedScheme) {
   TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"dfp_mixed_scheme", false}});
   runReloadTest();
 }
