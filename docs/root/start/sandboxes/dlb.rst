@@ -76,8 +76,10 @@ You should get output from Nginx like below:
 
 .. seealso::
    :ref:`DLB connection balanace API <envoy_v3_api_msg_extensions.network.connection_balance.dlb.v3alpha.Dlb>`
-      API and configuration reference for Envoy's brotli compression.
+      API and configuration reference for Envoy's DLB connection balanace.
 
    :ref:`Connection balance configuration <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
-      Reference documentation for Envoy's compressor filter.
+      Configuration referenc for Envoy's connection balanace.
 
+  `DLB <https://networkbuilders.intel.com/solutionslibrary/queue-management-and-load-balancing-on-intel-architecture>`_
+    The Intel DLB website.
