@@ -46,16 +46,14 @@ TEST(ClustersParamsTest, FormatSetToJsonWhenJsonSupplied) {
   EXPECT_EQ(code, expected_code);
 }
 
-TEST(ClustersParamsTest, FormatSetToUnknownWhenInvalidFormatSupplied) {
+TEST(ClustersParamsTest, ReturnsBadRequestWhenInvalidFormatSupplied) {
   ClustersParams params;
   Buffer::OwnedImpl buffer;
   std::string url = "localhost:1337/clusters?format=fail";
-  ClustersParams::Format expected_format = ClustersParams::Format::Unknown;
   Http::Code expected_code = Http::Code::BadRequest;
 
   Http::Code code = params.parse(url, buffer);
 
-  EXPECT_EQ(params.format_, expected_format);
   EXPECT_EQ(code, expected_code);
 }
 

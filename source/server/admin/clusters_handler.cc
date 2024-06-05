@@ -89,9 +89,6 @@ Admin::RequestPtr ClustersHandler::makeRequest(AdminStream& admin_stream) {
   }
   Admin::RequestPtr request{nullptr};
   switch (params.format_) {
-  case ClustersParams::Format::Unknown:
-    request = Admin::makeStaticTextRequest("unknown format type", Http::Code::BadRequest);
-    break;
   case ClustersParams::Format::Text:
     request =
         std::make_unique<TextClustersRequest>(ClustersRequest::DefaultChunkLimit, server_, params);

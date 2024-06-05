@@ -10,7 +10,6 @@ namespace Server {
 
 struct ClustersParams {
   enum class Format {
-    Unknown,
     Text,
     Json,
   };

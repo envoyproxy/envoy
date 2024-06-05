@@ -60,8 +60,6 @@ protected:
       return std::make_unique<TextClustersRequest>(chunk_limit, mock_server_, params);
     case ClustersParams::Format::Json:
       return std::make_unique<JsonClustersRequest>(chunk_limit, mock_server_, params);
-    case ClustersParams::Format::Unknown:
-      return nullptr;
     }
     return nullptr;
   }

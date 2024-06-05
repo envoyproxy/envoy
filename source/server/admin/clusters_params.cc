@@ -20,7 +20,6 @@ Http::Code ClustersParams::parse(absl::string_view url, Buffer::Instance& respon
       format_ = Format::Text;
     } else {
       response.addFragments({"invalid format ", *optional_format});
-      format_ = Format::Unknown;
       return Http::Code::BadRequest;
     }
   }
