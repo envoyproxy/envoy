@@ -6,11 +6,11 @@ namespace Envoy {
 namespace Extensions {
 namespace Outlier {
 
-class ConsecutiveErrorsMonitor : public Monitor {
+class ConsecutiveErrorsMonitor : public ExtMonitorBase {
 public:
   ConsecutiveErrorsMonitor() = delete;
   ConsecutiveErrorsMonitor(std::string name, uint32_t enforce, uint32_t max)
-      : Monitor(name, enforce), max_(max) {}
+      : ExtMonitorBase(name, enforce), max_(max) {}
   virtual ~ConsecutiveErrorsMonitor() {}
   virtual bool onError() override;
   virtual void onSuccess() override;

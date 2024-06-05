@@ -22,7 +22,7 @@ bool LocalOriginEventsBucket::matches(
             (local_origin_event.result() == Result::ExtOriginRequestSuccess)));
 }
 
-void Monitor::reportResult(const ExtResult& result) {
+void ExtMonitorBase::reportResult(const ExtResult& result) {
   if (buckets_.empty()) {
     return;
   }
@@ -66,7 +66,7 @@ void Monitor::reportResult(const ExtResult& result) {
   }
 }
 
-void Monitor::processBucketsConfig(
+void ExtMonitorBase::processBucketsConfig(
     const envoy::extensions::outlier_detection_monitors::common::v3::ErrorBuckets& config) {
   for (const auto& http_bucket : config.http_errors()) {
     addErrorBucket(

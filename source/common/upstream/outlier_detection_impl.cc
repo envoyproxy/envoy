@@ -99,9 +99,9 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   }
   // Wrap reported HTTP code into outlier detection extension's wrapper and forward
   // it to configured extensions.
-  for (auto& monitor : getExtensionMonitors()->monitors()) {
+  getExtensionMonitors()->for_each([response_code](ExtMonitorPtr& monitor) {
     monitor->reportResult(Extensions::Outlier::HttpCode(response_code));
-  }
+  });
 }
 std::function<void(uint32_t, std::string, absl::optional<std::string>)>
 DetectorHostMonitorImpl::getOnFailedExtensioMonitorCallback() {
@@ -213,9 +213,9 @@ void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> 
   // Pass the local origin event to all registered extension monitors.
   // Only monitors "interested" in local origin event will process the result.
   // Those not "interested" will ignore the call.
-  for (auto& monitor : getExtensionMonitors()->monitors()) {
+  getExtensionMonitors()->for_each([result](ExtMonitorPtr& monitor) {
     monitor->reportResult(Extensions::Outlier::LocalOriginEvent(result));
-  }
+  });
 }
 
 void DetectorHostMonitorImpl::localOriginFailure() {
@@ -457,9 +457,8 @@ void DetectorImpl::unejectHost(HostSharedPtr host) {
   host_monitors_[host]->uneject(time_source_.monotonicTime());
 
   if (host_monitors_[host]->getExtensionMonitors() != nullptr) {
-    for (auto& extension : host_monitors_[host]->getExtensionMonitors()->monitors()) {
-      extension->reset();
-    }
+    host_monitors_[host]->getExtensionMonitors()->for_each(
+        [](ExtMonitorPtr& monitor) { monitor->reset(); });
   }
 
   runCallbacks(host);

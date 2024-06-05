@@ -180,10 +180,8 @@ public:
   void setJitter(const std::chrono::milliseconds jitter) { jitter_ = jitter; }
   std::chrono::milliseconds getJitter() const { return jitter_; }
 
-  const std::unique_ptr<Extensions::Outlier::MonitorsSet>& getExtensionMonitors() const {
-    return monitors_set_;
-  }
-  void setExtensionsMonitors(std::unique_ptr<Extensions::Outlier::MonitorsSet>&& monitors_set) {
+  const std::unique_ptr<MonitorsSet>& getExtensionMonitors() const { return monitors_set_; }
+  void setExtensionsMonitors(std::unique_ptr<MonitorsSet>&& monitors_set) {
     monitors_set_ = std::move(monitors_set);
   }
 
@@ -222,7 +220,7 @@ private:
       put_result_func_;
 
   // Set of extension monitors.
-  std::unique_ptr<Extensions::Outlier::MonitorsSet> monitors_set_;
+  std::unique_ptr<MonitorsSet> monitors_set_;
   // The following fields are reported when extension monitor is "tripped" and
   // reports that a host where the extension monitor was attached should be
   // ejected.
@@ -342,7 +340,7 @@ public:
   bool successfulActiveHealthCheckUnejectHost() const {
     return successful_active_health_check_uneject_host_;
   }
-  std::unique_ptr<Extensions::Outlier::MonitorsSet> createMonitorExtensions(
+  std::unique_ptr<MonitorsSet> createMonitorExtensions(
       std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback);
 
 private:

@@ -9,16 +9,6 @@
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
-
-// Types of errors reported to outlier detectors.
-// Each type may have a different syntax and content.
-// TODO (cpakulski) - maybe use enums from protobufs.
-enum class Upstream::Outlier::ExtResultType {
-  TEST, // Used in unit tests.
-  HTTP_CODE,
-  LOCAL_ORIGIN,
-};
-
 namespace Extensions {
 namespace Outlier {
 
@@ -102,15 +92,12 @@ public:
   matches(const TypedExtResult<Upstream::Outlier::ExtResultType::LOCAL_ORIGIN>&) const override;
 };
 
-// Class groups error buckets. Buckets may be of different types.
-// Base class for various types of monitors.
-// Each monitor may implement different health detection algorithm.
-class Monitor {
+class ExtMonitorBase : public ExtMonitor {
 public:
-  Monitor(const std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
-  Monitor() = delete;
-  virtual ~Monitor() {}
-  void reportResult(const ExtResult&);
+  ExtMonitorBase(const std::string& name, uint32_t enforce) : ExtMonitor(name, enforce) {}
+  ExtMonitorBase() = delete;
+  virtual ~ExtMonitorBase() {}
+  void reportResult(const ExtResult&) override;
 
   void
   setCallback(std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) {
@@ -125,27 +112,7 @@ public:
   void addErrorBucket(ErrorsBucketPtr&& bucket) { buckets_.push_back(std::move(bucket)); }
 
 protected:
-  virtual bool onError() PURE;
-  virtual void onSuccess() PURE;
-  virtual void onReset() PURE;
-  // Default extra info is empty string. Descendant classes may overwrite it.
-  virtual std::string getFailedExtraInfo() { return ""; }
-
-  std::string name_;
-  uint32_t enforce_{100};
   std::vector<ErrorsBucketPtr> buckets_;
-  std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback_;
-};
-
-using MonitorPtr = std::unique_ptr<Monitor>;
-
-class MonitorsSet {
-public:
-  void addMonitor(MonitorPtr&& monitor) { monitors_.push_back(std::move(monitor)); }
-  const std::vector<MonitorPtr>& monitors() { return monitors_; }
-
-private:
-  std::vector<MonitorPtr> monitors_;
 };
 
 class MonitorFactoryContext {
@@ -162,16 +129,16 @@ class MonitorFactory : public Envoy::Config::TypedFactory {
 public:
   ~MonitorFactory() override = default;
 
-  virtual MonitorPtr createMonitor(const std::string& name, const Protobuf::Message& config,
-                                   MonitorFactoryContext& context) PURE;
+  virtual ExtMonitorPtr createMonitor(const std::string& name, const Protobuf::Message& config,
+                                      MonitorFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.outlier_detection_monitors"; }
 };
 
 template <class ConfigProto> class MonitorFactoryBase : public MonitorFactory {
 public:
-  MonitorPtr createMonitor(const std::string& monitor_name, const Protobuf::Message& config,
-                           MonitorFactoryContext& context) override {
+  ExtMonitorPtr createMonitor(const std::string& monitor_name, const Protobuf::Message& config,
+                              MonitorFactoryContext& context) override {
     return createMonitorFromProtoTyped(monitor_name,
                                        MessageUtil::downcastAndValidate<const ConfigProto&>(
                                            config, context.messageValidationVisitor()),
@@ -187,9 +154,9 @@ public:
   MonitorFactoryBase(const std::string& name) : name_(name) {}
 
 private:
-  virtual MonitorPtr createMonitorFromProtoTyped(const std::string& monitor_name,
-                                                 const ConfigProto& config,
-                                                 MonitorFactoryContext& context) PURE;
+  virtual ExtMonitorPtr createMonitorFromProtoTyped(const std::string& monitor_name,
+                                                    const ConfigProto& config,
+                                                    MonitorFactoryContext& context) PURE;
 
   const std::string name_;
 };

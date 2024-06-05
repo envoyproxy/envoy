@@ -47,8 +47,14 @@ enum class Result {
   ExtOriginRequestSuccess // Request was completed successfully.
 };
 
-// Types of outlier detection extension results which can be reported.
-enum class ExtResultType;
+// Types of errors reported to outlier detectors.
+// Each type may have a different syntax and content.
+// TODO (cpakulski) - maybe use enums from protobufs.
+enum class ExtResultType {
+  TEST, // Used in unit tests.
+  HTTP_CODE,
+  LOCAL_ORIGIN,
+};
 
 /*
  * Class carries result of a transaction with upstream entity
@@ -67,6 +73,48 @@ private:
   const ExtResultType type_;
 };
 
+// Base class for various types of monitors.
+// Each monitor may implement different health detection algorithm.
+class ExtMonitor {
+public:
+  ExtMonitor(const std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
+  ExtMonitor() = delete;
+  virtual ~ExtMonitor() {}
+  virtual void reportResult(const ExtResult&) PURE;
+
+  void
+  setCallback(std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) {
+    callback_ = callback;
+  }
+
+  void reset() { onReset(); }
+  std::string name() const { return name_; }
+
+protected:
+  virtual bool onError() PURE;
+  virtual void onSuccess() PURE;
+  virtual void onReset() PURE;
+  virtual std::string getFailedExtraInfo() { return ""; }
+
+  std::string name_;
+  uint32_t enforce_{100};
+  std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback_;
+};
+
+using ExtMonitorPtr = std::unique_ptr<ExtMonitor>;
+
+class MonitorsSet {
+public:
+  void addMonitor(ExtMonitorPtr&& monitor) { monitors_.push_back(std::move(monitor)); }
+  void for_each(std::function<void(ExtMonitorPtr&)> f) {
+    for (auto& monitor : monitors_) {
+      f(monitor);
+    }
+  }
+
+private:
+  absl::InlinedVector<ExtMonitorPtr, 3> monitors_;
+};
 /**
  * Monitor for per host data. Proxy filters should send pertinent data when available.
  */
