@@ -306,7 +306,7 @@ AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
   if (!creation_status.ok()) {
     return;
   }
-  if (nullptr != options.parent_span_) {
+  if (options.parent_span_ != nullptr) {
     const std::string child_span_name =
         options.child_span_name_.empty()
             ? absl::StrCat("async ", parent.cluster_->name(), " egress")
