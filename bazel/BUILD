@@ -477,6 +477,11 @@ selects.config_setting_group(
 )
 
 config_setting(
+    name = "disable_nghttp2",
+    values = {"define": "nghttp2=disabled"},
+)
+
+config_setting(
     name = "disable_google_grpc",
     values = {"define": "google_grpc=disabled"},
 )

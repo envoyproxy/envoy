@@ -108,6 +108,13 @@ def envoy_select_hot_restart(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if hot restart is enabled in the current build.
+def envoy_select_nghttp2(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_nghttp2": [],
+        "//conditions:default": xs,
+    })
+
 # Selects the given values if full protos are enabled in the current build.
 def envoy_select_enable_full_protos(xs, repository = ""):
     return select({
