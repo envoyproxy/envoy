@@ -78,7 +78,7 @@ public:
    * Creates a new generic thread from the specified `thread_routine`. When the
    * thread cannot be created, this function will crash.
    */
-  ThreadPtr createThread(std::function<void()> thread_routine, OptionsOptConstRef options) PURE;
+  ThreadPtr createThread(std::function<void()> thread_routine, OptionsOptConstRef options);
 
   /**
    * Creates a new POSIX thread from the specified `thread_routine`. When
@@ -86,17 +86,20 @@ public:
    * cannot be created; otherwise a `nullptr` will be returned.
    */
   virtual PosixThreadPtr createThread(std::function<void()> thread_routine,
-                                      OptionsOptConstRef options, bool crash_on_failure) PURE;
+                                      OptionsOptConstRef options, bool crash_on_failure);
 
   /**
    * On Linux, `currentThreadId()` uses `gettid()` and it returns the kernel
    * thread ID. The thread ID returned from this call is not the same as the
    * thread ID returned from `currentPThreadId()`.
    */
-  ThreadId currentThreadId() PURE;
+  ThreadId currentThreadId();
 
   /** Returns the current pthread ID. It uses `pthread_self()`. */
-  virtual ThreadId currentPthreadId() PURE;
+  virtual ThreadId currentPthreadId();
+
+protected:
+  virtual int createPthread(ThreadHandle* thread_handle);
 };
 
 } // namespace Thread

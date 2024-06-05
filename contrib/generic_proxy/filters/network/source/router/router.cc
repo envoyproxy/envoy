@@ -130,16 +130,12 @@ void UpstreamRequest::deferredDelete() {
   }
 }
 
-void UpstreamRequest::sendRequestStartToUpstream() {
+void UpstreamRequest::sendHeaderFrameToUpstream() {
   request_stream_header_sent_ = true;
-  ASSERT(generic_upstream_ != nullptr);
-
-  // The first frame of request is sent.
-  upstream_info_->upstreamTiming().onFirstUpstreamTxByteSent(parent_.time_source_);
-  generic_upstream_->clientCodec().encode(*parent_.request_stream_, *this);
+  sendFrameToUpstream(*parent_.request_stream_, true);
 }
 
-void UpstreamRequest::sendRequestFrameToUpstream() {
+void UpstreamRequest::sendCommonFrameToUpstream() {
   if (!request_stream_header_sent_) {
     // Do not send request frame to upstream until the request header is sent. It may be blocked
     // by the upstream connecting.
@@ -149,36 +145,43 @@ void UpstreamRequest::sendRequestFrameToUpstream() {
   while (!parent_.request_stream_frames_.empty()) {
     auto frame = std::move(parent_.request_stream_frames_.front());
     parent_.request_stream_frames_.pop_front();
-
-    ASSERT(generic_upstream_ != nullptr);
-    generic_upstream_->clientCodec().encode(*frame, *this);
+    if (!sendFrameToUpstream(*frame, false)) {
+      break;
+    }
   }
 }
 
-void UpstreamRequest::onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) {
-  encodeBufferToUpstream(buffer);
+bool UpstreamRequest::sendFrameToUpstream(const StreamFrame& frame, bool header_frame) {
+  ASSERT(generic_upstream_ != nullptr);
+  const bool end_stream = frame.frameFlags().endStream();
 
-  if (!end_stream) {
-    return;
+  const auto result = generic_upstream_->clientCodec().encode(frame, *this);
+  if (!result.ok()) {
+    ENVOY_LOG(error, "Generic proxy: request encoding failure: {}", result.status().message());
+    // The request encoding failure is treated as a protocol error.
+    resetStream(StreamResetReason::ProtocolError, result.status().message());
+    return false;
   }
 
-  // The request is fully sent.
-  upstream_info_->upstreamTiming().onLastUpstreamTxByteSent(parent_.time_source_);
+  ENVOY_LOG(debug, "Generic proxy: send {} bytes to server, complete: {}", result.value(),
+            end_stream);
 
-  // Request is complete.
-  ENVOY_LOG(debug, "upstream request encoding success");
-
-  // Need not to wait for the upstream response and complete directly.
-  if (!expects_response_) {
-    clearStream(false);
-    parent_.completeDirectly();
-    return;
+  if (header_frame) {
+    upstream_info_->upstreamTiming().onFirstUpstreamTxByteSent(parent_.time_source_);
   }
-}
 
-void UpstreamRequest::onEncodingFailure(absl::string_view reason) {
-  // The request encoding failure is treated as a protocol error.
-  resetStream(StreamResetReason::ProtocolError, reason);
+  // If the request is fully sent, record the last downstream tx byte sent time and clean
+  // up the stream.
+  if (end_stream) {
+    upstream_info_->upstreamTiming().onLastUpstreamTxByteSent(parent_.time_source_);
+
+    // Oneway requests need not to wait for the upstream response and complete directly.
+    if (!expects_response_) {
+      clearStream(false);
+      parent_.completeDirectly();
+    }
+  }
+  return true;
 }
 
 OptRef<const RouteEntry> UpstreamRequest::routeEntry() const {
@@ -215,8 +218,8 @@ void UpstreamRequest::onUpstreamSuccess() {
     parent_.callbacks_->activeSpan().injectContext(trace_context, upstream_context);
   }
 
-  sendRequestStartToUpstream();
-  sendRequestFrameToUpstream();
+  sendHeaderFrameToUpstream();
+  sendCommonFrameToUpstream();
 }
 
 void UpstreamRequest::onUpstreamResponseComplete(bool drain_close) {
@@ -244,7 +247,7 @@ void UpstreamRequest::onDecodingSuccess(ResponseHeaderFramePtr response_header_f
     onUpstreamResponseComplete(response_header_frame->frameFlags().streamFlags().drainClose());
   }
 
-  parent_.onResponseStart(std::move(response_header_frame));
+  parent_.onResponseHeaderFrame(std::move(response_header_frame));
 }
 
 void UpstreamRequest::onDecodingSuccess(ResponseCommonFramePtr response_common_frame) {
@@ -258,7 +261,7 @@ void UpstreamRequest::onDecodingSuccess(ResponseCommonFramePtr response_common_f
     onUpstreamResponseComplete(response_common_frame->frameFlags().streamFlags().drainClose());
   }
 
-  parent_.onResponseFrame(std::move(response_common_frame));
+  parent_.onResponseCommonFrame(std::move(response_common_frame));
 }
 
 void UpstreamRequest::onDecodingFailure(absl::string_view reason) {
@@ -311,26 +314,18 @@ void UpstreamRequest::onUpstreamConnectionReady() {
       connecting_start_time_.value(), parent_.time_source_);
 }
 
-void UpstreamRequest::encodeBufferToUpstream(Buffer::Instance& buffer) {
-  ENVOY_LOG(trace, "proxying {} bytes", buffer.length());
-
-  ASSERT(generic_upstream_ != nullptr);
-  ASSERT(generic_upstream_->upstreamConnection().has_value());
-  generic_upstream_->upstreamConnection()->write(buffer, false);
-}
-
-void RouterFilter::onResponseStart(ResponseHeaderFramePtr response_header_frame) {
+void RouterFilter::onResponseHeaderFrame(ResponseHeaderFramePtr response_header_frame) {
   if (response_header_frame->frameFlags().endStream()) {
     onFilterComplete();
   }
-  callbacks_->onResponseStart(std::move(response_header_frame));
+  callbacks_->onResponseHeaderFrame(std::move(response_header_frame));
 }
 
-void RouterFilter::onResponseFrame(ResponseCommonFramePtr response_common_frame) {
+void RouterFilter::onResponseCommonFrame(ResponseCommonFramePtr response_common_frame) {
   if (response_common_frame->frameFlags().endStream()) {
     onFilterComplete();
   }
-  callbacks_->onResponseFrame(std::move(response_common_frame));
+  callbacks_->onResponseCommonFrame(std::move(response_common_frame));
 }
 
 void RouterFilter::completeDirectly() {
@@ -468,7 +463,7 @@ void RouterFilter::onRequestCommonFrame(RequestCommonFramePtr frame) {
     return;
   }
 
-  upstream_requests_.front()->sendRequestFrameToUpstream();
+  upstream_requests_.front()->sendCommonFrameToUpstream();
 }
 
 FilterStatus RouterFilter::onStreamDecoded(StreamRequest& request) {

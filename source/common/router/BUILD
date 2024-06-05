@@ -176,19 +176,42 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "rds_lib",
+    name = "route_provider_manager_lib",
     srcs = [
-        "rds_impl.cc",
         "route_provider_manager.cc",
         "static_route_provider_impl.cc",
     ],
     hdrs = [
-        "rds_impl.h",
         "route_provider_manager.h",
         "static_route_provider_impl.h",
     ],
     deps = [
         ":config_lib",
+        "//envoy/http:codes_interface",
+        "//envoy/local_info:local_info_interface",
+        "//envoy/router:rds_interface",
+        "//envoy/router:route_config_provider_manager_interface",
+        "//envoy/router:route_config_update_info_interface",
+        "//source/common/router:route_config_update_impl_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_lib",
+    srcs = [
+        "rds_impl.cc",
+    ],
+    hdrs = [
+        "rds_impl.h",
+    ],
+    deps = [
+        ":config_lib",
+        ":route_provider_manager_lib",
         "//envoy/config:subscription_interface",
         "//envoy/http:codes_interface",
         "//envoy/local_info:local_info_interface",
@@ -205,6 +228,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(

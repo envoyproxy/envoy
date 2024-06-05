@@ -19,9 +19,9 @@ public:
    * @returns a DnsResolver object.
    * @param dispatcher: the local dispatcher thread
    * @param api: API interface to interact with system resources
-   * @param typed_dns_resolver_config: the typed DNS resolver config
+   * @param typed_dns_resolver_config: the typed DNS resolver config or error status.
    */
-  virtual DnsResolverSharedPtr createDnsResolver(
+  virtual absl::StatusOr<DnsResolverSharedPtr> createDnsResolver(
       Event::Dispatcher& dispatcher, Api::Api& api,
       const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) const PURE;
 

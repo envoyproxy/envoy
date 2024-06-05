@@ -10,7 +10,7 @@ import static org.junit.Assert.assertThrows;
 
 import androidx.test.core.app.ApplicationProvider;
 import io.envoyproxy.envoymobile.RequestMethod;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.engine.JniLibrary;
 import io.envoyproxy.envoymobile.utilities.StatsUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -53,7 +53,7 @@ public class CronvoyEngineTest {
 
   @BeforeClass
   public static void loadJniLibrary() {
-    AndroidJniLibrary.loadTestLibrary();
+    JniLibrary.loadTestLibrary();
   }
 
   @AfterClass

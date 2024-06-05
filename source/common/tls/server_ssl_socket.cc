@@ -28,13 +28,29 @@ SslSocketFactoryStats generateStats(Stats::Scope& store) {
 }
 } // namespace
 
+absl::StatusOr<std::unique_ptr<ServerSslSocketFactory>>
+ServerSslSocketFactory::create(Envoy::Ssl::ServerContextConfigPtr config,
+                               Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope,
+                               const std::vector<std::string>& server_names) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<ServerSslSocketFactory>(new ServerSslSocketFactory(
+      std::move(config), manager, stats_scope, server_names, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
                                                Envoy::Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope,
-                                               const std::vector<std::string>& server_names)
+                                               const std::vector<std::string>& server_names,
+                                               absl::Status& creation_status)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats(stats_scope)),
-      config_(std::move(config)), server_names_(server_names),
-      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
+      config_(std::move(config)), server_names_(server_names) {
+  auto ctx_or_error =
+      manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr);
+  SET_AND_RETURN_IF_NOT_OK(ctx_or_error.status(), creation_status);
+
+  ssl_ctx_ = *ctx_or_error;
   config_->setSecretUpdateCallback([this]() { return onAddOrUpdateSecret(); });
 }
 
@@ -53,7 +69,7 @@ Network::TransportSocketPtr ServerSslSocketFactory::createDownstreamTransportSoc
     auto status_or_socket = SslSocket::create(std::move(ssl_ctx), InitialState::Server, nullptr,
                                               config_->createHandshaker());
     if (status_or_socket.ok()) {
-      return std::move(status_or_socket.value());
+      return std::move(*status_or_socket);
     }
     return std::make_unique<ErrorSslSocket>(status_or_socket.status().message());
   } else {
@@ -67,12 +83,14 @@ bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
 
 absl::Status ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
-  auto ctx = manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr);
+  auto ctx_or_error =
+      manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr);
+  RETURN_IF_NOT_OK(ctx_or_error.status());
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    std::swap(ctx, ssl_ctx_);
+    std::swap(*ctx_or_error, ssl_ctx_);
   }
-  manager_.removeContext(ctx);
+  manager_.removeContext(*ctx_or_error);
 
   stats_.ssl_context_update_by_sds_.inc();
   return absl::OkStatus();

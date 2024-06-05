@@ -38,7 +38,6 @@ import org.robolectric.RobolectricTestRunner
 class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
   init {
     JniLibrary.loadTestLibrary()
-    JniLibrary.load()
   }
 
   private lateinit var httpProxyTestServer: HttpProxyTestServerFactory.HttpProxyTestServer

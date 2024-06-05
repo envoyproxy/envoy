@@ -34,7 +34,7 @@ class MockRouteMatcher : public RouteMatcher {
 public:
   MockRouteMatcher();
 
-  MOCK_METHOD(RouteEntryConstSharedPtr, routeEntry, (const Request& request), (const));
+  MOCK_METHOD(RouteEntryConstSharedPtr, routeEntry, (const MatchInput& request), (const));
 
   std::shared_ptr<const testing::NiceMock<MockRouteEntry>> route_entry_{
       std::make_shared<testing::NiceMock<MockRouteEntry>>()};

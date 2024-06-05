@@ -2,7 +2,10 @@ package io.envoyproxy.envoymobile
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class GRPCRequestHeadersBuilderTest {
   @Test
   fun `adds scheme to header`() {

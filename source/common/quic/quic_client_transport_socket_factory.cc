@@ -13,6 +13,18 @@
 namespace Envoy {
 namespace Quic {
 
+absl::StatusOr<std::unique_ptr<QuicClientTransportSocketFactory>>
+QuicClientTransportSocketFactory::create(
+    Ssl::ClientContextConfigPtr config,
+    Server::Configuration::TransportSocketFactoryContext& context) {
+  absl::Status creation_status = absl::OkStatus();
+  auto factory = std::unique_ptr<QuicClientTransportSocketFactory>(
+      new QuicClientTransportSocketFactory(std::move(config), context, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  factory->initialize();
+  return factory;
+}
+
 absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config,
@@ -22,19 +34,19 @@ QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
       config, context.messageValidationVisitor());
   auto client_config = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
       quic_transport.upstream_tls_context(), context);
-  auto factory =
-      std::make_unique<QuicClientTransportSocketFactory>(std::move(client_config), context);
-  factory->initialize();
-  return factory;
+  return QuicClientTransportSocketFactory::create(std::move(client_config), context);
 }
 
 QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
     Ssl::ClientContextConfigPtr config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context)
+    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    absl::Status& creation_status)
     : QuicTransportSocketFactoryBase(factory_context.statsScope(), "client"),
-      fallback_factory_(std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
-          std::move(config), factory_context.sslContextManager(), factory_context.statsScope())),
       tls_slot_(factory_context.serverFactoryContext().threadLocal()) {
+  auto factory_or_error = Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
+      std::move(config), factory_context.sslContextManager(), factory_context.statsScope());
+  SET_AND_RETURN_IF_NOT_OK(factory_or_error.status(), creation_status);
+  fallback_factory_ = std::move(*factory_or_error);
   tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalQuicConfig>(); });
 }
 

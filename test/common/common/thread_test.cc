@@ -8,6 +8,7 @@
 #include "source/common/common/thread_synchronizer.h"
 
 #include "test/test_common/thread_factory_for_test.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/notification.h"
@@ -273,6 +274,19 @@ TEST(PosixThreadTest, Joinable) {
   thread->join();
   EXPECT_FALSE(thread->joinable());
 }
+
+class PosixThreadFactoryFailCreate : public PosixThreadFactory {
+protected:
+  int createPthread(ThreadHandle*) override { return 1; }
+};
+
+TEST(PosixThreadTest, FailCreate) {
+  PosixThreadFactoryFailCreate thread_factory;
+  EXPECT_ENVOY_BUG(thread_factory.createThread([&]() {}, /* options= */ absl::nullopt,
+                                               /* crash_on_failure= */ false),
+                   "Unable to create a thread with return code: 1");
+}
+
 #endif
 
 } // namespace
