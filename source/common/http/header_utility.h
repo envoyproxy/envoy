@@ -140,7 +140,7 @@ public:
    * http://tools.ietf.org/html/rfc7230#section-3.2
    * @return bool true if the header name is valid, according to the aforementioned RFC.
    */
-  static bool headerNameIsValid(const absl::string_view header_key);
+  static bool headerNameIsValid(absl::string_view header_key);
 
   /**
    * Checks if header name contains underscore characters.
