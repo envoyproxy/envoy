@@ -15,8 +15,7 @@ namespace Envoy {
 namespace Server {
 
 /**
- * ClustersRequest captures context for a streaming request, implementing the
- * Admin::Request interface.
+ * ClustersRequest captures context for a streaming /clusters request.
  */
 class ClustersRequest : public Admin::Request {
 public:
