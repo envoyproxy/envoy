@@ -210,17 +210,9 @@ pkg_files(
     strip_prefix = "/configs",
 )
 
-pkg_files(
-    name = "examples_rst",
-    srcs = ["//examples:files"],
-    prefix = "start/sandboxes/_include",
-    strip_prefix = "/examples",
-)
-
 pkg_filegroup(
     name = "rst_files",
     srcs = [
-        ":examples_rst",
         ":repo_configs",
         ":sphinx_base",
         ":sphinx_inventories",
@@ -245,6 +237,7 @@ pkg_tar(
         ":extensions_security_rst",
         ":external_deps_rst",
         ":version_history_rst",
+        "//examples:docs",
     ],
 )
 
