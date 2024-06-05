@@ -3,6 +3,9 @@
 Using the Envoy Docker Image
 ============================
 
+Envoy OCI images are built using Docker and have been extensively battle-tested in large scale 
+deployments running with Docker. Use of other container technologies such as Podman, while known to
+function correctly, is not expressly supported.
 The following examples use the :ref:`official Envoy Docker image <start_install_docker>`.
 
 These instructions are known to work for the ``x86_64`` and ``arm64`` architectures.
@@ -50,13 +53,29 @@ Build the Docker image using:
    $ docker build -t envoy:v1 .
 
 Assuming Envoy is configured to listen on ports ``9901`` and ``10000``, you can now start it
-with:
+in Docker with:
 
 .. code-block:: console
 
    $ docker run -d --name envoy -p 9901:9901 -p 10000:10000 envoy:v1
 
-Permissions for running Docker Envoy containers as a non-root user
+or in Podman (unsupported) with:
+
+.. code-block:: console
+
+   $ podman run -d --name envoy -p 9901:9901 -p 10000:10000 envoy:v1
+
+Root filesystem permissions for running Envoy in containers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Envoy container image must be run with the container's root filesystem mounted read-write.
+With Docker and Podman, this means not using the ``--read-only`` option of the ``run`` command.
+With Kubernetes, this means not setting ``podSpec.containers.securityContext.readOnlyFilesystem`` to ``true``.
+
+Volume mounts, on the other hand, can be either read-only or read-write, depending on their use,
+such as for file-based logging and xDS configuration files.
+
+Permissions for running Envoy in containers as a non-root user
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 By default, the Envoy Docker image will start as the root user but will switch to the ``envoy``
@@ -125,7 +144,7 @@ host user's ``uid``, for example:
 
   $ docker run -d --name envoy -v $(pwd)/envoy.yaml:/etc/envoy/envoy.yaml -e ENVOY_UID=$(id -u) envoyproxy/|envoy_docker_image|
 
-Listen only on ports > 1024 inside the Docker Envoy container
+Listen only on ports > 1024 inside the Envoy container
 *************************************************************
 
 Unix-based systems restrict opening ``well-known`` ports (ie. with a port number < ``1024``) to the ``root`` user.
