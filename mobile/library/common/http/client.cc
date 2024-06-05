@@ -454,6 +454,9 @@ void Client::DirectStreamCallbacks::latchError() {
   std::transform(info.responseFlags().begin(), info.responseFlags().end(), response_flags.begin(),
                  [](StreamInfo::ResponseFlag flag) { return std::to_string(flag.value()); });
   error_msg_details.push_back(absl::StrCat("RESPONSE_FLAGS: ", absl::StrJoin(response_flags, ",")));
+  if (info.protocol().has_value()) {
+    error_msg_details.push_back(absl::StrCat("PROTOCOL: ", *info.protocol()));
+  }
   if (std::string resp_code_details = info.responseCodeDetails().value_or("");
       !resp_code_details.empty()) {
     error_msg_details.push_back(absl::StrCat("DETAILS: ", std::move(resp_code_details)));
