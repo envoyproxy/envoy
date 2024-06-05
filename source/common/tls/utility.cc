@@ -227,9 +227,35 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
     break;
   }
   case GEN_OTHERNAME:
-    str = general_name->d.otherName->value->value.asn1_string;
-    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
-    break;
+    ASN1_TYPE* value = general_name->d.otherName->value;
+    if (value == nullptr) {
+      break;
+    }
+    switch (value->type) {
+    case V_ASN1_NULL:
+      break;
+    case V_ASN1_BOOLEAN:
+      san = value->value.boolean ? "true" : "false";
+      break;
+    case V_ASN1_ENUMERATED:
+      san = std::to_string(ASN1_ENUMERATED_get(value->value.enumerated));
+      break;
+    case V_ASN1_INTEGER:
+      san = std::to_string(ASN1_INTEGER_get(value->value.integer));
+      break;
+    case V_ASN1_OBJECT: {
+      char tmp_obj[256]; // OID Max length
+      if (OBJ_obj2txt(tmp_obj, 256, value->value.object, 1) < 0) {
+        break;
+      }
+      san.assign(tmp_obj);
+      break;
+    }
+    default:
+      str = value->value.asn1_string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
   }
   return san;
 }
