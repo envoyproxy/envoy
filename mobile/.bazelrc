@@ -29,6 +29,7 @@ build --xcode_version=14.1
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
 build --define=google_grpc=disabled
+build --define=nghttp2=disabled
 build --define=envoy_yaml=disabled
 
 # We don't have a ton of Swift in Envoy Mobile, so always build with WMO

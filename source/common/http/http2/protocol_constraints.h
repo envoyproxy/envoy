@@ -9,11 +9,26 @@
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/status.h"
 
+#ifdef ENVOY_NGHTTP2
 #include "nghttp2/nghttp2.h"
+#endif
 
 namespace Envoy {
 namespace Http {
 namespace Http2 {
+
+enum FrameType {
+  DATA,
+  HEADERS,
+  PRIORITY,
+  RST_STREAM,
+  SETTINGS,
+  PUSH_PROMISE,
+  PING,
+  GOAWAY,
+  WINDOW_UPDATE,
+  CONTINUATION,
+};
 
 //  Class for detecting abusive peers and validating additional constraints imposed by Envoy.
 //  This class does not check protocol compliance with the H/2 standard, as this is checked by
