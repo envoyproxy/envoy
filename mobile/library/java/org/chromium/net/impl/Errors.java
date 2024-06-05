@@ -21,8 +21,10 @@ public class Errors {
   public static final int QUIC_INTERNAL_ERROR = 1;
   private static final Map<Long, NetError> ENVOYMOBILE_ERROR_TO_NET_ERROR = buildErrorMap();
 
-  /**Subset of errors defined in
-   * https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h */
+  /**
+   * Subset of errors defined in
+   * <a href="https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h"></a>
+   */
   @LongDef(flag = true,
            value = {EnvoyMobileError.DNS_RESOLUTION_FAILED, EnvoyMobileError.DURATION_TIMEOUT,
                     EnvoyMobileError.STREAM_IDLE_TIMEOUT,
@@ -31,12 +33,12 @@ public class Errors {
                     EnvoyMobileError.UPSTREAM_REMOTE_RESET})
   @Retention(RetentionPolicy.SOURCE)
   public @interface EnvoyMobileError {
-    long DNS_RESOLUTION_FAILED = 0x4000000;
-    long DURATION_TIMEOUT = 0x400000;
-    long STREAM_IDLE_TIMEOUT = 0x10000;
-    long UPSTREAM_CONNECTION_FAILURE = 0x20;
-    long UPSTREAM_CONNECTION_TERMINATION = 0x40;
-    long UPSTREAM_REMOTE_RESET = 0x10;
+    long DNS_RESOLUTION_FAILED = 1 << 26;          // 0x4000000;
+    long DURATION_TIMEOUT = 1 << 22;               // 0x400000;
+    long STREAM_IDLE_TIMEOUT = 1 << 16;            // 0x10000
+    long UPSTREAM_CONNECTION_FAILURE = 1 << 5;     // 0x20
+    long UPSTREAM_CONNECTION_TERMINATION = 1 << 6; // 0x40
+    long UPSTREAM_REMOTE_RESET = 1 << 4;           // 0x10
   }
 
   /** Subset of errors defined in chromium/src/net/base/net_error_list.h */
@@ -81,18 +83,18 @@ public class Errors {
       return NetError.ERR_INTERNET_DISCONNECTED;
     }
 
-    // Check if negotiated_protocol is quic
-    // TODO(abeyad): Assigning all errors that happen when using HTTP/3 to QUIC_PROTOCOL_ERROR
-    // can mask the real error (DNS, upstream connection, etc). Revisit the error conversion logic.
-    if (finalStreamIntel.getUpstreamProtocol() == UpstreamHttpProtocol.HTTP3) {
-      return NetError.ERR_QUIC_PROTOCOL_ERROR;
-    }
-
     // This will only map the first matched error to a NetError code.
     for (Map.Entry<Long, NetError> entry : ENVOYMOBILE_ERROR_TO_NET_ERROR.entrySet()) {
       if ((responseFlag & entry.getKey()) != 0) {
         return entry.getValue();
       }
+    }
+
+    // Check if negotiated_protocol is quic
+    // TODO(abeyad): Assigning all errors that happen when using HTTP/3 to QUIC_PROTOCOL_ERROR
+    // can mask the real error (DNS, upstream connection, etc). Revisit the error conversion logic.
+    if (finalStreamIntel.getUpstreamProtocol() == UpstreamHttpProtocol.HTTP3) {
+      return NetError.ERR_QUIC_PROTOCOL_ERROR;
     }
     return NetError.ERR_OTHER;
   }
