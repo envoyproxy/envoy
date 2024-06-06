@@ -409,8 +409,10 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
   MULTI_CATCH(
       const EnvoyException& e,
       {
+        envoy::config::bootstrap::v3::Bootstrap redacted_bootstrap = options_.configProto();
+        MessageUtil::redact(redacted_bootstrap);
         ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
-                  MessageUtil::redact(options_.configProto()).DebugString(), options_.configYaml(),
+                  redacted_bootstrap.DebugString(), options_.configYaml(),
                   options_.configPath(), e.what());
         terminate();
         throw;
