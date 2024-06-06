@@ -158,6 +158,8 @@ envoy_cc_library(
         ":main_common_with_all_extensions_lib",
         # These are compiled as extensions so Envoy Mobile doesn't have to link them in.
         # Envoy requires them.
+        "//source/common/tls:server_context_lib",
+        "//source/extensions/transport_sockets/tls:config",
         "//source/common/listener_manager:listener_manager_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/common/version:version_linkstamp",
@@ -211,7 +213,6 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/event:libevent_lib",
-        "//source/common/http/http2:nghttp2_lib",
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/server:proto_descriptors_lib",
     ],

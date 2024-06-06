@@ -97,6 +97,17 @@ void UpstreamConn::connect() {
   }
 }
 
+void UpstreamConn::enableHalfClose(bool enabled) {
+  if (closed_) {
+    ENVOY_LOG(warn, "connection has closed, addr: {}", addr_);
+    return;
+  }
+  ASSERT(conn_ != nullptr);
+  conn_->connection().enableHalfClose(enabled);
+  ENVOY_CONN_LOG(debug, "set enableHalfClose to addr: {}, enabled: {}, actualEnabled: {}",
+                 conn_->connection(), addr_, enabled, conn_->connection().isHalfCloseEnabled());
+}
+
 void UpstreamConn::write(Buffer::Instance& buf, bool end_stream) {
   if (closed_) {
     ENVOY_LOG(warn, "connection has closed, addr: {}", addr_);

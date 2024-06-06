@@ -8,6 +8,8 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/config/utility.h"
+#include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_impl.h"
 
 namespace Envoy {
@@ -18,7 +20,7 @@ namespace Tls {
 ContextManagerImpl::ContextManagerImpl(Server::Configuration::CommonFactoryContext& factory_context)
     : factory_context_(factory_context) {}
 
-Envoy::Ssl::ClientContextSharedPtr
+absl::StatusOr<Envoy::Ssl::ClientContextSharedPtr>
 ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
                                            const Envoy::Ssl::ClientContextConfig& config) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
@@ -32,7 +34,7 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
   return context;
 }
 
-Envoy::Ssl::ServerContextSharedPtr ContextManagerImpl::createSslServerContext(
+absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> ContextManagerImpl::createSslServerContext(
     Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
     const std::vector<std::string>& server_names, Ssl::ContextAdditionalInitFunc additional_init) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
@@ -40,7 +42,13 @@ Envoy::Ssl::ServerContextSharedPtr ContextManagerImpl::createSslServerContext(
     return nullptr;
   }
 
-  Envoy::Ssl::ServerContextSharedPtr context = std::make_shared<ServerContextImpl>(
+  auto factory = Envoy::Config::Utility::getFactoryByName<ServerContextFactory>(
+      "envoy.ssl.server_context_factory.default");
+  if (!factory) {
+    IS_ENVOY_BUG("No envoy.ssl.server_context_factory registered");
+    return nullptr;
+  }
+  Envoy::Ssl::ServerContextSharedPtr context = factory->createServerContext(
       scope, config, server_names, factory_context_, std::move(additional_init));
   contexts_.insert(context);
   return context;

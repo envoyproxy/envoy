@@ -13,11 +13,41 @@
 namespace Envoy {
 namespace Regex {
 
+absl::StatusOr<std::unique_ptr<CompiledGoogleReMatcher>>
+CompiledGoogleReMatcher::createAndSizeCheck(const std::string& regex) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<CompiledGoogleReMatcher>(
+      new CompiledGoogleReMatcher(regex, creation_status, true));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
+absl::StatusOr<std::unique_ptr<CompiledGoogleReMatcher>>
+CompiledGoogleReMatcher::create(const envoy::type::matcher::v3::RegexMatcher& config) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<CompiledGoogleReMatcher>(
+      new CompiledGoogleReMatcher(config, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
+absl::StatusOr<std::unique_ptr<CompiledGoogleReMatcher>>
+CompiledGoogleReMatcher::create(const xds::type::matcher::v3::RegexMatcher& config) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<CompiledGoogleReMatcher>(
+      new CompiledGoogleReMatcher(config, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
+REGISTER_FACTORY(GoogleReEngineFactory, EngineFactory);
 CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
+                                                 absl::Status& creation_status,
                                                  bool do_program_size_check)
     : regex_(regex, re2::RE2::Quiet) {
   if (!regex_.ok()) {
-    throwEnvoyExceptionOrPanic(regex_.error());
+    creation_status = absl::InvalidArgumentError(regex_.error());
+    return;
   }
 
   if (do_program_size_check && Runtime::isRuntimeInitialized()) {
@@ -25,7 +55,7 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
     const uint32_t max_program_size_error_level =
         Runtime::getInteger("re2.max_program_size.error_level", 100);
     if (regex_program_size > max_program_size_error_level) {
-      throwEnvoyExceptionOrPanic(
+      creation_status = absl::InvalidArgumentError(
           fmt::format("regex '{}' RE2 program size of {} > max program size of "
                       "{} set for the error level threshold. Increase "
                       "configured max program size if necessary.",
@@ -44,8 +74,9 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
 }
 
 CompiledGoogleReMatcher::CompiledGoogleReMatcher(
-    const envoy::type::matcher::v3::RegexMatcher& config)
-    : CompiledGoogleReMatcher(config.regex(), !config.google_re2().has_max_program_size()) {
+    const envoy::type::matcher::v3::RegexMatcher& config, absl::Status& creation_status)
+    : CompiledGoogleReMatcher(config.regex(), creation_status,
+                              !config.google_re2().has_max_program_size()) {
   const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
 
   // Check if the deprecated field max_program_size is set first, and follow the old logic if so.
@@ -53,7 +84,7 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(
     const uint32_t max_program_size =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.google_re2(), max_program_size, 100);
     if (regex_program_size > max_program_size) {
-      throwEnvoyExceptionOrPanic(
+      creation_status = absl::InvalidArgumentError(
           fmt::format("regex '{}' RE2 program size of {} > max program size of "
                       "{}. Increase configured max program size if necessary.",
                       config.regex(), regex_program_size, max_program_size));
@@ -61,8 +92,8 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(
   }
 }
 
-CompiledMatcherPtr GoogleReEngine::matcher(const std::string& regex) const {
-  return std::make_unique<CompiledGoogleReMatcher>(regex, true);
+absl::StatusOr<CompiledMatcherPtr> GoogleReEngine::matcher(const std::string& regex) const {
+  return CompiledGoogleReMatcher::createAndSizeCheck(regex);
 }
 
 EnginePtr GoogleReEngineFactory::createEngine(const Protobuf::Message&,
@@ -73,8 +104,6 @@ EnginePtr GoogleReEngineFactory::createEngine(const Protobuf::Message&,
 ProtobufTypes::MessagePtr GoogleReEngineFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::regex_engines::v3::GoogleRE2>();
 }
-
-REGISTER_FACTORY(GoogleReEngineFactory, EngineFactory);
 
 } // namespace Regex
 } // namespace Envoy

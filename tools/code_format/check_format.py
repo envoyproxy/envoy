@@ -398,14 +398,18 @@ class FormatChecker:
         # core and exception code. Source files are also discouraged but
         # extensions source files are currently exempt from checks as many factory creation
         # calls do not yet support StatusOr.
-        return ((
-            file_path.endswith('.h') and file_path.startswith("./source/")
-            and not file_path.startswith("./source/extensions/")
-            and not file_path in self.config.paths["exception"]["include"]) or (
-                file_path.endswith('.cc') and file_path.startswith("./source/")
-                and not file_path.startswith("./source/extensions/")
-                and not file_path in self.config.paths["exception"]["include"])
-                or self.is_in_subdir(file_path, 'tools/testdata'))
+        if not file_path.startswith("./source/") or not (file_path.endswith('.h')
+                                                         or file_path.endswith('.cc')):
+            return False
+
+        # Extensions can have entire directories exempted
+        if file_path.startswith("./source/extensions/"):
+            for entry in self.config.paths["exception"]["include"]:
+                if entry in file_path:
+                    return False
+
+        # As core code is mostly exception free, list individual files.
+        return not file_path in self.config.paths["exception"]["include"]
 
     def allow_listed_for_build_urls(self, file_path):
         return file_path in self.config.paths["build_urls"]["include"]

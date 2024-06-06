@@ -2,9 +2,12 @@
 
 namespace Envoy {
 
-EngineWithTestServer::EngineWithTestServer(Platform::EngineBuilder& engine_builder,
-                                           TestServerType type) {
+EngineWithTestServer::EngineWithTestServer(
+    Platform::EngineBuilder& engine_builder, TestServerType type,
+    const absl::flat_hash_map<std::string, std::string>& headers, absl::string_view body,
+    const absl::flat_hash_map<std::string, std::string>& trailers) {
   test_server_.start(type);
+  test_server_.setResponse(headers, body, trailers);
   engine_ = engine_builder.build();
 }
 

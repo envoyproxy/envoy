@@ -2056,20 +2056,24 @@ public class CronetUrlRequestTest {
   @Feature({"Cronet"})
   public void testErrorCodes() throws Exception {
     checkSpecificErrorCode(EnvoyMobileError.DNS_RESOLUTION_FAILED, NetError.ERR_NAME_NOT_RESOLVED,
-                           NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, "NAME_NOT_RESOLVED",
-                           false);
+                           NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, "NAME_NOT_RESOLVED", false,
+                           /*error_details=*/"RESPONSE_CODE: 400|ERROR_CODE: 0");
     checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_CONNECTION_TERMINATION,
                            NetError.ERR_CONNECTION_CLOSED, NetworkException.ERROR_CONNECTION_CLOSED,
-                           "CONNECTION_CLOSED", true);
+                           "CONNECTION_CLOSED", true,
+                           /*error_details=*/"RESPONSE_CODE: 400|ERROR_CODE: 0");
     checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE,
                            NetError.ERR_CONNECTION_REFUSED,
-                           NetworkException.ERROR_CONNECTION_REFUSED, "CONNECTION_REFUSED", false);
+                           NetworkException.ERROR_CONNECTION_REFUSED, "CONNECTION_REFUSED", false,
+                           /*error_details=*/"RESPONSE_CODE: 400|ERROR_CODE: 0");
     checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_REMOTE_RESET, NetError.ERR_CONNECTION_RESET,
-                           NetworkException.ERROR_CONNECTION_RESET, "CONNECTION_RESET", true);
+                           NetworkException.ERROR_CONNECTION_RESET, "CONNECTION_RESET", true,
+                           /*error_details=*/"RESPONSE_CODE: 400|ERROR_CODE: 0");
     checkSpecificErrorCode(EnvoyMobileError.STREAM_IDLE_TIMEOUT, NetError.ERR_TIMED_OUT,
-                           NetworkException.ERROR_TIMED_OUT, "TIMED_OUT", true);
-    checkSpecificErrorCode(0x2000, NetError.ERR_OTHER, NetworkException.ERROR_OTHER, "OTHER",
-                           false);
+                           NetworkException.ERROR_TIMED_OUT, "TIMED_OUT", true,
+                           /*error_details=*/"RESPONSE_CODE: 400|ERROR_CODE: 0");
+    checkSpecificErrorCode(0x2000, NetError.ERR_OTHER, NetworkException.ERROR_OTHER, "OTHER", false,
+                           /*error_details=*/"RESPONSE_CODE: 400|ERROR_CODE: 0");
   }
 
   /*
@@ -2091,9 +2095,10 @@ public class CronetUrlRequestTest {
     androidNetworkMonitor.onReceive(getContext(), intent);
 
     // send request and confirm errorcode
-    checkSpecificErrorCode(
-        EnvoyMobileError.DNS_RESOLUTION_FAILED, NetError.ERR_INTERNET_DISCONNECTED,
-        NetworkException.ERROR_INTERNET_DISCONNECTED, "INTERNET_DISCONNECTED", false);
+    checkSpecificErrorCode(EnvoyMobileError.DNS_RESOLUTION_FAILED,
+                           NetError.ERR_INTERNET_DISCONNECTED,
+                           NetworkException.ERROR_INTERNET_DISCONNECTED, "INTERNET_DISCONNECTED",
+                           false, /*error_details=*/"RESPONSE_CODE: 400|ERROR_CODE: 0");
 
     // bring back online since the AndroidNetworkMonitor class is a singleton
     connectivityManager.setActiveNetworkInfo(networkInfo);
@@ -2205,8 +2210,8 @@ public class CronetUrlRequestTest {
   }
 
   private void checkSpecificErrorCode(@EnvoyMobileError long envoyMobileError, NetError netError,
-                                      int errorCode, String name, boolean immediatelyRetryable)
-      throws Exception {
+                                      int errorCode, String name, boolean immediatelyRetryable,
+                                      String errorDetails) throws Exception {
     TestUrlRequestCallback callback =
         startAndWaitForComplete(mMockUrlRequestJobFactory.getCronetEngine(),
                                 MockUrlRequestJobFactory.getMockUrlWithFailure(envoyMobileError));
@@ -2221,7 +2226,7 @@ public class CronetUrlRequestTest {
     assertEquals(0, callback.mRedirectCount);
     assertTrue(callback.mOnErrorCalled);
     assertEquals(ResponseStep.ON_FAILED, callback.mResponseStep);
-    assertEquals("", ((CronvoyNetworkExceptionImpl)callback.mError).getErrorDetails());
+    assertEquals(errorDetails, ((CronvoyNetworkExceptionImpl)callback.mError).getErrorDetails());
   }
 
   // Returns the contents of byteBuffer, from its position() to its limit(),
@@ -2311,6 +2316,10 @@ public class CronetUrlRequestTest {
         NativeTestServer.getFileURL("/notfound.html"), callback, callback.getExecutor());
     builder.setHttpMethod("HEAD").build().start();
     callback.blockForDone();
+    checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE,
+                           NetError.ERR_CONNECTION_REFUSED,
+                           NetworkException.ERROR_CONNECTION_REFUSED, "CONNECTION_REFUSED", false,
+                           /*error_details=*/"RESPONSE_CODE: 400|ERROR_CODE: 0");
   }
 
   @Test

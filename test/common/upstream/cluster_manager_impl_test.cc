@@ -421,7 +421,8 @@ TEST_F(ODCDTest, TestAllocateWithLocator) {
       "static_cluster");
 
   auto locator =
-      Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.config.cluster.v3.Cluster/bar");
+      Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.config.cluster.v3.Cluster/bar")
+          .value();
   auto handle = cluster_manager_->allocateOdCdsApi(config, locator, mock_visitor);
   EXPECT_NE(handle, nullptr);
 }
@@ -613,7 +614,7 @@ class AlpnTestConfigFactory
     : public Envoy::Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory {
 public:
   std::string name() const override { return "envoy.transport_sockets.alpn"; }
-  Network::UpstreamTransportSocketFactoryPtr
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message&,
                                Server::Configuration::TransportSocketFactoryContext&) override {
     return std::make_unique<AlpnSocketFactory>();
@@ -1825,8 +1826,9 @@ TEST_P(ClusterManagerLifecycleTest, DynamicRemoveWithLocalCluster) {
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
   auto priority_update_cb = foo->prioritySet().addPriorityUpdateCb(
-      [&membership_updated](uint32_t, const HostVector&, const HostVector&) -> void {
+      [&membership_updated](uint32_t, const HostVector&, const HostVector&) {
         membership_updated.ready();
+        return absl::OkStatus();
       });
 
   // Remove the new cluster.

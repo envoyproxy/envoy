@@ -192,22 +192,20 @@ std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type, bool 
 
 std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
   std::string san;
+  ASN1_STRING* str = nullptr;
   switch (general_name->type) {
-  case GEN_DNS: {
-    ASN1_STRING* str = general_name->d.dNSName;
+  case GEN_DNS:
+    str = general_name->d.dNSName;
     san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
     break;
-  }
-  case GEN_URI: {
-    ASN1_STRING* str = general_name->d.uniformResourceIdentifier;
+  case GEN_URI:
+    str = general_name->d.uniformResourceIdentifier;
     san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
     break;
-  }
-  case GEN_EMAIL: {
-    ASN1_STRING* str = general_name->d.rfc822Name;
+  case GEN_EMAIL:
+    str = general_name->d.rfc822Name;
     san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
     break;
-  }
   case GEN_IPADD: {
     if (general_name->d.ip->length == 4) {
       sockaddr_in sin;

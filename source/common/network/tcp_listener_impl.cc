@@ -136,7 +136,11 @@ TcpListenerImpl::TcpListenerImpl(Event::Dispatcher& dispatcher, Random::RandomGe
     // transient accept errors or early termination due to accepting
     // max_connections_to_accept_per_socket_event connections.
     socket_->ioHandle().initializeFileEvent(
-        dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
+        dispatcher,
+        [this](uint32_t events) {
+          onSocketEvent(events);
+          return absl::OkStatus();
+        },
         Event::FileTriggerType::Level, Event::FileReadyType::Read);
   }
 }

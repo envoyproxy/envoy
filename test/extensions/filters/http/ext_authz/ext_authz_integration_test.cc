@@ -30,6 +30,7 @@ struct GrpcInitializeConfigOpts {
   bool failure_mode_allow = false;
   bool encode_raw_headers = false;
   uint64_t timeout_ms = 300'000; // 5 minutes.
+  bool validate_mutations = false;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -108,6 +109,7 @@ public:
 
       proto_config_.set_failure_mode_allow(opts.failure_mode_allow);
       proto_config_.set_failure_mode_allow_header_add(opts.failure_mode_allow);
+      proto_config_.set_validate_mutations(opts.validate_mutations);
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
 
       // Add labels and verify they are passed.
@@ -170,6 +172,7 @@ public:
         {"x-duplicate", "three"},
         {"allowed-prefix-one", "one"},
         {"allowed-prefix-two", "two"},
+        {"allowed-prefix-denied", "denied"},
         {"not-allowed", "nope"},
         {"regex-food", "food"},
         {"regex-fool", "fool"},
@@ -262,6 +265,7 @@ public:
                    .EnvoyAuthPartialBody.get(),
                "shouldn't be visible in authz request"},
               {"not-allowed", std::nullopt},
+              {"allowed-prefix-denied", std::nullopt},
           };
       for (const auto& [key, value] : unexpected_headers) {
         bool found = false;
@@ -283,6 +287,7 @@ public:
       EXPECT_EQ("one,two,three", (*http_request->mutable_headers())["x-duplicate"]);
       EXPECT_EQ("food", (*http_request->mutable_headers())["regex-food"]);
       EXPECT_EQ("fool", (*http_request->mutable_headers())["regex-fool"]);
+      EXPECT_FALSE(http_request->headers().contains("allowed-prefix-denied"));
       EXPECT_FALSE(http_request->headers().contains("not-allowed"));
     }
 
@@ -607,6 +612,9 @@ attributes:
       - prefix: allowed-prefix
       - safe_regex:
           regex: regex-foo.?
+    disallowed_headers:
+      patterns:
+      - prefix: allowed-prefix-denied
 
     with_request_body:
       max_request_bytes: 1024
@@ -651,6 +659,7 @@ public:
                                        {"x-duplicate", "three"},
                                        {"allowed-prefix-one", "one"},
                                        {"allowed-prefix-two", "two"},
+                                       {"allowed-prefix-denied", "blah"},
                                        {"not-allowed", "nope"},
                                        {"authorization", "legit"},
                                        {"regex-food", "food"},
@@ -686,6 +695,9 @@ public:
                            .getStringView());
     EXPECT_TRUE(ext_authz_request_->headers()
                     .get(Http::LowerCaseString(std::string("not-allowed")))
+                    .empty());
+    EXPECT_TRUE(ext_authz_request_->headers()
+                    .get(Http::LowerCaseString(std::string("allowed-prefix-denied")))
                     .empty());
     EXPECT_EQ("food", ext_authz_request_->headers()
                           .get(Http::LowerCaseString(std::string("regex-food")))[0]
@@ -837,6 +849,9 @@ public:
   const std::string case_sensitive_header_value_{"Case-Sensitive"};
   const std::string legacy_default_config_ = R"EOF(
   transport_api_version: V3
+  disallowed_headers:
+    patterns:
+    - prefix: allowed-prefix-denied
   http_service:
     server_uri:
       uri: "ext_authz:9000"
@@ -872,6 +887,9 @@ public:
     - safe_regex:
         regex: regex-foo.?
     - exact: x-forwarded-for
+  disallowed_headers:
+    patterns:
+    - prefix: allowed-prefix-denied
 
   http_service:
     server_uri:
@@ -965,8 +983,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
       {":scheme", "http"},           {":authority", "host"},
       {"x-duplicate", "one"},        {"x-duplicate", "two"},
       {"x-duplicate", "three"},      {"allowed-prefix-one", "one"},
-      {"allowed-prefix-two", "two"}, {"not-allowed", "nope"},
-      {"regex-food", "food"},        {"regex-fool", "fool"}};
+      {"allowed-prefix-two", "two"}, {"allowed-prefix-denied", "will not be sent"},
+      {"not-allowed", "nope"},       {"regex-food", "food"},
+      {"regex-fool", "fool"}};
 
   auto conn = makeClientConnection(lookupPort("http"));
   codec_client_ = makeHttpConnection(std::move(conn));
@@ -1072,6 +1091,31 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   cleanup();
 }
 
+// Test behavior when validate_mutations is true & side stream provides invalid mutations (should
+// respond downstream with HTTP 500 Internal Server Error).
+TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutations) {
+  GrpcInitializeConfigOpts opts;
+  opts.validate_mutations = true;
+  initializeConfig(opts);
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and request.
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+  sendExtAuthzResponse({{"invalid-\nheader-\nname", "blah"}}, {}, {}, {}, {}, {}, {}, {});
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
+  test_server_->waitForCounterEq("cluster.cluster_0.ext_authz.invalid", 1);
+
+  cleanup();
+}
+
 TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
   GrpcInitializeConfigOpts init_opts;
   init_opts.failure_mode_allow = true;
@@ -1117,10 +1161,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
       {":method", "POST"},           {":path", "/test"},
       {":scheme", "http"},           {":authority", "host"},
       {"x-bypass", invalid_unicode}, {"allowed-prefix-one", "one"},
-      {"allowed-prefix-two", "two"}, {"not-allowed", "nope"},
-      {"x-duplicate", "one"},        {"x-duplicate", "two"},
-      {"x-duplicate", "three"},      {"regex-food", "food"},
-      {"regex-fool", "fool"}};
+      {"allowed-prefix-two", "two"}, {"allowed-prefix-denied", "denied"},
+      {"not-allowed", "nope"},       {"x-duplicate", "one"},
+      {"x-duplicate", "two"},        {"x-duplicate", "three"},
+      {"regex-food", "food"},        {"regex-fool", "fool"}};
 
   response_ = codec_client_->makeRequestWithBody(headers, {});
 

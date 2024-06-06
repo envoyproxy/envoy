@@ -7,6 +7,7 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_impl.h"
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
@@ -384,6 +385,7 @@ void TestServer::start(TestServerType type) {
   // end pre-setup
   Network::DownstreamTransportSocketFactoryPtr factory;
 
+  Extensions::TransportSockets::Tls::forceRegisterServerContextFactoryImpl();
   switch (type) {
   case TestServerType::HTTP3:
     // Make sure if extensions aren't statically linked QUIC will work.
@@ -458,17 +460,17 @@ void TestServer::shutdown() {
   test_server_.reset();
 }
 
-std::string TestServer::getAddress() {
+std::string TestServer::getAddress() const {
   ASSERT(upstream_);
   return upstream_->localAddress()->asString();
 }
 
-std::string TestServer::getIpAddress() {
+std::string TestServer::getIpAddress() const {
   ASSERT(upstream_);
   return upstream_->localAddress()->ip()->addressAsString();
 }
 
-int TestServer::getPort() {
+int TestServer::getPort() const {
   ASSERT(upstream_ || test_server_);
   if (upstream_) {
     return upstream_->localAddress()->ip()->port();
@@ -533,7 +535,7 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
       "envoy.transport_sockets.quic");
 
-  return config_factory.createTransportSocketFactory(quic_config, factory_context, server_names);
+  return *config_factory.createTransportSocketFactory(quic_config, factory_context, server_names);
 }
 
 Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContext(
@@ -552,7 +554,7 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContex
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, factory_context);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+  return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
       std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
       std::vector<std::string>{});
 }

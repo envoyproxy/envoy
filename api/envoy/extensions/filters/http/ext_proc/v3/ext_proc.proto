@@ -250,7 +250,6 @@ message ExternalProcessor {
   bool disable_clear_route_cache = 11
       [(udpa.annotations.field_migrate).oneof_promotion = "clear_route_cache_type"];
 
-  // [#not-implemented-hide:]
   // Specifies the action to be taken when an external processor response is
   // received in response to request headers. It is recommended to set this field than set
   // :ref:`disable_clear_route_cache <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.disable_clear_route_cache>`.

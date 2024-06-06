@@ -93,16 +93,15 @@ paths:
     - source/common/matcher/matcher.h
     - source/extensions/common/matcher/trie_matcher.h
     - envoy/common/exception.h
+    - source/common/upstream/upstream_impl.h
+    - source/common/config/context_provider_impl.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
     - source/common/listener_manager/listener_impl.cc
     - source/common/listener_manager/listener_manager_impl.cc
     - source/common/listener_manager/filter_chain_manager_impl.cc
-    - source/common/upstream/thread_aware_lb_impl.cc
-    - source/common/upstream/subset_lb_config.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
-    - source/common/upstream/default_local_address_selector_factory.cc
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
@@ -115,29 +114,22 @@ paths:
     - source/common/formatter/substitution_format_string.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/http/http2/codec_impl.cc
-    - source/common/http/hash_policy.cc
     - source/common/http/conn_manager_utility.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/utility.cc
     - source/common/quic/quic_server_transport_socket_factory.cc
-    - source/common/secret/secret_manager_impl.cc
     - source/common/grpc/google_grpc_utils.cc
     - source/common/tcp_proxy/tcp_proxy.cc
     - source/common/config/subscription_factory_impl.cc
-    - source/common/config/xds_resource.cc
     - source/common/filter/config_discovery_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
     - source/common/router/config_impl.cc
     - source/common/router/scoped_config_impl.cc
-    - source/common/router/header_parser.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc
-    - source/common/filesystem/inotify/watcher_impl.cc
-    - source/common/filesystem/kqueue/watcher_impl.cc
     - source/common/filesystem/win32/directory_iterator_impl.cc
     - source/common/common/utility.cc
-    - source/common/common/regex.cc
-    - source/common/common/matchers.cc
+    - source/common/common/regex.h
     - source/exe/stripped_main_base.cc
     - source/server/options_impl.cc
     - source/server/overload_manager_impl.cc
@@ -147,7 +139,6 @@ paths:
     - source/server/server.cc
     - source/server/hot_restarting_base.cc
     - source/server/hot_restart_impl.cc
-    - source/server/ssl_context_manager.cc
     - source/server/config_validation/cluster_manager.cc
     - source/common/upstream/health_discovery_service.cc
     - source/common/secret/sds_api.h
@@ -158,13 +149,52 @@ paths:
     - source/common/common/logger_delegates.cc
     - source/common/upstream/health_checker_event_logger.h
     - source/common/upstream/outlier_detection_impl.h
+    - source/common/grpc/async_client_impl.cc
     - source/common/ssl/certificate_validation_context_config_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
     - source/common/tls/context_impl.cc
+    - source/common/tls/server_context_impl.cc
     - source/common/tls/context_config_impl.cc
-    - source/common/tls/ocsp/ocsp.cc
     - source/common/config/watched_directory.cc
+    - source/server/drain_manager_impl.cc
+    - source/common/router/rds_impl.cc
+    - source/common/io/io_uring_worker_impl.cc
+    - source/common/event/file_event_impl.cc
+    - source/common/http/async_client_impl.cc
+    - source/common/grpc/google_async_client_impl.cc
+    # Extensions can exempt entire directories but new extensions
+    # points should ideally use StatusOr
+    - source/extensions/access_loggers
+    - source/extensions/bootstrap
+    - source/extensions/clusters
+    - source/extensions/common
+    - source/extensions/config
+    - source/extensions/config_subscription
+    - source/extensions/compression/zstd/common
+    - source/extensions/early_data
+    - source/extensions/filters
+    - source/extensions/formatter
+    - source/extensions/geoip_providers
+    - source/extensions/grpc_credentials
+    - source/extensions/health_check
+    - source/extensions/health_checkers
+    - source/extensions/http
+    - source/extensions/io_socket
+    - source/extensions/key_value
+    - source/extensions/listener_managers
+    - source/extensions/load_balancing_policies
+    - source/extensions/matching
+    - source/extensions/network
+    - source/extensions/path
+    - source/extensions/rate_limit_descriptors
+    - source/extensions/resource_monitors
+    - source/extensions/retry
+    - source/extensions/router
+    - source/extensions/stat_sinks
+    - source/extensions/string_matcher
+    - source/extensions/tracers
+    - source/extensions/transport_sockets
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:
@@ -410,3 +440,4 @@ visibility_excludes:
 - source/extensions/load_balancing_policies/random/
 - source/extensions/load_balancing_policies/cluster_provided/
 - source/extensions/filters/http/match_delegate/
+- source/extensions/transport_sockets/tls/

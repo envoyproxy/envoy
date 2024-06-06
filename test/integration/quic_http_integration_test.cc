@@ -8,6 +8,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/quic/connection_debug_visitor/v3/connection_debug_visitor_basic.pb.h"
 #include "envoy/extensions/quic/server_preferred_address/v3/fixed_server_preferred_address_config.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
@@ -20,6 +21,7 @@
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_client_transport_socket_factory.h"
+#include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_config_impl.h"
 
 #include "test/common/config/dummy_config.pb.h"
@@ -315,6 +317,7 @@ public:
         Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
     transport_socket_factory_.reset(static_cast<QuicClientTransportSocketFactory*>(
         config_factory.createTransportSocketFactory(quic_transport_socket_config, context)
+            .value()
             .release()));
     ASSERT(transport_socket_factory_->clientContextConfig());
   }
@@ -1935,6 +1938,90 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
   }
 }
 
+TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDNAT) {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(
+      [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listen_address = bootstrap.mutable_static_resources()
+                                   ->mutable_listeners(0)
+                                   ->mutable_address()
+                                   ->mutable_socket_address();
+        // Change listening address to Any.
+        listen_address->set_address(Network::Test::getAnyAddressString(version_));
+        auto* preferred_address_config = bootstrap.mutable_static_resources()
+                                             ->mutable_listeners(0)
+                                             ->mutable_udp_listener_config()
+                                             ->mutable_quic_options()
+                                             ->mutable_server_preferred_address_config();
+
+        // Configure a loopback interface as the server's preferred address.
+        preferred_address_config->set_name("quic.server_preferred_address.fixed");
+        envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig
+            server_preferred_address;
+        server_preferred_address.mutable_ipv4_config()->mutable_address()->set_address("1.2.3.4");
+        server_preferred_address.mutable_ipv4_config()->mutable_address()->set_port_value(12345);
+        server_preferred_address.mutable_ipv4_config()->mutable_dnat_address()->set_address(
+            "127.0.0.2");
+        server_preferred_address.mutable_ipv4_config()->mutable_dnat_address()->set_port_value(0);
+
+        server_preferred_address.mutable_ipv6_config()->mutable_address()->set_address("::1");
+        server_preferred_address.mutable_ipv6_config()->mutable_address()->set_port_value(12345);
+        server_preferred_address.mutable_ipv6_config()->mutable_dnat_address()->set_address("::2");
+        server_preferred_address.mutable_ipv6_config()->mutable_dnat_address()->set_port_value(0);
+        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+
+        // Configure a test listener filter which is incompatible with any server preferred
+        // addresses but with any matcher, which effectively disables the filter.
+        auto* listener_filter =
+            bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
+        listener_filter->set_name("dumb_filter");
+        auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+        configuration.set_added_value("foo");
+        configuration.set_allow_server_migration(false);
+        configuration.set_allow_client_migration(false);
+        listener_filter->mutable_typed_config()->PackFrom(configuration);
+        listener_filter->mutable_filter_disabled()->set_any_match(true);
+      });
+
+  initialize();
+  auto listener_port = lookupPort("http");
+
+  // Setup DNAT for 0.0.0.0:12345-->127.0.0.2:listener_port
+  SocketInterfaceSwap socket_swap(Network::Socket::Type::Datagram);
+  socket_swap.write_matcher_->setDnat(
+      Network::Utility::parseInternetAddress("1.2.3.4", 12345),
+      Network::Utility::parseInternetAddress("127.0.0.2", listener_port));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(listener_port));
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
+            quic_connection_->peer_address().host().ToString());
+  ASSERT_TRUE((version_ == Network::Address::IpVersion::v4 &&
+               quic_session->config()->HasReceivedIPv4AlternateServerAddress()) ||
+              (version_ == Network::Address::IpVersion::v6 &&
+               quic_session->config()->HasReceivedIPv6AlternateServerAddress()));
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+  EXPECT_TRUE(quic_connection_->IsValidatingServerPreferredAddress());
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":authority", "sni.lyft.com"},
+      {":scheme", "http"},
+      {AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(1024 * 1024)}};
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  if (version_ == Network::Address::IpVersion::v4) {
+    // Most v6 platform doesn't support two loopback interfaces.
+    EXPECT_EQ("1.2.3.4", quic_connection_->peer_address().host().ToString());
+    test_server_->waitForCounterGe(
+        "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
+  }
+}
+
 TEST_P(QuicHttpIntegrationTest, PreferredAddressRuntimeFlag) {
   autonomous_upstream_ = true;
   config_helper_.addRuntimeOverride(
@@ -2175,6 +2262,46 @@ TEST_P(QuicHttpIntegrationTest, UnsetSendDisableActiveMigration) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   EXPECT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
+}
+
+// Validate that debug visitors are attached to connections when configured.
+TEST_P(QuicHttpIntegrationTest, ConnectionDebugVisitor) {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto debug_visitor_config = bootstrap.mutable_static_resources()
+                                    ->mutable_listeners(0)
+                                    ->mutable_udp_listener_config()
+                                    ->mutable_quic_options()
+                                    ->mutable_connection_debug_visitor_config();
+    debug_visitor_config->set_name("envoy.quic.connection_debug_visitor.basic");
+    envoy::extensions::quic::connection_debug_visitor::v3::BasicConfig config;
+    debug_visitor_config->mutable_typed_config()->PackFrom(config);
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
+            quic_connection_->peer_address().host().ToString());
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  std::string listener = version_ == Network::Address::IpVersion::v4 ? "127.0.0.1_0" : "[__1]_0";
+  EXPECT_LOG_CONTAINS(
+      "info",
+      fmt::format("Quic connection from {} with id {} closed {} with details:",
+                  quic_connection_->self_address().ToString(),
+                  quic_connection_->connection_id().ToString(),
+                  quic::ConnectionCloseSourceToString(quic::ConnectionCloseSource::FROM_PEER)),
+      {
+        quic_session->close(Network::ConnectionCloseType::NoFlush);
+        test_server_->waitForGaugeEq(fmt::format("listener.{}.downstream_cx_active", listener), 0u);
+      });
 }
 
 } // namespace Quic

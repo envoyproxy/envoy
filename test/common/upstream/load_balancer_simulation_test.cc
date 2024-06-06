@@ -11,8 +11,10 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/network/utility.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/least_request/least_request_lb.h"
+#include "source/extensions/load_balancing_policies/random/random_lb.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"

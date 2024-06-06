@@ -64,9 +64,10 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
       method_(getMethod(config.http_health_check().method())),
       response_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.http_health_check(), response_buffer_size, kDefaultMaxBytesInBuffer)),
-      request_headers_parser_(
+      request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
-                                          config.http_health_check().request_headers_to_remove())),
+                                          config.http_health_check().request_headers_to_remove()),
+          Router::HeaderParserPtr)),
       http_status_checker_(config.http_health_check().expected_statuses(),
                            config.http_health_check().retriable_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),

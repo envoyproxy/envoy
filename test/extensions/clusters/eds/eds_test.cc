@@ -428,6 +428,7 @@ TEST_F(EdsTest, DualStackEndpoint) {
   EXPECT_CALL(dispatcher, createClientConnection_(hosts[0]->address(), _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       hosts[0]->createConnection(dispatcher, options, transport_socket_options);
@@ -1150,6 +1151,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriorityWithDrain) {
       cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
         EXPECT_TRUE(added.empty());
         EXPECT_TRUE(removed.empty());
+        return absl::OkStatus();
       });
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
@@ -1264,6 +1266,7 @@ TEST_F(EdsTest, EndpointMovedWithDrain) {
       cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
         EXPECT_TRUE(added.empty());
         EXPECT_TRUE(removed.empty());
+        return absl::OkStatus();
       });
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
@@ -1346,6 +1349,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
       cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
         EXPECT_TRUE(added.empty());
         EXPECT_TRUE(removed.empty());
+        return absl::OkStatus();
       });
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
@@ -1460,6 +1464,7 @@ TEST_F(EdsTest, EndpointMoved) {
       cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
         EXPECT_TRUE(added.empty());
         EXPECT_TRUE(removed.empty());
+        return absl::OkStatus();
       });
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
@@ -1548,6 +1553,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriorityWithHealthAddressChange) {
       cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
         EXPECT_EQ(added.size(), 1);
         EXPECT_EQ(removed.size(), 1);
+        return absl::OkStatus();
       });
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
@@ -1571,6 +1577,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriorityWithHealthAddressChange) {
       cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
         EXPECT_EQ(added.size(), 1);
         EXPECT_EQ(removed.size(), 1);
+        return absl::OkStatus();
       });
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
@@ -1625,6 +1632,7 @@ TEST_F(EdsTest, ActiveHealthCheckFlagsEndpointMovedToNewLocality) {
       cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
         EXPECT_EQ(1, added.size());
         EXPECT_EQ(1, removed.size());
+        return absl::OkStatus();
       });
 
   // Validate that moving an healthy endpoint to another locality keeps

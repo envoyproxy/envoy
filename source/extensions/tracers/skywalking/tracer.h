@@ -88,7 +88,7 @@ public:
   void setSampled(bool do_sample) override;
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   void setBaggage(absl::string_view, absl::string_view) override {}
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; }
+  std::string getTraceId() const override { return tracing_context_->traceId(); }
 
   const TracingContextPtr tracingContext() { return tracing_context_; }
   const TracingSpanPtr spanEntity() { return span_entity_; }

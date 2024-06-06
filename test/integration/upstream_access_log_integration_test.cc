@@ -80,7 +80,7 @@ public:
     return std::make_unique<test::integration::upstream_socket::v3::Config>();
   }
 
-  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override {
     const auto& outer_config =
@@ -96,7 +96,7 @@ public:
                                                          context.messageValidationVisitor(),
                                                          inner_config_factory);
     auto inner_transport_factory =
-        inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
+        inner_config_factory.createTransportSocketFactory(*inner_factory_config, context).value();
     return std::make_unique<SocketFactory>(std::move(inner_transport_factory));
   }
 };
