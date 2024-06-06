@@ -97,10 +97,10 @@ void initializeMutex(pthread_mutex_t& mutex) {
 // the socket names to entirely prevent collisions between consecutive base ids.
 HotRestartImpl::HotRestartImpl(uint32_t base_id, uint32_t restart_epoch,
                                const std::string& socket_path, mode_t socket_mode,
-                               bool skip_hot_restart_on_no_parent)
+                               bool skip_hot_restart_on_no_parent, bool skip_parent_stats)
     : base_id_(base_id), scaled_base_id_(base_id * 10),
       as_child_(HotRestartingChild(scaled_base_id_, restart_epoch, socket_path, socket_mode,
-                                   skip_hot_restart_on_no_parent)),
+                                   skip_hot_restart_on_no_parent, skip_parent_stats)),
       as_parent_(HotRestartingParent(scaled_base_id_, restart_epoch, socket_path, socket_mode)),
       shmem_(attachSharedMemory(scaled_base_id_, restart_epoch)), log_lock_(shmem_->log_lock_),
       access_log_lock_(shmem_->access_log_lock_) {

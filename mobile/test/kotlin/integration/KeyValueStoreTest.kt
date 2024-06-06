@@ -6,7 +6,6 @@ import io.envoyproxy.envoymobile.KeyValueStore
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
@@ -16,10 +15,13 @@ import org.junit.After
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 private const val TEST_KEY = "foo"
 private const val TEST_VALUE = "bar"
 
+@RunWith(RobolectricTestRunner::class)
 class KeyValueStoreTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -56,7 +58,7 @@ class KeyValueStoreTest {
       }
 
     val engine =
-      EngineBuilder(Standard())
+      EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)

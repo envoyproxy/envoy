@@ -553,6 +553,7 @@ envoy_cc_test_library(
         "stop_iteration_and_continue_filter.cc",
     ],
     deps = [
+        ":common_lib",
         ":stop_and_continue_filter_config_proto_cc_proto",
         "//envoy/common:scope_tracker_interface",
         "//envoy/http:filter_interface",

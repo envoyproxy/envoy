@@ -160,7 +160,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//test/config:utility_lib",
         "//test/integration/filters:eds_ready_filter_config_lib",
         "//test/test_common:network_utility_lib",
@@ -281,7 +281,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//test/config:utility_lib",
         "//test/integration/clusters:custom_static_cluster",
         "//test/test_common:network_utility_lib",
@@ -1116,6 +1116,7 @@ envoy_cc_test_library(
         ":utility_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:api_version_lib",
+        "//source/common/http:rds_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:ssl_socket_lib",
@@ -1286,6 +1287,7 @@ envoy_cc_test_library(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
+        "//source/common/tls:server_context_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers/file:config",
@@ -1405,6 +1407,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/buffer:config",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -1827,6 +1830,9 @@ envoy_cc_test(
         ":tcp_tunneling_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/upstreams/http/tcp:config",
+        "//test/integration/filters:add_header_filter_config_lib",
+        "//test/integration/filters:add_header_filter_proto_cc_proto",
+        "//test/integration/filters:stop_iteration_and_continue",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
@@ -2420,6 +2426,7 @@ envoy_cc_test(
         "nofips",
     ],
     deps = envoy_select_enable_http3([
+        "//source/extensions/quic/connection_debug_visitor:envoy_quic_connection_debug_visitor_basic",
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/common/tls/cert_validator:timed_cert_validator",
@@ -2442,6 +2449,7 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/connection_debug_visitor/v3:pkg_cc_proto",
         "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]),
 )
@@ -2475,6 +2483,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
     ],
 )
 

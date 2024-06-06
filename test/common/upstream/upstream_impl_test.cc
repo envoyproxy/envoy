@@ -517,7 +517,10 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
@@ -621,7 +624,10 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -1034,7 +1040,10 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -1155,11 +1164,13 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   // host multiple times.
   absl::node_hash_set<HostSharedPtr> removed_hosts;
   auto priority_update_cb2 = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
+      [&](uint32_t, const HostVector&, const HostVector& hosts_removed) {
         for (const auto& host : hosts_removed) {
           EXPECT_EQ(removed_hosts.end(), removed_hosts.find(host));
           removed_hosts.insert(host);
+          return absl::OkStatus();
         }
+        return absl::OkStatus();
       });
 
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1246,7 +1257,10 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -1442,7 +1456,10 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRate) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -1567,7 +1584,7 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_region("oceania");
   locality.set_zone("hello");
   locality.set_sub_zone("world");
-  HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
+  HostImpl host(cluster.info_, "lyft.com", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
                 std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
                 envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
                 envoy::config::core::v3::UNKNOWN, simTime());
@@ -1591,7 +1608,7 @@ TEST_F(HostImplTest, CreateConnection) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
@@ -1607,9 +1624,11 @@ TEST_F(HostImplTest, CreateConnection) {
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(dispatcher, createClientConnection_(_, _, _, _)).WillOnce(Return(connection));
   EXPECT_CALL(*connection, connectionInfoSetter());
+  EXPECT_CALL(*connection, streamInfo());
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   EXPECT_EQ(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
@@ -1623,10 +1642,10 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
   AddressVector address_list = {
       address,
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
@@ -1647,11 +1666,13 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
   EXPECT_NE(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
@@ -1665,13 +1686,13 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
   Network::Address::InstanceConstSharedPtr proxy_address =
-      Network::Utility::resolveUrl("tcp://10.0.0.1:9999");
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:9999");
 
   AddressVector address_list = {
       address,
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
@@ -1695,12 +1716,14 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   // The underlying connection should be created to the proxy address.
   EXPECT_CALL(dispatcher, createClientConnection_(proxy_address, _, _, _))
       .WillOnce(Return(connection));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be a raw connection to the proxy address rather
   // than a happy eyeballs connection.
   EXPECT_EQ(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
@@ -1725,10 +1748,10 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+      *Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
   AddressVector address_list = {
       address,
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
@@ -1751,11 +1774,13 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   EXPECT_CALL(dispatcher, createClientConnection_(address_list[1], _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
   EXPECT_NE(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
@@ -1776,10 +1801,10 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+      *Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
   AddressVector address_list = {
       address,
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
@@ -1803,11 +1828,13 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
   EXPECT_NE(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, HealthFlags) {
@@ -1927,7 +1954,7 @@ TEST_F(HostImplTest, HealthPipeAddress) {
         std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
         config.set_port_value(8000);
-        HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("unix://foo"), nullptr,
+        HostDescriptionImpl descr(info, "", *Network::Utility::resolveUrl("unix://foo"), nullptr,
                                   envoy::config::core::v3::Locality().default_instance(), config, 1,
                                   simTime());
       },
@@ -1946,7 +1973,7 @@ TEST_F(HostImplTest, HealthcheckHostname) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
   config.set_hostname("foo");
-  HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr,
+  HostDescriptionImpl descr(info, "", *Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr,
                             envoy::config::core::v3::Locality().default_instance(), config, 1,
                             simTime());
   EXPECT_EQ("foo", descr.hostnameForHealthChecks());
@@ -3758,12 +3785,15 @@ TEST(PrioritySet, Extend) {
   uint32_t membership_changes = 0;
   uint32_t last_priority = 0;
   auto priority_update_cb = priority_set.addPriorityUpdateCb(
-      [&](uint32_t priority, const HostVector&, const HostVector&) -> void {
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
         last_priority = priority;
         ++priority_changes;
+        return absl::OkStatus();
       });
-  auto member_update_cb = priority_set.addMemberUpdateCb(
-      [&](const HostVector&, const HostVector&) -> void { ++membership_changes; });
+  auto member_update_cb = priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) {
+    ++membership_changes;
+    return absl::OkStatus();
+  });
 
   // The initial priority set starts with priority level 0.
   EXPECT_EQ(1, priority_set.hostSetsPerPriority().size());
@@ -3821,9 +3851,10 @@ TEST(PrioritySet, Extend) {
 
   // We're going to do a noop host change, so add a callback to assert that we're not announcing
   // any host changes.
-  auto member_update_cb2 = priority_set.addMemberUpdateCb(
-      [&](const HostVector& added, const HostVector& removed) -> void {
+  auto member_update_cb2 =
+      priority_set.addMemberUpdateCb([&](const HostVector& added, const HostVector& removed) {
         EXPECT_TRUE(added.empty() && removed.empty());
+        return absl::OkStatus();
       });
 
   TestBatchUpdateCb batch_update(hosts, hosts_per_locality);

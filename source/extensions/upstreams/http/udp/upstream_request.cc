@@ -64,8 +64,12 @@ UdpUpstream::UdpUpstream(Router::UpstreamToDownstream* upstream_to_downstream,
     : upstream_to_downstream_(upstream_to_downstream), socket_(std::move(socket)), host_(host),
       dispatcher_(dispatcher) {
   socket_->ioHandle().initializeFileEvent(
-      dispatcher_, [this](uint32_t) { onSocketReadReady(); }, Event::PlatformDefaultTriggerType,
-      Event::FileReadyType::Read);
+      dispatcher_,
+      [this](uint32_t) {
+        onSocketReadReady();
+        return absl::OkStatus();
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 }
 
 void UdpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {

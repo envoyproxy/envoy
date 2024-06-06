@@ -466,9 +466,10 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
   // and inserted into the authz Response just below.
   Response authz_response;
   authz_response.status = CheckStatus::OK;
-  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me"});
-  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me-too"});
-  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me-also"});
+  authz_response.headers_to_remove.emplace_back("remove-me");
+  authz_response.headers_to_remove.emplace_back("remove-me-too");
+  authz_response.headers_to_remove.emplace_back("remove-me-also");
+  authz_response.headers_to_remove.emplace_back("this is a valid header value but invalid name");
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
 
@@ -476,6 +477,9 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
       {":status", "200", false},
       {"x-envoy-auth-headers-to-remove", " ,remove-me,, ,  remove-me-too , ", false},
       {"x-envoy-auth-headers-to-remove", " remove-me-also ", false},
+      // This should not cause an error in the HTTP client. It should transparently pass it through
+      // to the filter (which will then SKIP the header later).
+      {"x-envoy-auth-headers-to-remove", "this is a valid header value but invalid name", false},
   });
   Http::ResponseMessagePtr http_response = TestCommon::makeMessageResponse(http_response_headers);
   client_->onSuccess(async_request_, std::move(http_response));

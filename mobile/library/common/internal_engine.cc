@@ -11,6 +11,9 @@
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
+namespace {
+constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(30);
+} // namespace
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
@@ -40,25 +43,15 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
                      thread_priority, Thread::PosixThreadFactory::create()) {}
 
-envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
-  // Start the Envoy on the dedicated thread.
-  auto options = std::make_shared<Envoy::OptionsImplBase>();
-  options->setConfigYaml(config);
-  if (!log_level.empty()) {
-    ENVOY_BUG(options->setLogLevel(log_level).ok(), "invalid log level");
-  }
-  options->setConcurrency(1);
-  return run(std::move(options));
-}
-
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
 envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
-                                           envoy_http_callbacks bridge_callbacks,
+                                           EnvoyStreamCallbacks&& stream_callbacks,
                                            bool explicit_flow_control) {
-  return dispatcher_->post([&, stream, bridge_callbacks, explicit_flow_control]() {
-    http_client_->startStream(stream, bridge_callbacks, explicit_flow_control);
-  });
+  return dispatcher_->post(
+      [&, stream, stream_callbacks = std::move(stream_callbacks), explicit_flow_control]() mutable {
+        http_client_->startStream(stream, std::move(stream_callbacks), explicit_flow_control);
+      });
 }
 
 envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,
@@ -183,6 +176,7 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
                                                         server_->serverFactoryContext().scope(),
                                                         server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
+          engine_running_.Notify();
           callbacks_->on_engine_running_();
         });
   } // mutex_
@@ -221,6 +215,10 @@ envoy_status_t InternalEngine::terminate() {
   if (!main_thread_->joinable()) {
     return ENVOY_FAILURE;
   }
+
+  // Wait until the Engine is ready before calling terminate to avoid assertion failures.
+  // TODO(fredyw): Fix this without having to wait.
+  ASSERT(engine_running_.WaitForNotificationWithTimeout(ENGINE_RUNNING_TIMEOUT));
 
   // We need to be sure that MainCommon is finished being constructed so we can dispatch shutdown.
   {

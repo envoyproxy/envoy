@@ -11,8 +11,10 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/network/utility.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/least_request/least_request_lb.h"
+#include "source/extensions/load_balancing_policies/random/random_lb.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -37,7 +39,7 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
   envoy::config::core::v3::Locality locality;
   locality.set_zone(zone);
   return HostSharedPtr{
-      new HostImpl(cluster, "", Network::Utility::resolveUrl(url), nullptr, weight, locality,
+      new HostImpl(cluster, "", *Network::Utility::resolveUrl(url), nullptr, weight, locality,
                    envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
                    envoy::config::core::v3::UNKNOWN, time_source)};
 }

@@ -2,8 +2,6 @@
 
 #include "source/common/common/lock_guard.h"
 
-#include "library/common/thread/lock_guard.h"
-
 namespace Envoy {
 namespace Event {
 

@@ -87,7 +87,6 @@ public:
     )EOF";
 
     const std::string grpc_config = R"EOF(
-    transport_api_version: V3
     failure_mode_allow_header_add: true
     grpc_service:
       envoy_grpc:
@@ -198,6 +197,197 @@ INSTANTIATE_TEST_SUITE_P(ParameterizedFilterConfig, HttpFilterTestParam,
                          testing::Combine(testing::Bool(), testing::Bool()),
                          HttpFilterTestParam::ParamsToString);
 
+class InvalidMutationTest : public HttpFilterTestBase<testing::Test> {
+public:
+  InvalidMutationTest() : invalid_value_(reinterpret_cast<const char*>(invalid_value_bytes_)) {}
+
+  void testResponse(const Filters::Common::ExtAuthz::Response& response) {
+    InSequence s;
+
+    initialize(R"(
+        grpc_service:
+          envoy_grpc:
+            cluster_name: "ext_authz_server"
+        validate_mutations: true
+    )");
+
+    // Simulate a downstream request.
+    ON_CALL(decoder_filter_callbacks_, connection())
+        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+    connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+    connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+    EXPECT_CALL(*client_, check(_, _, _, _))
+        .WillOnce(Invoke(
+            [&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+    // (The path pseudo header needs to be set for the query parameter tests.)
+    request_headers_.addCopy(Http::Headers::get().Path, "/some-endpoint");
+    EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+              filter_->decodeHeaders(request_headers_, false));
+
+    EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+    EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
+        .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+          EXPECT_EQ(headers.getStatusValue(),
+                    std::to_string(enumToInt(Http::Code::InternalServerError)));
+        }));
+
+    // Send this test's response. It should get invalidated.
+    request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+    EXPECT_EQ(decoder_filter_callbacks_.details(), "ext_authz_invalid");
+    EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                      ->statsScope()
+                      .counterFromString("ext_authz.invalid")
+                      .value());
+    EXPECT_EQ(1U, config_->stats().invalid_.value());
+  }
+
+  const std::string invalid_key_ = "invalid-\nkey";
+  const uint8_t invalid_value_bytes_[3]{0x7f, 0x7f, 0};
+  const std::string invalid_value_;
+};
+
+// Tests that the filter rejects authz responses with mutations with an invalid key when
+// validate_authz_response is set to true in config.
+TEST_F(InvalidMutationTest, HeadersToSetKey) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_set = {{invalid_key_, "bar"}};
+  testResponse(response);
+}
+
+// Same as above, setting a different field...
+TEST_F(InvalidMutationTest, HeadersToAddKey) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_add = {{invalid_key_, "bar"}};
+  testResponse(response);
+}
+
+// headers_to_set is also used when the authz response has status denied.
+TEST_F(InvalidMutationTest, HeadersToSetKeyDenied) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.headers_to_set = {{invalid_key_, "bar"}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, HeadersToAppendKey) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_append = {{invalid_key_, "bar"}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, ResponseHeadersToAddKey) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_set = {{invalid_key_, "bar"}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, ResponseHeadersToSetKey) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_set = {{invalid_key_, "bar"}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, ResponseHeadersToAddIfAbsentKey) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_add_if_absent = {{invalid_key_, "bar"}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, ResponseHeadersToOverwriteIfExistsKey) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_headers_to_overwrite_if_exists = {{invalid_key_, "bar"}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, QueryParametersToSetKey) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.query_parameters_to_set = {{"f o o", "bar"}};
+  testResponse(response);
+}
+
+// Test that the filter rejects mutations with an invalid value
+TEST_F(InvalidMutationTest, HeadersToSetValueOk) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_set = {{"foo", invalid_value_}};
+  testResponse(response);
+}
+
+// Same as above, setting a different field...
+TEST_F(InvalidMutationTest, HeadersToAddValue) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_add = {{"foo", invalid_value_}};
+  testResponse(response);
+}
+
+// headers_to_set is also used when the authz response has status denied.
+TEST_F(InvalidMutationTest, HeadersToSetValueDenied) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.headers_to_set = {{"foo", invalid_value_}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, HeadersToAppendValue) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_append = {{"foo", invalid_value_}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, ResponseHeadersToAddValue) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  // Add a valid header to see if it gets added to the downstream response.
+  response.response_headers_to_set = {{"foo", invalid_value_}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, ResponseHeadersToSetValue) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  // Add a valid header to see if it gets added to the downstream response.
+  response.response_headers_to_set = {{"foo", invalid_value_}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, ResponseHeadersToAddIfAbsentValue) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  // Add a valid header to see if it gets added to the downstream response.
+  response.response_headers_to_add_if_absent = {{"foo", invalid_value_}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, ResponseHeadersToOverwriteIfExistsValue) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  // Add a valid header to see if it gets added to the downstream response.
+  response.response_headers_to_overwrite_if_exists = {{"foo", invalid_value_}};
+  testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, QueryParametersToSetValue) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  // Add a valid header to see if it gets added to the downstream response.
+  response.query_parameters_to_set = {{"foo", "b a r"}};
+  testResponse(response);
+}
+
 // Test that the per route config is properly merged: more specific keys override previous keys.
 TEST_F(HttpFilterTest, MergeConfig) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
@@ -243,7 +433,6 @@ TEST_F(HttpFilterTest, StatsWithPrefix) {
 
   initialize(fmt::format(R"EOF(
   stat_prefix: "{}"
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -290,7 +479,6 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -329,7 +517,6 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -373,7 +560,6 @@ TEST_F(HttpFilterTest, ErrorFailOpen) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -411,7 +597,6 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -456,7 +641,6 @@ TEST_F(HttpFilterTest, ErrorOpenWithHeaderAddClose) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -494,7 +678,6 @@ TEST_F(HttpFilterTest, ImmediateErrorOpenWithHeaderAddClose) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -536,7 +719,6 @@ TEST_F(HttpFilterTest, ImmediateErrorOpenWithHeaderAddClose) {
 // Check a bad configuration results in validation exception.
 TEST_F(HttpFilterTest, BadConfig) {
   const std::string filter_config = R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc: {}
   failure_mode_allow: true
@@ -554,7 +736,6 @@ TEST_F(HttpFilterTest, RequestDataIsTooLarge) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -584,7 +765,6 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -632,7 +812,6 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -695,7 +874,6 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -729,7 +907,6 @@ TEST_F(HttpFilterTest, AuthWithRequestData) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -773,7 +950,6 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -821,7 +997,6 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
 
   // N.B. encode_raw_headers is set to true.
   initialize(R"EOF(
-  transport_api_version: V3
   encode_raw_headers: true
   grpc_service:
     envoy_grpc:
@@ -866,7 +1041,6 @@ TEST_F(HttpFilterTest, HeaderOnlyRequest) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -891,7 +1065,6 @@ TEST_F(HttpFilterTest, UpgradeWebsocketRequest) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -921,7 +1094,6 @@ TEST_F(HttpFilterTest, H2UpgradeRequest) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -951,7 +1123,6 @@ TEST_F(HttpFilterTest, HeaderOnlyRequestWithStream) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -987,7 +1158,6 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   request_headers_.addCopy("remove-me", "upstream-should-not-see-me");
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1013,11 +1183,14 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Let's try to remove all the headers in the request.
-  response.headers_to_remove = std::vector<Http::LowerCaseString>{
-      Http::Headers::get().Host,          Http::Headers::get().HostLegacy,
-      Http::Headers::get().Method,        Http::Headers::get().Path,
-      Http::Headers::get().Protocol,      Http::Headers::get().Scheme,
-      Http::LowerCaseString{"remove-me"},
+  response.headers_to_remove = std::vector<std::string>{
+      Http::Headers::get().Host.get(),
+      Http::Headers::get().HostLegacy.get(),
+      Http::Headers::get().Method.get(),
+      Http::Headers::get().Path.get(),
+      Http::Headers::get().Protocol.get(),
+      Http::Headers::get().Scheme.get(),
+      "remove-me",
   };
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
@@ -1041,7 +1214,6 @@ TEST_F(HttpFilterTest, ClearCache) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1067,10 +1239,9 @@ TEST_F(HttpFilterTest, ClearCache) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
-  response.headers_to_remove =
-      std::vector<Http::LowerCaseString>{Http::LowerCaseString{"remove-me"}};
+  response.headers_to_append = {{"foo", "bar"}};
+  response.headers_to_set = {{"bar", "foo"}};
+  response.headers_to_remove = std::vector<std::string>{"remove-me"};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
@@ -1088,7 +1259,6 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1114,7 +1284,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  response.headers_to_append = {{"foo", "bar"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
@@ -1132,7 +1302,6 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1158,7 +1327,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  response.headers_to_set = {{"foo", "bar"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
@@ -1176,7 +1345,6 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1202,7 +1370,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_remove = {Http::LowerCaseString{"remove-me"}};
+  response.headers_to_remove = {"remove-me"};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
@@ -1220,7 +1388,6 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1259,7 +1426,6 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1284,8 +1450,8 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
+  response.headers_to_append = {{"foo", "bar"}};
+  response.headers_to_set = {{"bar", "foo"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
@@ -1299,7 +1465,6 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1311,7 +1476,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  response.headers_to_set = {{"foo", "bar"}};
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
@@ -1337,7 +1502,6 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
 // Verifies that specified metadata is passed along in the check request
 TEST_F(HttpFilterTest, MetadataContext) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1435,7 +1599,6 @@ TEST_F(HttpFilterTest, MetadataContext) {
 // Verifies that specified connection metadata is passed along in the check request
 TEST_F(HttpFilterTest, ConnectionMetadataContext) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1571,7 +1734,6 @@ TEST_F(HttpFilterTest, ConnectionMetadataContext) {
 // Verifies that specified route metadata is passed along in the check request
 TEST_F(HttpFilterTest, RouteMetadataContext) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1739,7 +1901,6 @@ TEST_F(HttpFilterTest, RouteMetadataContext) {
 // Test that filter can be disabled via the filter_enabled field.
 TEST_F(HttpFilterTest, FilterDisabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1764,7 +1925,6 @@ TEST_F(HttpFilterTest, FilterDisabled) {
 // Test that filter can be enabled via the filter_enabled field.
 TEST_F(HttpFilterTest, FilterEnabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1792,7 +1952,6 @@ TEST_F(HttpFilterTest, FilterEnabled) {
 // Test that filter can be disabled via the filter_enabled_metadata field.
 TEST_F(HttpFilterTest, MetadataDisabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1825,7 +1984,6 @@ TEST_F(HttpFilterTest, MetadataDisabled) {
 // Test that filter can be enabled via the filter_enabled_metadata field.
 TEST_F(HttpFilterTest, MetadataEnabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1862,7 +2020,6 @@ TEST_F(HttpFilterTest, MetadataEnabled) {
 // is disabled.
 TEST_F(HttpFilterTest, FilterEnabledButMetadataDisabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1907,7 +2064,6 @@ TEST_F(HttpFilterTest, FilterEnabledButMetadataDisabled) {
 // is disabled.
 TEST_F(HttpFilterTest, FilterDisabledButMetadataEnabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1952,7 +2108,6 @@ TEST_F(HttpFilterTest, FilterDisabledButMetadataEnabled) {
 // is enabled.
 TEST_F(HttpFilterTest, FilterEnabledAndMetadataEnabled) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -1999,7 +2154,6 @@ TEST_F(HttpFilterTest, FilterEnabledAndMetadataEnabled) {
 // Test that filter can deny for protected path when filter is disabled via filter_enabled field.
 TEST_F(HttpFilterTest, FilterDenyAtDisable) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2033,7 +2187,6 @@ TEST_F(HttpFilterTest, FilterDenyAtDisable) {
 // Test that filter allows for protected path when filter is disabled via filter_enabled field.
 TEST_F(HttpFilterTest, FilterAllowAtDisable) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2158,7 +2311,6 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
 
   auto test_disable = [&](bool disabled) {
     initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2242,18 +2394,16 @@ TEST_P(HttpFilterTestParam, OkResponse) {
 
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcService) {
   initialize(R"EOF(
-    transport_api_version: V3
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
     )EOF");
 
-  EXPECT_TRUE(config_->requestHeaderMatchers() == nullptr);
+  EXPECT_TRUE(config_->allowedHeadersMatcher() == nullptr);
 }
 
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpService) {
   initialize(R"EOF(
-    transport_api_version: V3
     http_service:
       server_uri:
         uri: "ext_authz:9000"
@@ -2261,18 +2411,17 @@ TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpService) {
         timeout: 0.25s
     )EOF");
 
-  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Path.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher() != nullptr);
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Path.get()));
   EXPECT_TRUE(
-      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
+      config_->allowedHeadersMatcher()->matches(Http::CustomHeaders::get().Authorization.get()));
 }
 
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcServiceWithAllowedHeaders) {
   const Http::LowerCaseString foo{"foo"};
   initialize(R"EOF(
-    transport_api_version: V3
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
@@ -2282,14 +2431,29 @@ TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcServiceWithAllowedHeader
         ignore_case: true
     )EOF");
 
-  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(foo.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher() != nullptr);
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(foo.get()));
+}
+
+TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcServiceWithDisallowedHeaders) {
+  const Http::LowerCaseString foo{"foo"};
+  initialize(R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "ext_authz_server"
+    disallowed_headers:
+      patterns:
+      - exact: Foo
+        ignore_case: true
+    )EOF");
+
+  EXPECT_TRUE(config_->disallowedHeadersMatcher() != nullptr);
+  EXPECT_TRUE(config_->disallowedHeadersMatcher()->matches(foo.get()));
 }
 
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithAllowedHeaders) {
   const Http::LowerCaseString foo{"foo"};
   initialize(R"EOF(
-    transport_api_version: V3
     http_service:
       server_uri:
         uri: "ext_authz:9000"
@@ -2301,20 +2465,37 @@ TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithAllowedHeader
         ignore_case: true
     )EOF");
 
-  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher() != nullptr);
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Host.get()));
   EXPECT_TRUE(
-      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(foo.get()));
+      config_->allowedHeadersMatcher()->matches(Http::CustomHeaders::get().Authorization.get()));
+  EXPECT_FALSE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().ContentLength.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(foo.get()));
+}
+
+TEST_P(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithDisallowedHeaders) {
+  const Http::LowerCaseString foo{"foo"};
+  initialize(R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+    disallowed_headers:
+      patterns:
+      - exact: Foo
+        ignore_case: true
+    )EOF");
+
+  EXPECT_TRUE(config_->disallowedHeadersMatcher() != nullptr);
+  EXPECT_TRUE(config_->disallowedHeadersMatcher()->matches(foo.get()));
 }
 
 TEST_P(HttpFilterTestParam,
        DEPRECATED_FEATURE_TEST(RequestHeaderMatchersForHttpServiceWithLegacyAllowedHeaders)) {
   const Http::LowerCaseString foo{"foo"};
   initialize(R"EOF(
-    transport_api_version: V3
     http_service:
       server_uri:
         uri: "ext_authz:9000"
@@ -2327,13 +2508,13 @@ TEST_P(HttpFilterTestParam,
             ignore_case: true
     )EOF");
 
-  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher() != nullptr);
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().Host.get()));
   EXPECT_TRUE(
-      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(foo.get()));
+      config_->allowedHeadersMatcher()->matches(Http::CustomHeaders::get().Authorization.get()));
+  EXPECT_FALSE(config_->allowedHeadersMatcher()->matches(Http::Headers::get().ContentLength.get()));
+  EXPECT_TRUE(config_->allowedHeadersMatcher()->matches(foo.get()));
 }
 
 TEST_P(HttpFilterTestParam, DEPRECATED_FEATURE_TEST(DuplicateAllowedHeadersConfigIsInvalid)) {
@@ -2394,7 +2575,7 @@ TEST_P(HttpFilterTestParam, ImmediateDeniedResponseWithHttpAttributes) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  response.headers_to_set = {{"foo", "bar"}};
   response.body = std::string{"baz"};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
@@ -2441,16 +2622,14 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = Http::HeaderVector{{request_header_key, "bar"}};
-  response.headers_to_set = Http::HeaderVector{{key_to_add, "foo"}, {key_to_override, "bar"}};
-  response.headers_to_remove = {key_to_remove};
+  response.headers_to_append = {{request_header_key.get(), "bar"}};
+  response.headers_to_set = {{key_to_add.get(), "foo"}, {key_to_override.get(), "bar"}};
+  response.headers_to_remove = {key_to_remove.get()};
   // This cookie will be appended to the encoded headers.
-  response.response_headers_to_add =
-      Http::HeaderVector{{Http::LowerCaseString{"set-cookie"}, "cookie2=gingerbread"}};
+  response.response_headers_to_add = {{"set-cookie", "cookie2=gingerbread"}};
   // This "should-be-overridden" header value from the auth server will override the
   // "should-be-overridden" entry from the upstream server.
-  response.response_headers_to_set = Http::HeaderVector{
-      {Http::LowerCaseString{"should-be-overridden"}, "finally-set-by-auth-server"}};
+  response.response_headers_to_set = {{"should-be-overridden", "finally-set-by-auth-server"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2496,10 +2675,9 @@ TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActions) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_add_if_absent =
-      Http::HeaderVector{{Http::LowerCaseString{"header-to-add-if-absent"}, "new-value"}};
-  response.response_headers_to_overwrite_if_exists =
-      Http::HeaderVector{{Http::LowerCaseString{"header-to-overwrite-if-exists"}, "new-value"}};
+  response.response_headers_to_add_if_absent = {{"header-to-add-if-absent", "new-value"}};
+  response.response_headers_to_overwrite_if_exists = {
+      {"header-to-overwrite-if-exists", "new-value"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2535,10 +2713,9 @@ TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActionsDoNotTakeEffect
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_add_if_absent =
-      Http::HeaderVector{{Http::LowerCaseString{"header-to-add-if-absent"}, "new-value"}};
-  response.response_headers_to_overwrite_if_exists =
-      Http::HeaderVector{{Http::LowerCaseString{"header-to-overwrite-if-exists"}, "new-value"}};
+  response.response_headers_to_add_if_absent = {{"header-to-add-if-absent", "new-value"}};
+  response.response_headers_to_overwrite_if_exists = {
+      {"header-to-overwrite-if-exists", "new-value"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2689,7 +2866,6 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401) {
 // Test that a denied response results in the connection closing with a 401 response to the client.
 TEST_P(HttpFilterTestParam, DeniedResponseWith401NoClusterResponseCodeStats) {
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2779,8 +2955,7 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   response.body = std::string{"foo"};
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
-                                               {Http::LowerCaseString{"bar"}, "foo"}};
+  response.headers_to_set = {{"foo", "bar"}, {"bar", "foo"}};
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2837,12 +3012,11 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   response.body = std::string{"foo"};
-  response.headers_to_set =
-      Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
-                         {Http::LowerCaseString{"bar"}, "foo"},
-                         {Http::LowerCaseString{"set-cookie"}, "cookie1=value"},
-                         {Http::LowerCaseString{"set-cookie"}, "cookie2=value"},
-                         {Http::LowerCaseString{"accept-encoding"}, "gzip,deflate"}};
+  response.headers_to_set = {{"foo", "bar"},
+                             {"bar", "foo"},
+                             {"set-cookie", "cookie1=value"},
+                             {"set-cookie", "cookie2=value"},
+                             {"accept-encoding", "gzip,deflate"}};
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -2909,7 +3083,6 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2935,7 +3108,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  response.headers_to_set = {{"foo", "bar"}};
   (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] = ext_authz_duration_value;
 
   initializeMetadata(response);
@@ -2971,7 +3144,6 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -2981,7 +3153,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  response.headers_to_set = {{"foo", "bar"}};
 
   initializeMetadata(response);
 
@@ -3025,7 +3197,6 @@ TEST_F(HttpFilterTest, EmittingMetadataWhenError) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -3134,7 +3305,6 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsWorks) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -3191,7 +3361,6 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsOverrideWorks) {
   InSequence s;
 
   initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -3256,7 +3425,6 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
 
   auto test_disable_request_body_buffering = [&](bool bypass) {
     initialize(R"EOF(
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"

@@ -3,7 +3,7 @@
 
 #include "source/common/network/connection_impl.h"
 #include "source/common/tls/context_config_impl.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/transport_sockets/starttls/starttls_socket.h"
 
@@ -274,7 +274,7 @@ void StartTlsIntegrationTest::initialize() {
       downstream_tls_context, mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   tls_context_ = Network::DownstreamTransportSocketFactoryPtr{
-      new Extensions::TransportSockets::Tls::ServerSslSocketFactory(
+      *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
           std::move(cfg), *tls_context_manager_, *client_stats_store->rootScope(), {})};
 
   BaseIntegrationTest::initialize();

@@ -27,7 +27,8 @@
 #include "source/common/stats/symbol_table.h"
 
 #include "source/common/tls/context_config_impl.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/client_ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
@@ -571,7 +572,7 @@ public:
         tls_context, factory_context_);
 
     mock_host_description_->socket_factory_ =
-        std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
+        *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
             std::move(cfg), context_manager_, *stats_store_.rootScope());
     async_client_transport_socket_ =
         mock_host_description_->socket_factory_->createTransportSocket(nullptr, nullptr);
@@ -610,7 +611,7 @@ public:
         tls_context, factory_context_);
 
     static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+    return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
         std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
         std::vector<std::string>{});
   }

@@ -42,7 +42,7 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
 class DnsFilterTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   DnsFilterTest()
-      : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")),
+      : listener_address_(Network::Utility::parseInternetAddressAndPortNoThrow("127.0.2.1:5353")),
         api_(Api::createApiForTest(random_)),
         counters_(mock_query_buffer_underflow_, mock_record_name_overflow_, query_parsing_failure_,
                   queries_with_additional_rrs_, queries_with_ans_or_authority_rrs_) {
@@ -100,7 +100,7 @@ public:
 
   void sendQueryFromClient(const std::string& peer_address, const std::string& buffer) {
     Network::UdpRecvData data{};
-    data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort(peer_address);
+    data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow(peer_address);
     data.addresses_.local_ = listener_address_;
     data.buffer_ = std::make_unique<Buffer::OwnedImpl>(buffer);
     data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1365,7 +1365,7 @@ TEST_F(DnsFilterTest, InvalidAnswerNameTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1408,7 +1408,7 @@ TEST_F(DnsFilterTest, InvalidAnswerTypeTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1451,7 +1451,7 @@ TEST_F(DnsFilterTest, InvalidAnswerClassTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1495,7 +1495,7 @@ TEST_F(DnsFilterTest, InvalidAnswerAddressTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1542,7 +1542,7 @@ TEST_F(DnsFilterTest, InvalidAnswerDataLengthTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1581,7 +1581,7 @@ TEST_F(DnsFilterTest, TruncatedAnswerRecordTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1618,7 +1618,7 @@ TEST_F(DnsFilterTest, TruncatedQueryBufferTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1650,7 +1650,7 @@ TEST_F(DnsFilterTest, InvalidQueryClassTypeTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1682,7 +1682,7 @@ TEST_F(DnsFilterTest, InsufficientDataforQueryRecord) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));

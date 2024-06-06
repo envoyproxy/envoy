@@ -5,9 +5,10 @@
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/network/utility.h"
+#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_manager_impl.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 #include "test/config/utility.h"
 #include "test/integration/server.h"
@@ -105,8 +106,9 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
       tls_context, mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::UpstreamTransportSocketFactoryPtr{
-      new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
-          std::move(cfg), context_manager, *client_stats_store->rootScope())};
+      THROW_OR_RETURN_VALUE(Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
+                                std::move(cfg), context_manager, *client_stats_store->rootScope()),
+                            Network::UpstreamTransportSocketFactoryPtr)};
 }
 
 Network::DownstreamTransportSocketFactoryPtr
@@ -121,7 +123,7 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
 
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   if (!use_http3) {
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+    return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
         std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
         std::vector<std::string>{});
   }
@@ -135,7 +137,7 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   auto& config_factory = Config::Utility::getAndCheckFactoryByName<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
       "envoy.transport_sockets.quic");
-  return config_factory.createTransportSocketFactory(quic_config, mock_factory_ctx, server_names);
+  return *config_factory.createTransportSocketFactory(quic_config, mock_factory_ctx, server_names);
 }
 
 Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(
@@ -153,7 +155,7 @@ Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(
       tls_context, factory_context);
 
   static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
-  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+  return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
       std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
       std::vector<std::string>{});
 }
@@ -161,7 +163,7 @@ Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::I
                                                        int port) {
   std::string url =
       "tcp://" + Network::Test::getLoopbackAddressUrlString(version) + ":" + std::to_string(port);
-  return Network::Utility::resolveUrl(url);
+  return *Network::Utility::resolveUrl(url);
 }
 
 } // namespace Ssl

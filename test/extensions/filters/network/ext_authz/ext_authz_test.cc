@@ -62,7 +62,7 @@ public:
 
   ~ExtAuthzFilterTest() override {
     for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value());
+      EXPECT_EQ(0U, gauge->value()) << "guage name: " << gauge->name();
     }
   }
 
@@ -96,7 +96,7 @@ public:
 
     Filters::Common::ExtAuthz::Response response{};
     response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-    response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+    response.headers_to_set = Filters::Common::ExtAuthz::UnsafeHeaderVector{{"foo", "bar"}};
 
     auto* fields = response.dynamic_metadata.mutable_fields();
     (*fields)["foo"] = ValueUtil::stringValue("ok");
@@ -141,7 +141,6 @@ public:
   Network::Address::InstanceConstSharedPtr addr_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
   const std::string default_yaml_string_ = R"EOF(
-transport_api_version: V3
 grpc_service:
   envoy_grpc:
     cluster_name: ext_authz_server
@@ -150,7 +149,6 @@ failure_mode_allow: true
 stat_prefix: name
   )EOF";
   const std::string metadata_yaml_string_ = R"EOF(
-transport_api_version: V3
 grpc_service:
   envoy_grpc:
     cluster_name: ext_authz_server
@@ -168,7 +166,6 @@ filter_enabled_metadata:
 
 TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   std::string yaml_string = R"EOF(
-transport_api_version: V3
 grpc_service: {}
 stat_prefix: name
   )EOF";

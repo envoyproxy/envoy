@@ -6,7 +6,6 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.RequestTrailersBuilder
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
@@ -17,10 +16,13 @@ import org.junit.After
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 private const val TRAILER_NAME = "test-trailer"
 private const val TRAILER_VALUE = "test.code"
 
+@RunWith(RobolectricTestRunner::class)
 class ReceiveTrailersTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -49,7 +51,7 @@ class ReceiveTrailersTest {
     val trailersReceived = CountDownLatch(1)
     val expectation = CountDownLatch(1)
     val engine =
-      EngineBuilder(Standard())
+      EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)

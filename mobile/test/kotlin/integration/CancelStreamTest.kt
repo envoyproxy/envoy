@@ -13,7 +13,6 @@ import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
@@ -25,7 +24,10 @@ import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class CancelStreamTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -82,7 +84,7 @@ class CancelStreamTest {
   @Test
   fun `cancel stream calls onCancel callback`() {
     val engine =
-      EngineBuilder(Standard())
+      EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)

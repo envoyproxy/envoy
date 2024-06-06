@@ -5,7 +5,6 @@ import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
@@ -16,6 +15,8 @@ import org.junit.After
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 private const val ASSERTION_FILTER_TEXT_PROTO =
   """
@@ -30,6 +31,7 @@ private const val ASSERTION_FILTER_TEXT_PROTO =
 }
 """
 
+@RunWith(RobolectricTestRunner::class)
 class SendDataTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -57,7 +59,7 @@ class SendDataTest {
   fun `successful sending data`() {
     val expectation = CountDownLatch(1)
     val engine =
-      EngineBuilder(Standard())
+      EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)

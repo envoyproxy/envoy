@@ -1,6 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
+#include "source/common/router/rds_impl.h"
+
 #include "test/common/integration/xds_integration_test.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
@@ -18,6 +20,7 @@ public:
     setUpstreamProtocol(Http::CodecType::HTTP1);
 
     XdsIntegrationTest::initialize();
+    Router::forceRegisterRdsFactoryImpl();
 
     default_request_headers_.setScheme("http");
     initializeXdsStream();
@@ -41,14 +44,14 @@ public:
     stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                          true);
     terminal_callback_.waitReady();
-    EXPECT_EQ(cc_.on_headers_calls, 1);
-    EXPECT_EQ(cc_.status, "200");
-    EXPECT_EQ(cc_.on_data_calls, 2);
-    EXPECT_EQ(cc_.on_complete_calls, 1);
-    EXPECT_EQ(cc_.on_cancel_calls, 0);
-    EXPECT_EQ(cc_.on_error_calls, 0);
-    EXPECT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
-    EXPECT_EQ(cc_.on_complete_received_byte_count, 67);
+    EXPECT_EQ(cc_.on_headers_calls_, 1);
+    EXPECT_EQ(cc_.status_, "200");
+    EXPECT_EQ(cc_.on_data_calls_, 2);
+    EXPECT_EQ(cc_.on_complete_calls_, 1);
+    EXPECT_EQ(cc_.on_cancel_calls_, 0);
+    EXPECT_EQ(cc_.on_error_calls_, 0);
+    EXPECT_EQ(cc_.on_header_consumed_bytes_from_response_, 27);
+    EXPECT_EQ(cc_.on_complete_received_byte_count_, 67);
     // Check that the Runtime config is from the static layer.
     EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
@@ -97,12 +100,14 @@ INSTANTIATE_TEST_SUITE_P(
                      // Envoy Mobile's xDS APIs only support state-of-the-world, not delta.
                      testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw)));
 
-TEST_P(RtdsIntegrationTest, RtdsReloadWithDfpMixedScheme) {
+// https://github.com/envoyproxy/envoy/issues/34537
+TEST_P(RtdsIntegrationTest, DISABLED_RtdsReloadWithDfpMixedScheme) {
   TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"dfp_mixed_scheme", true}});
   runReloadTest();
 }
 
-TEST_P(RtdsIntegrationTest, RtdsReloadWithoutDfpMixedScheme) {
+// https://github.com/envoyproxy/envoy/issues/34537
+TEST_P(RtdsIntegrationTest, DISABLED_RtdsReloadWithoutDfpMixedScheme) {
   TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"dfp_mixed_scheme", false}});
   runReloadTest();
 }

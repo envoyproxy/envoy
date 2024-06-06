@@ -5,7 +5,7 @@ package io.envoyproxy.envoymobile
  *
  * @return The header representation of the retry policy.
  */
-internal fun RetryPolicy.outboundHeaders(): Map<String, List<String>> {
+fun RetryPolicy.outboundHeaders(): Map<String, List<String>> {
   val upstreamTimeoutMS = totalUpstreamTimeoutMS ?: 0L
   val headers =
     mutableMapOf(

@@ -47,7 +47,7 @@ public:
         .WillOnce([this, buffer](int, const msghdr* msg, int) {
           *buffer =
               std::string{static_cast<char*>(msg->msg_iov[0].iov_base), msg->msg_iov[0].iov_len};
-          udp_file_ready_callback_(Event::FileReadyType::Read);
+          THROW_IF_NOT_OK(udp_file_ready_callback_(Event::FileReadyType::Read));
           return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
         });
     EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).WillRepeatedly([buffer](int, msghdr* msg, int) {
@@ -91,8 +91,8 @@ public:
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(4);
     EXPECT_CALL(os_sys_calls_, close(_)).Times(4);
     fake_parent_ = std::make_unique<FakeHotRestartingParent>(os_sys_calls_, 0, 0, socket_path_);
-    hot_restarting_child_ =
-        std::make_unique<HotRestartingChild>(0, 1, socket_path_, 0, skipHotRestartOnNoParent());
+    hot_restarting_child_ = std::make_unique<HotRestartingChild>(
+        0, 1, socket_path_, 0, skipHotRestartOnNoParent(), skipParentStats());
     if (skipHotRestartOnNoParent()) {
       if (hotRestartIsSkipped()) {
         // A message is attempted to be sent to the parent and returns ECONNREFUSED.
@@ -121,6 +121,7 @@ public:
   std::unique_ptr<HotRestartingChild> hot_restarting_child_;
   virtual bool skipHotRestartOnNoParent() const { return false; }
   virtual bool hotRestartIsSkipped() const { return false; }
+  virtual bool skipParentStats() const { return false; }
 };
 
 class HotRestartingChildWithSkipTest : public HotRestartingChildTest {
@@ -144,8 +145,8 @@ TEST_F(HotRestartingChildWithSkipAndNoParentTest, SkipsOtherActionsIfParentConne
 }
 
 TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalled) {
-  auto test_listener_addr = Network::Utility::resolveUrl("udp://127.0.0.1:1234");
-  auto test_listener_addr2 = Network::Utility::resolveUrl("udp://127.0.0.1:1235");
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  auto test_listener_addr2 = *Network::Utility::resolveUrl("udp://127.0.0.1:1235");
   testing::MockFunction<void()> callback1;
   testing::MockFunction<void()> callback2;
   hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
@@ -159,8 +160,8 @@ TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalled) {
 }
 
 TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalledImmediatelyWhenAlreadyDrained) {
-  auto test_listener_addr = Network::Utility::resolveUrl("udp://127.0.0.1:1234");
-  auto test_listener_addr2 = Network::Utility::resolveUrl("udp://127.0.0.1:1235");
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  auto test_listener_addr2 = *Network::Utility::resolveUrl("udp://127.0.0.1:1235");
   testing::MockFunction<void()> callback1;
   testing::MockFunction<void()> callback2;
   fake_parent_->expectParentTerminateMessages();
@@ -254,8 +255,8 @@ TEST_F(HotRestartingChildTest, ForwardsPacketToRegisteredListenerOnMatch) {
   envoy::HotRestartMessage msg;
   auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
   auto mock_udp_listener_config = std::make_shared<Network::MockUdpListenerConfig>();
-  auto test_listener_addr = Network::Utility::resolveUrl("udp://127.0.0.1:1234");
-  auto test_remote_addr = Network::Utility::resolveUrl("udp://127.0.0.1:4321");
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  auto test_remote_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:4321");
   HotRestartUdpForwardingTestHelper(*hot_restarting_child_)
       .registerUdpForwardingListener(
           test_listener_addr,

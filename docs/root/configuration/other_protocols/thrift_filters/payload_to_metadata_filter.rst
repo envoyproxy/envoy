@@ -9,11 +9,11 @@ A typical use case for this filter is to dynamically match a specified payload f
 with load balancer subsets. For this, a given payload field's value would be extracted and attached
 to the request as dynamic metadata which would then be used to match a subset of endpoints.
 
-We already have :ref:`header-To-metadata filter <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata>`
-to achieve the similar goal. However, we have two reasons for introducing new :ref:`payload-To-metadata filter
+We already have :ref:`header-to-metadata filter <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata>`
+to achieve the similar goal. However, we have two reasons for introducing new :ref:`payload-to-metadata filter
 <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata>`:
 
-1. Transports like framed transport don't support THeaders, which is unable to use :ref:`Header-To-Metadata filter
+1. Transports like framed transport don't support THeaders, which is unable to use :ref:`header-to-metadata filter
 <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata>`.
 
 2. Directly referring to payload field stops envoy relying on that the downstream service always copies the field

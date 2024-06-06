@@ -73,7 +73,6 @@ public:
                  envoy_grpc:
                    cluster_name: tra_service
                timeout: 2s
-               transport_api_version: V3
 )EOF";
       TestUtility::loadFromYaml(sip_proxy_yaml1, sip_proxy_config_);
     } else {

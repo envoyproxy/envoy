@@ -90,7 +90,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
-      reset_stream_(false),
+      paused_for_websocket_(false), reset_stream_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
       cleaned_up_(false), had_upstream_(false),
       stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
@@ -389,6 +389,13 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   auto* headers = parent_.downstreamHeaders();
   if (headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     paused_for_connect_ = true;
+    // If this is a websocket upgrade request, pause the request until the upstream sends
+    // the 101 Switching Protocols response code. Using the else logic here to obey CONNECT
+    // method which is expecting 2xx response.
+  } else if ((Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.check_switch_protocol_websocket_handshake")) &&
+             Http::Utility::isWebSocketUpgradeRequest(*headers)) {
+    paused_for_websocket_ = true;
   }
 
   // Kick off creation of the upstream connection immediately upon receiving headers.
@@ -602,8 +609,10 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   if (protocol) {
     stream_info_.protocol(protocol.value());
   } else {
-    // We only pause for CONNECT for HTTP upstreams. If this is a TCP upstream, unpause.
+    // We only pause for CONNECT and WebSocket for HTTP upstreams. If this is a TCP upstream,
+    // unpause.
     paused_for_connect_ = false;
+    paused_for_websocket_ = false;
   }
 
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
