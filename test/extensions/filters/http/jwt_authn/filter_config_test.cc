@@ -308,6 +308,8 @@ providers:
     remote_jwks:
       cache_duration:
         seconds: 5223372036
+      http_uri:
+        uri: http://www.google.com
 )";
 
   JwtAuthentication proto_config;
@@ -316,6 +318,43 @@ providers:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
                              HasSubstr("Duration out-of-range"));
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksInvalidUri) {
+  // Invalid URI should fail config validation.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      http_uri:
+        uri: http://www.not\nvalid.com
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
+                             HasSubstr("invalid URI"));
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksValidUri) {
+  // Valid URI should not fail config validation.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      http_uri:
+        uri: http://www.valid.com/resource
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  FilterConfigImpl(proto_config, "", context);
 }
 
 TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksAsyncFetchRefetchDurationVeryBig) {
