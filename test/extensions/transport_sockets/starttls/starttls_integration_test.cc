@@ -205,7 +205,7 @@ void StartTlsIntegrationTest::initialize() {
   auto factory =
       std::make_unique<Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory>();
   cleartext_context_ = Network::UpstreamTransportSocketFactoryPtr{
-      factory->createTransportSocketFactory(*config, factory_context_)};
+      factory->createTransportSocketFactory(*config, factory_context_).value()};
 
   // Setup factories and contexts for tls transport socket.
   tls_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(

@@ -113,7 +113,7 @@ public:
   /**
    * Create a dns resolver to be used by the cluster.
    */
-  Network::DnsResolverSharedPtr
+  absl::StatusOr<Network::DnsResolverSharedPtr>
   selectDnsResolver(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context);
 

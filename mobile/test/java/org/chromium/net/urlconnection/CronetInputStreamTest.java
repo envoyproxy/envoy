@@ -2,7 +2,6 @@ package org.chromium.net.urlconnection;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -18,11 +17,12 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Test for {@link CronetInputStream}.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class CronetInputStreamTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 

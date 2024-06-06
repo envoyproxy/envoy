@@ -64,6 +64,7 @@ public:
   const StreamInfo::StreamInfo* requestStreamInfo() const override { return stream_info_.get(); }
 
   void connect();
+  void enableHalfClose(bool enabled);
   void write(Buffer::Instance& buf, bool end_stream);
   void close(Network::ConnectionCloseType close_type);
 

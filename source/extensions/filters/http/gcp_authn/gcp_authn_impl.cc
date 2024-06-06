@@ -91,8 +91,9 @@ void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
 
 void GcpAuthnClient::onFailure(const Http::AsyncClient::Request&,
                                Http::AsyncClient::FailureReason reason) {
-  // Http::AsyncClient::FailureReason only has one value: "Reset".
-  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  // TODO(botengyao): handle different failure reasons.
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
+         reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
   ENVOY_LOG(error, "Request failed: stream has been reset");
   active_request_ = nullptr;
   onError();

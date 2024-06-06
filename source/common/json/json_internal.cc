@@ -570,7 +570,9 @@ std::vector<ObjectSharedPtr> Field::asObjectArray() const {
 
 std::string Field::asJsonString() const {
   nlohmann::json j = asJsonDocument();
-  return j.dump();
+  // Call with defaults except in the case of UTF-8 errors which we replace
+  // invalid UTF-8 characters instead of throwing an exception.
+  return j.dump(-1, ' ', false, nlohmann::detail::error_handler_t::replace);
 }
 
 bool Field::empty() const {

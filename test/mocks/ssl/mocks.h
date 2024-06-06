@@ -24,9 +24,9 @@ public:
   MockContextManager();
   ~MockContextManager() override;
 
-  MOCK_METHOD(ClientContextSharedPtr, createSslClientContext,
+  MOCK_METHOD(absl::StatusOr<ClientContextSharedPtr>, createSslClientContext,
               (Stats::Scope & scope, const ClientContextConfig& config));
-  MOCK_METHOD(ServerContextSharedPtr, createSslServerContext,
+  MOCK_METHOD(absl::StatusOr<ServerContextSharedPtr>, createSslServerContext,
               (Stats::Scope & stats, const ServerContextConfig& config,
                const std::vector<std::string>& server_names,
                ContextAdditionalInitFunc additional_init));
@@ -94,7 +94,7 @@ public:
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
-  MOCK_METHOD(void, setSecretUpdateCallback, (std::function<void()> callback));
+  MOCK_METHOD(void, setSecretUpdateCallback, (std::function<absl::Status()> callback));
 
   MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
   MOCK_METHOD(Ssl::HandshakerCapabilities, capabilities, (), (const, override));
@@ -133,7 +133,7 @@ public:
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::seconds>, sessionTimeout, (), (const));
-  MOCK_METHOD(void, setSecretUpdateCallback, (std::function<void()> callback));
+  MOCK_METHOD(void, setSecretUpdateCallback, (std::function<absl::Status()> callback));
 
   MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
   MOCK_METHOD(Ssl::TlsCertificateSelectorFactoryCb, createTlsCertificateSelector, (),

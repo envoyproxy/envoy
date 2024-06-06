@@ -81,7 +81,7 @@ public:
    * are downloaded from SDS server, this callback is invoked to update SSL context.
    * @param callback callback that is executed by context config.
    */
-  virtual void setSecretUpdateCallback(std::function<void()> callback) PURE;
+  virtual void setSecretUpdateCallback(std::function<absl::Status()> callback) PURE;
 
   /**
    * @return a callback which can be used to create Handshaker instances.

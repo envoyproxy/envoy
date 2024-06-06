@@ -59,7 +59,7 @@ public:
     return tls_is_ready && combined_cvc_is_ready && cvc_is_ready;
   }
 
-  void setSecretUpdateCallback(std::function<void()> callback) override;
+  void setSecretUpdateCallback(std::function<absl::Status()> callback) override;
   Ssl::HandshakerFactoryCb createHandshaker() const override;
   Ssl::HandshakerCapabilities capabilities() const override { return capabilities_; }
   Ssl::SslCtxCb sslctxCb() const override { return sslctx_cb_; }
@@ -162,7 +162,7 @@ public:
     return parent_is_ready && session_ticket_keys_are_ready;
   }
 
-  void setSecretUpdateCallback(std::function<void()> callback) override;
+  void setSecretUpdateCallback(std::function<absl::Status()> callback) override;
   bool disableStatelessSessionResumption() const override {
     return disable_stateless_session_resumption_;
   }

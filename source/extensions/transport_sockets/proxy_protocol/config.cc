@@ -12,7 +12,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace ProxyProtocol {
 
-Network::UpstreamTransportSocketFactoryPtr
+absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 UpstreamProxyProtocolSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
@@ -24,10 +24,11 @@ UpstreamProxyProtocolSocketConfigFactory::createTransportSocketFactory(
       Server::Configuration::UpstreamTransportSocketConfigFactory>(outer_config.transport_socket());
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
-  auto inner_transport_factory =
+  auto factory_or_error =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
+  RETURN_IF_STATUS_NOT_OK(factory_or_error);
   return std::make_unique<UpstreamProxyProtocolSocketFactory>(
-      std::move(inner_transport_factory), outer_config.config(), context.statsScope());
+      std::move(factory_or_error.value()), outer_config.config(), context.statsScope());
 }
 
 ProtobufTypes::MessagePtr UpstreamProxyProtocolSocketConfigFactory::createEmptyConfigProto() {

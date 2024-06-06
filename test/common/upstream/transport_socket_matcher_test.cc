@@ -64,7 +64,7 @@ public:
               (const));
   MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
 
-  Network::UpstreamTransportSocketFactoryPtr
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& proto,
                                Server::Configuration::TransportSocketFactoryContext&) override {
     const auto& node = dynamic_cast<const envoy::config::core::v3::Node&>(proto);
@@ -96,8 +96,9 @@ public:
       auto transport_socket_match = matches.Add();
       TestUtility::loadFromYaml(yaml, *transport_socket_match);
     }
-    matcher_ = std::make_unique<TransportSocketMatcherImpl>(matches, mock_factory_context_,
-                                                            mock_default_factory_, *stats_scope_);
+    matcher_ = TransportSocketMatcherImpl::create(matches, mock_factory_context_,
+                                                  mock_default_factory_, *stats_scope_)
+                   .value();
   }
 
   void validate(const envoy::config::core::v3::Metadata& metadata, const std::string& expected) {

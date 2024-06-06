@@ -24,7 +24,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Clu
   std::list<ResolveTargetPtr> resolve_targets;
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
-    validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
+    THROW_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& socket_address = lb_endpoint.endpoint().address().socket_address();
@@ -196,10 +196,12 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 StrictDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                            ClusterFactoryContext& context) {
-  auto selected_dns_resolver = selectDnsResolver(cluster, context);
+  auto dns_resolver_or_error = selectDnsResolver(cluster, context);
+  THROW_IF_NOT_OK(dns_resolver_or_error.status());
 
-  return std::make_pair(
-      std::make_shared<StrictDnsClusterImpl>(cluster, context, selected_dns_resolver), nullptr);
+  return std::make_pair(std::make_shared<StrictDnsClusterImpl>(
+                            cluster, context, std::move(dns_resolver_or_error.value())),
+                        nullptr);
 }
 
 /**

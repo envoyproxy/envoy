@@ -62,10 +62,10 @@ public:
   }
 
   NiceMock<Upstream::MockClusterManager> cm_;
-  std::shared_ptr<OAuth2Client> client_;
   std::shared_ptr<MockCallbacks> mock_callbacks_;
   Http::MockAsyncClientRequest request_;
   std::deque<Http::AsyncClient::Callbacks*> callbacks_;
+  std::shared_ptr<OAuth2Client> client_;
 };
 
 TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
@@ -263,6 +263,47 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenInvalidResponse) {
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
+TEST_F(OAuth2ClientTest, RequestAccessTokenNetworkError) {
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncGetAccessToken("a", "b", "c", "d");
+  EXPECT_EQ(1, callbacks_.size());
+
+  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback([&](auto* callback) {
+    callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+  }));
+}
+
+TEST_F(OAuth2ClientTest, RequestAccessTokenUnhealthyUpstream) {
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "503"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            // if there is no healthy upstream, the request fails immediately
+            cb.onSuccess(request_, std::move(mock_response));
+            return nullptr;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
+  client_->asyncGetAccessToken("a", "b", "c", "d");
+}
+
 TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenSuccess) {
   std::string json = R"EOF(
   {
@@ -304,7 +345,7 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenSuccess) {
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
-TEST_F(OAuth2ClientTest, RequestSuccessBasicAuthType) {
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenSuccessBasicAuthType) {
   std::string json = R"EOF(
 {
   "access_token": "golden ticket",
@@ -345,7 +386,7 @@ TEST_F(OAuth2ClientTest, RequestSuccessBasicAuthType) {
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
-TEST_F(OAuth2ClientTest, RequestErrorResponse) {
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenErrorResponse) {
   Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
       {Http::Headers::get().Status.get(), "500"},
       {Http::Headers::get().ContentType.get(), "application/json"},
@@ -370,27 +411,7 @@ TEST_F(OAuth2ClientTest, RequestErrorResponse) {
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
-TEST_F(OAuth2ClientTest, NetworkError) {
-  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillRepeatedly(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_.push_back(&cb);
-            return &request_;
-          }));
-
-  client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d");
-  EXPECT_EQ(1, callbacks_.size());
-
-  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
-  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
-  ASSERT_TRUE(popPendingCallback([&](auto* callback) {
-    callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
-  }));
-}
-
-TEST_F(OAuth2ClientTest, UpdateTokenNetworkError) {
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenNetworkError) {
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
@@ -410,7 +431,28 @@ TEST_F(OAuth2ClientTest, UpdateTokenNetworkError) {
   }));
 }
 
-TEST_F(OAuth2ClientTest, NetworkErrorDoubleCallStateInvalid) {
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenUnhealthyUpstream) {
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "503"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            // if there is no healthy upstream, the request fails immediately
+            cb.onSuccess(request_, std::move(mock_response));
+            return nullptr;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  EXPECT_CALL(*mock_callbacks_, onRefreshAccessTokenFailure());
+  client_->asyncRefreshAccessToken("a", "b", "c");
+}
+
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenNetworkErrorDoubleCallStateInvalid) {
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
