@@ -247,7 +247,7 @@ TEST_F(ContextTest, FindValueTest) {
   EXPECT_FALSE(ctx_.FindValue("plugin_name", &arena).has_value());
 }
 
-TEST_F(ContextTest, ClearRouteCacheShouldBeCallInDownstreamConfiguration) {
+TEST_F(ContextTest, ClearRouteCacheCalledInDownstreamConfiguration) {
 
   Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
   EXPECT_CALL(downstream_callbacks, clearRouteCache()).Times(5).WillRepeatedly(testing::Return());
@@ -268,7 +268,7 @@ TEST_F(ContextTest, ClearRouteCacheShouldBeCallInDownstreamConfiguration) {
   ctx_.removeHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key");
 }
 
-TEST_F(ContextTest, ClearRouteCacheShouldBeCallInUpstreamConfiguration) {
+TEST_F(ContextTest, ClearRouteCacheDoesNothingInUpstreamConfiguration) {
 
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   EXPECT_CALL(decoder_callbacks, downstreamCallbacks())
