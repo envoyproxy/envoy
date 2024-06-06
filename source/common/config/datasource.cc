@@ -122,7 +122,7 @@ absl::StatusOr<DataSourceProviderPtr> DataSourceProvider::create(const ProtoData
 
   if (!source.has_watched_directory() ||
       source.specifier_case() != envoy::config::core::v3::DataSource::kFilename) {
-    if (max_size > 0 && source.specifier_case() != envoy::config::core::v3::DataSource::kFilename &&
+    if (source.specifier_case() != envoy::config::core::v3::DataSource::kFilename &&
         initial_data_or_error.value().length() > max_size) {
       return absl::InvalidArgumentError(fmt::format("response body size is {} bytes; maximum is {}",
                                                     initial_data_or_error.value().length(),
