@@ -71,7 +71,7 @@ public class Errors {
 
   /**
    * Maps Envoymobile's errorcode to chromium's net errorcode
-   * @param responseFlag envoymobile's finalStreamIntel responseFlag
+   * @param finalStreamIntel envoymobile's finalStreamIntel
    * @return the NetError that the EnvoyMobileError maps to
    */
   public static NetError mapEnvoyMobileErrorToNetError(EnvoyFinalStreamIntel finalStreamIntel) {
