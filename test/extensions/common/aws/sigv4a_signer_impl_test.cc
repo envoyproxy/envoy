@@ -503,6 +503,7 @@ TEST_F(SigV4ASignerImplTest, QueryStringDefault5s) {
   EXPECT_TRUE(absl::StrContains(headers.getPathValue(), "X-Amz-Expires=5&"));
 }
 
+// Verify specific key derivations, using values generated from the AWS SDK implementation
 TEST(SigV4AKeyDerivationTest, TestKeyDerivations) {
   auto ec_key =
       SigV4AKeyDerivation::derivePrivateKey(absl::string_view("akid"), absl::string_view("secret"));
@@ -543,6 +544,58 @@ TEST(SigV4AKeyDerivationTest, TestKeyDerivations) {
   OPENSSL_free(hexkey);
   EC_KEY_free(ec_key);
 }
+
+// void hexdump(void *ptr, int buflen) {
+//   unsigned char *buf = static_cast<unsigned char*>(ptr);
+//   int i, j;
+//   for (i=0; i<buflen; i+=16) {
+//     printf("%06x: ", i);
+//     for (j=0; j<16; j++)
+//     {
+
+//       if (i+j < buflen){
+//         printf("%02x ", buf[i+j]);
+
+//       }
+//       else
+//       {
+//         printf("   ");
+
+//       }
+//     }
+//     printf(" ");
+//     for (j=0; j<16; j++)
+//     {
+
+//       if (i+j < buflen)
+//       {
+//         printf("%c", isprint(buf[i+j]) ? buf[i+j] : '.');
+
+//       }
+//     }
+//     printf("\n");
+//   }
+// }
+
+// TEST(SigV4AKeyDerivationTest, A) {
+//     std::vector<uint8_t> fixed_input(32);
+//     fixed_input.clear();
+//     static constexpr absl::string_view SigV4AAlgorithm = "AWS4-ECDSA-P256-SHA256";
+//     auto l = fixed_input.begin();
+//     l = fixed_input.insert(fixed_input.begin(), {0x00, 0x00, 0x00, 0x01});
+//     fixed_input.insert(fixed_input.end(), SigV4AAlgorithm.begin(), SigV4AAlgorithm.end());
+//     hexdump(fixed_input.data(),fixed_input.size());
+//     printf("%lu", fixed_input.size());
+//     // hexdump(static_cast<void *>(&SigV4AAlgorithm[0]),SigV4AAlgorithm.size());
+//     std::cout << "fixed_input contains:";
+//     for (auto it=fixed_input.begin(); it<fixed_input.end(); it++)
+//     {
+//       std::cout << ' ' << *it;
+//     }
+//     std::cout << '\n';
+
+//     EXPECT_EQ(1,0);
+// }
 
 } // namespace
 } // namespace Aws
