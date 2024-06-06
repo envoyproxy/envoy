@@ -463,7 +463,8 @@ void Client::DirectStreamCallbacks::latchError() {
     error_msg_details.push_back(absl::StrCat("DETAILS: ", std::move(resp_code_details)));
   }
   // The format of the error message propogated to callbacks is:
-  // RESPONSE_CODE: {value}|ERROR_CODE: {value}|RESPONSE_FLAGS: {value}|PROTOCOL: {value}|DETAILS: {value}
+  // RESPONSE_CODE: {value}|ERROR_CODE: {value}|RESPONSE_FLAGS: {value}|PROTOCOL: {value}|DETAILS:
+  // {value}
   //
   // Where RESPONSE_CODE is the HTTP response code from StreamInfo::responseCode().
   // ERROR_CODE is of the envoy_error_code_t enum type, and gets mapped from RESPONSE_CODE.
