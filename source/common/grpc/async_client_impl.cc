@@ -88,7 +88,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
   // Configure the maximum frame length
   decoder_.setMaxFrameLength(parent_.max_recv_message_length_);
 
-  if (nullptr != options.parent_span_) {
+  if (options.parent_span_ != nullptr) {
     const std::string child_span_name =
         options.child_span_name_.empty()
             ? absl::StrCat("async ", service_full_name, ".", method_name, " egress")

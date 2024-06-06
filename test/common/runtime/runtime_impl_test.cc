@@ -962,7 +962,7 @@ public:
         dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
     THROW_IF_NOT_OK(loader.status());
     loader_ = std::move(loader.value());
-    loader_->initialize(cm_);
+    THROW_IF_NOT_OK(loader_->initialize(cm_));
     for (auto* sub : rtds_subscriptions_) {
       EXPECT_CALL(*sub, start(_));
     }
@@ -1298,7 +1298,8 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
   absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
       dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
 
-  EXPECT_THROW_WITH_MESSAGE(loader.value()->initialize(cm_), EnvoyException, "bad config");
+  EXPECT_THROW_WITH_MESSAGE(loader.value()->initialize(cm_).IgnoreError(), EnvoyException,
+                            "bad config");
 }
 
 } // namespace
