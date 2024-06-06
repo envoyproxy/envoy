@@ -62,9 +62,9 @@ TEST(MonitorBaseTest, LocalOriginErrorBucket) {
 }
 
 // Test monitor's logic of matching error types and calling appropriate methods.
-class MockMonitor : public Monitor {
+class MockMonitor : public ExtMonitorBase {
 public:
-  MockMonitor(const std::string& name, uint32_t enforce) : Monitor(name, enforce) {}
+  MockMonitor(const std::string& name, uint32_t enforce) : ExtMonitorBase(name, enforce) {}
   MOCK_METHOD(bool, onError, ());
   MOCK_METHOD(void, onSuccess, ());
   MOCK_METHOD(void, onReset, ());
