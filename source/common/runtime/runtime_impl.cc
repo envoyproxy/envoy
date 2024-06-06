@@ -386,11 +386,13 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
     break;
   case ProtobufWkt::Value::kStringValue:
     parseEntryDoubleValue(entry);
-    if (parseEntryBooleanValue(entry)) {
-      error_message = kBoolError;
-    }
-    if (parseEntryFractionalPercentValue(entry)) {
-      error_message = kFractionError;
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_invalid_yaml")) {
+      if (parseEntryBooleanValue(entry)) {
+        error_message = kBoolError;
+      }
+      if (parseEntryFractionalPercentValue(entry)) {
+        error_message = kFractionError;
+      }
     }
   default:
     break;
