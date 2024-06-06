@@ -178,6 +178,11 @@ new_features:
     to specify headers that should never be sent to the external authentication service. Overrides
     :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`
     if a header matches both.
+- area: upstream
+  change: |
+    Added a new field to locality, :ref:`locality.metadata
+    <envoy_v3_api_field_config.core.v3.Locality.metadata>`, that may be used for transport socket
+    matching groups of endpoints.
 - area: quic
   change: |
     Added support for QUIC server preferred address when there is a DNAT between the client and Envoy. See
