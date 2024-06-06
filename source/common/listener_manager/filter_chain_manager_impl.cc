@@ -28,7 +28,7 @@ namespace FilterChain {
 // when no IP matcher is configured.
 Network::Address::InstanceConstSharedPtr fakeAddress() {
   CONSTRUCT_ON_FIRST_USE(Network::Address::InstanceConstSharedPtr,
-                         Network::Utility::parseInternetAddress("255.255.255.255"));
+                         Network::Utility::parseInternetAddressNoThrow("255.255.255.255"));
 }
 
 struct FilterChainNameAction

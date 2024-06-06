@@ -2082,8 +2082,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
   // Setup DNAT for 0.0.0.0:12345-->127.0.0.2:listener_port
   SocketInterfaceSwap socket_swap(Network::Socket::Type::Datagram);
   socket_swap.write_matcher_->setDnat(
-      Network::Utility::parseInternetAddress("1.2.3.4", 12345),
-      Network::Utility::parseInternetAddress("127.0.0.2", listener_port));
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 12345),
+      Network::Utility::parseInternetAddressNoThrow("127.0.0.2", listener_port));
 
   codec_client_ = makeHttpConnection(makeClientConnection(listener_port));
   EnvoyQuicClientSession* quic_session =
