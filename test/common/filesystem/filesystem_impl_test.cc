@@ -235,6 +235,8 @@ TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_TRUE(file_system_.illegalPath("/sys"));
   EXPECT_TRUE(file_system_.illegalPath("/sys/"));
   EXPECT_TRUE(file_system_.illegalPath("/_some_non_existent_file"));
+  EXPECT_FALSE(file_system_.illegalPath("/sysroot"));
+  EXPECT_FALSE(file_system_.illegalPath("/sysroot/"));
 #endif
 }
 
