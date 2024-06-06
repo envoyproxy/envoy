@@ -309,7 +309,7 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
     // TODO(chaoqin-li1123): remove try catch pattern here once we figure how to handle unexpected
     // exception in fuzz tests.
     TRY_NEEDS_AUDIT {
-      callback_(pending_response_.status_, pending_response_.details_,
+      callback_(pending_response_.status_, std::move(pending_response_.details_),
                 std::move(pending_response_.address_list_));
     }
     END_TRY

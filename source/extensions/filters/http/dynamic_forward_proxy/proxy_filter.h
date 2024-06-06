@@ -151,8 +151,7 @@ public:
 
 private:
   void addHostAddressToFilterState(const Network::Address::InstanceConstSharedPtr& address);
-  void onDnsResolutionFail(
-      absl::optional<Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr> host_info);
+  void onDnsResolutionFail(absl::string_view details);
   bool isProxying();
 
   const ProxyFilterConfigSharedPtr config_;

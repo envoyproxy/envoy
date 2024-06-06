@@ -181,7 +181,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       if (finished_query->cancelled_) {
         ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
       } else {
-        finished_query->callback_(response.first, details, std::move(response.second));
+        finished_query->callback_(response.first, std::move(details), std::move(response.second));
       }
     });
   }

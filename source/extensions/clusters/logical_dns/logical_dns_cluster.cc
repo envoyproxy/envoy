@@ -95,7 +95,7 @@ void LogicalDnsCluster::startResolve() {
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address_, dns_lookup_family_,
-      [this](Network::DnsResolver::ResolutionStatus status, std::string details,
+      [this](Network::DnsResolver::ResolutionStatus status, std::string&& details,
              std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);

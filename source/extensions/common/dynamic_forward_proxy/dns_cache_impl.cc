@@ -345,15 +345,15 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   host_info.timeout_timer_->enableTimer(timeout_interval_, nullptr);
   host_info.active_query_ = resolver_->resolve(
       host_info.host_info_->resolvedHost(), dns_lookup_family_,
-      [this, host](Network::DnsResolver::ResolutionStatus status, std::string details,
+      [this, host](Network::DnsResolver::ResolutionStatus status, std::string&& details,
                    std::list<Network::DnsResponse>&& response) {
-        finishResolve(host, status, details, std::move(response));
+        finishResolve(host, status, std::move(details), std::move(response));
       });
 }
 
 void DnsCacheImpl::finishResolve(const std::string& host,
-                                 Network::DnsResolver::ResolutionStatus status, std::string details,
-                                 std::list<Network::DnsResponse>&& response,
+                                 Network::DnsResolver::ResolutionStatus status,
+                                 std::string&& details, std::list<Network::DnsResponse>&& response,
                                  absl::optional<MonotonicTime> resolution_time,
                                  bool is_proxy_lookup) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());

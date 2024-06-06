@@ -98,7 +98,7 @@ public:
    * @param details supplies the details for the current address' resolution.
    * @param response supplies the list of resolved IP addresses and TTLs.
    */
-  using ResolveCb = std::function<void(ResolutionStatus status, std::string details,
+  using ResolveCb = std::function<void(ResolutionStatus status, std::string&& details,
                                        std::list<DnsResponse>&& response)>;
 
   /**

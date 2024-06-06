@@ -223,7 +223,7 @@ private:
       ABSL_LOCKS_EXCLUDED(primary_hosts_lock_);
 
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
-                     std::string details, std::list<Network::DnsResponse>&& response,
+                     std::string&& details, std::list<Network::DnsResponse>&& response,
                      absl::optional<MonotonicTime> resolution_time = {},
                      bool is_proxy_lookup = false);
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);

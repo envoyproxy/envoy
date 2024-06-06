@@ -801,7 +801,7 @@ public:
                                           const absl::optional<std::chrono::seconds> expected_ttl) {
     return resolver_->resolve(
         address, lookup_family,
-        [=, this](DnsResolver::ResolutionStatus status, std::string,
+        [=, this](DnsResolver::ResolutionStatus status, std::string&&,
                   std::list<DnsResponse>&& results) -> void {
           EXPECT_EQ(expected_status, status);
 

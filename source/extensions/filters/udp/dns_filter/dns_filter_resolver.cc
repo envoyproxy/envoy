@@ -59,7 +59,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
   // Define the callback that is executed when resolution completes
   // Resolve the address in the query and add to the resolved_hosts vector
   resolver_->resolve(domain_query->name_, lookup_family,
-                     [this, id](Network::DnsResolver::ResolutionStatus status, std::string,
+                     [this, id](Network::DnsResolver::ResolutionStatus status, std::string&&,
                                 std::list<Network::DnsResponse>&& response) -> void {
                        auto ctx_iter = lookups_.find(id);
 
