@@ -321,6 +321,13 @@ message SubjectAltNameMatcher {
   SanType san_type = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
 
   // Matcher for SAN value.
+  //
+  // The string matching for OTHER_NAME SAN values depends on their ASN.1 type:
+  //
+  //          * OBJECT: Validated against its dotted numeric notation (e.g., "1.2.3.4")
+  //          * BOOLEAN: Validated against strings "true" or "false"
+  //          * INTEGER/ENUMERATED: Validated against a string containing the integer value
+  //          * Other types: Validated directly against the string value
   type.matcher.v3.StringMatcher matcher = 2 [(validate.rules).message = {required: true}];
 
   // OID Value which is required if OTHER_NAME SAN type is used.
