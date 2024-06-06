@@ -12,8 +12,6 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
-#include "openssl/rand.h"
-
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -544,7 +542,6 @@ TEST(SigV4AKeyDerivationTest, TestKeyDerivations) {
   OPENSSL_free(hexkey);
   EC_KEY_free(ec_key);
 }
-
 
 } // namespace
 } // namespace Aws
