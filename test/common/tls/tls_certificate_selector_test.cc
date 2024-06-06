@@ -159,8 +159,8 @@ Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                     Server::ThreadLocalOverloadStateOptRef overload_state,
                                     Random::RandomGenerator& rng, Event::Dispatcher& dispatcher) {
   return std::make_unique<Network::TcpListenerImpl>(
-      dispatcher, rng, runtime, socket, cb, listener_config.bindToPort(),
-      listener_config.ignoreGlobalConnLimit(),
+      dispatcher, rng, runtime, std::move(socket), cb, listener_config.bindToPort(),
+      listener_config.ignoreGlobalConnLimit(), listener_config.shouldBypassOverloadManager(),
       listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 }
 
@@ -232,9 +232,9 @@ protected:
     NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
     Tls::ContextManagerImpl manager(server_factory_context);
     Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
-    Tls::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
-                                                          *server_stats_store.rootScope(),
-                                                          std::vector<std::string>{});
+    auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
+        std::move(server_cfg), manager, *server_stats_store.rootScope(),
+        std::vector<std::string>{});
 
     auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(version_));
@@ -256,17 +256,17 @@ protected:
 
     auto client_cfg =
         std::make_unique<Tls::ClientContextConfigImpl>(client_tls_context, client_factory_context);
-    Tls::ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
-                                                          *client_stats_store.rootScope());
+    auto client_ssl_socket_factory = *ClientSslSocketFactory::create(
+        std::move(client_cfg), manager, *client_stats_store.rootScope());
     Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
         socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
-        client_ssl_socket_factory.createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+        client_ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
     Network::ConnectionPtr server_connection;
     Network::MockConnectionCallbacks server_connection_callbacks;
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     EXPECT_CALL(callbacks, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-          auto ssl_socket = server_ssl_socket_factory.createDownstreamTransportSocket();
+          auto ssl_socket = server_ssl_socket_factory->createDownstreamTransportSocket();
           // configureInitialCongestionWindow is an unimplemented empty function, this is just to
           // increase code coverage.
           ssl_socket->configureInitialCongestionWindow(100, std::chrono::microseconds(123));
