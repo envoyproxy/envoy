@@ -1,7 +1,6 @@
 #include "dns_filter_test_utils.h"
 
 #include "source/common/common/random_generator.h"
-#include "source/common/common/safe_memcpy.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 

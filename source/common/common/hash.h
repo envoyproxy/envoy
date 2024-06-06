@@ -4,6 +4,7 @@
 #include <type_traits>
 
 #include "source/common/common/macros.h"
+#include "source/common/common/safe_memcpy.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -134,7 +135,11 @@ public:
   static uint64_t murmurHash2(absl::string_view key, uint64_t seed = STD_HASH_SEED);
 
 private:
-  static inline uint64_t unalignedLoad(const char* p) { return absl::little_endian::Load64(p); }
+  static inline uint64_t unalignedLoad(const char* p) {
+    uint64_t result;
+    safeMemcpyUnsafeSrc(&result, p);
+    return result;
+  }
 
   // Loads n bytes, where 1 <= n < 8.
   static inline uint64_t loadBytes(const char* p, int n) {

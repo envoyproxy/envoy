@@ -1,4 +1,3 @@
-#include "source/common/common/safe_memcpy.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/well_known_names.h"
