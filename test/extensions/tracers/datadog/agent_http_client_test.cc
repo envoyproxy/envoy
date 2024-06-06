@@ -676,10 +676,6 @@ TEST_F(DatadogAgentHttpClientTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     EXPECT_EQ(1U, stats_.reports_dropped_.value());
     EXPECT_EQ(1U, stats_.reports_failed_.value());
   }
-
-  {
-
-  }
 }
 
 } // namespace
