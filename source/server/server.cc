@@ -410,7 +410,7 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
       const EnvoyException& e,
       {
         ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
-                  options_.configProto().DebugString(), options_.configYaml(),
+                  MessageUtil::redact(options_.configProto()).DebugString(), options_.configYaml(),
                   options_.configPath(), e.what());
         terminate();
         throw;
