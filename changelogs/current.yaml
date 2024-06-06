@@ -248,6 +248,12 @@ new_features:
     added :ref:`stat_prefix
     <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.stat_prefix>`
     configuration to support additional stat prefix for the OpenTelemetry logger.
+- area: routing
+  change: |
+    added support in :ref:`file datasource <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` implementation
+    to listen to file changes and dynamically update the response when :ref:`watched_directory
+    <envoy_v3_api_field_config.core.v3.datasource.watched_directory>`
+    is configured in :ref:`DataSource <envoy_v3_api_msg_config.core.v3.datasource>`.
 - area: listener
   change: |
     Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
