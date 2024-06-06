@@ -581,13 +581,15 @@ RedisClusterFactory::createClusterWithConfig(
   if (!cluster.has_cluster_type() || cluster.cluster_type().name() != "envoy.clusters.redis") {
     return absl::InvalidArgumentError("Redis cluster can only created with redis cluster type.");
   }
+  auto resolver =
+      THROW_OR_RETURN_VALUE(selectDnsResolver(cluster, context), Network::DnsResolverSharedPtr);
   // TODO(hyang): This is needed to migrate existing cluster, disallow using other lb_policy
   // in the future
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     return std::make_pair(std::make_shared<RedisCluster>(
                               cluster, proto_config, context,
                               NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
-                              selectDnsResolver(cluster, context), nullptr),
+                              resolver, nullptr),
                           nullptr);
   }
   auto lb_factory = std::make_shared<RedisClusterLoadBalancerFactory>(
@@ -595,7 +597,7 @@ RedisClusterFactory::createClusterWithConfig(
   return std::make_pair(std::make_shared<RedisCluster>(
                             cluster, proto_config, context,
                             NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
-                            selectDnsResolver(cluster, context), lb_factory),
+                            resolver, lb_factory),
                         std::make_unique<RedisClusterThreadAwareLoadBalancer>(lb_factory));
 }
 

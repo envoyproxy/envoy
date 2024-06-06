@@ -74,6 +74,11 @@ minor_behavior_changes:
 - area: quic
   change: |
     When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
+- area: config
+  change: |
+    In xDS configuration, the :ref:`AUTO <envoy_v3_api_enum_value_config.core.v3.ApiVersion.AUTO>` value now means
+    :ref:`V3 <envoy_v3_api_enum_value_config.core.v3.ApiVersion.V3>`. :ref:`AUTO <envoy_v3_api_enum_value_config.core.v3.ApiVersion.AUTO>`
+    is the default value of the enum, so this field may be omitted from all configurations now.
 - area: filters
   change: |
     Set ``WWW-Authenticate`` header for 401 responses from the Basic Auth filter.
@@ -91,10 +96,19 @@ bug_fixes:
     Fixed :ref:`successful_active_health_check_uneject_host
     <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`.
     Before, a failed health check could uneject the host if the ``FAILED_ACTIVE_HC`` health flag had not been set.
+- area: quic
+  change: |
+    Applied 2 QUICHE patches for crash bugs in ``QuicSpdyStream`` ``OnDataAvailable()`` and ``OnInitialHeaderComplete()``.
+- area: quic
+  change: |
+    Fixed crash bug when QUIC downstream stream was read closed and then timed out.
 - area: tls
   change: |
     Fix a RELEASE_ASSERT when using :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>`
     if the downstream request ``:authority`` was longer than 255 characters.
+- area: tracing
+  change: |
+    Fix an issue where span id is missing from opentelemetry access log entries.
 - area: ext_authz
   change: |
     Added field
@@ -131,6 +145,19 @@ bug_fixes:
     Set the SNI value from the requested server name if it isn't available on the connection/socket. This applies when
     ``include_tls_session`` is true. The requested server name is set on a connection when filters such as the TLS
     inspector are used.
+- area: decompression
+  change: |
+    Fixed a bug where Envoy will go into an endless loop when using the brotli decompressor. If the input stream has
+    redundant data, the decompressor will loop forever.
+- area: websocket
+  change: |
+    Only 101 is considered a successful response for websocket handshake for HTTP/1.1, and Envoy as a proxy will proxy the response
+    header from upstream to downstream and then close the request if other status is received. This behavior can be
+    reverted by ``envoy_reloadable_features_check_switch_protocol_websocket_handshake``.
+- area: async http client
+  change: |
+    Added one option to disable the response body buffering for mirror request. Also introduced a 32MB cap for the response
+    buffer, which can be changed by the runtime flag ``http.async_response_buffer_limit`` based on the product needs.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -155,6 +182,9 @@ removed_config_or_runtime:
 - area: router
   change: |
     Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
+- area: jwt
+  change: |
+    Removed ``envoy.reloadable_features.token_passed_entirely`` runtime flag and legacy code paths.
 
 new_features:
 - area: hot_restart
@@ -185,6 +215,10 @@ new_features:
     <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
     in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>`
     for disabling appending of the ``-shadow`` suffix to the shadowed host/authority header.
+- area: http
+  change: |
+    Added field :ref:`match_upstream <envoy_v3_api_field_config.core.v3.SchemeHeaderTransformation.match_upstream>`,
+    which, when set to true, will set the downstream request ``:scheme`` to match the upstream transport protocol.
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
@@ -214,6 +248,10 @@ new_features:
     added :ref:`stat_prefix
     <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.stat_prefix>`
     configuration to support additional stat prefix for the OpenTelemetry logger.
+- area: listener
+  change: |
+    Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
+    to bypass the overload manager for a listener. When set to true, the listener will not be subject to overload protection.
 
 deprecated:
 - area: tracing

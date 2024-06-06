@@ -159,7 +159,9 @@ public:
   enum Type { ConnectionRemote = 0, DownstreamLocal, DownstreamDirectRemote, DownstreamRemote };
 
   IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type)
-      : range_(Network::Address::CidrRange::create(range)), type_(type) {}
+      : range_(THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(range),
+                                     Network::Address::CidrRange)),
+        type_(type) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info) const override;

@@ -22,6 +22,7 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::ContainsRegex;
+using testing::Eq;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -121,7 +122,7 @@ protected:
     stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) -> void {
       callbacks_called.on_complete_calls_++;
     };
-    stream_callbacks.on_error_ = [&](EnvoyError, envoy_stream_intel,
+    stream_callbacks.on_error_ = [&](const EnvoyError&, envoy_stream_intel,
                                      envoy_final_stream_intel) -> void {
       callbacks_called.on_error_calls_++;
     };
@@ -473,12 +474,13 @@ TEST_P(ClientTest, EnvoyLocalError) {
   // Override the on_error default with some custom checks.
   StreamCallbacksCalled callbacks_called;
   auto stream_callbacks = createDefaultStreamCallbacks(callbacks_called);
-  stream_callbacks.on_error_ = [&](EnvoyError error, envoy_stream_intel,
+  stream_callbacks.on_error_ = [&](const EnvoyError& error, envoy_stream_intel,
                                    envoy_final_stream_intel) -> void {
-    EXPECT_EQ(error.error_code, ENVOY_CONNECTION_FAILURE);
-    EXPECT_THAT(error.message,
-                ContainsRegex("RESPONSE_CODE: 503|ERROR_CODE: 2|DETAILS: failed miserably"));
-    EXPECT_EQ(error.attempt_count, 123);
+    EXPECT_EQ(error.error_code_, ENVOY_CONNECTION_FAILURE);
+    EXPECT_THAT(
+        error.message_,
+        Eq("RESPONSE_CODE: 503|ERROR_CODE: 2|RESPONSE_FLAGS: 4,26|DETAILS: failed miserably"));
+    EXPECT_EQ(error.attempt_count_, 123);
     callbacks_called.on_error_calls_++;
   };
 
@@ -498,6 +500,8 @@ TEST_P(ClientTest, EnvoyLocalError) {
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   stream_info_.setResponseCode(503);
   stream_info_.setResponseCodeDetails("failed miserably");
+  stream_info_.setResponseFlag(StreamInfo::ResponseFlag(StreamInfo::UpstreamRemoteReset));
+  stream_info_.setResponseFlag(StreamInfo::ResponseFlag(StreamInfo::DnsResolutionFailed));
   stream_info_.setAttemptCount(123);
   response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalConnectionFailure);
   ASSERT_EQ(callbacks_called.on_headers_calls_, 0);
@@ -549,11 +553,11 @@ TEST_P(ClientTest, RemoteResetAfterStreamStart) {
   callbacks_called.end_stream_with_headers_ = false;
 
   auto stream_callbacks = createDefaultStreamCallbacks(callbacks_called);
-  stream_callbacks.on_error_ = [&](EnvoyError error, envoy_stream_intel,
+  stream_callbacks.on_error_ = [&](const EnvoyError& error, envoy_stream_intel,
                                    envoy_final_stream_intel) -> void {
-    EXPECT_EQ(error.error_code, ENVOY_STREAM_RESET);
-    EXPECT_THAT(error.message, ContainsRegex("ERROR_CODE: 1"));
-    EXPECT_EQ(error.attempt_count, 0);
+    EXPECT_EQ(error.error_code_, ENVOY_STREAM_RESET);
+    EXPECT_THAT(error.message_, ContainsRegex("ERROR_CODE: 1"));
+    EXPECT_EQ(error.attempt_count_, 0);
     callbacks_called.on_error_calls_++;
   };
 

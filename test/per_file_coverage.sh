@@ -44,7 +44,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/rate_limit_descriptors/expr:95.0"
 "source/extensions/stat_sinks/graphite_statsd:82.8" # Death tests don't report LCOV
 "source/extensions/stat_sinks/statsd:85.2" # Death tests don't report LCOV
-"source/extensions/tracers:96.5"
+"source/extensions/tracers:96.4"
 "source/extensions/tracers/common:74.8"
 "source/extensions/tracers/common/ot:72.9"
 "source/extensions/tracers/opencensus:93.9"

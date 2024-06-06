@@ -221,7 +221,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Upstream::HostDescriptionConstSharedPtr host_description =
       std::make_shared<Upstream::HostDescriptionImpl>(
           cluster, "",
-          Network::Utility::resolveUrl(
+          *Network::Utility::resolveUrl(
               fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp"))),
           nullptr, envoy::config::core::v3::Locality().default_instance(),
           envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
@@ -280,7 +280,7 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
                                    const std::string& body, Http::CodecType type,
                                    Network::Address::IpVersion ip_version, const std::string& host,
                                    const std::string& content_type) {
-  auto addr = Network::Utility::resolveUrl(
+  auto addr = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version), port));
   return makeSingleRequest(addr, method, url, body, type, host, content_type);
 }
@@ -315,7 +315,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
   }
 
   client_ = dispatcher_.createClientConnection(
-      Network::Utility::resolveUrl(
+      *Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
       Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr, nullptr);
   // ConnectionCallbacks will call write_request_callback from the connect and low-watermark

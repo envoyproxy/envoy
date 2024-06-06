@@ -81,9 +81,10 @@ public:
         .WillRepeatedly(ReturnRef(empty_string_list_));
     EXPECT_CALL(cert_validation_ctx_config_, customValidatorConfig())
         .WillRepeatedly(ReturnRef(custom_validator_config_));
-    auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
+    auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
         *store_.rootScope(), client_context_config_, factory_context_);
-    verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
+    THROW_IF_NOT_OK(context_or_error.status());
+    verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(*context_or_error));
   }
 
 protected:
