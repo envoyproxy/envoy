@@ -425,6 +425,10 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`.
     An additional field ``oid`` is added to :ref:`SubjectAltNameMatcher
     <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SubjectAltNameMatcher>` to support this change.
+- area: dns_filter
+  change: |
+    Added support wildcard names in :ref:`inline_dns_table
+    <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.ServerContextConfig.inline_dns_table>`.
 
 deprecated:
 - area: tracing
