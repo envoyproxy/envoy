@@ -168,7 +168,7 @@ message Cluster {
     // The name of the match, used in stats generation.
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // Optional endpoint metadata match criteria.
+    // Optional metadata match criteria.
     // The connection to the endpoint with metadata matching what is set in this field
     // will use the transport socket configuration specified here.
     // The endpoint's metadata entry in ``envoy.transport_socket_match`` is used to match
