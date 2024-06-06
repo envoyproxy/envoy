@@ -241,6 +241,11 @@ public:
   virtual bool pausedForConnect() const PURE;
   virtual void setPausedForConnect(bool value) PURE;
 
+  // Setters and getters to determine if sending body payload is paused on
+  // confirmation of a WebSocket upgrade. These should only be used by the upstream codec filter.
+  virtual bool pausedForWebsocketUpgrade() const PURE;
+  virtual void setPausedForWebsocketUpgrade(bool value) PURE;
+
   // Return the upstreamStreamOptions for this stream.
   virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
 

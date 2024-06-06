@@ -10,7 +10,6 @@ import android.os.StrictMode;
 import android.util.Log;
 import androidx.test.platform.app.InstrumentationRegistry;
 
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import java.io.File;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
@@ -29,6 +28,8 @@ import org.junit.Assert;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
+
+import io.envoyproxy.envoymobile.engine.JniLibrary;
 import io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary;
 
 /**
@@ -201,7 +202,7 @@ public final class CronetTestRule implements TestRule {
   }
 
   private void setUp() {
-    AndroidJniLibrary.loadTestLibrary();
+    JniLibrary.loadTestLibrary();
     ContextUtils.initApplicationContext(getContext().getApplicationContext());
     PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX);
     prepareTestStorage();

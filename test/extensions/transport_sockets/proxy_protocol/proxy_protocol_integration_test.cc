@@ -126,7 +126,7 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestV1ProxyProtocolMultipleConnections) 
   initialize();
   auto listener_port = lookupPort("listener_0");
 
-  auto loopback2 = Network::Utility::resolveUrl("tcp://127.0.0.2:0");
+  auto loopback2 = *Network::Utility::resolveUrl("tcp://127.0.0.2:0");
   auto tcp_client2 = makeTcpConnection(listener_port, nullptr, loopback2);
 
   auto tcp_client = makeTcpConnection(listener_port);
@@ -353,7 +353,7 @@ TEST_P(ProxyProtocolHttpIntegrationTest, TestV1ProxyProtocolMultipleConnections)
   initialize();
   auto listener_port = lookupPort("http");
   auto tcp_client = makeTcpConnection(listener_port);
-  auto loopback2 = Network::Utility::resolveUrl("tcp://127.0.0.2:0");
+  auto loopback2 = *Network::Utility::resolveUrl("tcp://127.0.0.2:0");
   auto tcp_client2 = makeTcpConnection(listener_port, nullptr, loopback2);
 
   auto request = "GET / HTTP/1.1\r\nhost: host\r\n\r\n";

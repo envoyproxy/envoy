@@ -433,34 +433,40 @@ void Client::DirectStreamCallbacks::latchError() {
 
   OptRef<RequestDecoder> request_decoder = direct_stream_.requestDecoder();
   if (!request_decoder) {
-    error_->message = "";
+    error_->message_ = "";
     return;
   }
   const auto& info = request_decoder->streamInfo();
 
   std::vector<std::string> error_msg_details;
   if (info.responseCode().has_value()) {
-    error_->error_code = Bridge::Utility::errorCodeFromLocalStatus(
+    error_->error_code_ = Bridge::Utility::errorCodeFromLocalStatus(
         static_cast<Http::Code>(info.responseCode().value()));
     error_msg_details.push_back(absl::StrCat("RESPONSE_CODE: ", info.responseCode().value()));
   } else if (StreamInfo::isStreamIdleTimeout(info)) {
-    error_->error_code = ENVOY_REQUEST_TIMEOUT;
+    error_->error_code_ = ENVOY_REQUEST_TIMEOUT;
   } else {
-    error_->error_code = ENVOY_STREAM_RESET;
+    error_->error_code_ = ENVOY_STREAM_RESET;
   }
 
-  error_msg_details.push_back(absl::StrCat("ERROR_CODE: ", error_->error_code));
+  error_msg_details.push_back(absl::StrCat("ERROR_CODE: ", error_->error_code_));
+  std::vector<std::string> response_flags(info.responseFlags().size());
+  std::transform(info.responseFlags().begin(), info.responseFlags().end(), response_flags.begin(),
+                 [](StreamInfo::ResponseFlag flag) { return std::to_string(flag.value()); });
+  error_msg_details.push_back(absl::StrCat("RESPONSE_FLAGS: ", absl::StrJoin(response_flags, ",")));
   if (std::string resp_code_details = info.responseCodeDetails().value_or("");
       !resp_code_details.empty()) {
     error_msg_details.push_back(absl::StrCat("DETAILS: ", std::move(resp_code_details)));
   }
   // The format of the error message propogated to callbacks is:
-  //  RESPONSE_CODE: {RESPONSE_CODE}|ERROR_CODE: {ERROR_CODE}|DETAILS: {DETAILS}
+  // RESPONSE_CODE: {value}|ERROR_CODE: {value}|RESPONSE_FLAGS: {value}|DETAILS: {value}
+  //
   // Where RESPONSE_CODE is the HTTP response code from StreamInfo::responseCode().
   // ERROR_CODE is of the envoy_error_code_t enum type, and gets mapped from RESPONSE_CODE.
+  // RESPONSE_FLAGS comes from StreamInfo::responseFlags().
   // DETAILS is the contents of StreamInfo::responseCodeDetails().
-  error_->message = absl::StrJoin(std::move(error_msg_details), "|");
-  error_->attempt_count = info.attemptCount().value_or(0);
+  error_->message_ = absl::StrJoin(std::move(error_msg_details), "|");
+  error_->attempt_count_ = info.attemptCount().value_or(0);
 }
 
 Client::DirectStream::DirectStream(envoy_stream_t stream_handle, Client& http_client)

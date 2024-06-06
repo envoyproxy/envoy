@@ -30,17 +30,17 @@ struct CidrInputs {
         tag_data_.emplace_back(
             std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
                 {"tag_1",
-                 {Envoy::Network::Address::CidrRange::create(
+                 {*Envoy::Network::Address::CidrRange::create(
                      fmt::format("192.0.{}.{}/32", i, j))}}));
       }
     }
     tag_data_nested_prefixes_ = tag_data_;
     tag_data_nested_prefixes_.emplace_back(
         std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
-            {"tag_0", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
+            {"tag_0", {*Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
     tag_data_minimal_.emplace_back(
         std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
-            {"tag_1", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
+            {"tag_1", {*Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
   }
 
   std::vector<std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>> tag_data_;

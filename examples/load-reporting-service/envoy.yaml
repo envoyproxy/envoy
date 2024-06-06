@@ -59,7 +59,6 @@ static_resources:
 cluster_manager:
   load_stats_config:
     api_type: GRPC
-    transport_api_version: V3
     grpc_services:
     - envoy_grpc:
         cluster_name: load_reporting_cluster

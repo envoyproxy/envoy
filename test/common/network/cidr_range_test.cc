@@ -85,15 +85,10 @@ TEST(TruncateIpAddressAndLength, Various) {
 }
 
 TEST(IsInRange, Various) {
-  {
-    CidrRange rng = CidrRange::create("foo");
-    EXPECT_FALSE(rng.isValid());
-    EXPECT_FALSE(rng.isInRange(Ipv4Instance("0.0.0.0")));
-  }
+  { EXPECT_FALSE(CidrRange::create("foo").status().ok()); }
 
   {
-    CidrRange rng = CidrRange::create("10.255.255.255/0");
-    EXPECT_TRUE(rng.isValid());
+    CidrRange rng = *CidrRange::create("10.255.255.255/0");
     EXPECT_EQ(rng.asString(), "0.0.0.0/0");
     EXPECT_EQ(rng.length(), 0);
     EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
@@ -105,8 +100,7 @@ TEST(IsInRange, Various) {
   }
 
   {
-    CidrRange rng = CidrRange::create("10.255.255.255/10");
-    EXPECT_TRUE(rng.isValid());
+    CidrRange rng = *CidrRange::create("10.255.255.255/10");
     EXPECT_EQ(rng.asString(), "10.192.0.0/10");
     EXPECT_EQ(rng.length(), 10);
     EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
@@ -117,8 +111,7 @@ TEST(IsInRange, Various) {
   }
 
   {
-    CidrRange rng = CidrRange::create("::/0");
-    EXPECT_TRUE(rng.isValid());
+    CidrRange rng = *CidrRange::create("::/0");
     EXPECT_EQ(rng.asString(), "::/0");
     EXPECT_EQ(rng.length(), 0);
     EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
@@ -130,8 +123,7 @@ TEST(IsInRange, Various) {
   }
 
   {
-    CidrRange rng = CidrRange::create("::1/128");
-    EXPECT_TRUE(rng.isValid());
+    CidrRange rng = *CidrRange::create("::1/128");
     EXPECT_EQ(rng.asString(), "::1/128");
     EXPECT_EQ(rng.length(), 128);
     EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
@@ -142,8 +134,7 @@ TEST(IsInRange, Various) {
   }
 
   {
-    CidrRange rng = CidrRange::create("2001:abcd:ef01:2345:6789:abcd:ef01:234/64");
-    EXPECT_TRUE(rng.isValid());
+    CidrRange rng = *CidrRange::create("2001:abcd:ef01:2345:6789:abcd:ef01:234/64");
     EXPECT_EQ(rng.asString(), "2001:abcd:ef01:2345::/64");
     EXPECT_EQ(rng.length(), 64);
     EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
@@ -156,8 +147,7 @@ TEST(IsInRange, Various) {
   }
 
   {
-    CidrRange rng = CidrRange::create("2001:abcd:ef01:2345:6789:abcd:ef01:234/60");
-    EXPECT_TRUE(rng.isValid());
+    CidrRange rng = *CidrRange::create("2001:abcd:ef01:2345:6789:abcd:ef01:234/60");
     EXPECT_EQ(rng.asString(), "2001:abcd:ef01:2340::/60");
     EXPECT_EQ(rng.length(), 60);
     EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
@@ -173,57 +163,47 @@ TEST(IsInRange, Various) {
 
 TEST(CidrRangeTest, OperatorIsEqual) {
   {
-    CidrRange rng1 = CidrRange::create("192.0.0.0/8");
-    CidrRange rng2 = CidrRange::create("192.168.0.0/16");
+    CidrRange rng1 = *CidrRange::create("192.0.0.0/8");
+    CidrRange rng2 = *CidrRange::create("192.168.0.0/16");
     EXPECT_FALSE(rng1 == rng2);
   }
 
   {
-    CidrRange rng1 = CidrRange::create("192.0.0.0/8");
-    CidrRange rng2 = CidrRange::create("192.168.0.0/8");
+    CidrRange rng1 = *CidrRange::create("192.0.0.0/8");
+    CidrRange rng2 = *CidrRange::create("192.168.0.0/8");
     EXPECT_TRUE(rng1 == rng2);
   }
 
   {
-    CidrRange rng1 = CidrRange::create("192.0.0.0/8");
-    CidrRange rng2 = CidrRange::create("2001::/8");
+    CidrRange rng1 = *CidrRange::create("192.0.0.0/8");
+    CidrRange rng2 = *CidrRange::create("2001::/8");
     EXPECT_FALSE(rng1 == rng2);
   }
 
   {
-    CidrRange rng1 = CidrRange::create("2002::/16");
-    CidrRange rng2 = CidrRange::create("2001::/16");
+    CidrRange rng1 = *CidrRange::create("2002::/16");
+    CidrRange rng2 = *CidrRange::create("2001::/16");
     EXPECT_FALSE(rng1 == rng2);
   }
 
   {
-    CidrRange rng1 = CidrRange::create("2002::/16");
-    CidrRange rng2 = CidrRange::create("192.168.0.1/16");
+    CidrRange rng1 = *CidrRange::create("2002::/16");
+    CidrRange rng2 = *CidrRange::create("192.168.0.1/16");
     EXPECT_FALSE(rng1 == rng2);
   }
 
   {
-    CidrRange rng1 = CidrRange::create("2002::/16");
-    CidrRange rng2 = CidrRange::create("2002::1/16");
+    CidrRange rng1 = *CidrRange::create("2002::/16");
+    CidrRange rng2 = *CidrRange::create("2002::1/16");
     EXPECT_TRUE(rng1 == rng2);
   }
 }
 
-TEST(CidrRangeTest, InvalidCidrRange) {
-  CidrRange rng1 = CidrRange::create("foo");
-  EXPECT_EQ(nullptr, rng1.ip());
-  EXPECT_EQ("/-1", rng1.asString());
-  // Not equal due to invalid CidrRange.
-  EXPECT_FALSE(rng1 == rng1);
-
-  CidrRange rng2 = CidrRange::create("192.0.0.0/8");
-  EXPECT_FALSE(rng1 == rng2);
-}
+TEST(CidrRangeTest, InvalidCidrRange) { EXPECT_FALSE(CidrRange::create("foo").status().ok()); }
 
 TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
   InstanceConstSharedPtr ptr = Utility::parseInternetAddress("1.2.3.5");
-  CidrRange rng(CidrRange::create(ptr, 31)); // Copy ctor.
-  EXPECT_TRUE(rng.isValid());
+  CidrRange rng(*CidrRange::create(ptr, 31)); // Copy ctor.
   EXPECT_EQ(rng.length(), 31);
   EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
   EXPECT_EQ(rng.asString(), "1.2.3.4/31");
@@ -232,18 +212,15 @@ TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
   EXPECT_TRUE(rng.isInRange(Ipv4Instance("1.2.3.5")));
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("1.2.3.6")));
 
-  CidrRange rng2(CidrRange::create(ptr, -1)); // Invalid length.
-  EXPECT_FALSE(rng2.isValid());
+  EXPECT_FALSE(CidrRange::create(ptr, -1).status().ok()); // Invalid length.
 
   ptr.reset();
-  CidrRange rng3(CidrRange::create(ptr, 10)); // Invalid address.
-  EXPECT_FALSE(rng3.isValid());
+  EXPECT_FALSE(CidrRange::create(ptr, 10).status().ok()); // Invalid address.
 }
 
 TEST(Ipv4CidrRangeTest, StringAndLengthCtor) {
   CidrRange rng;
-  rng = CidrRange::create("1.2.3.4", 31); // Assignment operator.
-  EXPECT_TRUE(rng.isValid());
+  rng = *CidrRange::create("1.2.3.4", 31); // Assignment operator.
   EXPECT_EQ(rng.asString(), "1.2.3.4/31");
   EXPECT_EQ(rng.length(), 31);
   EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
@@ -252,15 +229,13 @@ TEST(Ipv4CidrRangeTest, StringAndLengthCtor) {
   EXPECT_TRUE(rng.isInRange(Ipv4Instance("1.2.3.5")));
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("1.2.3.6")));
 
-  rng = CidrRange::create("1.2.3.4", -10); // Invalid length.
-  EXPECT_FALSE(rng.isValid());
+  EXPECT_FALSE(CidrRange::create("1.2.3.4", -10).status().ok()); // Invalid length.
 
-  EXPECT_THROW(CidrRange::create("bogus", 31), EnvoyException); // Invalid address.
+  EXPECT_FALSE(CidrRange::create("bogus", 31).status().ok()); // Invalid address.
 }
 
 TEST(Ipv4CidrRangeTest, StringCtor) {
-  CidrRange rng = CidrRange::create("1.2.3.4/31");
-  EXPECT_TRUE(rng.isValid());
+  CidrRange rng = *CidrRange::create("1.2.3.4/31");
   EXPECT_EQ(rng.asString(), "1.2.3.4/31");
   EXPECT_EQ(rng.length(), 31);
   EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
@@ -269,21 +244,14 @@ TEST(Ipv4CidrRangeTest, StringCtor) {
   EXPECT_TRUE(rng.isInRange(Ipv4Instance("1.2.3.5")));
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("1.2.3.6")));
 
-  CidrRange rng2 = CidrRange::create("1.2.3.4/-10"); // Invalid length.
-  EXPECT_FALSE(rng2.isValid());
-
-  EXPECT_THROW(CidrRange::create("bogus/31"), EnvoyException); // Invalid address.
-
-  CidrRange rng4 = CidrRange::create("/31"); // Missing address.
-  EXPECT_FALSE(rng4.isValid());
-
-  CidrRange rng5 = CidrRange::create("1.2.3.4/"); // Missing length.
-  EXPECT_FALSE(rng5.isValid());
+  EXPECT_FALSE(CidrRange::create("1.2.3.4/-10").status().ok()); // Invalid length.
+  EXPECT_FALSE(CidrRange::create("bogus/31").status().ok());    // Invalid address.
+  EXPECT_FALSE(CidrRange::create("/31").status().ok());         // Missing address.
+  EXPECT_FALSE(CidrRange::create("1.2.3.4/").status().ok());    // Missing length.
 }
 
 TEST(Ipv4CidrRangeTest, BigRange) {
-  CidrRange rng = CidrRange::create("10.255.255.255/8");
-  EXPECT_TRUE(rng.isValid());
+  CidrRange rng = *CidrRange::create("10.255.255.255/8");
   EXPECT_EQ(rng.asString(), "10.0.0.0/8");
   EXPECT_EQ(rng.length(), 8);
   EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
@@ -300,8 +268,7 @@ TEST(Ipv4CidrRangeTest, BigRange) {
 
 TEST(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
   InstanceConstSharedPtr ptr = Utility::parseInternetAddress("abcd::0345");
-  CidrRange rng(CidrRange::create(ptr, 127)); // Copy ctor.
-  EXPECT_TRUE(rng.isValid());
+  CidrRange rng(*CidrRange::create(ptr, 127)); // Copy ctor.
   EXPECT_EQ(rng.length(), 127);
   EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
   EXPECT_EQ(rng.asString(), "abcd::344/127");
@@ -310,18 +277,14 @@ TEST(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
   EXPECT_TRUE(rng.isInRange(Ipv6Instance("abcd::345")));
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("abcd::346")));
 
-  CidrRange rng2(CidrRange::create(ptr, -1)); // Invalid length.
-  EXPECT_FALSE(rng2.isValid());
-
+  EXPECT_FALSE(CidrRange::create(ptr, -1).status().ok()); // Invalid length.
   ptr.reset();
-  CidrRange rng3(CidrRange::create(ptr, 127)); // Invalid address.
-  EXPECT_FALSE(rng3.isValid());
+  EXPECT_FALSE(CidrRange::create(ptr, 127).status().ok()); // Invalid address.
 }
 
 TEST(Ipv6CidrRange, StringAndLengthCtor) {
   CidrRange rng;
-  rng = CidrRange::create("ff::ffff", 122); // Assignment operator.
-  EXPECT_TRUE(rng.isValid());
+  rng = *CidrRange::create("ff::ffff", 122); // Assignment operator.
   EXPECT_EQ(rng.asString(), "ff::ffc0/122");
   EXPECT_EQ(rng.length(), 122);
   EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
@@ -330,15 +293,12 @@ TEST(Ipv6CidrRange, StringAndLengthCtor) {
   EXPECT_TRUE(rng.isInRange(Ipv6Instance("ff::ffff")));
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("::1:0")));
 
-  rng = CidrRange::create("::ffff", -2); // Invalid length.
-  EXPECT_FALSE(rng.isValid());
-
-  EXPECT_THROW(CidrRange::create("bogus", 122), EnvoyException); // Invalid address.
+  EXPECT_FALSE(CidrRange::create("::ffff", -2).status().ok()); // Invalid length.
+  EXPECT_FALSE(CidrRange::create("bogus", 122).status().ok()); // Invalid address.
 }
 
 TEST(Ipv6CidrRange, StringCtor) {
-  CidrRange rng = CidrRange::create("ff::fc1f/118");
-  EXPECT_TRUE(rng.isValid());
+  CidrRange rng = *CidrRange::create("ff::fc1f/118");
   EXPECT_EQ(rng.asString(), "ff::fc00/118");
   EXPECT_EQ(rng.length(), 118);
   EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
@@ -347,22 +307,15 @@ TEST(Ipv6CidrRange, StringCtor) {
   EXPECT_TRUE(rng.isInRange(Ipv6Instance("ff::ffff")));
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("::1:00")));
 
-  CidrRange rng2 = CidrRange::create("::fc1f/-10"); // Invalid length.
-  EXPECT_FALSE(rng2.isValid());
-
-  EXPECT_THROW(CidrRange::create("::fc1f00/118"), EnvoyException); // Invalid address.
-
-  CidrRange rng4 = CidrRange::create("/118"); // Missing address.
-  EXPECT_FALSE(rng4.isValid());
-
-  CidrRange rng5 = CidrRange::create("::fc1f/"); // Missing length.
-  EXPECT_FALSE(rng5.isValid());
+  EXPECT_FALSE(CidrRange::create("::fc1f/-10").status().ok());   // Invalid length.
+  EXPECT_FALSE(CidrRange::create("::fc1f00/118").status().ok()); // Invalid address.
+  EXPECT_FALSE(CidrRange::create("/118").status().ok());         // Missing address.
+  EXPECT_FALSE(CidrRange::create("::fc1f/").status().ok());      // Missing length.
 }
 
 TEST(Ipv6CidrRange, BigRange) {
   std::string prefix = "2001:0db8:85a3:0000";
-  CidrRange rng = CidrRange::create(prefix + "::/64");
-  EXPECT_TRUE(rng.isValid());
+  CidrRange rng = *CidrRange::create(prefix + "::/64");
   EXPECT_EQ(rng.asString(), "2001:db8:85a3::/64");
   EXPECT_EQ(rng.length(), 64);
   EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
@@ -389,7 +342,7 @@ makeCidrRangeList(const std::vector<std::pair<std::string, uint32_t>>& ranges) {
 }
 
 TEST(IpListTest, Errors) {
-  { EXPECT_THROW(IpList::create(makeCidrRangeList({{"foo", 0}})).IgnoreError(), EnvoyException); }
+  { EXPECT_FALSE(IpList::create(makeCidrRangeList({{"foo", 0}})).status().ok()); }
 }
 
 TEST(IpListTest, SpecificAddressAllowed) {

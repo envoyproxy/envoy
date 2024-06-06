@@ -20,6 +20,7 @@ public:
     return envoy::config::core::v3::UNSPECIFIED;
   }
   bool isQuic() const override { return false; }
+  bool shouldBypassOverloadManager() const override { return false; }
 
 private:
   Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;

@@ -823,6 +823,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   filter_manager_.streamInfo().setStreamIdProvider(
       std::make_shared<HttpStreamIdProviderImpl>(*this));
 
+  filter_manager_.streamInfo().setShouldSchemeMatchUpstream(
+      connection_manager.config_->shouldSchemeMatchUpstream());
+
   // TODO(chaoqin-li1123): can this be moved to the on demand filter?
   static const std::string route_factory = "envoy.route_config_update_requester.default";
   auto factory =
