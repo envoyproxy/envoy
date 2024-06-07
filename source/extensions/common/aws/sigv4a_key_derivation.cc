@@ -36,19 +36,18 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
          (external_counter <= 254)) // MAX_KEY_DERIVATION_COUNTER_VALUE
   {
     fixed_input.clear();
-
     fixed_input.insert(fixed_input.begin(), {0x00, 0x00, 0x00, 0x01});
-    fixed_input.insert(fixed_input.end(), SigV4ASignatureConstants::SigV4AAlgorithm.data(),
-                       SigV4ASignatureConstants::SigV4AAlgorithm.data() +
-                           SigV4ASignatureConstants::SigV4AAlgorithm.size());
+    // Workaround for asan optimisation issue described here
+    // https://github.com/envoyproxy/envoy/pull/34377
+    absl::string_view s(SigV4ASignatureConstants::SigV4AAlgorithm);
+    fixed_input.insert(fixed_input.end(), s.begin(), s.end());
     fixed_input.insert(fixed_input.end(), 0x00);
-    fixed_input.insert(fixed_input.end(), access_key_id.data(),
-                       access_key_id.data() + access_key_id.size());
+    fixed_input.insert(fixed_input.end(), access_key_id.begin(), access_key_id.end());
     fixed_input.insert(fixed_input.end(), external_counter);
     fixed_input.insert(fixed_input.end(), {0x00, 0x00, 0x01, 0x00});
 
     auto k0 = crypto_util.getSha256Hmac(
-        std::vector<uint8_t>(secret_key.data(), secret_key.data() + secret_key.size()),
+        std::vector<uint8_t>(secret_key.begin(), secret_key.end()),
         absl::string_view(reinterpret_cast<char*>(fixed_input.data()), fixed_input.size()));
 
     // ECDSA q - 2
