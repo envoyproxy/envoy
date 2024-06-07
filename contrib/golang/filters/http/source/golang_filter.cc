@@ -957,8 +957,21 @@ CAPIStatus Filter::clearRouteCache() {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
   }
-  ENVOY_LOG(debug, "golang filter clearing route cache");
-  decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
+  if (!isThreadSafe()) {
+    ENVOY_LOG(debug, "golang filter posting clear route cache callback");
+    auto weak_ptr = weak_from_this();
+    getDispatcher().post([this, weak_ptr] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        ENVOY_LOG(debug, "golang filter clearing route cache");
+        decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+      }
+    });
+  } else {
+    ENVOY_LOG(debug, "golang filter clearing route cache");
+    decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
+  }
   return CAPIStatus::CAPIOK;
 }
 
