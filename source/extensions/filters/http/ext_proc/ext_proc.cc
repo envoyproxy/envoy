@@ -309,7 +309,8 @@ Filter::StreamOpenState Filter::openStream() {
     }
     stats_.streams_started_.inc();
 
-    stream_ = config_->threadLocalStreamManager().store(this, std::move(stream_object));
+    stream_ =
+        config_->threadLocalStreamManager().store(this, std::move(stream_object), config_->stats());
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
@@ -589,6 +590,7 @@ Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers
   }
 
   ProcessingRequest req;
+  req.set_observability_mode(true);
   addAttributes(state, req);
   addDynamicMetadata(state, req);
   auto* headers_req = state.mutableHeaders(req);
@@ -620,6 +622,7 @@ Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& dat
     }
     // Set up the the body chunk and send.
     auto req = setupBodyChunk(state, data, end_stream);
+    req.set_observability_mode(true);
     stream_->send(std::move(req), false);
     stats_.stream_msgs_sent_.inc();
     ENVOY_LOG(debug, "Sending body message in ObservabilityMode");
@@ -674,7 +677,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
       // Fall through
       break;
     }
-    sendTrailers(state, trailers);
+    sendTrailers(state, trailers, /*observability_mode=*/true);
     return FilterTrailersStatus::Continue;
   }
 
@@ -816,8 +819,10 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
   stats_.stream_msgs_sent_.inc();
 }
 
-void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
+void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
+                          bool observability_mode) {
   ProcessingRequest req;
+  req.set_observability_mode(observability_mode);
   addAttributes(state, req);
   addDynamicMetadata(state, req);
   auto* trailers_req = state.mutableTrailers(req);
@@ -1301,7 +1306,9 @@ void DeferredDeletableStream::closeStreamOnTimer(Filter* filter) {
   // Close the stream.
   if (stream_) {
     ENVOY_LOG(debug, "Closing the stream");
-    stream_->close();
+    if (stream_->close()) {
+      stats.streams_closed_.inc();
+    }
     stream_.reset();
   } else {
     ENVOY_LOG(debug, "Stream already closed");

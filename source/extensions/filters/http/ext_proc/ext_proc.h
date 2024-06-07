@@ -152,14 +152,16 @@ inline constexpr uint32_t DEFAULT_CLOSE_TIMEOUT_MS = 1000;
 // Deferred deletable stream wrapper.
 struct DeferredDeletableStream : public Logger::Loggable<Logger::Id::ext_proc> {
   explicit DeferredDeletableStream(ExternalProcessorStreamPtr stream,
-                                   ThreadLocalStreamManager& stream_manager)
-      : stream_(std::move(stream)), parent(stream_manager) {}
+                                   ThreadLocalStreamManager& stream_manager,
+                                   const ExtProcFilterStats& stat)
+      : stream_(std::move(stream)), parent(stream_manager), stats(stat) {}
 
   void deferredClose(Envoy::Event::Dispatcher& dispatcher, Filter* filter);
 
   void closeStreamOnTimer(Filter* filter);
   ExternalProcessorStreamPtr stream_;
   ThreadLocalStreamManager& parent;
+  ExtProcFilterStats stats;
   Event::TimerPtr derferred_close_timer;
 };
 
@@ -169,8 +171,10 @@ class ThreadLocalStreamManager : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
   // Store the ExternalProcessorStreamPtr (as a wrapper object) in the map and return the raw
   // pointer of ExternalProcessorStream.
-  ExternalProcessorStream* store(Filter* filter, ExternalProcessorStreamPtr stream) {
-    stream_manager_[filter] = std::make_unique<DeferredDeletableStream>(std::move(stream), *this);
+  ExternalProcessorStream* store(Filter* filter, ExternalProcessorStreamPtr stream,
+                                 const ExtProcFilterStats& stat) {
+    stream_manager_[filter] =
+        std::make_unique<DeferredDeletableStream>(std::move(stream), *this, stat);
     return stream_manager_[filter]->stream_.get();
   }
 
@@ -447,7 +451,8 @@ public:
   void sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
                      envoy::service::ext_proc::v3::ProcessingRequest& req);
 
-  void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
+  void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
+                    bool observability_mode = false);
   bool inHeaderProcessState() {
     return (decoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
             encoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback);
