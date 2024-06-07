@@ -36,6 +36,7 @@ filegroup(
     name = "contrib_configs",
     srcs = glob(
         [
+            "dlb/dlb_example_config.yaml",
             "golang-http/*.yaml",
             "golang-network/*.yaml",
             "mysql/*.yaml",
