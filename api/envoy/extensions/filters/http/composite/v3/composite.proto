@@ -65,5 +65,5 @@ message ExecuteFilterAction {
   // i.e, 1 - skip_percent, needs to be processed by the filter.  In such case, a dice roll
   // is done after a matching condition met, the action will only be taken if the dice roll
   // returns true. Otherwise, the action filter is skipped.
-  envoy.type.v3.FractionalPercent skip_percent = 3;
+  type.v3.FractionalPercent skip_percent = 3;
 }
