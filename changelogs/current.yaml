@@ -29,9 +29,9 @@ behavior_changes:
 - area: composite_filter
   change: |
     Adding support for
-    :ref:`skip_percent <envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.skip_percent>`.   
+    :ref:`skip_percent <envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.skip_percent>`.
     It specifies the percentage of traffic the action filter will be skipped after a match.
-    
+
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: grpc
