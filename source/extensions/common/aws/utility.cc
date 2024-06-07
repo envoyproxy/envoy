@@ -240,7 +240,6 @@ Utility::joinCanonicalHeaderNames(const std::map<std::string, std::string>& cano
  * (or FIPS if compiled for FIPS support)
  */
 std::string Utility::getSTSEndpoint(absl::string_view region) {
-
   std::string single_region;
 
   // If we contain a comma or asterisk it looks like a region set.
