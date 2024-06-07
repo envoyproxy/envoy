@@ -37,7 +37,7 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
   {
     fixed_input.clear();
     fixed_input.insert(fixed_input.begin(), {0x00, 0x00, 0x00, 0x01});
-    // Workaround for asan optimisation issue described here
+    // Workaround for asan optimization issue described here
     // https://github.com/envoyproxy/envoy/pull/34377
     absl::string_view s(SigV4ASignatureConstants::SigV4AAlgorithm);
     fixed_input.insert(fixed_input.end(), s.begin(), s.end());
