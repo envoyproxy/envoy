@@ -19,12 +19,12 @@ Step 2: Run Envoy with DLB connection balanace enabled
 
 With the example configuration Envoy listens on port 10000 and proxies to an upstream server listening on port 12000.
 
-.. literalinclude:: /start/sandboxes/_include/dlb_example_config.yaml
+.. literalinclude:: _include/dlb_example_config.yaml
  :language: yaml
  :lines: 7-11
  :lineno-start: 7
  :linenos:
- :caption: :download:`dlb_example_config.yaml </start/sandboxes/_include/dlb_example_config.yaml>`
+ :caption: :download:`dlb_example_config.yaml <_include/dlb_example_config.yaml>`
 
 .. code-block:: console
 
