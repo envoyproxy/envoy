@@ -148,8 +148,16 @@ public:
   void handleInsertFinished(const Key& key, bool write_succeeded) override {
     absl::MutexLock lock(&mu_);
     auto it = queues_.find(key);
-    ASSERT(it != queues_.end(),
+    ASSERT(!write_succeeded || it != queues_.end(),
            "should be impossible to complete an insert on a queue that doesn't exist");
+    if (it == queues_.end()) {
+      // Ideally it would also not be possible to abort a queue entry that doesn't
+      // exist, but a race is possible where a successful write clears the queue and
+      // posts retryHeaders, then the filter is deleted before that post is delivered,
+      // and the filter deletion therefore calls handleInsertFinished.
+      // To accommodate this race we must simply ignore such a callback if it happens.
+      return;
+    }
     it->second.blockers_.pop_front();
     if (write_succeeded) {
       unblock(key, it->second);
