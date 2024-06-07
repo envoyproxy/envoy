@@ -61,9 +61,13 @@ public:
     absl::MutexLock lock(&mu_);
     auto it = queues_.try_emplace(key).first;
     if (it->second.blockers_.size() < parallel_requests_) {
+      ENVOY_LOG(debug, "ThunderingHerdHandler adding blocker {}",
+                request_headers.Path()->value().getStringView());
       it->second.blockers_.push_back(maybeMakeTimeout(key, decoder_callbacks->dispatcher()));
       decoder_callbacks->continueDecoding();
     } else {
+      ENVOY_LOG(debug, "ThunderingHerdHandler adding blocked {}",
+                request_headers.Path()->value().getStringView());
       addBlocked(it->second, weak_filter, decoder_callbacks, request_headers);
     }
   }
@@ -96,7 +100,9 @@ public:
 
   void selectNewBlocker(const Key& key, Queue& queue) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
     if (queue.blocked_.empty()) {
+      ENVOY_LOG(debug, "ThunderingHerdHandler ended blocker");
       if (queue.blockers_.empty()) {
+        ENVOY_LOG(debug, "ThunderingHerdHandler deleted queue");
         queues_.erase(key);
       }
       return;
@@ -105,6 +111,7 @@ public:
     queue.blocked_.pop_front();
     queue.blockers_.push_back(maybeMakeTimeout(key, unblocking.dispatcher_));
     unblocking.dispatcher_.post([unblocking, on_undeliverable = onUndeliverable(key)]() {
+      ENVOY_LOG(debug, "ThunderingHerdHandler moving blocked to blocker");
       auto filter = unblocking.weak_filter_.lock();
       if (filter != nullptr) {
         unblocking.decoder_callbacks_->continueDecoding();
