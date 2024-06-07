@@ -143,7 +143,7 @@ message CacheConfig {
   bool ignore_request_cache_control_header = 6;
 
   // The selected ThunderingHerdHandler determines what the filter should do when
-  // multiple requests for the same cachable not-currently-cached item arrive.
+  // multiple requests for the same cacheable not-currently-cached item arrive.
   //
   // The default is none, which will pass all such requests to the upstream.
   ThunderingHerdHandler thundering_herd_handler = 7;
