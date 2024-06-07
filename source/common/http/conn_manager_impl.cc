@@ -126,10 +126,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfigSharedPtr co
                                      /*node_id=*/local_info_.node().id(),
                                      /*server_name=*/config_->serverName(),
                                      /*proxy_status_config=*/config_->proxyStatusConfig())),
-      max_requests_during_dispatch_(
-          runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
-      refresh_rtt_after_request_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")) {
+      max_requests_during_dispatch_(runtime_.snapshot().getInteger(
+          ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -337,17 +335,6 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   stream.completeRequest();
-
-  // If refresh rtt after request is required explicitly, then try to get rtt again set it into
-  // connection info.
-  if (refresh_rtt_after_request_) {
-    // Set roundtrip time in connectionInfoSetter before OnStreamComplete
-    absl::optional<std::chrono::milliseconds> t = read_callbacks_->connection().lastRoundTripTime();
-    if (t.has_value()) {
-      read_callbacks_->connection().connectionInfoSetter().setRoundTripTime(t.value());
-    }
-  }
-
   stream.filter_manager_.onStreamComplete();
 
   // For HTTP/3, skip access logging here and add deferred logging info
