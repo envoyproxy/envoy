@@ -7,6 +7,7 @@ import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -52,13 +53,6 @@ message CacheConfig {
   }
 
   message ThunderingHerdHandler {
-    // The default ``None`` handler will allow every request to go to the upstream service
-    // while a cache entry is not complete. This is the situation often described as
-    // "the thundering herd problem", in that many requests in a short time may overload
-    // the upstream server in a way one might expect a cache to prevent.
-    message None {
-    }
-
     // The ``BlockUntilCompletion`` handler will allow one request to go to the upstream,
     // then additional requests for that resource will be blocked until that initial one
     // completes. After a request completes, all the blocked requests will be released to
@@ -82,12 +76,23 @@ message CacheConfig {
       // prevent the cache from becoming populated in a timely fashion. Allowing a trickle
       // of additional requests improves the chance of the cache getting populated.
       //
+      // If unblock_additional_requests_period and parallel_requests are both set,
+      // each parallel request runs its own timer to unblock an additional request,
+      // i.e. with parallel_requests=2 and unblock_additional_requests_period=5s, if
+      // one request arrives at T=0 and one arrives at T=1, and neither successfully
+      // populate the cache, an additional queued request will be released at T=5,
+      // and another at T=6.
+      //
       // If unset, blocked requests remain blocked until a previous request finishes.
       google.protobuf.Duration unblock_additional_request_period = 2;
     }
 
     oneof handler {
-      None none = 1;
+      // The default ``none`` handler will allow every request to attempt a cache insert
+      // while a cache entry is not complete. This is the situation often described as
+      // "the thundering herd problem", in that many requests in a short time may overload
+      // the upstream server in a way one might expect a cache to prevent.
+      google.protobuf.Empty none = 1;
 
       BlockUntilCompletion block_until_completion = 2;
     }

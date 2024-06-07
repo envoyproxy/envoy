@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 #include "envoy/http/filter.h"
+
 #include "source/extensions/filters/http/cache/http_cache.h"
 
 namespace Envoy {

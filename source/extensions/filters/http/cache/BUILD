@@ -43,8 +43,8 @@ envoy_cc_library(
     deps = [
         ":http_cache_lib",
         "//envoy/http:filter_interface",
-        "//source/common/protobuf:utility_lib_header",
         "//source/common/common:thread_annotations",
+        "//source/common/protobuf:utility_lib_header",
         "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
