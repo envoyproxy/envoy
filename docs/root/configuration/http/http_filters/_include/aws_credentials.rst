@@ -27,6 +27,9 @@ secret access key (the session token is optional).
    - Then STS cluster host is set to ``sts.amazonaws.com`` (or ``sts-fips.us-east-1.amazonaws.com`` if compiled with FIPS support
    - Else STS cluster host is set to ``sts.<first region in region set>.amazonaws.com``
 
+  If you require the use of SigV4A signing and you are using an alternate partition, such as cn or GovCloud, you can ensure correct generation
+  of the STS endpoint by setting the first region in your SigV4A region set to the correct region (such as ``cn-northwest-1`` with no wildcard)
+
 4. Either EC2 instance metadata, ECS task metadata or EKS Pod Identity.
    For EC2 instance metadata, the fields ``AccessKeyId``, ``SecretAccessKey``, and ``Token`` are used, and credentials are cached for 1 hour.
    For ECS task metadata, the fields ``AccessKeyId``, ``SecretAccessKey``, and ``Token`` are used, and credentials are cached for 1 hour or
