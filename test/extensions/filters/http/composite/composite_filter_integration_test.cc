@@ -531,46 +531,46 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
-  void initializeConfig(bool downstream_filter, bool downstream) {
-    config_helper_.addConfigModifier(
-        [downstream_filter, downstream, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
-          ConfigHelper::setHttp2(
-              *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
+  void initializeConfig(bool downstream_filter, bool downstream, int skip_percent) {
+    config_helper_.addConfigModifier([downstream_filter, downstream, skip_percent,
+                                      this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
+      ConfigHelper::setHttp2(
+          *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
 
-          // Loading filter config from YAML for cluster_0.
-          prependServerFactoryContextFilter(downstream_filter, downstream);
-          // Clusters for test gRPC servers. The HTTP filters is not needed for these clusters.
-          for (size_t i = 0; i < grpc_upstreams_.size(); ++i) {
-            auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
-            std::string cluster_name = absl::StrCat("test_server_", i);
-            server_cluster->set_name(cluster_name);
-            server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
-            auto* address = server_cluster->mutable_load_assignment()
-                                ->add_endpoints()
-                                ->add_lb_endpoints()
-                                ->mutable_endpoint()
-                                ->mutable_address()
-                                ->mutable_socket_address();
-            address->set_address(Network::Test::getLoopbackAddressString(ipVersion()));
-            envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
-            protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-            (*server_cluster->mutable_typed_extension_protocol_options())
-                ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-                    .PackFrom(protocol_options);
-          }
-          // Parameterize with defer processing to prevent bit rot as filter made
-          // assumptions of data flow, prior relying on eager processing.
-          config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
-                                            deferredProcessing() ? "true" : "false");
-        });
+      // Loading filter config from YAML for cluster_0.
+      prependServerFactoryContextFilter(downstream_filter, downstream, skip_percent);
+      // Clusters for test gRPC servers. The HTTP filters is not needed for these clusters.
+      for (size_t i = 0; i < grpc_upstreams_.size(); ++i) {
+        auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
+        std::string cluster_name = absl::StrCat("test_server_", i);
+        server_cluster->set_name(cluster_name);
+        server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
+        auto* address = server_cluster->mutable_load_assignment()
+                            ->add_endpoints()
+                            ->add_lb_endpoints()
+                            ->mutable_endpoint()
+                            ->mutable_address()
+                            ->mutable_socket_address();
+        address->set_address(Network::Test::getLoopbackAddressString(ipVersion()));
+        envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
+        protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+        (*server_cluster->mutable_typed_extension_protocol_options())
+            ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                .PackFrom(protocol_options);
+      }
+      // Parameterize with defer processing to prevent bit rot as filter made
+      // assumptions of data flow, prior relying on eager processing.
+      config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
+                                        deferredProcessing() ? "true" : "false");
+    });
 
     setUpstreamProtocol(Http::CodecType::HTTP2);
     setDownstreamProtocol(Http::CodecType::HTTP2);
   }
 
   void
-  prependServerFactoryContextFilter(bool downstream_filter, bool downstream,
+  prependServerFactoryContextFilter(bool downstream_filter, bool downstream, int skip_percent,
                                     const std::string& name = "envoy.filters.http.match_delegate") {
     std::string context_filter_config = "ServerFactoryContextFilterConfig";
     if (!downstream_filter) {
@@ -620,6 +620,9 @@ public:
                     name: composite-action
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      skip_percent:
+                        numerator: %d
+                        denominator: HUNDRED
                       typed_config:
                         name: server-factory-context-filter
                         typed_config:
@@ -627,11 +630,12 @@ public:
                           grpc_service:
                             %s
     )EOF",
-                                                 name, context_filter_config, grpc_config),
+                                                 name, skip_percent, context_filter_config,
+                                                 grpc_config),
                                  downstream);
   }
 
-  void serverContextBasicFlowTest() {
+  void serverContextBasicFlowTest(int skip_percent) {
     HttpIntegrationTest::initialize();
 
     auto conn = makeClientConnection(lookupPort("http"));
@@ -644,20 +648,23 @@ public:
     // Send request from downstream to upstream.
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-    // Wait for side stream request.
-    helloworld::HelloRequest request;
-    request.set_name("hello");
-    ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, connection_));
-    ASSERT_TRUE(connection_->waitForNewStream(*dispatcher_, stream_));
-    ASSERT_TRUE(stream_->waitForGrpcMessage(*dispatcher_, request));
+    // Send request to side stream server when all sampled, i.e, skip_percent = 0.
+    if (skip_percent == 0) {
+      // Wait for side stream request.
+      helloworld::HelloRequest request;
+      request.set_name("hello");
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, connection_));
+      ASSERT_TRUE(connection_->waitForNewStream(*dispatcher_, stream_));
+      ASSERT_TRUE(stream_->waitForGrpcMessage(*dispatcher_, request));
 
-    // Start the grpc side stream.
-    stream_->startGrpcStream();
+      // Start the grpc side stream.
+      stream_->startGrpcStream();
 
-    // Send the side stream response.
-    helloworld::HelloReply reply;
-    reply.set_message("ack");
-    stream_->sendGrpcMessage(reply);
+      // Send the side stream response.
+      helloworld::HelloReply reply;
+      reply.set_message("ack");
+      stream_->sendGrpcMessage(reply);
+    }
 
     // Handle the upstream request.
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -666,8 +673,10 @@ public:
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_request_->encodeData(100, true);
 
-    // Close the grpc stream.
-    stream_->finishGrpcStream(Grpc::Status::Ok);
+    if (skip_percent == 0) {
+      // Close the grpc stream.
+      stream_->finishGrpcStream(Grpc::Status::Ok);
+    }
 
     // Verify the response from upstream to downstream.
     ASSERT_TRUE(response->waitForEndStream());
@@ -685,19 +694,36 @@ INSTANTIATE_TEST_SUITE_P(
     GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
     Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
 
-TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlowDownstreamFilterInDownstream) {
-  initializeConfig(/*downstream_filter*/ true, /*downstream*/ true);
-  serverContextBasicFlowTest();
+TEST_P(CompositeFilterSeverContextIntegrationTest,
+       BasicFlowDownstreamFilterInDownstreamAllSampled) {
+  initializeConfig(/*downstream_filter*/ true, /*downstream*/ true, /*skip_percent*/ 0);
+  serverContextBasicFlowTest(0);
 }
 
-TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlowDualFilterInDownstream) {
-  initializeConfig(/*downstream_filter*/ false, /*downstream*/ true);
-  serverContextBasicFlowTest();
+TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlowDualFilterInDownstreamAllSampled) {
+  initializeConfig(/*downstream_filter*/ false, /*downstream*/ true, /*skip_percent*/ 0);
+  serverContextBasicFlowTest(0);
 }
 
-TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlowDualFilterInUpstream) {
-  initializeConfig(/*downstream_filter*/ false, /*downstream*/ false);
-  serverContextBasicFlowTest();
+TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlowDualFilterInUpstreamAllSampled) {
+  initializeConfig(/*downstream_filter*/ false, /*downstream*/ false, /*skip_percent*/ 0);
+  serverContextBasicFlowTest(0);
+}
+
+TEST_P(CompositeFilterSeverContextIntegrationTest,
+       BasicFlowDownstreamFilterInDownstreamNoneSampled) {
+  initializeConfig(/*downstream_filter*/ true, /*downstream*/ true, /*skip_percent*/ 100);
+  serverContextBasicFlowTest(100);
+}
+
+TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlowDualFilterInDownstreamNoneSampled) {
+  initializeConfig(/*downstream_filter*/ false, /*downstream*/ true, /*skip_percent*/ 100);
+  serverContextBasicFlowTest(100);
+}
+
+TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlowDualFilterInUpstreamNoneSampled) {
+  initializeConfig(/*downstream_filter*/ false, /*downstream*/ false, /*skip_percent*/ 100);
+  serverContextBasicFlowTest(100);
 }
 
 } // namespace

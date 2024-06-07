@@ -9,6 +9,36 @@ void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callb
   cb_(callbacks);
 }
 
+float ExecuteFilterActionFactory::getSkipRatio(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action) {
+  const auto& skip_percent = composite_action.skip_percent();
+  float denominator = 100;
+  switch (skip_percent.denominator()) {
+  case envoy::type::v3::FractionalPercent::HUNDRED:
+    denominator = 100;
+    break;
+  case envoy::type::v3::FractionalPercent::TEN_THOUSAND:
+    denominator = 10000;
+    break;
+  case envoy::type::v3::FractionalPercent::MILLION:
+    denominator = 1000000;
+    break;
+  default:
+    throw EnvoyException(fmt::format("ExecuteFilterAction skip_percent config denominator setting "
+                                     "is invalid : {}. Valid range 0~2.",
+                                     skip_percent.denominator()));
+  }
+
+  float skip_ratio = float(skip_percent.numerator()) / (denominator);
+  if (skip_ratio > 1) {
+    throw EnvoyException(fmt::format(
+        "ExecuteFilterAction skip_percent config is invalid. skip_ratio={}(Numerator {} / "
+        "Denominator {}). The valid range is 0~1.",
+        skip_ratio, skip_percent.numerator(), denominator));
+  }
+  return skip_ratio;
+}
+
 Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     const Protobuf::Message& config, Http::Matching::HttpFilterActionContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
@@ -66,6 +96,32 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createDynamicActionFactoryC
       provider_manager);
 }
 
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createAtionFactoryCbCommon(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+    Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
+    bool is_downstream) {
+  std::string stream_str = "downstream";
+  if (!is_downstream) {
+    stream_str = "upstream";
+  }
+  if (callback == nullptr) {
+    throw EnvoyException(
+        fmt::format("Failed to get {} filter factory creation function", stream_str));
+  }
+  std::string name = composite_action.typed_config().name();
+
+  Random::RandomGenerator& random = context.server_factory_context_->api().randomGenerator();
+  float skip_ratio = getSkipRatio(composite_action);
+  return
+      [cb = std::move(callback), n = std::move(name), skip_ratio, &random]() -> Matcher::ActionPtr {
+        UnitFloat sample_ratio = UnitFloat(1 - skip_ratio);
+        if (random.bernoulli(sample_ratio)) {
+          return std::make_unique<ExecuteFilterAction>(cb, n);
+        }
+        return nullptr;
+      };
+}
+
 Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCbDownstream(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context,
@@ -93,14 +149,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCb
         *message, context.stat_prefix_, context.server_factory_context_.value());
   }
 
-  if (callback == nullptr) {
-    throw EnvoyException("Failed to get downstream filter factory creation function");
-  }
-  std::string name = composite_action.typed_config().name();
-
-  return [cb = std::move(callback), n = std::move(name)]() -> Matcher::ActionPtr {
-    return std::make_unique<ExecuteFilterAction>(cb, n);
-  };
+  return createAtionFactoryCbCommon(composite_action, context, callback, true);
 }
 
 Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCbUpstream(
@@ -124,14 +173,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCb
     callback = callback_or_status.value();
   }
 
-  if (callback == nullptr) {
-    throw EnvoyException("Failed to get upstream filter factory creation function");
-  }
-  std::string name = composite_action.typed_config().name();
-
-  return [cb = std::move(callback), n = std::move(name)]() -> Matcher::ActionPtr {
-    return std::make_unique<ExecuteFilterAction>(cb, n);
-  };
+  return createAtionFactoryCbCommon(composite_action, context, callback, false);
 }
 
 REGISTER_FACTORY(ExecuteFilterActionFactory,

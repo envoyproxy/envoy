@@ -46,6 +46,14 @@ public:
   }
 
 private:
+  float getSkipRatio(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action);
+
+  Matcher::ActionFactoryCb createAtionFactoryCbCommon(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
+      bool is_downstream);
+
   template <class FactoryCtx, class FilterCfgProviderMgr>
   Matcher::ActionFactoryCb createDynamicActionFactoryCbTyped(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
@@ -60,11 +68,20 @@ private:
         provider_manager->createDynamicFilterConfigProvider(
             config_discovery, name, server_factory_context, factory_context,
             server_factory_context.clusterManager(), false, filter_chain_type, nullptr);
-    return [provider = std::move(provider), n = std::move(name)]() -> Matcher::ActionPtr {
+
+    Random::RandomGenerator& random = server_factory_context.api().randomGenerator();
+    float skip_ratio = getSkipRatio(composite_action);
+    return [provider = std::move(provider), n = std::move(name), skip_ratio,
+            &random]() -> Matcher::ActionPtr {
       auto config_value = provider->config();
+      UnitFloat sample_ratio = UnitFloat(1 - skip_ratio);
+      // If composite action has non-zero skip_ratio configured, perform dice roll. If it
+      // returns true, then execute the action. Otherwise, execute the missing config filter.
       if (config_value.has_value()) {
-        auto factory_cb = config_value.value().get().factory_cb;
-        return std::make_unique<ExecuteFilterAction>(factory_cb, n);
+        if ((skip_ratio == 0) || random.bernoulli(sample_ratio)) {
+          auto factory_cb = config_value.value().get().factory_cb;
+          return std::make_unique<ExecuteFilterAction>(factory_cb, n);
+        }
       }
       // There is no dynamic config available. Apply missing config filter.
       auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
