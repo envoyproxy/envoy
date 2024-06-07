@@ -32,7 +32,7 @@ private:
   // Do not use ON_CALL outside of constructor on these mocks. Each ON_CALL has a memory cost and
   // will cause OOMs if the fuzzer runs long enough.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  Buffer::OwnedImpl decoding_buffer_;
+  std::unique_ptr<Buffer::OwnedImpl> decoding_buffer_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
