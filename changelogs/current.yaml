@@ -238,6 +238,12 @@ new_features:
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting
     :ref:`health_check_config <envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.proxy_protocol_config>`.
+- area: ext_authz
+  change: |
+    added
+    :ref:`decoder_header_mutation_rules <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.decoder_header_mutation_rules>`
+    which allows you to configure what decoder header mutations are allowed from the ext_authz
+    service as well as whether to fail the downstream request if disallowed mutations are requested.
 - area: access_log
   change: |
     added new ``access_log`` command operators to retrieve upstream connection information change: ``%UPSTREAM_PEER_URI_SAN%``,
