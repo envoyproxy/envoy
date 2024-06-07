@@ -195,9 +195,6 @@ type FilterCallbackHandler interface {
 	DecoderFilterCallbacks() DecoderFilterCallbacks
 	// EncoderFilterCallbacks could only be used in EncodeXXX phases.
 	EncoderFilterCallbacks() EncoderFilterCallbacks
-	// FilterCallbacks could only be used in Log phases.
-	// TODO: maybe we should update the OnLogXX APIs, and emit this API.
-	// such as: OnLog(HttpFormatterContext log_context, StreamInfo stream_info)
 }
 
 type DynamicMetadata interface {
