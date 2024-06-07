@@ -112,7 +112,7 @@ public:
             ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType auth_type =
                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                     OAuth2Config_AuthType_URL_ENCODED_BODY,
-            int default_refresh_token_expires_in = 0) {
+            int default_refresh_token_expires_in = 0, bool preserve_authorization_header = false) {
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -123,6 +123,7 @@ public:
     p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
     p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
     p.set_forward_bearer_token(forward_bearer_token);
+    p.set_preserve_authorization_header(preserve_authorization_header);
 
     auto* useRefreshToken = p.mutable_use_refresh_token();
     useRefreshToken->set_value(use_refresh_token);
@@ -598,6 +599,54 @@ TEST_F(OAuth2Test, OAuthOkPassButInvalidToken) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  // cookie-validation mocking
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+  // Sanitized return reference mocking
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(mock_request_headers, false));
+
+  // Ensure that existing OAuth forwarded headers got sanitized.
+  EXPECT_EQ(mock_request_headers, expected_headers);
+
+  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 1);
+}
+
+/**
+ * Scenario: The OAuth filter receives a request with a foreign token in the Authorization
+ * header. This header should be forwarded when preserve authorization header is enabled
+ * and forwarding bearer token is disabled.
+ *
+ * Expected behavior: the filter should forward the foreign token and let the request proceed.
+ */
+TEST_F(OAuth2Test, OAuthOkPreserveForeignAuthHeader) {
+  init(getConfig(false /* forward_bearer_token */, true /* use_refresh_token */,
+                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
+                 1200 /* default_refresh_token_expires_in */,
+                 true /* preserve_authorization_header */));
+
+  Http::TestRequestHeaderMapImpl mock_request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer ValidAuthorizationHeader"},
+  };
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer ValidAuthorizationHeader"},
   };
 
   // cookie-validation mocking
