@@ -320,6 +320,7 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
 }
 
 void CacheFilter::retryHeaders(Http::RequestHeaderMap& request_headers) {
+  additional_destroy_action_ = nullptr;
   getHeaders(request_headers);
 }
 

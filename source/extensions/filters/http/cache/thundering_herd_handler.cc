@@ -131,6 +131,7 @@ public:
   }
 
   void unblock(const Key& key, Queue& queue) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+    ENVOY_LOG(debug, "ThunderingHerdHandler unblocking queue of size {}", queue.blocked_.size());
     for (const Queue::Blocked& unblocking : queue.blocked_) {
       unblocking.dispatcher_.post([unblocking]() {
         if (auto filter = unblocking.weak_filter_.lock()) {
