@@ -18,10 +18,14 @@ secret access key (the session token is optional).
    ``Expiration``). To enable this credentials provider set ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` to ``true``
    so that it can use http async client to fetch the credentials. This provider is not compatible with :ref:`Grpc Credentials AWS AwsIamConfig
    <envoy_v3_api_file_envoy/config/grpc_credential/v3/aws_iam.proto>` plugin which can only support deprecated libcurl credentials fetcher
-   , see https://github.com/envoyproxy/envoy/pull/30626. To fetch the credentials a static cluster is required with the name
-   ``sts_token_service_internal`` pointing towards regional AWS Security Token Service. The static internal cluster will still be added even
-   if initially ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` is not set so that subsequently if the reloadable feature
-   is set to ``true`` the cluster config is available to fetch the credentials.
+   , see https://github.com/envoyproxy/envoy/pull/30626. To fetch the credentials a static cluster is created with the name
+   ``sts_token_service_internal-<region>`` pointing towards regional AWS Security Token Service.
+
+   Note: If ``signing_algorithm: AWS_SIGV4A`` is set, the logic for STS cluster host generation is as follows:
+   - If the ``region`` is configured (either through profile, environment or inline) as a SigV4A region set
+   - And if the first region in the region set contains a wildcard
+   - Then STS cluster host is set to ``sts.amazonaws.com`` (or ``sts-fips.us-east-1.amazonaws.com`` if compiled with FIPS support
+   - Else STS cluster host is set to ``sts.<first region in region set>.amazonaws.com``
 
 4. Either EC2 instance metadata, ECS task metadata or EKS Pod Identity.
    For EC2 instance metadata, the fields ``AccessKeyId``, ``SecretAccessKey``, and ``Token`` are used, and credentials are cached for 1 hour.
