@@ -2045,7 +2045,6 @@ void PriorityStateManager::registerHostForPriority(
     const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source) {
-  // @tallen
   auto endpoint_metadata =
       lb_endpoint.has_metadata()
           ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
