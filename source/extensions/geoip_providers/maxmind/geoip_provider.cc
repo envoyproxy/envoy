@@ -173,7 +173,7 @@ void GeoipProvider::lookupInCityDb(
     int mmdb_error;
     MMDB_lookup_result_s mmdb_lookup_result;
     {
-      absl::ReaderMutexLock lock(&city_db_mutex_);
+      absl::ReaderMutexLock lock(&mmdb_mutex_);
       ASSERT(city_db_, "Maxmind city database is not initialised for performing lookups");
       mmdb_lookup_result = MMDB_lookup_sockaddr(
           city_db_.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
@@ -219,7 +219,7 @@ void GeoipProvider::lookupInAsnDb(
     int mmdb_error;
     MMDB_lookup_result_s mmdb_lookup_result;
     {
-      absl::ReaderMutexLock lock(&isp_db_mutex_);
+      absl::ReaderMutexLock lock(&mmdb_mutex_);
       ASSERT(isp_db_, "Maxmind asn database is not initialised for performing lookups");
       mmdb_lookup_result = MMDB_lookup_sockaddr(
           isp_db_.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
@@ -251,7 +251,7 @@ void GeoipProvider::lookupInAnonDb(
     int mmdb_error;
     MMDB_lookup_result_s mmdb_lookup_result;
     {
-      absl::ReaderMutexLock lock(&anon_db_mutex_);
+      absl::ReaderMutexLock lock(&mmdb_mutex_);
       ASSERT(anon_db_, "Maxmind anon database is not initialised for performing lookups");
       mmdb_lookup_result = MMDB_lookup_sockaddr(
           anon_db_.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
@@ -315,15 +315,15 @@ absl::Status GeoipProvider::mmdbReload(const MaxmindDbSharedPtr reloaded_db,
                                        const absl::string_view& db_type) {
   if (reloaded_db) {
     if (db_type == CITY_DB_TYPE) {
-      absl::WriterMutexLock lock(&city_db_mutex_);
+      absl::WriterMutexLock lock(&mmdb_mutex_);
       city_db_ = reloaded_db;
       config_->incDbReloadSuccess(db_type);
     } else if (db_type == ISP_DB_TYPE) {
-      absl::WriterMutexLock lock(&isp_db_mutex_);
+      absl::WriterMutexLock lock(&mmdb_mutex_);
       isp_db_ = reloaded_db;
       config_->incDbReloadSuccess(db_type);
     } else if (db_type == ANON_DB_TYPE) {
-      absl::WriterMutexLock lock(&anon_db_mutex_);
+      absl::WriterMutexLock lock(&mmdb_mutex_);
       anon_db_ = reloaded_db;
       config_->incDbReloadSuccess(db_type);
     } else {

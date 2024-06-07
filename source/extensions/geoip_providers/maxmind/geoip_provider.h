@@ -103,12 +103,10 @@ private:
   // Allow the unit test to have access to private members.
   friend class GeoipProviderPeer;
   GeoipProviderConfigSharedPtr config_;
-  mutable absl::Mutex city_db_mutex_;
-  MaxmindDbSharedPtr city_db_ ABSL_GUARDED_BY(city_db_mutex_);
-  mutable absl::Mutex isp_db_mutex_;
-  MaxmindDbSharedPtr isp_db_ ABSL_GUARDED_BY(isp_db_mutex_);
-  mutable absl::Mutex anon_db_mutex_;
-  MaxmindDbSharedPtr anon_db_ ABSL_GUARDED_BY(anon_db_mutex_);
+  mutable absl::Mutex mmdb_mutex_;
+  MaxmindDbSharedPtr city_db_ ABSL_GUARDED_BY(mmdb_mutex_);
+  MaxmindDbSharedPtr isp_db_ ABSL_GUARDED_BY(mmdb_mutex_);
+  MaxmindDbSharedPtr anon_db_ ABSL_GUARDED_BY(mmdb_mutex_);
   Thread::ThreadPtr mmdb_reload_thread_;
   Event::DispatcherPtr mmdb_reload_dispatcher_;
   Filesystem::WatcherPtr mmdb_watcher_;
@@ -122,7 +120,7 @@ private:
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   absl::Status onMaxmindDbUpdate(const std::string& db_path, const absl::string_view& db_type);
   absl::Status mmdbReload(const MaxmindDbSharedPtr reloaded_db, const absl::string_view& db_type)
-      ABSL_LOCKS_EXCLUDED(city_db_mutex_, isp_db_mutex_, anon_db_mutex_);
+      ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   template <typename... Params>
   void populateGeoLookupResult(MMDB_lookup_result_s& mmdb_lookup_result,
                                absl::flat_hash_map<std::string, std::string>& lookup_result,

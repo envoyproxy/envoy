@@ -114,7 +114,7 @@ public:
     provider_ = provider_factory_->createGeoipProviderDriver(config, "prefix.", context_);
   }
 
-  void expectStats(const std::string& db_type, const uint32_t total_count = 1,
+  void expectStats(const absl::string_view& db_type, const uint32_t total_count = 1,
                    const uint32_t hit_count = 1, const uint32_t error_count = 0) {
     auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
     EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".total")).value(),
@@ -124,7 +124,7 @@ public:
               error_count);
   }
 
-  void expectReloadStats(const std::string& db_type, const uint32_t reload_success_count = 0,
+  void expectReloadStats(const absl::string_view& db_type, const uint32_t reload_success_count = 0,
                          const uint32_t reload_error_count = 0) {
     auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
     EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".db_reload_success")).value(),
