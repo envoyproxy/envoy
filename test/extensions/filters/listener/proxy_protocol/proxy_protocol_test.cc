@@ -131,6 +131,7 @@ public:
   }
   Init::Manager& initManager() override { return *init_manager_; }
   bool ignoreGlobalConnLimit() const override { return false; }
+  bool shouldBypassOverloadManager() const override { return false; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&,
@@ -2712,6 +2713,7 @@ public:
   }
   Init::Manager& initManager() override { return *init_manager_; }
   bool ignoreGlobalConnLimit() const override { return false; }
+  bool shouldBypassOverloadManager() const override { return false; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&,

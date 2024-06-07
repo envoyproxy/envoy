@@ -64,7 +64,7 @@ public:
                         const envoy::HotRestartMessage::Reply::Stats& stats_proto);
 
 protected:
-  void onSocketEventUdpForwarding();
+  absl::Status onSocketEventUdpForwarding();
   void onForwardedUdpPacket(uint32_t worker_index, Network::UdpRecvData&& data);
   // When call to terminate parent is sent, or parent is already terminated,
   void allDrainsImplicitlyComplete();

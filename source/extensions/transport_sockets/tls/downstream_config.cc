@@ -21,8 +21,8 @@ DownstreamSslSocketFactory::createTransportSocketFactory(
           const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext&>(
           message, context.messageValidationVisitor()),
       context);
-  return std::make_unique<ServerSslSocketFactory>(
-      std::move(server_config), context.sslContextManager(), context.statsScope(), server_names);
+  return ServerSslSocketFactory::create(std::move(server_config), context.sslContextManager(),
+                                        context.statsScope(), server_names);
 }
 
 ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {
