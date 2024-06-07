@@ -194,7 +194,8 @@ void FilterChainManagerImpl::addFilterChains(
         std::vector<std::string> ips;
         ips.reserve(prefix_ranges.size());
         for (const auto& ip : prefix_ranges) {
-          const auto& cidr_range = Network::Address::CidrRange::create(ip);
+          const auto& cidr_range = THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(ip),
+                                                         Network::Address::CidrRange);
           ips.push_back(cidr_range.asString());
         }
         return ips;
@@ -457,15 +458,18 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
   std::vector<Network::Address::CidrRange> subnets;
   if (cidr == EMPTY_STRING) {
     if (Network::SocketInterfaceSingleton::get().ipFamilySupported(AF_INET)) {
-      subnets.push_back(
-          Network::Address::CidrRange::create(Network::Utility::getIpv4CidrCatchAllAddress()));
+      subnets.push_back(THROW_OR_RETURN_VALUE(
+          Network::Address::CidrRange::create(Network::Utility::getIpv4CidrCatchAllAddress()),
+          Network::Address::CidrRange));
     }
     if (Network::SocketInterfaceSingleton::get().ipFamilySupported(AF_INET6)) {
-      subnets.push_back(
-          Network::Address::CidrRange::create(Network::Utility::getIpv6CidrCatchAllAddress()));
+      subnets.push_back(THROW_OR_RETURN_VALUE(
+          Network::Address::CidrRange::create(Network::Utility::getIpv6CidrCatchAllAddress()),
+          Network::Address::CidrRange));
     }
   } else {
-    subnets.push_back(Network::Address::CidrRange::create(cidr));
+    subnets.push_back(THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(cidr),
+                                            Network::Address::CidrRange));
   }
   return std::make_pair<T, std::vector<Network::Address::CidrRange>>(T(data), std::move(subnets));
 }

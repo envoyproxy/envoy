@@ -127,7 +127,7 @@ private:
 class ActiveStream : public FilterChainManager,
                      public LinkedObject<ActiveStream>,
                      public Envoy::Event::DeferredDeletable,
-                     public EncodingCallbacks,
+                     public EncodingContext,
                      public Tracing::Config,
                      Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
@@ -173,11 +173,11 @@ public:
       parent_.sendLocalReply(status, data, std::move(func));
     }
     void continueDecoding() override { parent_.continueDecoding(); }
-    void onResponseStart(ResponseHeaderFramePtr frame) override {
-      parent_.onResponseStart(std::move(frame));
+    void onResponseHeaderFrame(ResponseHeaderFramePtr frame) override {
+      parent_.onResponseHeaderFrame(std::move(frame));
     }
-    void onResponseFrame(ResponseCommonFramePtr frame) override {
-      parent_.onResponseFrame(std::move(frame));
+    void onResponseCommonFrame(ResponseCommonFramePtr frame) override {
+      parent_.onResponseCommonFrame(std::move(frame));
     }
     void setRequestFramesHandler(RequestFramesHandler& handler) override {
       ASSERT(parent_.request_stream_frames_handler_ == nullptr,
@@ -249,8 +249,8 @@ public:
 
   void sendLocalReply(Status status, absl::string_view data, ResponseUpdateFunction func);
   void continueDecoding();
-  void onResponseStart(ResponseHeaderFramePtr response_header_frame);
-  void onResponseFrame(ResponseCommonFramePtr response_common_frame);
+  void onResponseHeaderFrame(ResponseHeaderFramePtr response_header_frame);
+  void onResponseCommonFrame(ResponseCommonFramePtr response_common_frame);
   void completeDirectly();
 
   void continueEncoding();
@@ -261,9 +261,7 @@ public:
     factory(callbacks);
   }
 
-  // ResponseEncoderCallback
-  void onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) override;
-  void onEncodingFailure(absl::string_view reason = {}) override;
+  // EncodingContext
   OptRef<const RouteEntry> routeEntry() const override {
     return makeOptRefFromPtr<const RouteEntry>(cached_route_entry_.get());
   }
@@ -309,8 +307,9 @@ private:
 
   void sendRequestFrameToUpstream();
 
-  void sendResponseStartToDownstream();
-  void sendResponseFrameToDownstream();
+  void sendHeaderFrameToDownstream();
+  void sendCommonFrameToDownstream();
+  bool sendFrameToDownstream(const StreamFrame& frame, bool header_frame);
 
   bool active_stream_reset_{false};
 
@@ -394,8 +393,6 @@ public:
   }
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
-
-  void sendFrameToDownstream(StreamFrame& frame, EncodingCallbacks& callbacks);
 
   Network::Connection& downstreamConnection() {
     ASSERT(callbacks_ != nullptr);

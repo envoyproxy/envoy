@@ -60,7 +60,7 @@ protected:
     }
     EXPECT_EQ(quic_ccopts, "6RTOAKD4");
 
-    test_address_ = Network::Utility::resolveUrl(
+    test_address_ = *Network::Utility::resolveUrl(
         absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":30"));
     Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
     EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _)).WillOnce(Return(context));

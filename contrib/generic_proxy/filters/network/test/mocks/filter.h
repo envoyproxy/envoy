@@ -108,8 +108,8 @@ public:
 
   MOCK_METHOD(void, sendLocalReply, (Status, absl::string_view, ResponseUpdateFunction));
   MOCK_METHOD(void, continueDecoding, ());
-  MOCK_METHOD(void, onResponseStart, (ResponseHeaderFramePtr));
-  MOCK_METHOD(void, onResponseFrame, (ResponseCommonFramePtr));
+  MOCK_METHOD(void, onResponseHeaderFrame, (ResponseHeaderFramePtr));
+  MOCK_METHOD(void, onResponseCommonFrame, (ResponseCommonFramePtr));
   MOCK_METHOD(void, setRequestFramesHandler, (RequestFramesHandler&));
   MOCK_METHOD(void, completeDirectly, ());
 };

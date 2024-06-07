@@ -27,9 +27,9 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
   if (!config.isReady()) {
     return nullptr;
   }
-
-  Envoy::Ssl::ClientContextSharedPtr context =
-      std::make_shared<ClientContextImpl>(scope, config, factory_context_);
+  auto context_or_error = ClientContextImpl::create(scope, config, factory_context_);
+  RETURN_IF_NOT_OK(context_or_error.status());
+  Envoy::Ssl::ClientContextSharedPtr context = std::move(context_or_error.value());
   contexts_.insert(context);
   return context;
 }

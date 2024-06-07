@@ -11,17 +11,19 @@ void ListenerFilterFuzzer::fuzz(
     const test::extensions::filters::listener::FilterFuzzTestCase& input) {
   try {
     socket_.connectionInfoProvider().setLocalAddress(
-        Network::Utility::resolveUrl(input.sock().local_address()));
+        THROW_OR_RETURN_VALUE(Network::Utility::resolveUrl(input.sock().local_address()),
+                              Network::Address::InstanceConstSharedPtr));
   } catch (const EnvoyException& e) {
-    socket_.connectionInfoProvider().setLocalAddress(
-        Network::Utility::resolveUrl("tcp://0.0.0.0:0"));
+    socket_.connectionInfoProvider().setLocalAddress(THROW_OR_RETURN_VALUE(
+        Network::Utility::resolveUrl("tcp://0.0.0.0:0"), Network::Address::InstanceConstSharedPtr));
   }
   try {
     socket_.connectionInfoProvider().setRemoteAddress(
-        Network::Utility::resolveUrl(input.sock().remote_address()));
+        THROW_OR_RETURN_VALUE(Network::Utility::resolveUrl(input.sock().remote_address()),
+                              Network::Address::InstanceConstSharedPtr));
   } catch (const EnvoyException& e) {
-    socket_.connectionInfoProvider().setRemoteAddress(
-        Network::Utility::resolveUrl("tcp://0.0.0.0:0"));
+    socket_.connectionInfoProvider().setRemoteAddress(THROW_OR_RETURN_VALUE(
+        Network::Utility::resolveUrl("tcp://0.0.0.0:0"), Network::Address::InstanceConstSharedPtr));
   }
 
   filter->onAccept(cb_);

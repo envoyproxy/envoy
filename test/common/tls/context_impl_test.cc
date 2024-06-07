@@ -132,11 +132,10 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
-  EXPECT_THROW_WITH_MESSAGE(
-      manager_.createSslClientContext(*store_.rootScope(), cfg).IgnoreError(), EnvoyException,
-      "Failed to initialize cipher suites "
-      "-ALL:+[AES128-SHA|BOGUS1-SHA256]:BOGUS2-SHA:AES256-SHA. The following "
-      "ciphers were rejected when tried individually: BOGUS1-SHA256, BOGUS2-SHA");
+  EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), cfg).status().message(),
+            "Failed to initialize cipher suites "
+            "-ALL:+[AES128-SHA|BOGUS1-SHA256]:BOGUS2-SHA:AES256-SHA. The following "
+            "ciphers were rejected when tried individually: BOGUS1-SHA256, BOGUS2-SHA");
 }
 
 TEST_F(SslContextImplTest, TestExpiringCert) {
@@ -1187,9 +1186,9 @@ TEST_F(ClientContextConfigImplTest, InvalidCertificateHash) {
                                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   ClientContextConfigImpl client_context_config(tls_context, factory_context);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(
-      manager_.createSslClientContext(*store.rootScope(), client_context_config).IgnoreError(),
-      EnvoyException, "Invalid hex-encoded SHA-256 .*");
+  EXPECT_THAT(
+      manager_.createSslClientContext(*store.rootScope(), client_context_config).status().message(),
+      testing::MatchesRegex("Invalid hex-encoded SHA-256 .*"));
 }
 
 // Validate that values other than a base64-encoded SHA-256 fail config validation.
@@ -1202,9 +1201,9 @@ TEST_F(ClientContextConfigImplTest, InvalidCertificateSpki) {
       ->add_verify_certificate_spki("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   ClientContextConfigImpl client_context_config(tls_context, factory_context);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(
-      manager_.createSslClientContext(*store.rootScope(), client_context_config).IgnoreError(),
-      EnvoyException, "Invalid base64-encoded SHA-256 .*");
+  EXPECT_THAT(
+      manager_.createSslClientContext(*store.rootScope(), client_context_config).status().message(),
+      testing::MatchesRegex("Invalid base64-encoded SHA-256 .*"));
 }
 
 // Validate that 2048-bit RSA certificates load successfully.
@@ -1246,9 +1245,9 @@ TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
       "with 2048-bit or larger keys are supported"
 #endif
   );
-  EXPECT_THROW_WITH_REGEX(
-      manager_.createSslClientContext(*store.rootScope(), client_context_config).IgnoreError(),
-      EnvoyException, error_msg);
+  EXPECT_THAT(
+      manager_.createSslClientContext(*store.rootScope(), client_context_config).status().message(),
+      testing::MatchesRegex(error_msg));
 }
 
 // Validate that 1024-bit RSA certificates are rejected from `pkcs12`.
@@ -1271,9 +1270,9 @@ TEST_F(ClientContextConfigImplTest, RSA1024Pkcs12) {
                         "with 2048-bit or larger keys are supported"
 #endif
   );
-  EXPECT_THROW_WITH_REGEX(
-      manager_.createSslClientContext(*store.rootScope(), client_context_config).IgnoreError(),
-      EnvoyException, error_msg);
+  EXPECT_THAT(
+      manager_.createSslClientContext(*store.rootScope(), client_context_config).status().message(),
+      testing::MatchesRegex(error_msg));
 }
 
 // Validate that 3072-bit RSA certificates load successfully.
@@ -1341,11 +1340,11 @@ TEST_F(ClientContextConfigImplTest, NonP256EcdsaCert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(
-      manager_.createSslClientContext(*store.rootScope(), client_context_config).IgnoreError(),
-      EnvoyException,
-      "Failed to load certificate chain from .*selfsigned_ecdsa_p384_cert.pem, "
-      "only P-256 ECDSA certificates are supported");
+  EXPECT_THAT(
+      manager_.createSslClientContext(*store.rootScope(), client_context_config).status().message(),
+      testing::ContainsRegex(
+          "Failed to load certificate chain from .*selfsigned_ecdsa_p384_cert.pem, "
+          "only P-256 ECDSA certificates are supported"));
 }
 
 // Validate that non-P256 ECDSA certs are rejected loaded from `pkcs12`.
@@ -1359,11 +1358,11 @@ TEST_F(ClientContextConfigImplTest, NonP256EcdsaPkcs12) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(
-      manager_.createSslClientContext(*store.rootScope(), client_context_config).IgnoreError(),
-      EnvoyException,
-      "Failed to load certificate chain from .*selfsigned_ecdsa_p384_certkey.p12, "
-      "only P-256 ECDSA certificates are supported");
+  EXPECT_THAT(
+      manager_.createSslClientContext(*store.rootScope(), client_context_config).status().message(),
+      testing::ContainsRegex(
+          "Failed to load certificate chain from .*selfsigned_ecdsa_p384_certkey.p12, "
+          "only P-256 ECDSA certificates are supported"));
 }
 
 // Multiple TLS certificates are not yet supported.
@@ -1587,9 +1586,9 @@ TEST_F(ClientContextConfigImplTest, PasswordWrongPkcs12) {
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(
-      manager_.createSslClientContext(*store.rootScope(), client_context_config).IgnoreError(),
-      EnvoyException, absl::StrCat("Failed to load pkcs12 from ", pkcs12_path));
+  EXPECT_EQ(
+      manager_.createSslClientContext(*store.rootScope(), client_context_config).status().message(),
+      absl::StrCat("Failed to load pkcs12 from ", pkcs12_path));
 }
 
 // Validate that not supplying a passphrase for password-protected `PKCS12`
@@ -1615,9 +1614,9 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedPkcs12) {
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(
-      manager_.createSslClientContext(*store.rootScope(), client_context_config).IgnoreError(),
-      EnvoyException, absl::StrCat("Failed to load pkcs12 from ", pkcs12_path));
+  EXPECT_EQ(
+      manager_.createSslClientContext(*store.rootScope(), client_context_config).status().message(),
+      absl::StrCat("Failed to load pkcs12 from ", pkcs12_path));
 }
 
 // Validate that not supplying a passphrase for password-protected TLS certificates
@@ -1646,9 +1645,9 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedTlsCertificates) {
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(
-      manager_.createSslClientContext(*store.rootScope(), client_context_config).IgnoreError(),
-      EnvoyException, absl::StrCat("Failed to load private key from ", private_key_path));
+  EXPECT_THAT(
+      manager_.createSslClientContext(*store.rootScope(), client_context_config).status().message(),
+      testing::ContainsRegex(absl::StrCat("Failed to load private key from ", private_key_path)));
 }
 
 // Validate that client context config with static certificate validation context is created
@@ -2203,9 +2202,10 @@ TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndCertChain) {
 class TestContextImpl : public ContextImpl {
 public:
   TestContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
-                  Server::Configuration::ServerFactoryContext& factory_context)
-      : ContextImpl(scope, config, factory_context, nullptr), pool_(scope.symbolTable()),
-        fallback_(pool_.add("fallback")) {}
+                  Server::Configuration::ServerFactoryContext& factory_context,
+                  absl::Status& creation_status)
+      : ContextImpl(scope, config, factory_context, nullptr, creation_status),
+        pool_(scope.symbolTable()), fallback_(pool_.add("fallback")) {}
 
   void incCounter(absl::string_view name, absl::string_view value) {
     ContextImpl::incCounter(pool_.add(name), value, fallback_);
@@ -2221,8 +2221,10 @@ protected:
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context_);
     client_context_config_ =
         std::make_unique<ClientContextConfigImpl>(tls_context_, factory_context_);
+    absl::Status creation_status = absl::OkStatus();
     context_ = std::make_unique<TestContextImpl>(*store_.rootScope(), *client_context_config_,
-                                                 server_factory_context_);
+                                                 server_factory_context_, creation_status);
+    EXPECT_TRUE(creation_status.ok());
   }
 
   Stats::TestUtil::TestStore store_;

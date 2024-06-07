@@ -218,13 +218,11 @@ typed_config:
         sds_config:
           path_config_source:
             path: "{{ test_tmpdir }}/token_secret.yaml"
-          resource_api_version: V3
       hmac_secret:
         name: hmac
         sds_config:
           path_config_source:
             path: "{{ test_tmpdir }}/hmac_secret.yaml"
-          resource_api_version: V3
     use_refresh_token: true
     auth_scopes:
     - user
@@ -588,13 +586,11 @@ typed_config:
         sds_config:
           path_config_source:
             path: "{{ test_tmpdir }}/token_secret.yaml"
-          resource_api_version: V3
       hmac_secret:
         name: hmac
         sds_config:
           path_config_source:
             path: "{{ test_tmpdir }}/hmac_secret.yaml"
-          resource_api_version: V3
     auth_scopes:
     - user
     - openid

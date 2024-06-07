@@ -1879,8 +1879,9 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
     return;
   }
   status_code_ = static_cast<uint32_t>(WasmResult::BrokenConnection);
-  // This is the only value currently.
-  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  // TODO(botengyao): handle different failure reasons.
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
+         reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
   status_message_ = "reset";
   // Deferred "after VM call" actions are going to be executed upon returning from
   // ContextBase::*, which might include deleting Context object via proxy_done().

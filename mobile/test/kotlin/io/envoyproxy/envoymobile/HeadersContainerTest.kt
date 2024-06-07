@@ -2,8 +2,11 @@ package io.envoyproxy.envoymobile
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
-class HeadersContainerest {
+@RunWith(RobolectricTestRunner::class)
+class HeadersContainerTest {
   @Test
   fun `instantiation preserves all headers from input headers map`() {
     val headers = mapOf("a" to mutableListOf<String>("456"), "b" to mutableListOf<String>("123"))
