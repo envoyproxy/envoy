@@ -471,9 +471,8 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
       // Allow reading up to 100 bytes.
       streams[i]->readData(100);
     };
-    stream_callbacks.on_error_ = [](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {
-      RELEASE_ASSERT(0, "unexpected");
-    };
+    stream_callbacks.on_error_ = [](const EnvoyError&, envoy_stream_intel,
+                                    envoy_final_stream_intel) { RELEASE_ASSERT(0, "unexpected"); };
 
     auto stream = createNewStream(std::move(stream_callbacks));
     stream->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),

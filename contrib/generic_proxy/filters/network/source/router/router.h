@@ -45,7 +45,7 @@ class RouterFilter;
 
 class UpstreamRequest : public UpstreamRequestCallbacks,
                         public LinkedObject<UpstreamRequest>,
-                        public EncodingCallbacks,
+                        public EncodingContext,
                         Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   UpstreamRequest(RouterFilter& parent, StreamFlags stream_flags,
@@ -68,17 +68,16 @@ public:
   void onDecodingSuccess(ResponseCommonFramePtr response_common_frame) override;
   void onDecodingFailure(absl::string_view reason) override;
 
-  // RequestEncoderCallback
-  void onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) override;
-  void onEncodingFailure(absl::string_view reason) override;
+  // EncodingContext
   OptRef<const RouteEntry> routeEntry() const override;
 
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
   void onUpstreamConnectionReady();
   void encodeBufferToUpstream(Buffer::Instance& buffer);
 
-  void sendRequestStartToUpstream();
-  void sendRequestFrameToUpstream();
+  void sendHeaderFrameToUpstream();
+  void sendCommonFrameToUpstream();
+  bool sendFrameToUpstream(const StreamFrame& frame, bool header_frame);
 
   void onUpstreamResponseComplete(bool drain_close);
 
@@ -140,8 +139,8 @@ public:
   }
   FilterStatus onStreamDecoded(StreamRequest& request) override;
 
-  void onResponseStart(ResponseHeaderFramePtr response_header_frame);
-  void onResponseFrame(ResponseCommonFramePtr response_common_frame);
+  void onResponseHeaderFrame(ResponseHeaderFramePtr response_header_frame);
+  void onResponseCommonFrame(ResponseCommonFramePtr response_common_frame);
   void completeDirectly();
 
   void onUpstreamRequestReset(UpstreamRequest& upstream_request, StreamResetReason reason,

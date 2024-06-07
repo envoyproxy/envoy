@@ -104,13 +104,13 @@ public:
    * Called when the upstream response frame is received. This should only be called once.
    * @param frame supplies the upstream response frame.
    */
-  virtual void onResponseStart(ResponseHeaderFramePtr frame) PURE;
+  virtual void onResponseHeaderFrame(ResponseHeaderFramePtr frame) PURE;
 
   /**
    * Called when the upstream response frame is received.
    * @param frame supplies the upstream frame.
    */
-  virtual void onResponseFrame(ResponseCommonFramePtr frame) PURE;
+  virtual void onResponseCommonFrame(ResponseCommonFramePtr frame) PURE;
 
   /**
    * Register a request frames handler to used to handle the request frames (except the special

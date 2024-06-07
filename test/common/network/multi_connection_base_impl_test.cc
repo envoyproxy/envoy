@@ -297,7 +297,8 @@ TEST_F(MultiConnectionBaseImplTest, HashKey) {
   startConnect();
 
   std::vector<uint8_t> hash_key = {'A', 'B', 'C'};
-  uint8_t* id_array = reinterpret_cast<uint8_t*>(&id);
+  uint8_t id_array[sizeof(id)];
+  absl::little_endian::Store64(id_array, id);
   impl_->hashKey(hash_key);
   EXPECT_EQ(3 + sizeof(id), hash_key.size());
   EXPECT_EQ('A', hash_key[0]);
