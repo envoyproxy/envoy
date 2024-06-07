@@ -22,7 +22,7 @@ namespace Golang {
 
 class Filter;
 
-class BufferList : NonCopyable {
+class BufferList : public NonCopyable {
 public:
   BufferList() = default;
 
