@@ -572,10 +572,16 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       using_new_timeouts_(route.route().has_max_stream_duration()),
       match_grpc_(route.match().has_grpc()),
       case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
-  auto body_or_error = ConfigUtility::parseDirectResponseBody(
-      route, factory_context.api(), vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
-  SET_AND_RETURN_IF_NOT_OK(body_or_error.status(), creation_status);
-  direct_response_body_ = body_or_error.value();
+
+  if (route.has_direct_response() && route.direct_response().has_body()) {
+
+    auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider::create(
+        route.direct_response().body(), factory_context.mainThreadDispatcher(),
+        factory_context.threadLocal(), factory_context.api(), true,
+        vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
+    SET_AND_RETURN_IF_NOT_OK(provider_or_error.status(), creation_status);
+    direct_response_body_provider_ = std::move(provider_or_error.value());
+  }
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
     request_headers_parser_ = THROW_OR_RETURN_VALUE(
         HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove()),

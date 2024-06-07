@@ -2,10 +2,12 @@
 #include <memory>
 
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
@@ -15,6 +17,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -80,7 +83,10 @@ public:
           EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
           return logger_;
         });
-    return std::make_unique<AccessLog>(FilterPtr{filter_}, config_, tls_, logger_cache_);
+    auto commands =
+        Formatter::SubstitutionFormatStringUtils::parseFormatters(config_.formatters(), context_);
+
+    return std::make_unique<AccessLog>(FilterPtr{filter_}, config_, tls_, logger_cache_, commands);
   }
 
   void expectLog(const std::string& expected_log_entry_yaml) {
@@ -94,6 +100,7 @@ public:
 
   MockFilter* filter_{new NiceMock<MockFilter>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config_;
   std::shared_ptr<MockGrpcAccessLogger> logger_{new MockGrpcAccessLogger()};
   std::shared_ptr<MockGrpcAccessLoggerCache> logger_cache_{new MockGrpcAccessLoggerCache()};

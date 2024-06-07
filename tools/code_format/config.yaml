@@ -117,7 +117,11 @@ paths:
     - source/common/quic/quic_server_transport_socket_factory.cc
     - source/common/grpc/google_grpc_utils.cc
     - source/common/tcp_proxy/tcp_proxy.cc
-    - source/common/config/subscription_factory_impl.cc
+    - source/common/listener_manager/lds_api.cc
+    - source/common/upstream/od_cds_api_impl.cc
+    - source/common/upstream/cds_api_impl.cc
+    - source/common/router/vhds.cc
+    - source/common/rds/rds_route_config_subscription.cc
     - source/common/filter/config_discovery_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc

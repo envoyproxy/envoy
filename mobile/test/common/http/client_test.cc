@@ -477,9 +477,8 @@ TEST_P(ClientTest, EnvoyLocalError) {
   stream_callbacks.on_error_ = [&](const EnvoyError& error, envoy_stream_intel,
                                    envoy_final_stream_intel) -> void {
     EXPECT_EQ(error.error_code_, ENVOY_CONNECTION_FAILURE);
-    EXPECT_THAT(
-        error.message_,
-        Eq("RESPONSE_CODE: 503|ERROR_CODE: 2|RESPONSE_FLAGS: 4,26|DETAILS: failed miserably"));
+    EXPECT_THAT(error.message_, Eq("RESPONSE_CODE: 503|ERROR_CODE: 2|RESPONSE_FLAGS: "
+                                   "4,26|PROTOCOL: 3|DETAILS: failed miserably"));
     EXPECT_EQ(error.attempt_count_, 123);
     callbacks_called.on_error_calls_++;
   };
@@ -503,6 +502,7 @@ TEST_P(ClientTest, EnvoyLocalError) {
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag(StreamInfo::UpstreamRemoteReset));
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag(StreamInfo::DnsResolutionFailed));
   stream_info_.setAttemptCount(123);
+  EXPECT_CALL(stream_info_, protocol()).WillRepeatedly(Return(Http::Protocol::Http3));
   response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalConnectionFailure);
   ASSERT_EQ(callbacks_called.on_headers_calls_, 0);
   // Ensure that the callbacks on the EnvoyStreamCallbacks were called.

@@ -20,8 +20,11 @@ namespace Envoy {
 namespace Config {
 namespace DataSource {
 
+class DataSourceProvider;
+
 using ProtoDataSource = envoy::config::core::v3::DataSource;
 using ProtoWatchedDirectory = envoy::config::core::v3::WatchedDirectory;
+using DataSourceProviderPtr = std::unique_ptr<DataSourceProvider>;
 
 /**
  * Read contents of the DataSource.
@@ -54,7 +57,7 @@ public:
               Filesystem::WatcherPtr watcher);
   ~DynamicData();
 
-  absl::string_view data() const;
+  const std::string& data() const;
 
 private:
   Event::Dispatcher& dispatcher_;
@@ -85,12 +88,11 @@ public:
    * NOTE: If file watch is enabled and the new file content does not meet the
    * requirements (allow_empty, max_size), the provider will keep the old content.
    */
-  static absl::StatusOr<DataSourceProvider> create(const ProtoDataSource& source,
-                                                   Event::Dispatcher& main_dispatcher,
-                                                   ThreadLocal::SlotAllocator& tls, Api::Api& api,
-                                                   bool allow_empty, uint64_t max_size = 0);
+  static absl::StatusOr<DataSourceProviderPtr>
+  create(const ProtoDataSource& source, Event::Dispatcher& main_dispatcher,
+         ThreadLocal::SlotAllocator& tls, Api::Api& api, bool allow_empty, uint64_t max_size = 0);
 
-  absl::string_view data() const;
+  const std::string& data() const;
 
 private:
   DataSourceProvider(std::string&& data) : data_(std::move(data)) {}
