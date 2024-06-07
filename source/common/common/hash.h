@@ -138,10 +138,12 @@ private:
   static inline uint64_t unalignedLoad(const char* p) {
     uint64_t result;
     safeMemcpyUnsafeSrc(&result, p);
-    return result;
+    // byte swap to little endian on big endian platforms so hash values are the same regardless
+    // of host endianness.
+    return htole64(result);
   }
 
-  // Loads n bytes, where 1 <= n < 8.
+  // Loads n bytes in little endian format, where 1 <= n < 8.
   static inline uint64_t loadBytes(const char* p, int n) {
     uint64_t result = 0;
     --n;
