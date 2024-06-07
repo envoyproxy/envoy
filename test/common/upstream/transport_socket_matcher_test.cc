@@ -318,7 +318,7 @@ transport_socket:
  )EOF",
         R"EOF(
 name: "two"
-match: 
+match:
   whodis: "two"
 transport_socket:
   name: "two"
@@ -353,7 +353,7 @@ transport_socket:
  )EOF",
         R"EOF(
 name: "locality"
-match: 
+match:
   whodis: "locality"
 transport_socket:
   name: "locality"
