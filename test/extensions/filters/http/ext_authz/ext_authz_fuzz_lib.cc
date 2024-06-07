@@ -26,6 +26,7 @@ ReusableFilterFactory::ReusableFilterFactory()
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_callbacks_.stream_info_, dynamicMetadata())
       .WillByDefault(testing::ReturnRef(metadata_));
+  ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault(testing::Return(&decoding_buffer_));
 }
 
 std::unique_ptr<Filter>
