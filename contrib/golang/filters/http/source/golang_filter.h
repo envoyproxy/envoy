@@ -343,13 +343,6 @@ private:
   const FilterConfigSharedPtr config_;
   Dso::HttpFilterDsoPtr dynamic_lib_;
 
-  // save temp values from local reply
-  // useless now
-  /*
-  Http::RequestOrResponseHeaderMap* local_headers_{nullptr};
-  Http::HeaderMap* local_trailers_{nullptr};
-  */
-
   // save temp values for fetching request attributes in the later phase,
   // like getting request size
   Http::RequestOrResponseHeaderMap* request_headers_{nullptr};
