@@ -45,10 +45,10 @@ public:
     return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterAction>();
   }
 
-private:
   float getSkipRatio(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action);
 
+private:
   Matcher::ActionFactoryCb createAtionFactoryCbCommon(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
