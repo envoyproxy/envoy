@@ -293,7 +293,8 @@ public:
                                GoInt32* rc);
 
   bool isProcessingInGo() {
-    return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();
+    return is_golang_processing_log_ || decoding_state_.isProcessingInGo() ||
+           encoding_state_.isProcessingInGo();
   }
   void deferredDeleteRequest(HttpRequestInternal* req);
 
@@ -360,10 +361,7 @@ private:
   Thread::MutexBasicLockable mutex_{};
   bool has_destroyed_ ABSL_GUARDED_BY(mutex_){false};
 
-  // other filter trigger sendLocalReply during go processing in async.
-  // will wait go return before continue.
-  // this variable is read/write in safe thread, do no need lock.
-  // bool local_reply_waiting_go_{false};
+  bool is_golang_processing_log_{false};
 };
 
 struct httpConfigInternal : httpConfig {

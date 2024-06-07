@@ -161,15 +161,18 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
   switch (log_context.accessLogType()) {
   case Envoy::AccessLog::AccessLogType::DownstreamStart:
   case Envoy::AccessLog::AccessLogType::DownstreamPeriodic:
-  case Envoy::AccessLog::AccessLogType::DownstreamEnd: {
+  case Envoy::AccessLog::AccessLogType::DownstreamEnd:
     // log called by AccessLogDownstreamStart will happen before doHeaders
     if (initRequest()) {
       request_headers_ = static_cast<Http::RequestOrResponseHeaderMap*>(
           const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders()));
     }
 
+    // This only run in the work thread, it's safe even without lock.
+    is_golang_processing_log_ = true;
     dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()));
-  } break;
+    is_golang_processing_log_ = false;
+    break;
   default:
     // skip calling with unsupported log types
     break;
