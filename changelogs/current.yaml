@@ -30,7 +30,7 @@ behavior_changes:
   change: |
     Added support for observability mode. If enabled, each part of the HTTP request or response specified by ProcessingMode
     is sent without pausing on filter chain iteration. It is "Send and Go" mode that can be used by external processor to
-    observe Envoy data and status
+    observe Envoy data and status.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
