@@ -176,7 +176,7 @@ TEST(DataSourceProviderTest, NonFileDataSourceTest) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider_or_error =
-      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 15);
+      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
   EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
 }
 
