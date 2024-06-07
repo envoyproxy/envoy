@@ -590,7 +590,6 @@ CAPIStatus Filter::setHeader(ProcessorState& state, absl::string_view key, absl:
     // in the Go thread.
     state.getDispatcher().post([this, headers, weak_ptr, key_str, value_str, act] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
-        Thread::LockGuard lock(mutex_);
         switch (act) {
         case HeaderAdd:
           headers->addCopy(Http::LowerCaseString(key_str), value_str);
@@ -642,7 +641,6 @@ CAPIStatus Filter::removeHeader(ProcessorState& state, absl::string_view key) {
     // in the Go thread.
     state.getDispatcher().post([this, weak_ptr, headers, key_str] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
-        Thread::LockGuard lock(mutex_);
         headers->remove(Http::LowerCaseString(key_str));
       } else {
         ENVOY_LOG(debug, "golang filter has gone or destroyed in removeHeader");
@@ -782,7 +780,6 @@ CAPIStatus Filter::setTrailer(ProcessorState& state, absl::string_view key, absl
     // writing in the Go thread.
     state.getDispatcher().post([this, trailers, weak_ptr, key_str, value_str, act] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
-        Thread::LockGuard lock(mutex_);
         switch (act) {
         case HeaderAdd:
           trailers->addCopy(Http::LowerCaseString(key_str), value_str);
@@ -830,7 +827,6 @@ CAPIStatus Filter::removeTrailer(ProcessorState& state, absl::string_view key) {
     // in the Go thread.
     state.getDispatcher().post([this, trailers, weak_ptr, key_str] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
-        Thread::LockGuard lock(mutex_);
         trailers->remove(Http::LowerCaseString(key_str));
       } else {
         ENVOY_LOG(debug, "golang filter has gone or destroyed in removeTrailer");
@@ -1069,7 +1065,6 @@ CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view
     getDispatcher().post(
         [this, weak_ptr, key_str, filter_state, state_type, life_span, stream_sharing] {
           if (!weak_ptr.expired() && !hasDestroyed()) {
-            Thread::LockGuard lock(mutex_);
             streamInfo().filterState()->setData(
                 key_str, filter_state, static_cast<StreamInfo::FilterState::StateType>(state_type),
                 static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
