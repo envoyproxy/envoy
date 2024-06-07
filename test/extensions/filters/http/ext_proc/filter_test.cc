@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <cstdint>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -4058,7 +4057,7 @@ TEST_F(HttpFilterTest, HeaderProcessingInObservabilityMode) {
   request_headers_.addCopy(LowerCaseString("content-length"), 10);
   request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
 
-  // In the observability mode, the filter returns `Continue` in all events of http resquest
+  // In the observability mode, the filter returns `Continue` in all events of http request
   // lifecycle.
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   processRequestHeaders(false,

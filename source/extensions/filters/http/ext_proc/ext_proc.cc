@@ -351,7 +351,10 @@ void Filter::onDestroy() {
   }
 
   if (config_->observabilityMode()) {
-    // Perform deferred close on the stream in observability mode only.
+    // In observability mode where the main stream processing and side stream processing are
+    // asynchronous, it is possible that filter instance is destroyed before the side stream request
+    // arrives at ext_proc server. In order to prevent the data loss in this case, side stream
+    // closure is deferred upon filter destruction with a timer.
     deferredCloseStream();
   } else {
     // Perform immediate close on the stream otherwise.
@@ -1318,6 +1321,8 @@ void DeferredDeletableStream::closeStreamOnTimer(Filter* filter) {
   parent.erase(filter);
 }
 
+// In the deferred closure mode, stream closure is deferred upon filter destruction, with a timer
+// to prevent unbounded resource usage growth.
 void DeferredDeletableStream::deferredClose(Envoy::Event::Dispatcher& dispatcher, Filter* filter) {
   derferred_close_timer = dispatcher.createTimer([this, filter] { closeStreamOnTimer(filter); });
   derferred_close_timer->enableTimer(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
