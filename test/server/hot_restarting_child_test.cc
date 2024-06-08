@@ -47,7 +47,7 @@ public:
         .WillOnce([this, buffer](int, const msghdr* msg, int) {
           *buffer =
               std::string{static_cast<char*>(msg->msg_iov[0].iov_base), msg->msg_iov[0].iov_len};
-          EXPECT_TRUE(udp_file_ready_callback_(Event::FileReadyType::Read).ok());
+          THROW_IF_NOT_OK(udp_file_ready_callback_(Event::FileReadyType::Read));
           return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
         });
     EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).WillRepeatedly([buffer](int, msghdr* msg, int) {
@@ -145,8 +145,8 @@ TEST_F(HotRestartingChildWithSkipAndNoParentTest, SkipsOtherActionsIfParentConne
 }
 
 TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalled) {
-  auto test_listener_addr = Network::Utility::resolveUrl("udp://127.0.0.1:1234");
-  auto test_listener_addr2 = Network::Utility::resolveUrl("udp://127.0.0.1:1235");
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  auto test_listener_addr2 = *Network::Utility::resolveUrl("udp://127.0.0.1:1235");
   testing::MockFunction<void()> callback1;
   testing::MockFunction<void()> callback2;
   hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
@@ -160,8 +160,8 @@ TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalled) {
 }
 
 TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalledImmediatelyWhenAlreadyDrained) {
-  auto test_listener_addr = Network::Utility::resolveUrl("udp://127.0.0.1:1234");
-  auto test_listener_addr2 = Network::Utility::resolveUrl("udp://127.0.0.1:1235");
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  auto test_listener_addr2 = *Network::Utility::resolveUrl("udp://127.0.0.1:1235");
   testing::MockFunction<void()> callback1;
   testing::MockFunction<void()> callback2;
   fake_parent_->expectParentTerminateMessages();
@@ -255,8 +255,8 @@ TEST_F(HotRestartingChildTest, ForwardsPacketToRegisteredListenerOnMatch) {
   envoy::HotRestartMessage msg;
   auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
   auto mock_udp_listener_config = std::make_shared<Network::MockUdpListenerConfig>();
-  auto test_listener_addr = Network::Utility::resolveUrl("udp://127.0.0.1:1234");
-  auto test_remote_addr = Network::Utility::resolveUrl("udp://127.0.0.1:4321");
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  auto test_remote_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:4321");
   HotRestartUdpForwardingTestHelper(*hot_restarting_child_)
       .registerUdpForwardingListener(
           test_listener_addr,

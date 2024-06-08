@@ -119,9 +119,11 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
-      request_headers_parser_(Router::HeaderParser::configure(
-          config.http_service().authorization_request().headers_to_add(),
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)),
+      request_headers_parser_(THROW_OR_RETURN_VALUE(
+          Router::HeaderParser::configure(
+              config.http_service().authorization_request().headers_to_add(),
+              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
+          Router::HeaderParserPtr)),
       encode_raw_headers_(config.encode_raw_headers()) {}
 
 MatcherSharedPtr
@@ -290,7 +292,9 @@ void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
 void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
                                   Http::AsyncClient::FailureReason reason) {
-  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  // TODO(botengyao): handle different failure reasons.
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
+         reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
   callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
   callbacks_ = nullptr;
 }

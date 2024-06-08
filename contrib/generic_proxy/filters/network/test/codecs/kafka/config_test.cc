@@ -144,7 +144,7 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
   {
     // Test encode() method with non-response frame.
 
-    NiceMock<GenericProxy::MockEncodingCallbacks> encoding_callbacks;
+    NiceMock<GenericProxy::MockEncodingContext> encoding_context;
 
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
@@ -153,30 +153,27 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
     KafkaRequestFrame request_frame(request);
 
-    // Do nothing.
-    server_codec.encode(request_frame, encoding_callbacks);
+    auto status_or = server_codec.encode(request_frame, encoding_context);
+    EXPECT_FALSE(status_or.ok());
+    EXPECT_EQ(status_or.status().message(), "Invalid response frame type");
   }
 
   {
     // Test encode() method without actual response.
 
-    NiceMock<GenericProxy::MockEncodingCallbacks> encoding_callbacks;
-    NiceMock<Network::MockServerConnection> mock_connection;
+    NiceMock<GenericProxy::MockEncodingContext> encoding_context;
 
     KafkaResponseFrame response_frame(nullptr);
 
-    // Expect close connection.
-    EXPECT_CALL(callbacks, connection())
-        .WillOnce(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
-    EXPECT_CALL(mock_connection, close(Network::ConnectionCloseType::FlushWrite));
-
-    server_codec.encode(response_frame, encoding_callbacks);
+    auto status_or = server_codec.encode(response_frame, encoding_context);
+    EXPECT_FALSE(status_or.ok());
+    EXPECT_EQ(status_or.status().message(), "Invalid empty response frame");
   }
 
   {
     // Test encode() method with response.
 
-    NiceMock<GenericProxy::MockEncodingCallbacks> encoding_callbacks;
+    NiceMock<GenericProxy::MockEncodingContext> encoding_context;
 
     auto response =
         std::make_shared<NetworkFilters::Kafka::Response<NetworkFilters::Kafka::FetchResponse>>(
@@ -191,11 +188,12 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
     dst_buffer.add(&size, sizeof(size)); // Encode data length.
     response->encode(dst_buffer);
 
-    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, true))
-        .WillOnce(testing::Invoke([&](Buffer::Instance& buffer, bool) {
+    EXPECT_CALL(callbacks, writeToConnection(_))
+        .WillOnce(testing::Invoke([&](Buffer::Instance& buffer) {
           EXPECT_EQ(buffer.toString(), dst_buffer.toString());
+          buffer.drain(buffer.length());
         }));
-    server_codec.encode(response_frame, encoding_callbacks);
+    EXPECT_TRUE(server_codec.encode(response_frame, encoding_context).ok());
   }
 }
 
@@ -233,7 +231,7 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
   {
     // Test encode() method with non-request frame.
 
-    NiceMock<GenericProxy::MockEncodingCallbacks> encoding_callbacks;
+    NiceMock<GenericProxy::MockEncodingContext> encoding_context;
 
     auto response =
         std::make_shared<NetworkFilters::Kafka::Response<NetworkFilters::Kafka::FetchResponse>>(
@@ -242,14 +240,15 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
             NetworkFilters::Kafka::FetchResponse({}, {}));
     KafkaResponseFrame response_frame(response);
 
-    // Do nothing.
-    client_codec.encode(response_frame, encoding_callbacks);
+    auto status_or = client_codec.encode(response_frame, encoding_context);
+    EXPECT_FALSE(status_or.ok());
+    EXPECT_EQ(status_or.status().message(), "Invalid request frame type");
   }
 
   {
     // Test encode() method with request.
 
-    NiceMock<GenericProxy::MockEncodingCallbacks> encoding_callbacks;
+    NiceMock<GenericProxy::MockEncodingContext> encoding_context;
 
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
@@ -264,12 +263,13 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
     dst_buffer.add(&size, sizeof(size)); // Encode data length.
     request->encode(dst_buffer);
 
-    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, true))
-        .WillOnce(testing::Invoke([&](Buffer::Instance& buffer, bool) {
+    EXPECT_CALL(callbacks, writeToConnection(_))
+        .WillOnce(testing::Invoke([&](Buffer::Instance& buffer) {
           EXPECT_EQ(buffer.toString(), dst_buffer.toString());
+          buffer.drain(buffer.length());
         }));
 
-    client_codec.encode(request_frame, encoding_callbacks);
+    EXPECT_TRUE(client_codec.encode(request_frame, encoding_context).ok());
   }
 }
 

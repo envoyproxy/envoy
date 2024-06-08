@@ -4,8 +4,11 @@ import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import org.junit.Test
+import org.junit.runner.RunWith
 import org.mockito.Mockito.mock
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class EngineBuilderTest {
   private lateinit var engineBuilder: EngineBuilder
   private var envoyEngine: EnvoyEngine = mock(EnvoyEngine::class.java)

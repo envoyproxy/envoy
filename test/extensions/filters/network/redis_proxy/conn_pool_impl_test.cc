@@ -103,7 +103,7 @@ public:
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_username_ = auth_username_;
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
     conn_pool_ = std::move(conn_pool_impl);
-    test_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
+    test_address_ = *Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
   }
 
   void makeSimpleRequest(bool create_client, const std::string& hash_key, uint64_t hash_value) {
@@ -747,7 +747,7 @@ TEST_F(RedisConnPoolImplTest, HostRemovedNeverAdded) {
   setup();
 
   std::shared_ptr<Upstream::MockHost> host1(new Upstream::MockHost());
-  auto host1_test_address = Network::Utility::resolveUrl("tcp://10.0.0.1:3000");
+  auto host1_test_address = *Network::Utility::resolveUrl("tcp://10.0.0.1:3000");
   EXPECT_CALL(*host1, address()).WillOnce(Return(host1_test_address));
   EXPECT_NO_THROW(cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0)->runCallbacks(
       {}, {host1}));
@@ -940,8 +940,8 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
 
   std::shared_ptr<Upstream::MockHost> new_host1(new Upstream::MockHost());
   std::shared_ptr<Upstream::MockHost> new_host2(new Upstream::MockHost());
-  auto new_host1_test_address = Network::Utility::resolveUrl("tcp://10.0.0.1:3000");
-  auto new_host2_test_address = Network::Utility::resolveUrl("tcp://[2001:470:813b::1]:3333");
+  auto new_host1_test_address = *Network::Utility::resolveUrl("tcp://10.0.0.1:3000");
+  auto new_host2_test_address = *Network::Utility::resolveUrl("tcp://[2001:470:813b::1]:3333");
   EXPECT_CALL(*new_host1, address()).WillRepeatedly(Return(new_host1_test_address));
   EXPECT_CALL(*new_host2, address()).WillRepeatedly(Return(new_host2_test_address));
   EXPECT_CALL(*client1, active()).WillOnce(Return(true));
@@ -1038,8 +1038,8 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
 
   std::shared_ptr<Upstream::MockHost> new_host1(new Upstream::MockHost());
   std::shared_ptr<Upstream::MockHost> new_host2(new Upstream::MockHost());
-  auto new_host1_test_address = Network::Utility::resolveUrl("tcp://10.0.0.1:3000");
-  auto new_host2_test_address = Network::Utility::resolveUrl("tcp://[2001:470:813b::1]:3333");
+  auto new_host1_test_address = *Network::Utility::resolveUrl("tcp://10.0.0.1:3000");
+  auto new_host2_test_address = *Network::Utility::resolveUrl("tcp://[2001:470:813b::1]:3333");
   EXPECT_CALL(*new_host1, address()).WillRepeatedly(Return(new_host1_test_address));
   EXPECT_CALL(*new_host2, address()).WillRepeatedly(Return(new_host2_test_address));
   EXPECT_CALL(*client1, active()).WillOnce(Return(true));
@@ -1116,8 +1116,8 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
 
   std::shared_ptr<Upstream::MockHost> new_host1(new Upstream::MockHost());
   std::shared_ptr<Upstream::MockHost> new_host2(new Upstream::MockHost());
-  auto new_host1_test_address = Network::Utility::resolveUrl("tcp://10.0.0.1:3000");
-  auto new_host2_test_address = Network::Utility::resolveUrl("tcp://[2001:470:813b::1]:3333");
+  auto new_host1_test_address = *Network::Utility::resolveUrl("tcp://10.0.0.1:3000");
+  auto new_host2_test_address = *Network::Utility::resolveUrl("tcp://[2001:470:813b::1]:3333");
   EXPECT_CALL(*new_host1, address()).WillRepeatedly(Return(new_host1_test_address));
   EXPECT_CALL(*new_host2, address()).WillRepeatedly(Return(new_host2_test_address));
   EXPECT_CALL(*client1, active()).WillOnce(Return(true));

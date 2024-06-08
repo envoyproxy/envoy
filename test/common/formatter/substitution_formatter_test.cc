@@ -25,6 +25,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
@@ -1936,7 +1937,270 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue(expected_cert)));
   }
-
+  // Test that the upstream peer uri san is returned by the formatter.
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_URI_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san"};
+    EXPECT_CALL(*connection_info, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san")));
+  }
+  // Test that peer URI SAN delimiter is applied correctly
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_URI_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san1", "san2"};
+    EXPECT_CALL(*connection_info, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san1,san2")));
+  }
+  // Test that an empty peer URI SAN list returns a null value
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_URI_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, uriSanPeerCertificate())
+        .WillRepeatedly(Return(std::vector<std::string>()));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Test that a null connection returns a null peer URI SAN
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_URI_SAN");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Test that the upstream peer DNS san is returned by the formatter.
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_DNS_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san"};
+    EXPECT_CALL(*connection_info, dnsSansPeerCertificate()).WillRepeatedly(Return(sans));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san")));
+  }
+  // Test that peer DNS SAN delimiter is applied correctly
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_DNS_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san1", "san2"};
+    EXPECT_CALL(*connection_info, dnsSansPeerCertificate()).WillRepeatedly(Return(sans));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san1,san2")));
+  }
+  // Test that an empty peer DNS SAN list returns a null value
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_DNS_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, dnsSansPeerCertificate())
+        .WillRepeatedly(Return(std::vector<std::string>()));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Test that a null connection returns a null peer DNS SAN
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_DNS_SAN");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Test that the upstream peer IP san is returned by the formatter.
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_IP_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san"};
+    EXPECT_CALL(*connection_info, ipSansPeerCertificate()).WillRepeatedly(Return(sans));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san")));
+  }
+  // Test that peer IP SAN delimiter is applied correctly
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_IP_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san1", "san2"};
+    EXPECT_CALL(*connection_info, ipSansPeerCertificate()).WillRepeatedly(Return(sans));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san1,san2")));
+  }
+  // Test that an empty peer IP SAN list returns a null value
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_IP_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, ipSansPeerCertificate())
+        .WillRepeatedly(Return(std::vector<std::string>()));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Test that a null connection returns a null peer IP SAN
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("UPSTREAM_PEER_IP_SAN");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Test that the upstream local DNS san is returned by the formatter.
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_DNS_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san"};
+    EXPECT_CALL(*connection_info, dnsSansLocalCertificate()).WillRepeatedly(Return(sans));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san")));
+  }
+  // Test that local DNS SAN delimiter is applied correctly
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_DNS_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san1", "san2"};
+    EXPECT_CALL(*connection_info, dnsSansLocalCertificate()).WillRepeatedly(Return(sans));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san1,san2")));
+  }
+  // Test that an empty local DNS SAN list returns a null value
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_DNS_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, dnsSansLocalCertificate())
+        .WillRepeatedly(Return(std::vector<std::string>()));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Test that a null connection returns a null local DNS SAN
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_DNS_SAN");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Test that the upstream local URI san is returned by the formatter.
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_URI_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san"};
+    EXPECT_CALL(*connection_info, uriSanLocalCertificate()).WillRepeatedly(Return(sans));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san")));
+  }
+  // Test that local URI SAN delimiter is applied correctly
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_URI_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san1", "san2"};
+    EXPECT_CALL(*connection_info, uriSanLocalCertificate()).WillRepeatedly(Return(sans));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san1,san2")));
+  }
+  // Test that an empty local URI SAN list returns a null value
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_URI_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, uriSanLocalCertificate())
+        .WillRepeatedly(Return(std::vector<std::string>()));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Test that a null connection returns a null local URI SAN
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_URI_SAN");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Test that the upstream local IP san is returned by the formatter.
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_IP_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san"};
+    EXPECT_CALL(*connection_info, ipSansLocalCertificate()).WillRepeatedly(Return(sans));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san")));
+  }
+  // Test that local IP SAN delimiter is applied correctly
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_IP_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san1", "san2"};
+    EXPECT_CALL(*connection_info, ipSansLocalCertificate()).WillRepeatedly(Return(sans));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san1,san2")));
+  }
+  // Test that an empty local IP SAN list returns a null value
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_IP_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, ipSansLocalCertificate())
+        .WillRepeatedly(Return(std::vector<std::string>()));
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Test that a null connection returns a null local IP SAN
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_IP_SAN");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("UPSTREAM_PEER_SUBJECT");
@@ -2141,6 +2405,36 @@ TEST(SubstitutionFormatterTest, responseTrailerFormatter) {
     EXPECT_EQ("PO", formatter.formatWithContext(formatter_context, stream_info));
     EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("PO")));
+  }
+}
+
+TEST(SubstitutionFormatterTest, TraceIDFormatter) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{};
+  Http::TestResponseHeaderMapImpl response_header{};
+  Http::TestResponseTrailerMapImpl response_trailer{};
+  std::string body;
+
+  Tracing::MockSpan active_span;
+  EXPECT_CALL(active_span, getTraceId()).WillRepeatedly(Return("ae0046f9075194306d7de2931bd38ce3"));
+
+  {
+    HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
+                                           body, AccessLogType::NotSet, &active_span);
+    TraceIDFormatter formatter{};
+    EXPECT_EQ("ae0046f9075194306d7de2931bd38ce3",
+              formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("ae0046f9075194306d7de2931bd38ce3")));
+  }
+
+  {
+    HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
+                                           body);
+    TraceIDFormatter formatter{};
+    EXPECT_EQ(absl::nullopt, formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
   }
 }
 
@@ -4040,7 +4334,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    const std::string format = "{{%PROTOCOL%}}   %RESP(not exist)%++%RESP(test)% "
+    const std::string format = "{{%PROTOCOL%}}   %RESP(not_exist)%++%RESP(test)% "
                                "%REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)%"
                                "\t@%TRAILER(THIRD)%@\t%TRAILER(TEST?TEST-2)%[]";
     FormatterImpl formatter(format, false);
@@ -4238,7 +4532,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
                                          body);
 
   {
-    const std::string format = "%PROTOCOL%|%RESP(not exist)%|"
+    const std::string format = "%PROTOCOL%|%RESP(not_exist)%|"
                                "%REQ(FIRST?SECOND)%|%RESP(FIRST?SECOND)%|"
                                "%TRAILER(THIRD)%|%TRAILER(TEST?TEST-2)%";
     FormatterImpl formatter(format, false);
@@ -4249,7 +4543,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
   }
 
   {
-    const std::string format = "%PROTOCOL%|%RESP(not exist)%|"
+    const std::string format = "%PROTOCOL%|%RESP(not_exist)%|"
                                "%REQ(FIRST?SECOND)%%RESP(FIRST?SECOND)%|"
                                "%TRAILER(THIRD)%|%TRAILER(TEST?TEST-2)%";
     FormatterImpl formatter(format, true);

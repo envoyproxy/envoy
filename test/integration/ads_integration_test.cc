@@ -260,7 +260,6 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
           validation_context_sds_secret_config:
             name: validation_context
             sds_config:
-              resource_api_version: V3
               initial_fetch_timeout: 5s
               ads: {}
   )EOF",
@@ -274,7 +273,7 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster}, {}, "1");
 
   // The cluster needs this secret, so it's going to request it.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}));
 
   // Cluster should start off warming as the secret is being requested.
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
@@ -345,7 +344,6 @@ TEST_P(AdsIntegrationTest, ClusterSharingSecretWarming) {
           validation_context_sds_secret_config:
             name: validation_context
             sds_config:
-              resource_api_version: V3
               ads: {}
   )EOF",
                             sds_transport_socket);
@@ -402,7 +400,6 @@ TEST_P(AdsIntegrationTest, SecretsPausedDuringCDS) {
             validation_context_sds_secret_config:
               name: validation_context_{}
               sds_config:
-                resource_api_version: V3
                 ads: {{}}
     )EOF",
                                           i),
@@ -2693,11 +2690,9 @@ TEST_P(AdsIntegrationTest, SrdsPausedDuringLds) {
                       separator: =
                       key: vip
               rds_config_source:
-                resource_api_version: V3
                 ads: {}
               scoped_rds:
                 scoped_rds_config_source:
-                  resource_api_version: V3
                   ads: {}
             http_filters:
             - name: envoy.filters.http.router

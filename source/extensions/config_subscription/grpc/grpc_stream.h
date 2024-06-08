@@ -6,6 +6,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/grpc/status.h"
 
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/common/token_bucket_impl.h"
@@ -48,6 +49,7 @@ public:
   }
 
   void establishNewStream() override {
+    stream_intentionally_closed_ = false;
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream to {} for {}", async_client_.destination(),
               service_method_.DebugString());
     if (stream_ != nullptr) {
@@ -102,7 +104,10 @@ public:
     stream_ = nullptr;
     control_plane_stats_.connected_state_.set(0);
     callbacks_->onEstablishmentFailure();
-    setRetryTimer();
+    // Only retry the timer if not intentionally closed by Envoy.
+    if (!stream_intentionally_closed_) {
+      setRetryTimer();
+    }
   }
 
   void maybeUpdateQueueSizeStat(uint64_t size) override {
@@ -129,6 +134,22 @@ public:
       drain_request_timer_->enableTimer(limit_request_->nextTokenAvailable());
     }
     return false;
+  }
+
+  void closeStream() override {
+    ENVOY_LOG_MISC(debug, "Intentionally closing the gRPC stream to {}",
+                   async_client_.destination());
+    retry_timer_->disableTimer();
+    if (rate_limiting_enabled_) {
+      drain_request_timer_->disableTimer();
+    }
+    control_plane_stats_.connected_state_.set(0);
+    logClose(Grpc::Status::WellKnownGrpcStatus::Ok, "Envoy initiated close.");
+    if (stream_ != nullptr) {
+      stream_.resetStream();
+      stream_ = nullptr;
+    }
+    stream_intentionally_closed_ = true;
   }
 
   absl::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() const {
@@ -243,6 +264,8 @@ private:
   absl::optional<Grpc::Status::GrpcStatus> last_close_status_;
   std::string last_close_message_;
   MonotonicTime last_close_time_;
+
+  bool stream_intentionally_closed_{false};
 };
 
 } // namespace Config

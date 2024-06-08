@@ -5,17 +5,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-REGISTER_FACTORY(ServiceMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+REGISTER_FACTORY(ServiceMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
 
-REGISTER_FACTORY(HostMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+REGISTER_FACTORY(HostMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
 
-REGISTER_FACTORY(PathMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+REGISTER_FACTORY(PathMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
 
-REGISTER_FACTORY(MethodMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+REGISTER_FACTORY(MethodMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
 
-REGISTER_FACTORY(PropertyMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+REGISTER_FACTORY(PropertyMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
 
-REGISTER_FACTORY(RequestMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+REGISTER_FACTORY(RequestMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
 
 using StringMatcherImpl = Matchers::StringMatcherImpl<StringMatcherProto>;
 
@@ -50,10 +50,10 @@ bool RequestMatchInputMatcher::match(const Matcher::MatchingDataType& input) {
     return false;
   }
 
-  return match(typed_data->request());
+  return match(typed_data->data().requestHeader());
 }
 
-bool RequestMatchInputMatcher::match(const Request& request) {
+bool RequestMatchInputMatcher::match(const RequestHeaderFrame& request) {
   // TODO(wbpcode): may add more debug log for request match?
   if (host_ != nullptr) {
     if (!host_->match(request.host())) {

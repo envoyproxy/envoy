@@ -34,6 +34,7 @@ public:
   void enable() override;
   void setRejectFraction(UnitFloat) override {}
   void configureLoadShedPoints(Server::LoadShedPointProvider&) override {}
+  bool shouldBypassOverloadManager() const override { return false; }
 
   // Network::UdpListener
   Event::Dispatcher& dispatcher() override;

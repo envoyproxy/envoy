@@ -40,13 +40,18 @@ namespace Tls {
 
 class ClientContextImpl : public ContextImpl, public Envoy::Ssl::ClientContext {
 public:
-  ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
-                    Server::Configuration::CommonFactoryContext& factory_context);
+  static absl::StatusOr<std::unique_ptr<ClientContextImpl>>
+  create(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
+         Server::Configuration::CommonFactoryContext& factory_context);
 
   absl::StatusOr<bssl::UniquePtr<SSL>>
   newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) override;
 
 private:
+  ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
+                    Server::Configuration::CommonFactoryContext& factory_context,
+                    absl::Status& creation_status);
+
   int newSessionKey(SSL_SESSION* session);
 
   const std::string server_name_indication_;

@@ -38,9 +38,9 @@ struct EnvoyEventTracker {
 
 /** The Envoy error passed into `EnvoyStreamCallbacks::on_error_` callback. */
 struct EnvoyError {
-  envoy_error_code_t error_code;
-  std::string message;
-  absl::optional<int> attempt_count = absl::nullopt;
+  envoy_error_code_t error_code_;
+  std::string message_;
+  absl::optional<int> attempt_count_ = absl::nullopt;
 };
 
 /** The callbacks for the stream. */
@@ -64,6 +64,7 @@ struct EnvoyStreamCallbacks {
    *
    * The callback function pases the following parameters.
    * - buffer: the data received.
+   * - length: the length of data to read. It will always be <= `buffer.length()`
    * - end_stream: whether the data is the last data frame.
    * - stream_intel: contains internal stream metrics.
    */
@@ -105,8 +106,8 @@ struct EnvoyStreamCallbacks {
    * - stream_intel: contains internal stream metrics.
    * - final_stream_intel: contains final internal stream metrics.
    */
-  absl::AnyInvocable<void(EnvoyError, envoy_stream_intel, envoy_final_stream_intel)> on_error_ =
-      [](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {};
+  absl::AnyInvocable<void(const EnvoyError&, envoy_stream_intel, envoy_final_stream_intel)>
+      on_error_ = [](const EnvoyError&, envoy_stream_intel, envoy_final_stream_intel) {};
 
   /**
    * The callback for when the stream is cancelled.

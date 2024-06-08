@@ -16,30 +16,6 @@
 namespace Envoy {
 namespace JNI {
 
-void setClassLoader(jobject class_loader);
-
-/**
- * Finds a class with a given name using a class loader provided with the use
- * of `setClassLoader` function. The class loader is supposed to come from
- * application's context and should be associated with project's code - Java classes
- * defined by the project. For finding classes of Java built in-types use
- * `env->FindClass(...)` method instead as it is lighter to use.
- *
- * Read more about why you cannot use `env->FindClass(...)` to look for Java classes
- * defined by the project and a pattern used by the implementation of `findClass` helper
- * method at https://developer.android.com/training/articles/perf-jni#native-libraries.
- *
- * The method works on Android targets only as the `setClassLoader` method is not
- * called by JVM-only targets.
- *
- * @param class_name, the name of the class to find (i.e.
- * "io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary").
- *
- * @return jclass, the class with a provided `class_name` or NULL if
- *         it couldn't be found.
- */
-LocalRefUniquePtr<jclass> findClass(const char* class_name);
-
 void jniDeleteGlobalRef(void* context);
 
 void jniDeleteConstGlobalRef(const void* context);
@@ -134,12 +110,12 @@ LocalRefUniquePtr<jstring> cppStringToJavaString(JniHelper& jni_helper,
 /** Converts from C++'s map-type<std::string, std::string> to Java `HashMap<String, String>`. */
 template <typename MapType>
 LocalRefUniquePtr<jobject> cppMapToJavaMap(JniHelper& jni_helper, const MapType& cpp_map) {
-  auto java_map_class = jni_helper.findClass("java/util/HashMap");
-  auto java_map_init_method_id = jni_helper.getMethodId(java_map_class.get(), "<init>", "(I)V");
+  jclass java_map_class = jni_helper.findClass("java/util/HashMap");
+  auto java_map_init_method_id = jni_helper.getMethodId(java_map_class, "<init>", "(I)V");
   auto java_map_put_method_id = jni_helper.getMethodId(
-      java_map_class.get(), "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+      java_map_class, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
   auto java_map_object =
-      jni_helper.newObject(java_map_class.get(), java_map_init_method_id, cpp_map.size());
+      jni_helper.newObject(java_map_class, java_map_init_method_id, cpp_map.size());
   for (const auto& [cpp_key, cpp_value] : cpp_map) {
     auto java_key = cppStringToJavaString(jni_helper, cpp_key);
     auto java_value = cppStringToJavaString(jni_helper, cpp_value);
@@ -190,13 +166,13 @@ Buffer::InstancePtr javaDirectByteBufferToCppBufferInstance(JniHelper& jni_helpe
                                                             jobject java_byte_buffer, jlong length);
 
 /**
- * Converts from `Envoy::Buffer::Instance` to Java direct `ByteBuffer` (off the JVM heap).
+ * Converts from `Envoy::Buffer::Instance` to Java direct `ByteBuffer` (off the JVM heap) up to the
+ * specified length.
  *
  * The function will avoid copying the data from `Envoy::Buffer::Instance` into the `ByteBuffer`.
  */
-LocalRefUniquePtr<jobject>
-cppBufferInstanceToJavaDirectByteBuffer(JniHelper& jni_helper,
-                                        const Buffer::Instance& cpp_buffer_instance);
+LocalRefUniquePtr<jobject> cppBufferInstanceToJavaDirectByteBuffer(
+    JniHelper& jni_helper, const Buffer::Instance& cpp_buffer_instance, uint64_t length);
 
 /**
  * Converts from Java non-direct `ByteBuffer` (on the JVM heap) to `Envoy::Buffer::Instance` up
@@ -209,16 +185,45 @@ Buffer::InstancePtr javaNonDirectByteBufferToCppBufferInstance(JniHelper& jni_he
                                                                jlong length);
 
 /**
- * Converts from `Envoy::Buffer::Instance` to Java non-direct `ByteBuffer` (off the JVM heap).
+ * Converts from `Envoy::Buffer::Instance` to Java non-direct `ByteBuffer` (off the JVM heap) up to
+ * the specified length.
  *
  * The function will copy the data from `Envoy::Buffer::Instance` into the `ByteBuffer`.
  */
-LocalRefUniquePtr<jobject>
-cppBufferInstanceToJavaNonDirectByteBuffer(JniHelper& jni_helper,
-                                           const Buffer::Instance& cpp_buffer_instance);
+LocalRefUniquePtr<jobject> cppBufferInstanceToJavaNonDirectByteBuffer(
+    JniHelper& jni_helper, const Buffer::Instance& cpp_buffer_instance, uint64_t length);
 
 /** Gets the Java exception message from the `throwable`. */
 std::string getJavaExceptionMessage(JniHelper& jni_helper, jthrowable throwable);
+
+/**
+ * Converts from Java `io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel` to C++
+ * `envoy_stream_intel`.
+ */
+envoy_stream_intel javaStreamIntelToCppStreamIntel(JniHelper& jni_helper,
+                                                   jobject java_stream_intel);
+
+/**
+ * Converts from C++ `envoy_stream_intel` to Java  to
+ * `io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel`.
+ */
+LocalRefUniquePtr<jobject> cppStreamIntelToJavaStreamIntel(JniHelper& jni_helper,
+                                                           const envoy_stream_intel& stream_intel);
+
+/**
+ * Converts from Java `io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel` to C++
+ * `envoy_final_stream_intel`.
+ */
+envoy_final_stream_intel javaFinalStreamIntelToCppFinalStreamIntel(JniHelper& jni_helper,
+                                                                   jobject java_final_stream_intel);
+
+/**
+ * Converts from C++ `envoy_final_stream_intel` to Java  to
+ * `io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel`.
+ */
+LocalRefUniquePtr<jobject>
+cppFinalStreamIntelToJavaFinalStreamIntel(JniHelper& jni_helper,
+                                          const envoy_final_stream_intel& final_stream_intel);
 
 } // namespace JNI
 } // namespace Envoy

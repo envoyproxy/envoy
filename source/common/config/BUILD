@@ -53,6 +53,7 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/api:api_interface",
         "//envoy/init:manager_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",
         "//source/common/common:empty_string",

@@ -24,6 +24,7 @@
 
 #include "source/common/common/matchers.h"
 #include "source/common/common/packed_struct.h"
+#include "source/common/config/datasource.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/header_utility.h"
@@ -101,7 +102,7 @@ public:
   absl::optional<bool> disabled(absl::string_view name) const;
 
 private:
-  RouteSpecificFilterConfigConstSharedPtr
+  absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                                   bool is_optional,
                                   Server::Configuration::ServerFactoryContext& factory_context,
@@ -247,7 +248,8 @@ public:
   CommonVirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                         const CommonConfigSharedPtr& global_route_config,
                         Server::Configuration::ServerFactoryContext& factory_context,
-                        Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator);
+                        Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
+                        absl::Status& creation_status);
 
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
   const CommonConfigImpl& globalRouteConfig() const { return *global_route_config_; }
@@ -376,7 +378,8 @@ public:
       const CommonConfigSharedPtr& global_route_config,
       Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
       ProtobufMessage::ValidationVisitor& validator,
-      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters);
+      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters,
+      absl::Status& creation_status);
 
   RouteConstSharedPtr getRouteFromEntries(const RouteCallback& cb,
                                           const Http::RequestHeaderMap& headers,
@@ -409,10 +412,11 @@ using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
 class RetryPolicyImpl : public RetryPolicy {
 
 public:
-  RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                  Upstream::RetryExtensionFactoryContext& factory_context,
-                  Server::Configuration::CommonFactoryContext& common_context);
+  static absl::StatusOr<std::unique_ptr<RetryPolicyImpl>>
+  create(const envoy::config::route::v3::RetryPolicy& retry_policy,
+         ProtobufMessage::ValidationVisitor& validation_visitor,
+         Upstream::RetryExtensionFactoryContext& factory_context,
+         Server::Configuration::CommonFactoryContext& common_context);
   RetryPolicyImpl() = default;
 
   // Router::RetryPolicy
@@ -444,6 +448,10 @@ public:
   std::chrono::milliseconds resetMaxInterval() const override { return reset_max_interval_; }
 
 private:
+  RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
+                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                  Upstream::RetryExtensionFactoryContext& factory_context,
+                  Server::Configuration::CommonFactoryContext& common_context);
   std::chrono::milliseconds per_try_timeout_{0};
   std::chrono::milliseconds per_try_idle_timeout_{0};
   // We set the number of retries to 1 by default (i.e. when no route or vhost level retry policy is
@@ -791,7 +799,10 @@ public:
   std::string newUri(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
-  const std::string& responseBody() const override { return direct_response_body_; }
+  const std::string& responseBody() const override {
+    return direct_response_body_provider_ != nullptr ? direct_response_body_provider_->data()
+                                                     : EMPTY_STRING;
+  }
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
@@ -1162,11 +1173,13 @@ private:
     return absl::nullopt;
   }
 
-  PathMatcherSharedPtr buildPathMatcher(envoy::config::route::v3::Route route,
-                                        ProtobufMessage::ValidationVisitor& validator) const;
+  absl::StatusOr<PathMatcherSharedPtr>
+  buildPathMatcher(envoy::config::route::v3::Route route,
+                   ProtobufMessage::ValidationVisitor& validator) const;
 
-  PathRewriterSharedPtr buildPathRewriter(envoy::config::route::v3::Route route,
-                                          ProtobufMessage::ValidationVisitor& validator) const;
+  absl::StatusOr<PathRewriterSharedPtr>
+  buildPathRewriter(envoy::config::route::v3::Route route,
+                    ProtobufMessage::ValidationVisitor& validator) const;
 
   RouteConstSharedPtr
   pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
@@ -1218,7 +1231,7 @@ private:
 
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
-  std::string direct_response_body_;
+  Envoy::Config::DataSource::DataSourceProviderPtr direct_response_body_provider_;
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;
@@ -1505,10 +1518,11 @@ DECLARE_FACTORY(RouteListMatchActionFactory);
  */
 class RouteMatcher {
 public:
-  RouteMatcher(const envoy::config::route::v3::RouteConfiguration& config,
-               const CommonConfigSharedPtr& global_route_config,
-               Server::Configuration::ServerFactoryContext& factory_context,
-               ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
+  static absl::StatusOr<std::unique_ptr<RouteMatcher>>
+  create(const envoy::config::route::v3::RouteConfiguration& config,
+         const CommonConfigSharedPtr& global_route_config,
+         Server::Configuration::ServerFactoryContext& factory_context,
+         ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
   RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
@@ -1516,6 +1530,12 @@ public:
   const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
 
 private:
+  RouteMatcher(const envoy::config::route::v3::RouteConfiguration& config,
+               const CommonConfigSharedPtr& global_route_config,
+               Server::Configuration::ServerFactoryContext& factory_context,
+               ProtobufMessage::ValidationVisitor& validator, bool validate_clusters,
+               absl::Status& creation_status);
+
   using WildcardVirtualHosts =
       std::map<int64_t, absl::node_hash_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
   using SubstringFunction = std::function<absl::string_view(absl::string_view, int)>;
@@ -1584,7 +1604,8 @@ public:
     return max_direct_response_body_size_bytes_;
   }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
-  ClusterSpecifierPluginSharedPtr clusterSpecifierPlugin(absl::string_view provider) const;
+  absl::StatusOr<ClusterSpecifierPluginSharedPtr>
+  clusterSpecifierPlugin(absl::string_view provider) const;
   bool ignorePathParametersInPathMatching() const {
     return ignore_path_parameters_in_path_matching_;
   }

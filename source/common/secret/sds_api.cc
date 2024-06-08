@@ -32,8 +32,10 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
                                               time_source_.systemTime()} {
   const auto resource_name = getResourceName();
   // This has to happen here (rather than in initialize()) as it can throw exceptions.
-  subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+  subscription_ = THROW_OR_RETURN_VALUE(
+      subscription_factory_.subscriptionFromConfigSource(
+          sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {}),
+      Config::SubscriptionPtr);
 }
 
 void SdsApi::resolveDataSource(const FileContentMap& files,

@@ -193,7 +193,7 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
   void start();
   absl::Status validateUpdateSize(uint32_t added_resources_num, uint32_t removed_resources_num);
   absl::Status onConfigRemoved(const Protobuf::RepeatedPtrField<std::string>& removed_resources);
-  void createSubscription();
+  absl::Status createSubscription();
 
   LoaderImpl& parent_;
   const envoy::config::core::v3::ConfigSource config_source_;
@@ -223,7 +223,7 @@ public:
          Api::Api& api);
 
   // Runtime::Loader
-  void initialize(Upstream::ClusterManager& cm) override;
+  absl::Status initialize(Upstream::ClusterManager& cm) override;
   const Snapshot& snapshot() override;
   SnapshotConstSharedPtr threadsafeSnapshot() override;
   absl::Status mergeValues(const absl::node_hash_map<std::string, std::string>& values) override;
