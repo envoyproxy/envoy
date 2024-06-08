@@ -54,7 +54,7 @@ SanMatcherPtr createStringSanMatcher(
     bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj(matcher.oid().c_str(), 0));
     if (oid == nullptr) {
       return nullptr;
-    };
+    }
     return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher.matcher(),
                                                             context, std::move(oid))};
   }
