@@ -239,6 +239,10 @@ generate_rsa_key san_othername
 generate_x509_cert san_othername ca
 
 # Generate san_dns_and_othername_cert.pem.
+generate_rsa_key san_multiple_othername
+generate_x509_cert san_multiple_othername ca
+
+# Generate san_dns_and_othername_cert.pem.
 generate_rsa_key san_dns_and_othername
 generate_x509_cert san_dns_and_othername ca
 
