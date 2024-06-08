@@ -398,7 +398,7 @@ TEST_F(GeoipProviderDeathTest, GeoDbNotSetForConfiguredHeader) {
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   EXPECT_DEATH(provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
-               "assert failure: isp_db_. Details: Maxmind asn database is not initialised for "
+               "assert failure: isp_db_. Details: Maxmind asn database must be initialised for "
                "performing lookups");
 }
 

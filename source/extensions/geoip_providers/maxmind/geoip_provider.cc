@@ -174,7 +174,7 @@ void GeoipProvider::lookupInCityDb(
     MMDB_lookup_result_s mmdb_lookup_result;
     {
       absl::ReaderMutexLock lock(&mmdb_mutex_);
-      ASSERT(city_db_, "Maxmind city database is not initialised for performing lookups");
+      ASSERT(city_db_, "Maxmind city database must be initialised for performing lookups");
       mmdb_lookup_result = MMDB_lookup_sockaddr(
           city_db_.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
           &mmdb_error);
@@ -220,7 +220,7 @@ void GeoipProvider::lookupInAsnDb(
     MMDB_lookup_result_s mmdb_lookup_result;
     {
       absl::ReaderMutexLock lock(&mmdb_mutex_);
-      ASSERT(isp_db_, "Maxmind asn database is not initialised for performing lookups");
+      ASSERT(isp_db_, "Maxmind asn database must be initialised for performing lookups");
       mmdb_lookup_result = MMDB_lookup_sockaddr(
           isp_db_.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
           &mmdb_error);
@@ -252,7 +252,7 @@ void GeoipProvider::lookupInAnonDb(
     MMDB_lookup_result_s mmdb_lookup_result;
     {
       absl::ReaderMutexLock lock(&mmdb_mutex_);
-      ASSERT(anon_db_, "Maxmind anon database is not initialised for performing lookups");
+      ASSERT(anon_db_, "Maxmind anon database must be initialised for performing lookups");
       mmdb_lookup_result = MMDB_lookup_sockaddr(
           anon_db_.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
           &mmdb_error);
