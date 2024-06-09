@@ -178,7 +178,12 @@ public:
   }
 
   void prependCompositeDynamicFilter(const std::string& name = "composite",
-                                     const std::string& path = "set_response_code.yaml") {
+                                     const std::string& path = "set_response_code.yaml",
+                                     bool sampling = true) {
+    int numerator = 0;
+    if (!sampling) {
+      numerator = 100;
+    }
     config_helper_.prependFilter(
         TestEnvironment::substitute(absl::StrFormat(R"EOF(
       name: %s
@@ -202,6 +207,9 @@ public:
                     name: composite-action
                     typed_config:
                         "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                        skip_percent:
+                          numerator: %d
+                          denominator: HUNDRED
                         dynamic_config:
                           name: set-response-code
                           config_discovery:
@@ -211,7 +219,7 @@ public:
                             type_urls:
                             - type.googleapis.com/test.integration.filters.%s
     )EOF",
-                                                    name, path, proto_type_)),
+                                                    name, numerator, path, proto_type_)),
         downstream_filter_);
 
     TestEnvironment::writeStringToFileForTest("set_response_code.yaml",
@@ -383,6 +391,27 @@ TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
   }
+}
+
+// Verifies that with dynamic config, if no sampling, then missing config filter
+// is applied, and local reply with status code 500 is sent back to client.
+TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilterNoSampling) {
+  prependCompositeDynamicFilter("composite-dynamic", "set_response_code.yaml", false);
+  initialize();
+  if (downstream_filter_) {
+    test_server_->waitForCounterGe(
+        "extension_config_discovery.http_filter.set-response-code.config_reload", 1);
+  } else {
+    test_server_->waitForCounterGe(
+        "extension_config_discovery.upstream_http_filter.set-response-code.config_reload", 1);
+  }
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("500"));
 }
 
 // Verifies that if ECDS response is not sent, the missing filter config is applied that returns

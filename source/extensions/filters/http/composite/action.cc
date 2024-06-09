@@ -110,6 +110,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createAtionFactoryCbCommon(
   }
   std::string name = composite_action.typed_config().name();
 
+  ASSERT(context.server_factory_context_ != absl::nullopt);
   Random::RandomGenerator& random = context.server_factory_context_->api().randomGenerator();
   float skip_ratio = getSkipRatio(composite_action);
   return
