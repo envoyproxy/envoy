@@ -76,7 +76,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       decoder_callbacks_->sendLocalReply(
           Http::Code::Forbidden,
           config_.get()->stripFailureResponse()
-              ? nullptr
+              ? ""
               : absl::StrCat("Failed JWT authentication: ", error_msg),
           nullptr, absl::nullopt, generateRcDetails(error_msg));
       return Http::FilterHeadersStatus::StopIteration;

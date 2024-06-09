@@ -19,9 +19,11 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
+std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks,
+                                bool strip_failure_response = false) {
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config_str, proto_config);
+  proto_config.set_strip_failure_response(strip_failure_response);
 
   if (use_local_jwks) {
     auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
@@ -36,9 +38,11 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
   return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
-std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_listener) {
+std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_listener,
+                                      bool strip_failure_response = false) {
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config_str, proto_config);
+  proto_config.set_strip_failure_response(strip_failure_response);
 
   auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
   auto* async_fetch = provider0.mutable_remote_jwks()->mutable_async_fetch();
@@ -53,8 +57,8 @@ std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_l
   return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
-std::string getFilterConfig(bool use_local_jwks) {
-  return getAuthFilterConfig(ExampleConfig, use_local_jwks);
+std::string getFilterConfig(bool use_local_jwks, bool strip_failure_response = false) {
+  return getAuthFilterConfig(ExampleConfig, use_local_jwks, strip_failure_response);
 }
 
 class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {};
@@ -161,6 +165,30 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
 
   EXPECT_NE("0", response->headers().getContentLengthValue());
   EXPECT_THAT(response->body(), ::testing::IsEmpty());
+}
+
+// With local Jwks, this test verifies a request is rejected with an expired Jwt token
+// with only a 401 status without WWWAuthenticate/Body set with error details
+TEST_P(LocalJwksIntegrationTest, ExpiredTokenWithStripFailureResponse) {
+  config_helper_.prependFilter(getFilterConfig(true, true));
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Bearer " + std::string(ExpiredToken)},
+  });
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("401", response->headers().getStatusValue());
+  ASSERT_TRUE(response->headers().get(Http::Headers::get().WWWAuthenticate).empty());
+  ASSERT_TRUE(response->body().empty());
 }
 
 // This test verifies a request is passed with a path that don't match any requirements.

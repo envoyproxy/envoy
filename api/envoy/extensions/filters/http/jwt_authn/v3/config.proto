@@ -803,10 +803,9 @@ message JwtAuthentication {
   // in ``PerRouteConfig`` uses this map to specify a JwtRequirement.
   map<string, JwtRequirement> requirement_map = 5;
 
-  // JWT Authentication filter returns a 401 downstream with the failure response details in the body.
-  // If this value is set to true, the response details will be stripped and only a 401 response code
-  // will be produced. Default value is false
-  //
+  // A request failing the verification process will receive a 401 downstream with the failure response details
+  // in the body along with WWWAuthenticate header value set with "invalid token". If this value is set to true,
+  // the response details will be stripped and only a 401 response code will be returned. Default value is false
   bool strip_failure_response = 6;
 }
 
