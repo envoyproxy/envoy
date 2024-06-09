@@ -75,13 +75,14 @@ private:
             &random]() -> Matcher::ActionPtr {
       auto config_value = provider->config();
       UnitFloat sample_ratio = UnitFloat(1 - skip_ratio);
-      // If composite action has non-zero skip_ratio configured, perform dice roll. If it
-      // returns true, then execute the action. Otherwise, execute the missing config filter.
+
+      // Perform dice roll. If negative, then skip the action.
+      if (!random.bernoulli(sample_ratio)) {
+        return nullptr;
+      }
       if (config_value.has_value()) {
-        if ((skip_ratio == 0) || random.bernoulli(sample_ratio)) {
-          auto factory_cb = config_value.value().get().factory_cb;
-          return std::make_unique<ExecuteFilterAction>(factory_cb, n);
-        }
+        auto factory_cb = config_value.value().get().factory_cb;
+        return std::make_unique<ExecuteFilterAction>(factory_cb, n);
       }
       // There is no dynamic config available. Apply missing config filter.
       auto factory_cb = Envoy::Http::MissingConfigFilterFactory;

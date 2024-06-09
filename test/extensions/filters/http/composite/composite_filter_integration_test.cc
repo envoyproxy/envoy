@@ -378,6 +378,8 @@ TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   {
+    // Sending default headers, not matching the xDS config, the request reaches backend.
+    // 200 is sent back.
     auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
     waitForNextUpstreamRequest();
 
@@ -387,14 +389,15 @@ TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
   }
 
   {
+    // Sending headers matching the xDS config, sampled and the action filter is
+    // executed. Local reply with status code 403 is sent back.
     auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
   }
 }
 
-// Verifies that with dynamic config, if no sampling, then missing config filter
-// is applied, and local reply with status code 500 is sent back to client.
+// Verifies that with dynamic config, if not sampled, then the action filter is skipped.
 TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilterNoSampling) {
   prependCompositeDynamicFilter("composite-dynamic", "set_response_code.yaml", false);
   initialize();
@@ -409,9 +412,28 @@ TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilterNoSampling) {
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers(), Http::HttpStatusIs("500"));
+  {
+    // Sending default headers, not matching the xDS config, the request reaches backend,
+    // 200 is sent back.
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+    waitForNextUpstreamRequest();
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  }
+
+  {
+    // Sending headers matching the xDS config, not sampled. The action filter is
+    // skipped. The request reaches backend, and 200 is sent back.
+    // 200 is returned back.
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    waitForNextUpstreamRequest();
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  }
 }
 
 // Verifies that if ECDS response is not sent, the missing filter config is applied that returns
