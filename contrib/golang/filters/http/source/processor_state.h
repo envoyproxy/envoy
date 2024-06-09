@@ -82,7 +82,7 @@ class ProcessorState : public processState, public Logger::Loggable<Logger::Id::
 public:
   explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) {
     req = r;
-    state = 0; // 0 is WaitingHeader
+    setFilterState(FilterState::WaitingHeader);
   }
   virtual ~ProcessorState() = default;
 

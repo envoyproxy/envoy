@@ -107,7 +107,7 @@ CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key_data, int ke
 CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key_data, int key_len,
                                               uint64_t* value_data, int* value_len, int* rc);
 
-/* These APIs have nothing to with request */
+/* These APIs have nothing to do with request */
 void envoyGoFilterLog(uint32_t level, void* message_data, int message_len);
 uint32_t envoyGoFilterLogLevel();
 

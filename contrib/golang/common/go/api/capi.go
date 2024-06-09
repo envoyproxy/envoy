@@ -65,7 +65,7 @@ type HttpCAPI interface {
 	HttpRecordMetric(c unsafe.Pointer, metricId uint32, value uint64)
 	HttpConfigFinalize(c unsafe.Pointer)
 
-	/* These APIs have nothing to with request */
+	/* These APIs have nothing to do with request */
 	HttpLog(level LogType, message string)
 	HttpLogLevel() LogType
 }

@@ -853,7 +853,7 @@ CAPIStatus Filter::clearRouteCache() {
         ENVOY_LOG(debug, "golang filter clearing route cache");
         decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
       } else {
-        ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+        ENVOY_LOG(info, "golang filter has gone or destroyed in clearRouteCache");
       }
     });
   }
