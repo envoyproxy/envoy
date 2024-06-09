@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.composite.v3;
 
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/type/v3/percent.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
@@ -57,4 +58,13 @@ message ExecuteFilterAction {
   // Only one of ``typed_config`` or ``dynamic_config`` can be set.
   DynamicConfig dynamic_config = 2
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
+
+  // [#not-implemented-hide:]
+  // Percentage of traffic the action filter will be skipped. By default this is 0.
+  // This is to support sampling behavior for certain filters like ext_proc, access_logging ...
+  // If a none-zero number is configured for ``skip_percent``, only a portion of traffic,
+  // i.e, 1 - skip_percent, needs to be processed by the filter.  In such case, a dice roll
+  // is done after a matching condition met, the action will only be taken if the dice roll
+  // returns true. Otherwise, the action filter is skipped.
+  type.v3.FractionalPercent skip_percent = 3;
 }

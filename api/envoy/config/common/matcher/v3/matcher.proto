@@ -5,7 +5,6 @@ package envoy.config.common.matcher.v3;
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/string.proto";
-import "envoy/type/v3/percent.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -143,15 +142,6 @@ message Matcher {
   // to have matched.
   // If not specified, the matcher is considered not to have matched.
   OnMatch on_no_match = 3;
-
-  // [#not-implemented-hide:]
-  // When the matching condition is met, ``skip_percentage`` controls the
-  // percentage of traffic that should be skipped, i.e, not going through
-  // the matching action. By default this is 0.
-  // This is to support the sampling behavior. For example, if only 30% requests
-  // need to be sent to the logging server, then one can config the
-  // ``skip_percentage`` as 1 - 30% = 70%.
-  type.v3.FractionalPercent skip_percentage = 4;
 }
 
 // Match configuration. This is a recursive structure which allows complex nested match
