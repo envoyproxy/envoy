@@ -23,6 +23,8 @@ jobs:
     - run: |
         df -h
         uname -a
+        jq --version || echo "NO JQ"
+        docker --version || echo "NO DOCKER"
 
   arm64-base:
     permissions:
@@ -32,3 +34,5 @@ jobs:
     - run: |
         df -h
         uname -a
+        jq --version || echo "NO JQ"
+        docker --version || echo "NO DOCKER"
