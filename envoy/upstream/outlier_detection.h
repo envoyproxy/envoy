@@ -8,6 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "absl/types/optional.h"
 
@@ -73,6 +74,36 @@ private:
   const ExtResultType type_;
 };
 
+// Types derived from TypedExtResult are used to report the result of transaction to
+// an outlier detection monitor.
+template <ExtResultType E> class TypedExtResult : public ExtResult {
+protected:
+  TypedExtResult() : ExtResult(E) {}
+};
+
+class HttpCode : public TypedExtResult<ExtResultType::HTTP_CODE> {
+public:
+  HttpCode(uint32_t code) : code_(code) {}
+  HttpCode() = delete;
+  virtual ~HttpCode() {}
+  uint32_t code() const { return code_; }
+
+private:
+  uint32_t code_;
+};
+
+// LocalOriginEvent is used to report errors like resets, timeouts but also
+// successful connection attempts.
+class LocalOriginEvent : public TypedExtResult<ExtResultType::LOCAL_ORIGIN> {
+public:
+  LocalOriginEvent(Result result) : result_(result) {}
+  LocalOriginEvent() = delete;
+  Result result() const { return result_; }
+
+private:
+  Result result_;
+};
+
 // Base class for various types of monitors.
 // Each monitor may implement different health detection algorithm.
 class ExtMonitor {
@@ -103,7 +134,7 @@ protected:
 
 using ExtMonitorPtr = std::unique_ptr<ExtMonitor>;
 
-class MonitorsSet {
+class ExtMonitorsSet {
 public:
   void addMonitor(ExtMonitorPtr&& monitor) { monitors_.push_back(std::move(monitor)); }
   void for_each(std::function<void(ExtMonitorPtr&)> f) {
@@ -263,6 +294,26 @@ public:
 };
 
 using EventLoggerSharedPtr = std::shared_ptr<EventLogger>;
+
+class ExtMonitorFactoryContext {
+public:
+  ExtMonitorFactoryContext(ProtobufMessage::ValidationVisitor& validation_visitor)
+      : validation_visitor_(validation_visitor) {}
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() { return validation_visitor_; }
+
+private:
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+};
+
+class ExtMonitorFactory : public Envoy::Config::TypedFactory {
+public:
+  ~ExtMonitorFactory() override = default;
+
+  virtual ExtMonitorPtr createMonitor(const std::string& name, const Protobuf::Message& config,
+                                      ExtMonitorFactoryContext& context) PURE;
+
+  std::string category() const override { return "envoy.outlier_detection_monitors"; }
+};
 
 } // namespace Outlier
 } // namespace Upstream

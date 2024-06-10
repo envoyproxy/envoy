@@ -22,7 +22,6 @@
 #include "envoy/upstream/outlier_detection.h"
 
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/outlier_detection_monitors/common/monitor_base_impl.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -180,8 +179,8 @@ public:
   void setJitter(const std::chrono::milliseconds jitter) { jitter_ = jitter; }
   std::chrono::milliseconds getJitter() const { return jitter_; }
 
-  const std::unique_ptr<MonitorsSet>& getExtensionMonitors() const { return monitors_set_; }
-  void setExtensionsMonitors(std::unique_ptr<MonitorsSet>&& monitors_set) {
+  const std::unique_ptr<ExtMonitorsSet>& getExtensionMonitors() const { return monitors_set_; }
+  void setExtensionsMonitors(std::unique_ptr<ExtMonitorsSet>&& monitors_set) {
     monitors_set_ = std::move(monitors_set);
   }
 
@@ -220,7 +219,7 @@ private:
       put_result_func_;
 
   // Set of extension monitors.
-  std::unique_ptr<MonitorsSet> monitors_set_;
+  std::unique_ptr<ExtMonitorsSet> monitors_set_;
   // The following fields are reported when extension monitor is "tripped" and
   // reports that a host where the extension monitor was attached should be
   // ejected.
@@ -340,7 +339,7 @@ public:
   bool successfulActiveHealthCheckUnejectHost() const {
     return successful_active_health_check_uneject_host_;
   }
-  std::unique_ptr<MonitorsSet> createMonitorExtensions(
+  std::unique_ptr<ExtMonitorsSet> createMonitorExtensions(
       std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback);
 
 private:

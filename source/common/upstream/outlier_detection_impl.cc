@@ -99,9 +99,8 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   }
   // Wrap reported HTTP code into outlier detection extension's wrapper and forward
   // it to configured extensions.
-  getExtensionMonitors()->for_each([response_code](ExtMonitorPtr& monitor) {
-    monitor->reportResult(Extensions::Outlier::HttpCode(response_code));
-  });
+  getExtensionMonitors()->for_each(
+      [response_code](ExtMonitorPtr& monitor) { monitor->reportResult(HttpCode(response_code)); });
 }
 std::function<void(uint32_t, std::string, absl::optional<std::string>)>
 DetectorHostMonitorImpl::getOnFailedExtensioMonitorCallback() {
@@ -213,9 +212,8 @@ void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> 
   // Pass the local origin event to all registered extension monitors.
   // Only monitors "interested" in local origin event will process the result.
   // Those not "interested" will ignore the call.
-  getExtensionMonitors()->for_each([result](ExtMonitorPtr& monitor) {
-    monitor->reportResult(Extensions::Outlier::LocalOriginEvent(result));
-  });
+  getExtensionMonitors()->for_each(
+      [result](ExtMonitorPtr& monitor) { monitor->reportResult(LocalOriginEvent(result)); });
 }
 
 void DetectorHostMonitorImpl::localOriginFailure() {
@@ -307,18 +305,17 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
   extensions_config_ = config.monitors();
 }
 
-std::unique_ptr<Extensions::Outlier::MonitorsSet> DetectorConfig::createMonitorExtensions(
+std::unique_ptr<ExtMonitorsSet> DetectorConfig::createMonitorExtensions(
     std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) {
   // Create outlier detection extensions.
   if (extensions_config_.empty()) {
     return nullptr;
   }
 
-  auto monitors_set = std::make_unique<Extensions::Outlier::MonitorsSet>();
-  Extensions::Outlier::MonitorFactoryContext context(validation_visitor_);
+  auto monitors_set = std::make_unique<ExtMonitorsSet>();
+  ExtMonitorFactoryContext context(validation_visitor_);
   for (const auto& monitor_config : extensions_config_) {
-    auto& factory =
-        Config::Utility::getAndCheckFactory<Extensions::Outlier::MonitorFactory>(monitor_config);
+    auto& factory = Config::Utility::getAndCheckFactory<ExtMonitorFactory>(monitor_config);
     auto config =
         Config::Utility::translateToFactoryConfig(monitor_config, validation_visitor_, factory);
     auto extension = factory.createMonitor(monitor_config.name(), *config, context);

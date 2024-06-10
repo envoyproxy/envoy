@@ -14,37 +14,6 @@ namespace Outlier {
 
 using namespace Envoy::Upstream::Outlier;
 
-// Types derived from TypedExtResult are used to report the result of transaction to
-// an outlier detection monitor.
-template <Upstream::Outlier::ExtResultType E>
-class TypedExtResult : public Upstream::Outlier::ExtResult {
-protected:
-  TypedExtResult() : Upstream::Outlier::ExtResult(E) {}
-};
-
-class HttpCode : public TypedExtResult<Upstream::Outlier::ExtResultType::HTTP_CODE> {
-public:
-  HttpCode(uint32_t code) : code_(code) {}
-  HttpCode() = delete;
-  virtual ~HttpCode() {}
-  uint32_t code() const { return code_; }
-
-private:
-  uint32_t code_;
-};
-
-// LocalOriginEvent is used to report errors like resets, timeouts but also
-// successful connection attempts.
-class LocalOriginEvent : public TypedExtResult<Upstream::Outlier::ExtResultType::LOCAL_ORIGIN> {
-public:
-  LocalOriginEvent(Result result) : result_(result) {}
-  LocalOriginEvent() = delete;
-  Result result() const { return result_; }
-
-private:
-  Result result_;
-};
-
 // ErrorsBucket is used by outlier detection monitors and is used to
 // "catch" reported Error (TypedError);
 class ErrorsBucket {
@@ -115,32 +84,13 @@ protected:
   std::vector<ErrorsBucketPtr> buckets_;
 };
 
-class MonitorFactoryContext {
-public:
-  MonitorFactoryContext(ProtobufMessage::ValidationVisitor& validation_visitor)
-      : validation_visitor_(validation_visitor) {}
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() { return validation_visitor_; }
-
-private:
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
-};
-
-class MonitorFactory : public Envoy::Config::TypedFactory {
-public:
-  ~MonitorFactory() override = default;
-
-  virtual ExtMonitorPtr createMonitor(const std::string& name, const Protobuf::Message& config,
-                                      MonitorFactoryContext& context) PURE;
-
-  std::string category() const override { return "envoy.outlier_detection_monitors"; }
-};
-
-template <class ConfigProto> class MonitorFactoryBase : public MonitorFactory {
+template <class ConfigProto>
+class ExtMonitorFactoryBase : public Upstream::Outlier::ExtMonitorFactory {
 public:
   ExtMonitorPtr createMonitor(const std::string& monitor_name, const Protobuf::Message& config,
-                              MonitorFactoryContext& context) override {
+                              ExtMonitorFactoryContext& context) override {
     return createMonitorFromProtoTyped(monitor_name,
-                                       MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                       Envoy::MessageUtil::downcastAndValidate<const ConfigProto&>(
                                            config, context.messageValidationVisitor()),
                                        context);
   }
@@ -151,12 +101,12 @@ public:
 
   std::string name() const override { return name_; }
 
-  MonitorFactoryBase(const std::string& name) : name_(name) {}
+  ExtMonitorFactoryBase(const std::string& name) : name_(name) {}
 
 private:
   virtual ExtMonitorPtr createMonitorFromProtoTyped(const std::string& monitor_name,
                                                     const ConfigProto& config,
-                                                    MonitorFactoryContext& context) PURE;
+                                                    ExtMonitorFactoryContext& context) PURE;
 
   const std::string name_;
 };

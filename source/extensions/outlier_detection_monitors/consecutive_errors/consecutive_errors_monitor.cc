@@ -29,17 +29,17 @@ void ConsecutiveErrorsMonitor::onSuccess() {
 void ConsecutiveErrorsMonitor::onReset() { counter_ = 0; }
 
 class ConsecutiveErrorsMonitorFactory
-    : public MonitorFactoryBase<envoy::extensions::outlier_detection_monitors::consecutive_errors::
-                                    v3::ConsecutiveErrors> {
+    : public ExtMonitorFactoryBase<envoy::extensions::outlier_detection_monitors::
+                                       consecutive_errors::v3::ConsecutiveErrors> {
 public:
   ConsecutiveErrorsMonitorFactory()
-      : MonitorFactoryBase("envoy.outlier_detection_monitors.consecutive_errors") {}
+      : ExtMonitorFactoryBase("envoy.outlier_detection_monitors.consecutive_errors") {}
 
 private:
   ExtMonitorPtr createMonitorFromProtoTyped(const std::string& monitor_name,
                                             const envoy::extensions::outlier_detection_monitors::
                                                 consecutive_errors::v3::ConsecutiveErrors& config,
-                                            MonitorFactoryContext&) override {
+                                            Upstream::Outlier::ExtMonitorFactoryContext&) override {
     auto monitor = std::make_unique<ConsecutiveErrorsMonitor>(
         monitor_name, config.enforcing().value(),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, threshold, 3));
@@ -49,7 +49,7 @@ private:
   }
 };
 
-REGISTER_FACTORY(ConsecutiveErrorsMonitorFactory, MonitorFactory);
+REGISTER_FACTORY(ConsecutiveErrorsMonitorFactory, ExtMonitorFactory);
 
 } // namespace Outlier
 } // namespace Extensions
