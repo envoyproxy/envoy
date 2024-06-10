@@ -90,7 +90,7 @@ public class Errors {
       }
     }
 
-    // Check if the upstream negotiated protocol is HTTP/3.
+    // Use the QUIC error code if the upstream negotiated protocol is HTTP/3.
     if (finalStreamIntel.getUpstreamProtocol() == UpstreamHttpProtocol.HTTP3) {
       return NetError.ERR_QUIC_PROTOCOL_ERROR;
     }
