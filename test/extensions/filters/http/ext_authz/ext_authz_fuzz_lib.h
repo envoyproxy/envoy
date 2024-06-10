@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/http/ext_authz/ext_authz_fuzz.pb.h"
@@ -31,6 +32,7 @@ private:
   // Do not use ON_CALL outside of constructor on these mocks. Each ON_CALL has a memory cost and
   // will cause OOMs if the fuzzer runs long enough.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  std::unique_ptr<Buffer::OwnedImpl> decoding_buffer_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
