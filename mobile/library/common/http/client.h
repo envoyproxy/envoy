@@ -161,8 +161,7 @@ private:
     Stream& getStream() override { return direct_stream_; }
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
     void encode1xxHeaders(const ResponseHeaderMap&) override {
-      // TODO(goaway): implement?
-      PANIC("not implemented");
+      IS_ENVOY_BUG("Unexpected 100 continue"); // proxy_100_continue_ false by default.
     }
     bool streamErrorOnInvalidHttpMessage() const override { return false; }
     void setRequestDecoder(RequestDecoder& /*decoder*/) override{};
@@ -171,7 +170,7 @@ private:
                                               Http::ResponseTrailerMapConstSharedPtr,
                                               StreamInfo::StreamInfo&) override {}
 
-    void encodeMetadata(const MetadataMapVector&) override { PANIC("not implemented"); }
+    void encodeMetadata(const MetadataMapVector&) override { IS_ENVOY_BUG("Unexpected metadata"); }
 
     void onHasBufferedData();
     void onBufferedDataDrained();

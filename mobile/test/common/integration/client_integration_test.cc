@@ -314,6 +314,7 @@ void ClientIntegrationTest::trickleTest(bool final_chunk_has_data) {
       upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*BaseIntegrationTest::dispatcher_));
 
+  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   // This will be read immediately. on_data_ will kick off more chunks.
   upstream_request_->encodeData(1, false);
