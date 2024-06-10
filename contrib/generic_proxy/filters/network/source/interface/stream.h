@@ -132,9 +132,21 @@ public:
   virtual FrameFlags frameFlags() const { return {}; }
 };
 
+/**
+ * Common frame that used to represent any data or structure of L7 protocols. No specific
+ * interface is provided for the common frame.
+ */
 class CommonFrame : public StreamFrame {};
 using CommonFramePtr = std::unique_ptr<CommonFrame>;
 
+/**
+ * Header frame of generic request or response. This provide some basic interfaces that are
+ * used to get/set attributes of the request or response.
+ * NOTE: Header frame should always be the first frame of the request or response. And there
+ * has no requirement that the header frame could only contain the 'header' of L7 protocols.
+ * For example, for short HTTP request, the header frame could contain the whole request
+ * header map, body, and even trailer.
+ */
 class HeaderFrame : public StreamFrame {
 public:
   using IterateCallback = std::function<bool(absl::string_view key, absl::string_view val)>;
@@ -183,10 +195,6 @@ using StreamBase = HeaderFrame;
 /**
  * Interface of generic request. This is derived from StreamFrame that contains the request
  * specific information. First frame of the request MUST be a RequestHeaderFrame.
- *
- * NOTE: using interface that provided by the TraceContext as the interface of generic request
- * here to simplify the tracing integration. This is not a good design. This should be changed
- * in the future.
  */
 class RequestHeaderFrame : public HeaderFrame {
 public:

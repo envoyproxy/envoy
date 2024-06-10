@@ -26,12 +26,16 @@ ReusableFilterFactory::ReusableFilterFactory()
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_callbacks_.stream_info_, dynamicMetadata())
       .WillByDefault(testing::ReturnRef(metadata_));
+  ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault([this]() {
+    return decoding_buffer_.get();
+  });
 }
 
 std::unique_ptr<Filter>
 ReusableFilterFactory::newFilter(FilterConfigSharedPtr config,
                                  Filters::Common::ExtAuthz::ClientPtr&& client,
                                  const envoy::config::core::v3::Metadata& metadata) {
+  decoding_buffer_ = std::make_unique<Buffer::OwnedImpl>();
   metadata_ = metadata;
   std::unique_ptr<Filter> filter = std::make_unique<Filter>(std::move(config), std::move(client));
   filter->setDecoderFilterCallbacks(decoder_callbacks_);

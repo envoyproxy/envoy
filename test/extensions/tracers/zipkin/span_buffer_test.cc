@@ -327,7 +327,11 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
   EXPECT_EQ(withDefaultTimestampAndDuration("{"
                                             R"("spans":[{)"
                                             R"("traceId":"AAAAAAAAAAE=",)"
+#ifdef ABSL_IS_BIG_ENDIAN
+                                            R"("id":"AAAAAAAAAAE=",)"
+#else
                                             R"("id":"AQAAAAAAAAA=",)"
+#endif
                                             R"("kind":"CLIENT",)"
                                             R"("timestamp":"ANNOTATION_TEST_TIMESTAMP",)"
                                             R"("duration":"DEFAULT_TEST_DURATION",)"
@@ -346,7 +350,11 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                 "{"
                 R"("spans":[{)"
                 R"("traceId":"AAAAAAAAAAE=",)"
+#ifdef ABSL_IS_BIG_ENDIAN
+                R"("id":"AAAAAAAAAAE=",)"
+#else
                 R"("id":"AQAAAAAAAAA=",)"
+#endif
                 R"("kind":"CLIENT",)"
                 R"("timestamp":"ANNOTATION_TEST_TIMESTAMP",)"
                 R"("duration":"DEFAULT_TEST_DURATION",)"
@@ -365,7 +373,11 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
   EXPECT_EQ(withDefaultTimestampAndDuration("{"
                                             R"("spans":[{)"
                                             R"("traceId":"AAAAAAAAAAE=",)"
+#ifdef ABSL_IS_BIG_ENDIAN
+                                            R"("id":"AAAAAAAAAAE=",)"
+#else
                                             R"("id":"AQAAAAAAAAA=",)"
+#endif
                                             R"("kind":"CLIENT",)"
                                             R"("timestamp":"ANNOTATION_TEST_TIMESTAMP",)"
                                             R"("duration":"DEFAULT_TEST_DURATION",)"
@@ -377,7 +389,11 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                                             R"("response_size":"DEFAULT_TEST_DURATION"}},)"
                                             R"({)"
                                             R"("traceId":"AAAAAAAAAAE=",)"
+#ifdef ABSL_IS_BIG_ENDIAN
+                                            R"("id":"AAAAAAAAAAE=",)"
+#else
                                             R"("id":"AQAAAAAAAAA=",)"
+#endif
                                             R"("kind":"SERVER",)"
                                             R"("timestamp":"ANNOTATION_TEST_TIMESTAMP",)"
                                             R"("duration":"DEFAULT_TEST_DURATION",)"
@@ -396,7 +412,11 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
   EXPECT_EQ(withDefaultTimestampAndDuration("{"
                                             R"("spans":[{)"
                                             R"("traceId":"AAAAAAAAAAE=",)"
+#ifdef ABSL_IS_BIG_ENDIAN
+                                            R"("id":"AAAAAAAAAAE=",)"
+#else
                                             R"("id":"AQAAAAAAAAA=",)"
+#endif
                                             R"("kind":"CLIENT",)"
                                             R"("timestamp":"ANNOTATION_TEST_TIMESTAMP",)"
                                             R"("duration":"DEFAULT_TEST_DURATION",)"
@@ -408,7 +428,11 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                                             R"("response_size":"DEFAULT_TEST_DURATION"}},)"
                                             R"({)"
                                             R"("traceId":"AAAAAAAAAAE=",)"
+#ifdef ABSL_IS_BIG_ENDIAN
+                                            R"("id":"AAAAAAAAAAE=",)"
+#else
                                             R"("id":"AQAAAAAAAAA=",)"
+#endif
                                             R"("kind":"SERVER",)"
                                             R"("timestamp":"ANNOTATION_TEST_TIMESTAMP",)"
                                             R"("duration":"DEFAULT_TEST_DURATION",)"

@@ -96,7 +96,7 @@ struct ProxyProtocolStats {
    * For backwards compatibility, the legacy stats are rooted under their own scope.
    * The general and versioned stats are correctly rooted at this filter's own scope.
    */
-  static ProxyProtocolStats create(Stats::Scope& scope);
+  static ProxyProtocolStats create(Stats::Scope& scope, absl::string_view stat_prefix);
 };
 
 /**

@@ -70,7 +70,7 @@ configuration, you should see it is configured with the ``example_proxy_cluster`
 
    $ curl -s http://localhost:19000/config_dump | jq -r '.configs[1].dynamic_active_clusters'
 
-.. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters.json
+.. literalinclude:: /start/sandboxes/_include/dynamic-config-fs/_include/response-config-active-clusters.json
    :language: json
    :emphasize-lines: 10, 18-19
 
@@ -79,15 +79,15 @@ Step 4: Replace ``cds.yaml`` inside the container to update upstream cluster
 
 The example setup provides Envoy with two dynamic configuration files:
 
-- :download:`configs/cds.yaml <_include/dynamic-config-fs/configs/cds.yaml>` to provide a :ref:`Cluster
+- :download:`configs/cds.yaml </start/sandboxes/_include/dynamic-config-fs/configs/cds.yaml>` to provide a :ref:`Cluster
   discovery service (CDS) <config_cluster_manager_cds>`.
-- :download:`configs/lds.yaml <_include/dynamic-config-fs/configs/lds.yaml>` to provide a :ref:`Listener
+- :download:`configs/lds.yaml </start/sandboxes/_include/dynamic-config-fs/configs/lds.yaml>` to provide a :ref:`Listener
   discovery service (LDS) <config_listeners_lds>`.
 
 Edit ``cds.yaml`` inside the container and change the cluster address
 from ``service1`` to ``service2``:
 
-.. literalinclude:: _include/dynamic-config-fs/configs/cds.yaml
+.. literalinclude:: /start/sandboxes/_include/dynamic-config-fs/configs/cds.yaml
    :language: yaml
    :linenos:
    :lines: 6-13
@@ -121,7 +121,7 @@ the ``example_proxy_cluster`` should now be configured to proxy to ``service2``:
 
    $ curl -s http://localhost:19000/config_dump | jq -r '.configs[1].dynamic_active_clusters'
 
-.. literalinclude:: _include/dynamic-config-fs/response-config-active-clusters-updated.json
+.. literalinclude:: /start/sandboxes/_include/dynamic-config-fs/_include/response-config-active-clusters-updated.json
    :language: json
    :emphasize-lines: 10, 18-19
 
