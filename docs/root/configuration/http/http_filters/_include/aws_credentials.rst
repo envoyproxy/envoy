@@ -17,8 +17,8 @@ secret access key (the session token is optional).
    ``SecretAccessKey``, and ``SessionToken`` are used, and credentials are cached for 1 hour or until they expire (according to the field
    ``Expiration``). To enable this credentials provider set ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` to ``true``
    so that it can use http async client to fetch the credentials. This provider is not compatible with :ref:`Grpc Credentials AWS AwsIamConfig
-   <envoy_v3_api_file_envoy/config/grpc_credential/v3/aws_iam.proto>` plugin which can only support deprecated libcurl credentials fetcher
-   , see https://github.com/envoyproxy/envoy/pull/30626. To fetch the credentials a static cluster is created with the name
+   <envoy_v3_api_file_envoy/config/grpc_credential/v3/aws_iam.proto>` plugin which can only support deprecated libcurl credentials
+   fetcher (see https://github.com/envoyproxy/envoy/pull/30626) . To fetch the credentials a static cluster is created with the name
    ``sts_token_service_internal-<region>`` pointing towards regional AWS Security Token Service.
 
    Note: If ``signing_algorithm: AWS_SIGV4A`` is set, the logic for STS cluster host generation is as follows:
