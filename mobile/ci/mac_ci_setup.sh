@@ -29,13 +29,14 @@ function retry () {
 }
 
 function is_installed {
+    echo "Checking brew package $1"
     brew ls --versions "$1"
 }
 
 function install {
-    echo "Installing $1"
+    echo "Installing brew package $1"
     if ! retry brew install --quiet "$1"; then
-        echo "Failed to install $1"
+        echo "Failed to install brew package $1"
         exit 1
     fi
 }
@@ -47,11 +48,11 @@ fi
 
 # This is to save some disk space.
 # https://mac.install.guide/homebrew/8
-# brew autoremove
-# brew cleanup --prune=all
-# brew cleanup --prune-prefix
-# brew uninstall coreutils
-# brew install coreutils
+brew autoremove
+brew cleanup --prune=all
+# Remove broken symlinks.
+brew cleanup --prune-prefix
+brew uninstall coreutils || brew install coreutils
 
 DEPS="automake cmake coreutils libtool ninja"
 for DEP in ${DEPS}
