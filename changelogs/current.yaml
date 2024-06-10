@@ -82,6 +82,9 @@ minor_behavior_changes:
 - area: filters
   change: |
     Set ``WWW-Authenticate`` header for 401 responses from the Basic Auth filter.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` and legacy code path.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -222,6 +225,11 @@ new_features:
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
+- area: proxy_protocol
+  change: |
+    Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.stat_prefix>`
+    to the proxy protocol listener filter configuration, allowing for differentiating statistics when multiple proxy
+    protocol listener filters are configured.
 - area: aws_lambda
   change: |
     The ``aws_lambda`` filter now supports the
@@ -238,6 +246,12 @@ new_features:
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting
     :ref:`health_check_config <envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.proxy_protocol_config>`.
+- area: ext_authz
+  change: |
+    added
+    :ref:`decoder_header_mutation_rules <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.decoder_header_mutation_rules>`
+    which allows you to configure what decoder header mutations are allowed from the ext_authz
+    service as well as whether to fail the downstream request if disallowed mutations are requested.
 - area: access_log
   change: |
     added new ``access_log`` command operators to retrieve upstream connection information change: ``%UPSTREAM_PEER_URI_SAN%``,
@@ -248,6 +262,17 @@ new_features:
     added :ref:`stat_prefix
     <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.stat_prefix>`
     configuration to support additional stat prefix for the OpenTelemetry logger.
+- area: open_telemetry
+  change: |
+    added :ref:`formatters
+    <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.formatters>`
+    configuration to support extension formatter for the OpenTelemetry logger.
+- area: routing
+  change: |
+    added support in :ref:`file datasource <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` implementation
+    to listen to file changes and dynamically update the response when :ref:`watched_directory
+    <envoy_v3_api_field_config.core.v3.datasource.watched_directory>`
+    is configured in :ref:`DataSource <envoy_v3_api_msg_config.core.v3.datasource>`.
 - area: listener
   change: |
     Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`

@@ -1359,6 +1359,61 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
   EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
 }
 
+TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
+                                    "true");
+  useAccessLog(
+      "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
+      "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
+      "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
+      "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
+      "METADATA("
+      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
+  initialize();
+
+  // Make a header-only request and delay the response by 1ms to ensure that the ROUNDTRIP_DURATION
+  // metric is > 0 if exists.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  absl::SleepFor(absl::Milliseconds(1));
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Prevent the client's dispatcher from running by not calling waitForEndStream or closing the
+  // client's connection, then wait for server to tear down connection due to too many
+  // retransmissions.
+  int iterations = 0;
+  std::string contents = TestEnvironment::readFileToStringForTest(access_log_name_);
+  while (iterations < 20) {
+    timeSystem().advanceTimeWait(std::chrono::seconds(1));
+    // check for deferred logs from connection teardown.
+    contents = TestEnvironment::readFileToStringForTest(access_log_name_);
+    if (!contents.empty()) {
+      break;
+    }
+    iterations++;
+  }
+
+  std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
+  EXPECT_EQ(entries.size(), 1);
+  std::string log = entries[0];
+
+  std::vector<std::string> metrics = absl::StrSplit(log, ',');
+  ASSERT_EQ(metrics.size(), 21);
+  EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
+  EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
+  EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
+  EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
+  EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
+  EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
+  // Ensure that request headers from top-level access logger parameter and stream info are
+  // consistent.
+  EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
+
+  codec_client_->close();
+}
+
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingDisabled) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
                                     "false");
