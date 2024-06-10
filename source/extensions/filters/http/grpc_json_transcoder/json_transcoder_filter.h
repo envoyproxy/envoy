@@ -150,7 +150,7 @@ using JsonTranscoderConfigConstSharedPtr = std::shared_ptr<const JsonTranscoderC
 class JsonTranscoderFilter : public Http::StreamFilter, public Logger::Loggable<Logger::Id::http2> {
 public:
   JsonTranscoderFilter(const JsonTranscoderConfigConstSharedPtr& config,
-                       GrpcJsonTranscoderFilterStatsSharedPtr& stats);
+                       const GrpcJsonTranscoderFilterStatsSharedPtr& stats);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -209,7 +209,7 @@ private:
   void maybeExpandBufferLimits();
 
   const JsonTranscoderConfigConstSharedPtr config_;
-  GrpcJsonTranscoderFilterStatsSharedPtr stats_;
+  const GrpcJsonTranscoderFilterStatsSharedPtr stats_;
   const JsonTranscoderConfig* per_route_config_{};
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
   TranscoderInputStreamImpl request_in_;

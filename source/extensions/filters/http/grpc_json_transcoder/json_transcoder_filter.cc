@@ -425,7 +425,7 @@ absl::Status JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::M
 }
 
 JsonTranscoderFilter::JsonTranscoderFilter(const JsonTranscoderConfigConstSharedPtr& config,
-                                           GrpcJsonTranscoderFilterStatsSharedPtr& stats)
+                                           const GrpcJsonTranscoderFilterStatsSharedPtr& stats)
     : config_(config), stats_(stats) {}
 
 void JsonTranscoderFilter::initPerRouteConfig() {
