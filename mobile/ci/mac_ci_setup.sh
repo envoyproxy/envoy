@@ -47,8 +47,9 @@ fi
 
 # This is to save some disk space.
 # https://mac.install.guide/homebrew/8
-# brew autoremove
+brew autoremove
 brew cleanup --prune=all
+brew cleanup --prune-prefix
 
 DEPS="automake cmake coreutils libtool ninja"
 for DEP in ${DEPS}
