@@ -109,7 +109,7 @@ public:
                                           const bool expected_results,
                                           const bool exit_dispatcher = true) {
     return resolver_->resolve(address, lookup_family,
-                              [=](DnsResolver::ResolutionStatus status, std::string&&,
+                              [=](DnsResolver::ResolutionStatus status, absl::string_view,
                                   std::list<DnsResponse>&& results) -> void {
                                 EXPECT_EQ(expected_status, status);
                                 if (expected_results) {

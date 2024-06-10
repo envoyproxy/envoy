@@ -345,15 +345,16 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   host_info.timeout_timer_->enableTimer(timeout_interval_, nullptr);
   host_info.active_query_ = resolver_->resolve(
       host_info.host_info_->resolvedHost(), dns_lookup_family_,
-      [this, host](Network::DnsResolver::ResolutionStatus status, std::string&& details,
+      [this, host](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
                    std::list<Network::DnsResponse>&& response) {
-        finishResolve(host, status, std::move(details), std::move(response));
+        finishResolve(host, status, details, std::move(response));
       });
 }
 
 void DnsCacheImpl::finishResolve(const std::string& host,
                                  Network::DnsResolver::ResolutionStatus status,
-                                 std::string&& details, std::list<Network::DnsResponse>&& response,
+                                 absl::string_view details,
+                                 std::list<Network::DnsResponse>&& response,
                                  absl::optional<MonotonicTime> resolution_time,
                                  bool is_proxy_lookup) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
@@ -437,7 +438,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                     current_address ? current_address->asStringView() : "<empty>",
                     new_address ? new_address->asStringView() : "<empty>");
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
-    primary_host_info->host_info_->setDetails(details);
+    primary_host_info->host_info_->setDetails(std::string(details));
 
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
     if (Runtime::runtimeFeatureEnabled(
@@ -450,7 +451,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     // We only set details here if current address is null because but
     // non-null->null resolutions we don't update the address so will use a
     // previously resolved address + details.
-    primary_host_info->host_info_->setDetails(details);
+    primary_host_info->host_info_->setDetails(std::string(details));
   }
 
   if (first_resolve) {

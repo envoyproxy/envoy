@@ -182,7 +182,7 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](Network::DnsResolver::ResolutionStatus status, std::string&&,
+      [this](Network::DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
@@ -341,7 +341,7 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
       parent_.dns_resolver_->resolve(
           slot.primary_hostname_, parent_.dns_lookup_family_,
           [this, slot_idx, slots, hostname_resolution_required_cnt](
-              Network::DnsResolver::ResolutionStatus status, std::string&&,
+              Network::DnsResolver::ResolutionStatus status, absl::string_view,
               std::list<Network::DnsResponse>&& response) -> void {
             auto& slot = (*slots)[slot_idx];
             ENVOY_LOG(
@@ -397,7 +397,7 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
     parent_.dns_resolver_->resolve(
         replica.first, parent_.dns_lookup_family_,
         [this, index, slots, replica_idx, hostname_resolution_required_cnt](
-            Network::DnsResolver::ResolutionStatus status, std::string&&,
+            Network::DnsResolver::ResolutionStatus status, absl::string_view,
             std::list<Network::DnsResponse>&& response) -> void {
           auto& slot = (*slots)[index];
           auto& replica = slot.replicas_to_resolve_[replica_idx];
