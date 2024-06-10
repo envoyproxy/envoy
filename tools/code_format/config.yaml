@@ -161,6 +161,7 @@ paths:
     - source/common/event/file_event_impl.cc
     - source/common/http/async_client_impl.cc
     - source/common/grpc/google_async_client_impl.cc
+    - source/common/formatter/substitution_format_utility.cc
     # Extensions can exempt entire directories but new extensions
     # points should ideally use StatusOr
     - source/extensions/access_loggers

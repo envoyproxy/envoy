@@ -454,12 +454,17 @@ void Client::DirectStreamCallbacks::latchError() {
   std::transform(info.responseFlags().begin(), info.responseFlags().end(), response_flags.begin(),
                  [](StreamInfo::ResponseFlag flag) { return std::to_string(flag.value()); });
   error_msg_details.push_back(absl::StrCat("RESPONSE_FLAGS: ", absl::StrJoin(response_flags, ",")));
+  if (info.protocol().has_value()) {
+    // https://github.com/envoyproxy/envoy/blob/fbce85914421145b5ae3210c9313eced63e535b0/envoy/http/protocol.h#L13
+    error_msg_details.push_back(absl::StrCat("PROTOCOL: ", *info.protocol()));
+  }
   if (std::string resp_code_details = info.responseCodeDetails().value_or("");
       !resp_code_details.empty()) {
     error_msg_details.push_back(absl::StrCat("DETAILS: ", std::move(resp_code_details)));
   }
   // The format of the error message propogated to callbacks is:
-  // RESPONSE_CODE: {value}|ERROR_CODE: {value}|RESPONSE_FLAGS: {value}|DETAILS: {value}
+  // RESPONSE_CODE: {value}|ERROR_CODE: {value}|RESPONSE_FLAGS: {value}|PROTOCOL: {value}|DETAILS:
+  // {value}
   //
   // Where RESPONSE_CODE is the HTTP response code from StreamInfo::responseCode().
   // ERROR_CODE is of the envoy_error_code_t enum type, and gets mapped from RESPONSE_CODE.
@@ -656,7 +661,7 @@ void Client::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool en
   }
 }
 
-void Client::sendMetadata(envoy_stream_t, envoy_headers) { PANIC("not implemented"); }
+void Client::sendMetadata(envoy_stream_t, envoy_headers) { IS_ENVOY_BUG("not implemented"); }
 
 void Client::sendTrailers(envoy_stream_t stream, RequestTrailerMapPtr trailers) {
   ASSERT(dispatcher_.isThreadSafe());

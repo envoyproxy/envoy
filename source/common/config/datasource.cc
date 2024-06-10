@@ -100,29 +100,36 @@ DynamicData::~DynamicData() {
   }
 }
 
-absl::string_view DynamicData::data() const {
+const std::string& DynamicData::data() const {
   const auto thread_local_data = slot_->get();
   return thread_local_data.has_value() ? *thread_local_data->data_ : EMPTY_STRING;
 }
 
-absl::string_view DataSourceProvider::data() const {
+const std::string& DataSourceProvider::data() const {
   if (absl::holds_alternative<std::string>(data_)) {
     return absl::get<std::string>(data_);
   }
   return absl::get<DynamicData>(data_).data();
 }
 
-absl::StatusOr<DataSourceProvider> DataSourceProvider::create(const ProtoDataSource& source,
-                                                              Event::Dispatcher& main_dispatcher,
-                                                              ThreadLocal::SlotAllocator& tls,
-                                                              Api::Api& api, bool allow_empty,
-                                                              uint64_t max_size) {
+absl::StatusOr<DataSourceProviderPtr> DataSourceProvider::create(const ProtoDataSource& source,
+                                                                 Event::Dispatcher& main_dispatcher,
+                                                                 ThreadLocal::SlotAllocator& tls,
+                                                                 Api::Api& api, bool allow_empty,
+                                                                 uint64_t max_size) {
   auto initial_data_or_error = read(source, allow_empty, api, max_size);
   RETURN_IF_STATUS_NOT_OK(initial_data_or_error);
 
   if (!source.has_watched_directory() ||
       source.specifier_case() != envoy::config::core::v3::DataSource::kFilename) {
-    return DataSourceProvider(std::move(initial_data_or_error).value());
+    if (source.specifier_case() != envoy::config::core::v3::DataSource::kFilename &&
+        initial_data_or_error.value().length() > max_size) {
+      return absl::InvalidArgumentError(fmt::format("response body size is {} bytes; maximum is {}",
+                                                    initial_data_or_error.value().length(),
+                                                    max_size));
+    }
+    return std::unique_ptr<DataSourceProvider>(
+        new DataSourceProvider(std::move(initial_data_or_error).value()));
   }
 
   auto slot = ThreadLocal::TypedSlot<DynamicData::ThreadLocalData>::makeUnique(tls);
@@ -157,7 +164,8 @@ absl::StatusOr<DataSourceProvider> DataSourceProvider::create(const ProtoDataSou
       });
   RETURN_IF_NOT_OK(watcher_status);
 
-  return DataSourceProvider(DynamicData(main_dispatcher, std::move(slot), std::move(watcher)));
+  return std::unique_ptr<DataSourceProvider>(
+      new DataSourceProvider(DynamicData(main_dispatcher, std::move(slot), std::move(watcher))));
 }
 
 } // namespace DataSource
