@@ -285,7 +285,7 @@ new_features:
     to bypass the overload manager for a listener. When set to true, the listener will not be subject to overload protection.
 - area: oauth
   change: |
-    Added :ref:`disable_id_token_set_cookie <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2>`to disable
+    Added :ref:`disable_id_token_set_cookie <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2>` to disable
     setting the ID Token cookie.
 
 deprecated:
