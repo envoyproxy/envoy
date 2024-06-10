@@ -754,10 +754,12 @@ public:
   }
 
   /**
-   * Finds the entry associated with the longest prefix. Complexity is O(min(longest key prefix,
-   * key length)).
+   * Finds the entry with the longest key that is a prefix of the specified key.
+   * Complexity is O(min(longest key prefix, key length)).
    * @param key the key used to find.
-   * @return the value matching the longest prefix based on the key.
+   * @return a value whose key is a prefix of the specified key. If there are
+   *         multiple such values, the one with the longest key. If there are
+   *         no keys that are a prefix of the input key, an empty-initialized Value.
    */
   Value findLongestPrefix(absl::string_view key) const {
     const TrieNode* current = &root_;
