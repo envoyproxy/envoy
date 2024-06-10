@@ -33,7 +33,7 @@ If there is a protocol error or an unsupported address family
 Statistics
 ----------
 
-This filter emits the following general statistics, rooted at *downstream_proxy_proto*
+This filter emits the following general statistics, rooted at *proxy_proto.[<stat_prefix>.]*
 
 .. csv-table::
   :header: Name, Type, Description
@@ -42,7 +42,7 @@ This filter emits the following general statistics, rooted at *downstream_proxy_
   not_found_disallowed, Counter, "Total number of connections that don't contain the PROXY protocol header and are rejected."
   not_found_allowed, Counter, "Total number of connections that don't contain the PROXY protocol header, but are allowed due to :ref:`allow_requests_without_proxy_protocol <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>`."
 
-The filter also emits the statistics rooted at *downstream_proxy_proto.versions.<version>*
+The filter also emits the statistics rooted at *proxy_proto.[<stat_prefix>.]versions.<version>*
 for each matched PROXY protocol version. Proxy protocol versions include ``v1`` and ``v2``.
 
 .. csv-table::
@@ -53,7 +53,7 @@ for each matched PROXY protocol version. Proxy protocol versions include ``v1`` 
   disallowed, Counter, "Total number of ``found`` connections that are rejected due to :ref:`disallowed_versions <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.disallowed_versions>`."
   error, Counter, "Total number of connections where the PROXY protocol header was malformed (and the connection was rejected)."
 
-The filter also emits the following legacy statistics, rooted at its own scope:
+The filter also emits the following legacy statistics, rooted at its own scope and **not** including the *stat_prefix*:
 
 .. csv-table::
   :header: Name, Type, Description

@@ -225,6 +225,11 @@ new_features:
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
+- area: proxy_protocol
+  change: |
+    Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.stat_prefix>`
+    to the proxy protocol listener filter configuration, allowing for differentiating statistics when multiple proxy
+    protocol listener filters are configured.
 - area: aws_lambda
   change: |
     The ``aws_lambda`` filter now supports the
