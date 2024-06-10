@@ -266,7 +266,7 @@ TEST(StringUtil, WhitespaceChars) {
 
 TEST(StringUtil, itoa) {
   char buf[32];
-  EXPECT_THROW(StringUtil::itoa(buf, 20, 1), std::invalid_argument);
+  EXPECT_ENVOY_BUG(EXPECT_EQ(StringUtil::itoa(buf, 20, 1), 0), "itoa buffer too small");
 
   EXPECT_EQ(1UL, StringUtil::itoa(buf, sizeof(buf), 0));
   EXPECT_STREQ("0", buf);
