@@ -34,6 +34,9 @@ minor_behavior_changes:
     Changes in ``AsyncStreamImpl`` now propagate tracing context headers in bidirectional streams when using
     :ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>`. Previously, tracing context headers
     were not being set when calling external services such as ``ext_proc``.
+- area: http
+  change: |
+    Fixed host header changes for shadow requests to properly handle ipv6 addresses.
 - area: tracers
   change: |
     Set status code for OpenTelemetry tracers (previously unset).

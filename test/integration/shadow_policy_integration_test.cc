@@ -948,6 +948,31 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderAppendsSuffix) {
   EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "sni.lyft.com-shadow");
 }
 
+TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderAppendsSuffixAddresses) {
+  initialConfigSetup("cluster_1", "");
+  // By default `disable_shadow_host_suffix_append` is "false".
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_1");
+      });
+
+  initialize();
+  default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
+  sendRequestAndValidateResponse();
+  // Ensure shadowed host header has suffix "-shadow".
+  EXPECT_EQ(upstream_headers_->getHostValue(), fake_upstreams_[0]->localAddress()->asStringView());
+  EXPECT_EQ(mirror_headers_->getHostValue(),
+            absl::StrCat(version_ == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]",
+                         "-shadow:", fake_upstreams_[0]->localAddress()->ip()->port()))
+      << mirror_headers_->getHostValue();
+}
+
 TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderDisabledAppendSuffix) {
   initialConfigSetup("cluster_1", "");
   config_helper_.addConfigModifier(
