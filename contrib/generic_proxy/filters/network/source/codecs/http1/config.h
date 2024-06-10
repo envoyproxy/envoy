@@ -291,7 +291,7 @@ public:
       callbacks_->onDecodingFailure();
     }
   }
-  void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) override;
+  EncodingResult encode(const StreamFrame& frame, EncodingContext& ctx) override;
   ResponsePtr respond(absl::Status status, absl::string_view data, const Request&) override {
     auto response = Http::ResponseHeaderMapImpl::create();
     response->setStatus(std::to_string(Utility::statusToHttpStatus(status.code())));
@@ -352,7 +352,7 @@ public:
       callbacks_->onDecodingFailure();
     }
   }
-  void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) override;
+  EncodingResult encode(const StreamFrame& frame, EncodingContext& ctx) override;
 
   void onDecodingSuccess(RequestHeaderFramePtr, absl::optional<StartTime>) override {}
   void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,

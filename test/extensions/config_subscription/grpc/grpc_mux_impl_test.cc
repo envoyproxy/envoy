@@ -27,6 +27,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -49,7 +50,7 @@ namespace {
 
 // We test some mux specific stuff below, other unit test coverage for singleton use of GrpcMuxImpl
 // is provided in [grpc_]subscription_impl_test.cc.
-class GrpcMuxImplTestBase : public testing::Test {
+class GrpcMuxImplTestBase : public testing::TestWithParam<bool> {
 public:
   GrpcMuxImplTestBase()
       : async_client_(new Grpc::MockAsyncClient()),
@@ -58,15 +59,19 @@ public:
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
         control_plane_pending_requests_(
-            stats_.gauge("control_plane.pending_requests", Stats::Gauge::ImportMode::NeverImport))
-
-  {}
+            stats_.gauge("control_plane.pending_requests", Stats::Gauge::ImportMode::NeverImport)) {
+    // Once "envoy.restart_features.xds_failover_support" is deprecated, the
+    // test should no longer be parameterized.
+    scoped_runtime_.mergeValues(
+        {{"envoy.restart_features.xds_failover_support", GetParam() ? "true" : "false"}});
+  }
 
   void setup() { setup(rate_limit_settings_); }
 
   void setup(const RateLimitSettings& custom_rate_limit_settings) {
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+        /*failover_async_client_=*/nullptr,
         /*dispatcher_=*/dispatcher_,
         /*service_method_=*/
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -111,6 +116,7 @@ public:
     EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
   }
 
+  TestScopedRuntime scoped_runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -132,9 +138,11 @@ public:
   Event::SimulatedTimeSystem time_system_;
 };
 
+INSTANTIATE_TEST_SUITE_P(GrpcMuxImpl, GrpcMuxImplTest, ::testing::Bool());
+
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
 // (via RAII).
-TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
+TEST_P(GrpcMuxImplTest, MultipleTypeUrlStreams) {
   setup();
   InSequence s;
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
@@ -154,7 +162,7 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
 }
 
 // Validate behavior when dynamic context parameters are updated.
-TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
+TEST_P(GrpcMuxImplTest, DynamicContextParameters) {
   setup();
   InSequence s;
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
@@ -179,7 +187,7 @@ TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
 }
 
 // Validate behavior when xdstp naming is used.
-TEST_F(GrpcMuxImplTest, Xdstp) {
+TEST_P(GrpcMuxImplTest, Xdstp) {
   setup();
   InSequence s;
 
@@ -203,7 +211,7 @@ TEST_F(GrpcMuxImplTest, Xdstp) {
 }
 
 // Validate behavior when xdstp naming is used with context parameters in the URI.
-TEST_F(GrpcMuxImplTest, XdstpWithContextParams) {
+TEST_P(GrpcMuxImplTest, XdstpWithContextParams) {
   setup();
   InSequence s;
 
@@ -234,7 +242,7 @@ TEST_F(GrpcMuxImplTest, XdstpWithContextParams) {
 }
 
 // Validate behavior when multiple type URL watches are maintained and the stream is reset.
-TEST_F(GrpcMuxImplTest, ResetStream) {
+TEST_P(GrpcMuxImplTest, ResetStream) {
   InSequence s;
 
   auto* timer = new Event::MockTimer(&dispatcher_);
@@ -278,7 +286,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
 }
 
 // Validate cached nonces are cleared on reconnection.
-TEST_F(GrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
+TEST_P(GrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
@@ -334,7 +342,7 @@ TEST_F(GrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
 }
 
 // Validate pause-resume behavior.
-TEST_F(GrpcMuxImplTest, PauseResume) {
+TEST_P(GrpcMuxImplTest, PauseResume) {
   setup();
   InSequence s;
   GrpcMuxWatchPtr foo_sub;
@@ -368,7 +376,7 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
 }
 
 // Validate behavior when type URL mismatches occur.
-TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
+TEST_P(GrpcMuxImplTest, TypeUrlMismatch) {
   setup();
 
   auto invalid_response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
@@ -406,7 +414,7 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   expectSendMessage("foo", {}, "");
 }
 
-TEST_F(GrpcMuxImplTest, RpcErrorMessageTruncated) {
+TEST_P(GrpcMuxImplTest, RpcErrorMessageTruncated) {
   setup();
   auto invalid_response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   InSequence s;
@@ -459,7 +467,7 @@ resourceWithTtl(std::chrono::milliseconds ttl,
   return resource;
 }
 // Validates the behavior when the TTL timer expires.
-TEST_F(GrpcMuxImplTest, ResourceTTL) {
+TEST_P(GrpcMuxImplTest, ResourceTTL) {
   setup();
 
   time_system_.setSystemTime(std::chrono::seconds(0));
@@ -590,7 +598,7 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
 }
 
 // Checks that the control plane identifier is logged
-TEST_F(GrpcMuxImplTest, LogsControlPlaneIndentifier) {
+TEST_P(GrpcMuxImplTest, LogsControlPlaneIndentifier) {
   setup();
   std::string type_url = "foo";
   auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
@@ -624,7 +632,7 @@ TEST_F(GrpcMuxImplTest, LogsControlPlaneIndentifier) {
 }
 
 // Validate behavior when watches has an unknown resource name.
-TEST_F(GrpcMuxImplTest, WildcardWatch) {
+TEST_P(GrpcMuxImplTest, WildcardWatch) {
   setup();
 
   InSequence s;
@@ -660,7 +668,7 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
 }
 
 // Validate behavior when watches specify resources (potentially overlapping).
-TEST_F(GrpcMuxImplTest, WatchDemux) {
+TEST_P(GrpcMuxImplTest, WatchDemux) {
   setup();
   InSequence s;
   OpaqueResourceDecoderSharedPtr resource_decoder(
@@ -748,7 +756,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
 }
 
 // Validate behavior when we have multiple watchers that send empty updates.
-TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
+TEST_P(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
   setup();
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
@@ -771,7 +779,7 @@ TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
 }
 
 // Validate behavior when we have Single Watcher that sends Empty updates.
-TEST_F(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
+TEST_P(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
   setup();
   const std::string& type_url = Config::TypeUrl::get().Cluster;
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
@@ -801,8 +809,11 @@ public:
   Event::DelegatingTestTimeSystem<MockTimeSystem> mock_time_system_;
 };
 
+INSTANTIATE_TEST_SUITE_P(GrpcMuxImplTestWithMockTimeSystem, GrpcMuxImplTestWithMockTimeSystem,
+                         ::testing::Bool());
+
 //  Verifies that rate limiting is not enforced with defaults.
-TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
+TEST_P(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
 
   auto ttl_timer = new Event::MockTimer(&dispatcher_);
   // Retry timer,
@@ -840,7 +851,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
 }
 
 //  Verifies that default rate limiting is enforced with empty RateLimitSettings.
-TEST_F(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
+TEST_P(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
   // Validate that request drain timer is created.
 
   auto ttl_timer = new Event::MockTimer(&dispatcher_);
@@ -897,7 +908,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
 }
 
 //  Verifies that rate limiting is enforced with custom RateLimitSettings.
-TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
+TEST_P(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   // Validate that request drain timer is created.
 
   // TTL timer.
@@ -950,7 +961,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
 }
 
 //  Verifies that a message with no resources is accepted.
-TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
+TEST_P(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   setup();
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -986,7 +997,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
 }
 
 //  Verifies that a message with some resources is rejected when there are no watches.
-TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
+TEST_P(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
   setup();
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -1016,10 +1027,11 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
                       grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response)));
 }
 
-TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
+TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
   EXPECT_CALL(local_info_, clusterName()).WillOnce(ReturnRef(EMPTY_STRING));
   GrpcMuxContext grpc_mux_context{
       /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
       /*dispatcher_=*/dispatcher_,
       /*service_method_=*/
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -1041,10 +1053,11 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
       "--service-node and --service-cluster options.");
 }
 
-TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
+TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
   EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(EMPTY_STRING));
   GrpcMuxContext grpc_mux_context{
       /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
       /*dispatcher_=*/dispatcher_,
       /*service_method_=*/
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -1067,20 +1080,20 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
 }
 
 // Validates that the EDS cache getter returns the cache.
-TEST_F(GrpcMuxImplTest, EdsResourcesCacheForEds) {
+TEST_P(GrpcMuxImplTest, EdsResourcesCacheForEds) {
   eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
   setup();
   EXPECT_TRUE(grpc_mux_->edsResourcesCache().has_value());
 }
 
 // Validates that the EDS cache getter returns empty if there is no cache.
-TEST_F(GrpcMuxImplTest, EdsResourcesCacheForEdsNoCache) {
+TEST_P(GrpcMuxImplTest, EdsResourcesCacheForEdsNoCache) {
   setup();
   EXPECT_FALSE(grpc_mux_->edsResourcesCache().has_value());
 }
 
 // Validate that an EDS resource is cached if there's a cache.
-TEST_F(GrpcMuxImplTest, CacheEdsResource) {
+TEST_P(GrpcMuxImplTest, CacheEdsResource) {
   // Create the cache that will also be passed to the GrpcMux object via setup().
   eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
   setup();
@@ -1122,7 +1135,7 @@ TEST_F(GrpcMuxImplTest, CacheEdsResource) {
 
 // Validate that an update to an EDS resource watcher is reflected in the cache,
 // if there's a cache.
-TEST_F(GrpcMuxImplTest, UpdateCacheEdsResource) {
+TEST_P(GrpcMuxImplTest, UpdateCacheEdsResource) {
   // Create the cache that will also be passed to the GrpcMux object via setup().
   eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
   setup();
@@ -1170,7 +1183,7 @@ TEST_F(GrpcMuxImplTest, UpdateCacheEdsResource) {
 
 // Validate that adding and removing watchers reflects on the cache changes,
 // if there's a cache.
-TEST_F(GrpcMuxImplTest, AddRemoveSubscriptions) {
+TEST_P(GrpcMuxImplTest, AddRemoveSubscriptions) {
   // Create the cache that will also be passed to the GrpcMux object via setup().
   eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
   setup();
@@ -1248,7 +1261,7 @@ TEST_F(GrpcMuxImplTest, AddRemoveSubscriptions) {
 
 // Validate that a cached resource is removed only after the last subscription
 // (watch) that needs it is removed.
-TEST_F(GrpcMuxImplTest, RemoveCachedResourceOnLastSubscription) {
+TEST_P(GrpcMuxImplTest, RemoveCachedResourceOnLastSubscription) {
   // Create the cache that will also be passed to the GrpcMux object via setup().
   eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
   setup();
@@ -1398,9 +1411,9 @@ TEST(GrpcMuxFactoryTest, InvalidRateLimit) {
   ads_config.mutable_rate_limit_settings()->mutable_max_tokens()->set_value(100);
   ads_config.mutable_rate_limit_settings()->mutable_fill_rate()->set_value(
       std::numeric_limits<double>::quiet_NaN());
-  EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), dispatcher, random, scope,
-                               ads_config, local_info, nullptr, nullptr, absl::nullopt,
-                               absl::nullopt, false),
+  EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
+                               random, scope, ads_config, local_info, nullptr, nullptr,
+                               absl::nullopt, absl::nullopt, false),
                EnvoyException);
 }
 

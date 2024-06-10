@@ -32,10 +32,10 @@ envoy_map makeEnvoyMap(std::initializer_list<std::pair<std::string, std::string>
 
 envoy_error toBridgeError(const EnvoyError& error) {
   envoy_error error_bridge{};
-  error_bridge.message = copyToBridgeData(error.message);
-  error_bridge.error_code = error.error_code;
-  if (error.attempt_count.has_value()) {
-    error_bridge.attempt_count = *error.attempt_count;
+  error_bridge.message = copyToBridgeData(error.message_);
+  error_bridge.error_code = error.error_code_;
+  if (error.attempt_count_.has_value()) {
+    error_bridge.attempt_count = *error.attempt_count_;
   }
   return error_bridge;
 }

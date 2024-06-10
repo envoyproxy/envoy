@@ -23,7 +23,11 @@ int32_t BufferHelper::peekInt32(Buffer::Instance& data) {
 
   int32_t val;
   val = data.peekLEInt<uint32_t>();
+#ifdef ABSL_IS_BIG_ENDIAN
+  return val;
+#else
   return le32toh(val);
+#endif
 }
 
 uint8_t BufferHelper::removeByte(Buffer::Instance& data) {
@@ -88,7 +92,11 @@ int64_t BufferHelper::removeInt64(Buffer::Instance& data) {
 
   int64_t val;
   val = data.drainLEInt<uint64_t>();
+#ifdef ABSL_IS_BIG_ENDIAN
+  return val;
+#else
   return le64toh(val);
+#endif
 }
 
 std::string BufferHelper::removeString(Buffer::Instance& data) {

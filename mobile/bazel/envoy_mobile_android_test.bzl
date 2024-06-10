@@ -1,6 +1,6 @@
 load("@build_bazel_rules_android//android:rules.bzl", "android_library", "android_local_test")
 load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_local_test")
-load("//bazel:kotlin_lib.bzl", "native_lib_name")
+load("//bazel:envoy_mobile_android_jni.bzl", "native_lib_name")
 
 # A simple macro to define the JVM flags.
 def jvm_flags(lib_name):
@@ -27,15 +27,6 @@ def _contains_all(srcs, extension):
 
 # A basic macro to run android based (robolectric) tests with native dependencies
 def envoy_mobile_android_test(name, srcs, native_lib_name = "", deps = [], native_deps = [], repository = "", exec_properties = {}):
-    android_library(
-        name = name + "_test_lib",
-        custom_package = "io.envoyproxy.envoymobile.test",
-        manifest = repository + "//bazel:test_manifest.xml",
-        visibility = ["//visibility:public"],
-        data = native_deps,
-        exports = deps,
-        testonly = True,
-    )
     dependencies = deps + [
         repository + "//bazel:envoy_mobile_test_suite",
         "@maven//:androidx_annotation_annotation",
