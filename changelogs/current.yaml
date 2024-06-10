@@ -85,6 +85,10 @@ minor_behavior_changes:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` and legacy code path.
+- area: http
+  change: |
+    Changing HTTP/2 semi-colon prefixed headers to being sanitized by Envoy code rather than nghttp2. Should be a functional no-op but
+    guarded by ``envoy.reloadable_features.sanitize_http2_headers_without_nghttp2``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
