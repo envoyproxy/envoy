@@ -28,11 +28,6 @@ function retry () {
     return "$returns"
 }
 
-function is_installed {
-    echo "Checking brew package $1"
-    brew ls --versions "$1"
-}
-
 function install {
     echo "Installing brew package $1"
     if ! retry brew install --quiet "$1"; then
@@ -52,12 +47,11 @@ brew autoremove
 brew cleanup --prune=all
 # Remove broken symlinks.
 brew cleanup --prune-prefix
-brew uninstall coreutils || brew install coreutils
 
 DEPS="automake cmake coreutils libtool ninja"
 for DEP in ${DEPS}
 do
-    is_installed "${DEP}" || install "${DEP}"
+    install "${DEP}"
 done
 
 # https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md#xcode
