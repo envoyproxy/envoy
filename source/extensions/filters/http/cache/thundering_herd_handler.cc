@@ -186,6 +186,7 @@ std::shared_ptr<ThunderingHerdHandler> ThunderingHerdHandler::create(
       HANDLER_NOT_SET:
     return std::make_shared<ThunderingHerdHandlerNone>();
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Cache
