@@ -26,15 +26,3 @@ jobs:
         jq --version || echo "NO JQ"
         docker --version || echo "NO DOCKER"
         skopeo --version || echo "NO SKOPEO"
-
-  arm64-base:
-    permissions:
-      contents: read
-    runs-on: envoy-ubuntu-arm64-base
-    steps:
-    - run: |
-        df -h
-        uname -a
-        jq --version || echo "NO JQ"
-        docker --version || echo "NO DOCKER"
-        skopeo --version || echo "NO SKOPEO"
