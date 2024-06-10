@@ -136,6 +136,6 @@ message FileSystemHttpCacheConfig {
   // and other parallel requests will bypass the cache.
   //
   // It is recommended to set this to true when using a
-  // :ref:`ThunderingHerdHandler <envoy_v3_api_field_CacheConfig.thundering_herd_handler>`.
+  // :ref:`ThunderingHerdHandler <envoy_v3_api_field_extensions.filters.http.cache.v3.CacheConfig.thundering_herd_handler>`.
   bool allow_parallel_inserts = 11;
 }
