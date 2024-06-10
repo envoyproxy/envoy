@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stddef.h>
+
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/socket.h"
@@ -15,8 +17,14 @@ struct SocketCreationOptions {
   // and only valid on Linux.
   bool mptcp_enabled_{false};
 
+  // Specifies whether there should be a cache for all the address instances associated to this
+  // socket, and the max cache size for this cache. 0 means do not cache any address.0 This is only
+  // valid for Datagram sockets.
+  size_t max_addresses_cache_size_{0};
+
   bool operator==(const SocketCreationOptions& rhs) const {
-    return mptcp_enabled_ == rhs.mptcp_enabled_;
+    return mptcp_enabled_ == rhs.mptcp_enabled_ &&
+           max_addresses_cache_size_ == rhs.max_addresses_cache_size_;
   }
 };
 
