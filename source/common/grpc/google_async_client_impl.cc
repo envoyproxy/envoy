@@ -175,6 +175,7 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
             : options.child_span_name_;
     current_span_ = options.parent_span_->spawnChild(Tracing::EgressConfig::get(), child_span_name,
                                                      parent.timeSource().systemTime());
+    current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.stat_prefix_);
     current_span_->setTag(Tracing::Tags::get().UpstreamAddress, parent.target_uri_);
     current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
   } else {
