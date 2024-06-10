@@ -968,7 +968,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   factory->initialize();
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
-  EXPECT_CALL(matcher, resolve(_))
+  EXPECT_CALL(matcher, resolve(_, _))
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
@@ -1012,7 +1012,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   factory->initialize();
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
-  EXPECT_CALL(matcher, resolve(_))
+  EXPECT_CALL(matcher, resolve(_, _))
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
