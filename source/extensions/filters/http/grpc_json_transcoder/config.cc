@@ -15,8 +15,8 @@ Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactoryFromPro
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  JsonTranscoderConfigSharedPtr filter_config = std::make_shared<JsonTranscoderConfig>(
-      proto_config, stats_prefix, context.scope(), context.serverFactoryContext().api());
+  JsonTranscoderConfigSharedPtr filter_config =
+      std::make_shared<JsonTranscoderConfig>(proto_config, context.serverFactoryContext().api());
   auto stats = std::make_shared<GrpcJsonTranscoderFilterStats>(
       GrpcJsonTranscoderFilterStats::generateStats(stats_prefix, context.scope()));
   return [filter_config, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
