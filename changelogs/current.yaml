@@ -179,6 +179,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and lagacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.http_allow_partial_urls_in_referer`` runtime flag and lagacy code paths.
 - area: upstream
   change: |
     Removed ``envoy.reloadable_features.convert_legacy_lb_config`` runtime flag and lagacy code paths.
