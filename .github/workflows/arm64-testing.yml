@@ -27,7 +27,7 @@ jobs:
   arm64-base:
     permissions:
       contents: read
-    runs-on: envoy-ubuntu-arm64
+    runs-on: envoy-ubuntu-arm64-base
     steps:
     - run: |
         df -h
