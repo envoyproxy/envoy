@@ -50,6 +50,8 @@ fi
 brew autoremove
 brew cleanup --prune=all
 brew cleanup --prune-prefix
+brew uninstall coreutils
+brew install coreutils
 
 DEPS="automake cmake coreutils libtool ninja"
 for DEP in ${DEPS}
