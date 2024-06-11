@@ -23,6 +23,7 @@ filegroup(
             "opentelemetry/otel-collector-config.yaml",
             "**/*docker-compose*.yaml",
             # Contrib extensions tested over in contrib.
+            "dlb/*.yaml",
             "golang-http/*.yaml",
             "golang-network/*.yaml",
             "mysql/*",
@@ -36,7 +37,6 @@ filegroup(
     name = "contrib_configs",
     srcs = glob(
         [
-            "dlb/*.yaml",
             "golang-http/*.yaml",
             "golang-network/*.yaml",
             "mysql/*.yaml",
@@ -44,6 +44,7 @@ filegroup(
             "kafka/*.yaml",
         ],
         exclude = [
+            "dlb/*.yaml",
             "**/*docker-compose*.yaml",
         ],
     ),
