@@ -25,7 +25,7 @@ You should get output like below:
    7c:00.0 Co-processor: Intel Corporation Device 2710
    8d:00.0 Co-processor: Intel Corporation Device 2710
 
-The number of DLB devices depends on specified CPU.
+The number and PCIE address of DLB devices vary from CPU to CPU.
 
 You can download the DLB driver release tarball from the `DLB website <https://www.intel.com/content/www/us/en/download/686372/intel-dynamic-load-balancer.html>`_.
 
