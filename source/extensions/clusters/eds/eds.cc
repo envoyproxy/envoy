@@ -34,10 +34,11 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
     initialize_phase_ = InitializePhase::Secondary;
   }
   const auto resource_name = getResourceName();
-  subscription_ =
+  subscription_ = THROW_OR_RETURN_VALUE(
       cluster_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
-          resource_decoder_, {});
+          resource_decoder_, {}),
+      Config::SubscriptionPtr);
 }
 
 EdsClusterImpl::~EdsClusterImpl() {

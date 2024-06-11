@@ -12,4 +12,6 @@ source/common/router/scoped_rds.h
 source/extensions/load_balancing_policies/subset/subset_lb.h
 source/extensions/transport_sockets/tls/downstream_config.h
 source/common/tls/server_ssl_socket.h
+source/common/router/rds_impl.h
+source/common/router/vhds.h
 source/common/tls/server_context_impl.h

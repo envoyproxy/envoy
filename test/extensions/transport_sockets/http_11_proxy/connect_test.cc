@@ -40,7 +40,7 @@ public:
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
     Network::Address::InstanceConstSharedPtr address =
-        Network::Utility::parseInternetAddressAndPort(address_string);
+        Network::Utility::parseInternetAddressAndPortNoThrow(address_string);
     auto info =
         std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>("www.foo.com", address);
     if (no_proxy_protocol) {
@@ -67,7 +67,7 @@ public:
   void setAddress() {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
-    auto address = Network::Utility::parseInternetAddressAndPort(address_string);
+    auto address = Network::Utility::parseInternetAddressAndPortNoThrow(address_string);
     transport_callbacks_.connection_.stream_info_.filterState()->setData(
         "envoy.network.transport_socket.http_11_proxy.address",
         std::make_unique<Network::Http11ProxyInfoFilterState>("www.foo.com", address),

@@ -8,6 +8,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/quic/connection_debug_visitor/v3/connection_debug_visitor_basic.pb.h"
 #include "envoy/extensions/quic/server_preferred_address/v3/fixed_server_preferred_address_config.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
@@ -218,7 +219,7 @@ public:
       uint32_t port, const std::string& host,
       const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr) {
     // Setting socket options is not supported.
-    server_addr_ = Network::Utility::resolveUrl(
+    server_addr_ = *Network::Utility::resolveUrl(
         fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
     Network::Address::InstanceConstSharedPtr local_addr =
         Network::Test::getCanonicalLoopbackAddress(version_);
@@ -333,6 +334,7 @@ public:
         Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
     transport_socket_factory_.reset(static_cast<QuicClientTransportSocketFactory*>(
         config_factory.createTransportSocketFactory(quic_transport_socket_config, context)
+            .value()
             .release()));
     ASSERT(transport_socket_factory_->clientContextConfig());
   }
@@ -595,6 +597,20 @@ public:
   }
 };
 
+class QuicHttpIntegrationSPATest
+    : public QuicHttpIntegrationTestBase,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+public:
+  QuicHttpIntegrationSPATest()
+      : QuicHttpIntegrationTestBase(std::get<0>(GetParam()), ConfigHelper::quicHttpProxyConfig()) {}
+
+  void SetUp() override {
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients",
+        std::get<1>(GetParam()) ? "true" : "false");
+  }
+};
+
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -603,6 +619,18 @@ INSTANTIATE_TEST_SUITE_P(QuicHttpMultiAddressesIntegrationTest,
                          QuicHttpMultiAddressesIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+static std::string SPATestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+  return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)), "_",
+                      std::get<1>(params.param) ? "all_clients_impl" : "quiche_client_impl");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicHttpIntegrationSPATests, QuicHttpIntegrationSPATest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(true, false)),
+    SPATestParamsToString);
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   useAccessLog("%DOWNSTREAM_TLS_VERSION% %DOWNSTREAM_TLS_CIPHER% %DOWNSTREAM_TLS_SESSION_ID%");
@@ -1356,6 +1384,61 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
   EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
 }
 
+TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
+                                    "true");
+  useAccessLog(
+      "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
+      "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
+      "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
+      "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
+      "METADATA("
+      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
+  initialize();
+
+  // Make a header-only request and delay the response by 1ms to ensure that the ROUNDTRIP_DURATION
+  // metric is > 0 if exists.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  absl::SleepFor(absl::Milliseconds(1));
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Prevent the client's dispatcher from running by not calling waitForEndStream or closing the
+  // client's connection, then wait for server to tear down connection due to too many
+  // retransmissions.
+  int iterations = 0;
+  std::string contents = TestEnvironment::readFileToStringForTest(access_log_name_);
+  while (iterations < 20) {
+    timeSystem().advanceTimeWait(std::chrono::seconds(1));
+    // check for deferred logs from connection teardown.
+    contents = TestEnvironment::readFileToStringForTest(access_log_name_);
+    if (!contents.empty()) {
+      break;
+    }
+    iterations++;
+  }
+
+  std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
+  EXPECT_EQ(entries.size(), 1);
+  std::string log = entries[0];
+
+  std::vector<std::string> metrics = absl::StrSplit(log, ',');
+  ASSERT_EQ(metrics.size(), 21);
+  EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
+  EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
+  EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
+  EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
+  EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
+  EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
+  // Ensure that request headers from top-level access logger parameter and stream info are
+  // consistent.
+  EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
+
+  codec_client_->close();
+}
+
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingDisabled) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
                                     "false");
@@ -1894,7 +1977,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
   }
 }
 
-TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
+TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(
       [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -1931,6 +2014,12 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
       });
 
   initialize();
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients")) {
+    quic::QuicTagVector connection_options{quic::kSPAD};
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetConnectionOptionsToSend(connection_options);
+  }
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
@@ -1961,7 +2050,7 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
   }
 }
 
-TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDNAT) {
+TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(
       [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -2007,6 +2096,12 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDNAT) {
       });
 
   initialize();
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients")) {
+    quic::QuicTagVector connection_options{quic::kSPAD};
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetConnectionOptionsToSend(connection_options);
+  }
   auto listener_port = lookupPort("http");
 
   // Setup DNAT for 0.0.0.0:12345-->127.0.0.2:listener_port
@@ -2045,10 +2140,12 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDNAT) {
   }
 }
 
-TEST_P(QuicHttpIntegrationTest, PreferredAddressRuntimeFlag) {
+TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients")) {
+    return;
+  }
   autonomous_upstream_ = true;
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients", "false");
   config_helper_.addConfigModifier(
       [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listen_address = bootstrap.mutable_static_resources()
@@ -2105,7 +2202,7 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressRuntimeFlag) {
   ASSERT_TRUE(response->complete());
 }
 
-TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDualStack) {
+TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
   if (!(TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6) &&
         version_ == Network::Address::IpVersion::v4)) {
     return;
@@ -2135,6 +2232,13 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDualStack) {
   });
 
   initialize();
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients")) {
+    quic::QuicTagVector connection_options{quic::kSPAD};
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetConnectionOptionsToSend(connection_options);
+  }
+
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
@@ -2204,6 +2308,12 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFil
       });
 
   initialize();
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients")) {
+    quic::QuicTagVector connection_options{quic::kSPAD};
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetConnectionOptionsToSend(connection_options);
+  }
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
@@ -2285,6 +2395,74 @@ TEST_P(QuicHttpIntegrationTest, UnsetSendDisableActiveMigration) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   EXPECT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
+}
+
+// Validate that debug visitors are attached to connections when configured.
+TEST_P(QuicHttpIntegrationTest, ConnectionDebugVisitor) {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto debug_visitor_config = bootstrap.mutable_static_resources()
+                                    ->mutable_listeners(0)
+                                    ->mutable_udp_listener_config()
+                                    ->mutable_quic_options()
+                                    ->mutable_connection_debug_visitor_config();
+    debug_visitor_config->set_name("envoy.quic.connection_debug_visitor.basic");
+    envoy::extensions::quic::connection_debug_visitor::v3::BasicConfig config;
+    debug_visitor_config->mutable_typed_config()->PackFrom(config);
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
+            quic_connection_->peer_address().host().ToString());
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  // TODO(https://github.com/envoyproxy/envoy/issues/34492) fix
+  return;
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  std::string listener = version_ == Network::Address::IpVersion::v4 ? "127.0.0.1_0" : "[__1]_0";
+  EXPECT_LOG_CONTAINS(
+      "info",
+      fmt::format("Quic connection from {} with id {} closed {} with details:",
+                  quic_connection_->self_address().ToString(),
+                  quic_connection_->connection_id().ToString(),
+                  quic::ConnectionCloseSourceToString(quic::ConnectionCloseSource::FROM_PEER)),
+      {
+        quic_session->close(Network::ConnectionCloseType::NoFlush);
+        test_server_->waitForGaugeEq(fmt::format("listener.{}.downstream_cx_active", listener), 0u);
+      });
+}
+
+TEST_P(QuicHttpIntegrationTest, StreamTimeoutWithHalfClose) {
+  // Tighten the stream idle timeout to 400ms.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        hcm.mutable_stream_idle_timeout()->set_nanos(400 * 1000 * 1000);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeRequestWithBody(default_request_headers_, "partial body", false);
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  quic::QuicStream* stream = quic_session->GetActiveStream(0);
+  // Only send RESET_STREAM to close write side of this stream.
+  stream->ResetWriteSide(quic::QuicResetStreamError::FromInternal(quic::QUIC_STREAM_NO_ERROR));
+
+  // Wait for the server to timeout this request and the local reply.
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
+  codec_client_->close();
 }
 
 } // namespace Quic

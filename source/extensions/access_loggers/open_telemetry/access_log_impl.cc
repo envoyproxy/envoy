@@ -9,6 +9,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
@@ -58,7 +59,8 @@ AccessLog::ThreadLocalLogger::ThreadLocalLogger(GrpcAccessLoggerSharedPtr logger
 AccessLog::AccessLog(
     ::Envoy::AccessLog::FilterPtr&& filter,
     envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
-    ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache)
+    ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+    const std::vector<Formatter::CommandParserPtr>& commands)
     : Common::ImplBase(std::move(filter)), tls_slot_(tls.allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)) {
 
@@ -71,9 +73,9 @@ AccessLog::AccessLog(
   // Packing the body "AnyValue" to a "KeyValueList" only if it's not empty, otherwise the
   // formatter would fail to parse it.
   if (config.body().value_case() != ::opentelemetry::proto::common::v1::AnyValue::VALUE_NOT_SET) {
-    body_formatter_ = std::make_unique<OpenTelemetryFormatter>(packBody(config.body()));
+    body_formatter_ = std::make_unique<OpenTelemetryFormatter>(packBody(config.body()), commands);
   }
-  attributes_formatter_ = std::make_unique<OpenTelemetryFormatter>(config.attributes());
+  attributes_formatter_ = std::make_unique<OpenTelemetryFormatter>(config.attributes(), commands);
 }
 
 void AccessLog::emitLog(const Formatter::HttpFormatterContext& log_context,
@@ -101,6 +103,10 @@ void AccessLog::emitLog(const Formatter::HttpFormatterContext& log_context,
   } else if (trace_id_hex.size() == 16) {
     auto trace_id = absl::StrCat(Hex::uint64ToHex(0), trace_id_hex);
     *log_entry.mutable_trace_id() = absl::HexStringToBytes(trace_id);
+  }
+  std::string span_id_hex = log_context.activeSpan().getSpanId();
+  if (!span_id_hex.empty()) {
+    *log_entry.mutable_span_id() = absl::HexStringToBytes(span_id_hex);
   }
 
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));

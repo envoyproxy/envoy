@@ -16,10 +16,13 @@ import org.junit.After
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 private const val TRAILER_NAME = "test-trailer"
 private const val TRAILER_VALUE = "test.code"
 
+@RunWith(RobolectricTestRunner::class)
 class ReceiveTrailersTest {
   init {
     JniLibrary.loadTestLibrary()

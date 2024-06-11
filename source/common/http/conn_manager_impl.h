@@ -638,8 +638,6 @@ private:
   uint32_t requests_during_dispatch_count_{0};
   const uint32_t max_requests_during_dispatch_{UINT32_MAX};
   Event::SchedulableCallbackPtr deferred_request_processing_callback_;
-
-  const bool refresh_rtt_after_request_{};
 };
 
 } // namespace Http

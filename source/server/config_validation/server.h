@@ -81,12 +81,7 @@ public:
   }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
-  Network::DnsResolverSharedPtr dnsResolver() override {
-    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    Network::DnsResolverFactory& dns_resolver_factory =
-        Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
-    return dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
-  }
+  Network::DnsResolverSharedPtr dnsResolver() override;
   void drainListeners(OptRef<const Network::ExtraShutdownListenerOptions>) override {}
   DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
@@ -102,6 +97,7 @@ public:
   void shutdownAdmin() override {}
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
+  OverloadManager& nullOverloadManager() override { return *null_overload_manager_; }
   bool healthCheckFailed() override { return false; }
   const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { PANIC("not implemented"); }
@@ -134,7 +130,8 @@ public:
   void setSinkPredicates(std::unique_ptr<Stats::SinkPredicates>&&) override {}
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(uint32_t, OverloadManager&, const std::string&) override {
+  WorkerPtr createWorker(uint32_t, OverloadManager&, OverloadManager&,
+                         const std::string&) override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
@@ -184,6 +181,7 @@ private:
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
+  std::unique_ptr<OverloadManager> null_overload_manager_;
   MutexTracer* mutex_tracer_{nullptr};
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;

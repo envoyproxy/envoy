@@ -31,6 +31,7 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
   THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
   GrpcMuxContext grpc_mux_context{
       factory_or_error.value()->createUncachedRawAsyncClient(),
+      /*failover_async_client_*/ nullptr,
       /*dispatcher_=*/data.dispatcher_,
       /*service_method_=*/deltaGrpcMethod(data.type_url_),
       /*local_info_=*/data.local_info_,

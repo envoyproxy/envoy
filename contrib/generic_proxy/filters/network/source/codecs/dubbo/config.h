@@ -165,17 +165,25 @@ public:
     }
   }
 
-  void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) override {
+  EncodingResult encode(const StreamFrame& frame, EncodingContext&) override {
     ASSERT(dynamic_cast<const EncoderMessageType*>(&frame) != nullptr);
     const auto* typed_message = static_cast<const EncoderMessageType*>(&frame);
 
-    Buffer::OwnedImpl buffer;
-    codec_->encode(buffer, *typed_message->inner_metadata_);
-    callbacks.onEncodingSuccess(buffer, true);
+    codec_->encode(encoding_buffer_, *typed_message->inner_metadata_);
+    const uint64_t encoded_size = encoding_buffer_.length();
+
+    // Write the encoded data to the connection and clean the buffer for the next encoding.
+    callback_->writeToConnection(encoding_buffer_);
+    encoding_buffer_.drain(encoding_buffer_.length());
+
+    return encoded_size;
   }
 
   Common::Dubbo::MessageMetadataSharedPtr metadata_;
   CallBackType* callback_{};
+
+private:
+  Buffer::OwnedImpl encoding_buffer_;
 };
 
 class DubboServerCodec

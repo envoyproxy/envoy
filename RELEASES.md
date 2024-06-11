@@ -65,6 +65,7 @@ actual mechanics of the release itself.
 | 2022 Q4 | Can Cecen ([cancecen](https://github.com/cancecen))            | Tony Allen ([tonya11en](https://github.com/tonya11en))                   |
 | 2023 Q3 | Boteng Yao ([botengyao](https://github.com/botengyao))         | Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik))              |
 | 2023 Q4 | Paul Merrison ([pmerrison](https://github.com/pmerrison))      | Brian Sonnenberg ([briansonnenberg](https://github.com/briansonnenberg)) |
+| 2024 Q2 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
 
 ## Major release schedule
 
@@ -129,9 +130,13 @@ envoy-maintainers@googlegroups.com -
 include in this email a link to the latest [release page](https://github.com/envoyproxy/envoy/releases) (ending in `tag/[version]`)
 * Announce in [#envoy-dev](https://envoyproxy.slack.com/archives/C78HA81DH) and [#envoy-users](https://envoyproxy.slack.com/archives/C78M4KW76) slack channels.
 
-
 ## Security release schedule
 
-There is no fixed scheduled for security fixes. Zero-day vulnerabilities might necessitate
-an emergency release with little or no warning. However, historically security release have
-happened roughly once per quarter, midway between major releases.
+Security releases are published on a 3-monthly cycle, around the mid point between major releases.
+
+| Quarter |  Expected  |   Actual   | Difference |
+|:-------:|:----------:|:----------:|:----------:|
+| 2024 Q2 | 2024/06/04 | 2024/06/04 |   0 days   |
+| 2024 Q3 | 2024/09/03 |
+
+NOTE: Zero-day vulnerabilities, and upstream vulnerabilities disclosed to us under embargo, may necessitate an emergency release with little or no warning.

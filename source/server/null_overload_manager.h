@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/server/overload/overload_manager.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/event/scaled_range_timer_manager_impl.h"
 

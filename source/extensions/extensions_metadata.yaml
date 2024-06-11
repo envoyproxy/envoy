@@ -554,8 +554,10 @@ envoy.filters.http.thrift_to_metadata:
 envoy.filters.http.wasm:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.wasm.v3.Wasm
 envoy.filters.http.stateful_session:
@@ -1762,3 +1764,10 @@ envoy.tracers.opentelemetry.resource_detectors.dynatrace:
   status: wip
   type_urls:
   - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.DynatraceResourceDetectorConfig
+envoy.quic.connection_debug_visitor.basic:
+  categories:
+  - envoy.quic.connection_debug_visitor
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.quic.connection_debug_visitor.v3.BasicConfig

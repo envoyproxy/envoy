@@ -136,12 +136,12 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
 - name: bar
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
 - name: envoy.filters.http.router

@@ -344,23 +344,21 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   // that we can support the header in TTwitter protocol, which reads/adds response headers to
   // metadata in messageBegin when reading the response from upstream. Therefore detecting a drain
   // should happen here.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_connection_draining")) {
-    metadata_->setDraining(!metadata->responseHeaders().get(Headers::get().Drain).empty());
-    metadata->responseHeaders().remove(Headers::get().Drain);
+  metadata_->setDraining(!metadata->responseHeaders().get(Headers::get().Drain).empty());
+  metadata->responseHeaders().remove(Headers::get().Drain);
 
-    // Check if this host itself is draining.
-    //
-    // Note: Similarly as above, the response is buffered until transportEnd. Therefore metadata
-    // should be set before the encodeFrame() call. It should be set at or after the messageBegin
-    // call so that the header is added after all upstream headers passed, due to messageBegin
-    // possibly not getting headers in transportBegin.
-    if (cm.drain_decision_.drainClose()) {
-      ENVOY_STREAM_LOG(debug, "propogate Drain header for drain close decision", parent_);
-      // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
-      // over)?
-      metadata->responseHeaders().addReferenceKey(Headers::get().Drain, "true");
-      cm.stats_.downstream_response_drain_close_.inc();
-    }
+  // Check if this host itself is draining.
+  //
+  // Note: Similarly as above, the response is buffered until transportEnd. Therefore metadata
+  // should be set before the encodeFrame() call. It should be set at or after the messageBegin
+  // call so that the header is added after all upstream headers passed, due to messageBegin
+  // possibly not getting headers in transportBegin.
+  if (cm.drain_decision_.drainClose()) {
+    ENVOY_STREAM_LOG(debug, "propogate Drain header for drain close decision", parent_);
+    // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
+    // over)?
+    metadata->responseHeaders().addReferenceKey(Headers::get().Drain, "true");
+    cm.stats_.downstream_response_drain_close_.inc();
   }
 
   parent_.recordResponseAccessLog(metadata);
@@ -1046,8 +1044,7 @@ void ConnectionManager::ActiveRpc::sendLocalReply(const DirectResponse& response
 
   onLocalReply(*localReplyMetadata_, end_stream);
 
-  if (end_stream &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_connection_draining")) {
+  if (end_stream) {
     localReplyMetadata_->responseHeaders().addReferenceKey(Headers::get().Drain, "true");
     ConnectionManager& cm = parent_;
     cm.stats_.downstream_response_drain_close_.inc();
