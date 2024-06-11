@@ -216,7 +216,6 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainThenCancel) {
   EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
       .Times(testing::AnyNumber())
       .WillOnce(Invoke([&](const char*, const char*, const addrinfo*, addrinfo**) {
-        query.load()->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
         dispatcher_->exit();
         return Api::SysCallIntResult{EAI_AGAIN, 0};
       }));

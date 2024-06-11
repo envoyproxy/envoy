@@ -184,7 +184,7 @@ public:
    */
   void kickOffNewUpstreamRequest(bool with_tracing = false) {
     expectNewUpstreamRequest(with_tracing);
-    EXPECT_EQ(filter_->onStreamDecoded(*request_), FilterStatus::StopIteration);
+    EXPECT_EQ(filter_->decodeHeaderFrame(*request_), HeaderFilterStatus::StopIteration);
     EXPECT_EQ(1, filter_->upstreamRequestsSize());
   }
 
@@ -261,7 +261,7 @@ public:
   uint32_t creating_connection_{};
 };
 
-TEST_F(RouterFilterTest, OnStreamDecodedAndNoRouteEntry) {
+TEST_F(RouterFilterTest, DecodeHeaderFrameAndNoRouteEntry) {
   setup();
 
   EXPECT_CALL(mock_filter_callback_, routeEntry()).WillOnce(Return(nullptr));
@@ -270,7 +270,7 @@ TEST_F(RouterFilterTest, OnStreamDecodedAndNoRouteEntry) {
         EXPECT_EQ(status.message(), "route_not_found");
       }));
 
-  EXPECT_EQ(filter_->onStreamDecoded(*request_), FilterStatus::StopIteration);
+  EXPECT_EQ(filter_->decodeHeaderFrame(*request_), HeaderFilterStatus::StopIteration);
   cleanUp();
 
   // Mock downstream closing.
@@ -291,7 +291,7 @@ TEST_F(RouterFilterTest, NoUpstreamCluster) {
         EXPECT_EQ(status.message(), "cluster_not_found");
       }));
 
-  filter_->onStreamDecoded(*request_);
+  filter_->decodeHeaderFrame(*request_);
   cleanUp();
 
   // Mock downstream closing.
@@ -320,7 +320,7 @@ TEST_F(RouterFilterTest, UpstreamClusterMaintainMode) {
         EXPECT_EQ(status.message(), "cluster_maintain_mode");
       }));
 
-  filter_->onStreamDecoded(*request_);
+  filter_->decodeHeaderFrame(*request_);
   cleanUp();
 
   // Mock downstream closing.
@@ -348,7 +348,7 @@ TEST_F(RouterFilterTest, UpstreamClusterNoHealthyUpstream) {
         EXPECT_EQ(status.message(), "no_healthy_upstream");
       }));
 
-  filter_->onStreamDecoded(*request_);
+  filter_->decodeHeaderFrame(*request_);
 
   cleanUp();
 
@@ -705,6 +705,7 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
 
   auto frame_1 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   frame_1->stream_frame_flags_ = FrameFlags(StreamFlags(0, false, false, true), false);
+  EXPECT_EQ(CommonFilterStatus::StopIteration, filter_->decodeCommonFrame(*frame_1));
 
   // This only store the frame and does nothing else because the pool is not ready yet.
   filter_->onRequestCommonFrame(std::move(frame_1));
@@ -720,6 +721,8 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
 
   // End stream is set to true by default.
   auto frame_2 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
+  EXPECT_EQ(CommonFilterStatus::StopIteration, filter_->decodeCommonFrame(*frame_1));
+
   // This will trigger the last frame to be sent directly because connection is ready and other
   // frames are already sent.
   filter_->onRequestCommonFrame(std::move(frame_2));

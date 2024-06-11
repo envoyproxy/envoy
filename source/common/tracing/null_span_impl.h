@@ -25,6 +25,7 @@ public:
   void injectContext(Tracing::TraceContext&, const UpstreamContext&) override {}
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
+  std::string getSpanId() const override { return EMPTY_STRING; }
   std::string getTraceId() const override { return EMPTY_STRING; }
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {
     return SpanPtr{new NullSpan()};
