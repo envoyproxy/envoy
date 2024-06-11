@@ -20,6 +20,12 @@ behavior_changes:
   change: |
     Passes HTTP/2 DATA frames through a different codec API. This behavior can be temporarily disabled by setting the runtime
     feature ``envoy.reloadable_features.http2_use_visitor_for_data`` to false.
+- area: runtime
+  change: |
+    Rejecting invalid yaml. This has been an ENVOY_BUG linked to https://github.com/envoyproxy/envoy/issues/27434
+    for over a year with no hard-blockers so should be Ok. This behavior can be temporarily disabled by setting
+    the runtime feature ``envoy.reloadable_features.reject_invalid_yaml`` to false but the runtime guard must be
+    parsed before any invalid yaml.
 - area: proxy_protocol
   change: |
     Populate typed metadata by default in proxy protocol listener. Typed metadata can be consumed as
