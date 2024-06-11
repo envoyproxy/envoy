@@ -15,9 +15,9 @@ Http::LocalErrorStatus LocalErrorFilter::onLocalReply(const LocalReplyData& repl
   ASSERT(decoder_callbacks_);
   auto& info = decoder_callbacks_->streamInfo();
   // TODO(goaway): set responseCode in upstream Envoy when responseCodDetails are set.
-  // ASSERT(static_cast<uint32_t>(reply.code_) == info.responseCode());
+  ASSERT(static_cast<uint32_t>(reply.code_) == info.responseCode());
   // TODO(goaway): follow up on the underscore discrepancy between these values.
-  // ASSERT(reply.details_ == info.responseCodeDetails().value());
+  ASSERT(reply.details_ == info.responseCodeDetails().value());
   info.setResponseCode(static_cast<uint32_t>(reply.code_));
 
   return Http::Utility::statusForOnLocalReply(reply, decoder_callbacks_->streamInfo());
