@@ -352,6 +352,43 @@ TEST_F(DatadogAgentHttpClientTest, OnErrorStreamReset) {
   callbacks_->onFailure(request_, Http::AsyncClient::FailureReason::Reset);
 }
 
+TEST_F(DatadogAgentHttpClientTest, OnErrorExceedResponseBufferLimit) {
+  // When `onFailure` is invoked on the `Http::AsyncClient::Callbacks` with
+  // `FailureReason::ExceedResponseBufferLimit`, the associated `on_error` callback is invoked
+  // with a corresponding `datadog::tracing::Error`.
+
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_ = &callbacks_arg;
+            return &request_;
+          }));
+
+  // `callbacks_->onFailure(...)` will cause `on_error_` to be called.
+  // `on_response_` will not be called.
+  EXPECT_CALL(on_error_, Call(_)).WillOnce(Invoke([](datadog::tracing::Error error) {
+    EXPECT_EQ(error.code, datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE);
+  }));
+  EXPECT_CALL(on_response_, Call(_, _, _)).Times(0);
+
+  // The request will not be canceled; neither explicitly nor in
+  // `~AgentHTTPClient`, because it will have been fulfilled.
+  EXPECT_CALL(request_, cancel()).Times(0);
+
+  const auto ignore = [](auto&&...) {};
+  datadog::tracing::Expected<void> result =
+      client_.post(url_, ignore, "{}", on_response_.AsStdFunction(), on_error_.AsStdFunction(),
+                   time_.monotonicTime() + std::chrono::seconds(1));
+  EXPECT_TRUE(result) << result.error();
+
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  msg->body().add("{}");
+
+  callbacks_->onFailure(request_, Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
+}
+
 TEST_F(DatadogAgentHttpClientTest, OnErrorOther) {
   // When `onFailure` is invoked on the `Http::AsyncClient::Callbacks` with any
   // value other than `FailureReason::Reset`, the associated `on_error` callback

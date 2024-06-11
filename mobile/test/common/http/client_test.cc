@@ -658,7 +658,8 @@ TEST_P(ClientTest, Encode100Continue) {
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 // Death tests are not supported on iOS.
 #ifndef TARGET_OS_IOS
-  EXPECT_DEATH(response_encoder_->encode1xxHeaders(response_headers), "panic: not implemented");
+  EXPECT_ENVOY_BUG(response_encoder_->encode1xxHeaders(response_headers),
+                   "Unexpected 100 continue");
 #endif
 }
 
@@ -688,7 +689,7 @@ TEST_P(ClientTest, EncodeMetadata) {
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
 // Death tests are not supported on iOS.
 #ifndef TARGET_OS_IOS
-  EXPECT_DEATH(response_encoder_->encodeMetadata(metadata_map_vector), "panic: not implemented");
+  EXPECT_ENVOY_BUG(response_encoder_->encodeMetadata(metadata_map_vector), "Unexpected metadata");
 #endif
 }
 
