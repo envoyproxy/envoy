@@ -51,6 +51,18 @@ public:
   }
 };
 
+TEST_F(ThunderingHerdHandlerTest, WriteFailedWithNoBlockedRequestsDoesNothing) {
+  envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
+  handler_ = ThunderingHerdHandler::create(config);
+  // Make one request.
+  EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
+  handler_->handleUpstreamRequest(mock_filter_, &mock_decoder_callbacks_, key_, request_headers_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
+  handler_->handleInsertFinished(key_, false);
+  // Nothing additional is expected to happen - the queue should have been released,
+  // and since nothing was blocked, nothing is unblocked.
+}
+
 TEST_F(ThunderingHerdHandlerTest, UnsetIsPassThrough) {
   envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
   handler_ = ThunderingHerdHandler::create(config);

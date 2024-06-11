@@ -401,6 +401,41 @@ TEST_F(CacheFilterTest,
   filter->onDestroy();
 }
 
+TEST_F(CacheFilterTest, WaitsForThunderingHerdHandlerAndRetriesHeadersIfRequired) {
+  request_headers_.setHost("CacheMiss");
+  auto mock_thundering_herd_handler = std::make_shared<MockThunderingHerdHandler>();
+  auto filter =
+      makeFilter(simple_cache_, false,
+                 std::make_shared<CacheFilterConfig>(
+                     Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>(), true,
+                     mock_thundering_herd_handler, context_.server_factory_context_));
+  std::weak_ptr<ThunderingHerdRetryInterface> retry_filter_ptr;
+  Http::RequestHeaderMap* retry_headers;
+  EXPECT_CALL(*mock_thundering_herd_handler, handleUpstreamRequest(_, _, _, _))
+      .WillOnce([&retry_filter_ptr,
+                 &retry_headers](std::weak_ptr<ThunderingHerdRetryInterface> retry_filter,
+                                 Http::StreamDecoderFilterCallbacks*, const Key&,
+                                 Http::RequestHeaderMap& headers) {
+        retry_filter_ptr = retry_filter;
+        retry_headers = &headers;
+      });
+  // The filter should stop decoding iteration when decodeHeaders is called as a cache lookup is
+  // in progress.
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  testing::Mock::VerifyAndClearExpectations(mock_thundering_herd_handler.get());
+  // retryHeaders will ask the thundering herd handler again since nothing has changed.
+  EXPECT_CALL(*mock_thundering_herd_handler, handleUpstreamRequest(_, _, _, _))
+      .WillOnce([](std::weak_ptr<ThunderingHerdRetryInterface>,
+                   Http::StreamDecoderFilterCallbacks* decoder_callbacks, const Key&,
+                   Http::RequestHeaderMap&) { decoder_callbacks->continueDecoding(); });
+  // The filter should continue decoding when thundering herd handler says to.
+  EXPECT_CALL(decoder_callbacks_, continueDecoding);
+  retry_filter_ptr.lock()->retryHeaders(*retry_headers);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 TEST_F(CacheFilterTest,
        ConsultsThunderingHerdHandlerOnCacheMissAndUnblocksItOnCacheWriteCompletion) {
   request_headers_.setHost("CacheMiss");
