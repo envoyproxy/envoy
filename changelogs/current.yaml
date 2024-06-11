@@ -32,12 +32,6 @@ behavior_changes:
     :ref:`TlvsMetadata type <envoy_v3_api_msg_data.core.v3.TlvsMetadata>`.
     This change can be temporarily disabled by setting the runtime flag
     ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` to ``false``.
-- area: ext_authz
-  change: |
-    Added
-    :ref:`disable_dynamic_metadata_ingestion
-    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.disable_dynamic_metadata_ingestion>`,
-    which allows ext_authz to be configured to reject responses containing dynamic metadata.
 - area: golang
   change: |
     Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
@@ -314,6 +308,12 @@ new_features:
   change: |
     Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
     to bypass the overload manager for a listener. When set to true, the listener will not be subject to overload protection.
+- area: ext_authz
+  change: |
+    Added
+    :ref:`disable_dynamic_metadata_ingestion
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.disable_dynamic_metadata_ingestion>`,
+    which allows ext_authz to be configured to reject responses containing dynamic metadata.
 
 deprecated:
 - area: tracing
