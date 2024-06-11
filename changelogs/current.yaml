@@ -20,6 +20,12 @@ behavior_changes:
   change: |
     Passes HTTP/2 DATA frames through a different codec API. This behavior can be temporarily disabled by setting the runtime
     feature ``envoy.reloadable_features.http2_use_visitor_for_data`` to false.
+- area: runtime
+  change: |
+    Rejecting invalid yaml. This has been an ENVOY_BUG linked to https://github.com/envoyproxy/envoy/issues/27434
+    for over a year with no hard-blockers so should be Ok. This behavior can be temporarily disabled by setting
+    the runtime feature ``envoy.reloadable_features.reject_invalid_yaml`` to false but the runtime guard must be
+    parsed before any invalid yaml.
 - area: proxy_protocol
   change: |
     Populate typed metadata by default in proxy protocol listener. Typed metadata can be consumed as
@@ -34,6 +40,9 @@ minor_behavior_changes:
     Changes in ``AsyncStreamImpl`` now propagate tracing context headers in bidirectional streams when using
     :ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>`. Previously, tracing context headers
     were not being set when calling external services such as ``ext_proc``.
+- area: http
+  change: |
+    Fixed host header changes for shadow requests to properly handle ipv6 addresses.
 - area: tracers
   change: |
     Set status code for OpenTelemetry tracers (previously unset).
@@ -178,16 +187,22 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.detect_and_raise_rst_tcp_connection`` runtime flag and legacy code paths.
 - area: http
   change: |
-    Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and lagacy code paths.
+    Removed ``envoy.reloadable_features.http_allow_partial_urls_in_referer`` runtime flag and legacy code paths.
 - area: http
   change: |
-    Removed ``envoy.reloadable_features.http_allow_partial_urls_in_referer`` runtime flag and lagacy code paths.
+    Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and legacy code paths.
 - area: upstream
   change: |
-    Removed ``envoy.reloadable_features.convert_legacy_lb_config`` runtime flag and lagacy code paths.
+    Removed ``envoy.reloadable_features.convert_legacy_lb_config`` runtime flag and legacy code paths.
+- area: thrift
+  change: |
+    Removed ``envoy.reloadable_features.thrift_connection_draining`` runtime flag and legacy code paths.
 - area: router
   change: |
     Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
+- area: http2
+  change: |
+    Removed ``envoy.reloadable_features.http2_decode_metadata_with_quiche`` runtime flag and legacy code paths.
 - area: jwt
   change: |
     Removed ``envoy.reloadable_features.token_passed_entirely`` runtime flag and legacy code paths.

@@ -90,9 +90,7 @@ public class Errors {
       }
     }
 
-    // Check if negotiated_protocol is quic
-    // TODO(abeyad): Assigning all errors that happen when using HTTP/3 to QUIC_PROTOCOL_ERROR
-    // can mask the real error (DNS, upstream connection, etc). Revisit the error conversion logic.
+    // Use the QUIC error code if the upstream negotiated protocol is HTTP/3.
     if (finalStreamIntel.getUpstreamProtocol() == UpstreamHttpProtocol.HTTP3) {
       return NetError.ERR_QUIC_PROTOCOL_ERROR;
     }
