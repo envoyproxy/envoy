@@ -72,7 +72,7 @@ genrule(
     cmd = """
     TEMP=$$(mktemp -d)
     for location in $(locations :docs_rst); do
-        example=$$(echo $$location | cut -d/ -f2)
+        example=$$(echo $$location | sed -e 's#^external/[^/]*/##' | cut -d/ -f2)
         cp -a $$location "$${TEMP}/$${example}.rst"
         echo "    $${example}" >> "$${TEMP}/_toctree.rst"
     done
