@@ -137,7 +137,6 @@ def api_proto_package(
     if srcs == []:
         srcs = native.glob(["*.proto"])
 
-    name = "pkg"
     api_cc_py_proto_library(
         name = name,
         visibility = visibility,

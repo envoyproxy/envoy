@@ -15,3 +15,13 @@ source/common/tls/server_ssl_socket.h
 source/common/router/rds_impl.h
 source/common/router/vhds.h
 source/common/tls/server_context_impl.h
+api/envoy/config/trace/v3/lightstep.proto
+api/envoy/config/trace/v3/dynamic_ot.proto
+api/envoy/config/trace/v3/opencensus.proto
+api/envoy/config/trace/v3/service.proto
+api/envoy/config/trace/v3/trace.proto
+api/envoy/config/trace/v3/zipkin.proto
+api/envoy/config/trace/v3/datadog.proto
+api/envoy/config/trace/v3/opentelemetry.proto
+api/envoy/config/trace/v3/skywalking.proto
+api/envoy/config/trace/v3/xray.proto

@@ -66,17 +66,7 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/config/route/v3/route_descriptor.pb.h"
 #include "envoy/config/route/v3/route_components_descriptor.pb.h"
 #include "envoy/config/route/v3/scoped_route_descriptor.pb.h"
-#include "envoy/config/trace/v3/datadog_descriptor.pb.h"
-#include "envoy/config/trace/v3/dynamic_ot_descriptor.pb.h"
 #include "envoy/config/trace/v3/http_tracer_descriptor.pb.h"
-#include "envoy/config/trace/v3/lightstep_descriptor.pb.h"
-#include "envoy/config/trace/v3/opencensus_descriptor.pb.h"
-#include "envoy/config/trace/v3/opentelemetry_descriptor.pb.h"
-#include "envoy/config/trace/v3/service_descriptor.pb.h"
-#include "envoy/config/trace/v3/skywalking_descriptor.pb.h"
-#include "envoy/config/trace/v3/trace_descriptor.pb.h"
-#include "envoy/config/trace/v3/xray_descriptor.pb.h"
-#include "envoy/config/trace/v3/zipkin_descriptor.pb.h"
 #include "envoy/config/upstream/local_address_selector/v3/default_local_address_selector_descriptor.pb.h"
 #include "envoy/data/accesslog/v3/accesslog_descriptor.pb.h"
 #include "envoy/data/cluster/v3/outlier_detection_event_descriptor.pb.h"
@@ -246,17 +236,7 @@ std::unique_ptr<TextFormatTranscoder> createTranscoder() {
       protobuf::reflection::envoy_config_route_v3_route::kFileDescriptorInfo,
       protobuf::reflection::envoy_config_route_v3_route_components::kFileDescriptorInfo,
       protobuf::reflection::envoy_config_route_v3_scoped_route::kFileDescriptorInfo,
-      protobuf::reflection::envoy_config_trace_v3_datadog::kFileDescriptorInfo,
-      protobuf::reflection::envoy_config_trace_v3_dynamic_ot::kFileDescriptorInfo,
       protobuf::reflection::envoy_config_trace_v3_http_tracer::kFileDescriptorInfo,
-      protobuf::reflection::envoy_config_trace_v3_lightstep::kFileDescriptorInfo,
-      protobuf::reflection::envoy_config_trace_v3_opencensus::kFileDescriptorInfo,
-      protobuf::reflection::envoy_config_trace_v3_opentelemetry::kFileDescriptorInfo,
-      protobuf::reflection::envoy_config_trace_v3_service::kFileDescriptorInfo,
-      protobuf::reflection::envoy_config_trace_v3_skywalking::kFileDescriptorInfo,
-      protobuf::reflection::envoy_config_trace_v3_trace::kFileDescriptorInfo,
-      protobuf::reflection::envoy_config_trace_v3_xray::kFileDescriptorInfo,
-      protobuf::reflection::envoy_config_trace_v3_zipkin::kFileDescriptorInfo,
       protobuf::reflection::
           envoy_config_upstream_local_address_selector_v3_default_local_address_selector::
               kFileDescriptorInfo,

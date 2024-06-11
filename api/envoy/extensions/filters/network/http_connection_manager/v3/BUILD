@@ -10,7 +10,7 @@ api_proto_package(
         "//envoy/config/accesslog/v3:pkg",
         "//envoy/config/core/v3:pkg",
         "//envoy/config/route/v3:pkg",
-        "//envoy/config/trace/v3:pkg",
+        "//envoy/config/trace/v3:http_tracer",
         "//envoy/type/http/v3:pkg",
         "//envoy/type/tracing/v3:pkg",
         "//envoy/type/v3:pkg",

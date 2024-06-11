@@ -129,6 +129,7 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_interface",
         "//envoy/tracing:tracer_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "@envoy_api//envoy/config/trace/v3:http_tracer_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )

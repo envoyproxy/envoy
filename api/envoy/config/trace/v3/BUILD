@@ -5,9 +5,24 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
+    name = "http_tracer",
+    srcs = ["http_tracer.proto"],
     deps = [
         "//envoy/annotations:pkg",
         "//envoy/config/core/v3:pkg",
+        "@com_github_cncf_xds//udpa/annotations:pkg",
+    ],
+)
+
+api_proto_package(
+    srcs = glob(
+        ["*.proto"],
+        exclude = ["http_tracer.proto"],
+    ),
+    deps = [
+        "//envoy/annotations:pkg",
+        "//envoy/config/core/v3:pkg",
+        "//envoy/config/trace/v3:http_tracer",
         "@com_github_cncf_xds//udpa/annotations:pkg",
         "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto",
     ],
