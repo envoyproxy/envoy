@@ -32,6 +32,10 @@ behavior_changes:
     :ref:`TlvsMetadata type <envoy_v3_api_msg_data.core.v3.TlvsMetadata>`.
     This change can be temporarily disabled by setting the runtime flag
     ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` to ``false``.
+- area: golang
+  change: |
+    Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
+    ``EncoderFilterCallbacks``, to support full-duplex processing.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -173,6 +177,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: tls
+  change: |
+    Removed ``envoy.reloadable_features.enable_intermediate_ca`` runtime flag and lagacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` runtime flag and lagacy code paths.
@@ -197,6 +204,9 @@ removed_config_or_runtime:
 - area: thrift
   change: |
     Removed ``envoy.reloadable_features.thrift_connection_draining`` runtime flag and legacy code paths.
+- area: thrift
+  change: |
+    Removed ``envoy.reloadable_features.thrift_allow_negative_field_ids`` runtime flag and legacy code paths.
 - area: router
   change: |
     Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
