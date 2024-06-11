@@ -98,3 +98,26 @@ envoy_cc_fuzz_test(
         "@envoy_api//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "websocket_integration_test",
+    size = "large",
+    srcs = ["websocket_integration_test.cc"],
+    data = [
+        "//contrib/golang/filters/http/test/test_data/websocket:filter.so",
+    ],
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        "//contrib/golang/filters/http/source:config",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/http/buffer:config",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/integration:websocket_integration_test_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)

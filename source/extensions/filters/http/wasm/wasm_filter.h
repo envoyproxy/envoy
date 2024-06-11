@@ -27,6 +27,9 @@ public:
   FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                Server::Configuration::FactoryContext& context);
 
+  FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
+               Server::Configuration::UpstreamFactoryContext& context);
+
   std::shared_ptr<Context> createFilter() {
     Wasm* wasm = nullptr;
     if (!tls_slot_->currentThreadRegistered()) {
@@ -51,6 +54,9 @@ public:
   }
 
 private:
+  void createWasm(PluginSharedPtr plugin,
+                  Envoy::Server::Configuration::ServerFactoryContext& server,
+                  const Stats::ScopeSharedPtr& scope, Envoy::Init::Manager& init_manager);
   ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
 };

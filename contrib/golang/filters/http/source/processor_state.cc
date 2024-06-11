@@ -12,7 +12,7 @@ Buffer::Instance& BufferList::push(Buffer::Instance& data) {
   bytes_ += data.length();
 
   auto ptr = std::make_unique<Buffer::OwnedImpl>();
-  Buffer::Instance& buffer = *ptr.get();
+  Buffer::Instance& buffer = *ptr;
   buffer.move(data);
   queue_.push_back(std::move(ptr));
 
@@ -48,10 +48,10 @@ bool BufferList::checkExisting(Buffer::Instance* data) {
 
 // headers_ should set to nullptr when return true.
 bool ProcessorState::handleHeaderGolangStatus(GolangStatus status) {
-  ENVOY_LOG(debug, "golang filter handle header status, state: {}, phase: {}, status: {}",
-            stateStr(), phaseStr(), int(status));
+  ENVOY_LOG(debug, "golang filter handle header status, state: {}, status: {}", stateStr(),
+            int(status));
 
-  ASSERT(state_ == FilterState::ProcessingHeader);
+  ASSERT(filterState() == FilterState::ProcessingHeader);
   bool done = false;
 
   switch (status) {
@@ -65,19 +65,19 @@ bool ProcessorState::handleHeaderGolangStatus(GolangStatus status) {
 
   case GolangStatus::Continue:
     if (do_end_stream_) {
-      state_ = FilterState::Done;
+      setFilterState(FilterState::Done);
     } else {
-      state_ = FilterState::WaitingData;
+      setFilterState(FilterState::WaitingData);
     }
     done = true;
     break;
 
   case GolangStatus::StopAndBuffer:
-    state_ = FilterState::WaitingAllData;
+    setFilterState(FilterState::WaitingAllData);
     break;
 
   case GolangStatus::StopAndBufferWatermark:
-    state_ = FilterState::WaitingData;
+    setFilterState(FilterState::WaitingData);
     break;
 
   default:
@@ -85,17 +85,17 @@ bool ProcessorState::handleHeaderGolangStatus(GolangStatus status) {
     break;
   }
 
-  ENVOY_LOG(debug, "golang filter after handle header status, state: {}, phase: {}, status: {}",
-            stateStr(), phaseStr(), int(status));
+  ENVOY_LOG(debug, "golang filter after handle header status, state: {}, status: {}", stateStr(),
+            int(status));
 
   return done;
 };
 
 bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
-  ENVOY_LOG(debug, "golang filter handle data status, state: {}, phase: {}, status: {}", stateStr(),
-            phaseStr(), int(status));
+  ENVOY_LOG(debug, "golang filter handle data status, state: {}, status: {}", stateStr(),
+            int(status));
 
-  ASSERT(state_ == FilterState::ProcessingData);
+  ASSERT(filterState() == FilterState::ProcessingData);
 
   bool done = false;
 
@@ -112,9 +112,9 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
 
   case GolangStatus::Continue:
     if (do_end_stream_) {
-      state_ = FilterState::Done;
+      setFilterState(FilterState::Done);
     } else {
-      state_ = FilterState::WaitingData;
+      setFilterState(FilterState::WaitingData);
     }
     done = true;
     break;
@@ -124,7 +124,7 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
       ENVOY_LOG(error, "want more data while stream is end");
       // TODO: terminate the stream?
     }
-    state_ = FilterState::WaitingAllData;
+    setFilterState(FilterState::WaitingAllData);
     break;
 
   case GolangStatus::StopAndBufferWatermark:
@@ -132,7 +132,7 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
       ENVOY_LOG(error, "want more data while stream is end");
       // TODO: terminate the stream?
     }
-    state_ = FilterState::WaitingData;
+    setFilterState(FilterState::WaitingData);
     break;
 
   case GolangStatus::StopNoBuffer:
@@ -141,7 +141,7 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
       // TODO: terminate the stream?
     }
     doDataList.clearLatest();
-    state_ = FilterState::WaitingData;
+    setFilterState(FilterState::WaitingData);
     break;
 
   default:
@@ -151,13 +151,13 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
   }
 
   // see trailers and no buffered data
-  if (seen_trailers_ && isBufferDataEmpty()) {
-    ENVOY_LOG(error, "see trailers and buffer is empty");
-    state_ = FilterState::WaitingTrailer;
+  if (trailers != nullptr && isBufferDataEmpty()) {
+    ENVOY_LOG(debug, "see trailers and buffer is empty");
+    setFilterState(FilterState::WaitingTrailer);
   }
 
-  ENVOY_LOG(debug, "golang filter after handle data status, state: {}, phase: {}, status: {}",
-            int(state_), phaseStr(), int(status));
+  ENVOY_LOG(debug, "golang filter after handle data status, state: {}, status: {}", stateStr(),
+            int(status));
 
   return done;
 };
@@ -165,10 +165,10 @@ bool ProcessorState::handleDataGolangStatus(const GolangStatus status) {
 // should set trailers_ to nullptr when return true.
 // means we should not read/write trailers then, since trailers will pass to next fitler.
 bool ProcessorState::handleTrailerGolangStatus(const GolangStatus status) {
-  ENVOY_LOG(debug, "golang filter handle trailer status, state: {}, phase: {}, status: {}",
-            stateStr(), phaseStr(), int(status));
+  ENVOY_LOG(debug, "golang filter handle trailer status, state: {}, status: {}", stateStr(),
+            int(status));
 
-  ASSERT(state_ == FilterState::ProcessingTrailer);
+  ASSERT(filterState() == FilterState::ProcessingTrailer);
 
   auto done = false;
 
@@ -182,7 +182,7 @@ bool ProcessorState::handleTrailerGolangStatus(const GolangStatus status) {
     break;
 
   case GolangStatus::Continue:
-    state_ = FilterState::Done;
+    setFilterState(FilterState::Done);
     done = true;
     break;
 
@@ -192,8 +192,8 @@ bool ProcessorState::handleTrailerGolangStatus(const GolangStatus status) {
     break;
   }
 
-  ENVOY_LOG(debug, "golang filter after handle trailer status, state: {}, phase: {}, status: {}",
-            stateStr(), phaseStr(), int(status));
+  ENVOY_LOG(debug, "golang filter after handle trailer status, state: {}, status: {}", stateStr(),
+            int(status));
 
   return done;
 };
@@ -204,12 +204,12 @@ bool ProcessorState::handleGolangStatus(GolangStatus status) {
   ASSERT(isProcessingInGo(), "unexpected state");
 
   ENVOY_LOG(debug,
-            "before handle golang status, status: {}, state: {}, phase: {}, "
-            "do_end_stream_: {}",
-            int(status), stateStr(), phaseStr(), do_end_stream_);
+            "before handle golang status, status: {}, state: {}, "
+            "do_end_stream_: {}, seen trailers: {}",
+            int(status), stateStr(), do_end_stream_, trailers != nullptr);
 
   bool done = false;
-  switch (state_) {
+  switch (filterState()) {
   case FilterState::ProcessingHeader:
     done = handleHeaderGolangStatus(status);
     break;
@@ -227,9 +227,9 @@ bool ProcessorState::handleGolangStatus(GolangStatus status) {
   }
 
   ENVOY_LOG(debug,
-            "after handle golang status, status: {}, state: {}, phase: {}, "
-            "do_end_stream_: {}",
-            int(status), stateStr(), phaseStr(), do_end_stream_);
+            "after handle golang status, status: {}, state: {}, "
+            "do_end_stream_: {}, done: {}, seen trailers: {}",
+            int(status), stateStr(), do_end_stream_, done, trailers != nullptr);
 
   return done;
 }
@@ -244,8 +244,8 @@ void ProcessorState::drainBufferData() {
   }
 }
 
-std::string ProcessorState::stateStr() {
-  switch (state_) {
+std::string state2Str(FilterState state) {
+  switch (state) {
   case FilterState::WaitingHeader:
     return "WaitingHeader";
   case FilterState::ProcessingHeader:
@@ -260,61 +260,17 @@ std::string ProcessorState::stateStr() {
     return "WaitingTrailer";
   case FilterState::ProcessingTrailer:
     return "ProcessingTrailer";
-  case FilterState::Log:
-    return "Log";
   case FilterState::Done:
     return "Done";
   default:
-    return "unknown";
+    return "unknown(" + std::to_string(static_cast<int>(state)) + ")";
   }
 }
 
-Phase ProcessorState::state2Phase() {
-  Phase phase;
-  switch (state_) {
-  case FilterState::WaitingHeader:
-  case FilterState::ProcessingHeader:
-    phase = Phase::DecodeHeader;
-    break;
-  case FilterState::WaitingData:
-  case FilterState::WaitingAllData:
-  case FilterState::ProcessingData:
-    phase = Phase::DecodeData;
-    break;
-  case FilterState::WaitingTrailer:
-  case FilterState::ProcessingTrailer:
-    phase = Phase::DecodeTrailer;
-    break;
-  case FilterState::Log:
-    phase = Phase::Log;
-    break;
-  // decode Done state means encode header phase, encode done state means done phase
-  case FilterState::Done:
-    phase = Phase::EncodeHeader;
-    break;
-  }
-  return phase;
-};
-
-std::string ProcessorState::phaseStr() {
-  switch (phase()) {
-  case Phase::DecodeHeader:
-    return "DecodeHeader";
-  case Phase::DecodeData:
-    return "DecodeData";
-  case Phase::DecodeTrailer:
-    return "DecodeTrailer";
-  case Phase::EncodeHeader:
-    return "EncodeHeader";
-  case Phase::EncodeData:
-    return "EncodeData";
-  case Phase::EncodeTrailer:
-    return "EncodeTrailer";
-  case Phase::Log:
-    return "Log";
-  default:
-    return "unknown";
-  }
+std::string ProcessorState::stateStr() {
+  std::string prefix = is_encoding == 1 ? "encoder" : "decoder";
+  auto state_str = state2Str(filterState());
+  return prefix + ":" + state_str;
 }
 
 void DecodingProcessorState::addBufferData(Buffer::Instance& data) {
@@ -328,7 +284,7 @@ void DecodingProcessorState::addBufferData(Buffer::Instance& data) {
           }
         },
         [this]() -> void {
-          if (state_ == FilterState::WaitingAllData) {
+          if (filterState() == FilterState::WaitingAllData) {
             // On the request path exceeding buffer limits will result in a 413.
             ENVOY_LOG(debug, "golang filter decode data buffer is full, reply with 413");
             decoder_callbacks_->sendLocalReply(
@@ -360,7 +316,7 @@ void EncodingProcessorState::addBufferData(Buffer::Instance& data) {
           }
         },
         [this]() -> void {
-          if (state_ == FilterState::WaitingAllData) {
+          if (filterState() == FilterState::WaitingAllData) {
             ENVOY_LOG(debug, "golang filter encode data buffer is full, reply with 500");
 
             // In this case, sendLocalReply will either send a response directly to the encoder, or

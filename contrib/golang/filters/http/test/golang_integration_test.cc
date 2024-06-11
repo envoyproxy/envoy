@@ -340,7 +340,9 @@ typed_config:
     entries = upstream_request_->trailers()->get(Http::LowerCaseString("existed-trailer"));
     EXPECT_EQ(2, entries.size());
     EXPECT_EQ("foo", entries[0]->value().getStringView());
-    EXPECT_EQ("bar", entries[1]->value().getStringView());
+    if (entries.size() == 2) {
+      EXPECT_EQ("bar", entries[1]->value().getStringView());
+    }
 
     // check trailer value which set in golang: x-test-trailer-0
     entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-0"));
@@ -662,16 +664,7 @@ typed_config:
     cleanup();
   }
 
-  void cleanup() {
-    codec_client_->close();
-
-    if (fake_upstream_connection_ != nullptr) {
-      AssertionResult result = fake_upstream_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_upstream_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
-  }
+  void cleanup() { cleanupUpstreamAndDownstream(); }
 
   void testDynamicMetadata(std::string path) {
     initializeBasicFilter(BASIC, "*", true);

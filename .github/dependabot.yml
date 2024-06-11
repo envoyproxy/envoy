@@ -324,6 +324,12 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/websocket"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/network/test/test_data"
   groups:
     contrib-golang:

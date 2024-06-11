@@ -41,8 +41,8 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	if decodeHeadersRet != "" {
 		if async != "" {
 			go func() {
-				defer f.callbacks.RecoverPanic()
-				f.callbacks.Continue(getStatus(decodeHeadersRet))
+				defer f.callbacks.DecoderFilterCallbacks().RecoverPanic()
+				f.callbacks.DecoderFilterCallbacks().Continue(getStatus(decodeHeadersRet))
 			}()
 			return api.Running
 		}
@@ -59,8 +59,8 @@ func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	if encodeHeadersRet != "" {
 		if async != "" {
 			go func() {
-				defer f.callbacks.RecoverPanic()
-				f.callbacks.Continue(getStatus(encodeHeadersRet))
+				defer f.callbacks.EncoderFilterCallbacks().RecoverPanic()
+				f.callbacks.EncoderFilterCallbacks().Continue(getStatus(encodeHeadersRet))
 			}()
 			return api.Running
 		}

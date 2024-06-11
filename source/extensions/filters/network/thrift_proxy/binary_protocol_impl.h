@@ -82,8 +82,6 @@ public:
   static constexpr uint64_t MinMessageBeginLength = 12;
 
 private:
-  static void validateFieldId(int16_t id);
-
   const static uint16_t Magic;
 };
 

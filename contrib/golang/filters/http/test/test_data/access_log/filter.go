@@ -36,11 +36,11 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		query, _ := f.callbacks.GetProperty("request.query")
 		if query == "periodic=1" {
 			go func() {
-				defer f.callbacks.RecoverPanic()
+				defer f.callbacks.DecoderFilterCallbacks().RecoverPanic()
 
 				// trigger AccessLogDownstreamPeriodic
 				time.Sleep(110 * time.Millisecond)
-				f.callbacks.Continue(api.Continue)
+				f.callbacks.DecoderFilterCallbacks().Continue(api.Continue)
 			}()
 			return api.Running
 		}

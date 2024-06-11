@@ -111,7 +111,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
     }
   }
 
-  postToConnectionThread([this, headers_copy, end_stream]() -> void {
+  postToConnectionThread([this, headers_copy = std::move(headers_copy), end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
       if (!parent_.connected() || saw_reset_) {

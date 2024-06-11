@@ -110,19 +110,16 @@ func capiStatusToErr(status C.CAPIStatus) error {
 	return errors.New("unknown status")
 }
 
-func (c *httpCApiImpl) ClearRouteCache(r unsafe.Pointer) {
-	res := C.envoyGoFilterHttpClearRouteCache(r)
-	handleCApiStatus(res)
-}
-
-func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
-	res := C.envoyGoFilterHttpContinue(r, C.int(status))
+func (c *httpCApiImpl) HttpContinue(s unsafe.Pointer, status uint64) {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpContinue(unsafe.Pointer(state.processState), C.int(status))
 	handleCApiStatus(res)
 }
 
 // Only may panic with errRequestFinished, errFilterDestroyed or errNotInGo,
 // won't panic with errInvalidPhase and others, otherwise will cause deadloop, see RecoverPanic for the details.
-func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string) {
+func (c *httpCApiImpl) HttpSendLocalReply(s unsafe.Pointer, responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string) {
+	state := (*processState)(s)
 	hLen := len(headers)
 	strs := make([]*C.char, 0, hLen*2)
 	defer func() {
@@ -138,27 +135,30 @@ func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, responseCode int, bo
 			strs = append(strs, keyStr, valueStr)
 		}
 	}
-	res := C.envoyGoFilterHttpSendLocalReply(r, C.int(responseCode),
+	res := C.envoyGoFilterHttpSendLocalReply(unsafe.Pointer(state.processState), C.int(responseCode),
 		unsafe.Pointer(unsafe.StringData(bodyText)), C.int(len(bodyText)),
 		unsafe.Pointer(unsafe.SliceData(strs)), C.int(len(strs)),
 		C.longlong(grpcStatus), unsafe.Pointer(unsafe.StringData(details)), C.int(len(details)))
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpSendPanicReply(r unsafe.Pointer, details string) {
-	res := C.envoyGoFilterHttpSendPanicReply(r, unsafe.Pointer(unsafe.StringData(details)), C.int(len(details)))
+func (c *httpCApiImpl) HttpSendPanicReply(s unsafe.Pointer, details string) {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpSendPanicReply(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(details)), C.int(len(details)))
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetHeader(r unsafe.Pointer, key string) string {
+func (c *httpCApiImpl) HttpGetHeader(s unsafe.Pointer, key string) string {
+	state := (*processState)(s)
 	var valueData C.uint64_t
 	var valueLen C.int
-	res := C.envoyGoFilterHttpGetHeader(r, unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
+	res := C.envoyGoFilterHttpGetHeader(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
 	handleCApiStatus(res)
 	return unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
 }
 
-func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
+func (c *httpCApiImpl) HttpCopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
+	state := (*processState)(s)
 	var strs []string
 	if num <= maxStackAllocedHeaderSize {
 		// NOTE: only const length slice may be allocated on stack.
@@ -173,7 +173,7 @@ func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint6
 	// we have to make sure the all strings is not using before reusing,
 	// but strings may be alive beyond the request life.
 	buf := make([]byte, bytes)
-	res := C.envoyGoFilterHttpCopyHeaders(r, unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
+	res := C.envoyGoFilterHttpCopyHeaders(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
 	handleCApiStatus(res)
 
 	m := make(map[string][]string, num)
@@ -191,44 +191,50 @@ func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint6
 	return m
 }
 
-func (c *httpCApiImpl) HttpSetHeader(r unsafe.Pointer, key string, value string, add bool) {
+func (c *httpCApiImpl) HttpSetHeader(s unsafe.Pointer, key string, value string, add bool) {
+	state := (*processState)(s)
 	var act C.headerAction
 	if add {
 		act = C.HeaderAdd
 	} else {
 		act = C.HeaderSet
 	}
-	res := C.envoyGoFilterHttpSetHeaderHelper(r, unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
+	res := C.envoyGoFilterHttpSetHeaderHelper(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
 		unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), act)
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpRemoveHeader(r unsafe.Pointer, key string) {
-	res := C.envoyGoFilterHttpRemoveHeader(r, unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)))
+func (c *httpCApiImpl) HttpRemoveHeader(s unsafe.Pointer, key string) {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpRemoveHeader(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)))
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) []byte {
+func (c *httpCApiImpl) HttpGetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte {
+	state := (*processState)(s)
 	buf := make([]byte, length)
-	res := C.envoyGoFilterHttpGetBuffer(r, C.uint64_t(bufferPtr), unsafe.Pointer(unsafe.SliceData(buf)))
+	res := C.envoyGoFilterHttpGetBuffer(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), unsafe.Pointer(unsafe.SliceData(buf)))
 	handleCApiStatus(res)
 	return unsafe.Slice(unsafe.SliceData(buf), length)
 }
 
-func (c *httpCApiImpl) HttpDrainBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) {
-	res := C.envoyGoFilterHttpDrainBuffer(r, C.uint64_t(bufferPtr), C.uint64_t(length))
+func (c *httpCApiImpl) HttpDrainBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpDrainBuffer(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), C.uint64_t(length))
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction) {
-	c.httpSetBufferHelper(r, bufferPtr, unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), action)
+func (c *httpCApiImpl) HttpSetBufferHelper(s unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction) {
+	state := (*processState)(s)
+	c.httpSetBufferHelper(state, bufferPtr, unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), action)
 }
 
-func (c *httpCApiImpl) HttpSetBytesBufferHelper(r unsafe.Pointer, bufferPtr uint64, value []byte, action api.BufferAction) {
-	c.httpSetBufferHelper(r, bufferPtr, unsafe.Pointer(unsafe.SliceData(value)), C.int(len(value)), action)
+func (c *httpCApiImpl) HttpSetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action api.BufferAction) {
+	state := (*processState)(s)
+	c.httpSetBufferHelper(state, bufferPtr, unsafe.Pointer(unsafe.SliceData(value)), C.int(len(value)), action)
 }
 
-func (c *httpCApiImpl) httpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, data unsafe.Pointer, length C.int, action api.BufferAction) {
+func (c *httpCApiImpl) httpSetBufferHelper(state *processState, bufferPtr uint64, data unsafe.Pointer, length C.int, action api.BufferAction) {
 	var act C.bufferAction
 	switch action {
 	case api.SetBuffer:
@@ -238,11 +244,12 @@ func (c *httpCApiImpl) httpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, d
 	case api.PrependBuffer:
 		act = C.Prepend
 	}
-	res := C.envoyGoFilterHttpSetBufferHelper(r, C.uint64_t(bufferPtr), data, length, act)
+	res := C.envoyGoFilterHttpSetBufferHelper(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), data, length, act)
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
+func (c *httpCApiImpl) HttpCopyTrailers(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
+	state := (*processState)(s)
 	var strs []string
 	if num <= maxStackAllocedHeaderSize {
 		// NOTE: only const length slice may be allocated on stack.
@@ -257,7 +264,7 @@ func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint
 	// we have to make sure the all strings is not using before reusing,
 	// but strings may be alive beyond the request life.
 	buf := make([]byte, bytes)
-	res := C.envoyGoFilterHttpCopyTrailers(r, unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
+	res := C.envoyGoFilterHttpCopyTrailers(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
 	handleCApiStatus(res)
 
 	m := make(map[string][]string, num)
@@ -275,33 +282,41 @@ func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint
 	return m
 }
 
-func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key string, value string, add bool) {
+func (c *httpCApiImpl) HttpSetTrailer(s unsafe.Pointer, key string, value string, add bool) {
+	state := (*processState)(s)
 	var act C.headerAction
 	if add {
 		act = C.HeaderAdd
 	} else {
 		act = C.HeaderSet
 	}
-	res := C.envoyGoFilterHttpSetTrailer(r, unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
+	res := C.envoyGoFilterHttpSetTrailer(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
 		unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), act)
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpRemoveTrailer(r unsafe.Pointer, key string) {
-	res := C.envoyGoFilterHttpRemoveTrailer(r, unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)))
+func (c *httpCApiImpl) HttpRemoveTrailer(s unsafe.Pointer, key string) {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpRemoveTrailer(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)))
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetStringValue(rr unsafe.Pointer, id int) (string, bool) {
-	r := (*httpRequest)(rr)
+func (c *httpCApiImpl) ClearRouteCache(r unsafe.Pointer) {
+	req := (*httpRequest)(r)
+	res := C.envoyGoFilterHttpClearRouteCache(unsafe.Pointer(req.req))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetStringValue(r unsafe.Pointer, id int) (string, bool) {
+	req := (*httpRequest)(r)
 	// add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
 	// since there might be multiple concurrency goroutines invoking this API on the Go side.
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
 
 	var valueData C.uint64_t
 	var valueLen C.int
-	res := C.envoyGoFilterHttpGetStringValue(unsafe.Pointer(r.req), C.int(id), &valueData, &valueLen)
+	res := C.envoyGoFilterHttpGetStringValue(unsafe.Pointer(req.req), C.int(id), &valueData, &valueLen)
 	if res == C.CAPIValueNotFound {
 		return "", false
 	}
@@ -312,8 +327,9 @@ func (c *httpCApiImpl) HttpGetStringValue(rr unsafe.Pointer, id int) (string, bo
 }
 
 func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool) {
+	req := (*httpRequest)(r)
 	var value C.uint64_t
-	res := C.envoyGoFilterHttpGetIntegerValue(r, C.int(id), &value)
+	res := C.envoyGoFilterHttpGetIntegerValue(unsafe.Pointer(req.req), C.int(id), &value)
 	if res == C.CAPIValueNotFound {
 		return 0, false
 	}
@@ -321,20 +337,20 @@ func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bo
 	return uint64(value), true
 }
 
-func (c *httpCApiImpl) HttpGetDynamicMetadata(rr unsafe.Pointer, filterName string) map[string]interface{} {
-	r := (*httpRequest)(rr)
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	r.markMayWaitingCallback()
+func (c *httpCApiImpl) HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{} {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+	req.markMayWaitingCallback()
 
 	var valueData C.uint64_t
 	var valueLen C.int
-	res := C.envoyGoFilterHttpGetDynamicMetadata(unsafe.Pointer(r.req),
+	res := C.envoyGoFilterHttpGetDynamicMetadata(unsafe.Pointer(req.req),
 		unsafe.Pointer(unsafe.StringData(filterName)), C.int(len(filterName)), &valueData, &valueLen)
 	if res == C.CAPIYield {
-		r.checkOrWaitCallback()
+		req.checkOrWaitCallback()
 	} else {
-		r.markNoWaitingCallback()
+		req.markNoWaitingCallback()
 		handleCApiStatus(res)
 	}
 	buf := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
@@ -345,6 +361,7 @@ func (c *httpCApiImpl) HttpGetDynamicMetadata(rr unsafe.Pointer, filterName stri
 }
 
 func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{}) {
+	req := (*httpRequest)(r)
 	v, err := structpb.NewValue(value)
 	if err != nil {
 		panic(err)
@@ -353,11 +370,71 @@ func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName strin
 	if err != nil {
 		panic(err)
 	}
-	res := C.envoyGoFilterHttpSetDynamicMetadata(r,
+	res := C.envoyGoFilterHttpSetDynamicMetadata(unsafe.Pointer(req.req),
 		unsafe.Pointer(unsafe.StringData(filterName)), C.int(len(filterName)),
 		unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
 		unsafe.Pointer(unsafe.SliceData(buf)), C.int(len(buf)))
 	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
+	req := (*httpRequest)(r)
+	C.envoyGoFilterHttpFinalize(unsafe.Pointer(req.req), C.int(reason))
+}
+
+func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
+	req := (*httpRequest)(r)
+	res := C.envoyGoFilterHttpSetStringFilterState(unsafe.Pointer(req.req),
+		unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
+		unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)),
+		C.int(stateType), C.int(lifeSpan), C.int(streamSharing))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetStringFilterState(r unsafe.Pointer, key string) string {
+	req := (*httpRequest)(r)
+	var valueData C.uint64_t
+	var valueLen C.int
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+	req.markMayWaitingCallback()
+	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(req.req),
+		unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
+	if res == C.CAPIYield {
+		req.checkOrWaitCallback()
+	} else {
+		req.markNoWaitingCallback()
+		handleCApiStatus(res)
+	}
+
+	value := unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
+	return strings.Clone(value)
+}
+
+func (c *httpCApiImpl) HttpGetStringProperty(r unsafe.Pointer, key string) (string, error) {
+	req := (*httpRequest)(r)
+	var valueData C.uint64_t
+	var valueLen C.int
+	var rc C.int
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+	req.markMayWaitingCallback()
+	res := C.envoyGoFilterHttpGetStringProperty(unsafe.Pointer(req.req),
+		unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen, &rc)
+	if res == C.CAPIYield {
+		req.checkOrWaitCallback()
+		res = C.CAPIStatus(rc)
+	} else {
+		req.markNoWaitingCallback()
+		handleCApiStatus(res)
+	}
+
+	if res == C.CAPIOK {
+		value := unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
+		return strings.Clone(value), nil
+	}
+
+	return "", capiStatusToErr(res)
 }
 
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
@@ -368,14 +445,6 @@ func (c *httpCApiImpl) HttpLogLevel() api.LogType {
 	return api.GetLogLevel()
 }
 
-func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
-	C.envoyGoFilterHttpFinalize(r, C.int(reason))
-}
-
-func (c *httpCApiImpl) HttpConfigFinalize(cfg unsafe.Pointer) {
-	C.envoyGoConfigHttpFinalize(cfg)
-}
-
 var cAPI api.HttpCAPI = &httpCApiImpl{}
 
 // SetHttpCAPI for mock cAPI
@@ -383,58 +452,8 @@ func SetHttpCAPI(api api.HttpCAPI) {
 	cAPI = api
 }
 
-func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
-	res := C.envoyGoFilterHttpSetStringFilterState(r,
-		unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
-		unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)),
-		C.int(stateType), C.int(lifeSpan), C.int(streamSharing))
-	handleCApiStatus(res)
-}
-
-func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) string {
-	r := (*httpRequest)(rr)
-	var valueData C.uint64_t
-	var valueLen C.int
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	r.markMayWaitingCallback()
-	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(r.req),
-		unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
-	if res == C.CAPIYield {
-		r.checkOrWaitCallback()
-	} else {
-		r.markNoWaitingCallback()
-		handleCApiStatus(res)
-	}
-
-	value := unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
-	return strings.Clone(value)
-}
-
-func (c *httpCApiImpl) HttpGetStringProperty(rr unsafe.Pointer, key string) (string, error) {
-	r := (*httpRequest)(rr)
-	var valueData C.uint64_t
-	var valueLen C.int
-	var rc C.int
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	r.markMayWaitingCallback()
-	res := C.envoyGoFilterHttpGetStringProperty(unsafe.Pointer(r.req),
-		unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen, &rc)
-	if res == C.CAPIYield {
-		r.checkOrWaitCallback()
-		res = C.CAPIStatus(rc)
-	} else {
-		r.markNoWaitingCallback()
-		handleCApiStatus(res)
-	}
-
-	if res == C.CAPIOK {
-		value := unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
-		return strings.Clone(value), nil
-	}
-
-	return "", capiStatusToErr(res)
+func (c *httpCApiImpl) HttpConfigFinalize(cfg unsafe.Pointer) {
+	C.envoyGoConfigHttpFinalize(cfg)
 }
 
 func (c *httpCApiImpl) HttpDefineMetric(cfg unsafe.Pointer, metricType api.MetricType, name string) uint32 {

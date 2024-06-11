@@ -123,8 +123,7 @@ void CompactProtocolImpl::validateFieldId(int32_t id) {
     return;
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_allow_negative_field_ids") &&
-      id < 0 && id >= std::numeric_limits<int16_t>::min()) {
+  if (id < 0 && id >= std::numeric_limits<int16_t>::min()) {
     return;
   }
 

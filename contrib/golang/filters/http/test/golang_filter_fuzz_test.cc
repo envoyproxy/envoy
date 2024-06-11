@@ -59,7 +59,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
   ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpDestroy(_, _))
       .WillByDefault(Invoke([&](httpRequest* p0, int) -> void {
         // delete the filter->req_, make LeakSanitizer happy.
-        auto req = reinterpret_cast<httpRequestInternal*>(p0);
+        auto req = reinterpret_cast<HttpRequestInternal*>(p0);
         delete req;
       }));
 

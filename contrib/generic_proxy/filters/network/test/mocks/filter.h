@@ -26,7 +26,10 @@ public:
   MOCK_METHOD(void, onDestroy, ());
 
   MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallback & callbacks));
-  MOCK_METHOD(FilterStatus, onStreamDecoded, (Request & request));
+  MOCK_METHOD(HeaderFilterStatus, decodeHeaderFrame, (RequestHeaderFrame&));
+  MOCK_METHOD(CommonFilterStatus, decodeCommonFrame, (RequestCommonFrame&));
+
+  DecoderFilterCallback* decoder_callbacks_{};
 };
 
 class MockEncoderFilter : public EncoderFilter {
@@ -36,7 +39,10 @@ public:
   MOCK_METHOD(void, onDestroy, ());
 
   MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallback & callbacks));
-  MOCK_METHOD(FilterStatus, onStreamEncoded, (Response & response));
+  MOCK_METHOD(HeaderFilterStatus, encodeHeaderFrame, (ResponseHeaderFrame&));
+  MOCK_METHOD(CommonFilterStatus, encodeCommonFrame, (ResponseCommonFrame&));
+
+  EncoderFilterCallback* encoder_callbacks_{};
 };
 
 class MockStreamFilter : public StreamFilter {
@@ -46,10 +52,15 @@ public:
   MOCK_METHOD(void, onDestroy, ());
 
   MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallback & callbacks));
-  MOCK_METHOD(FilterStatus, onStreamEncoded, (Response & response));
+  MOCK_METHOD(HeaderFilterStatus, decodeHeaderFrame, (RequestHeaderFrame&));
+  MOCK_METHOD(CommonFilterStatus, decodeCommonFrame, (RequestCommonFrame&));
 
   MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallback & callbacks));
-  MOCK_METHOD(FilterStatus, onStreamDecoded, (Request & request));
+  MOCK_METHOD(HeaderFilterStatus, encodeHeaderFrame, (ResponseHeaderFrame&));
+  MOCK_METHOD(CommonFilterStatus, encodeCommonFrame, (ResponseCommonFrame&));
+
+  DecoderFilterCallback* decoder_callbacks_{};
+  EncoderFilterCallback* encoder_callbacks_{};
 };
 
 class MockStreamFilterConfig : public NamedFilterConfigFactory {
@@ -110,8 +121,9 @@ public:
   MOCK_METHOD(void, continueDecoding, ());
   MOCK_METHOD(void, onResponseHeaderFrame, (ResponseHeaderFramePtr));
   MOCK_METHOD(void, onResponseCommonFrame, (ResponseCommonFramePtr));
-  MOCK_METHOD(void, setRequestFramesHandler, (RequestFramesHandler&));
+  MOCK_METHOD(void, setRequestFramesHandler, (RequestFramesHandler*));
   MOCK_METHOD(void, completeDirectly, ());
+  MOCK_METHOD(absl::string_view, filterConfigName, (), (const));
 };
 
 class MockEncoderFilterCallback : public MockStreamFilterCallbacks<EncoderFilterCallback> {

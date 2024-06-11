@@ -19,7 +19,7 @@ func (f *filter) sendLocalReply() api.StatusType {
 	echoBody := f.config.echoBody
 	{
 		body := fmt.Sprintf("%s, path: %s\r\n", echoBody, f.path)
-		f.callbacks.SendLocalReply(403, body, nil, 0, "")
+		f.callbacks.DecoderFilterCallbacks().SendLocalReply(403, body, nil, 0, "")
 	}
 	// Force GC to free the body string.
 	// For the case that C++ shouldn't touch the memory of the body string,

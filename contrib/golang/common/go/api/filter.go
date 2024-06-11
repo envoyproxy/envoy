@@ -152,18 +152,10 @@ type StreamInfo interface {
 
 type StreamFilterCallbacks interface {
 	StreamInfo() StreamInfo
-}
 
-type FilterCallbacks interface {
-	StreamFilterCallbacks
 	// ClearRouteCache clears the route cache for the current request, and filtermanager will re-fetch the route in the next filter.
 	// Please be careful to invoke it, since filtermanager will raise an 404 route_not_found response when failed to re-fetch a route.
 	ClearRouteCache()
-	// Continue or SendLocalReply should be last API invoked, no more code after them.
-	Continue(StatusType)
-	SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
-	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
-	RecoverPanic()
 	Log(level LogType, msg string)
 	LogLevel() LogType
 	// GetProperty fetch Envoy attribute and return the value as a string.
@@ -180,8 +172,29 @@ type FilterCallbacks interface {
 	// TODO add more for filter callbacks
 }
 
+// FilterProcessCallbacks is the interface for filter to process request/response in decode/encode phase.
+type FilterProcessCallbacks interface {
+	// Continue or SendLocalReply should be last API invoked, no more code after them.
+	Continue(StatusType)
+	SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
+	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
+	RecoverPanic()
+}
+
+type DecoderFilterCallbacks interface {
+	FilterProcessCallbacks
+}
+
+type EncoderFilterCallbacks interface {
+	FilterProcessCallbacks
+}
+
 type FilterCallbackHandler interface {
-	FilterCallbacks
+	StreamFilterCallbacks
+	// DecoderFilterCallbacks could only be used in DecodeXXX phases.
+	DecoderFilterCallbacks() DecoderFilterCallbacks
+	// EncoderFilterCallbacks could only be used in EncodeXXX phases.
+	EncoderFilterCallbacks() EncoderFilterCallbacks
 }
 
 type DynamicMetadata interface {

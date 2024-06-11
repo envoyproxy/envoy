@@ -31,8 +31,7 @@ Tracing::Decision tracingDecision(const Tracing::ConnectionManagerTracingConfig&
   return {Tracing::Reason::NotTraceable, false};
 }
 
-StreamInfo::CoreResponseFlag
-responseFlagFromDownstreamReasonReason(DownstreamStreamResetReason reason) {
+StreamInfo::CoreResponseFlag flagFromDownstreamReasonReason(DownstreamStreamResetReason reason) {
   switch (reason) {
   case DownstreamStreamResetReason::ConnectionTermination:
     return StreamInfo::CoreResponseFlag::DownstreamConnectionTermination;
@@ -48,8 +47,7 @@ responseFlagFromDownstreamReasonReason(DownstreamStreamResetReason reason) {
 
 ActiveStream::ActiveStream(Filter& parent, RequestHeaderFramePtr request,
                            absl::optional<StartTime> start_time)
-    : parent_(parent), request_stream_(std::move(request)),
-      request_stream_end_(request_stream_->frameFlags().endStream()),
+    : parent_(parent), request_header_frame_(std::move(request)),
       stream_info_(parent_.time_source_,
                    parent_.callbacks_->connection().connectionInfoProviderSharedPtr(),
                    StreamInfo::FilterState::LifeSpan::FilterChain) {
@@ -59,10 +57,10 @@ ActiveStream::ActiveStream(Filter& parent, RequestHeaderFramePtr request,
     stream_info_.start_time_monotonic_ = start_time.value().start_time_monotonic;
   };
 
-  if (!request_stream_end_) {
+  if (!request_header_frame_->frameFlags().endStream()) {
     // If the request is not fully received, register the stream to the frame handler map.
     parent_.registerFrameHandler(requestStreamId(), this);
-    registered_in_frame_handlers_ = true;
+    waiting_request_frames_ = true;
   } else {
     // The request is fully received.
     stream_info_.downstreamTiming().onLastDownstreamRxByteReceived(parent_.time_source_);
@@ -83,7 +81,7 @@ ActiveStream::ActiveStream(Filter& parent, RequestHeaderFramePtr request,
     stream_info_.setTraceReason(decision.reason);
   }
 
-  TraceContextBridge trace_context{*request_stream_};
+  TraceContextBridge trace_context{*request_header_frame_};
   active_span_ = tracer->startSpan(*this, trace_context, stream_info_, decision);
 }
 
@@ -116,42 +114,8 @@ Envoy::Event::Dispatcher& ActiveStream::dispatcher() {
   return parent_.downstreamConnection().dispatcher();
 }
 const CodecFactory& ActiveStream::codecFactory() { return parent_.config_->codecFactory(); }
-void ActiveStream::resetStream(DownstreamStreamResetReason reason) {
-  if (active_stream_reset_) {
-    return;
-  }
-  active_stream_reset_ = true;
 
-  parent_.stats_helper_.onRequestReset();
-  stream_info_.setResponseFlag(responseFlagFromDownstreamReasonReason(reason));
-
-  completeRequest();
-}
-
-void ActiveStream::sendHeaderFrameToDownstream() {
-  ASSERT(response_stream_ != nullptr);
-  response_filter_chain_complete_ = true;
-  sendFrameToDownstream(*response_stream_, true);
-}
-
-void ActiveStream::sendCommonFrameToDownstream() {
-  if (!response_filter_chain_complete_) {
-    // Wait for the response header frame to be sent first. It may be blocked by
-    // the filter chain.
-    return;
-  }
-
-  while (!response_stream_frames_.empty()) {
-    // Pop the first frame from the queue.
-    auto frame = std::move(response_stream_frames_.front());
-    response_stream_frames_.pop_front();
-
-    // Send the frame to downstream.
-    if (!sendFrameToDownstream(*frame, false)) {
-      break;
-    }
-  }
-}
+void ActiveStream::resetStream(DownstreamStreamResetReason reason) { completeStream(reason); }
 
 bool ActiveStream::sendFrameToDownstream(const StreamFrame& frame, bool header_frame) {
   const bool end_stream = frame.frameFlags().endStream();
@@ -174,67 +138,265 @@ bool ActiveStream::sendFrameToDownstream(const StreamFrame& frame, bool header_f
   // up the stream.
   if (end_stream) {
     stream_info_.downstreamTiming().onLastDownstreamTxByteSent(parent_.time_source_);
-
-    ASSERT(response_stream_end_);
-    ASSERT(response_stream_frames_.empty());
-    completeRequest();
+    ASSERT(response_common_frames_.empty());
+    completeStream();
   }
   return true;
-}
-
-void ActiveStream::sendRequestFrameToUpstream() {
-  if (!request_filter_chain_complete_) {
-    // Wait for the request header frame to be sent first. It may be blocked by
-    // the filter chain.
-    return;
-  }
-
-  if (request_stream_frames_handler_ == nullptr) {
-    // The request stream frame handler is not ready yet.
-    return;
-  }
-
-  while (!request_stream_frames_.empty()) {
-    // Pop the first frame from the queue.
-    auto frame = std::move(request_stream_frames_.front());
-    request_stream_frames_.pop_front();
-
-    // Send the frame to upstream.
-    request_stream_frames_handler_->onRequestCommonFrame(std::move(frame));
-  }
 }
 
 // TODO(wbpcode): add the short_response_flags support to the sendLocalReply
 // method.
 void ActiveStream::sendLocalReply(Status status, absl::string_view data,
                                   ResponseUpdateFunction func) {
-  response_stream_ = parent_.server_codec_->respond(status, data, *request_stream_);
-  response_stream_frames_.clear();
-  // Only one frame is allowed in the local reply.
-  response_stream_end_ = true;
+  // Clear possible response frames.
+  response_header_frame_ = nullptr;
+  response_common_frames_.clear();
 
-  ASSERT(response_stream_ != nullptr);
+  // Create the local response frame.
+  auto response = parent_.server_codec_->respond(status, data, *request_header_frame_);
 
-  if (func != nullptr) {
-    func(*response_stream_);
+  if (response == nullptr || !response->frameFlags().endStream()) {
+    // This will be treated as protocol error.
+    ENVOY_LOG(error, "Generic proxy: invalid local reply: null or not end stream.");
+    resetStream(DownstreamStreamResetReason::ProtocolError);
+    return;
   }
 
+  if (func != nullptr) {
+    func(*response);
+  }
+
+  response_header_frame_ = std::move(response);
   local_reply_ = true;
   // status message will be used as response code details.
   stream_info_.setResponseCodeDetails(status.message());
   // Set the response code to the stream info.
-  stream_info_.setResponseCode(response_stream_->status().code());
+  stream_info_.setResponseCode(response_header_frame_->status().code());
 
-  sendHeaderFrameToDownstream();
+  // Send the response header frame to downstream.
+  sendFrameToDownstream(*response_header_frame_, true);
+}
+
+void ActiveStream::processRequestHeaderFrame() {
+  ASSERT(request_header_frame_ != nullptr);
+  if (decoder_filter_iter_header_ == decoder_filters_.end() || stream_reset_or_complete_) {
+    // This header frame is already completed or the stream is reset.
+    return;
+  }
+
+  while (decoder_filter_iter_header_ != decoder_filters_.end()) {
+    const auto status =
+        (*decoder_filter_iter_header_)->filter_->decodeHeaderFrame(*request_header_frame_);
+
+    ENVOY_LOG(debug, "Generic proxy: decode header frame (filter: {} status: {} stream: {}).",
+              (*decoder_filter_iter_header_)->filterConfigName(), static_cast<size_t>(status),
+              stream_reset_or_complete_);
+
+    if (stream_reset_or_complete_) {
+      stop_decoder_filter_chain_ = true;
+      return;
+    }
+
+    decoder_filter_iter_header_++;
+
+    if (status == HeaderFilterStatus::StopIteration) {
+      break;
+    }
+  }
+
+  // Stop the filter chain if the filter returns StopIteration status and the filter is not
+  // the terminal filter.
+  // Note: the StopIteration status of terminal filter make no sense because it will be
+  // treated as complete anyway.
+  stop_decoder_filter_chain_ = decoder_filter_iter_header_ != decoder_filters_.end();
+  if (stop_decoder_filter_chain_) {
+    return;
+  }
+  ENVOY_LOG(debug, "Generic proxy: complete decoder filters for header frame (end_stream: {})",
+            request_header_frame_->frameFlags().endStream());
+}
+
+void ActiveStream::processRequestCommonFrame() {
+  ASSERT(request_common_frame_ != nullptr);
+  if (decoder_filter_iter_common_ == decoder_filters_.end() || stream_reset_or_complete_) {
+    // This common frame is already completed or the stream is reset.
+    return;
+  }
+
+  while (decoder_filter_iter_common_ != decoder_filters_.end()) {
+    const auto status =
+        (*decoder_filter_iter_common_)->filter_->decodeCommonFrame(*request_common_frame_);
+
+    ENVOY_LOG(debug, "Generic proxy: decode common frame (filter: {} status: {} stream: {}).",
+              (*decoder_filter_iter_common_)->filterConfigName(), static_cast<size_t>(status),
+              stream_reset_or_complete_);
+
+    if (stream_reset_or_complete_) {
+      stop_decoder_filter_chain_ = true;
+      return;
+    }
+
+    decoder_filter_iter_common_++;
+
+    if (status == CommonFilterStatus::StopIteration) {
+      break;
+    }
+  }
+
+  // Stop the filter chain if the filter returns StopIteration status and the filter is not
+  // the terminal filter.
+  // Note: the StopIteration status of terminal filter make no sense because it will be
+  // treated as complete anyway.
+  stop_decoder_filter_chain_ = decoder_filter_iter_common_ != decoder_filters_.end();
+  if (stop_decoder_filter_chain_) {
+    return;
+  }
+
+  ENVOY_LOG(debug, "Generic proxy: complete decoder filters for common frame (end_stream: {})",
+            request_common_frame_->frameFlags().endStream());
+
+  // Transfer the active common frame to the request stream frame handler.
+  if (request_stream_frames_handler_ != nullptr) {
+    request_stream_frames_handler_->onRequestCommonFrame(std::move(request_common_frame_));
+    if (stream_reset_or_complete_) {
+      stop_decoder_filter_chain_ = true;
+      return;
+    }
+  }
+
+  // Reset the iter and frame for the next common frame.
+  request_common_frame_ = nullptr;
+  decoder_filter_iter_common_ = decoder_filters_.begin();
+}
+
+void ActiveStream::processResponseHeaderFrame() {
+  ASSERT(response_header_frame_ != nullptr);
+
+  auto on_header_complete = [this]() {
+    ENVOY_LOG(debug, "Generic proxy: complete encoder filters for header frame (end_stream: {})",
+              response_header_frame_->frameFlags().endStream());
+
+    // Send the header frame to downstream.
+    if (!sendFrameToDownstream(*response_header_frame_, false)) {
+      stop_encoder_filter_chain_ = true;
+    }
+  };
+
+  // Handle the special case where no filter is added to the encoder filter chain.
+  if (encoder_filters_.empty()) {
+    // No filter is added to the encoder filter chain. Directly send the response header frame
+    // to downstream.
+    on_header_complete();
+    return;
+  }
+
+  if (encoder_filter_iter_header_ == encoder_filters_.end() || stream_reset_or_complete_) {
+    // This header frame is already completed or the stream is reset.
+    return;
+  }
+
+  while (encoder_filter_iter_header_ != encoder_filters_.end()) {
+    const auto status =
+        (*encoder_filter_iter_header_)->filter_->encodeHeaderFrame(*response_header_frame_);
+
+    ENVOY_LOG(debug, "Generic proxy: encode header frame (filter: {} status: {} stream: {}).",
+              (*encoder_filter_iter_header_)->filterConfigName(), static_cast<size_t>(status),
+              stream_reset_or_complete_);
+
+    if (stream_reset_or_complete_) {
+      stop_encoder_filter_chain_ = true;
+      return;
+    }
+
+    encoder_filter_iter_header_++;
+
+    if (status == HeaderFilterStatus::StopIteration) {
+      break;
+    }
+  }
+
+  // Stop the filter chain if the filter returns StopIteration status and the filter is not
+  // the terminal filter.
+  // Note: the StopIteration status of terminal filter make no sense because it will be
+  // treated as complete anyway.
+  stop_encoder_filter_chain_ = encoder_filter_iter_header_ != encoder_filters_.end();
+  if (stop_encoder_filter_chain_) {
+    return;
+  }
+
+  on_header_complete();
+}
+
+void ActiveStream::processResponseCommonFrame() {
+  ASSERT(response_common_frame_ != nullptr);
+
+  auto on_common_complete = [this]() {
+    ENVOY_LOG(debug, "Generic proxy: complete encoder filters for common frame (end_stream: {})",
+              response_common_frame_->frameFlags().endStream());
+
+    // Send the common frame to downstream.
+    if (!sendFrameToDownstream(*response_common_frame_, false)) {
+      stop_encoder_filter_chain_ = true;
+      return;
+    }
+
+    // Reset the iter and frame for the next common frame.
+    response_common_frame_ = nullptr;
+    encoder_filter_iter_common_ = encoder_filters_.begin();
+  };
+
+  // Handle the special case where no filter is added to the encoder filter chain.
+  if (encoder_filters_.empty()) {
+    // No filter is added to the encoder filter chain. Directly send the response common frame
+    // to downstream.
+    on_common_complete();
+    return;
+  }
+
+  if (encoder_filter_iter_common_ == encoder_filters_.end() || stream_reset_or_complete_) {
+    // This common frame is already completed or the stream is reset.
+    return;
+  }
+
+  for (; encoder_filter_iter_common_ < encoder_filters_.end();) {
+    const auto status =
+        (*encoder_filter_iter_common_)->filter_->encodeCommonFrame(*response_common_frame_);
+
+    ENVOY_LOG(debug, "Generic proxy: encode common frame (filter: {} status: {} stream: {}).",
+              (*encoder_filter_iter_common_)->filterConfigName(), static_cast<size_t>(status),
+              stream_reset_or_complete_);
+
+    if (stream_reset_or_complete_) {
+      stop_encoder_filter_chain_ = true;
+      return;
+    }
+
+    encoder_filter_iter_common_++;
+
+    if (status == CommonFilterStatus::StopIteration) {
+      break;
+    }
+  }
+
+  // Stop the filter chain if the filter returns StopIteration status and the filter is not
+  // the terminal filter.
+  // Note: the StopIteration status of terminal filter make no sense because it will be
+  // treated as complete anyway.
+  stop_encoder_filter_chain_ = encoder_filter_iter_common_ != encoder_filters_.end();
+  if (stop_encoder_filter_chain_) {
+    return;
+  }
+
+  on_common_complete();
 }
 
 void ActiveStream::continueDecoding() {
-  if (active_stream_reset_ || request_stream_ == nullptr) {
+  if (stream_reset_or_complete_) {
     return;
   }
 
   if (cached_route_entry_ == nullptr) {
-    const MatchInput match_input(*request_stream_, stream_info_, MatchAction::RouteAction);
+    const MatchInput match_input(*request_header_frame_, stream_info_, MatchAction::RouteAction);
     cached_route_entry_ = parent_.config_->routeEntry(match_input);
     if (cached_route_entry_ != nullptr) {
       auto* cluster =
@@ -245,98 +407,151 @@ void ActiveStream::continueDecoding() {
     }
   }
 
-  ASSERT(request_stream_ != nullptr);
-  for (; next_decoder_filter_index_ < decoder_filters_.size();) {
-    auto status =
-        decoder_filters_[next_decoder_filter_index_]->filter_->onStreamDecoded(*request_stream_);
-    next_decoder_filter_index_++;
-    if (status == FilterStatus::StopIteration) {
+  stop_decoder_filter_chain_ = false;
+
+  // Handle the request header frame.
+  processRequestHeaderFrame();
+  if (stop_decoder_filter_chain_) {
+    return;
+  }
+
+  // Handle the active request common frame if exists.
+  if (request_common_frame_ != nullptr) {
+    processRequestCommonFrame();
+  }
+  if (stop_decoder_filter_chain_) {
+    return;
+  }
+
+  // Handle the other request common frames if exists.
+  while (!request_common_frames_.empty()) {
+    ASSERT(request_common_frame_ == nullptr);
+    ASSERT(decoder_filter_iter_common_ == decoder_filters_.begin());
+
+    // Pop the first frame from the queue.
+    auto frame = std::move(request_common_frames_.front());
+    request_common_frames_.pop_front();
+    request_common_frame_ = std::move(frame);
+
+    processRequestCommonFrame();
+    if (stop_decoder_filter_chain_) {
       break;
     }
   }
-  if (next_decoder_filter_index_ == decoder_filters_.size()) {
-    ENVOY_LOG(debug, "Complete decoder filters");
-    request_filter_chain_complete_ = true;
-    sendRequestFrameToUpstream();
-  }
 }
 
-void ActiveStream::onRequestFrame(RequestCommonFramePtr request_common_frame) {
-  request_stream_end_ = request_common_frame->frameFlags().endStream();
-  request_stream_frames_.emplace_back(std::move(request_common_frame));
-
-  ASSERT(registered_in_frame_handlers_);
-  if (request_stream_end_) {
-    // The request is fully received.
+void ActiveStream::onRequestCommonFrame(RequestCommonFramePtr request_common_frame) {
+  if (request_common_frame->frameFlags().endStream()) {
+    // The request is fully received. Record the last downstream rx byte received time.
     stream_info_.downstreamTiming().onLastDownstreamRxByteReceived(parent_.time_source_);
 
-    // If the request is fully received, remove the stream from the
-    // frame handler map.
+    // Unregister the stream from the frame handler map to not expect any more frames.
     parent_.unregisterFrameHandler(requestStreamId());
-    registered_in_frame_handlers_ = false;
+    waiting_request_frames_ = false;
   }
 
-  // Try to send the frame to upstream immediately.
-  sendRequestFrameToUpstream();
+  if (stop_decoder_filter_chain_) {
+    request_common_frames_.emplace_back(std::move(request_common_frame));
+  } else {
+    // The active stream always try to send all the frames to the upstream. If the
+    // stop_decoder_filter_chain_ is false, it means all the previous frames are already
+    // sent to the upstream. So, we can process the new frame directly.
+
+    ASSERT(decoder_filter_iter_common_ == decoder_filters_.begin());
+    ASSERT(request_common_frame_ == nullptr);
+    request_common_frame_ = std::move(request_common_frame);
+    processRequestCommonFrame();
+  }
 }
 
 void ActiveStream::onResponseHeaderFrame(ResponsePtr response) {
-  ASSERT(response_stream_ == nullptr);
-  response_stream_ = std::move(response);
-  ASSERT(response_stream_ != nullptr);
-  response_stream_end_ = response_stream_->frameFlags().endStream();
-  parent_.stream_drain_decision_ = response_stream_->frameFlags().streamFlags().drainClose();
+  ASSERT(response_header_frame_ == nullptr);
+  response_header_frame_ = std::move(response);
+  ASSERT(response_header_frame_ != nullptr);
+  parent_.stream_drain_decision_ = response_header_frame_->frameFlags().streamFlags().drainClose();
 
   // The response code details always be "via_upstream" for response from upstream.
   stream_info_.setResponseCodeDetails("via_upstream");
   // Set the response code to the stream info.
-  stream_info_.setResponseCode(response_stream_->status().code());
+  stream_info_.setResponseCode(response_header_frame_->status().code());
   continueEncoding();
 }
 
 void ActiveStream::onResponseCommonFrame(ResponseCommonFramePtr response_common_frame) {
-  response_stream_end_ = response_common_frame->frameFlags().endStream();
-  response_stream_frames_.emplace_back(std::move(response_common_frame));
-  // Try to send the frame to downstream immediately.
-  sendCommonFrameToDownstream();
-}
+  if (stop_encoder_filter_chain_) {
+    response_common_frames_.emplace_back(std::move(response_common_frame));
+  } else {
+    // The active stream always try to send all the frames to the downstream.
+    // If the stop_encoder_filter_chain_ is false, it means all the previous
+    // frames are already sent to the downstream. So, we can process the new
+    // frame directly.
 
-void ActiveStream::completeDirectly() {
-  response_stream_end_ = true;
-  completeRequest();
-};
+    ASSERT(encoder_filter_iter_common_ == encoder_filters_.begin());
+    ASSERT(response_common_frame_ == nullptr);
+    response_common_frame_ = std::move(response_common_frame);
+    processResponseCommonFrame();
+  }
+}
 
 const Network::Connection* ActiveStream::ActiveFilterBase::connection() const {
   return &parent_.parent_.downstreamConnection();
 }
 
 void ActiveStream::continueEncoding() {
-  if (active_stream_reset_ || response_stream_ == nullptr) {
+  if (stream_reset_or_complete_ || response_header_frame_ == nullptr) {
     return;
   }
 
-  ASSERT(response_stream_ != nullptr);
-  for (; next_encoder_filter_index_ < encoder_filters_.size();) {
-    auto status =
-        encoder_filters_[next_encoder_filter_index_]->filter_->onStreamEncoded(*response_stream_);
-    next_encoder_filter_index_++;
-    if (status == FilterStatus::StopIteration) {
+  stop_encoder_filter_chain_ = false;
+
+  // Handle the response header frame.
+  processResponseHeaderFrame();
+  if (stop_encoder_filter_chain_) {
+    return;
+  }
+
+  // Handle the active response common frame if exists.
+  if (response_common_frame_ != nullptr) {
+    processResponseCommonFrame();
+  }
+  if (stop_encoder_filter_chain_) {
+    return;
+  }
+
+  // Handle the other response common frames if exists.
+  while (!response_common_frames_.empty()) {
+    ASSERT(response_common_frame_ == nullptr);
+    ASSERT(encoder_filter_iter_common_ == encoder_filters_.begin());
+
+    // Pop the first frame from the queue.
+    auto frame = std::move(response_common_frames_.front());
+    response_common_frames_.pop_front();
+    response_common_frame_ = std::move(frame);
+
+    processResponseCommonFrame();
+    if (stop_encoder_filter_chain_) {
       break;
     }
   }
-
-  if (next_encoder_filter_index_ == encoder_filters_.size()) {
-    ENVOY_LOG(debug, "Complete encoder filters");
-    sendHeaderFrameToDownstream();
-    sendCommonFrameToDownstream();
-  }
 }
 
-void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
+bool ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
   factory.createFilterChain(*this);
   // Reverse the encoder filter chain so that the first encoder filter is the last filter in the
   // chain.
   std::reverse(encoder_filters_.begin(), encoder_filters_.end());
+
+  if (decoder_filters_.empty()) {
+    ENVOY_LOG(error, "Generic proxy: as least on terminal decoder filter should be added.");
+    return false;
+  }
+
+  decoder_filter_iter_header_ = decoder_filters_.begin();
+  decoder_filter_iter_common_ = decoder_filters_.begin();
+
+  encoder_filter_iter_header_ = encoder_filters_.begin();
+  encoder_filter_iter_common_ = encoder_filters_.begin();
+  return true;
 }
 
 void ActiveStream::deferredDelete() {
@@ -346,32 +561,44 @@ void ActiveStream::deferredDelete() {
   }
 }
 
-void ActiveStream::completeRequest() {
+void ActiveStream::completeStream(absl::optional<DownstreamStreamResetReason> reason) {
+  if (stream_reset_or_complete_) {
+    return;
+  }
+  stream_reset_or_complete_ = true;
+
+  if (reason.has_value()) {
+    parent_.stats_helper_.onRequestReset();
+    stream_info_.setResponseFlag(flagFromDownstreamReasonReason(reason.value()));
+  }
+
   deferredDelete();
 
-  if (registered_in_frame_handlers_) {
+  if (waiting_request_frames_) {
     parent_.unregisterFrameHandler(requestStreamId());
-    registered_in_frame_handlers_ = false;
+    waiting_request_frames_ = false;
   }
 
   stream_info_.onRequestComplete();
 
   bool error_reply = false;
   // This response frame may be nullptr if the request is one-way.
-  if (response_stream_ != nullptr) {
-    error_reply = !response_stream_->status().ok();
+  if (response_header_frame_ != nullptr) {
+    error_reply = !response_header_frame_->status().ok();
   }
   parent_.stats_helper_.onRequestComplete(stream_info_, local_reply_, error_reply);
 
   if (active_span_) {
-    TraceContextBridge trace_context{*request_stream_};
-    Tracing::TracerUtility::finalizeSpan(*active_span_, trace_context, stream_info_, *this, false);
+    const TraceContextBridge context{*request_header_frame_};
+    Tracing::TracerUtility::finalizeSpan(*active_span_, context, stream_info_, *this, false);
   }
 
   for (const auto& access_log : parent_.config_->accessLogs()) {
-    access_log->log({request_stream_.get(), response_stream_.get()}, stream_info_);
+    const FormatterContext context{request_header_frame_.get(), response_header_frame_.get()};
+    access_log->log(context, stream_info_);
   }
 
+  // TODO(wbpcode): use ranges to simplify the code.
   for (auto& filter : decoder_filters_) {
     filter->filter_->onDestroy();
   }
@@ -397,7 +624,7 @@ Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool 
 
 void Filter::onDecodingSuccess(RequestHeaderFramePtr request_header_frame,
                                absl::optional<StartTime> start_time) {
-  const uint64_t stream_id = request_header_frame->frameFlags().streamFlags().streamId();
+  const uint64_t stream_id = request_header_frame->frameFlags().streamId();
 
   if (!frame_handlers_.empty()) { // Quick empty check to avoid the map lookup.
     if (auto iter = frame_handlers_.find(stream_id); iter != frame_handlers_.end()) {
@@ -411,17 +638,17 @@ void Filter::onDecodingSuccess(RequestHeaderFramePtr request_header_frame,
 }
 
 void Filter::onDecodingSuccess(RequestCommonFramePtr request_common_frame) {
-  const uint64_t stream_id = request_common_frame->frameFlags().streamFlags().streamId();
+  const uint64_t stream_id = request_common_frame->frameFlags().streamId();
   // One existing stream expects this frame.
   if (auto iter = frame_handlers_.find(stream_id); iter != frame_handlers_.end()) {
-    iter->second->onRequestFrame(std::move(request_common_frame));
+    iter->second->onRequestCommonFrame(std::move(request_common_frame));
     return;
   }
 
   // No existing stream expects this non-leading frame. It should not happen.
   // We treat it as request decoding failure.
   ENVOY_LOG(error, "generic proxy: id {} not found for stream frame", stream_id);
-  onDecodingFailure();
+  onDecodingFailure("unknown stream id");
 }
 
 void Filter::onDecodingFailure(absl::string_view reason) {
@@ -466,7 +693,11 @@ void Filter::newDownstreamRequest(StreamRequestPtr request, absl::optional<Start
   LinkedList::moveIntoList(std::move(stream), active_streams_);
 
   // Initialize filter chain.
-  raw_stream->initializeFilterChain(*config_);
+  if (!raw_stream->initializeFilterChain(*config_)) {
+    raw_stream->resetStream(DownstreamStreamResetReason::LocalConnectionTermination);
+    return;
+  }
+
   // Start request.
   raw_stream->continueDecoding();
 }

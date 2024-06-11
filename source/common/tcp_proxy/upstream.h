@@ -381,9 +381,9 @@ private:
   std::unique_ptr<HttpConnPool::Callbacks> conn_pool_callbacks_;
   bool read_half_closed_{};
   bool write_half_closed_{};
-  // upstream_requests_ has to be destroyed first as they may use CombinedUpstream parent
+  // upstream_request_ has to be destroyed first as they may use CombinedUpstream parent
   // during destruction.
-  std::list<UpstreamRequestPtr> upstream_requests_;
+  UpstreamRequestPtr upstream_request_;
 };
 
 } // namespace TcpProxy

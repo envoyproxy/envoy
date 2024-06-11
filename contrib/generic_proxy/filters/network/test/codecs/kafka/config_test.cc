@@ -29,13 +29,13 @@ TEST(KafkaCodecTest, SimpleFrameTest) {
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
 
     KafkaRequestFrame frame(request);
-    EXPECT_EQ(frame.frameFlags().streamFlags().streamId(), 3);
+    EXPECT_EQ(frame.frameFlags().streamId(), 3);
   }
 
   {
     KafkaResponseFrame frame(nullptr);
     EXPECT_EQ(frame.protocol(), "kafka");
-    EXPECT_EQ(frame.frameFlags().streamFlags().streamId(), 0);
+    EXPECT_EQ(frame.frameFlags().streamId(), 0);
   }
 
   {
@@ -46,12 +46,15 @@ TEST(KafkaCodecTest, SimpleFrameTest) {
             NetworkFilters::Kafka::FetchResponse({}, {}));
 
     KafkaResponseFrame frame(response);
-    EXPECT_EQ(frame.frameFlags().streamFlags().streamId(), 3);
+    EXPECT_EQ(frame.frameFlags().streamId(), 3);
   }
 }
 
 TEST(KafkaCodecTest, KafkaRequestCallbacksTest) {
   NiceMock<GenericProxy::MockServerCodecCallbacks> callbacks;
+  NiceMock<Network::MockServerConnection> mock_connection;
+  ON_CALL(callbacks, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
 
   KafkaRequestCallbacks request_callbacks(callbacks);
 
@@ -75,6 +78,9 @@ TEST(KafkaCodecTest, KafkaRequestCallbacksTest) {
 
 TEST(KafkaCodecTest, KafkaResponseCallbacksTest) {
   NiceMock<GenericProxy::MockClientCodecCallbacks> callbacks;
+  NiceMock<Network::MockClientConnection> mock_connection;
+  ON_CALL(callbacks, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
 
   KafkaResponseCallbacks response_callbacks(callbacks);
 
@@ -98,6 +104,9 @@ TEST(KafkaCodecTest, KafkaResponseCallbacksTest) {
 
 TEST(KafkaCodecTest, KafkaServerCodecTest) {
   NiceMock<GenericProxy::MockServerCodecCallbacks> callbacks;
+  NiceMock<Network::MockServerConnection> mock_connection;
+  ON_CALL(callbacks, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
 
   KafkaServerCodec server_codec;
   server_codec.setCodecCallbacks(callbacks);
@@ -199,6 +208,9 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
 
 TEST(KafkaCodecTest, KafkaClientCodecTest) {
   NiceMock<GenericProxy::MockClientCodecCallbacks> callbacks;
+  NiceMock<Network::MockClientConnection> mock_connection;
+  ON_CALL(callbacks, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
 
   KafkaClientCodec client_codec;
   client_codec.setCodecCallbacks(callbacks);

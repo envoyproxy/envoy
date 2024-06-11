@@ -75,3 +75,29 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/wasm/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "wasm_filter_integration_test",
+    srcs = ["wasm_filter_integration_test.cc"],
+    data = envoy_select_wasm_cpp_tests([
+        "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
+    ]),
+    extension_names = ["envoy.filters.http.wasm"],
+    shard_count = 16,
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/common:base64_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/common/http:message_lib",
+        "//source/extensions/common/wasm:wasm_lib",
+        "//source/extensions/filters/http/wasm:config",
+        "//test/extensions/common/wasm:wasm_runtime",
+        "//test/integration:http_integration_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

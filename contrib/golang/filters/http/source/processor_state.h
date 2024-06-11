@@ -13,6 +13,7 @@
 #include "source/common/http/utility.h"
 
 #include "absl/status/status.h"
+#include "contrib/golang/common/dso/dso.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -59,23 +60,7 @@ enum class FilterState {
   WaitingTrailer,
   // Processing trailer in Go
   ProcessingTrailer,
-  // Log in Go
-  Log,
   // All done
-  Done,
-};
-
-/*
- * request phase
- */
-enum class Phase {
-  DecodeHeader = 1,
-  DecodeData,
-  DecodeTrailer,
-  EncodeHeader,
-  EncodeData,
-  EncodeTrailer,
-  Log,
   Done,
 };
 
@@ -93,26 +78,29 @@ enum class GolangStatus {
   StopNoBuffer,
 };
 
-class ProcessorState : public Logger::Loggable<Logger::Id::http>, NonCopyable {
+class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
 public:
-  explicit ProcessorState(Filter& filter) : filter_(filter) {}
+  explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) {
+    req = r;
+    setFilterState(FilterState::WaitingHeader);
+  }
   virtual ~ProcessorState() = default;
 
-  FilterState state() const { return state_; }
+  FilterState filterState() const { return static_cast<FilterState>(state); }
+  void setFilterState(FilterState st) { state = static_cast<int>(st); }
   std::string stateStr();
 
-  virtual Phase phase() PURE;
-  std::string phaseStr();
+  virtual Http::StreamFilterCallbacks* getFilterCallbacks() const PURE;
 
   bool isProcessingInGo() {
-    return state_ == FilterState::ProcessingHeader || state_ == FilterState::ProcessingData ||
-           state_ == FilterState::ProcessingTrailer || state_ == FilterState::Log;
+    return filterState() == FilterState::ProcessingHeader ||
+           filterState() == FilterState::ProcessingData ||
+           filterState() == FilterState::ProcessingTrailer;
   }
-  bool isProcessingHeader() { return state_ == FilterState::ProcessingHeader; }
-  Http::StreamFilterCallbacks* getFilterCallbacks() { return filter_callbacks_; };
+  bool isProcessingHeader() { return filterState() == FilterState::ProcessingHeader; }
 
-  bool isThreadSafe() { return filter_callbacks_->dispatcher().isThreadSafe(); };
-  Event::Dispatcher& getDispatcher() { return filter_callbacks_->dispatcher(); }
+  bool isThreadSafe() { return getFilterCallbacks()->dispatcher().isThreadSafe(); };
+  Event::Dispatcher& getDispatcher() { return getFilterCallbacks()->dispatcher(); }
 
   /* data buffer */
   // add data to state buffer
@@ -122,7 +110,6 @@ public:
   bool isBufferDataEmpty() { return data_buffer_ == nullptr || data_buffer_->length() == 0; };
   void drainBufferData();
 
-  void setSeenTrailers() { seen_trailers_ = true; }
   bool isProcessingEndStream() { return do_end_stream_; }
 
   virtual void continueProcessing() PURE;
@@ -134,36 +121,31 @@ public:
     Buffer::OwnedImpl data_to_write;
     doDataList.moveOut(data_to_write);
 
+    ENVOY_LOG(debug, "golang filter injecting data to filter chain, end_stream: {}",
+              do_end_stream_);
     injectDataToFilterChain(data_to_write, do_end_stream_);
   }
 
   void processHeader(bool end_stream) {
-    ASSERT(state_ == FilterState::WaitingHeader);
-    state_ = FilterState::ProcessingHeader;
+    ASSERT(filterState() == FilterState::WaitingHeader);
+    setFilterState(FilterState::ProcessingHeader);
     do_end_stream_ = end_stream;
   }
 
   void processData(bool end_stream) {
-    ASSERT(state_ == FilterState::WaitingData ||
-           (state_ == FilterState::WaitingAllData && (end_stream || seen_trailers_)));
-    state_ = FilterState::ProcessingData;
+    ASSERT(filterState() == FilterState::WaitingData ||
+           (filterState() == FilterState::WaitingAllData && (end_stream || trailers != nullptr)));
+    setFilterState(FilterState::ProcessingData);
+
     do_end_stream_ = end_stream;
   }
 
   void processTrailer() {
-    ASSERT(state_ == FilterState::WaitingTrailer || state_ == FilterState::WaitingData ||
-           state_ == FilterState::WaitingAllData);
-    state_ = FilterState::ProcessingTrailer;
+    ASSERT(filterState() == FilterState::WaitingTrailer ||
+           filterState() == FilterState::WaitingData ||
+           filterState() == FilterState::WaitingAllData);
+    setFilterState(FilterState::ProcessingTrailer);
     do_end_stream_ = true;
-  }
-
-  void enterLog() {
-    prev_state_ = state_;
-    state_ = FilterState::Log;
-  }
-  void leaveLog() {
-    state_ = prev_state_;
-    prev_state_ = FilterState::Log;
   }
 
   bool handleHeaderGolangStatus(const GolangStatus status);
@@ -175,43 +157,41 @@ public:
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details) PURE;
 
-  const StreamInfo::StreamInfo& streamInfo() const { return filter_callbacks_->streamInfo(); }
-  StreamInfo::StreamInfo& streamInfo() { return filter_callbacks_->streamInfo(); }
+  const StreamInfo::StreamInfo& streamInfo() const { return getFilterCallbacks()->streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return getFilterCallbacks()->streamInfo(); }
 
   void setEndStream(bool end_stream) { end_stream_ = end_stream; }
   bool getEndStream() { return end_stream_; }
   // seen trailers also means stream is end
-  bool isStreamEnd() { return end_stream_ || seen_trailers_; }
+  bool isStreamEnd() { return end_stream_ || trailers != nullptr; }
+
+  Http::RequestOrResponseHeaderMap* headers{nullptr};
+  Http::HeaderMap* trailers{nullptr};
 
   BufferList doDataList;
 
 protected:
-  Phase state2Phase();
   Filter& filter_;
-  Http::StreamFilterCallbacks* filter_callbacks_{nullptr};
   bool watermark_requested_{false};
   Buffer::InstancePtr data_buffer_{nullptr};
-  FilterState state_{FilterState::WaitingHeader};
-  FilterState prev_state_{FilterState::Done};
   bool end_stream_{false};
   bool do_end_stream_{false};
-  bool seen_trailers_{false};
 };
 
 class DecodingProcessorState : public ProcessorState {
 public:
-  explicit DecodingProcessorState(Filter& filter) : ProcessorState(filter) {}
+  explicit DecodingProcessorState(Filter& filter, httpRequest* r) : ProcessorState(filter, r) {
+    is_encoding = 0;
+  }
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
     decoder_callbacks_ = &callbacks;
-    filter_callbacks_ = &callbacks;
   }
+  Http::StreamFilterCallbacks* getFilterCallbacks() const override { return decoder_callbacks_; }
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
     decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
   }
-
-  Phase phase() override { return state2Phase(); };
 
   void addBufferData(Buffer::Instance& data) override;
 
@@ -222,10 +202,10 @@ public:
   void sendLocalReply(Http::Code response_code, absl::string_view body_text,
                       std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                       Grpc::Status::GrpcStatus grpc_status, absl::string_view details) override {
-    // it's safe to reset state_, since it is read/write in safe thread.
+    // it's safe to reset filterState(), since it is read/write in safe thread.
     ENVOY_LOG(debug, "golang filter phase grow to EncodeHeader and state grow to WaitHeader before "
                      "sendLocalReply");
-    state_ = FilterState::WaitingHeader;
+    setFilterState(FilterState::WaitingHeader);
     decoder_callbacks_->sendLocalReply(response_code, body_text, modify_headers, grpc_status,
                                        details);
   };
@@ -236,18 +216,18 @@ private:
 
 class EncodingProcessorState : public ProcessorState {
 public:
-  explicit EncodingProcessorState(Filter& filter) : ProcessorState(filter) {}
+  explicit EncodingProcessorState(Filter& filter, httpRequest* r) : ProcessorState(filter, r) {
+    is_encoding = 1;
+  }
 
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
     encoder_callbacks_ = &callbacks;
-    filter_callbacks_ = &callbacks;
   }
+  Http::StreamFilterCallbacks* getFilterCallbacks() const override { return encoder_callbacks_; }
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
     encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
   }
-
-  Phase phase() override { return static_cast<Phase>(static_cast<int>(state2Phase()) + 3); };
 
   void addBufferData(Buffer::Instance& data) override;
 

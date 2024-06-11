@@ -28,7 +28,7 @@ void SharedRequestManager::onConnectionClose(Network::ConnectionEvent event) {
 void SharedRequestManager::onDecodingSuccess(ResponseHeaderFramePtr header_frame,
                                              absl::optional<StartTime> start_time) {
 
-  const uint64_t stream_id = header_frame->frameFlags().streamFlags().streamId();
+  const uint64_t stream_id = header_frame->frameFlags().streamId();
   const bool end_stream = header_frame->frameFlags().endStream();
 
   auto it = pending_requests_.find(stream_id);
@@ -48,7 +48,7 @@ void SharedRequestManager::onDecodingSuccess(ResponseHeaderFramePtr header_frame
   cb->onDecodingSuccess(std::move(header_frame), std::move(start_time));
 }
 void SharedRequestManager::onDecodingSuccess(ResponseCommonFramePtr common_frame) {
-  const uint64_t stream_id = common_frame->frameFlags().streamFlags().streamId();
+  const uint64_t stream_id = common_frame->frameFlags().streamId();
   const bool end_stream = common_frame->frameFlags().endStream();
 
   auto it = pending_requests_.find(stream_id);

@@ -21,7 +21,7 @@ type filter struct {
 
 func (f *filter) sendLocalReplyInternal() api.StatusType {
 	body := fmt.Sprintf("%s, path: %s\r\n", f.config.echoBody, f.path)
-	f.callbacks.SendLocalReply(200, body, nil, 0, "")
+	f.callbacks.DecoderFilterCallbacks().SendLocalReply(200, body, nil, 0, "")
 	// Remember to return LocalReply when the request is replied locally
 	return api.LocalReply
 }

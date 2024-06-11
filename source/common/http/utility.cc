@@ -1524,14 +1524,6 @@ bool Utility::isValidRefererValue(absl::string_view value) {
   // a host to be present if there is a schema.
   Utility::Url url;
 
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_allow_partial_urls_in_referer")) {
-    if (url.initialize(value, false)) {
-      return true;
-    }
-    return false;
-  }
-
   if (url.initialize(value, false)) {
     return !(url.containsFragment() || url.containsUserinfo());
   }

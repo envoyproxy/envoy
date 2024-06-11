@@ -106,7 +106,7 @@ void UpstreamRequest::clearStream(bool close_connection) {
   // connection close event will not be handled.
   reset_or_response_complete_ = true;
 
-  ENVOY_LOG(debug, "generic proxy upstream request: complete upstream request ()",
+  ENVOY_LOG(debug, "generic proxy upstream request: complete upstream request {}",
             close_connection);
 
   if (span_ != nullptr) {
@@ -421,6 +421,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
   num_retries_++;
 
   const auto& cluster_name = route_entry_->clusterName();
+  ENVOY_LOG(debug, "generic proxy: route to cluster: {}", cluster_name);
 
   auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
@@ -466,7 +467,7 @@ void RouterFilter::onRequestCommonFrame(RequestCommonFramePtr frame) {
   upstream_requests_.front()->sendCommonFrameToUpstream();
 }
 
-FilterStatus RouterFilter::onStreamDecoded(StreamRequest& request) {
+HeaderFilterStatus RouterFilter::decodeHeaderFrame(StreamRequest& request) {
   ENVOY_LOG(debug, "Try route request to the upstream based on the route entry");
 
   setRouteEntry(callbacks_->routeEntry());
@@ -476,12 +477,12 @@ FilterStatus RouterFilter::onStreamDecoded(StreamRequest& request) {
     ENVOY_LOG(debug, "No route for current request and send local reply");
     completeAndSendLocalReply(Status(StatusCode::kNotFound, "route_not_found"), {},
                               StreamInfo::CoreResponseFlag::NoRouteFound);
-    return FilterStatus::StopIteration;
+    return HeaderFilterStatus::StopIteration;
   }
 
   mayRequestStreamEnd(request.frameFlags().endStream());
   kickOffNewUpstreamRequest();
-  return FilterStatus::StopIteration;
+  return HeaderFilterStatus::StopIteration;
 }
 
 const Envoy::Router::MetadataMatchCriteria* RouterFilter::metadataMatchCriteria() {

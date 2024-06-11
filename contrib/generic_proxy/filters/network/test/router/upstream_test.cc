@@ -43,7 +43,7 @@ public:
         .WillByDefault(testing::Invoke([&](ResponseHeaderFramePtr frame, auto) {
           if (upstream_ != nullptr) {
             if (frame->frameFlags().endStream()) {
-              upstream_->removeUpstreamRequest(frame->frameFlags().streamFlags().streamId());
+              upstream_->removeUpstreamRequest(frame->frameFlags().streamId());
               upstream_->cleanUp(false);
             }
           }
@@ -52,7 +52,7 @@ public:
         .WillByDefault(testing::Invoke([&](ResponseCommonFramePtr frame) {
           if (upstream_ != nullptr) {
             if (frame->frameFlags().endStream()) {
-              upstream_->removeUpstreamRequest(frame->frameFlags().streamFlags().streamId());
+              upstream_->removeUpstreamRequest(frame->frameFlags().streamId());
               upstream_->cleanUp(false);
             }
           }

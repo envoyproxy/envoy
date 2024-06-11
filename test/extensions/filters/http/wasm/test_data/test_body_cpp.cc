@@ -128,7 +128,6 @@ FilterDataStatus BodyContext::onBody(WasmBufferType type, size_t buffer_length,
 
 FilterHeadersStatus BodyContext::onRequestHeaders(uint32_t, bool) {
   body_op_ = getRequestHeader("x-test-operation")->toString();
-  setRequestHeaderPairs({{"a", "a"}, {"b", "b"}});
   return FilterHeadersStatus::Continue;
 }
 
