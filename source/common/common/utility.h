@@ -665,46 +665,48 @@ template <class Value> class TrieLookupTable {
   public:
     Value value_{};
 
-    // Returns a pointer to the child branch with character c, or nullptr if
+    // Returns a pointer to the child branch at child_index, or nullptr if
     // there are no entries in the trie on that branch.
-    const TrieNode* operator[](uint8_t c) const {
-      if (c >= min_child_ && c < (min_child_ + children_.size())) {
-        return children_[c - min_child_].get();
+    const TrieNode* operator[](uint8_t child_index) const {
+      if (child_index >= min_child_ && child_index < (min_child_ + children_.size())) {
+        return children_[child_index - min_child_].get();
       }
       return nullptr;
     }
 
-    // Returns a pointer to the child branch with character c, or nullptr if
+    // Returns a pointer to the child branch at child_index, or nullptr if
     // there are no entries in the trie on that branch.
-    TrieNode* operator[](uint8_t c) { return const_cast<TrieNode*>(std::as_const(*this)[c]); }
+    TrieNode* operator[](uint8_t child_index) {
+      return const_cast<TrieNode*>(std::as_const(*this)[child_index]);
+    }
 
-    // Populates a child branch with for character c, with the child specified
+    // Populates a child branch at child_index, with the child specified
     // by `node`. If the branch already exists it will be overwritten.
-    void set(uint8_t c, std::unique_ptr<TrieNode> node) {
+    void set(uint8_t child_index, std::unique_ptr<TrieNode> node) {
       if (children_.empty()) {
         children_.reserve(1);
         children_.emplace_back(std::move(node));
-        min_child_ = c;
+        min_child_ = child_index;
         return;
       }
-      if (c < min_child_) {
+      if (child_index < min_child_) {
         // Expand the vector backwards, by moving the existing vector onto
         // the end of a newly allocated one.
         std::vector<std::unique_ptr<TrieNode>> new_children;
-        new_children.reserve(min_child_ - c + children_.size());
-        new_children.resize(min_child_ - c);
+        new_children.reserve(min_child_ - child_index + children_.size());
+        new_children.resize(min_child_ - child_index);
         std::move(children_.begin(), children_.end(), std::back_inserter(new_children));
         new_children[0] = std::move(node);
-        min_child_ = c;
+        min_child_ = child_index;
         children_ = std::move(new_children);
         return;
       }
-      if (c >= (min_child_ + children_.size())) {
+      if (child_index >= (min_child_ + children_.size())) {
         // Expand the vector forwards.
-        children_.resize(c - min_child_ + 1);
+        children_.resize(child_index - min_child_ + 1);
         // Fall through to "insert" behavior.
       }
-      children_[c - min_child_] = std::move(node);
+      children_[child_index - min_child_] = std::move(node);
     }
 
   private:
