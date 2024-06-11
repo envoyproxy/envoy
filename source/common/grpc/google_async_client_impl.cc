@@ -168,6 +168,7 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
       options_(options), unused_stream_info_(Http::Protocol::Http2, dispatcher_.timeSource(),
                                              Network::ConnectionInfoProviderSharedPtr{},
                                              StreamInfo::FilterState::LifeSpan::FilterChain) {
+  // TODO(cainelli): add a common library for tracing tags between gRPC implementations.
   if (options.parent_span_ != nullptr) {
     const std::string child_span_name =
         options.child_span_name_.empty()
