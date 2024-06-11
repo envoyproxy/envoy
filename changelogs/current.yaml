@@ -187,6 +187,9 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.detect_and_raise_rst_tcp_connection`` runtime flag and legacy code paths.
 - area: http
   change: |
+    Removed ``envoy.reloadable_features.http_allow_partial_urls_in_referer`` runtime flag and legacy code paths.
+- area: http
+  change: |
     Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and legacy code paths.
 - area: upstream
   change: |
