@@ -32,6 +32,10 @@ behavior_changes:
     :ref:`TlvsMetadata type <envoy_v3_api_msg_data.core.v3.TlvsMetadata>`.
     This change can be temporarily disabled by setting the runtime flag
     ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` to ``false``.
+- area: golang
+  change: |
+    Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
+    ``EncoderFilterCallbacks``, to support full-duplex processing.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
