@@ -525,14 +525,18 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   for (size_t i = 1; i <= count; ++i) {
     sendCHLO(quic::test::TestConnectionId(i));
   }
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  absl::SleepFor(absl::Milliseconds(1));
+  size_t read_ready = 0;
+  for (; quic_dispatcher_->NumSessions() < count + 1; ++read_ready) {
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
 
-  // The first kNumSessionsToCreatePerLoop were processed immediately, the next
-  // kNumSessionsToCreatePerLoop were buffered for the next run of the event loop, and the last one
-  // was buffered to the subsequent event loop.
-  EXPECT_EQ(2, quic_listener_->eventLoopsWithBufferedChlosForTest());
+  if (read_ready == 3) {
+    // The first kNumSessionsToCreatePerLoop were processed immediately, the next
+    // kNumSessionsToCreatePerLoop were buffered for the next run of the event loop, and the last
+    // one was buffered to the subsequent event loop.
+    EXPECT_EQ(2, quic_listener_->eventLoopsWithBufferedChlosForTest());
+  }
 
   for (size_t i = 1; i <= count; ++i) {
     EXPECT_FALSE(buffered_packets->HasBufferedPackets(quic::test::TestConnectionId(i)));
