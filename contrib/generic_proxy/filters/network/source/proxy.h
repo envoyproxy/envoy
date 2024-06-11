@@ -151,6 +151,7 @@ public:
     Tracing::Span& activeSpan() override { return parent_.activeSpan(); }
     OptRef<const Tracing::Config> tracingConfig() const override { return parent_.tracingConfig(); }
     const Network::Connection* connection() const override;
+    absl::string_view filterConfigName() const override { return context_.config_name; }
 
     bool isDualFilter() const { return is_dual_; }
 
@@ -179,12 +180,12 @@ public:
     void onResponseCommonFrame(ResponseCommonFramePtr frame) override {
       parent_.onResponseCommonFrame(std::move(frame));
     }
-    void setRequestFramesHandler(RequestFramesHandler& handler) override {
+    void setRequestFramesHandler(RequestFramesHandler* handler) override {
       ASSERT(parent_.request_stream_frames_handler_ == nullptr,
              "request frames handler is already set");
-      parent_.request_stream_frames_handler_ = &handler;
+      parent_.request_stream_frames_handler_ = handler;
     }
-    void completeDirectly() override { parent_.completeDirectly(); }
+    void completeDirectly() override { parent_.completeStream(); }
 
     DecoderFilterSharedPtr filter_;
   };
@@ -240,7 +241,7 @@ public:
     encoder_filters_.emplace_back(std::move(filter));
   }
 
-  void initializeFilterChain(FilterChainFactory& factory);
+  bool initializeFilterChain(FilterChainFactory& factory);
 
   Envoy::Event::Dispatcher& dispatcher();
   const CodecFactory& codecFactory();
@@ -249,10 +250,10 @@ public:
 
   void sendLocalReply(Status status, absl::string_view data, ResponseUpdateFunction func);
   void continueDecoding();
+  void onRequestCommonFrame(RequestCommonFramePtr request_common_frame);
+
   void onResponseHeaderFrame(ResponseHeaderFramePtr response_header_frame);
   void onResponseCommonFrame(ResponseCommonFramePtr response_common_frame);
-  void completeDirectly();
-
   void continueEncoding();
 
   // FilterChainManager
@@ -265,13 +266,6 @@ public:
   OptRef<const RouteEntry> routeEntry() const override {
     return makeOptRefFromPtr<const RouteEntry>(cached_route_entry_.get());
   }
-
-  void onRequestFrame(RequestCommonFramePtr request_common_frame);
-
-  std::vector<ActiveDecoderFilterPtr>& decoderFiltersForTest() { return decoder_filters_; }
-  std::vector<ActiveEncoderFilterPtr>& encoderFiltersForTest() { return encoder_filters_; }
-  size_t nextDecoderFilterIndexForTest() { return next_decoder_filter_index_; }
-  size_t nextEncoderFilterIndexForTest() { return next_encoder_filter_index_; }
 
   Tracing::Span& activeSpan() {
     if (active_span_) {
@@ -289,11 +283,16 @@ public:
   }
 
   void deferredDelete();
-  void completeRequest();
+  void completeStream(absl::optional<DownstreamStreamResetReason> reason = {});
 
-  uint64_t requestStreamId() const {
-    return request_stream_->frameFlags().streamFlags().streamId();
-  }
+  uint64_t requestStreamId() const { return request_header_frame_->frameFlags().streamId(); }
+
+  auto& decoderFiltersForTest() { return decoder_filters_; }
+  auto& encoderFiltersForTest() { return encoder_filters_; }
+  auto nextDecoderHeaderFilterForTest() { return decoder_filter_iter_header_; }
+  auto nextDecoderCommonFilterForTest() { return decoder_filter_iter_common_; }
+  auto nextEncoderHeaderFilterForTest() { return encoder_filter_iter_header_; }
+  auto nextEncoderCommonFilterForTest() { return encoder_filter_iter_common_; }
 
 private:
   // Keep these methods private to ensure that these methods are only called by the reference
@@ -307,36 +306,46 @@ private:
 
   void sendRequestFrameToUpstream();
 
-  void sendHeaderFrameToDownstream();
-  void sendCommonFrameToDownstream();
   bool sendFrameToDownstream(const StreamFrame& frame, bool header_frame);
 
-  bool active_stream_reset_{false};
+  void processRequestHeaderFrame();
+  void processRequestCommonFrame();
+  void processResponseHeaderFrame();
+  void processResponseCommonFrame();
 
-  bool registered_in_frame_handlers_{false};
+  bool stream_reset_or_complete_{false};
+  bool waiting_request_frames_{false};
 
   Filter& parent_;
 
-  RequestHeaderFramePtr request_stream_;
-  std::list<RequestCommonFramePtr> request_stream_frames_;
-  bool request_stream_end_{false};
-  bool request_filter_chain_complete_{false};
+  RequestHeaderFramePtr request_header_frame_;
+  std::list<RequestCommonFramePtr> request_common_frames_;
 
+  // The request common frame that is being processed.
+  RequestCommonFramePtr request_common_frame_;
   RequestFramesHandler* request_stream_frames_handler_{nullptr};
 
-  ResponseHeaderFramePtr response_stream_;
-  std::list<ResponseCommonFramePtr> response_stream_frames_;
-  bool response_stream_end_{false};
-  bool response_filter_chain_complete_{false};
+  ResponseHeaderFramePtr response_header_frame_;
+  std::list<ResponseCommonFramePtr> response_common_frames_;
   bool local_reply_{false};
+
+  // The response common frame that is being processed.
+  ResponseCommonFramePtr response_common_frame_;
 
   RouteEntryConstSharedPtr cached_route_entry_;
 
-  std::vector<ActiveDecoderFilterPtr> decoder_filters_;
-  size_t next_decoder_filter_index_{0};
+  using DecoderFilters = absl::InlinedVector<ActiveDecoderFilterPtr, 8>;
+  using EncoderFilters = absl::InlinedVector<ActiveEncoderFilterPtr, 8>;
 
-  std::vector<ActiveEncoderFilterPtr> encoder_filters_;
-  size_t next_encoder_filter_index_{0};
+  DecoderFilters decoder_filters_;
+  DecoderFilters::iterator decoder_filter_iter_header_{};
+  DecoderFilters::iterator decoder_filter_iter_common_{};
+  bool stop_decoder_filter_chain_{};
+
+  EncoderFilters encoder_filters_;
+  EncoderFilters::iterator encoder_filter_iter_header_{};
+  EncoderFilters::iterator encoder_filter_iter_common_{};
+  bool stop_encoder_filter_chain_{};
 
   StreamInfo::StreamInfoImpl stream_info_;
 

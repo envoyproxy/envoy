@@ -29,13 +29,13 @@ TEST(KafkaCodecTest, SimpleFrameTest) {
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
 
     KafkaRequestFrame frame(request);
-    EXPECT_EQ(frame.frameFlags().streamFlags().streamId(), 3);
+    EXPECT_EQ(frame.frameFlags().streamId(), 3);
   }
 
   {
     KafkaResponseFrame frame(nullptr);
     EXPECT_EQ(frame.protocol(), "kafka");
-    EXPECT_EQ(frame.frameFlags().streamFlags().streamId(), 0);
+    EXPECT_EQ(frame.frameFlags().streamId(), 0);
   }
 
   {
@@ -46,7 +46,7 @@ TEST(KafkaCodecTest, SimpleFrameTest) {
             NetworkFilters::Kafka::FetchResponse({}, {}));
 
     KafkaResponseFrame frame(response);
-    EXPECT_EQ(frame.frameFlags().streamFlags().streamId(), 3);
+    EXPECT_EQ(frame.frameFlags().streamId(), 3);
   }
 }
 
