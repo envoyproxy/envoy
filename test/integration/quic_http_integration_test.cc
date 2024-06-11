@@ -2070,6 +2070,9 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
         listener_filter->mutable_filter_disabled()->set_any_match(true);
       });
 
+  // Do socket swap before initialization to avoid races.
+  SocketInterfaceSwap socket_swap(Network::Socket::Type::Datagram);
+
   initialize();
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients")) {
@@ -2080,7 +2083,6 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
   auto listener_port = lookupPort("http");
 
   // Setup DNAT for 0.0.0.0:12345-->127.0.0.2:listener_port
-  SocketInterfaceSwap socket_swap(Network::Socket::Type::Datagram);
   socket_swap.write_matcher_->setDnat(
       Network::Utility::parseInternetAddress("1.2.3.4", 12345),
       Network::Utility::parseInternetAddress("127.0.0.2", listener_port));
