@@ -78,7 +78,7 @@ public:
     absl::flat_hash_map<std::string, std::string> data_;
   };
 
-  class FakeServerCodec : public ServerCodec {
+  class FakeServerCodec : public ServerCodec, Logger::Loggable<Logger::Id::filter> {
   public:
     bool parseRequestBody() {
       std::string body(message_size_.value(), 0);
@@ -155,6 +155,8 @@ public:
 
     void setCodecCallbacks(ServerCodecCallbacks& callback) override { callback_ = &callback; }
     void decode(Buffer::Instance& buffer, bool) override {
+      ENVOY_LOG(debug, "FakeServerCodec::decode: {}", buffer.toString());
+
       buffer_.move(buffer);
       while (true) {
         if (!message_size_.has_value()) {
@@ -204,10 +206,12 @@ public:
         buffer += "message_type:common;";
       }
 
-      buffer += fmt::format("stream_id:{};", response.frameFlags().streamFlags().streamId());
+      buffer += fmt::format("stream_id:{};", response.frameFlags().streamId());
       buffer += fmt::format("end_stream:{};", response.frameFlags().endStream());
       buffer +=
           fmt::format("close_connection:{};", response.frameFlags().streamFlags().drainClose());
+
+      ENVOY_LOG(debug, "FakeServerCodec::encode: {}", buffer);
 
       encoding_buffer_.writeBEInt<uint32_t>(buffer.size());
       encoding_buffer_.add(buffer);
@@ -233,7 +237,7 @@ public:
     ServerCodecCallbacks* callback_{};
   };
 
-  class FakeClientCodec : public ClientCodec {
+  class FakeClientCodec : public ClientCodec, Logger::Loggable<Logger::Id::filter> {
   public:
     bool parseResponseBody() {
       std::string body(message_size_.value(), 0);
@@ -307,6 +311,8 @@ public:
 
     void setCodecCallbacks(ClientCodecCallbacks& callback) override { callback_ = &callback; }
     void decode(Buffer::Instance& buffer, bool) override {
+      ENVOY_LOG(debug, "FakeClientCodec::decode: {}", buffer.toString());
+
       buffer_.move(buffer);
       while (true) {
         if (!message_size_.has_value()) {
@@ -363,9 +369,11 @@ public:
         buffer += "message_type:common;";
       }
 
-      buffer += fmt::format("stream_id:{};", request.frameFlags().streamFlags().streamId());
+      buffer += fmt::format("stream_id:{};", request.frameFlags().streamId());
       buffer += fmt::format("end_stream:{};", request.frameFlags().endStream());
       buffer += fmt::format("one_way:{};", request.frameFlags().streamFlags().oneWayStream());
+
+      ENVOY_LOG(debug, "FakeClientCodec::encode: {}", buffer);
 
       encoding_buffer_.writeBEInt<uint32_t>(buffer.size());
       encoding_buffer_.add(buffer);
