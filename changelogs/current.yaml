@@ -177,6 +177,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: tls
+  change: |
+    Removed ``envoy.reloadable_features.enable_intermediate_ca`` runtime flag and lagacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` runtime flag and lagacy code paths.
