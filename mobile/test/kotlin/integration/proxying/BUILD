@@ -11,8 +11,6 @@ envoy_mobile_android_test(
         "ProxyInfoIntentPerformHTTPRequestUsingProxyTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [
@@ -38,8 +36,6 @@ envoy_mobile_android_test(
         "ProxyInfoIntentPerformHTTPSRequestUsingProxyTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [
@@ -65,8 +61,6 @@ envoy_mobile_android_test(
         "ProxyInfoIntentPerformHTTPSRequestUsingAsyncProxyTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [
@@ -92,8 +86,6 @@ envoy_mobile_android_test(
         "ProxyInfoIntentPerformHTTPSRequestBadHostnameTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [
@@ -119,8 +111,6 @@ envoy_mobile_android_test(
         "ProxyPollPerformHTTPRequestUsingProxyTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [
@@ -146,8 +136,6 @@ envoy_mobile_android_test(
         "ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [

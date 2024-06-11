@@ -58,10 +58,11 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
   const auto resource_name = getResourceName();
   Envoy::Config::SubscriptionOptions options;
   options.use_namespace_matching_ = true;
-  subscription_ =
+  subscription_ = THROW_OR_RETURN_VALUE(
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->protobufConfigurationCast().vhds().config_source(),
-          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options);
+          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options),
+      Envoy::Config::SubscriptionPtr);
 }
 
 void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {

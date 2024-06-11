@@ -605,12 +605,13 @@ absl::Status LoaderImpl::initLayers(Event::Dispatcher& dispatcher,
   return loadNewSnapshot();
 }
 
-void LoaderImpl::initialize(Upstream::ClusterManager& cm) {
+absl::Status LoaderImpl::initialize(Upstream::ClusterManager& cm) {
   cm_ = &cm;
 
   for (const auto& s : subscriptions_) {
-    s->createSubscription();
+    RETURN_IF_NOT_OK(s->createSubscription());
   }
+  return absl::OkStatus();
 }
 
 void LoaderImpl::startRtdsSubscriptions(ReadyCallback on_done) {
@@ -632,11 +633,14 @@ RtdsSubscription::RtdsSubscription(
       stats_scope_(store_.createScope("runtime")), resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }) {}
 
-void RtdsSubscription::createSubscription() {
+absl::Status RtdsSubscription::createSubscription() {
   const auto resource_name = getResourceName();
-  subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
+  auto subscription_or_error = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
       config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this, resource_decoder_,
       {});
+  RETURN_IF_NOT_OK(subscription_or_error.status());
+  subscription_ = std::move(*subscription_or_error);
+  return absl::OkStatus();
 }
 
 absl::Status

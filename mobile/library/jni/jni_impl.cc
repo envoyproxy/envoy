@@ -841,7 +841,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
     jni_helper.getEnv()->DeleteGlobalRef(java_stream_callbacks_global_ref);
   };
   stream_callbacks.on_error_ = [java_stream_callbacks_global_ref](
-                                   Envoy::EnvoyError error, envoy_stream_intel stream_intel,
+                                   const Envoy::EnvoyError& error, envoy_stream_intel stream_intel,
                                    envoy_final_stream_intel final_stream_intel) {
     Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
     auto java_stream_intel = Envoy::JNI::cppStreamIntelToJavaStreamIntel(jni_helper, stream_intel);
@@ -852,10 +852,10 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
         java_stream_callbacks_class.get(), "onError",
         "(ILjava/lang/String;ILio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;"
         "Lio/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel;)V");
-    auto java_error_message = Envoy::JNI::cppStringToJavaString(jni_helper, error.message);
+    auto java_error_message = Envoy::JNI::cppStringToJavaString(jni_helper, error.message_);
     jni_helper.callVoidMethod(java_stream_callbacks_global_ref, java_on_error_method_id,
-                              static_cast<jint>(error.error_code), java_error_message.get(),
-                              error.attempt_count.value_or(-1), java_stream_intel.get(),
+                              static_cast<jint>(error.error_code_), java_error_message.get(),
+                              error.attempt_count_.value_or(-1), java_stream_intel.get(),
                               java_final_stream_intel.get());
     // on_error_ is a terminal callback, delete the java_stream_callbacks_global_ref.
     jni_helper.getEnv()->DeleteGlobalRef(java_stream_callbacks_global_ref);
