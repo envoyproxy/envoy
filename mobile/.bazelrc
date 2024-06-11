@@ -254,9 +254,13 @@ build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci-cc
 build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
 build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
 
-build:mobile-remote-ci-cc-test --config=mobile-remote-ci-cc
-test:mobile-remote-ci-cc-test --test_output=all
-test:mobile-remote-ci-cc-test --config=mobile-remote-ci-cc
+build:mobile-remote-ci-cc-xds-enabled --config=mobile-remote-ci-cc
+test:mobile-remote-ci-cc-xds-enabled --config=mobile-remote-ci-cc
+test:mobile-remote-ci-cc-xds-enabled --define=envoy_mobile_xds=enabled
+
+build:mobile-remote-ci-cc-full-protos-enabled --config=mobile-remote-ci-cc
+test:mobile-remote-ci-cc-full-protos-enabled --config=mobile-remote-ci-cc
+test:mobile-remote-ci-cc-full-protos-enabled --define=envoy_full_protos=enabled
 
 build:mobile-remote-ci-macos-kotlin --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-kotlin --fat_apk_cpu=x86_64

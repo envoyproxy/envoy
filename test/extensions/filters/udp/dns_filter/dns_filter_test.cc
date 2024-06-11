@@ -1910,6 +1910,12 @@ TEST_F(DnsFilterTest, InvalidShortBufferTest) {
 }
 
 TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
+#if defined(__linux__) && defined(__s390x__)
+  // Skip on s390x because this test incorrectly depends on the ordering of
+  // addresses that happens to work on other platforms.
+  // See https://github.com/envoyproxy/envoy/pull/24330
+  GTEST_SKIP() << "Skipping RandomizeFirstAnswerTest on s390x";
+#endif
   InSequence s;
 
   setup(forward_query_off_config);

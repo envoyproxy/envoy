@@ -9,6 +9,8 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+exports_files(["example.rst"])
+
 selects.config_setting_group(
     name = "include_wasm_config",
     match_all = [
@@ -46,5 +48,5 @@ envoy_wasm_cc_binary(
 
 filegroup(
     name = "files",
-    srcs = glob(["**/*"]),
+    srcs = glob(["**/*"], exclude = ["example.rst"]),
 )

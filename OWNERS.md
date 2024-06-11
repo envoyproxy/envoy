@@ -52,6 +52,8 @@ routing PRs, questions, etc. to the right place.
   * Listeners, iouring, data plane.
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
   * Load balancing, GeoIP, overload manager, security.
+* Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
+  * ext_proc, data plane, flow control, CEL.
 
 # Envoy mobile maintainers
 

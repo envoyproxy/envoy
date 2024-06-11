@@ -434,12 +434,12 @@ Http::Http1::CallbackResult Http1ServerCodec::onMessageCompleteImpl() {
   return Http::Http1::CallbackResult::Success;
 }
 
-void Http1ServerCodec::encode(const StreamFrame& frame, EncodingCallbacks& callbacks) {
+EncodingResult Http1ServerCodec::encode(const StreamFrame& frame, EncodingContext&) {
   const bool response_end_stream = frame.frameFlags().endStream();
 
   if (auto* headers = dynamic_cast<const HttpResponseFrame*>(&frame); headers != nullptr) {
-    ENVOY_LOG(debug, "encoding response headers (end_stream={}):\n{}", response_end_stream,
-              *headers->response_);
+    ENVOY_LOG(debug, "Generic proxy HTTP1 codec: encoding response headers (end_stream={}):\n{}",
+              response_end_stream, *headers->response_);
 
     active_request_->response_chunk_encoding_ =
         Utility::isChunked(*headers->response_, response_end_stream);
@@ -449,8 +449,7 @@ void Http1ServerCodec::encode(const StreamFrame& frame, EncodingCallbacks& callb
     if (!status.ok()) {
       ENVOY_LOG(error, "Generic proxy HTTP1 codec: failed to encode response headers: {}",
                 status.message());
-      callbacks_->connection()->close(Network::ConnectionCloseType::FlushWrite);
-      return;
+      return status;
     }
 
     // Encode the optional buffer if it exists. This is used for local response or for the
@@ -462,27 +461,31 @@ void Http1ServerCodec::encode(const StreamFrame& frame, EncodingCallbacks& callb
     }
 
   } else if (auto* body = dynamic_cast<const HttpRawBodyFrame*>(&frame); body != nullptr) {
-    ENVOY_LOG(debug, "encoding response body (end_stream={} size={})", response_end_stream,
-              body->buffer().length());
+    ENVOY_LOG(debug, "Generic proxy HTTP1 codec: encoding response body (end_stream={} size={})",
+              response_end_stream, body->buffer().length());
     Utility::encodeBody(encoding_buffer_, body->buffer(), active_request_->response_chunk_encoding_,
                         response_end_stream);
   }
 
-  callbacks.onEncodingSuccess(encoding_buffer_, response_end_stream);
+  const uint64_t encoded_size = encoding_buffer_.length();
+
+  // Send the encoded data to the connection and reset the buffer for the next frame.
+  callbacks_->writeToConnection(encoding_buffer_);
+  ASSERT(encoding_buffer_.length() == 0);
 
   if (response_end_stream) {
     if (active_request_->request_complete_) {
       active_request_.reset();
-      return;
+      return encoded_size;
     }
     ENVOY_LOG(debug, "Generic proxy HTTP1 server codec: response complete before request complete");
-    if (callbacks_->connection().has_value()) {
-      callbacks_->connection()->close(Network::ConnectionCloseType::FlushWrite);
-    }
+    return absl::InvalidArgumentError("response complete before request complete");
   }
+
+  return encoded_size;
 }
 
-void Http1ClientCodec::encode(const StreamFrame& frame, EncodingCallbacks& callbacks) {
+EncodingResult Http1ClientCodec::encode(const StreamFrame& frame, EncodingContext&) {
   const bool request_end_stream = frame.frameFlags().endStream();
 
   if (auto* headers = dynamic_cast<const HttpRequestFrame*>(&frame); headers != nullptr) {
@@ -501,8 +504,7 @@ void Http1ClientCodec::encode(const StreamFrame& frame, EncodingCallbacks& callb
     if (!status.ok()) {
       ENVOY_LOG(error, "Generic proxy HTTP1 codec: failed to encode request headers: {}",
                 status.message());
-      callbacks_->connection()->close(Network::ConnectionCloseType::FlushWrite);
-      return;
+      return status;
     }
 
     // Encode the optional buffer if it exists. This is used for local response or for the
@@ -524,7 +526,13 @@ void Http1ClientCodec::encode(const StreamFrame& frame, EncodingCallbacks& callb
     expect_response_->request_complete_ = true;
   }
 
-  callbacks.onEncodingSuccess(encoding_buffer_, request_end_stream);
+  const uint64_t encoded_size = encoding_buffer_.length();
+
+  // Send the encoded data to the connection and reset the buffer for the next frame.
+  callbacks_->writeToConnection(encoding_buffer_);
+  ASSERT(encoding_buffer_.length() == 0);
+
+  return encoded_size;
 }
 
 Http::Http1::CallbackResult Http1ClientCodec::onMessageBeginImpl() {

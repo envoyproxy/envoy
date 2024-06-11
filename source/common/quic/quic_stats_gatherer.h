@@ -17,6 +17,11 @@ namespace Quic {
 class QuicStatsGatherer : public quic::QuicAckListenerInterface {
 public:
   explicit QuicStatsGatherer(Envoy::TimeSource* time_source) : time_source_(time_source) {}
+  ~QuicStatsGatherer() override {
+    if (!logging_done_) {
+      maybeDoDeferredLog(false);
+    }
+  }
 
   // QuicAckListenerInterface
   void OnPacketAcked(int acked_bytes, quic::QuicTime::Delta delta_largest_observed) override;

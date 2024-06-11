@@ -183,7 +183,8 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
                                            envoy_final_stream_intel final_stream_intel) {
     ios_on_complete(stream_intel, final_stream_intel, context);
   };
-  streamCallbacks.on_error_ = [context](Envoy::EnvoyError error, envoy_stream_intel stream_intel,
+  streamCallbacks.on_error_ = [context](const Envoy::EnvoyError &error,
+                                        envoy_stream_intel stream_intel,
                                         envoy_final_stream_intel final_stream_intel) {
     envoy_error bridge_error = Envoy::Bridge::Utility::toBridgeError(error);
     ios_on_error(bridge_error, stream_intel, final_stream_intel, context);
