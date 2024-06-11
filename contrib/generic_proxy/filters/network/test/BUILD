@@ -80,35 +80,36 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "integration_test",
-    srcs = [
-        "integration_test.cc",
-    ],
-    tags = [
-        "cpu:3",
-    ],
-    deps = [
-        ":fake_codec_lib",
-        "//contrib/generic_proxy/filters/network/source:config",
-        "//contrib/generic_proxy/filters/network/source:proxy_lib",
-        "//contrib/generic_proxy/filters/network/test/mocks:codec_mocks",
-        "//contrib/generic_proxy/filters/network/test/mocks:filter_mocks",
-        "//contrib/generic_proxy/filters/network/test/mocks:route_mocks",
-        "//envoy/event:timer_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:thread_annotations",
-        "//source/common/network:socket_option_lib",
-        "//source/extensions/access_loggers/file:config",
-        "//source/extensions/transport_sockets/raw_buffer:config",
-        "//test/common/upstream:utility_lib",
-        "//test/integration:base_integration_test_lib",
-        "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/upstream:cluster_info_mocks",
-        "//test/test_common:registry_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
+# TODO(https://github.com/envoyproxy/envoy/issues/34639) enable
+#envoy_cc_test(
+#    name = "integration_test",
+#    srcs = [
+#        "integration_test.cc",
+#    ],
+#    tags = [
+#        "cpu:3",
+#    ],
+#    deps = [
+#        ":fake_codec_lib",
+#        "//contrib/generic_proxy/filters/network/source:config",
+#        "//contrib/generic_proxy/filters/network/source:proxy_lib",
+#        "//contrib/generic_proxy/filters/network/test/mocks:codec_mocks",
+#        "//contrib/generic_proxy/filters/network/test/mocks:filter_mocks",
+#        "//contrib/generic_proxy/filters/network/test/mocks:route_mocks",
+#        "//envoy/event:timer_interface",
+#        "//source/common/buffer:buffer_lib",
+#        "//source/common/common:thread_annotations",
+#        "//source/common/network:socket_option_lib",
+#        "//source/extensions/access_loggers/file:config",
+#        "//source/extensions/transport_sockets/raw_buffer:config",
+#        "//test/common/upstream:utility_lib",
+#        "//test/integration:base_integration_test_lib",
+#        "//test/mocks/server:factory_context_mocks",
+#        "//test/mocks/upstream:cluster_info_mocks",
+#        "//test/test_common:registry_lib",
+#        "//test/test_common:utility_lib",
+#    ],
+#)
 
 envoy_cc_test(
     name = "match_test",

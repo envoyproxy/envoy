@@ -336,7 +336,8 @@ HttpBuiltInCommandParser::getKnownFormatters() {
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
 
-           SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header, alternative_header);
+           THROW_IF_NOT_OK(SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header,
+                                                                           alternative_header));
 
            return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
                                                            max_length);
@@ -346,7 +347,8 @@ HttpBuiltInCommandParser::getKnownFormatters() {
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
 
-           SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header, alternative_header);
+           THROW_IF_NOT_OK(SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header,
+                                                                           alternative_header));
 
            return std::make_unique<ResponseHeaderFormatter>(main_header, alternative_header,
                                                             max_length);
@@ -356,7 +358,8 @@ HttpBuiltInCommandParser::getKnownFormatters() {
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
 
-           SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header, alternative_header);
+           THROW_IF_NOT_OK(SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header,
+                                                                           alternative_header));
 
            return std::make_unique<ResponseTrailerFormatter>(main_header, alternative_header,
                                                              max_length);
@@ -405,7 +408,8 @@ HttpBuiltInCommandParser::getKnownFormatters() {
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
-           SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header, alternative_header);
+           THROW_IF_NOT_OK(SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header,
+                                                                           alternative_header));
 
            return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
                                                            max_length);

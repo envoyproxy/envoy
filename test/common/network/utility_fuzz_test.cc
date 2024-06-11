@@ -17,18 +17,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
   }
 
-  try {
-    Network::Utility::parseInternetAddressAndPort(string_buffer);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-  }
-
-  try {
-    std::list<Network::PortRange> port_range_list;
-    Network::Utility::parsePortRangeList(string_buffer, port_range_list);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-  }
+  Network::Utility::parseInternetAddressAndPortNoThrow(string_buffer);
 
   try {
     envoy::config::core::v3::Address proto_address;

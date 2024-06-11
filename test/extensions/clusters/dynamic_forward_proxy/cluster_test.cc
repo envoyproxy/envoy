@@ -356,7 +356,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoConnections) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -373,7 +373,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnection) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -406,7 +406,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnectionHttp3) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -439,7 +439,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoMatchingConnectionAfterDraining) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -471,7 +471,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolInvalidAlpn) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -500,7 +500,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolSanMismatch) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -530,7 +530,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolHashMismatch) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -559,7 +559,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolIpMismatch) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -589,7 +589,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolEmptyHostname) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -623,7 +623,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoSSSL) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 

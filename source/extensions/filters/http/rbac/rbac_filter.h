@@ -98,7 +98,7 @@ class RoleBasedAccessControlFilter : public Http::StreamDecoderFilter,
                                      public Logger::Loggable<Logger::Id::rbac> {
 public:
   RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
-      : config_(config) {}
+      : config_(std::move(config)) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,

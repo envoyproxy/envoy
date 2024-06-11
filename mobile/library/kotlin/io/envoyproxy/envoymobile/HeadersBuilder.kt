@@ -67,7 +67,7 @@ open class HeadersBuilder {
    * @param value: The value associated to the header name.
    * @return HeadersBuilder, This builder.
    */
-  internal open fun internalSet(name: String, value: MutableList<String>): HeadersBuilder {
+  open fun internalSet(name: String, value: MutableList<String>): HeadersBuilder {
     container.set(name, value)
     return this
   }

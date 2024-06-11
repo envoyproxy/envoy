@@ -30,7 +30,9 @@ LocalResponsePolicy::LocalResponsePolicy(
                        ? absl::optional<Envoy::Http::Code>(
                              static_cast<Envoy::Http::Code>(config.status_code().value()))
                        : absl::optional<Envoy::Http::Code>{}},
-      header_parser_(Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {
+      header_parser_(THROW_OR_RETURN_VALUE(
+          Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
+          Router::HeaderParserPtr)) {
 
   // TODO(wbpcode): these is a potential bug of message validation. The validation visitor
   // of server context should not be used here directly. But this is bug is not introduced

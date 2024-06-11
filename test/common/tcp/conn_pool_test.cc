@@ -285,7 +285,7 @@ public:
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, setConnectionStats(_));
     EXPECT_CALL(*connection_, noDelay(true));
-    EXPECT_CALL(*connection_, streamInfo());
+    EXPECT_CALL(*connection_, streamInfo()).Times(AnyNumber());
     EXPECT_CALL(*connection_, id()).Times(AnyNumber());
     EXPECT_CALL(*connection_, readDisable(_)).Times(AnyNumber());
     EXPECT_CALL(*connection_, initializeReadFilters());

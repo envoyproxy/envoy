@@ -139,8 +139,10 @@ decodeFragment(absl::string_view fragment,
   const std::vector<absl::string_view> fragment_components = absl::StrSplit(fragment, ',');
   for (const absl::string_view& fragment_component : fragment_components) {
     if (absl::StartsWith(fragment_component, "alt=")) {
-      directives.Add()->mutable_alt()->MergeFrom(
-          XdsResourceIdentifier::decodeUrl(PercentEncoding::decode(fragment_component.substr(4))));
+      auto url_or_error =
+          XdsResourceIdentifier::decodeUrl(PercentEncoding::decode(fragment_component.substr(4)));
+      RETURN_IF_NOT_OK(url_or_error.status());
+      directives.Add()->mutable_alt()->MergeFrom(url_or_error.value());
     } else if (absl::StartsWith(fragment_component, "entry=")) {
       directives.Add()->set_entry(PercentEncoding::decode(fragment_component.substr(6)));
     } else {
@@ -176,14 +178,15 @@ XdsResourceIdentifier::decodeUrn(absl::string_view resource_urn) {
   return decoded_resource_name;
 }
 
-xds::core::v3::ResourceLocator XdsResourceIdentifier::decodeUrl(absl::string_view resource_url) {
+absl::StatusOr<xds::core::v3::ResourceLocator>
+XdsResourceIdentifier::decodeUrl(absl::string_view resource_url) {
   absl::string_view host, path;
   Http::Utility::extractHostPathFromUri(resource_url, host, path);
   xds::core::v3::ResourceLocator decoded_resource_locator;
   const size_t fragment_start = path.find('#');
   if (fragment_start != absl::string_view::npos) {
-    THROW_IF_NOT_OK(decodeFragment(path.substr(fragment_start + 1),
-                                   *decoded_resource_locator.mutable_directives()));
+    RETURN_IF_NOT_OK(decodeFragment(path.substr(fragment_start + 1),
+                                    *decoded_resource_locator.mutable_directives()));
     path = path.substr(0, fragment_start);
   }
   if (hasXdsTpScheme(resource_url)) {
@@ -193,10 +196,10 @@ xds::core::v3::ResourceLocator XdsResourceIdentifier::decodeUrl(absl::string_vie
   } else if (absl::StartsWith(resource_url, "file:")) {
     decoded_resource_locator.set_scheme(xds::core::v3::ResourceLocator::FILE);
     // File URLs only have a path and fragment.
-    THROW_IF_NOT_OK(decodePath(path, nullptr, *decoded_resource_locator.mutable_id()));
+    RETURN_IF_NOT_OK(decodePath(path, nullptr, *decoded_resource_locator.mutable_id()));
     return decoded_resource_locator;
   } else {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("{} does not have a xdstp:, http: or file: scheme", resource_url));
   }
   decoded_resource_locator.set_authority(PercentEncoding::decode(host));
@@ -206,8 +209,8 @@ xds::core::v3::ResourceLocator XdsResourceIdentifier::decodeUrl(absl::string_vie
                       *decoded_resource_locator.mutable_exact_context());
     path = path.substr(0, query_params_start);
   }
-  THROW_IF_NOT_OK(decodePath(path, decoded_resource_locator.mutable_resource_type(),
-                             *decoded_resource_locator.mutable_id()));
+  RETURN_IF_NOT_OK(decodePath(path, decoded_resource_locator.mutable_resource_type(),
+                              *decoded_resource_locator.mutable_id()));
   return decoded_resource_locator;
 }
 

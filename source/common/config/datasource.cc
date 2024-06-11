@@ -10,6 +10,46 @@ namespace Envoy {
 namespace Config {
 namespace DataSource {
 
+namespace {
+/**
+ * Read contents of the file.
+ * @param path file path.
+ * @param api reference to the Api.
+ * @param allow_empty return an empty string if the file is empty.
+ * @param max_size max size limit of file to read, default 0 means no limit, and if the file data
+ * would exceed the limit, it will return an error status.
+ * @return std::string with file contents. or an error status if the file does not exist or
+ * cannot be read.
+ */
+absl::StatusOr<std::string> readFile(const std::string& path, Api::Api& api, bool allow_empty,
+                                     uint64_t max_size) {
+  auto& file_system = api.fileSystem();
+
+  if (max_size > 0) {
+    if (!file_system.fileExists(path)) {
+      return absl::InvalidArgumentError(fmt::format("file {} does not exist", path));
+    }
+    const ssize_t size = file_system.fileSize(path);
+    if (size < 0) {
+      return absl::InvalidArgumentError(absl::StrCat("cannot determine size of file ", path));
+    }
+    if (static_cast<uint64_t>(size) > max_size) {
+      return absl::InvalidArgumentError(
+          fmt::format("file {} size is {} bytes; maximum is {}", path, size, max_size));
+    }
+  }
+
+  auto file_content_or_error = file_system.fileReadToEnd(path);
+  RETURN_IF_STATUS_NOT_OK(file_content_or_error);
+
+  if (!allow_empty && file_content_or_error.value().empty()) {
+    return absl::InvalidArgumentError(fmt::format("file {} is empty", path));
+  }
+
+  return file_content_or_error.value();
+}
+} // namespace
+
 absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& source,
                                  bool allow_empty, Api::Api& api, uint64_t max_size) {
   std::string data;
@@ -43,34 +83,6 @@ absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& sour
   return data;
 }
 
-absl::StatusOr<std::string> readFile(const std::string& path, Api::Api& api, bool allow_empty,
-                                     uint64_t max_size) {
-  auto& file_system = api.fileSystem();
-
-  if (max_size > 0) {
-    if (!file_system.fileExists(path)) {
-      return absl::InvalidArgumentError(fmt::format("file {} does not exist", path));
-    }
-    const ssize_t size = file_system.fileSize(path);
-    if (size < 0) {
-      return absl::InvalidArgumentError(absl::StrCat("cannot determine size of file ", path));
-    }
-    if (static_cast<uint64_t>(size) > max_size) {
-      return absl::InvalidArgumentError(
-          fmt::format("file {} size is {} bytes; maximum is {}", path, size, max_size));
-    }
-  }
-
-  auto file_content_or_error = file_system.fileReadToEnd(path);
-  RETURN_IF_STATUS_NOT_OK(file_content_or_error);
-
-  if (!allow_empty && file_content_or_error.value().empty()) {
-    return absl::InvalidArgumentError(fmt::format("file {} is empty", path));
-  }
-
-  return file_content_or_error.value();
-}
-
 absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source) {
   return source.specifier_case() == envoy::config::core::v3::DataSource::SpecifierCase::kFilename
              ? absl::make_optional(source.filename())
@@ -88,29 +100,36 @@ DynamicData::~DynamicData() {
   }
 }
 
-absl::string_view DynamicData::data() const {
+const std::string& DynamicData::data() const {
   const auto thread_local_data = slot_->get();
   return thread_local_data.has_value() ? *thread_local_data->data_ : EMPTY_STRING;
 }
 
-absl::string_view DataSourceProvider::data() const {
+const std::string& DataSourceProvider::data() const {
   if (absl::holds_alternative<std::string>(data_)) {
     return absl::get<std::string>(data_);
   }
   return absl::get<DynamicData>(data_).data();
 }
 
-absl::StatusOr<DataSourceProvider> DataSourceProvider::create(const ProtoDataSource& source,
-                                                              Event::Dispatcher& main_dispatcher,
-                                                              ThreadLocal::SlotAllocator& tls,
-                                                              Api::Api& api, bool allow_empty,
-                                                              uint64_t max_size) {
+absl::StatusOr<DataSourceProviderPtr> DataSourceProvider::create(const ProtoDataSource& source,
+                                                                 Event::Dispatcher& main_dispatcher,
+                                                                 ThreadLocal::SlotAllocator& tls,
+                                                                 Api::Api& api, bool allow_empty,
+                                                                 uint64_t max_size) {
   auto initial_data_or_error = read(source, allow_empty, api, max_size);
   RETURN_IF_STATUS_NOT_OK(initial_data_or_error);
 
   if (!source.has_watched_directory() ||
       source.specifier_case() != envoy::config::core::v3::DataSource::kFilename) {
-    return DataSourceProvider(std::move(initial_data_or_error).value());
+    if (source.specifier_case() != envoy::config::core::v3::DataSource::kFilename &&
+        initial_data_or_error.value().length() > max_size) {
+      return absl::InvalidArgumentError(fmt::format("response body size is {} bytes; maximum is {}",
+                                                    initial_data_or_error.value().length(),
+                                                    max_size));
+    }
+    return std::unique_ptr<DataSourceProvider>(
+        new DataSourceProvider(std::move(initial_data_or_error).value()));
   }
 
   auto slot = ThreadLocal::TypedSlot<DynamicData::ThreadLocalData>::makeUnique(tls);
@@ -145,7 +164,8 @@ absl::StatusOr<DataSourceProvider> DataSourceProvider::create(const ProtoDataSou
       });
   RETURN_IF_NOT_OK(watcher_status);
 
-  return DataSourceProvider(DynamicData(main_dispatcher, std::move(slot), std::move(watcher)));
+  return std::unique_ptr<DataSourceProvider>(
+      new DataSourceProvider(DynamicData(main_dispatcher, std::move(slot), std::move(watcher))));
 }
 
 } // namespace DataSource

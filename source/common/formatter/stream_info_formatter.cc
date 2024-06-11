@@ -1352,6 +1352,54 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return result;
                   });
             }}},
+          {"UPSTREAM_PEER_URI_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
+                  });
+            }}},
+          {"UPSTREAM_PEER_DNS_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.dnsSansPeerCertificate(), ",");
+                  });
+            }}},
+          {"UPSTREAM_PEER_IP_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.ipSansPeerCertificate(), ",");
+                  });
+            }}},
+          {"UPSTREAM_LOCAL_URI_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.uriSanLocalCertificate(), ",");
+                  });
+            }}},
+          {"UPSTREAM_LOCAL_DNS_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.dnsSansLocalCertificate(), ",");
+                  });
+            }}},
+          {"UPSTREAM_LOCAL_IP_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.ipSansLocalCertificate(), ",");
+                  });
+            }}},
           {"DOWNSTREAM_PEER_URI_SAN",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, absl::optional<size_t>) {

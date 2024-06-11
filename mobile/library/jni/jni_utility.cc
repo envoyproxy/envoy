@@ -11,27 +11,6 @@
 namespace Envoy {
 namespace JNI {
 
-static jobject static_class_loader = nullptr;
-
-void setClassLoader(jobject class_loader) { static_class_loader = class_loader; }
-
-jobject getClassLoader() {
-  RELEASE_ASSERT(static_class_loader,
-                 "findClass() is used before calling AndroidJniLibrary.load()");
-  return static_class_loader;
-}
-
-LocalRefUniquePtr<jclass> findClass(const char* class_name) {
-  JniHelper jni_helper(JniHelper::getThreadLocalEnv());
-  jclass class_loader = jni_helper.findClass("java/lang/ClassLoader");
-  jmethodID find_class_method =
-      jni_helper.getMethodId(class_loader, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
-  LocalRefUniquePtr<jstring> str_class_name = jni_helper.newStringUtf(class_name);
-  LocalRefUniquePtr<jclass> clazz = jni_helper.callObjectMethod<jclass>(
-      getClassLoader(), find_class_method, str_class_name.get());
-  return clazz;
-}
-
 void jniDeleteGlobalRef(void* context) {
   JNIEnv* env = JniHelper::getThreadLocalEnv();
   jobject ref = static_cast<jobject>(context);

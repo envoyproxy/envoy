@@ -42,10 +42,11 @@ enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
 
 class ServerContextImpl : public ContextImpl, public Envoy::Ssl::ServerContext {
 public:
-  ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                    const std::vector<std::string>& server_names,
-                    Server::Configuration::CommonFactoryContext& factory_context,
-                    Ssl::ContextAdditionalInitFunc additional_init);
+  static absl::StatusOr<std::unique_ptr<ServerContextImpl>>
+  create(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+         const std::vector<std::string>& server_names,
+         Server::Configuration::CommonFactoryContext& factory_context,
+         Ssl::ContextAdditionalInitFunc additional_init);
 
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
   // ClientHello details. This is made public for use by custom TLS extensions who want to
@@ -60,6 +61,11 @@ public:
                                                                      bool* cert_matched_sni);
 
 private:
+  ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+                    const std::vector<std::string>& server_names,
+                    Server::Configuration::CommonFactoryContext& factory_context,
+                    Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
+
   // Currently, at most one certificate of a given key type may be specified for each exact
   // server name or wildcard domain name.
   using PkeyTypesMap = absl::flat_hash_map<int, std::reference_wrapper<Ssl::TlsContext>>;
@@ -96,10 +102,7 @@ public:
   createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                       const std::vector<std::string>& server_names,
                       Server::Configuration::CommonFactoryContext& factory_context,
-                      Ssl::ContextAdditionalInitFunc additional_init) override {
-    return std::make_shared<ServerContextImpl>(scope, config, server_names, factory_context,
-                                               std::move(additional_init));
-  }
+                      Ssl::ContextAdditionalInitFunc additional_init) override;
 };
 
 DECLARE_FACTORY(ServerContextFactoryImpl);
