@@ -272,6 +272,9 @@ new_features:
     added new ``access_log`` command operators to retrieve upstream connection information change: ``%UPSTREAM_PEER_URI_SAN%``,
     ``%UPSTREAM_PEER_IP_SAN%``, ``%UPSTREAM_PEER_DNS_SAN%``, ``%UPSTREAM_LOCAL_URI_SAN%``, ``%UPSTREAM_LOCAL_DNS_SAN%``,
     ``%UPSTREAM_LOCAL_IP_SAN%``.
+- area: wasm
+  change: |
+    Update ``wasm`` filter to support use as an upstream filter.
 - area: open_telemetry
   change: |
     added :ref:`stat_prefix
