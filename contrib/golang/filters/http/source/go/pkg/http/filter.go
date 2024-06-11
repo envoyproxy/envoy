@@ -78,6 +78,8 @@ type httpRequest struct {
 	// 2. protect waitingCallback from being modified in markMayWaitingCallback concurrently.
 	mutex sync.Mutex
 
+	// decodingState and encodingState are part of httpRequest, not another GC object.
+	// So, no cycle reference, GC finalizer could work well.
 	decodingState processState
 	encodingState processState
 	streamInfo    streamInfo
