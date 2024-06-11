@@ -145,7 +145,12 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   }
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
       Network::Socket::Type::Datagram, local_addr, peer_addr,
-      Network::SocketCreationOptions{false, /*max_addresses_cache_size_ = */ (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read") ? 4u : 0u)});
+      Network::SocketCreationOptions{
+          false, /*max_addresses_cache_size_ = */ (
+              Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read")
+                  ? 4u
+                  : 0u)});
   connection_socket->setDetectedTransportProtocol("quic");
   if (!connection_socket->isOpen()) {
     ENVOY_LOG_MISC(error, "Failed to create quic socket");
