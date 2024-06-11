@@ -10,6 +10,23 @@ This sandbox provides an example about how to enable DLB connection balanace.
 Step 1: Install DLB Driver
 **************************
 
+Please run below command to check your CPU supports DLB:
+
+.. code-block:: console
+
+ $ lspci -d :2710
+
+You should get output like below:
+
+.. code-block:: text
+
+   5a:00.0 Co-processor: Intel Corporation Device 2710
+   6b:00.0 Co-processor: Intel Corporation Device 2710
+   7c:00.0 Co-processor: Intel Corporation Device 2710
+   8d:00.0 Co-processor: Intel Corporation Device 2710
+
+The number of DLB devices depends on specified CPU.
+
 You can download the DLB driver release tarball from the `DLB website <https://www.intel.com/content/www/us/en/download/686372/intel-dynamic-load-balancer.html>`_.
 
 To install it refer to `the getting started guide <https://downloadmirror.intel.com/727424/DLB_Driver_User_Guide.pdf>`_.
