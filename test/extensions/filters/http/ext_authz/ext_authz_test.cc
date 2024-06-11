@@ -250,6 +250,50 @@ public:
   const std::string invalid_value_;
 };
 
+TEST_F(HttpFilterTest, DisableDynamicMetadataIngestion) {
+  InSequence s;
+
+  initialize(R"(
+      grpc_service:
+        envoy_grpc:
+          cluster_name: "ext_authz_server"
+      disable_dynamic_metadata_ingestion: true
+  )");
+
+  // Simulate a downstream request.
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(),
+                  std::to_string(enumToInt(Http::Code::InternalServerError)));
+      }));
+
+  // Send response. It should get invalidated.
+  Filters::Common::ExtAuthz::Response response;
+  (*response.dynamic_metadata.mutable_fields())["key"] = ValueUtil::stringValue("value");
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(decoder_filter_callbacks_.details(), "ext_authz_invalid");
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.invalid")
+                    .value());
+  EXPECT_EQ(1U, config_->stats().invalid_.value());
+}
+
 // Tests that the filter rejects authz responses with mutations with an invalid key when
 // validate_authz_response is set to true in config.
 TEST_F(InvalidMutationTest, HeadersToSetKey) {

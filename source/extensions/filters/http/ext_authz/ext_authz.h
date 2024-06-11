@@ -81,6 +81,7 @@ public:
                       Filters::Common::MutationRules::Checker(
                           config.decoder_header_mutation_rules(), factory_context.regexEngine()))
                 : absl::nullopt),
+        disable_dynamic_metadata_ingestion_(config.disable_dynamic_metadata_ingestion()),
         runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
         filter_enabled_(config.has_filter_enabled()
                             ? absl::optional<Runtime::FractionalPercent>(
@@ -183,6 +184,8 @@ public:
     return decoder_header_mutation_checker_.has_value();
   }
 
+  bool disableDynamicMetadataIngestion() const { return disable_dynamic_metadata_ingestion_; }
+
   Http::Code statusOnError() const { return status_on_error_; }
 
   bool validateMutations() const { return validate_mutations_; }
@@ -274,6 +277,7 @@ private:
   const bool validate_mutations_;
   Stats::Scope& scope_;
   const absl::optional<Filters::Common::MutationRules::Checker> decoder_header_mutation_checker_;
+  const bool disable_dynamic_metadata_ingestion_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;

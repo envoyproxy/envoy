@@ -26,6 +26,12 @@ behavior_changes:
     :ref:`TlvsMetadata type <envoy_v3_api_msg_data.core.v3.TlvsMetadata>`.
     This change can be temporarily disabled by setting the runtime flag
     ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` to ``false``.
+- area: ext_authz
+  change: |
+    Added
+    :ref:`disable_dynamic_metadata_ingestion
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.disable_dynamic_metadata_ingestion>`,
+    which allows ext_authz to be configured to reject responses containing dynamic metadata.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

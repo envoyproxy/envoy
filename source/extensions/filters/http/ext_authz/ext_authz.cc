@@ -308,6 +308,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   Stats::StatName empty_stat_name;
 
   if (!response->dynamic_metadata.fields().empty()) {
+    if (config_->disableDynamicMetadataIngestion()) {
+      ENVOY_STREAM_LOG(trace,
+                       "Rejecting response: response is trying to inject dynamic metadata, "
+                       "but dynamic metadata ingestion is disabled.",
+                       *decoder_callbacks_);
+      rejectResponse();
+      return;
+    }
+
     // Add duration of call to dynamic metadata if applicable
     if (start_time_.has_value() && response->status == CheckStatus::OK) {
       ProtobufWkt::Value ext_authz_duration_value;
