@@ -515,7 +515,7 @@ TEST(ConfigTest, TestDownstreamFilterNoOverridingServerContext) {
       EnvoyException, "Creating filter factory from server factory context is not supported");
 }
 
-// Validate skip_percent config bad denominator.
+// Validate sample_percent config bad denominator.
 TEST(ConfigTest, TestSkipPercentConfigBadDenominator) {
   const std::string yaml_string = R"EOF(
       typed_config:
@@ -524,7 +524,7 @@ TEST(ConfigTest, TestSkipPercentConfigBadDenominator) {
           "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
           abort:
             http_status: 503
-      skip_percent:
+      sample_percent:
         numerator: 20
         denominator: 5
   )EOF";
@@ -532,12 +532,12 @@ TEST(ConfigTest, TestSkipPercentConfigBadDenominator) {
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.getSkipRatio(config), EnvoyException,
-                            "ExecuteFilterAction skip_percent config denominator setting is "
+  EXPECT_THROW_WITH_MESSAGE(factory.getSampleRatio(config), EnvoyException,
+                            "ExecuteFilterAction sample_percent config denominator setting is "
                             "invalid : 5. Valid range 0~2.");
 }
 
-// Validate skip_percent config bad numerator.
+// Validate sample_percent config bad numerator.
 TEST(ConfigTest, TestSkipPercentConfigBadNumerator) {
   const std::string yaml_string = R"EOF(
       typed_config:
@@ -546,7 +546,7 @@ TEST(ConfigTest, TestSkipPercentConfigBadNumerator) {
           "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
           abort:
             http_status: 503
-      skip_percent:
+      sample_percent:
         numerator: 20000
         denominator: TEN_THOUSAND
   )EOF";
@@ -555,8 +555,8 @@ TEST(ConfigTest, TestSkipPercentConfigBadNumerator) {
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.getSkipRatio(config), EnvoyException,
-      "ExecuteFilterAction skip_percent config is invalid. skip_ratio=2(Numerator 20000 / "
+      factory.getSampleRatio(config), EnvoyException,
+      "ExecuteFilterAction sample_percent config is invalid. sample_ratio=2(Numerator 20000 / "
       "Denominator 10000). The valid range is 0~1.");
 }
 
@@ -569,7 +569,7 @@ TEST(ConfigTest, TestSkipPercentConfigMillion) {
           "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
           abort:
             http_status: 503
-      skip_percent:
+      sample_percent:
         numerator: 20000
         denominator: Million
   )EOF";
@@ -577,7 +577,7 @@ TEST(ConfigTest, TestSkipPercentConfigMillion) {
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
-  EXPECT_EQ(float(0.02), factory.getSkipRatio(config));
+  EXPECT_EQ(float(0.02), factory.getSampleRatio(config));
 }
 
 // Config test to check TEN_THOUSAND
@@ -589,7 +589,7 @@ TEST(ConfigTest, TestSkipPercentConfigTenThousand) {
           "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
           abort:
             http_status: 503
-      skip_percent:
+      sample_percent:
         numerator: 3000
         denominator: TEN_THOUSAND
   )EOF";
@@ -597,7 +597,7 @@ TEST(ConfigTest, TestSkipPercentConfigTenThousand) {
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
-  EXPECT_EQ(float(0.3), factory.getSkipRatio(config));
+  EXPECT_EQ(float(0.3), factory.getSampleRatio(config));
 }
 
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConfig) {

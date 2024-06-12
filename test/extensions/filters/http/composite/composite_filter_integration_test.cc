@@ -180,9 +180,9 @@ public:
   void prependCompositeDynamicFilter(const std::string& name = "composite",
                                      const std::string& path = "set_response_code.yaml",
                                      bool sampling = true) {
-    int numerator = 0;
+    int numerator = 100;
     if (!sampling) {
-      numerator = 100;
+      numerator = 0;
     }
     config_helper_.prependFilter(
         TestEnvironment::substitute(absl::StrFormat(R"EOF(
@@ -207,7 +207,7 @@ public:
                     name: composite-action
                     typed_config:
                         "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
-                        skip_percent:
+                        sample_percent:
                           numerator: %d
                           denominator: HUNDRED
                         dynamic_config:
@@ -582,15 +582,15 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
-  void initializeConfig(bool downstream_filter, bool downstream, int skip_percent) {
-    config_helper_.addConfigModifier([downstream_filter, downstream, skip_percent,
+  void initializeConfig(bool downstream_filter, bool downstream, int sample_percent) {
+    config_helper_.addConfigModifier([downstream_filter, downstream, sample_percent,
                                       this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
       ConfigHelper::setHttp2(
           *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
 
       // Loading filter config from YAML for cluster_0.
-      prependServerFactoryContextFilter(downstream_filter, downstream, skip_percent);
+      prependServerFactoryContextFilter(downstream_filter, downstream, sample_percent);
       // Clusters for test gRPC servers. The HTTP filters is not needed for these clusters.
       for (size_t i = 0; i < grpc_upstreams_.size(); ++i) {
         auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -621,7 +621,7 @@ public:
   }
 
   void
-  prependServerFactoryContextFilter(bool downstream_filter, bool downstream, int skip_percent,
+  prependServerFactoryContextFilter(bool downstream_filter, bool downstream, int sample_percent,
                                     const std::string& name = "envoy.filters.http.match_delegate") {
     std::string context_filter_config = "ServerFactoryContextFilterConfig";
     if (!downstream_filter) {
@@ -671,7 +671,7 @@ public:
                     name: composite-action
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
-                      skip_percent:
+                      sample_percent:
                         numerator: %d
                         denominator: HUNDRED
                       typed_config:
@@ -681,12 +681,12 @@ public:
                           grpc_service:
                             %s
     )EOF",
-                                                 name, skip_percent, context_filter_config,
+                                                 name, sample_percent, context_filter_config,
                                                  grpc_config),
                                  downstream);
   }
 
-  void serverContextBasicFlowTest(int skip_percent) {
+  void serverContextBasicFlowTest(int sample_percent) {
     HttpIntegrationTest::initialize();
 
     auto conn = makeClientConnection(lookupPort("http"));
@@ -699,8 +699,8 @@ public:
     // Send request from downstream to upstream.
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-    // Send request to side stream server when all sampled, i.e, skip_percent = 0.
-    if (skip_percent == 0) {
+    // Send request to side stream server when all sampled, i.e, sample_percent = 100.
+    if (sample_percent == 100) {
       // Wait for side stream request.
       helloworld::HelloRequest request;
       request.set_name("hello");
@@ -724,7 +724,7 @@ public:
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_request_->encodeData(100, true);
 
-    if (skip_percent == 0) {
+    if (sample_percent == 100) {
       // Close the grpc stream.
       stream_->finishGrpcStream(Grpc::Status::Ok);
     }
@@ -747,34 +747,34 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(CompositeFilterSeverContextIntegrationTest,
        BasicFlowDownstreamFilterInDownstreamAllSampled) {
-  initializeConfig(/*downstream_filter*/ true, /*downstream*/ true, /*skip_percent*/ 0);
-  serverContextBasicFlowTest(0);
+  initializeConfig(/*downstream_filter*/ true, /*downstream*/ true, /*sample_percent*/ 100);
+  serverContextBasicFlowTest(100);
 }
 
 TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlowDualFilterInDownstreamAllSampled) {
-  initializeConfig(/*downstream_filter*/ false, /*downstream*/ true, /*skip_percent*/ 0);
-  serverContextBasicFlowTest(0);
+  initializeConfig(/*downstream_filter*/ false, /*downstream*/ true, /*sample_percent*/ 100);
+  serverContextBasicFlowTest(100);
 }
 
 TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlowDualFilterInUpstreamAllSampled) {
-  initializeConfig(/*downstream_filter*/ false, /*downstream*/ false, /*skip_percent*/ 0);
-  serverContextBasicFlowTest(0);
+  initializeConfig(/*downstream_filter*/ false, /*downstream*/ false, /*sample_percent*/ 100);
+  serverContextBasicFlowTest(100);
 }
 
 TEST_P(CompositeFilterSeverContextIntegrationTest,
        BasicFlowDownstreamFilterInDownstreamNoneSampled) {
-  initializeConfig(/*downstream_filter*/ true, /*downstream*/ true, /*skip_percent*/ 100);
-  serverContextBasicFlowTest(100);
+  initializeConfig(/*downstream_filter*/ true, /*downstream*/ true, /*sample_percent*/ 0);
+  serverContextBasicFlowTest(0);
 }
 
 TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlowDualFilterInDownstreamNoneSampled) {
-  initializeConfig(/*downstream_filter*/ false, /*downstream*/ true, /*skip_percent*/ 100);
-  serverContextBasicFlowTest(100);
+  initializeConfig(/*downstream_filter*/ false, /*downstream*/ true, /*sample_percent*/ 0);
+  serverContextBasicFlowTest(0);
 }
 
 TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlowDualFilterInUpstreamNoneSampled) {
-  initializeConfig(/*downstream_filter*/ false, /*downstream*/ false, /*skip_percent*/ 100);
-  serverContextBasicFlowTest(100);
+  initializeConfig(/*downstream_filter*/ false, /*downstream*/ false, /*sample_percent*/ 0);
+  serverContextBasicFlowTest(0);
 }
 
 } // namespace

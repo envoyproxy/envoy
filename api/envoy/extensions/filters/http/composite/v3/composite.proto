@@ -59,11 +59,10 @@ message ExecuteFilterAction {
   DynamicConfig dynamic_config = 2
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
-  // Percentage of traffic the action filter will be skipped. By default this is 0.
+  // Percentage of traffic the action filter will be executed. By default this is 100%.
   // This is to support sampling behavior for certain filters like ext_proc, access_logging ...
-  // If a none-zero number is configured for ``skip_percent``, only a portion of traffic,
-  // i.e, 1 - skip_percent, needs to be processed by the filter.  In such case, a dice roll
-  // is done after a matching condition met, the action will only be taken if the dice roll
-  // returns true. Otherwise, the action filter is skipped.
-  type.v3.FractionalPercent skip_percent = 3;
+  // For example, if ``sample_percent`` is configured with 30%, a dice roll with that
+  // probability is done. The underline action filter will only be executed if the
+  // dice roll returns positive. Otherwise, the action filter is skipped.
+  type.v3.FractionalPercent sample_percent = 3;
 }

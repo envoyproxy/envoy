@@ -9,11 +9,16 @@ void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callb
   cb_(callbacks);
 }
 
-float ExecuteFilterActionFactory::getSkipRatio(
+float ExecuteFilterActionFactory::getSampleRatio(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action) {
-  const auto& skip_percent = composite_action.skip_percent();
+  // In default case, if sample_percent is not populated, sample_ratio is 100%, i.e, all sampled.
+  if (!composite_action.has_sample_percent()) {
+    float all_sampled = 1;
+    return all_sampled;
+  }
+  const auto& sample_percent = composite_action.sample_percent();
   float denominator = 100;
-  switch (skip_percent.denominator()) {
+  switch (sample_percent.denominator()) {
   case envoy::type::v3::FractionalPercent::HUNDRED:
     denominator = 100;
     break;
@@ -24,19 +29,19 @@ float ExecuteFilterActionFactory::getSkipRatio(
     denominator = 1000000;
     break;
   default:
-    throw EnvoyException(fmt::format("ExecuteFilterAction skip_percent config denominator setting "
+    throw EnvoyException(fmt::format("ExecuteFilterAction sample_percent config denominator setting "
                                      "is invalid : {}. Valid range 0~2.",
-                                     skip_percent.denominator()));
+                                     sample_percent.denominator()));
   }
 
-  float skip_ratio = float(skip_percent.numerator()) / (denominator);
-  if (skip_ratio > 1) {
+  float sample_ratio = float(sample_percent.numerator()) / (denominator);
+  if (sample_ratio > 1) {
     throw EnvoyException(fmt::format(
-        "ExecuteFilterAction skip_percent config is invalid. skip_ratio={}(Numerator {} / "
+        "ExecuteFilterAction sample_percent config is invalid. sample_ratio={}(Numerator {} / "
         "Denominator {}). The valid range is 0~1.",
-        skip_ratio, skip_percent.numerator(), denominator));
+        sample_ratio, sample_percent.numerator(), denominator));
   }
-  return skip_ratio;
+  return sample_ratio;
 }
 
 Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
@@ -112,11 +117,11 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createAtionFactoryCbCommon(
 
   ASSERT(context.server_factory_context_ != absl::nullopt);
   Random::RandomGenerator& random = context.server_factory_context_->api().randomGenerator();
-  float skip_ratio = getSkipRatio(composite_action);
+  float sample_ratio = getSampleRatio(composite_action);
   return
-      [cb = std::move(callback), n = std::move(name), skip_ratio, &random]() -> Matcher::ActionPtr {
-        UnitFloat sample_ratio = UnitFloat(1 - skip_ratio);
-        if (random.bernoulli(sample_ratio)) {
+      [cb = std::move(callback), n = std::move(name), sample_ratio, &random]() -> Matcher::ActionPtr {
+        UnitFloat sample_ratio_uf = UnitFloat(sample_ratio);
+        if (random.bernoulli(sample_ratio_uf)) {
           return std::make_unique<ExecuteFilterAction>(cb, n);
         }
         return nullptr;

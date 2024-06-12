@@ -45,7 +45,7 @@ public:
     return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterAction>();
   }
 
-  float getSkipRatio(
+  float getSampleRatio(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action);
 
 private:
@@ -70,14 +70,14 @@ private:
             server_factory_context.clusterManager(), false, filter_chain_type, nullptr);
 
     Random::RandomGenerator& random = server_factory_context.api().randomGenerator();
-    float skip_ratio = getSkipRatio(composite_action);
-    return [provider = std::move(provider), n = std::move(name), skip_ratio,
+    float sample_ratio = getSampleRatio(composite_action);
+    return [provider = std::move(provider), n = std::move(name), sample_ratio,
             &random]() -> Matcher::ActionPtr {
       auto config_value = provider->config();
-      UnitFloat sample_ratio = UnitFloat(1 - skip_ratio);
+      UnitFloat sample_ratio_uf = UnitFloat(sample_ratio);
 
       // Perform dice roll. If negative, then skip the action.
-      if (!random.bernoulli(sample_ratio)) {
+      if (!random.bernoulli(sample_ratio_uf)) {
         return nullptr;
       }
       if (config_value.has_value()) {
