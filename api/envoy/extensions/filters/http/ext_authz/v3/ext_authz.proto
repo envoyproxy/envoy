@@ -282,9 +282,9 @@ message ExtAuthz {
 
   // Disables ingestion of dynamic metadata from ext_authz service.
   //
-  // If set to true, the filter will reject responses from the ext_authz service which contain
-  // dynamic metadata. The downstream client will receive a HTTP 500 Internal Server Error in this
-  // case.
+  // If set to true, the filter will ignore the dynamic_metadata field in the ext_authz response. If
+  // it is non-empty, the filter will log, increment the ``ignored_dynamic_metadata`` stat, then
+  // continue handling the response.
   //
   // If set to false (the default value), the filter will ingest dynamic metadata entries as normal.
   bool disable_dynamic_metadata_ingestion = 27;
