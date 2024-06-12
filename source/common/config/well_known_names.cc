@@ -27,7 +27,8 @@ std::string expandRegex(const std::string& regex) {
               // alphanumerics, underscores, and dashes.
               {"<ROUTE_CONFIG_NAME>", R"([\w-\./]+)"},
               // Match a prefix that is either a listener plus name or cluster plus name
-              {"<LISTENER_OR_CLUSTER_WITH_NAME>", R"((?:listener|cluster)\..*?)"}});
+              {"<LISTENER_OR_CLUSTER_WITH_NAME>", R"((?:listener|cluster)\..*?)"},
+              {"<PROXY_PROTOCOL_VERSION>", R"(\d)"}});
 }
 
 const Regex::CompiledGoogleReMatcher& validTagValueRegex() {
@@ -218,8 +219,15 @@ TagNameValues::TagNameValues() {
   // http.<stat_prefix>.rbac.(<rules_stat_prefix>.)* but excluding policy
   addRe2(RBAC_HTTP_PREFIX, R"(^http\.<TAG_VALUE>\.rbac\.((<TAG_VALUE>)\.).*?)", "", "policy");
 
-  // proxy_proto.(versions.v<version_number>.)**
-  addRe2(PROXY_PROTOCOL_VERSION, R"(^proxy_proto\.(versions\.v(\d)\.)\w+)", "proxy_proto.versions");
+  // proxy_proto.(<stat_prefix>.)**
+  addRe2(PROXY_PROTOCOL_PREFIX, R"(^proxy_proto\.((<TAG_VALUE>)\.).+$)", "", "versions");
+
+  // proxy_proto.([<optional stat_prefix>.]versions.v(<version_number>).)(found|disallowed|error)
+  //
+  // Strips out:  [<optional stat_prefix>.]versions.v(<version_number>).
+  // Leaving: proxy_proto.(found|disallowed|error)
+  addRe2(PROXY_PROTOCOL_VERSION,
+         R"(^proxy_proto\.((?:<TAG_VALUE>\.)?versions\.v(<PROXY_PROTOCOL_VERSION>)\.)\w+$)");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,

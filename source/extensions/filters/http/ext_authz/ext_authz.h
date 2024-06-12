@@ -24,6 +24,7 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -74,6 +75,12 @@ public:
 
         status_on_error_(toErrorCode(config.status_on_error().code())),
         validate_mutations_(config.validate_mutations()), scope_(scope),
+        decoder_header_mutation_checker_(
+            config.has_decoder_header_mutation_rules()
+                ? absl::optional<Filters::Common::MutationRules::Checker>(
+                      Filters::Common::MutationRules::Checker(
+                          config.decoder_header_mutation_rules(), factory_context.regexEngine()))
+                : absl::nullopt),
         runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
         filter_enabled_(config.has_filter_enabled()
                             ? absl::optional<Runtime::FractionalPercent>(
@@ -161,6 +168,20 @@ public:
   bool packAsBytes() const { return pack_as_bytes_; }
 
   bool headersAsBytes() const { return encode_raw_headers_; }
+
+  Filters::Common::MutationRules::CheckResult
+  checkDecoderHeaderMutation(const Filters::Common::MutationRules::CheckOperation& operation,
+                             const Http::LowerCaseString& key, absl::string_view value) const {
+    if (!decoder_header_mutation_checker_.has_value()) {
+      return Filters::Common::MutationRules::CheckResult::OK;
+    }
+    return decoder_header_mutation_checker_->check(operation, key, value);
+  }
+
+  // Used for headers_to_remove to avoid a redundant pseudo header check.
+  bool hasDecoderHeaderMutationRules() const {
+    return decoder_header_mutation_checker_.has_value();
+  }
 
   Http::Code statusOnError() const { return status_on_error_; }
 
@@ -252,6 +273,7 @@ private:
   const Http::Code status_on_error_;
   const bool validate_mutations_;
   Stats::Scope& scope_;
+  const absl::optional<Filters::Common::MutationRules::Checker> decoder_header_mutation_checker_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;
@@ -372,6 +394,13 @@ public:
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
 private:
+  // Convenience function for the following:
+  // 1. If `validate_mutations` is set to true, validate header key and value.
+  // 2. If `decoder_header_mutation_rules` is set, check that mutation is allowed.
+  Filters::Common::MutationRules::CheckResult
+  validateAndCheckDecoderHeaderMutation(Filters::Common::MutationRules::CheckOperation operation,
+                                        absl::string_view key, absl::string_view value) const;
+
   // Called when the filter is configured to reject invalid responses & the authz response contains
   // invalid header or query parameters. Sends a local response with the configured rejection status
   // code.

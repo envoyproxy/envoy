@@ -25,6 +25,9 @@ Step 1: Start all of our containers
 ***********************************
 
 First lets start the containers - an Envoy proxy which uses a Wasm Filter, and a backend which echos back our request.
+The Envoy configuration exposes two listeners, the first one listens in port 8000 which contains the wasm filter in
+the listener filter chain. The second one listens in port 8001 routing to a cluster containing the wasm filter in the
+cluster filter chain.
 
 Change to the ``examples/wasm-cc`` folder in the Envoy repo, and start the composition:
 
@@ -38,7 +41,7 @@ Change to the ``examples/wasm-cc`` folder in the Envoy repo, and start the compo
 
         Name                     Command                State             Ports
     -----------------------------------------------------------------------------------------------
-    wasm_proxy_1         /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
+    wasm_proxy_1         /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
     wasm_web_service_1   node ./index.js                Up
 
 Step 2: Check web response
@@ -59,6 +62,19 @@ The filter also sets the ``content-type`` header to ``text/plain``, and adds a c
    content-type: text/plain; charset=utf-8
 
    $ curl -v http://localhost:8000 | grep "x-wasm-custom: "
+   x-wasm-custom: FOO
+
+Similar outputs could be obtained in the second listener routing to the cluster with upstream wasm filter.
+
+.. code-block:: console
+
+   $ curl -s http://localhost:8001 | grep "Hello, world"
+   }Hello, world
+
+   $ curl -v http://localhost:8001 | grep "content-type: "
+   content-type: text/plain; charset=utf-8
+
+   $ curl -v http://localhost:8001 | grep "x-wasm-custom: "
    x-wasm-custom: FOO
 
 Step 3: Compile the updated filter

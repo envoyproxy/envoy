@@ -176,8 +176,8 @@ TEST(DataSourceProviderTest, NonFileDataSourceTest) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider_or_error =
-      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
-  EXPECT_EQ(provider_or_error.value().data(), "Hello, world!");
+      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 15);
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
 }
 
 TEST(DataSourceProviderTest, FileDataSourceButNoWatch) {
@@ -218,7 +218,7 @@ TEST(DataSourceProviderTest, FileDataSourceButNoWatch) {
 
   auto provider_or_error =
       DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
-  EXPECT_EQ(provider_or_error.value().data(), "Hello, world!");
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
@@ -227,7 +227,7 @@ TEST(DataSourceProviderTest, FileDataSourceButNoWatch) {
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 
   // The provider should still return the old content.
-  EXPECT_EQ(provider_or_error.value().data(), "Hello, world!");
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
 
   // Remove the file.
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
@@ -278,7 +278,7 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatch) {
   // Create a provider with watch.
   auto provider_or_error =
       DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
-  EXPECT_EQ(provider_or_error.value().data(), "Hello, world!");
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
@@ -287,7 +287,7 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatch) {
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 
   // The provider should return the updated content.
-  EXPECT_EQ(provider_or_error.value().data(), "Hello, world! Updated!");
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world! Updated!");
 
   // Remove the file.
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
@@ -339,7 +339,7 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatchButUpdateError) {
   // ignored.
   auto provider_or_error =
       DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 15);
-  EXPECT_EQ(provider_or_error.value().data(), "Hello, world!");
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
@@ -348,7 +348,7 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatchButUpdateError) {
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 
   // The provider should return the old content because the updated content is ignored.
-  EXPECT_EQ(provider_or_error.value().data(), "Hello, world!");
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
 
   // Remove the file.
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());

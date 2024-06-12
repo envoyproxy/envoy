@@ -275,10 +275,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        .setChildSpanName(config_->tracingName())
                        .setSampled(absl::nullopt);
 
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.ext_authz_http_send_original_xff")) {
-      options.setSendXff(false);
-    }
+    options.setSendXff(false);
 
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
@@ -292,7 +289,9 @@ void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
 void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
                                   Http::AsyncClient::FailureReason reason) {
-  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  // TODO(botengyao): handle different failure reasons.
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
+         reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
   callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
   callbacks_ = nullptr;
 }

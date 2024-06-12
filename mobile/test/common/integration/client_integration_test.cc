@@ -314,6 +314,7 @@ void ClientIntegrationTest::trickleTest(bool final_chunk_has_data) {
       upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*BaseIntegrationTest::dispatcher_));
 
+  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   // This will be read immediately. on_data_ will kick off more chunks.
   upstream_request_->encodeData(1, false);
@@ -471,9 +472,8 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
       // Allow reading up to 100 bytes.
       streams[i]->readData(100);
     };
-    stream_callbacks.on_error_ = [](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {
-      RELEASE_ASSERT(0, "unexpected");
-    };
+    stream_callbacks.on_error_ = [](const EnvoyError&, envoy_stream_intel,
+                                    envoy_final_stream_intel) { RELEASE_ASSERT(0, "unexpected"); };
 
     auto stream = createNewStream(std::move(stream_callbacks));
     stream->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
@@ -714,7 +714,7 @@ TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
     return; // This test relies on ipv4 loopback.
   }
 
-  auto next_address = Network::Utility::parseInternetAddress(
+  auto next_address = Network::Utility::parseInternetAddressNoThrow(
       "127.0.0.3", fake_upstreams_[0]->localAddress()->ip()->port());
   // This will hopefully be miniminally flaky because of low use of 127.0.0.3
   // but may need to be disabled.
