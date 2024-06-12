@@ -9978,7 +9978,9 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "path_match_policy.path_template /rest/{one/{two} is invalid");
+      EnvoyException,
+      "path_match_policy.path_template /rest/{one/{two} is invalid: Invalid variable name: "
+      "\"one/{two\"");
 }
 
 TEST_F(RouteMatcherTest, PatternMatchConfigMissingVariable) {
@@ -10073,7 +10075,9 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "path_match_policy.path_template /rest/{middlewildcard=**}/{two} is invalid");
+      EnvoyException,
+      "path_match_policy.path_template /rest/{middlewildcard=**}/{two} is invalid: Implicit "
+      "variable path glob after text glob.");
 }
 
 TEST_F(RouteMatcherTest, PatternMatchWildcardUnnamedVariable) {
@@ -10272,7 +10276,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
       EnvoyException,
-      "path_match_policy.path_template /rest/{one}/{two}/{three}/{four}/{five}/{six} is invalid");
+      "path_match_policy.path_template /rest/{one}/{two}/{three}/{four}/{five}/{six} is invalid: "
+      "Exceeded variable count limit (5)");
 }
 
 TEST_F(RouteConfigurationV2, DefaultInternalRedirectPolicyIsSensible) {

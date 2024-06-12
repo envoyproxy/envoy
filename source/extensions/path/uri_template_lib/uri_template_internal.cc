@@ -226,9 +226,8 @@ gatherCaptureNames(const struct ParsedPathPattern& pattern) {
       continue;
     }
     if (captured_variables.size() >= kPatternMatchingMaxVariablesPerPath) {
-      return absl::InvalidArgumentError(fmt::format("Exceeded variable count limit ({} > {})",
-                                                    captured_variables.size(),
-                                                    kPatternMatchingMaxVariablesPerPath));
+      return absl::InvalidArgumentError(
+          fmt::format("Exceeded variable count limit ({})", kPatternMatchingMaxVariablesPerPath));
     }
     absl::string_view name = absl::get<Variable>(segment).name_;
 
