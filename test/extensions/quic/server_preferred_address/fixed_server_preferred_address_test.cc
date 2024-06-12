@@ -23,7 +23,7 @@ TEST_F(FixedServerPreferredAddressConfigTest, Validation) {
     cfg.mutable_ipv4_config()->mutable_address()->set_address("not an address");
     cfg.mutable_ipv4_config()->mutable_address()->set_port_value(1);
     EXPECT_THROW_WITH_REGEX(factory_.createServerPreferredAddressConfig(cfg, visitor_, {}),
-                            EnvoyException, ".*malformed IP address: not an address.*");
+                            EnvoyException, ".*Invalid address socket_address.*");
   }
   {
     // Bad address.
