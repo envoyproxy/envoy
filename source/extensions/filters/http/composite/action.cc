@@ -29,9 +29,10 @@ float ExecuteFilterActionFactory::getSampleRatio(
     denominator = 1000000;
     break;
   default:
-    throw EnvoyException(fmt::format("ExecuteFilterAction sample_percent config denominator setting "
-                                     "is invalid : {}. Valid range 0~2.",
-                                     sample_percent.denominator()));
+    throw EnvoyException(
+        fmt::format("ExecuteFilterAction sample_percent config denominator setting "
+                    "is invalid : {}. Valid range 0~2.",
+                    sample_percent.denominator()));
   }
 
   float sample_ratio = float(sample_percent.numerator()) / (denominator);
@@ -118,14 +119,14 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createAtionFactoryCbCommon(
   ASSERT(context.server_factory_context_ != absl::nullopt);
   Random::RandomGenerator& random = context.server_factory_context_->api().randomGenerator();
   float sample_ratio = getSampleRatio(composite_action);
-  return
-      [cb = std::move(callback), n = std::move(name), sample_ratio, &random]() -> Matcher::ActionPtr {
-        UnitFloat sample_ratio_uf = UnitFloat(sample_ratio);
-        if (random.bernoulli(sample_ratio_uf)) {
-          return std::make_unique<ExecuteFilterAction>(cb, n);
-        }
-        return nullptr;
-      };
+  return [cb = std::move(callback), n = std::move(name), sample_ratio,
+          &random]() -> Matcher::ActionPtr {
+    UnitFloat sample_ratio_uf = UnitFloat(sample_ratio);
+    if (random.bernoulli(sample_ratio_uf)) {
+      return std::make_unique<ExecuteFilterAction>(cb, n);
+    }
+    return nullptr;
+  };
 }
 
 Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCbDownstream(
