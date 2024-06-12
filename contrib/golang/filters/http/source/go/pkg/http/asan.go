@@ -25,7 +25,7 @@ func forceGCFinalizer() {
 		})
 	}
 
-	api.LogDebugf("golang filter enforcing GC")
+	api.LogWarn("golang filter enforcing GC")
 	// enforce a GC cycle.
 	runtime.GC()
 
