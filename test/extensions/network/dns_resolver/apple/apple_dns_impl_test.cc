@@ -183,7 +183,7 @@ public:
                                        const DnsLookupFamily lookup_family) {
     return resolver_->resolve(
         address, lookup_family,
-        [](DnsResolver::ResolutionStatus, absl::string_biew, std::list<DnsResponse>&&) -> void {
+        [](DnsResolver::ResolutionStatus, absl::string_view, std::list<DnsResponse>&&) -> void {
           throw EnvoyException("Envoy exception");
         });
   }
