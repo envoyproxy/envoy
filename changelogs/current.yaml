@@ -186,6 +186,9 @@ removed_config_or_runtime:
 - area: load_balancing
   change: |
     Removed ``envoy.reloadable_features.enable_zone_routing_different_zone_counts`` runtime flag and legacy code paths.
+- area: load_balancing
+  change: |
+    Removed ``envoy.reloadable_features.locality_routing_use_new_routing_logic`` runtime flag and legacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.proxy_status_upstream_request_timeout`` runtime flag and lagacy code paths.

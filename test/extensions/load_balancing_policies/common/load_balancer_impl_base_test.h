@@ -70,7 +70,6 @@ public:
 
 struct LoadBalancerTestParam {
   bool use_default_host_set;
-  bool use_new_locality_routing;
 };
 
 class LoadBalancerTestBase : public Event::TestUsingSimulatedTime,
