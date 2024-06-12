@@ -47,7 +47,8 @@ namespace Config {
  * defined, and may be converted to a config field in the future.
  */
 template <class RequestType, class ResponseType>
-class GrpcMuxFailover : public Logger::Loggable<Logger::Id::config> {
+class GrpcMuxFailover : public GrpcStreamInterface<RequestType, ResponseType>,
+                        public Logger::Loggable<Logger::Id::config> {
 public:
   // A GrpcStream creator function that receives the stream callbacks and returns a
   // GrpcStream object. This is introduced to facilitate dependency injection for
@@ -79,7 +80,7 @@ public:
   virtual ~GrpcMuxFailover() = default;
 
   // Attempts to establish a new stream to the either the primary or failover source.
-  void establishNewStream() {
+  void establishNewStream() override {
     // Attempt establishing a connection to the primary source.
     // This method may be called multiple times, even if the primary stream is already
     // established or in the process of being established.
@@ -111,7 +112,7 @@ public:
   }
 
   // Returns the availability of the underlying stream.
-  bool grpcStreamAvailable() const {
+  bool grpcStreamAvailable() const override {
     if (connectingToOrConnectedToFailover()) {
       return failover_grpc_stream_->grpcStreamAvailable();
     }
@@ -120,7 +121,7 @@ public:
   }
 
   // Sends a message using the underlying stream.
-  void sendMessage(const RequestType& request) {
+  void sendMessage(const RequestType& request) override {
     if (connectingToOrConnectedToFailover()) {
       failover_grpc_stream_->sendMessage(request);
       return;
@@ -130,7 +131,7 @@ public:
   }
 
   // Updates the queue size of the underlying stream.
-  void maybeUpdateQueueSizeStat(uint64_t size) {
+  void maybeUpdateQueueSizeStat(uint64_t size) override {
     if (connectingToOrConnectedToFailover()) {
       failover_grpc_stream_->maybeUpdateQueueSizeStat(size);
       return;
@@ -140,7 +141,7 @@ public:
   }
 
   // Returns true if the rate-limit allows draining.
-  bool checkRateLimitAllowsDrain() {
+  bool checkRateLimitAllowsDrain() override {
     if (connectingToOrConnectedToFailover()) {
       return failover_grpc_stream_->checkRateLimitAllowsDrain();
     }
@@ -354,6 +355,20 @@ private:
       failover_grpc_stream_->establishNewStream();
     }
   }
+
+  // The following method overrides are to allow GrpcMuxFailover to extend the
+  // GrpcStreamInterface. Once envoy.restart_features.xds_failover_support is deprecated,
+  // the class will no longer need to extend the interface, and these can be removed.
+  void onCreateInitialMetadata(Http::RequestHeaderMap&) override { PANIC("not implemented"); }
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override { PANIC("not implemented"); }
+  void onReceiveMessage(std::unique_ptr<ResponseType>&&) override { PANIC("not implemented"); }
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {
+    PANIC("not implemented");
+  }
+  void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
+    PANIC("not implemented");
+  }
+  void closeStream() override { PANIC("not implemented"); }
 
   // The stream callbacks that will be invoked on the GrpcMux object, to notify
   // about the state of the underlying primary/failover stream.

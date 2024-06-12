@@ -529,9 +529,12 @@ public:
     void encodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
     Http::ResponseTrailerMapOptRef responseTrailers() override { return {}; }
     void encodeMetadata(Http::MetadataMapPtr&&) override {}
-    // TODO(vikaschoudhary16): Implement watermark callbacks and test through flow control e2es.
-    void onDecoderFilterAboveWriteBufferHighWatermark() override {}
-    void onDecoderFilterBelowWriteBufferLowWatermark() override {}
+    void onDecoderFilterAboveWriteBufferHighWatermark() override {
+      parent_->upstream_callbacks_->onAboveWriteBufferHighWatermark();
+    }
+    void onDecoderFilterBelowWriteBufferLowWatermark() override {
+      parent_->upstream_callbacks_->onBelowWriteBufferLowWatermark();
+    }
     void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
     void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
     void setDecoderBufferLimit(uint32_t) override {}

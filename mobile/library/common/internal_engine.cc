@@ -12,7 +12,7 @@
 
 namespace Envoy {
 namespace {
-constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(3);
+constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(30);
 } // namespace
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};

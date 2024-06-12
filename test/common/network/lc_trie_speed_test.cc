@@ -12,7 +12,7 @@ struct AddressInputs {
         "192.0.2.225",   "198.51.100.55", "198.51.100.105", "192.0.2.150",   "203.0.113.162",
         "203.0.113.110", "203.0.113.99",  "198.51.100.23",  "198.51.100.24", "203.0.113.12"};
     for (const auto& address : test_addresses) {
-      addresses_.push_back(Envoy::Network::Utility::parseInternetAddress(address));
+      addresses_.push_back(Envoy::Network::Utility::parseInternetAddressNoThrow(address));
     }
   }
 
@@ -30,17 +30,17 @@ struct CidrInputs {
         tag_data_.emplace_back(
             std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
                 {"tag_1",
-                 {Envoy::Network::Address::CidrRange::create(
+                 {*Envoy::Network::Address::CidrRange::create(
                      fmt::format("192.0.{}.{}/32", i, j))}}));
       }
     }
     tag_data_nested_prefixes_ = tag_data_;
     tag_data_nested_prefixes_.emplace_back(
         std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
-            {"tag_0", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
+            {"tag_0", {*Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
     tag_data_minimal_.emplace_back(
         std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
-            {"tag_1", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
+            {"tag_1", {*Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
   }
 
   std::vector<std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>> tag_data_;

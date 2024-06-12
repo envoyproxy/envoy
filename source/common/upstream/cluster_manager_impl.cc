@@ -450,11 +450,11 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
           *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false);
       THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
-      ads_mux_ =
-          factory->create(factory_or_error.value()->createUncachedRawAsyncClient(), dispatcher_,
-                          random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
-                          std::move(custom_config_validators), std::move(backoff_strategy),
-                          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
+      ads_mux_ = factory->create(factory_or_error.value()->createUncachedRawAsyncClient(), nullptr,
+                                 dispatcher_, random_, *stats_.rootScope(),
+                                 dyn_resources.ads_config(), local_info_,
+                                 std::move(custom_config_validators), std::move(backoff_strategy),
+                                 makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
     } else {
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       RETURN_IF_NOT_OK(status);
@@ -474,7 +474,7 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
           *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false);
       THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
       ads_mux_ = factory->create(
-          factory_or_error.value()->createUncachedRawAsyncClient(), dispatcher_, random_,
+          factory_or_error.value()->createUncachedRawAsyncClient(), nullptr, dispatcher_, random_,
           *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
           std::move(custom_config_validators), std::move(backoff_strategy),
           makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, use_eds_cache);

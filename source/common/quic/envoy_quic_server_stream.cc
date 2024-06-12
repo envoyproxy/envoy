@@ -112,10 +112,13 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
     // of propagating original reset reason. In QUICHE if a stream stops reading
     // before FIN or RESET received, it resets the steam with QUIC_STREAM_NO_ERROR.
     StopReading();
-    runResetCallbacks(Http::StreamResetReason::LocalReset);
   } else {
     Reset(envoyResetReasonToQuicRstError(reason));
   }
+  // Run reset callbacks once because HCM calls resetStream() without tearing
+  // down its own ActiveStream. It might be no-op if it has been called already
+  // in ResetWithError().
+  runResetCallbacks(Http::StreamResetReason::LocalReset);
 }
 
 void EnvoyQuicServerStream::switchStreamBlockState() {

@@ -15,6 +15,8 @@ import org.junit.After
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 private const val ASSERTION_FILTER_TEXT_PROTO =
   """
@@ -29,6 +31,7 @@ private const val ASSERTION_FILTER_TEXT_PROTO =
 }
 """
 
+@RunWith(RobolectricTestRunner::class)
 class SendDataTest {
   init {
     JniLibrary.loadTestLibrary()

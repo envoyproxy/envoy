@@ -175,7 +175,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
       address = address_or_error.value();
     }
   } else {
-    address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");
+    address = *Network::Utility::resolveUrl("tcp://10.0.0.1:443");
   }
   Envoy::Network::Address::InstanceConstSharedPtr upstream_local_address;
   if (stream_info.has_upstream_local_address()) {
@@ -184,7 +184,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
     THROW_IF_STATUS_NOT_OK(upstream_local_address_or_error, throw);
     upstream_local_address = upstream_local_address_or_error.value();
   } else {
-    upstream_local_address = Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
+    upstream_local_address = *Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
   }
   test_stream_info->upstreamInfo()->setUpstreamLocalAddress(upstream_local_address);
   test_stream_info->downstream_connection_info_provider_ =

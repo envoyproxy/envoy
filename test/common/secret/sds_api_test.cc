@@ -112,7 +112,7 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
                         &stats](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                                 Stats::Scope&, Config::SubscriptionCallbacks& cbs,
                                 Config::OpaqueResourceDecoderSharedPtr,
-                                const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
+                                const Config::SubscriptionOptions&) {
         return std::make_unique<Config::FilesystemSubscriptionImpl>(
             *dispatcher_, Config::makePathConfigSource(sds_config_path), cbs, resource_decoder,
             stats, validation_visitor_, *api_);
@@ -138,7 +138,7 @@ TEST_F(SdsApiTest, BadConfigSource) {
   ::testing::InSequence s;
   envoy::config::core::v3::ConfigSource config_source;
   EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillOnce(InvokeWithoutArgs([]() -> Config::SubscriptionPtr {
+      .WillOnce(InvokeWithoutArgs([]() {
         throw EnvoyException("bad config");
         return nullptr;
       }));

@@ -14,7 +14,6 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
-#include "contrib/golang/common/dso/dso.h"
 #include "contrib/golang/filters/http/source/processor_state.h"
 #include "contrib/golang/filters/http/source/stats.h"
 
@@ -94,6 +93,7 @@ private:
   // TODO(StarryVae): use rwlock.
   Thread::MutexBasicLockable mutex_{};
   MetricStoreSharedPtr metric_store_ ABSL_GUARDED_BY(mutex_);
+  // filter level config is created in C++ side, and freed by Golang GC finalizer.
   httpConfigInternal* config_{nullptr};
 };
 
@@ -119,7 +119,8 @@ private:
   uint64_t cached_parent_id_ ABSL_GUARDED_BY(mutex_){0};
 
   absl::Mutex mutex_;
-  httpConfig* config_{nullptr};
+  // route level config, no Golang GC finalizer.
+  httpConfig config_;
 };
 
 using RoutePluginConfigPtr = std::shared_ptr<RoutePluginConfig>;
@@ -160,7 +161,44 @@ enum class EnvoyValue {
   VirtualClusterName,
 };
 
-struct httpRequestInternal;
+class Filter;
+
+// Go code only touch the fields in httpRequest
+class HttpRequestInternal : public httpRequest {
+public:
+  HttpRequestInternal(Filter& filter)
+      : decoding_state_(filter, this), encoding_state_(filter, this) {
+    configId = 0;
+  }
+
+  void setWeakFilter(std::weak_ptr<Filter> f) { filter_ = f; }
+  std::weak_ptr<Filter> weakFilter() { return filter_; }
+
+  DecodingProcessorState& decodingState() { return decoding_state_; }
+  EncodingProcessorState& encodingState() { return encoding_state_; }
+
+  // anchor a string temporarily, make sure it won't be freed before copied to Go.
+  std::string strValue;
+
+private:
+  std::weak_ptr<Filter> filter_;
+
+  // The state of the filter on both the encoding and decoding side.
+  DecodingProcessorState decoding_state_;
+  EncodingProcessorState encoding_state_;
+};
+
+// Wrapper HttpRequestInternal to DeferredDeletable.
+// Since we want keep httpRequest at the top of the HttpRequestInternal,
+// so, HttpRequestInternal can not inherit the virtual class DeferredDeletable.
+class HttpRequestInternalWrapper : public Envoy::Event::DeferredDeletable {
+public:
+  HttpRequestInternalWrapper(HttpRequestInternal* req) : req_(req) {}
+  ~HttpRequestInternalWrapper() override { delete req_; }
+
+private:
+  HttpRequestInternal* req_;
+};
 
 /**
  * See docs/configuration/http_filters/golang_extension_filter.rst
@@ -173,8 +211,16 @@ class Filter : public Http::StreamFilter,
 public:
   explicit Filter(FilterConfigSharedPtr config, Dso::HttpFilterDsoPtr dynamic_lib,
                   uint32_t worker_id)
-      : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this),
-        worker_id_(worker_id) {}
+      : config_(config), dynamic_lib_(dynamic_lib), req_(new HttpRequestInternal(*this)),
+        decoding_state_(req_->decodingState()), encoding_state_(req_->encodingState()) {
+    // req is used by go, so need to use raw memory and then it is safe to release at the gc
+    // finalize phase of the go object.
+    req_->plugin_name.data = config_->pluginName().data();
+    req_->plugin_name.len = config_->pluginName().length();
+    req_->worker_id = worker_id;
+    ENVOY_LOG(debug, "initilizing Golang Filter, decode state: {}, encode state: {}",
+              decoding_state_.stateStr(), encoding_state_.stateStr());
+  }
 
   // Http::StreamFilterBase
   void onDestroy() ABSL_LOCKS_EXCLUDED(mutex_) override;
@@ -212,25 +258,29 @@ public:
   void onStreamComplete() override {}
 
   CAPIStatus clearRouteCache();
-  CAPIStatus continueStatus(GolangStatus status);
+  CAPIStatus continueStatus(ProcessorState& state, GolangStatus status);
 
-  CAPIStatus sendLocalReply(Http::Code response_code, std::string body_text,
+  CAPIStatus sendLocalReply(ProcessorState& state, Http::Code response_code, std::string body_text,
                             std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                             Grpc::Status::GrpcStatus grpc_status, std::string details);
 
-  CAPIStatus sendPanicReply(absl::string_view details);
+  CAPIStatus sendPanicReply(ProcessorState& state, absl::string_view details);
 
-  CAPIStatus getHeader(absl::string_view key, uint64_t* value_data, int* value_len);
-  CAPIStatus copyHeaders(GoString* go_strs, char* go_buf);
-  CAPIStatus setHeader(absl::string_view key, absl::string_view value, headerAction act);
-  CAPIStatus removeHeader(absl::string_view key);
-  CAPIStatus copyBuffer(Buffer::Instance* buffer, char* data);
-  CAPIStatus drainBuffer(Buffer::Instance* buffer, uint64_t length);
-  CAPIStatus setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
-                             bufferAction action);
-  CAPIStatus copyTrailers(GoString* go_strs, char* go_buf);
-  CAPIStatus setTrailer(absl::string_view key, absl::string_view value, headerAction act);
-  CAPIStatus removeTrailer(absl::string_view key);
+  CAPIStatus getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data,
+                       int* value_len);
+  CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
+  CAPIStatus setHeader(ProcessorState& state, absl::string_view key, absl::string_view value,
+                       headerAction act);
+  CAPIStatus removeHeader(ProcessorState& state, absl::string_view key);
+  CAPIStatus copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data);
+  CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
+  CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
+                             absl::string_view& value, bufferAction action);
+  CAPIStatus copyTrailers(ProcessorState& state, GoString* go_strs, char* go_buf);
+  CAPIStatus setTrailer(ProcessorState& state, absl::string_view key, absl::string_view value,
+                        headerAction act);
+  CAPIStatus removeTrailer(ProcessorState& state, absl::string_view key);
+
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
 
@@ -242,12 +292,21 @@ public:
   CAPIStatus getStringProperty(absl::string_view path, uint64_t* value_data, int* value_len,
                                GoInt32* rc);
 
+  bool isProcessingInGo() {
+    return is_golang_processing_log_ || decoding_state_.isProcessingInGo() ||
+           encoding_state_.isProcessingInGo();
+  }
+  void deferredDeleteRequest(HttpRequestInternal* req);
+
 private:
   bool hasDestroyed() {
     Thread::LockGuard lock(mutex_);
     return has_destroyed_;
   };
-  ProcessorState& getProcessorState();
+  const StreamInfo::StreamInfo& streamInfo() const { return decoding_state_.streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return decoding_state_.streamInfo(); }
+  bool isThreadSafe() { return decoding_state_.isThreadSafe(); };
+  Event::Dispatcher& getDispatcher() { return decoding_state_.getDispatcher(); }
 
   bool doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   GolangStatus doHeadersGo(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
@@ -257,26 +316,26 @@ private:
   bool doTrailer(ProcessorState& state, Http::HeaderMap& trailers);
   bool doTrailerGo(ProcessorState& state, Http::HeaderMap& trailers);
 
-  void initRequest(ProcessorState& state);
+  // return true when it is first inited.
+  bool initRequest();
 
-  uint64_t getMergedConfigId(ProcessorState& state);
+  uint64_t getMergedConfigId();
 
   void continueEncodeLocalReply(ProcessorState& state);
-  void continueStatusInternal(GolangStatus status);
+  void continueStatusInternal(ProcessorState& state, GolangStatus status);
   void continueData(ProcessorState& state);
 
-  void sendLocalReplyInternal(Http::Code response_code, absl::string_view body_text,
+  void sendLocalReplyInternal(ProcessorState& state, Http::Code response_code,
+                              absl::string_view body_text,
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
-  void setDynamicMetadataInternal(ProcessorState& state, std::string filter_name, std::string key,
+  void setDynamicMetadataInternal(std::string filter_name, std::string key,
                                   const absl::string_view& buf);
 
-  void populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
-                                 uint64_t* buf_data, int* buf_len);
+  void populateSliceWithMetadata(const std::string& filter_name, uint64_t* buf_data, int* buf_len);
 
-  CAPIStatus getStringPropertyCommon(absl::string_view path, uint64_t* value_data, int* value_len,
-                                     ProcessorState& state);
+  CAPIStatus getStringPropertyCommon(absl::string_view path, uint64_t* value_data, int* value_len);
   CAPIStatus getStringPropertyInternal(absl::string_view path, std::string* result);
   absl::optional<google::api::expr::runtime::CelValue> findValue(absl::string_view name,
                                                                  Protobuf::Arena* arena);
@@ -285,49 +344,24 @@ private:
   const FilterConfigSharedPtr config_;
   Dso::HttpFilterDsoPtr dynamic_lib_;
 
-  Http::RequestOrResponseHeaderMap* headers_ ABSL_GUARDED_BY(mutex_){nullptr};
-  Http::HeaderMap* trailers_ ABSL_GUARDED_BY(mutex_){nullptr};
-
-  // save temp values from local reply
-  Http::RequestOrResponseHeaderMap* local_headers_{nullptr};
-  Http::HeaderMap* local_trailers_{nullptr};
-
   // save temp values for fetching request attributes in the later phase,
   // like getting request size
   Http::RequestOrResponseHeaderMap* request_headers_{nullptr};
 
+  HttpRequestInternal* req_{nullptr};
+
   // The state of the filter on both the encoding and decoding side.
-  DecodingProcessorState decoding_state_;
-  EncodingProcessorState encoding_state_;
+  // They are stored in HttpRequestInternal since Go need to read them,
+  // And it's safe to read them before onDestroy in C++ side.
+  DecodingProcessorState& decoding_state_;
+  EncodingProcessorState& encoding_state_;
 
-  httpRequestInternal* req_{nullptr};
-
-  // lock for has_destroyed_ and the functions get/set/copy/remove/etc that operate on the
-  // headers_/trailers_/etc, to avoid race between envoy c thread and go thread (when calling back
-  // from go). it should also be okay without this lock in most cases, just for extreme case.
+  // lock for has_destroyed_/etc, to avoid race between envoy c thread and go thread (when calling
+  // back from go).
   Thread::MutexBasicLockable mutex_{};
   bool has_destroyed_ ABSL_GUARDED_BY(mutex_){false};
 
-  // other filter trigger sendLocalReply during go processing in async.
-  // will wait go return before continue.
-  // this variable is read/write in safe thread, do no need lock.
-  bool local_reply_waiting_go_{false};
-
-  // the filter enter encoding phase
-  bool enter_encoding_{false};
-
-  // The ID of the worker that is processing this request, this enables the go filter to dedicate
-  // memory to each worker and not require locks
-  uint32_t worker_id_ = 0;
-};
-
-// Go code only touch the fields in httpRequest
-struct httpRequestInternal : httpRequest {
-  std::weak_ptr<Filter> filter_;
-  // anchor a string temporarily, make sure it won't be freed before copied to Go.
-  std::string strValue;
-  httpRequestInternal(std::weak_ptr<Filter> f) { filter_ = f; }
-  std::weak_ptr<Filter> weakFilter() { return filter_; }
+  bool is_golang_processing_log_{false};
 };
 
 struct httpConfigInternal : httpConfig {

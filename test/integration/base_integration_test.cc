@@ -91,8 +91,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
 const BaseIntegrationTest::InstanceConstSharedPtrFn
 BaseIntegrationTest::defaultAddressFunction(Network::Address::IpVersion version) {
   return [version](int) {
-    return Network::Utility::parseInternetAddress(Network::Test::getLoopbackAddressString(version),
-                                                  0);
+    return Network::Utility::parseInternetAddressNoThrow(
+        Network::Test::getLoopbackAddressString(version), 0);
   };
 }
 
@@ -107,7 +107,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOptions(
     uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(
+      *Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options,
       nullptr));

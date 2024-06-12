@@ -44,14 +44,28 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+absl::StatusOr<std::unique_ptr<ClientContextImpl>>
+ClientContextImpl::create(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
+                          Server::Configuration::CommonFactoryContext& factory_context) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<ClientContextImpl>(
+      new ClientContextImpl(scope, config, factory_context, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ClientContextConfig& config,
-                                     Server::Configuration::CommonFactoryContext& factory_context)
-    : ContextImpl(scope, config, factory_context, nullptr /* additional_init */),
+                                     Server::Configuration::CommonFactoryContext& factory_context,
+                                     absl::Status& creation_status)
+    : ContextImpl(scope, config, factory_context, nullptr /* additional_init */, creation_status),
       server_name_indication_(config.serverNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
       enforce_rsa_key_usage_(config.enforceRsaKeyUsage()),
       max_session_keys_(config.maxSessionKeys()) {
+  if (!creation_status.ok()) {
+    return;
+  }
   // This should be guaranteed during configuration ingestion for client contexts.
   ASSERT(tls_contexts_.size() == 1);
   if (!parsed_alpn_protocols_.empty()) {
@@ -109,15 +123,18 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
   // the TLS context. We've stored this value in parsed_alpn_protocols_ so we can check that to see
   // if it's already been set.
   bool has_alpn_defined = !parsed_alpn_protocols_.empty();
+  absl::Status parse_status = absl::OkStatus();
   if (options) {
     // ALPN override takes precedence over TLS context specified, so blindly overwrite it.
-    has_alpn_defined |= parseAndSetAlpn(options->applicationProtocolListOverride(), *ssl_con);
+    has_alpn_defined |=
+        parseAndSetAlpn(options->applicationProtocolListOverride(), *ssl_con, parse_status);
   }
 
   if (options && !has_alpn_defined && !options->applicationProtocolFallback().empty()) {
     // If ALPN hasn't already been set (either through TLS context or override), use the fallback.
-    parseAndSetAlpn(options->applicationProtocolFallback(), *ssl_con);
+    parseAndSetAlpn(options->applicationProtocolFallback(), *ssl_con, parse_status);
   }
+  RETURN_IF_NOT_OK(parse_status);
 
   if (allow_renegotiation_) {
     SSL_set_renegotiate_mode(ssl_con.get(), ssl_renegotiate_freely);
