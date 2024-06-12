@@ -305,7 +305,7 @@ message RuntimeFeatureFlag {
 
 message KeyValue {
   // The key of the key/value pair.
-  string key = 1 [(validate.rules).string = {min_len: 1, max_bytes: 16384}];
+  string key = 1 [(validate.rules).string = {min_len: 1 max_bytes: 16384}];
 
   // The value of the key/value pair.
   string value = 2;
@@ -353,7 +353,7 @@ message KeyValueMutation {
   KeyValueAppend append = 1;
 
   // Key to remove. Only one of ``append`` or ``remove`` can be set.
-  string remove = 2 [(validate.rules).string = {max_bytes: 16384}];;
+  string remove = 2 [(validate.rules).string = {max_bytes: 16384}];
 }
 
 // Query parameter name/value pair.
