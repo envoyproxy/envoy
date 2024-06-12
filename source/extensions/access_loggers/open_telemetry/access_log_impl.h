@@ -36,7 +36,8 @@ public:
   AccessLog(
       ::Envoy::AccessLog::FilterPtr&& filter,
       envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
-      ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache);
+      ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+      const std::vector<Formatter::CommandParserPtr>& commands);
 
 private:
   /**

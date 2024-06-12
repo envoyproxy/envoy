@@ -501,6 +501,48 @@ TEST_F(SigV4ASignerImplTest, QueryStringDefault5s) {
   EXPECT_TRUE(absl::StrContains(headers.getPathValue(), "X-Amz-Expires=5&"));
 }
 
+// Verify specific key derivations, using values generated from the AWS SDK implementation
+TEST(SigV4AKeyDerivationTest, TestKeyDerivations) {
+  auto ec_key =
+      SigV4AKeyDerivation::derivePrivateKey(absl::string_view("akid"), absl::string_view("secret"));
+
+  auto ec_private_key = EC_KEY_get0_private_key(ec_key);
+  auto hexkey = BN_bn2hex(ec_private_key);
+  EXPECT_STREQ(hexkey, "0a56b8224b63e587ab069a15a730a103add19b45a644a197d24415ff89b993dc");
+  OPENSSL_free(hexkey);
+  EC_KEY_free(ec_key);
+  ec_key = SigV4AKeyDerivation::derivePrivateKey(absl::string_view("akid"),
+                                                 absl::string_view("testkey2"));
+
+  ec_private_key = EC_KEY_get0_private_key(ec_key);
+  hexkey = BN_bn2hex(ec_private_key);
+
+  EXPECT_STREQ(hexkey, "7b6c4f9d70561838cd1160e5e8674bf3a40e8bb3865ccfee37b3c423035a5c43");
+  OPENSSL_free(hexkey);
+  EC_KEY_free(ec_key);
+
+  ec_key = SigV4AKeyDerivation::derivePrivateKey(absl::string_view("akid"),
+                                                 absl::string_view("abcdefghi"));
+
+  ec_private_key = EC_KEY_get0_private_key(ec_key);
+  hexkey = BN_bn2hex(ec_private_key);
+  EXPECT_STREQ(hexkey, "31ce325f5a7e167ce0659aa8fec550c005b892833bcb5627fba6b5c55023f1cc");
+  OPENSSL_free(hexkey);
+  EC_KEY_free(ec_key);
+
+  // This access key secret key combination will push our key derivation into two cycles, for more
+  // code coverage
+  ec_key =
+      SigV4AKeyDerivation::derivePrivateKey(absl::string_view("eb63466a7cf7ee3cd4880df6dc4aaed"),
+                                            absl::string_view("d7e7f9c8f2344a12bc51f3d05a2fb8"));
+
+  ec_private_key = EC_KEY_get0_private_key(ec_key);
+  hexkey = BN_bn2hex(ec_private_key);
+  EXPECT_STREQ(hexkey, "d0fdb7810916566bd91ec0b3d45dcfc01de8f3ffe783754cf7ce4c6dd86f584b");
+  OPENSSL_free(hexkey);
+  EC_KEY_free(ec_key);
+}
+
 } // namespace
 } // namespace Aws
 } // namespace Common

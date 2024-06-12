@@ -34,10 +34,10 @@ enum class IpType { V4, V6 };
 
 Endpoint createEndpoint(const IpType ip_type) {
   Endpoint endpoint;
-  endpoint.setAddress(ip_type == IpType::V6
-                          ? Envoy::Network::Utility::parseInternetAddress(
-                                "2001:db8:85a3::8a2e:370:4444", 7334, true)
-                          : Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 8080, false));
+  endpoint.setAddress(ip_type == IpType::V6 ? Envoy::Network::Utility::parseInternetAddressNoThrow(
+                                                  "2001:db8:85a3::8a2e:370:4444", 7334, true)
+                                            : Envoy::Network::Utility::parseInternetAddressNoThrow(
+                                                  "1.2.3.4", 8080, false));
   endpoint.setServiceName("service1");
   return endpoint;
 }

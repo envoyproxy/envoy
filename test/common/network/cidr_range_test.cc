@@ -69,7 +69,7 @@ TEST(TruncateIpAddressAndLength, Various) {
       {{"ffff::ffff", 999}, {"ffff::ffff", 128}},
   };
   for (const auto& kv : test_cases) {
-    InstanceConstSharedPtr inPtr = Utility::parseInternetAddress(kv.first.first);
+    InstanceConstSharedPtr inPtr = Utility::parseInternetAddressNoThrow(kv.first.first);
     EXPECT_NE(inPtr, nullptr) << kv.first.first;
     int length_io = kv.first.second;
     InstanceConstSharedPtr outPtr = CidrRange::truncateIpAddressAndLength(inPtr, &length_io);
@@ -202,7 +202,7 @@ TEST(CidrRangeTest, OperatorIsEqual) {
 TEST(CidrRangeTest, InvalidCidrRange) { EXPECT_FALSE(CidrRange::create("foo").status().ok()); }
 
 TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
-  InstanceConstSharedPtr ptr = Utility::parseInternetAddress("1.2.3.5");
+  InstanceConstSharedPtr ptr = Utility::parseInternetAddressNoThrow("1.2.3.5");
   CidrRange rng(*CidrRange::create(ptr, 31)); // Copy ctor.
   EXPECT_EQ(rng.length(), 31);
   EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
@@ -267,7 +267,7 @@ TEST(Ipv4CidrRangeTest, BigRange) {
 }
 
 TEST(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
-  InstanceConstSharedPtr ptr = Utility::parseInternetAddress("abcd::0345");
+  InstanceConstSharedPtr ptr = Utility::parseInternetAddressNoThrow("abcd::0345");
   CidrRange rng(*CidrRange::create(ptr, 127)); // Copy ctor.
   EXPECT_EQ(rng.length(), 127);
   EXPECT_EQ(rng.ip()->version(), IpVersion::v6);

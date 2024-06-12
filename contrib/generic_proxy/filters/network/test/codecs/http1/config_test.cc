@@ -230,13 +230,13 @@ public:
   }
 
   NiceMock<MockServerCodecCallbacks> codec_callbacks_;
-  NiceMock<Network::MockServerConnection> mock_connection;
+  NiceMock<Network::MockServerConnection> mock_connection_;
   std::unique_ptr<Http1ServerCodec> codec_;
 };
 
 TEST_F(Http1ServerCodecTest, HeaderOnlyRequestDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   Buffer::OwnedImpl buffer;
 
@@ -267,7 +267,7 @@ TEST_F(Http1ServerCodecTest, HeaderOnlyRequestDecodingTest) {
 
 TEST_F(Http1ServerCodecTest, RequestDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   Buffer::OwnedImpl buffer;
 
@@ -306,7 +306,7 @@ TEST_F(Http1ServerCodecTest, RequestDecodingTest) {
 
 TEST_F(Http1ServerCodecTest, ChunkedRequestDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   Buffer::OwnedImpl buffer;
 
@@ -353,7 +353,7 @@ TEST_F(Http1ServerCodecTest, ChunkedRequestDecodingTest) {
 
 TEST_F(Http1ServerCodecTest, MultipleBufferChunkedRequestDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   Buffer::OwnedImpl buffer;
 
@@ -408,7 +408,7 @@ TEST_F(Http1ServerCodecTest, MultipleBufferChunkedRequestDecodingTest) {
 
 TEST_F(Http1ServerCodecTest, UnexpectedRequestTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   // Connect.
   {
@@ -649,7 +649,7 @@ TEST_F(Http1ServerCodecTest, ChunkedResponseEncodingTest) {
 
 TEST_F(Http1ServerCodecTest, RequestAndResponseTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   // Do repeated request and response.
   for (size_t i = 0; i < 100; i++) {
@@ -692,7 +692,7 @@ TEST_F(Http1ServerCodecTest, RequestAndResponseTest) {
 
 TEST_F(Http1ServerCodecTest, ResponseCompleteBeforeRequestCompleteTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   Buffer::OwnedImpl buffer;
 
@@ -736,7 +736,7 @@ TEST_F(Http1ServerCodecTest, ResponseCompleteBeforeRequestCompleteTest) {
 
 TEST_F(Http1ServerCodecTest, NewRequestBeforeFirstRequestCompleteTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   Buffer::OwnedImpl buffer;
 
@@ -768,7 +768,7 @@ TEST_F(Http1ServerCodecTest, SingleFrameModeRequestDecodingTest) {
   initializeCodec(true, 8 * 1024 * 1024);
 
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   Buffer::OwnedImpl buffer;
 
@@ -805,7 +805,7 @@ TEST_F(Http1ServerCodecTest, SingleFrameModeRequestTooLargeTest) {
   initializeCodec(true, 4);
 
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   Buffer::OwnedImpl buffer;
 
@@ -824,7 +824,7 @@ TEST_F(Http1ServerCodecTest, SingleFrameModeChunkedRequestDecodingTest) {
   initializeCodec(true, 8 * 1024 * 1024);
 
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   Buffer::OwnedImpl buffer;
 
@@ -865,7 +865,7 @@ TEST_F(Http1ServerCodecTest, SingleFrameModeMultipleBufferChunkedRequestDecoding
   initializeCodec(true, 8 * 1024 * 1024);
 
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   Buffer::OwnedImpl buffer;
 
@@ -908,6 +908,9 @@ TEST_F(Http1ServerCodecTest, SingleFrameModeMultipleBufferChunkedRequestDecoding
 }
 
 TEST_F(Http1ServerCodecTest, SingleFrameModeResponseEncodingTest) {
+  // Mock request.
+  codec_->active_request_ = ActiveRequest{nullptr, true};
+
   // Create a response.
   auto headers = Http::ResponseHeaderMapImpl::create();
   headers->setStatus(200);
@@ -928,7 +931,9 @@ TEST_F(Http1ServerCodecTest, SingleFrameModeResponseEncodingTest) {
                                        "body");
           buffer.drain(buffer.length());
         }));
-    EXPECT_TRUE(codec_->encode(response, encoding_context).ok());
+    auto status = codec_->encode(response, encoding_context);
+    std::cout << status.status().message() << std::endl;
+    EXPECT_TRUE(status.ok());
   }
 }
 
@@ -943,7 +948,7 @@ public:
 
   void encodingOneRequest() {
     ON_CALL(codec_callbacks_, connection())
-        .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+        .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
     // Create a request.
     auto headers = Http::RequestHeaderMapImpl::create();
@@ -983,13 +988,13 @@ public:
   }
 
   NiceMock<MockClientCodecCallbacks> codec_callbacks_;
-  NiceMock<Network::MockServerConnection> mock_connection;
+  NiceMock<Network::MockServerConnection> mock_connection_;
   std::unique_ptr<Http1ClientCodec> codec_;
 };
 
 TEST_F(Http1ClientCodecTest, HeaderOnlyResponseDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   encodingOneRequest();
 
@@ -1013,7 +1018,7 @@ TEST_F(Http1ClientCodecTest, HeaderOnlyResponseDecodingTest) {
 
 TEST_F(Http1ClientCodecTest, ResponseDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   encodingOneRequest();
 
@@ -1048,7 +1053,7 @@ TEST_F(Http1ClientCodecTest, ResponseDecodingTest) {
 
 TEST_F(Http1ClientCodecTest, ChunkedResponseDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   encodingOneRequest();
 
@@ -1089,7 +1094,7 @@ TEST_F(Http1ClientCodecTest, ChunkedResponseDecodingTest) {
 
 TEST_F(Http1ClientCodecTest, MultipleBufferChunkedResponseDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   encodingOneRequest();
 
@@ -1138,7 +1143,7 @@ TEST_F(Http1ClientCodecTest, MultipleBufferChunkedResponseDecodingTest) {
 
 TEST_F(Http1ClientCodecTest, UnexpectedResponseTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   // Transfer-Encoding and Content-Length are set at same time.
   {
@@ -1188,7 +1193,7 @@ TEST_F(Http1ClientCodecTest, UnexpectedResponseTest) {
 
 TEST_F(Http1ClientCodecTest, HeaderOnlyRequestEncodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   // Create a request.
   auto headers = Http::RequestHeaderMapImpl::create();
@@ -1217,7 +1222,7 @@ TEST_F(Http1ClientCodecTest, HeaderOnlyRequestEncodingTest) {
 
 TEST_F(Http1ClientCodecTest, MissingRequiredHeadersEncodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   // Create a request without method.
   auto headers = Http::RequestHeaderMapImpl::create();
@@ -1241,7 +1246,7 @@ TEST_F(Http1ClientCodecTest, RequestEncodingTest) { encodingOneRequest(); }
 
 TEST_F(Http1ClientCodecTest, ChunkedRequestEncodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   // Create a request.
   auto headers = Http::RequestHeaderMapImpl::create();
@@ -1286,7 +1291,7 @@ TEST_F(Http1ClientCodecTest, ChunkedRequestEncodingTest) {
 
 TEST_F(Http1ClientCodecTest, RequestAndResponseTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   // Do repeated request and response.
   for (size_t i = 0; i < 100; i++) {
@@ -1331,7 +1336,7 @@ TEST_F(Http1ClientCodecTest, RequestAndResponseTest) {
 
 TEST_F(Http1ClientCodecTest, ResponseCompleteBeforeRequestCompleteTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   // Create a request.
   auto headers = Http::RequestHeaderMapImpl::create();
@@ -1372,7 +1377,7 @@ TEST_F(Http1ClientCodecTest, ResponseCompleteBeforeRequestCompleteTest) {
 
 TEST_F(Http1ClientCodecTest, SingleFrameModeRequestEncodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   initializeCodec(true, 8 * 1024 * 1024);
 
@@ -1404,7 +1409,7 @@ TEST_F(Http1ClientCodecTest, SingleFrameModeRequestEncodingTest) {
 
 TEST_F(Http1ClientCodecTest, SingleFrameModeResponseDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   initializeCodec(true, 8 * 1024 * 1024);
 
@@ -1436,7 +1441,7 @@ TEST_F(Http1ClientCodecTest, SingleFrameModeResponseDecodingTest) {
 
 TEST_F(Http1ClientCodecTest, SingleFrameModeResponseTooLargeTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   initializeCodec(true, 4);
 
@@ -1456,7 +1461,7 @@ TEST_F(Http1ClientCodecTest, SingleFrameModeResponseTooLargeTest) {
 
 TEST_F(Http1ClientCodecTest, SingleFrameModeChunkedResponseDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   initializeCodec(true, 8 * 1024 * 1024);
 
@@ -1492,7 +1497,7 @@ TEST_F(Http1ClientCodecTest, SingleFrameModeChunkedResponseDecodingTest) {
 
 TEST_F(Http1ClientCodecTest, SingleFrameModeMultipleBufferChunkedResponseDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
-      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
 
   initializeCodec(true, 8 * 1024 * 1024);
 

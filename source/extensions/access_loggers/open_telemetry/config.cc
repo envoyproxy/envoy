@@ -7,6 +7,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/grpc/async_client_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
@@ -40,9 +41,12 @@ AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  return std::make_shared<AccessLog>(std::move(filter), proto_config,
-                                     context.serverFactoryContext().threadLocal(),
-                                     getAccessLoggerCacheSingleton(context.serverFactoryContext()));
+  auto commands =
+      Formatter::SubstitutionFormatStringUtils::parseFormatters(proto_config.formatters(), context);
+
+  return std::make_shared<AccessLog>(
+      std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),
+      getAccessLoggerCacheSingleton(context.serverFactoryContext()), commands);
 }
 
 ProtobufTypes::MessagePtr AccessLogFactory::createEmptyConfigProto() {
