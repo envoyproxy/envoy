@@ -20,11 +20,11 @@ TEST(DnsUtils, MultipleGenerateTest) {
 
 TEST(DnsUtils, ListChanged) {
   Network::Address::InstanceConstSharedPtr address1 =
-      Network::Utility::parseInternetAddress("10.0.0.1");
+      Network::Utility::parseInternetAddressNoThrow("10.0.0.1");
   Network::Address::InstanceConstSharedPtr address1_dup =
-      Network::Utility::parseInternetAddress("10.0.0.1");
+      Network::Utility::parseInternetAddressNoThrow("10.0.0.1");
   Network::Address::InstanceConstSharedPtr address2 =
-      Network::Utility::parseInternetAddress("10.0.0.2");
+      Network::Utility::parseInternetAddressNoThrow("10.0.0.2");
 
   std::vector<Network::Address::InstanceConstSharedPtr> addresses1 = {address1, address2};
   std::vector<Network::Address::InstanceConstSharedPtr> addresses2 = {address1_dup, address2};
