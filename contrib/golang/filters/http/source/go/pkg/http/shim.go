@@ -105,10 +105,34 @@ func requestFinalize(r *httpRequest) {
 	r.Finalize(api.NormalFinalize)
 }
 
+func getOrCreateState(s *C.processState) *processState {
+	r := s.req
+	req := getRequest(r)
+	if req == nil {
+		req = createRequest(r)
+	}
+	if s.is_encoding == 0 {
+		if req.decodingState.processState == nil {
+			req.decodingState.processState = s
+		}
+		return &req.decodingState
+	}
+
+	// s.is_encoding == 1
+	if req.encodingState.processState == nil {
+		req.encodingState.processState = s
+	}
+	return &req.encodingState
+}
+
 func createRequest(r *C.httpRequest) *httpRequest {
 	req := &httpRequest{
 		req: r,
 	}
+	req.decodingState.request = req
+	req.encodingState.request = req
+	req.streamInfo.request = req
+
 	req.cond.L = &req.waitingLock
 	// NP: make sure filter will be deleted.
 	runtime.SetFinalizer(req, requestFinalize)
@@ -130,32 +154,38 @@ func getRequest(r *C.httpRequest) *httpRequest {
 	return Requests.GetReq(r)
 }
 
-//export envoyGoFilterOnHttpHeader
-func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64 {
-	var req *httpRequest
-	phase := api.EnvoyRequestPhase(r.phase)
-	// early SendLocalReply or OnLogDownstreamStart may run before the header handling
-	req = getRequest(r)
-	if req == nil {
-		req = createRequest(r)
+func getState(s *C.processState) *processState {
+	r := s.req
+	req := getRequest(r)
+	if s.is_encoding == 0 {
+		return &req.decodingState
 	}
+	// s.is_encoding == 1
+	return &req.encodingState
+}
 
+//export envoyGoFilterOnHttpHeader
+func envoyGoFilterOnHttpHeader(s *C.processState, endStream, headerNum, headerBytes uint64) uint64 {
+	// early SendLocalReply or OnLogDownstreamStart may run before the header handling
+	state := getOrCreateState(s)
+
+	req := state.request
 	if req.pInfo.paniced {
 		// goroutine panic in the previous state that could not sendLocalReply, delay terminating the request here,
 		// to prevent error from spreading.
-		req.sendPanicReply(req.pInfo.details)
+		state.sendPanicReply(req.pInfo.details)
 		return uint64(api.LocalReply)
 	}
-	defer req.RecoverPanic()
+	defer state.RecoverPanic()
 	f := req.httpFilter
 
 	var status api.StatusType
-	switch phase {
+	switch state.Phase() {
 	case api.DecodeHeaderPhase:
 		header := &requestHeaderMapImpl{
 			requestOrResponseHeaderMapImpl{
 				headerMapImpl{
-					request:     req,
+					state:       state,
 					headerNum:   headerNum,
 					headerBytes: headerBytes,
 				},
@@ -166,7 +196,7 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 		header := &requestTrailerMapImpl{
 			requestOrResponseTrailerMapImpl{
 				headerMapImpl{
-					request:     req,
+					state:       state,
 					headerNum:   headerNum,
 					headerBytes: headerBytes,
 				},
@@ -177,7 +207,7 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 		header := &responseHeaderMapImpl{
 			requestOrResponseHeaderMapImpl{
 				headerMapImpl{
-					request:     req,
+					state:       state,
 					headerNum:   headerNum,
 					headerBytes: headerBytes,
 				},
@@ -188,7 +218,7 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 		header := &responseTrailerMapImpl{
 			requestOrResponseTrailerMapImpl{
 				headerMapImpl{
-					request:     req,
+					state:       state,
 					headerNum:   headerNum,
 					headerBytes: headerBytes,
 				},
@@ -205,21 +235,23 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 }
 
 //export envoyGoFilterOnHttpData
-func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
-	req := getRequest(r)
+func envoyGoFilterOnHttpData(s *C.processState, endStream, buffer, length uint64) uint64 {
+	state := getState(s)
+
+	req := state.request
 	if req.pInfo.paniced {
 		// goroutine panic in the previous state that could not sendLocalReply, delay terminating the request here,
 		// to prevent error from spreading.
-		req.sendPanicReply(req.pInfo.details)
+		state.sendPanicReply(req.pInfo.details)
 		return uint64(api.LocalReply)
 	}
-	defer req.RecoverPanic()
+	defer state.RecoverPanic()
 
 	f := req.httpFilter
-	isDecode := api.EnvoyRequestPhase(r.phase) == api.DecodeDataPhase
+	isDecode := state.Phase() == api.DecodeDataPhase
 
 	buf := &httpBuffer{
-		request:             req,
+		state:               state,
 		envoyBufferInstance: buffer,
 		length:              length,
 	}
@@ -240,7 +272,7 @@ func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
 		req = createRequest(r)
 	}
 
-	defer req.RecoverPanic()
+	defer req.recoverPanic()
 
 	v := api.AccessLogType(logType)
 
@@ -261,7 +293,7 @@ func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
 func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)
 	// do nothing even when req.panic is true, since filter is already destroying.
-	defer req.RecoverPanic()
+	defer req.recoverPanic()
 
 	req.resumeWaitCallback()
 
@@ -281,6 +313,6 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 //export envoyGoRequestSemaDec
 func envoyGoRequestSemaDec(r *C.httpRequest) {
 	req := getRequest(r)
-	defer req.RecoverPanic()
+	defer req.recoverPanic()
 	req.resumeWaitCallback()
 }

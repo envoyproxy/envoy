@@ -8,6 +8,7 @@ services:
     - web_service
     ports:
     - "8000:8000"
+    - "8001:8001"
 
   web_service:
     environment:

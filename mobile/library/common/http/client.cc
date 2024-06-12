@@ -661,7 +661,7 @@ void Client::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool en
   }
 }
 
-void Client::sendMetadata(envoy_stream_t, envoy_headers) { PANIC("not implemented"); }
+void Client::sendMetadata(envoy_stream_t, envoy_headers) { IS_ENVOY_BUG("not implemented"); }
 
 void Client::sendTrailers(envoy_stream_t stream, RequestTrailerMapPtr trailers) {
   ASSERT(dispatcher_.isThreadSafe());

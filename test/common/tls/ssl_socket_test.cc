@@ -1660,10 +1660,6 @@ TEST_P(SslSocketTest, MultiCertPickRSAOnSniMatch) {
 
 // On SNI mismatch, if full scan is disabled, validate that the first cert is used.
 TEST_P(SslSocketTest, MultiCertWithFullScanDisabledOnSniMismatch) {
-  // This test is specific for no full scan case, i.e., below flag is true case.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch", "true"}});
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     sni: "nomatch.example.com"
     common_tls_context:
@@ -1696,47 +1692,6 @@ TEST_P(SslSocketTest, MultiCertWithFullScanDisabledOnSniMismatch) {
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
   // The validation succeeds with the default cert that does not match to SNI, because Envoy does
   // not define the criteria that how to validate cert SAN based on SNI .
-  testUtil(test_options.setExpectedSni("nomatch.example.com"));
-}
-
-// On SNI mismatch, full scan will be executed if it is enabled, validate that ECDSA cert is
-// preferred over RSA cert.
-TEST_P(SslSocketTest, MultiCertPreferEcdsaWithFullScanEnabledOnSniMismatch) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch", "false"}});
-  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
-    sni: "nomatch.example.com"
-    common_tls_context:
-      tls_params:
-        tls_minimum_protocol_version: TLSv1_2
-        tls_maximum_protocol_version: TLSv1_2
-        cipher_suites:
-        - ECDHE-ECDSA-AES128-GCM-SHA256
-        - ECDHE-RSA-AES128-GCM-SHA256
-      validation_context:
-        verify_certificate_hash: )EOF",
-                                                   TEST_SAN_DNS_ECDSA_1_CERT_256_HASH);
-  const std::string server_ctx_yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_key.pem"
-)EOF";
-
-  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  // The validation succeeds with the certificate that does not match to SNI, because Envoy does not
-  // define the criteria that how to validate cert SAN based on SNI .
   testUtil(test_options.setExpectedSni("nomatch.example.com"));
 }
 
