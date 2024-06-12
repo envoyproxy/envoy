@@ -25,9 +25,15 @@ public:
     switch (socket_address.port_specifier_case()) {
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::kPortValue:
     // Default to port 0 if no port value is specified.
-    case envoy::config::core::v3::SocketAddress::PortSpecifierCase::PORT_SPECIFIER_NOT_SET:
-      return Network::Utility::parseInternetAddress(
+    case envoy::config::core::v3::SocketAddress::PortSpecifierCase::PORT_SPECIFIER_NOT_SET: {
+      auto addr = Network::Utility::parseInternetAddressNoThrow(
           socket_address.address(), socket_address.port_value(), !socket_address.ipv4_compat());
+      if (!addr) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("malformed IP address: ", socket_address.address()));
+      }
+      return addr;
+    }
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::kNamedPort:
       break;
     }

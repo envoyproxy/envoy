@@ -25,12 +25,14 @@ UberFilterFuzzer::UberFilterFuzzer()
       .WillByDefault(Invoke([&](Http::StreamDecoderFilterSharedPtr filter) -> void {
         decoder_filter_ = filter;
         decoder_filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+        destroy_filters_ = [&]() { decoder_filter_->onDestroy(); };
       }));
   // This is an encoded filter.
   ON_CALL(filter_callback_, addStreamEncoderFilter(_))
       .WillByDefault(Invoke([&](Http::StreamEncoderFilterSharedPtr filter) -> void {
         encoder_filter_ = filter;
         encoder_filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+        destroy_filters_ = [&]() { encoder_filter_->onDestroy(); };
       }));
   // This is a decoder and encoder filter.
   ON_CALL(filter_callback_, addStreamFilter(_))
@@ -39,6 +41,11 @@ UberFilterFuzzer::UberFilterFuzzer()
         decoder_filter_->setDecoderFilterCallbacks(decoder_callbacks_);
         encoder_filter_ = filter;
         encoder_filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+        destroy_filters_ = [&]() {
+          // Only onDestroy one of the instances because they're the same filter.
+          // Calling onDestroy on both results in double-calling of onDestroy.
+          decoder_filter_->onDestroy();
+        };
       }));
   // This filter supports access logging.
   ON_CALL(filter_callback_, addAccessLogHandler(_))
@@ -121,14 +128,8 @@ void UberFilterFuzzer::fuzz(
 }
 
 void UberFilterFuzzer::reset() {
-  if (decoder_filter_ != nullptr) {
-    decoder_filter_->onDestroy();
-  }
+  destroy_filters_();
   decoder_filter_.reset();
-
-  if (encoder_filter_ != nullptr) {
-    encoder_filter_->onDestroy();
-  }
   encoder_filter_.reset();
 
   access_logger_.reset();

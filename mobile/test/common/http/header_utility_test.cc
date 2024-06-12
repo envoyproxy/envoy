@@ -18,10 +18,7 @@ envoy_data envoyTestString(std::string& s, uint32_t* sentinel) {
 }
 
 TEST(RequestHeaderDataConstructorTest, FromCToCppEmpty) {
-  std::map<std::string, std::string> empty_map;
-  envoy_headers empty_headers = Bridge::Utility::makeEnvoyMap(empty_map);
-
-  RequestHeaderMapPtr cpp_headers = Utility::toRequestHeaders(empty_headers);
+  RequestHeaderMapPtr cpp_headers = Utility::toRequestHeaders(envoy_headers{});
 
   ASSERT_TRUE(cpp_headers->empty());
 }

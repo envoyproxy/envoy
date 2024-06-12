@@ -323,7 +323,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
     : HttpIntegrationTest::HttpIntegrationTest(
           downstream_protocol,
           [version](int) {
-            return Network::Utility::parseInternetAddress(
+            return Network::Utility::parseInternetAddressNoThrow(
                 Network::Test::getLoopbackAddressString(version), 0);
           },
           version, config) {}

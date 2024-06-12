@@ -29,6 +29,7 @@ envoy_cc_extension(
         ":filter_cc_proto",
         "//library/common/api:external_api_lib",
         "//library/common/bridge:utility_lib",
+        "//library/common/buffer:bridge_fragment_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/stream_info:extra_stream_info_lib",
         "//library/common/types:c_types_lib",

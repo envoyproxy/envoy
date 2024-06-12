@@ -12,7 +12,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//library/common:engine_types_lib",
-        "//library/common/buffer:bridge_fragment_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/buffer:buffer_interface",
         "@envoy//envoy/http:codes_interface",

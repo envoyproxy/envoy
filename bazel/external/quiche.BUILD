@@ -4028,7 +4028,6 @@ envoy_quic_cc_library(
         ":quic_core_utils_lib",
         ":quic_core_versions_lib",
         ":quic_platform",
-        ":quic_server_crypto_crypto_handshake_lib",
         ":quic_stream_priority_lib",
         ":quiche_common_callbacks",
         ":quiche_common_structured_headers_lib",

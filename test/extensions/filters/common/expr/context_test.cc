@@ -481,13 +481,13 @@ TEST(Context, ConnectionAttributes) {
   PeerWrapper destination(arena, info, true);
 
   Network::Address::InstanceConstSharedPtr local =
-      Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 123, false);
   Network::Address::InstanceConstSharedPtr remote =
-      Network::Utility::parseInternetAddress("10.20.30.40", 456, false);
+      Network::Utility::parseInternetAddressNoThrow("10.20.30.40", 456, false);
   Network::Address::InstanceConstSharedPtr upstream_address =
-      Network::Utility::parseInternetAddress("10.1.2.3", 679, false);
+      Network::Utility::parseInternetAddressNoThrow("10.1.2.3", 679, false);
   Network::Address::InstanceConstSharedPtr upstream_local_address =
-      Network::Utility::parseInternetAddress("10.1.2.3", 1000, false);
+      Network::Utility::parseInternetAddressNoThrow("10.1.2.3", 1000, false);
   const std::string sni_name = "kittens.com";
   info.downstream_connection_info_provider_->setLocalAddress(local);
   info.downstream_connection_info_provider_->setRemoteAddress(remote);

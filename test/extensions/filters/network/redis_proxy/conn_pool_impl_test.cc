@@ -1252,7 +1252,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionSuccessWithDNSEntryCached) {
 
   // DNS entry is cached.
   auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 6379);
+  host_info->address_ = Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 6379);
   EXPECT_CALL(*dns_cache, loadDnsCacheEntry_(Eq("foo:6379"), 6379, false, _))
       .WillOnce(Invoke([&](absl::string_view, uint16_t, bool,
                            Extensions::Common::DynamicForwardProxy::DnsCache::
@@ -1360,7 +1360,7 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionSuccessWithDNSEntryViaCallback) {
   EXPECT_CALL(*handle, onDestroy());
 
   auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 6379);
+  host_info->address_ = Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 6379);
   EXPECT_CALL(*host_info, address()).Times(2);
 
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client2)));

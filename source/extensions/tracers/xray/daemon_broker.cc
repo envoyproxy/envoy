@@ -32,7 +32,7 @@ DaemonBrokerImpl::DaemonBrokerImpl(const std::string& daemon_endpoint)
           Network::Utility::parseInternetAddressAndPortNoThrow(daemon_endpoint, false /*v6only*/)),
       io_handle_(Network::ioHandleForAddr(Network::Socket::Type::Datagram, address_, {})) {
   if (address_ == nullptr) {
-    throwEnvoyExceptionOrPanic(absl::StrCat("malformed IP address: ", daemon_endpoint));
+    throw EnvoyException(absl::StrCat("malformed IP address: ", daemon_endpoint));
   }
 }
 

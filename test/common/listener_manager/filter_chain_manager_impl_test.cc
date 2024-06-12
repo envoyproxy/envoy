@@ -82,7 +82,7 @@ public:
       local_address_ = std::make_shared<Network::Address::PipeInstance>(destination_address);
     } else {
       local_address_ =
-          Network::Utility::parseInternetAddress(destination_address, destination_port);
+          Network::Utility::parseInternetAddressNoThrow(destination_address, destination_port);
     }
     mock_socket->connection_info_provider_->setLocalAddress(local_address_);
 
@@ -96,7 +96,7 @@ public:
     if (absl::StartsWith(source_address, "/")) {
       remote_address_ = std::make_shared<Network::Address::PipeInstance>(source_address);
     } else {
-      remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
+      remote_address_ = Network::Utility::parseInternetAddressNoThrow(source_address, source_port);
     }
     mock_socket->connection_info_provider_->setRemoteAddress(remote_address_);
     NiceMock<StreamInfo::MockStreamInfo> stream_info;

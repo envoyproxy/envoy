@@ -1793,7 +1793,7 @@ ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& add
   absl::Status resolve_status;
   TRY_ASSERT_MAIN_THREAD {
     auto address_or_error = Network::Address::resolveProtoAddress(address);
-    if (address_or_error.value()) {
+    if (address_or_error.status().ok()) {
       return address_or_error.value();
     }
     resolve_status = address_or_error.status();

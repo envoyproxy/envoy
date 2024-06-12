@@ -25,7 +25,7 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
                               ep.toStruct(replacements)));
 
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::parseInternetAddress("127.0.0.1");
+      Network::Utility::parseInternetAddressNoThrow("127.0.0.1");
   ep.setAddress(addr);
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":0,"serviceName":""})"),

@@ -241,18 +241,6 @@ public:
                                                             uint32_t port);
 
   /**
-   * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
-   * not include a port number. Throws EnvoyException if unable to parse the address.
-   * @param ip_address string to be parsed as an internet address.
-   * @param port optional port to include in Instance created from ip_address, 0 by default.
-   * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
-   * @return pointer to the Instance.
-   * @throw EnvoyException in case of a malformed IP address.
-   */
-  static Address::InstanceConstSharedPtr
-  parseInternetAddress(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
-
-  /**
    * Retrieve the original destination address from an accepted socket.
    * The address (IP and port) may be not local and the port may differ from
    * the listener port if the packets were redirected using iptables
@@ -275,8 +263,12 @@ public:
    */
   static absl::uint128 Ip6htonl(const absl::uint128& address);
 
+  /**
+   * @param proto_address supplies the proto address to convert
+   * @return the InstanceConstSharedPtr for the address, or null if proto_address is invalid.
+   */
   static Address::InstanceConstSharedPtr
-  protobufAddressToAddress(const envoy::config::core::v3::Address& proto_address);
+  protobufAddressToAddressNoThrow(const envoy::config::core::v3::Address& proto_address);
 
   /**
    * Copies the address instance into the protobuf representation of an address.

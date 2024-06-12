@@ -414,10 +414,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)),
       disable_stateful_session_resumption_(config.disable_stateful_session_resumption()),
-      full_scan_certs_on_sni_mismatch_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, full_scan_certs_on_sni_mismatch,
-          !Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch"))) {
+      full_scan_certs_on_sni_mismatch_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, full_scan_certs_on_sni_mismatch, false)) {
 
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.

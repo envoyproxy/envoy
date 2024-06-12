@@ -853,7 +853,7 @@ TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResFail) {
   EXPECT_EQ("503", response2->headers().getStatusValue());
 }
 const BaseIntegrationTest::InstanceConstSharedPtrFn alternateLoopbackFunction() {
-  return [](int) { return Network::Utility::parseInternetAddress("127.0.0.2", 0); };
+  return [](int) { return Network::Utility::parseInternetAddressNoThrow("127.0.0.2", 0); };
 }
 
 // Make sure that even with a resolution success we won't drain the connection.

@@ -64,6 +64,7 @@ private:
   Api::MockApi api_{};
   Thread::ThreadFactory& thread_factory_;
   Event::DispatcherPtr worker_thread_dispatcher_;
+  std::function<void()> destroy_filters_ = []() {};
 
   const Buffer::Instance* decoding_buffer_{};
 };

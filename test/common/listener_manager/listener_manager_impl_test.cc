@@ -6519,7 +6519,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
   NiceMock<Network::MockAddressResolver> mock_resolver;
   EXPECT_CALL(mock_resolver, resolve(_))
       .Times(2)
-      .WillRepeatedly(Return(Network::Utility::parseInternetAddress("127.0.0.1", 1111, false)));
+      .WillRepeatedly(
+          Return(Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 1111, false)));
   Registry::InjectFactory<Network::Address::Resolver> register_resolver(mock_resolver);
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));

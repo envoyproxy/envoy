@@ -40,7 +40,8 @@ public:
     for (const auto& kv : test_output) {
       std::vector<std::string> expected(kv.second);
       std::sort(expected.begin(), expected.end());
-      std::vector<std::string> actual(trie_->getData(Utility::parseInternetAddress(kv.first)));
+      std::vector<std::string> actual(
+          trie_->getData(Utility::parseInternetAddressNoThrow(kv.first)));
       std::sort(actual.begin(), actual.end());
       EXPECT_EQ(expected, actual);
     }

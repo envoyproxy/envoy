@@ -714,7 +714,7 @@ TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
     return; // This test relies on ipv4 loopback.
   }
 
-  auto next_address = Network::Utility::parseInternetAddress(
+  auto next_address = Network::Utility::parseInternetAddressNoThrow(
       "127.0.0.3", fake_upstreams_[0]->localAddress()->ip()->port());
   // This will hopefully be miniminally flaky because of low use of 127.0.0.3
   // but may need to be disabled.

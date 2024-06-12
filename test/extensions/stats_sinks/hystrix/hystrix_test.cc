@@ -514,7 +514,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   NiceMock<Server::MockAdminStream> admin_stream_mock;
   NiceMock<Network::MockConnection> connection_mock;
 
-  auto addr_instance_ = Envoy::Network::Utility::parseInternetAddress("2.3.4.5", 123, false);
+  auto addr_instance_ = Envoy::Network::Utility::parseInternetAddressNoThrow("2.3.4.5", 123, false);
 
   Http::MockHttp1StreamEncoderOptions stream_encoder_options;
   ON_CALL(admin_stream_mock, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(callbacks_));

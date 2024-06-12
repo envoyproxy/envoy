@@ -478,7 +478,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
 
 TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   char addr4str[INET_ADDRSTRLEN];
-  auto addr4 = Network::Utility::parseInternetAddress("1.2.3.4");
+  auto addr4 = Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
 
   // First, create a resolver with no fallback. Check to see if cares default is
   // the only nameserver.

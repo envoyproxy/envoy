@@ -91,8 +91,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
 const BaseIntegrationTest::InstanceConstSharedPtrFn
 BaseIntegrationTest::defaultAddressFunction(Network::Address::IpVersion version) {
   return [version](int) {
-    return Network::Utility::parseInternetAddress(Network::Test::getLoopbackAddressString(version),
-                                                  0);
+    return Network::Utility::parseInternetAddressNoThrow(
+        Network::Test::getLoopbackAddressString(version), 0);
   };
 }
 

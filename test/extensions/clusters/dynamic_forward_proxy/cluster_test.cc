@@ -98,7 +98,7 @@ public:
   void makeTestHost(const std::string& host, const std::string& address) {
     EXPECT_TRUE(host_map_.find(host) == host_map_.end());
     host_map_[host] = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-    host_map_[host]->address_ = Network::Utility::parseInternetAddress(address);
+    host_map_[host]->address_ = Network::Utility::parseInternetAddressNoThrow(address);
 
     // Allow touch() to still be strict.
     EXPECT_CALL(*host_map_[host], address()).Times(AtLeast(0));
@@ -109,7 +109,7 @@ public:
 
   void updateTestHostAddress(const std::string& host, const std::string& address) {
     EXPECT_FALSE(host_map_.find(host) == host_map_.end());
-    host_map_[host]->address_ = Network::Utility::parseInternetAddress(address);
+    host_map_[host]->address_ = Network::Utility::parseInternetAddressNoThrow(address);
   }
 
   void refreshLb() { lb_ = lb_factory_->create(lb_params_); }

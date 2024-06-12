@@ -105,7 +105,6 @@ paths:
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
-    - source/common/network/utility.cc
     - source/common/formatter/http_specific_formatter.cc
     - source/common/formatter/stream_info_formatter.h
     - source/common/formatter/stream_info_formatter.cc
