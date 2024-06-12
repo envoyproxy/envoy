@@ -308,7 +308,7 @@ message KeyValue {
   string key = 1 [(validate.rules).string = {min_len: 1 max_bytes: 16384}];
 
   // The value of the key/value pair.
-  string value = 2;
+  bytes value = 2;
 }
 
 // Key/value pair plus option to control append behavior. This is used to specify
