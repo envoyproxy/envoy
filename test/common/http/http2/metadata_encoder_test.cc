@@ -77,13 +77,8 @@ public:
 
 } // namespace
 
-class MetadataEncoderTest : public testing::TestWithParam<bool> {
+class MetadataEncoderTest : public testing::Test {
 public:
-  void SetUp() override {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_decode_metadata_with_quiche",
-                                  GetParam() ? "true" : "false"}});
-  }
-
   void initialize(MetadataCallback cb) {
     decoder_ = std::make_unique<MetadataDecoder>(cb);
 
@@ -129,12 +124,9 @@ public:
   TestBuffer output_buffer_;
 
   Random::RandomGeneratorImpl random_generator_;
-  TestScopedRuntime scoped_runtime_;
 };
 
-INSTANTIATE_TEST_SUITE_P(BothBoolValues, MetadataEncoderTest, ::testing::Bool());
-
-TEST_P(MetadataEncoderTest, TestTotalPayloadSize) {
+TEST_F(MetadataEncoderTest, TestTotalPayloadSize) {
   initialize([](MetadataMapPtr&&) {});
 
   const std::string payload = std::string(1024, 'a');
@@ -147,7 +139,7 @@ TEST_P(MetadataEncoderTest, TestTotalPayloadSize) {
   EXPECT_EQ(2 * payload.size(), decoder_->totalPayloadSize());
 }
 
-TEST_P(MetadataEncoderTest, TestDecodeBadData) {
+TEST_F(MetadataEncoderTest, TestDecodeBadData) {
   MetadataMap metadata_map = {
       {"header_key1", "header_value1"},
   };
@@ -168,7 +160,7 @@ TEST_P(MetadataEncoderTest, TestDecodeBadData) {
 }
 
 // Checks if accumulated metadata size reaches size limit, returns failure.
-TEST_P(MetadataEncoderTest, VerifyEncoderDecoderMultipleMetadataReachSizeLimit) {
+TEST_F(MetadataEncoderTest, VerifyEncoderDecoderMultipleMetadataReachSizeLimit) {
   MetadataMap metadata_map_empty = {};
   MetadataCallback cb = [](std::unique_ptr<MetadataMap>) -> void {};
   initialize(cb);
@@ -206,7 +198,7 @@ TEST_P(MetadataEncoderTest, VerifyEncoderDecoderMultipleMetadataReachSizeLimit) 
 }
 
 // Tests encoding an empty map.
-TEST_P(MetadataEncoderTest, EncodeMetadataMapEmpty) {
+TEST_F(MetadataEncoderTest, EncodeMetadataMapEmpty) {
   MetadataMap empty = {};
   MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(empty);
 
@@ -224,7 +216,7 @@ TEST_P(MetadataEncoderTest, EncodeMetadataMapEmpty) {
 }
 
 // Tests encoding/decoding small metadata map vectors.
-TEST_P(MetadataEncoderTest, EncodeMetadataMapVectorSmall) {
+TEST_F(MetadataEncoderTest, EncodeMetadataMapVectorSmall) {
   MetadataMap metadata_map = {
       {"header_key1", std::string(5, 'a')},
       {"header_key2", std::string(5, 'b')},
@@ -260,7 +252,7 @@ TEST_P(MetadataEncoderTest, EncodeMetadataMapVectorSmall) {
 }
 
 // Tests encoding/decoding large metadata map vectors.
-TEST_P(MetadataEncoderTest, EncodeMetadataMapVectorLarge) {
+TEST_F(MetadataEncoderTest, EncodeMetadataMapVectorLarge) {
   MetadataMapVector metadata_map_vector;
   for (int i = 0; i < 10; i++) {
     MetadataMap metadata_map = {
@@ -283,7 +275,7 @@ TEST_P(MetadataEncoderTest, EncodeMetadataMapVectorLarge) {
 }
 
 // Tests encoding/decoding with fuzzed metadata size.
-TEST_P(MetadataEncoderTest, EncodeFuzzedMetadata) {
+TEST_F(MetadataEncoderTest, EncodeFuzzedMetadata) {
   MetadataMapVector metadata_map_vector;
   for (int i = 0; i < 10; i++) {
     Random::RandomGeneratorImpl random;
@@ -307,7 +299,7 @@ TEST_P(MetadataEncoderTest, EncodeFuzzedMetadata) {
   session_->ProcessBytes(toStringView(output_buffer_.buf, output_buffer_.length));
 }
 
-TEST_P(MetadataEncoderTest, EncodeDecodeFrameTest) {
+TEST_F(MetadataEncoderTest, EncodeDecodeFrameTest) {
   MetadataMap metadataMap = {
       {"Connections", "15"},
       {"Timeout Seconds", "10"},

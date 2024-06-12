@@ -30,6 +30,7 @@ project-lifecycle:
   - github:ravenblackx
   - github:soulxu
   - github:nezdolik
+  - github:tyxia
 contribution-policy:
   accepts-pull-requests: true
   accepts-automated-pull-requests: true

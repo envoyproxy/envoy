@@ -91,8 +91,13 @@ bool DnsAnswerRecord::serialize(Buffer::OwnedImpl& output) {
       // Store the 128bit address with 2 64 bit writes
       const absl::uint128 addr6 = ip_address->ipv6()->address();
       output.writeBEInt<uint16_t>(sizeof(addr6));
+#ifdef ABSL_IS_BIG_ENDIAN
+      output.writeBEInt<uint64_t>(absl::Uint128High64(addr6));
+      output.writeBEInt<uint64_t>(absl::Uint128Low64(addr6));
+#else
       output.writeLEInt<uint64_t>(absl::Uint128Low64(addr6));
       output.writeLEInt<uint64_t>(absl::Uint128High64(addr6));
+#endif
     } else if (ip_address->ipv4() != nullptr) {
       output.writeBEInt<uint16_t>(4);
       output.writeLEInt<uint32_t>(ip_address->ipv4()->address());
