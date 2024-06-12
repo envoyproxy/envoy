@@ -32,6 +32,10 @@ behavior_changes:
     :ref:`TlvsMetadata type <envoy_v3_api_msg_data.core.v3.TlvsMetadata>`.
     This change can be temporarily disabled by setting the runtime flag
     ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` to ``false``.
+- area: golang
+  change: |
+    Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
+    ``EncoderFilterCallbacks``, to support full-duplex processing.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -177,6 +181,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: tls
+  change: |
+    Removed ``envoy.reloadable_features.enable_intermediate_ca`` runtime flag and lagacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` runtime flag and lagacy code paths.
@@ -189,6 +196,12 @@ removed_config_or_runtime:
 - area: tcp
   change: |
     Removed ``envoy.reloadable_features.detect_and_raise_rst_tcp_connection`` runtime flag and legacy code paths.
+- area: tls
+  change: |
+    Removed ``envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch`` runtime flag and lagacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.http_allow_partial_urls_in_referer`` runtime flag and legacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and legacy code paths.
@@ -198,6 +211,9 @@ removed_config_or_runtime:
 - area: thrift
   change: |
     Removed ``envoy.reloadable_features.thrift_connection_draining`` runtime flag and legacy code paths.
+- area: thrift
+  change: |
+    Removed ``envoy.reloadable_features.thrift_allow_negative_field_ids`` runtime flag and legacy code paths.
 - area: router
   change: |
     Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
@@ -276,11 +292,18 @@ new_features:
     added new ``access_log`` command operators to retrieve upstream connection information change: ``%UPSTREAM_PEER_URI_SAN%``,
     ``%UPSTREAM_PEER_IP_SAN%``, ``%UPSTREAM_PEER_DNS_SAN%``, ``%UPSTREAM_LOCAL_URI_SAN%``, ``%UPSTREAM_LOCAL_DNS_SAN%``,
     ``%UPSTREAM_LOCAL_IP_SAN%``.
+- area: wasm
+  change: |
+    Update ``wasm`` filter to support use as an upstream filter.
 - area: open_telemetry
   change: |
     added :ref:`stat_prefix
     <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.stat_prefix>`
     configuration to support additional stat prefix for the OpenTelemetry logger.
+- area: thrift
+  change: |
+    added implementation of :ref:`thrift to metadata <envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata>`
+    http filter.
 - area: open_telemetry
   change: |
     added :ref:`formatters

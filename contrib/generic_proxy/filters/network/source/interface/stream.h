@@ -85,7 +85,7 @@ public:
    */
   FrameFlags(StreamFlags stream_flags = StreamFlags(), bool end_stream = true,
              uint32_t frame_tags = 0)
-      : stream_flags_(stream_flags), end_stream_(end_stream), frame_tags_(frame_tags) {}
+      : stream_flags_(stream_flags), frame_tags_(frame_tags), end_stream_(end_stream) {}
 
   /**
    * Get flags of stream that the frame belongs to. The flags MUST be same for all frames of the
@@ -93,6 +93,11 @@ public:
    * @return StreamFlags of the stream.
    */
   StreamFlags streamFlags() const { return stream_flags_; }
+
+  /**
+   * @return the stream id of the request or response.
+   */
+  uint64_t streamId() const { return stream_flags_.streamId(); }
 
   /**
    * @return whether the current frame is the last frame of the request or response.
@@ -112,9 +117,9 @@ public:
 private:
   StreamFlags stream_flags_{};
 
+  uint32_t frame_tags_{};
   // Default to true for backward compatibility.
   bool end_stream_{true};
-  uint32_t frame_tags_{};
 };
 
 /**
