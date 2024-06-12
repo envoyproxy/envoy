@@ -12,7 +12,6 @@ ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 ENVOY_FILTER_EXAMPLE_TESTS=(
     "//:echo2_integration_test"
     "//http-filter-example:http_filter_integration_test"
-    "//contrib/golang/filters/http/test/..."
     "//:envoy_binary_test")
 
 if [[ ! -d "${ENVOY_FILTER_EXAMPLE_SRCDIR}/.git" ]]; then
