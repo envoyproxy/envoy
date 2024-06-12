@@ -18,6 +18,7 @@ SINGLETON_MANAGER_REGISTRATION(local_ratelimit_share_provider_manager);
 class DefaultEvenShareMonitor : public ShareProviderManager::ShareMonitor {
 public:
   uint32_t tokensPerFill(uint32_t origin_tokens_per_fill) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     return std::ceil(origin_tokens_per_fill * share_);
   }
   void onLocalClusterUpdate(const Upstream::Cluster& cluster) override {
