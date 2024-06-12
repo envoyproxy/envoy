@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "cpu_utilization_monitor_lib",
+    name = "cpu_utilization_monitor",
     srcs = ["cpu_utilization_monitor.cc"],
     hdrs = [
         "cpu_stats_reader.h",
@@ -18,7 +18,6 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/common:exception_lib",
-        "//envoy/runtime:runtime_interface",
         "//envoy/server:resource_monitor_config_interface",
         "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg_cc_proto",
@@ -26,7 +25,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "linux_cpu_stats_reader_lib",
+    name = "linux_cpu_stats_reader",
     srcs = ["linux_cpu_stats_reader.cc"],
     hdrs = [
         "cpu_stats_reader.h",
@@ -45,8 +44,8 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":cpu_utilization_monitor_lib",
-        ":linux_cpu_stats_reader_lib",
+        ":cpu_utilization_monitor",
+        ":linux_cpu_stats_reader",
         "//envoy/registry",
         "//envoy/server:resource_monitor_config_interface",
         "//source/common/common:logger_lib",

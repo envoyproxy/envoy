@@ -23,25 +23,10 @@ CpuUtilizationMonitor::CpuUtilizationMonitor(
         CpuUtilizationConfig& /*config*/,
     std::unique_ptr<CpuStatsReader> cpu_stats_reader)
     : utilization_(0.0), cpu_stats_reader_(std::move(cpu_stats_reader)) {
-  if (Runtime::runtimeFeatureEnabled(CPU_UTILIZATION_MONITOR_ENABLED_RUNTIME_KEY)) {
-    previous_cpu_times_ = cpu_stats_reader_->getCpuTimes();
-  }
+  previous_cpu_times_ = cpu_stats_reader_->getCpuTimes();
 }
 
 void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
-  if (!Runtime::runtimeFeatureEnabled(CPU_UTILIZATION_MONITOR_ENABLED_RUNTIME_KEY)) {
-    // Overload manager configuration cannot be pushed from the control plane.
-    // There may be cases where we would like to stop shedding load based on CPU Monitor.
-    // We will achieve this by sending this runtime flag from the control plane and
-    // setting the utilization artifically to 0, assuming users will set their utilization
-    // limits to a much larger value than 0.
-    ENVOY_LOG_MISC(trace, "CPU Monitor is disabled");
-    Server::ResourceUsage usage;
-    usage.resource_pressure_ = 0;
-    callbacks.onSuccess(usage);
-    return;
-  }
-
   CpuTimes cpu_times = cpu_stats_reader_->getCpuTimes();
   if (!cpu_times.is_valid) {
     ENVOY_LOG_MISC(error, "Can't open file to read CPU utilization");

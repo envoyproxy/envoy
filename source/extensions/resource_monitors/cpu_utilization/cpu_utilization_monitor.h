@@ -3,7 +3,6 @@
 #include <chrono>
 
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/server/resource_monitor.h"
 
 #include "source/common/runtime/runtime_features.h"
@@ -13,9 +12,6 @@ namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
-
-static const std::string CPU_UTILIZATION_MONITOR_ENABLED_RUNTIME_KEY =
-    "envoy.reloadable_features.cpu_utilization_monitor";
 
 constexpr double DAMPENING_ALPHA = 0.05;
 
