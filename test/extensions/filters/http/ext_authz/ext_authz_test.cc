@@ -274,24 +274,15 @@ TEST_F(HttpFilterTest, DisableDynamicMetadataIngestion) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
-  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.getStatusValue(),
-                  std::to_string(enumToInt(Http::Code::InternalServerError)));
-      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
 
-  // Send response. It should get invalidated.
+  // Send response. Dynamic metadata should be ignored.
   Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   (*response.dynamic_metadata.mutable_fields())["key"] = ValueUtil::stringValue("value");
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-  EXPECT_EQ(decoder_filter_callbacks_.details(), "ext_authz_invalid");
-  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
-                    ->statsScope()
-                    .counterFromString("ext_authz.invalid")
-                    .value());
-  EXPECT_EQ(1U, config_->stats().invalid_.value());
+  EXPECT_EQ(1U, config_->stats().ignored_dynamic_metadata_.value());
 }
 
 // Tests that the filter rejects authz responses with mutations with an invalid key when

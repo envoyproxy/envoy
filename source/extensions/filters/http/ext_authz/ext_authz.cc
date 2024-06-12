@@ -310,25 +310,24 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   if (!response->dynamic_metadata.fields().empty()) {
     if (config_->disableDynamicMetadataIngestion()) {
       ENVOY_STREAM_LOG(trace,
-                       "Rejecting response: response is trying to inject dynamic metadata, "
-                       "but dynamic metadata ingestion is disabled.",
+                       "Response is trying to inject dynamic metadata, but dynamic metadata "
+                       "ingestion is disabled. Ignoring...",
                        *decoder_callbacks_);
-      rejectResponse();
-      return;
+      stats_.ignored_dynamic_metadata_.inc();
+    } else {
+      // Add duration of call to dynamic metadata if applicable
+      if (start_time_.has_value() && response->status == CheckStatus::OK) {
+        ProtobufWkt::Value ext_authz_duration_value;
+        auto duration =
+            decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
+        ext_authz_duration_value.set_number_value(
+            std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+        (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+            ext_authz_duration_value;
+      }
+      decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",
+                                                          response->dynamic_metadata);
     }
-
-    // Add duration of call to dynamic metadata if applicable
-    if (start_time_.has_value() && response->status == CheckStatus::OK) {
-      ProtobufWkt::Value ext_authz_duration_value;
-      auto duration =
-          decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
-      ext_authz_duration_value.set_number_value(
-          std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
-      (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
-          ext_authz_duration_value;
-    }
-    decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",
-                                                        response->dynamic_metadata);
   }
 
   switch (response->status) {

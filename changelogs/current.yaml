@@ -313,7 +313,7 @@ new_features:
     Added
     :ref:`disable_dynamic_metadata_ingestion
     <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.disable_dynamic_metadata_ingestion>`,
-    which allows ext_authz to be configured to reject responses containing dynamic metadata.
+    which allows ext_authz to be configured to ignore dynamic metadata in ext_authz responses.
 
 deprecated:
 - area: tracing
