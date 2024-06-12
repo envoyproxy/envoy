@@ -38,7 +38,7 @@ bool addressesEqual(const InstanceConstSharedPtr& a, const Instance& b) {
 }
 
 void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6only) {
-  auto addr_port = Network::Utility::parseInternetAddressAndPort(
+  auto addr_port = Network::Utility::parseInternetAddressAndPortNoThrow(
       fmt::format("{}:0", Network::Test::getAnyAddressUrlString(ip_version)), v6only);
   ASSERT_NE(addr_port, nullptr);
 
@@ -91,7 +91,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
         << "\nerrno: " << result.errno_;
   };
 
-  auto client_addr_port = Network::Utility::parseInternetAddressAndPort(
+  auto client_addr_port = Network::Utility::parseInternetAddressAndPortNoThrow(
       fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version),
                   addr_port->ip()->port()),
       v6only);

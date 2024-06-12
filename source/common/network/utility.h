@@ -17,22 +17,6 @@ namespace Envoy {
 namespace Network {
 
 /**
- * Utility class to represent TCP/UDP port range
- */
-class PortRange {
-public:
-  PortRange(uint32_t min, uint32_t max) : min_(min), max_(max) {}
-
-  bool contains(uint32_t port) const { return (port >= min_ && port <= max_); }
-
-private:
-  const uint32_t min_;
-  const uint32_t max_;
-};
-
-using PortRangeList = std::list<PortRange>;
-
-/**
  * A callback interface used by readFromSocket() to pass packets read from
  * socket.
  */
@@ -119,10 +103,9 @@ public:
   /**
    * Resolve a URL.
    * @param url supplies the url to resolve.
-   * @return Address::InstanceConstSharedPtr the resolved address.
-   * @throw EnvoyException if url is invalid.
+   * @return Address::InstanceConstSharedPtr the resolved address or an error status
    */
-  static Address::InstanceConstSharedPtr resolveUrl(const std::string& url);
+  static absl::StatusOr<Address::InstanceConstSharedPtr> resolveUrl(const std::string& url);
 
   /**
    * Determine the socket type for a URL.
@@ -155,18 +138,6 @@ public:
 
   /**
    * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
-   * not include a port number. Throws EnvoyException if unable to parse the address.
-   * @param ip_address string to be parsed as an internet address.
-   * @param port optional port to include in Instance created from ip_address, 0 by default.
-   * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
-   * @return pointer to the Instance.
-   * @throw EnvoyException in case of a malformed IP address.
-   */
-  static Address::InstanceConstSharedPtr
-  parseInternetAddress(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
-
-  /**
-   * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
    * not include a port number.
    * @param ip_address string to be parsed as an internet address.
    * @param port optional port to include in Instance created from ip_address, 0 by default.
@@ -184,18 +155,6 @@ public:
    * @return pointer to the Instance.
    */
   static Address::InstanceConstSharedPtr copyInternetAddressAndPort(const Address::Ip& ip);
-
-  /**
-   * Create a new Instance from an internet host address (IPv4 or IPv6) and port.
-   * @param ip_addr string to be parsed as an internet address and port. Examples:
-   *        - "1.2.3.4:80"
-   *        - "[1234:5678::9]:443"
-   * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
-   * @return pointer to the Instance.
-   * @throw EnvoyException in case of a malformed IP address.
-   */
-  static Address::InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_address,
-                                                                     bool v6only = true);
 
   /**
    * Create a new Instance from an internet host address (IPv4 or IPv6) and port.
@@ -282,6 +241,18 @@ public:
                                                             uint32_t port);
 
   /**
+   * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
+   * not include a port number. Throws EnvoyException if unable to parse the address.
+   * @param ip_address string to be parsed as an internet address.
+   * @param port optional port to include in Instance created from ip_address, 0 by default.
+   * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
+   * @return pointer to the Instance.
+   * @throw EnvoyException in case of a malformed IP address.
+   */
+  static Address::InstanceConstSharedPtr
+  parseInternetAddress(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
+
+  /**
    * Retrieve the original destination address from an accepted socket.
    * The address (IP and port) may be not local and the port may differ from
    * the listener port if the packets were redirected using iptables
@@ -289,24 +260,6 @@ public:
    * @return the original destination or nullptr if not available.
    */
   static Address::InstanceConstSharedPtr getOriginalDst(Socket& sock);
-
-  /**
-   * Parses a string containing a comma-separated list of port numbers and/or
-   * port ranges and appends the values to a caller-provided list of PortRange structures.
-   * For example, the string "1-1024,2048-4096,12345" causes 3 PortRange structures
-   * to be appended to the supplied list.
-   * @param str is the string containing the port numbers and ranges
-   * @param list is the list to append the new data structures to
-   */
-  static void parsePortRangeList(absl::string_view string, std::list<PortRange>& list);
-
-  /**
-   * Checks whether a given port number appears in at least one of the port ranges in a list
-   * @param address supplies the IP address to compare.
-   * @param list the list of port ranges in which the port may appear
-   * @return whether the port appears in at least one of the ranges in the list
-   */
-  static bool portInRangeList(const Address::Instance& address, const std::list<PortRange>& list);
 
   /**
    * Converts IPv6 absl::uint128 in network byte order to host byte order.
@@ -408,8 +361,6 @@ public:
                                                bool allow_mmsg, uint32_t& packets_dropped);
 
 private:
-  static void throwWithMalformedIp(absl::string_view ip_address);
-
   /**
    * Takes a number and flips the order in byte chunks. The last byte of the input will be the
    * first byte in the output. The second to last byte will be the second to first byte in the

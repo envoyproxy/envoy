@@ -39,7 +39,6 @@ import org.robolectric.RobolectricTestRunner
 class ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest {
   init {
     JniLibrary.loadTestLibrary()
-    JniLibrary.load()
   }
 
   private lateinit var httpProxyTestServer: HttpProxyTestServerFactory.HttpProxyTestServer

@@ -20,11 +20,14 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 private const val FILTER_NAME = "cancel_validation_filter"
 private const val LOCAL_ERROR_FILTER_CONFIG =
   "[type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError] {}"
 
+@RunWith(RobolectricTestRunner::class)
 class CancelGRPCStreamTest {
 
   init {

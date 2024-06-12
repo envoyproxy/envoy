@@ -30,6 +30,11 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
       quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
       listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory),
       connection_stats_(connection_stats) {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
+    http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
+  }
+#endif
   // If a factory is available, create a debug visitor and attach it to the connection.
   if (debug_visitor_factory.has_value()) {
     debug_visitor_ = debug_visitor_factory->createQuicConnectionDebugVisitor(this, streamInfo());

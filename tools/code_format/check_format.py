@@ -806,7 +806,9 @@ class FormatChecker:
             return False
 
         if self.deny_listed_for_exceptions(file_path):
-            if has_non_comment_throw(line) or "THROW" in line or "throwExceptionOrPanic" in line:
+            if has_non_comment_throw(
+                    line) or "THROW" in line or "throwEnvoyExceptionOrPanic" in line:
+
                 report_error(
                     "Don't introduce throws into exception-free files, use error "
                     "statuses instead.")

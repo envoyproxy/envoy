@@ -61,11 +61,11 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	f.initRequest(header)
 	if f.async {
 		go func() {
-			defer f.callbacks.RecoverPanic()
+			defer f.callbacks.DecoderFilterCallbacks().RecoverPanic()
 
 			status := f.decodeHeaders(header, endStream)
 			if status != api.LocalReply {
-				f.callbacks.Continue(status)
+				f.callbacks.DecoderFilterCallbacks().Continue(status)
 			}
 		}()
 		return api.Running

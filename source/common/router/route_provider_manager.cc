@@ -17,7 +17,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
-#include "source/common/router/rds_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
 #include "source/common/router/static_route_provider_impl.h"
 
@@ -31,23 +30,14 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
     const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
     Init::Manager& init_manager) {
-  auto provider = manager_.addDynamicProvider(
-      rds, rds.route_config_name(), init_manager,
-      [&factory_context, &rds, &stat_prefix, this](uint64_t manager_identifier) {
-        auto config_update =
-            std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits_, factory_context);
-        auto resource_decoder = std::make_shared<
-            Envoy::Config::OpaqueResourceDecoderImpl<envoy::config::route::v3::RouteConfiguration>>(
-            factory_context.messageValidationContext().dynamicValidationVisitor(), "name");
-        auto subscription = std::make_shared<RdsRouteConfigSubscription>(
-            std::move(config_update), std::move(resource_decoder), rds, manager_identifier,
-            factory_context, stat_prefix, manager_);
-        auto provider =
-            std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription), factory_context);
-        return std::make_pair(provider, &provider->subscription().initTarget());
-      });
-  ASSERT(dynamic_cast<RouteConfigProvider*>(provider.get()));
-  return std::static_pointer_cast<RouteConfigProvider>(provider);
+
+  auto factory = Envoy::Config::Utility::getFactoryByName<RdsFactory>("envoy.rds_factory.default");
+  if (!factory) {
+    IS_ENVOY_BUG("No envoy.rds_factory.default registered");
+    return nullptr;
+  }
+  return factory->createRdsRouteConfigProvider(rds, factory_context, stat_prefix, init_manager,
+                                               proto_traits_, manager_);
 }
 
 RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigProvider(

@@ -38,7 +38,7 @@ data class RetryPolicy(
      *
      * @param headers: The headers with which to initialize the retry policy.
      */
-    internal fun from(headers: RequestHeaders): RetryPolicy? {
+    fun from(headers: RequestHeaders): RetryPolicy? {
       val maxRetries = headers.value("x-envoy-max-retries")?.first()?.toIntOrNull() ?: return null
 
       return RetryPolicy(

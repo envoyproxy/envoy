@@ -20,8 +20,10 @@ envoy_mobile_swift_test(
         "RetryPolicyMapperTests.swift",
         "RetryPolicyTests.swift",
     ],
+    exec_properties = {
+        "sandboxNetwork": "standard",
+    },
     flaky = True,  # TODO(jpsim): Fix timeouts when running these tests on CI
-    tags = ["no-remote-exec"],  # TODO(32551): Re-enable remote exec
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_engine_objc_lib",
