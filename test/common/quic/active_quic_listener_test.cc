@@ -525,8 +525,11 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   for (size_t i = 1; i <= count; ++i) {
     sendCHLO(quic::test::TestConnectionId(i));
   }
+  // Wait for 1ms so that as many packets as possible can arrive at the listener.
   absl::SleepFor(absl::Milliseconds(1));
   size_t read_ready = 0;
+  // Read all the packets and count how many Read events it took. If all packets
+  // arrive within 3 event loops, QUIC stack will defer processing some of them.
   for (; quic_dispatcher_->NumSessions() < count + 1; ++read_ready) {
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
