@@ -488,6 +488,24 @@ TEST(UtilityTest, GetGovCloudSTSEndpoints) {
   EXPECT_EQ("sts.us-gov-west-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-west-1"));
 }
 
+// Test edge case where a SigV4a region set is provided and also web identity provider is in use
+TEST(UtilityTest, CorrectlyConvertRegionSet) {
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("*"));
+  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("*,ap-southeast-2"));
+  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com",
+            Utility::getSTSEndpoint("ca-central-*,ap-southeast-2"));
+#else
+  EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("*"));
+  EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("*,ap-southeast-2"));
+  EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("ca-central-*,ap-southeast-2"));
+#endif
+  EXPECT_EQ("sts.ap-southeast-2.amazonaws.com",
+            Utility::getSTSEndpoint("ap-southeast-2,us-east-2"));
+  EXPECT_EQ("sts.ca-central-1.amazonaws.com",
+            Utility::getSTSEndpoint("ca-central-1,ap-southeast-2,eu-central-1"));
+}
+
 TEST(UtilityTest, JsonStringFound) {
   auto test_json = Json::Factory::loadFromStringNoThrow("{\"access_key_id\":\"testvalue\"}");
   EXPECT_TRUE(test_json.ok());
