@@ -352,7 +352,7 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
       fmt::format(config_yaml, TestEnvironment::substitute(city_db_path));
   initializeProvider(formatted_config);
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("78.26.243.166");
+      Network::Utility::parseInternetAddressNoThrow("78.26.243.166");
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
@@ -367,7 +367,7 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
   expectReloadStats("city_db", 1, 0);
   captured_lookup_response_.clear();
   EXPECT_EQ(0, captured_lookup_response_.size());
-  remote_address = Network::Utility::parseInternetAddress("78.26.243.166");
+  remote_address = Network::Utility::parseInternetAddressNoThrow("78.26.243.166");
   Geolocation::LookupRequest lookup_rq2{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb2;
   auto lookup_cb_std2 = lookup_cb2.AsStdFunction();
@@ -398,7 +398,7 @@ TEST_F(GeoipProviderDeathTest, GeoDbNotSetForConfiguredHeader) {
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   EXPECT_DEATH(provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
-               "assert failure: isp_db_. Details: Maxmind asn database must be initialised for "
+               "assert failure: isp_db. Details: Maxmind asn database must be initialised for "
                "performing lookups");
 }
 
@@ -444,7 +444,7 @@ TEST_P(MmdbReloadImplTest, MmdbReloaded) {
   MmdbReloadTestCase test_case = GetParam();
   initializeProvider(test_case.yaml_config_);
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress(test_case.ip_);
+      Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
@@ -460,7 +460,7 @@ TEST_P(MmdbReloadImplTest, MmdbReloaded) {
   EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
   expectReloadStats(test_case.db_type_, 1, 0);
   captured_lookup_response_.clear();
-  remote_address = Network::Utility::parseInternetAddress(test_case.ip_);
+  remote_address = Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
   Geolocation::LookupRequest lookup_rq2{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb2;
   auto lookup_cb_std2 = lookup_cb2.AsStdFunction();
@@ -479,7 +479,7 @@ TEST_P(MmdbReloadImplTest, MmdbNotReloadedRuntimeFeatureDisabled) {
   MmdbReloadTestCase test_case = GetParam();
   initializeProvider(test_case.yaml_config_);
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress(test_case.ip_);
+      Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
@@ -495,7 +495,7 @@ TEST_P(MmdbReloadImplTest, MmdbNotReloadedRuntimeFeatureDisabled) {
   EXPECT_EQ(0, on_changed_cbs_.size());
   expectReloadStats(test_case.db_type_, 0, 0);
   captured_lookup_response_.clear();
-  remote_address = Network::Utility::parseInternetAddress(test_case.ip_);
+  remote_address = Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
   Geolocation::LookupRequest lookup_rq2{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb2;
   auto lookup_cb_std2 = lookup_cb2.AsStdFunction();

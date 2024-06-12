@@ -171,14 +171,10 @@ void GeoipProvider::lookupInCityDb(
       config_->isLookupEnabledForHeader(config_->regionHeader()) ||
       config_->isLookupEnabledForHeader(config_->countryHeader())) {
     int mmdb_error;
-    MMDB_lookup_result_s mmdb_lookup_result;
-    {
-      absl::ReaderMutexLock lock(&mmdb_mutex_);
-      ASSERT(city_db_, "Maxmind city database must be initialised for performing lookups");
-      mmdb_lookup_result = MMDB_lookup_sockaddr(
-          city_db_.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
-          &mmdb_error);
-    }
+    auto city_db = getCityDb();
+    ASSERT(city_db, "Maxmind city database must be initialised for performing lookups");
+    MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
+        city_db.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
@@ -217,14 +213,10 @@ void GeoipProvider::lookupInAsnDb(
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
     int mmdb_error;
-    MMDB_lookup_result_s mmdb_lookup_result;
-    {
-      absl::ReaderMutexLock lock(&mmdb_mutex_);
-      ASSERT(isp_db_, "Maxmind asn database must be initialised for performing lookups");
-      mmdb_lookup_result = MMDB_lookup_sockaddr(
-          isp_db_.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
-          &mmdb_error);
-    }
+    auto isp_db = getIspDb();
+    ASSERT(isp_db, "Maxmind asn database must be initialised for performing lookups");
+    MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
+        isp_db.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
@@ -249,14 +241,10 @@ void GeoipProvider::lookupInAnonDb(
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (config_->isLookupEnabledForHeader(config_->anonHeader()) || config_->anonVpnHeader()) {
     int mmdb_error;
-    MMDB_lookup_result_s mmdb_lookup_result;
-    {
-      absl::ReaderMutexLock lock(&mmdb_mutex_);
-      ASSERT(anon_db_, "Maxmind anon database must be initialised for performing lookups");
-      mmdb_lookup_result = MMDB_lookup_sockaddr(
-          anon_db_.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
-          &mmdb_error);
-    }
+    auto anon_db = getAnonDb();
+    ASSERT(anon_db, "Maxmind anon database must be initialised for performing lookups");
+    MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
+        anon_db.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
@@ -315,16 +303,13 @@ absl::Status GeoipProvider::mmdbReload(const MaxmindDbSharedPtr reloaded_db,
                                        const absl::string_view& db_type) {
   if (reloaded_db) {
     if (db_type == CITY_DB_TYPE) {
-      absl::WriterMutexLock lock(&mmdb_mutex_);
-      city_db_ = reloaded_db;
+      updateCityDb(reloaded_db);
       config_->incDbReloadSuccess(db_type);
     } else if (db_type == ISP_DB_TYPE) {
-      absl::WriterMutexLock lock(&mmdb_mutex_);
-      isp_db_ = reloaded_db;
+      updateIspDb(reloaded_db);
       config_->incDbReloadSuccess(db_type);
     } else if (db_type == ANON_DB_TYPE) {
-      absl::WriterMutexLock lock(&mmdb_mutex_);
-      anon_db_ = reloaded_db;
+      updateAnonDb(reloaded_db);
       config_->incDbReloadSuccess(db_type);
     } else {
       ENVOY_LOG(error, "Unsupported maxmind db type {}", db_type);
@@ -334,6 +319,36 @@ absl::Status GeoipProvider::mmdbReload(const MaxmindDbSharedPtr reloaded_db,
     config_->incDbReloadError(db_type);
   }
   return absl::OkStatus();
+}
+
+MaxmindDbSharedPtr GeoipProvider::getCityDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
+  absl::ReaderMutexLock lock(&mmdb_mutex_);
+  return city_db_;
+}
+
+void GeoipProvider::updateCityDb(MaxmindDbSharedPtr city_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
+  absl::MutexLock lock(&mmdb_mutex_);
+  city_db_ = city_db;
+}
+
+MaxmindDbSharedPtr GeoipProvider::getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
+  absl::ReaderMutexLock lock(&mmdb_mutex_);
+  return isp_db_;
+}
+
+void GeoipProvider::updateIspDb(MaxmindDbSharedPtr isp_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
+  absl::MutexLock lock(&mmdb_mutex_);
+  isp_db_ = isp_db;
+}
+
+MaxmindDbSharedPtr GeoipProvider::getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
+  absl::ReaderMutexLock lock(&mmdb_mutex_);
+  return anon_db_;
+}
+
+void GeoipProvider::updateAnonDb(MaxmindDbSharedPtr anon_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
+  absl::MutexLock lock(&mmdb_mutex_);
+  anon_db_ = anon_db;
 }
 
 absl::Status GeoipProvider::onMaxmindDbUpdate(const std::string& db_path,
