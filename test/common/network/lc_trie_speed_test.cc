@@ -12,7 +12,7 @@ struct AddressInputs {
         "192.0.2.225",   "198.51.100.55", "198.51.100.105", "192.0.2.150",   "203.0.113.162",
         "203.0.113.110", "203.0.113.99",  "198.51.100.23",  "198.51.100.24", "203.0.113.12"};
     for (const auto& address : test_addresses) {
-      addresses_.push_back(Envoy::Network::Utility::parseInternetAddress(address));
+      addresses_.push_back(Envoy::Network::Utility::parseInternetAddressNoThrow(address));
     }
   }
 

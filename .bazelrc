@@ -54,6 +54,8 @@ build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
 
+test --bes_upload_mode=nowait_for_upload_complete
+test --bes_timeout=30s
 test --test_verbose_timeout_warnings
 
 # Allow tags to influence execution requirements

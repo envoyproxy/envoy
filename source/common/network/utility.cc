@@ -160,16 +160,6 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::
   return nullptr;
 }
 
-Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,
-                                                              uint16_t port, bool v6only) {
-  const Address::InstanceConstSharedPtr address =
-      parseInternetAddressNoThrow(ip_address, port, v6only);
-  if (address == nullptr) {
-    throwEnvoyExceptionOrPanic(absl::StrCat("malformed IP address: ", ip_address));
-  }
-  return address;
-}
-
 Address::InstanceConstSharedPtr
 Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only) {
   if (ip_address.empty()) {
@@ -446,12 +436,12 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
 }
 
 Address::InstanceConstSharedPtr
-Utility::protobufAddressToAddress(const envoy::config::core::v3::Address& proto_address) {
+Utility::protobufAddressToAddressNoThrow(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
-    return Utility::parseInternetAddress(proto_address.socket_address().address(),
-                                         proto_address.socket_address().port_value(),
-                                         !proto_address.socket_address().ipv4_compat());
+    return Utility::parseInternetAddressNoThrow(proto_address.socket_address().address(),
+                                                proto_address.socket_address().port_value(),
+                                                !proto_address.socket_address().ipv4_compat());
   case envoy::config::core::v3::Address::AddressCase::kPipe:
     return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
                                                    proto_address.pipe().mode());

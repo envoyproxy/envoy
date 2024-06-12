@@ -1036,64 +1036,6 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareDifferentZoneSize) {
   }
 }
 
-TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSizeDisabled) {
-  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
-    return;
-  }
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.enable_zone_routing_different_zone_counts", "false"}});
-
-  envoy::config::core::v3::Locality zone_a;
-  zone_a.set_zone("A");
-  envoy::config::core::v3::Locality zone_b;
-  zone_b.set_zone("B");
-  envoy::config::core::v3::Locality zone_c;
-  zone_c.set_zone("C");
-
-  HostVectorSharedPtr upstream_hosts(
-      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b),
-                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)}));
-  HostVectorSharedPtr local_hosts(
-      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:0", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:1", simTime(), zone_b)}));
-  HostsPerLocalitySharedPtr upstream_hosts_per_locality =
-      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)},
-                            {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)},
-                            {makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)}});
-  HostsPerLocalitySharedPtr local_hosts_per_locality =
-      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:1", simTime(), zone_b)},
-                            {makeTestHost(info_, "tcp://127.0.0.1:0", simTime(), zone_a)}});
-
-  hostSet().healthy_hosts_ = *upstream_hosts;
-  hostSet().hosts_ = *upstream_hosts;
-  hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
-  common_config_.mutable_healthy_panic_threshold()->set_value(100);
-  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
-  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(3);
-  init(true);
-  updateHosts(local_hosts, local_hosts_per_locality);
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 100))
-      .WillRepeatedly(Return(50));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 98))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 3))
-      .WillRepeatedly(Return(3));
-
-  // Zone-aware routing should be disabled because the local zone and upstream zone count
-  // are different and the runtime feature flag is disabled.
-  EXPECT_CALL(random_, random()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_CALL(random_, random()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(0U, stats_.lb_zone_routing_all_directly_.value());
-  EXPECT_EQ(0U, stats_.lb_zone_routing_sampled_.value());
-  EXPECT_EQ(0U, stats_.lb_zone_routing_cross_zone_.value());
-  EXPECT_EQ(1U, stats_.lb_zone_number_differs_.value());
-}
-
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
