@@ -272,7 +272,7 @@ public:
   };
 
   /**
-   * Clear all dso to make asan happy in testing.
+   * Clean up all golang runtime to make asan happy in testing.
    */
   static void cleanUpForTest() {
     DsoStoreType& dsoStore = getDsoStore();
