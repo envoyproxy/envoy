@@ -2059,18 +2059,17 @@ public class CronetUrlRequestTest {
         EnvoyMobileError.DNS_RESOLUTION_FAILED, NetError.ERR_NAME_NOT_RESOLVED,
         NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, "NAME_NOT_RESOLVED", false,
         /*error_details=*/"envoy_rc: 400|envoy_ec: 0|resp_flags: 26|protocol: 1");
-    checkSpecificErrorCode(
-        EnvoyMobileError.UPSTREAM_CONNECTION_TERMINATION, NetError.ERR_CONNECTION_CLOSED,
-        NetworkException.ERROR_CONNECTION_CLOSED, "CONNECTION_CLOSED", true,
-        /*error_details=*/"envoy_rc: 400|envoy_ec: 0|resp_flags: 6|protocol: 1");
-    checkSpecificErrorCode(
-        EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE, NetError.ERR_CONNECTION_REFUSED,
-        NetworkException.ERROR_CONNECTION_REFUSED, "CONNECTION_REFUSED", false,
-        /*error_details=*/"envoy_rc: 400|envoy_ec: 0|resp_flags: 5|protocol: 1");
-    checkSpecificErrorCode(
-        EnvoyMobileError.UPSTREAM_REMOTE_RESET, NetError.ERR_CONNECTION_RESET,
-        NetworkException.ERROR_CONNECTION_RESET, "CONNECTION_RESET", true,
-        /*error_details=*/"envoy_rc: 400|envoy_ec: 0|resp_flags: 4|protocol: 1");
+    checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_CONNECTION_TERMINATION,
+                           NetError.ERR_CONNECTION_CLOSED, NetworkException.ERROR_CONNECTION_CLOSED,
+                           "CONNECTION_CLOSED", true,
+                           /*error_details=*/"envoy_rc: 400|envoy_ec: 0|resp_flags: 6|protocol: 1");
+    checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE,
+                           NetError.ERR_CONNECTION_REFUSED,
+                           NetworkException.ERROR_CONNECTION_REFUSED, "CONNECTION_REFUSED", false,
+                           /*error_details=*/"envoy_rc: 400|envoy_ec: 0|resp_flags: 5|protocol: 1");
+    checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_REMOTE_RESET, NetError.ERR_CONNECTION_RESET,
+                           NetworkException.ERROR_CONNECTION_RESET, "CONNECTION_RESET", true,
+                           /*error_details=*/"envoy_rc: 400|envoy_ec: 0|resp_flags: 4|protocol: 1");
     checkSpecificErrorCode(
         EnvoyMobileError.STREAM_IDLE_TIMEOUT, NetError.ERR_TIMED_OUT,
         NetworkException.ERROR_TIMED_OUT, "TIMED_OUT", true,
@@ -2320,10 +2319,10 @@ public class CronetUrlRequestTest {
         NativeTestServer.getFileURL("/notfound.html"), callback, callback.getExecutor());
     builder.setHttpMethod("HEAD").build().start();
     callback.blockForDone();
-    checkSpecificErrorCode(
-        EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE, NetError.ERR_CONNECTION_REFUSED,
-        NetworkException.ERROR_CONNECTION_REFUSED, "CONNECTION_REFUSED", false,
-        /*error_details=*/"envoy_rc: 400|envoy_ec: 0|resp_flags: 5|protocol: 1");
+    checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE,
+                           NetError.ERR_CONNECTION_REFUSED,
+                           NetworkException.ERROR_CONNECTION_REFUSED, "CONNECTION_REFUSED", false,
+                           /*error_details=*/"envoy_rc: 400|envoy_ec: 0|resp_flags: 5|protocol: 1");
   }
 
   @Test
