@@ -67,7 +67,6 @@ enum TrafficDirection {
 }
 
 // Identifies location of where either Envoy runs or where upstream hosts run.
-// [#next-free-field: 5]
 message Locality {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Locality";
 
