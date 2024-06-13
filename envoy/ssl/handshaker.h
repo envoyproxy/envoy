@@ -12,10 +12,20 @@
 #include "openssl/ssl.h"
 
 namespace Envoy {
+
+namespace Server {
+namespace Configuration {
+class CommonFactoryContext;
+} // namespace Configuration
+} // namespace Server
+
 namespace Ssl {
 
 // Opaque type defined and used by the ``ServerContext``.
 struct TlsContext;
+
+// It's defined in context_config.h
+class ServerContextConfig;
 
 class HandshakeCallbacks {
 public:
@@ -201,6 +211,8 @@ public:
 
 using CertSelectionCallbackPtr = std::unique_ptr<CertSelectionCallback>;
 
+enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
+
 class TlsCertificateSelector {
 public:
   virtual ~TlsCertificateSelector() = default;
@@ -210,6 +222,12 @@ public:
    */
   virtual SelectionResult selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
                                            CertSelectionCallbackPtr cb) PURE;
+
+  // Finds the best matching context. The returned context will have the same lifetime as
+  // ``ServerContextImpl``.
+  virtual std::pair<const Ssl::TlsContext&, OcspStapleAction>
+  findTlsContext(absl::string_view sni, bool client_ecdsa_capable, bool client_ocsp_capable,
+                 bool* cert_matched_sni) PURE;
 };
 
 using TlsCertificateSelectorPtr = std::unique_ptr<TlsCertificateSelector>;
@@ -224,30 +242,8 @@ public:
   virtual const std::vector<TlsContext>& getTlsContexts() const PURE;
 };
 
-using ContextSelectionCallbackWeakPtr = std::weak_ptr<ContextSelectionCallback>;
-
 using TlsCertificateSelectorFactoryCb =
-    std::function<TlsCertificateSelectorPtr(ContextSelectionCallbackWeakPtr)>;
-
-class TlsCertificateSelectorFactoryContext {
-public:
-  virtual ~TlsCertificateSelectorFactoryContext() = default;
-
-  /**
-   * Returns the singleton manager.
-   */
-  virtual Singleton::Manager& singletonManager() PURE;
-
-  /**
-   * @return reference to the server options
-   */
-  virtual const Server::Options& options() const PURE;
-
-  /**
-   * @return reference to the Api object
-   */
-  virtual Api::Api& api() PURE;
-};
+    std::function<TlsCertificateSelectorPtr(const ServerContextConfig&, ContextSelectionCallback&)>;
 
 class TlsCertificateSelectorFactory : public Config::TypedFactory {
 public:
@@ -256,10 +252,10 @@ public:
    * |validation_visitor| for early validation. This virtual base doesn't
    * perform MessageUtil::downcastAndValidate, but an implementation should.
    */
-  virtual TlsCertificateSelectorFactoryCb createTlsCertificateSelectorCb(
-      const ProtobufWkt::Any& config,
-      TlsCertificateSelectorFactoryContext& tls_certificate_selector_factory_context,
-      ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual TlsCertificateSelectorFactoryCb
+  createTlsCertificateSelectorCb(const Protobuf::Message& config,
+                                 Server::Configuration::CommonFactoryContext& factory_context,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.ssl.certificate_selector_factory"; }
 };

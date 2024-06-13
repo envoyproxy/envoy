@@ -66,16 +66,11 @@
 #include "xds/type/v3/typed_struct.pb.h"
 
 using testing::_;
-using testing::ContainsRegex;
-using testing::DoAll;
-using testing::InSequence;
 using testing::Invoke;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Ref;
-using testing::Return;
 using testing::ReturnRef;
-using testing::StrictMock;
 using testing::WithArg;
 
 namespace Envoy {
@@ -85,9 +80,11 @@ namespace Tls {
 
 class TestTlsCertificateSelector : public virtual Ssl::TlsCertificateSelector {
 public:
-  TestTlsCertificateSelector(Ssl::ContextSelectionCallbackWeakPtr ctx, const ProtobufWkt::Any&)
+  TestTlsCertificateSelector(Ssl::ContextSelectionCallback& ctx, const Protobuf::Message&)
       : ctx_(ctx) {}
-  ~TestTlsCertificateSelector() { ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector"); }
+  ~TestTlsCertificateSelector() override {
+    ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector");
+  }
   Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO*,
                                         Ssl::CertSelectionCallbackPtr cb) override {
     ENVOY_LOG_MISC(info, "debug: select context");
@@ -108,36 +105,39 @@ public:
     return {mod_, nullptr, false};
   };
 
+  std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction> findTlsContext(absl::string_view, bool,
+                                                                          bool, bool*) override {
+    PANIC("unreachable");
+  };
+
   void selectTlsContextAsync() {
     ENVOY_LOG_MISC(info, "debug: select cert async done");
     cb_->onCertSelectionResult(getTlsContext(), false);
   }
 
-  const Ssl::TlsContext& getTlsContext() { return ctx_.lock()->getTlsContexts()[0]; }
+  const Ssl::TlsContext& getTlsContext() { return ctx_.getTlsContexts()[0]; }
 
   Ssl::SelectionResult::SelectionStatus mod_;
 
 private:
-  Ssl::ContextSelectionCallbackWeakPtr ctx_;
+  Ssl::ContextSelectionCallback& ctx_;
   Ssl::CertSelectionCallbackPtr cb_;
 };
 
 class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorFactory {
 public:
   using CreateProviderHook =
-      std::function<void(const ProtobufWkt::Any&, Ssl::TlsCertificateSelectorFactoryContext&,
+      std::function<void(const Protobuf::Message&, Server::Configuration::CommonFactoryContext&,
                          ProtobufMessage::ValidationVisitor&)>;
 
-  Ssl::TlsCertificateSelectorFactoryCb createTlsCertificateSelectorCb(
-      const ProtobufWkt::Any& config,
-      Ssl::TlsCertificateSelectorFactoryContext& tls_certificate_selector_factory_context,
-      ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    tls_certificate_selector_factory_context.options();
-    tls_certificate_selector_factory_context.singletonManager();
+  Ssl::TlsCertificateSelectorFactoryCb
+  createTlsCertificateSelectorCb(const Protobuf::Message& config,
+                                 Server::Configuration::CommonFactoryContext& factory_context,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor) override {
     if (selector_cb_) {
-      selector_cb_(config, tls_certificate_selector_factory_context, validation_visitor);
+      selector_cb_(config, factory_context, validation_visitor);
     }
-    return [&config, this](Ssl::ContextSelectionCallbackWeakPtr ctx) {
+    return [&config, this](const Ssl::ServerContextConfig&, Ssl::ContextSelectionCallback& ctx) {
       ENVOY_LOG_MISC(info, "debug: init provider");
       auto provider = std::make_unique<TestTlsCertificateSelector>(ctx, config);
       provider->mod_ = mod_;
@@ -215,7 +215,7 @@ protected:
     provider_factory_.selector_cb_ = mock_factory_cb.AsStdFunction();
 
     EXPECT_CALL(mock_factory_cb, Call)
-        .WillOnce(WithArg<1>([&](Ssl::TlsCertificateSelectorFactoryContext& context) {
+        .WillOnce(WithArg<1>([&](Server::Configuration::CommonFactoryContext& context) {
           // Check that the objects available via the context are the same ones
           // provided to the parent context.
           EXPECT_THAT(context.api(), Ref(*server_api));

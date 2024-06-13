@@ -39,12 +39,9 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
-
 class ServerContextImpl : public ContextImpl,
                           public Envoy::Ssl::ServerContext,
-                          public Envoy::Ssl::ContextSelectionCallback,
-                          public std::enable_shared_from_this<ServerContextImpl> {
+                          public Envoy::Ssl::ContextSelectionCallback {
 public:
   static absl::StatusOr<std::unique_ptr<ServerContextImpl>>
   create(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
@@ -63,46 +60,30 @@ public:
 
   // Finds the best matching context. The returned context will have the same lifetime as
   // this ``ServerContextImpl``.
-  std::pair<const Ssl::TlsContext&, OcspStapleAction> findTlsContext(absl::string_view sni,
-                                                                     bool client_ecdsa_capable,
-                                                                     bool client_ocsp_capable,
-                                                                     bool* cert_matched_sni);
-  bool isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
-  bool isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
+  std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction> findTlsContext(absl::string_view sni,
+                                                                          bool client_ecdsa_capable,
+                                                                          bool client_ocsp_capable,
+                                                                          bool* cert_matched_sni);
+  bool isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello) const;
+  bool isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello) const;
 
 private:
   ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                     const std::vector<std::string>& server_names,
                     Server::Configuration::CommonFactoryContext& factory_context,
                     Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
-
-  // Currently, at most one certificate of a given key type may be specified for each exact
-  // server name or wildcard domain name.
-  using PkeyTypesMap = absl::flat_hash_map<int, std::reference_wrapper<Ssl::TlsContext>>;
-  // Both exact server names and wildcard domains are part of the same map, in which wildcard
-  // domains are prefixed with "." (i.e. ".example.com" for "*.example.com") to differentiate
-  // between exact and wildcard entries.
-  using ServerNamesMap = absl::flat_hash_map<std::string, PkeyTypesMap>;
-
-  void populateServerNamesMap(Ssl::TlsContext& ctx, const int pkey_id);
-
   using SessionContextID = std::array<uint8_t, SSL_MAX_SSL_SESSION_ID_LENGTH>;
 
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
                          unsigned int inlen);
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
-  OcspStapleAction ocspStapleAction(const Ssl::TlsContext& ctx, bool client_ocsp_capable);
 
   SessionContextID generateHashForSessionContextId(const std::vector<std::string>& server_names);
 
-  Ssl::TlsCertificateSelectorFactoryCb tls_certificate_selector_factory_cb_;
   Ssl::TlsCertificateSelectorPtr tls_certificate_selector_;
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
-  ServerNamesMap server_names_map_;
-  bool has_rsa_{false};
-  bool full_scan_certs_on_sni_mismatch_;
 };
 
 class ServerContextFactoryImpl : public ServerContextFactory {
