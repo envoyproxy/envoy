@@ -187,6 +187,12 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` runtime flag and lagacy code paths.
+- area: load_balancing
+  change: |
+    Removed ``envoy.reloadable_features.enable_zone_routing_different_zone_counts`` runtime flag and legacy code paths.
+- area: load_balancing
+  change: |
+    Removed ``envoy.reloadable_features.locality_routing_use_new_routing_logic`` runtime flag and legacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.proxy_status_upstream_request_timeout`` runtime flag and lagacy code paths.
@@ -202,6 +208,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.http_allow_partial_urls_in_referer`` runtime flag and legacy code paths.
+- area: oauth
+  change: |
+    Removed ``envoy.reloadable_features.oauth_make_token_cookie_httponly`` runtime flag and legacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and legacy code paths.
@@ -220,6 +229,9 @@ removed_config_or_runtime:
 - area: http2
   change: |
     Removed ``envoy.reloadable_features.http2_decode_metadata_with_quiche`` runtime flag and legacy code paths.
+- area: ext_authz
+  change: |
+    Removed ``envoy.reloadable_features.ext_authz_http_send_original_xff`` runtime flag and legacy code paths.
 - area: jwt
   change: |
     Removed ``envoy.reloadable_features.token_passed_entirely`` runtime flag and legacy code paths.

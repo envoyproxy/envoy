@@ -316,3 +316,11 @@ func envoyGoRequestSemaDec(r *C.httpRequest) {
 	defer req.recoverPanic()
 	req.resumeWaitCallback()
 }
+
+// This is unsafe, just for asan testing.
+//
+//export envoyGoFilterCleanUp
+func envoyGoFilterCleanUp() {
+	asanTestEnabled = true
+	forceGCFinalizer()
+}

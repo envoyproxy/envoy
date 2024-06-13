@@ -40,7 +40,6 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-constexpr const char* CookieTailFormatString = ";path=/;Max-Age={};secure";
 constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
@@ -683,7 +682,6 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   }
 
   // We use HTTP Only cookies.
-  const std::string cookie_tail = fmt::format(CookieTailFormatString, max_age);
   const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, max_age);
   const CookieNames& cookie_names = config_->cookieNames();
 
@@ -697,17 +695,13 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
   // auth server.
   if (config_->forwardBearerToken()) {
-    std::string cookie_attribute_httponly =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_make_token_cookie_httponly")
-            ? cookie_tail_http_only
-            : cookie_tail;
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_attribute_httponly));
+        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail_http_only));
     if (!id_token_.empty()) {
       headers.addReferenceKey(
           Http::Headers::get().SetCookie,
-          absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_attribute_httponly));
+          absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_tail_http_only));
     }
 
     if (!refresh_token_.empty()) {
