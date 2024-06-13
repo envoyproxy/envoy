@@ -2098,7 +2098,7 @@ public class CronetUrlRequestTest {
     checkSpecificErrorCode(
         EnvoyMobileError.DNS_RESOLUTION_FAILED, NetError.ERR_INTERNET_DISCONNECTED,
         NetworkException.ERROR_INTERNET_DISCONNECTED, "INTERNET_DISCONNECTED", false,
-        /*error_details=*/"envoy_rc: 400|envoy_rc: 0|rsp_flags: 26|protocol: 1");
+        /*error_details=*/"envoy_rc: 400|envoy_ec: 0|rsp_flags: 26|protocol: 1");
 
     // bring back online since the AndroidNetworkMonitor class is a singleton
     connectivityManager.setActiveNetworkInfo(networkInfo);
