@@ -33,3 +33,18 @@ envoy_extension_cc_test(
         "//test/test_common:environment_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_names = ["envoy.resource_monitors.cpu_utilization"],
+    deps = [
+        "//envoy/registry",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/resource_monitors/cpu_utilization:config",
+        "//source/server:resource_monitor_config_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/server:options_mocks",
+        "@envoy_api//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg_cc_proto",
+    ],
+)
