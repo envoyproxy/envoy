@@ -297,28 +297,36 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
       max_ejection_time_jitter_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(
           config, max_ejection_time_jitter, DEFAULT_MAX_EJECTION_TIME_JITTER_MS))),
       successful_active_health_check_uneject_host_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, successful_active_health_check_uneject_host, true)),
-      validation_visitor_(validation_visitor) {
+          config, successful_active_health_check_uneject_host, true)) {
 
-  // Store extensions' config. It will be used to create extensions monitors
-  // when host are added to the cluster.
-  extensions_config_ = config.monitors();
+  if (config.monitors().empty()) {
+    return;
+  }
+
+  // The following loop passes extensions' configs to factory's validators.
+  // After checking the validity of each config, the factory returns callback function
+  // which is stored and executed later on, when outlier extensions are created for
+  // each host in the cluster.
+  std::shared_ptr<ExtMonitorFactoryContext> context =
+      std::make_shared<ExtMonitorFactoryContext>(validation_visitor);
+  for (const auto& monitor_config : config.monitors()) {
+    auto& factory = Config::Utility::getAndCheckFactory<ExtMonitorFactory>(monitor_config);
+    auto config =
+        Config::Utility::translateToFactoryConfig(monitor_config, validation_visitor, factory);
+    auto extension_create_fn =
+        factory.createMonitor(monitor_config.name(), std::move(config), context);
+    monitors_create_fn.push_back(extension_create_fn);
+  }
 }
 
 std::unique_ptr<ExtMonitorsSet> DetectorConfig::createMonitorExtensions(
     std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) {
-  // Create outlier detection extensions.
-  if (extensions_config_.empty()) {
-    return nullptr;
-  }
-
   auto monitors_set = std::make_unique<ExtMonitorsSet>();
-  ExtMonitorFactoryContext context(validation_visitor_);
-  for (const auto& monitor_config : extensions_config_) {
-    auto& factory = Config::Utility::getAndCheckFactory<ExtMonitorFactory>(monitor_config);
-    auto config =
-        Config::Utility::translateToFactoryConfig(monitor_config, validation_visitor_, factory);
-    auto extension = factory.createMonitor(monitor_config.name(), *config, context);
+
+  // Create each extension by calling a callback function created by factory when the
+  // config was evaluated.
+  for (const auto& create_fn : monitors_create_fn) {
+    auto extension = create_fn();
     extension->setCallback(callback);
     monitors_set->addMonitor(std::move(extension));
   }

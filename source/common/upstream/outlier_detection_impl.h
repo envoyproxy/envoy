@@ -389,11 +389,9 @@ private:
   static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_MS = 10 * DEFAULT_BASE_EJECTION_TIME_MS;
   static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_JITTER_MS = 0;
 
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
-  // Store extensions config. It will be used when monitors are created and extensions
-  // must be attached.
-  Envoy::Protobuf::RepeatedPtrField<::envoy::config::core::v3::TypedExtensionConfig>
-      extensions_config_;
+  // Set of functions creating extensions. They are called when a new host is created and needs
+  // outlier detection monitors. Monitors configs are validated when this set is created.
+  absl::InlinedVector<ExtMonitorCreateFn, 3> monitors_create_fn;
 };
 
 /**

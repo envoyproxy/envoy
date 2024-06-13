@@ -87,12 +87,18 @@ protected:
 template <class ConfigProto>
 class ExtMonitorFactoryBase : public Upstream::Outlier::ExtMonitorFactory {
 public:
-  ExtMonitorPtr createMonitor(const std::string& monitor_name, const Protobuf::Message& config,
-                              ExtMonitorFactoryContext& context) override {
-    return createMonitorFromProtoTyped(monitor_name,
-                                       Envoy::MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                           config, context.messageValidationVisitor()),
-                                       context);
+  ExtMonitorCreateFn createMonitor(const std::string& monitor_name,
+                                   ProtobufTypes::MessagePtr&& config,
+                                   std::shared_ptr<ExtMonitorFactoryContext> context) override {
+    // This should throw exception if config is wrong. In the lambda below there is no need to
+    // validate config again.
+    Envoy::MessageUtil::downcastAndValidate<const ConfigProto&>(
+        *config, context->messageValidationVisitor());
+    // "convert" unique pointer to shared one.
+    std::shared_ptr<Protobuf::Message> cfg(config.release());
+    return [&monitor_name, cfg, context, this]() {
+      return createMonitorFromProtoTyped(monitor_name, dynamic_cast<ConfigProto&>(*cfg), *context);
+    };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
