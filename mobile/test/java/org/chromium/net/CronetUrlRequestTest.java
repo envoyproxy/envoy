@@ -2055,10 +2055,9 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testErrorCodes() throws Exception {
-    checkSpecificErrorCode(
-        EnvoyMobileError.DNS_RESOLUTION_FAILED, NetError.ERR_NAME_NOT_RESOLVED,
-        NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, "NAME_NOT_RESOLVED", false,
-        /*error_details=*/"envoy_rc: 400|envoy_ec: 0|rsp_flags: 26|protocol: 1");
+    checkSpecificErrorCode(EnvoyMobileError.DNS_RESOLUTION_FAILED, NetError.ERR_NAME_NOT_RESOLVED,
+                           NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, "NAME_NOT_RESOLVED", false,
+                           /*error_details=*/"envoy_rc: 400|envoy_ec: 0|rsp_flags: 26|protocol: 1");
     checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_CONNECTION_TERMINATION,
                            NetError.ERR_CONNECTION_CLOSED, NetworkException.ERROR_CONNECTION_CLOSED,
                            "CONNECTION_CLOSED", true,
@@ -2070,13 +2069,11 @@ public class CronetUrlRequestTest {
     checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_REMOTE_RESET, NetError.ERR_CONNECTION_RESET,
                            NetworkException.ERROR_CONNECTION_RESET, "CONNECTION_RESET", true,
                            /*error_details=*/"envoy_rc: 400|envoy_ec: 0|rsp_flags: 4|protocol: 1");
-    checkSpecificErrorCode(
-        EnvoyMobileError.STREAM_IDLE_TIMEOUT, NetError.ERR_TIMED_OUT,
-        NetworkException.ERROR_TIMED_OUT, "TIMED_OUT", true,
-        /*error_details=*/"envoy_rc: 400|envoy_ec: 0|rsp_flags: 16|protocol: 1");
-    checkSpecificErrorCode(
-        0x2000, NetError.ERR_OTHER, NetworkException.ERROR_OTHER, "OTHER", false,
-        /*error_details=*/"envoy_rc: 400|envoy_ec: 0|rsp_flags: 13|protocol: 1");
+    checkSpecificErrorCode(EnvoyMobileError.STREAM_IDLE_TIMEOUT, NetError.ERR_TIMED_OUT,
+                           NetworkException.ERROR_TIMED_OUT, "TIMED_OUT", true,
+                           /*error_details=*/"envoy_rc: 400|envoy_ec: 0|rsp_flags: 16|protocol: 1");
+    checkSpecificErrorCode(0x2000, NetError.ERR_OTHER, NetworkException.ERROR_OTHER, "OTHER", false,
+                           /*error_details=*/"envoy_rc: 400|envoy_ec: 0|rsp_flags: 13|protocol: 1");
   }
 
   /*
