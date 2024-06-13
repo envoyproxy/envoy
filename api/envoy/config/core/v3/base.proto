@@ -67,7 +67,7 @@ enum TrafficDirection {
 }
 
 // Identifies location of where either Envoy runs or where upstream hosts run.
-// [#next-free-field: 10]
+// [#next-free-field: 5]
 message Locality {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Locality";
 
@@ -90,7 +90,7 @@ message Locality {
   string sub_zone = 3;
 
   // Metadata to provide additional information about the locality.
-  Metadata metadata = 9;
+  Metadata metadata = 4;
 }
 
 // BuildVersion combines SemVer version of extension with free-form build information
