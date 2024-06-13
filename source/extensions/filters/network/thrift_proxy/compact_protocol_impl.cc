@@ -112,22 +112,13 @@ bool CompactProtocolImpl::peekReplyPayload(Buffer::Instance& buffer, ReplyType& 
     return false;
   }
 
-  validateFieldId(id);
+  if (id < std::numeric_limits<int16_t>::min() && id > std::numeric_limits<int16_t>::max()) {
+    throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
+  }
+
   // successful response struct in field id 0, error (IDL exception) in field id greater than 0
   reply_type = id == 0 ? ReplyType::Success : ReplyType::Error;
   return true;
-}
-
-void CompactProtocolImpl::validateFieldId(int32_t id) {
-  if (id >= 0 && id <= std::numeric_limits<int16_t>::max()) {
-    return;
-  }
-
-  if (id < 0 && id >= std::numeric_limits<int16_t>::min()) {
-    return;
-  }
-
-  throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
 }
 
 bool CompactProtocolImpl::readStructBegin(Buffer::Instance& buffer, std::string& name) {
