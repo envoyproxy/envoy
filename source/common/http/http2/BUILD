@@ -88,6 +88,7 @@ envoy_cc_library(
         "//envoy/http:codec_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:c_smart_ptr_lib",
         "//source/common/common:minimal_logger_lib",
     ],
 )
@@ -101,8 +102,10 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/http:codec_interface",
+        "//envoy/http:metadata_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:c_smart_ptr_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/runtime:runtime_features_lib",
     ],

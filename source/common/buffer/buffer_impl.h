@@ -12,7 +12,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/non_copyable.h"
 #include "source/common/common/utility.h"
-#include "source/common/event/libevent.h"
 
 #include "absl/functional/any_invocable.h"
 

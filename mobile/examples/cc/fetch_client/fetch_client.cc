@@ -4,6 +4,7 @@
 
 #include "source/common/api/api_impl.h"
 #include "source/common/common/thread.h"
+#include "source/common/event/libevent.h"
 #include "source/common/http/utility.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
