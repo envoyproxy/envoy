@@ -52,6 +52,7 @@ namespace ExternalProcessing {
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
+constexpr absl::string_view ImmediateResponsePrefix = "direct_response_from_ext_proc[{}]";
 
 class ExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:

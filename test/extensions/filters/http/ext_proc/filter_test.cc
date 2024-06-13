@@ -83,7 +83,6 @@ using namespace std::chrono_literals;
 
 static const uint32_t BufferSize = 100000;
 constexpr absl::string_view FilterConfigName = "scooby.dooby.doo";
-constexpr absl::string_view ImmediateResponsePrefix = "immediate_response_from_ext_proc[{}]";
 const std::string badRequestResponseDetails() {
   CONSTRUCT_ON_FIRST_USE(std::string,
                          absl::StrCat(fmt::format(ImmediateResponsePrefix, FilterConfigName), ":",
