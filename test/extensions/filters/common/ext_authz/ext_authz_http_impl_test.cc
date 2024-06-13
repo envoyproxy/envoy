@@ -263,11 +263,11 @@ TEST_F(ExtAuthzHttpClientTest, PathPrefixShouldBeSanitized) {
   auto empty_config = createConfig(EMPTY_STRING, 250, "");
   EXPECT_TRUE(empty_config->pathPrefix().empty());
 
-  auto prefix_config = createConfig(EMPTY_STRING, 250, "the_prefix");
-  EXPECT_EQ(prefix_config->pathPrefix(), "/the_prefix");
-
   auto slash_prefix_config = createConfig(EMPTY_STRING, 250, "/the_prefix");
   EXPECT_EQ(slash_prefix_config->pathPrefix(), "/the_prefix");
+
+  EXPECT_THROW_WITH_MESSAGE(createConfig(EMPTY_STRING, 250, "the_prefix"), EnvoyException,
+                            "path_prefix should start with \"/\".");
 }
 
 // Verify client response when the authorization server returns a 200 OK and path_prefix is
