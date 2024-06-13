@@ -144,11 +144,27 @@ bool ActiveStream::sendFrameToDownstream(const StreamFrame& frame, bool header_f
   return true;
 }
 
-// TODO(wbpcode): add the short_response_flags support to the sendLocalReply
-// method.
 void ActiveStream::sendLocalReply(Status status, absl::string_view data,
                                   ResponseUpdateFunction func) {
-  // Clear possible response frames.
+  // To ensure only one response header frame is sent for local reply.
+  // If there is a previsous response header but has not been sent to the downstream,
+  // we should send the latest local reply to the downstream directly without any
+  // filter processing.
+  // If the previous response header has been sent to the downstream, it is an invalid
+  // situation that we cannot handle. Then, we should reset the stream and return.
+  // In other cases, we should continue the filter chain to process the local reply.
+
+  const bool has_prev_response = response_header_frame_ != nullptr;
+  const bool has_sent_response =
+      has_prev_response && encoder_filter_iter_header_ == encoder_filters_.end();
+
+  if (has_sent_response) {
+    ENVOY_LOG(error, "Generic proxy: invalid local reply: response is already sent.");
+    resetStream(DownstreamStreamResetReason::ProtocolError);
+    return;
+  }
+
+  // Clear possible response frames anyway now.
   response_header_frame_ = nullptr;
   response_common_frames_.clear();
 
@@ -167,14 +183,20 @@ void ActiveStream::sendLocalReply(Status status, absl::string_view data,
   }
 
   response_header_frame_ = std::move(response);
+  parent_.stream_drain_decision_ |= response_header_frame_->frameFlags().drainClose();
   local_reply_ = true;
   // status message will be used as response code details.
   stream_info_.setResponseCodeDetails(status.message());
   // Set the response code to the stream info.
   stream_info_.setResponseCode(response_header_frame_->status().code());
 
-  // Send the response header frame to downstream.
-  sendFrameToDownstream(*response_header_frame_, true);
+  if (has_prev_response) {
+    // There was a previous response. Send the new response to the downstream directly.
+    sendFrameToDownstream(*response_header_frame_, true);
+    return;
+  } else {
+    continueEncoding();
+  }
 }
 
 void ActiveStream::processRequestHeaderFrame() {
@@ -277,7 +299,7 @@ void ActiveStream::processResponseHeaderFrame() {
               response_header_frame_->frameFlags().endStream());
 
     // Send the header frame to downstream.
-    if (!sendFrameToDownstream(*response_header_frame_, false)) {
+    if (!sendFrameToDownstream(*response_header_frame_, true)) {
       stop_encoder_filter_chain_ = true;
     }
   };
@@ -465,15 +487,25 @@ void ActiveStream::onRequestCommonFrame(RequestCommonFramePtr request_common_fra
 }
 
 void ActiveStream::onResponseHeaderFrame(ResponsePtr response) {
-  ASSERT(response_header_frame_ == nullptr);
+  // To ensure only one response header frame is handled for upstream response.
+  // If there is a previous response header frame, no matter it is come from
+  // the upstream or the local reply, it is an invalid situation that we cannot
+  // handle. Then, we should reset the stream and return.
+  const bool has_prev_response = response_header_frame_ != nullptr;
+  if (has_prev_response) {
+    ENVOY_LOG(error, "Generic proxy: invalid response: has previous response.");
+    resetStream(DownstreamStreamResetReason::ProtocolError);
+    return;
+  }
+
   response_header_frame_ = std::move(response);
-  ASSERT(response_header_frame_ != nullptr);
-  parent_.stream_drain_decision_ = response_header_frame_->frameFlags().streamFlags().drainClose();
+  parent_.stream_drain_decision_ |= response_header_frame_->frameFlags().drainClose();
 
   // The response code details always be "via_upstream" for response from upstream.
   stream_info_.setResponseCodeDetails("via_upstream");
   // Set the response code to the stream info.
   stream_info_.setResponseCode(response_header_frame_->status().code());
+
   continueEncoding();
 }
 

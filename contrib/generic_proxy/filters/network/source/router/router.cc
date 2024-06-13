@@ -40,12 +40,13 @@ ReasonViewAndFlag resetReasonToViewAndFlag(StreamResetReason reason) {
 
 } // namespace
 
-UpstreamRequest::UpstreamRequest(RouterFilter& parent, StreamFlags stream_flags,
+UpstreamRequest::UpstreamRequest(RouterFilter& parent, FrameFlags header_frame_flags,
                                  GenericUpstreamSharedPtr generic_upstream)
     : parent_(parent), generic_upstream_(std::move(generic_upstream)),
       stream_info_(parent.time_source_, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain),
       upstream_info_(std::make_shared<StreamInfo::UpstreamInfoImpl>()),
-      stream_id_(stream_flags.streamId()), expects_response_(!stream_flags.oneWayStream()) {
+      stream_id_(header_frame_flags.streamId()),
+      expects_response_(!header_frame_flags.oneWayStream()) {
 
   // Host is known at this point and set the initial upstream host.
   onUpstreamHostSelected(generic_upstream_->upstreamHost());
@@ -244,7 +245,7 @@ void UpstreamRequest::onDecodingSuccess(ResponseHeaderFramePtr response_header_f
   }
 
   if (response_header_frame->frameFlags().endStream()) {
-    onUpstreamResponseComplete(response_header_frame->frameFlags().streamFlags().drainClose());
+    onUpstreamResponseComplete(response_header_frame->frameFlags().drainClose());
   }
 
   parent_.onResponseHeaderFrame(std::move(response_header_frame));
@@ -258,7 +259,7 @@ void UpstreamRequest::onDecodingSuccess(ResponseCommonFramePtr response_common_f
   }
 
   if (response_common_frame->frameFlags().endStream()) {
-    onUpstreamResponseComplete(response_common_frame->frameFlags().streamFlags().drainClose());
+    onUpstreamResponseComplete(response_common_frame->frameFlags().drainClose());
   }
 
   parent_.onResponseCommonFrame(std::move(response_common_frame));
@@ -448,8 +449,8 @@ void RouterFilter::kickOffNewUpstreamRequest() {
     return;
   }
 
-  auto upstream_request = std::make_unique<UpstreamRequest>(
-      *this, request_stream_->frameFlags().streamFlags(), std::move(generic_upstream));
+  auto upstream_request = std::make_unique<UpstreamRequest>(*this, request_stream_->frameFlags(),
+                                                            std::move(generic_upstream));
   auto raw_upstream_request = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   raw_upstream_request->startStream();
