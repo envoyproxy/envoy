@@ -556,7 +556,7 @@ TEST_P(ClientTest, RemoteResetAfterStreamStart) {
   stream_callbacks.on_error_ = [&](const EnvoyError& error, envoy_stream_intel,
                                    envoy_final_stream_intel) -> void {
     EXPECT_EQ(error.error_code_, ENVOY_STREAM_RESET);
-    EXPECT_THAT(error.message_, ContainsRegex("ERROR_CODE: 1"));
+    EXPECT_THAT(error.message_, ContainsRegex("envoy_ec: 1"));
     EXPECT_EQ(error.attempt_count_, 0);
     callbacks_called.on_error_calls_++;
   };
