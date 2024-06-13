@@ -137,10 +137,16 @@ public:
       }
 
       auto message = std::make_unique<DecoderMessageType>(metadata_);
-      message->stream_frame_flags_ = {{static_cast<uint64_t>(metadata_->requestId()),
-                                       !metadata_->context().isTwoWay(), false,
-                                       metadata_->context().heartbeat()},
-                                      true};
+
+      uint32_t frame_flags = FrameFlags::FLAG_END_STREAM; // Dubbo message only has one frame.
+      if (!metadata_->context().isTwoWay()) {
+        frame_flags |= FrameFlags::FLAG_ONE_WAY;
+      }
+      if (metadata_->context().heartbeat()) {
+        frame_flags |= FrameFlags::FLAG_HEARTBEAT;
+      }
+
+      message->stream_frame_flags_ = {static_cast<uint64_t>(metadata_->requestId()), frame_flags};
       metadata_.reset();
       callback_->onDecodingSuccess(std::move(message));
 

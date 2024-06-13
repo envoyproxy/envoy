@@ -425,235 +425,235 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// TEST_P(IntegrationTest, InitializeInstance) {
-//   FakeStreamCodecFactoryConfig codec_factory_config;
-//   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+TEST_P(IntegrationTest, InitializeInstance) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
-//   initialize(defaultConfig(), std::make_unique<FakeStreamCodecFactory>());
-// }
+  initialize(defaultConfig(), std::make_unique<FakeStreamCodecFactory>());
+}
 
-// TEST_P(IntegrationTest, RequestRouteNotFound) {
-//   FakeStreamCodecFactoryConfig codec_factory_config;
-//   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+TEST_P(IntegrationTest, RequestRouteNotFound) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
-//   initialize(defaultConfig(), std::make_unique<FakeStreamCodecFactory>());
-//   EXPECT_TRUE(makeClientConnectionForTest());
+  initialize(defaultConfig(), std::make_unique<FakeStreamCodecFactory>());
+  EXPECT_TRUE(makeClientConnectionForTest());
 
-//   FakeStreamCodecFactory::FakeRequest request;
-//   request.host_ = "service_name_0";
-//   request.method_ = "hello";
-//   request.path_ = "/path_or_anything";
-//   request.protocol_ = "fake_fake_fake";
-//   request.data_ = {{"version", "v2"}};
+  FakeStreamCodecFactory::FakeRequest request;
+  request.host_ = "service_name_0";
+  request.method_ = "hello";
+  request.path_ = "/path_or_anything";
+  request.protocol_ = "fake_fake_fake";
+  request.data_ = {{"version", "v2"}};
 
-//   sendRequestForTest(request);
+  sendRequestForTest(request);
 
-//   RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
-//                  "unexpected timeout");
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
+                 "unexpected timeout");
 
-//   EXPECT_NE(client_codec_callabcks_->responses_[0].response_, nullptr);
-//   EXPECT_EQ(client_codec_callabcks_->responses_[0].response_->status().code(),
-//             static_cast<uint32_t>(absl::StatusCode::kNotFound));
+  EXPECT_NE(client_codec_callabcks_->responses_[0].response_, nullptr);
+  EXPECT_EQ(client_codec_callabcks_->responses_[0].response_->status().code(),
+            static_cast<uint32_t>(absl::StatusCode::kNotFound));
 
-//   cleanup();
-// }
+  cleanup();
+}
 
-// TEST_P(IntegrationTest, RequestAndResponse) {
-//   FakeStreamCodecFactoryConfig codec_factory_config;
-//   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+TEST_P(IntegrationTest, RequestAndResponse) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
-//   initialize(defaultConfig(), std::make_unique<FakeStreamCodecFactory>());
+  initialize(defaultConfig(), std::make_unique<FakeStreamCodecFactory>());
 
-//   EXPECT_TRUE(makeClientConnectionForTest());
+  EXPECT_TRUE(makeClientConnectionForTest());
 
-//   FakeStreamCodecFactory::FakeRequest request;
-//   request.host_ = "service_name_0";
-//   request.method_ = "hello";
-//   request.path_ = "/path_or_anything";
-//   request.protocol_ = "fake_fake_fake";
-//   request.data_ = {{"version", "v1"}};
+  FakeStreamCodecFactory::FakeRequest request;
+  request.host_ = "service_name_0";
+  request.method_ = "hello";
+  request.path_ = "/path_or_anything";
+  request.protocol_ = "fake_fake_fake";
+  request.data_ = {{"version", "v1"}};
 
-//   sendRequestForTest(request);
+  sendRequestForTest(request);
 
-//   waitForUpstreamConnectionForTest();
-//   const std::function<bool(const std::string&)> data_validator =
-//       [](const std::string& data) -> bool { return data.find("v1") != std::string::npos; };
-//   waitForUpstreamRequestForTest(data_validator);
+  waitForUpstreamConnectionForTest();
+  const std::function<bool(const std::string&)> data_validator =
+      [](const std::string& data) -> bool { return data.find("v1") != std::string::npos; };
+  waitForUpstreamRequestForTest(data_validator);
 
-//   FakeStreamCodecFactory::FakeResponse response;
-//   response.protocol_ = "fake_fake_fake";
-//   response.status_ = StreamStatus();
-//   response.data_["zzzz"] = "xxxx";
+  FakeStreamCodecFactory::FakeResponse response;
+  response.protocol_ = "fake_fake_fake";
+  response.status_ = StreamStatus();
+  response.data_["zzzz"] = "xxxx";
 
-//   sendResponseForTest(response);
+  sendResponseForTest(response);
 
-//   RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
-//                  "unexpected timeout");
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
+                 "unexpected timeout");
 
-//   EXPECT_NE(client_codec_callabcks_->responses_[0].response_, nullptr);
-//   EXPECT_EQ(client_codec_callabcks_->responses_[0].response_->status().code(), 0);
-//   EXPECT_EQ(client_codec_callabcks_->responses_[0].response_->get("zzzz"), "xxxx");
+  EXPECT_NE(client_codec_callabcks_->responses_[0].response_, nullptr);
+  EXPECT_EQ(client_codec_callabcks_->responses_[0].response_->status().code(), 0);
+  EXPECT_EQ(client_codec_callabcks_->responses_[0].response_->get("zzzz"), "xxxx");
 
-//   cleanup();
-// }
+  cleanup();
+}
 
-// TEST_P(IntegrationTest, RequestTimeout) {
-//   FakeStreamCodecFactoryConfig codec_factory_config;
-//   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+TEST_P(IntegrationTest, RequestTimeout) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
-//   initialize(timeoutConfig(), std::make_unique<FakeStreamCodecFactory>());
+  initialize(timeoutConfig(), std::make_unique<FakeStreamCodecFactory>());
 
-//   EXPECT_TRUE(makeClientConnectionForTest());
+  EXPECT_TRUE(makeClientConnectionForTest());
 
-//   FakeStreamCodecFactory::FakeRequest request;
-//   request.host_ = "service_name_0";
-//   request.method_ = "hello";
-//   request.path_ = "/path_or_anything";
-//   request.protocol_ = "fake_fake_fake";
-//   request.data_ = {{"version", "v1"}};
+  FakeStreamCodecFactory::FakeRequest request;
+  request.host_ = "service_name_0";
+  request.method_ = "hello";
+  request.path_ = "/path_or_anything";
+  request.protocol_ = "fake_fake_fake";
+  request.data_ = {{"version", "v1"}};
 
-//   sendRequestForTest(request);
+  sendRequestForTest(request);
 
-//   waitForUpstreamConnectionForTest();
-//   const std::function<bool(const std::string&)> data_validator =
-//       [](const std::string& data) -> bool { return data.find("v1") != std::string::npos; };
-//   waitForUpstreamRequestForTest(data_validator);
+  waitForUpstreamConnectionForTest();
+  const std::function<bool(const std::string&)> data_validator =
+      [](const std::string& data) -> bool { return data.find("v1") != std::string::npos; };
+  waitForUpstreamRequestForTest(data_validator);
 
-//   // No response is sent, so the downstream should timeout.
+  // No response is sent, so the downstream should timeout.
 
-//   RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
-//                  "unexpected timeout");
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
+                 "unexpected timeout");
 
-//   EXPECT_NE(client_codec_callabcks_->responses_[0].response_, nullptr);
-//   EXPECT_EQ(client_codec_callabcks_->responses_[0].response_->status().code(), 4);
+  EXPECT_NE(client_codec_callabcks_->responses_[0].response_, nullptr);
+  EXPECT_EQ(client_codec_callabcks_->responses_[0].response_->status().code(), 4);
 
-//   cleanup();
-// }
+  cleanup();
+}
 
-// TEST_P(IntegrationTest, MultipleRequestsWithSameStreamId) {
-//   FakeStreamCodecFactoryConfig codec_factory_config;
-//   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+TEST_P(IntegrationTest, MultipleRequestsWithSameStreamId) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
-//   auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
+  auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
 
-//   initialize(defaultConfig(true), std::move(codec_factory));
+  initialize(defaultConfig(true), std::move(codec_factory));
 
-//   EXPECT_TRUE(makeClientConnectionForTest());
+  EXPECT_TRUE(makeClientConnectionForTest());
 
-//   FakeStreamCodecFactory::FakeRequest request_1;
-//   request_1.host_ = "service_name_0";
-//   request_1.method_ = "hello";
-//   request_1.path_ = "/path_or_anything";
-//   request_1.protocol_ = "fake_fake_fake";
-//   request_1.data_ = {{"version", "v1"}};
-//   request_1.stream_frame_flags_ = FrameFlags(StreamFlags(1));
+  FakeStreamCodecFactory::FakeRequest request_1;
+  request_1.host_ = "service_name_0";
+  request_1.method_ = "hello";
+  request_1.path_ = "/path_or_anything";
+  request_1.protocol_ = "fake_fake_fake";
+  request_1.data_ = {{"version", "v1"}};
+  request_1.stream_frame_flags_ = FrameFlags(1);
 
-//   sendRequestForTest(request_1);
+  sendRequestForTest(request_1);
 
-//   waitForUpstreamConnectionForTest();
-//   const std::function<bool(const std::string&)> data_validator =
-//       [](const std::string& data) -> bool { return data.find("v1") != std::string::npos; };
-//   waitForUpstreamRequestForTest(data_validator);
+  waitForUpstreamConnectionForTest();
+  const std::function<bool(const std::string&)> data_validator =
+      [](const std::string& data) -> bool { return data.find("v1") != std::string::npos; };
+  waitForUpstreamRequestForTest(data_validator);
 
-//   FakeStreamCodecFactory::FakeRequest request_2;
-//   request_2.host_ = "service_name_0";
-//   request_2.method_ = "hello";
-//   request_2.path_ = "/path_or_anything";
-//   request_2.protocol_ = "fake_fake_fake";
-//   request_2.data_ = {{"version", "v1"}};
-//   request_2.stream_frame_flags_ = FrameFlags(StreamFlags(1));
+  FakeStreamCodecFactory::FakeRequest request_2;
+  request_2.host_ = "service_name_0";
+  request_2.method_ = "hello";
+  request_2.path_ = "/path_or_anything";
+  request_2.protocol_ = "fake_fake_fake";
+  request_2.data_ = {{"version", "v1"}};
+  request_2.stream_frame_flags_ = FrameFlags(1);
 
-//   // Send the second request with the same stream id and expect the connection to be closed.
-//   sendRequestForTest(request_2);
+  // Send the second request with the same stream id and expect the connection to be closed.
+  sendRequestForTest(request_2);
 
-//   // Wait for the connection to be closed.
-//   auto result = upstream_connection_->waitForDisconnect();
-//   RELEASE_ASSERT(result, result.message());
+  // Wait for the connection to be closed.
+  auto result = upstream_connection_->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
 
-//   cleanup();
-// }
+  cleanup();
+}
 
-// TEST_P(IntegrationTest, MultipleRequests) {
-//   FakeStreamCodecFactoryConfig codec_factory_config;
-//   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+TEST_P(IntegrationTest, MultipleRequests) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
-//   auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
+  auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
 
-//   initialize(defaultConfig(true), std::move(codec_factory));
+  initialize(defaultConfig(true), std::move(codec_factory));
 
-//   EXPECT_TRUE(makeClientConnectionForTest());
+  EXPECT_TRUE(makeClientConnectionForTest());
 
-//   FakeStreamCodecFactory::FakeRequest request_1;
-//   request_1.host_ = "service_name_0";
-//   request_1.method_ = "hello";
-//   request_1.path_ = "/path_or_anything";
-//   request_1.protocol_ = "fake_fake_fake";
-//   request_1.data_ = {{"version", "v1"}, {"frame", "1_header"}};
-//   request_1.stream_frame_flags_ = FrameFlags(StreamFlags(1));
+  FakeStreamCodecFactory::FakeRequest request_1;
+  request_1.host_ = "service_name_0";
+  request_1.method_ = "hello";
+  request_1.path_ = "/path_or_anything";
+  request_1.protocol_ = "fake_fake_fake";
+  request_1.data_ = {{"version", "v1"}, {"frame", "1_header"}};
+  request_1.stream_frame_flags_ = FrameFlags(1);
 
-//   sendRequestForTest(request_1);
+  sendRequestForTest(request_1);
 
-//   waitForUpstreamConnectionForTest();
+  waitForUpstreamConnectionForTest();
 
-//   const std::function<bool(const std::string&)> data_validator_1 =
-//       [](const std::string& data) -> bool {
-//     return data.find("frame:1_header") != std::string::npos;
-//   };
-//   waitForUpstreamRequestForTest(data_validator_1);
+  const std::function<bool(const std::string&)> data_validator_1 =
+      [](const std::string& data) -> bool {
+    return data.find("frame:1_header") != std::string::npos;
+  };
+  waitForUpstreamRequestForTest(data_validator_1);
 
-//   FakeStreamCodecFactory::FakeRequest request_2;
-//   request_2.host_ = "service_name_0";
-//   request_2.method_ = "hello";
-//   request_2.path_ = "/path_or_anything";
-//   request_2.protocol_ = "fake_fake_fake";
-//   request_2.data_ = {{"version", "v1"}, {"frame", "2_header"}};
-//   request_2.stream_frame_flags_ = FrameFlags(StreamFlags(2));
+  FakeStreamCodecFactory::FakeRequest request_2;
+  request_2.host_ = "service_name_0";
+  request_2.method_ = "hello";
+  request_2.path_ = "/path_or_anything";
+  request_2.protocol_ = "fake_fake_fake";
+  request_2.data_ = {{"version", "v1"}, {"frame", "2_header"}};
+  request_2.stream_frame_flags_ = FrameFlags(2);
 
-//   // Reset request encoder callback.
-//   test_encoding_context_ = std::make_shared<TestEncodingContext>();
+  // Reset request encoder callback.
+  test_encoding_context_ = std::make_shared<TestEncodingContext>();
 
-//   // Send the second request with the different stream id and expect the connection to be alive.
-//   sendRequestForTest(request_2);
-//   const std::function<bool(const std::string&)> data_validator_2 =
-//       [](const std::string& data) -> bool {
-//     return data.find("frame:2_header") != std::string::npos;
-//   };
-//   waitForUpstreamRequestForTest(data_validator_2);
+  // Send the second request with the different stream id and expect the connection to be alive.
+  sendRequestForTest(request_2);
+  const std::function<bool(const std::string&)> data_validator_2 =
+      [](const std::string& data) -> bool {
+    return data.find("frame:2_header") != std::string::npos;
+  };
+  waitForUpstreamRequestForTest(data_validator_2);
 
-//   FakeStreamCodecFactory::FakeResponse response_2;
-//   response_2.protocol_ = "fake_fake_fake";
-//   response_2.status_ = StreamStatus();
-//   response_2.data_["zzzz"] = "xxxx";
-//   response_2.stream_frame_flags_ = FrameFlags(StreamFlags(2));
+  FakeStreamCodecFactory::FakeResponse response_2;
+  response_2.protocol_ = "fake_fake_fake";
+  response_2.status_ = StreamStatus();
+  response_2.data_["zzzz"] = "xxxx";
+  response_2.stream_frame_flags_ = FrameFlags(2);
 
-//   sendResponseForTest(response_2);
+  sendResponseForTest(response_2);
 
-//   RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 2),
-//                  "unexpected timeout");
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 2),
+                 "unexpected timeout");
 
-//   EXPECT_NE(client_codec_callabcks_->responses_[2].response_, nullptr);
-//   EXPECT_EQ(client_codec_callabcks_->responses_[2].response_->status().code(), 0);
-//   EXPECT_EQ(client_codec_callabcks_->responses_[2].response_->get("zzzz"), "xxxx");
-//   EXPECT_EQ(client_codec_callabcks_->responses_[2].response_->frameFlags().streamId(), 2);
+  EXPECT_NE(client_codec_callabcks_->responses_[2].response_, nullptr);
+  EXPECT_EQ(client_codec_callabcks_->responses_[2].response_->status().code(), 0);
+  EXPECT_EQ(client_codec_callabcks_->responses_[2].response_->get("zzzz"), "xxxx");
+  EXPECT_EQ(client_codec_callabcks_->responses_[2].response_->frameFlags().streamId(), 2);
 
-//   FakeStreamCodecFactory::FakeResponse response_1;
-//   response_1.protocol_ = "fake_fake_fake";
-//   response_1.status_ = StreamStatus();
-//   response_1.data_["zzzz"] = "yyyy";
-//   response_1.stream_frame_flags_ = FrameFlags(StreamFlags(1));
+  FakeStreamCodecFactory::FakeResponse response_1;
+  response_1.protocol_ = "fake_fake_fake";
+  response_1.status_ = StreamStatus();
+  response_1.data_["zzzz"] = "yyyy";
+  response_1.stream_frame_flags_ = FrameFlags(1);
 
-//   sendResponseForTest(response_1);
+  sendResponseForTest(response_1);
 
-//   RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 1),
-//                  "unexpected timeout");
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 1),
+                 "unexpected timeout");
 
-//   EXPECT_NE(client_codec_callabcks_->responses_[1].response_, nullptr);
-//   EXPECT_EQ(client_codec_callabcks_->responses_[1].response_->status().code(), 0);
-//   EXPECT_EQ(client_codec_callabcks_->responses_[1].response_->get("zzzz"), "yyyy");
-//   EXPECT_EQ(client_codec_callabcks_->responses_[1].response_->frameFlags().streamId(), 1);
+  EXPECT_NE(client_codec_callabcks_->responses_[1].response_, nullptr);
+  EXPECT_EQ(client_codec_callabcks_->responses_[1].response_->status().code(), 0);
+  EXPECT_EQ(client_codec_callabcks_->responses_[1].response_->get("zzzz"), "yyyy");
+  EXPECT_EQ(client_codec_callabcks_->responses_[1].response_->frameFlags().streamId(), 1);
 
-//   cleanup();
-// }
+  cleanup();
+}
 
 TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   FakeStreamCodecFactoryConfig codec_factory_config;
@@ -671,15 +671,15 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   request_1.path_ = "/path_or_anything";
   request_1.protocol_ = "fake_fake_fake";
   request_1.data_ = {{"version", "v1"}, {"frame", "1_header"}};
-  request_1.stream_frame_flags_ = FrameFlags(StreamFlags(1), false);
+  request_1.stream_frame_flags_ = FrameFlags(1, FrameFlags::FLAG_EMPTY);
 
   FakeStreamCodecFactory::FakeCommonFrame request_1_frame_1;
   request_1_frame_1.data_ = {{"frame", "1_frame_1"}};
-  request_1_frame_1.stream_frame_flags_ = FrameFlags(StreamFlags(1), false);
+  request_1_frame_1.stream_frame_flags_ = FrameFlags(1, FrameFlags::FLAG_EMPTY);
 
   FakeStreamCodecFactory::FakeCommonFrame request_1_frame_2;
   request_1_frame_2.data_ = {{"frame", "1_frame_2"}};
-  request_1_frame_2.stream_frame_flags_ = FrameFlags(StreamFlags(1), true);
+  request_1_frame_2.stream_frame_flags_ = FrameFlags(1);
 
   FakeStreamCodecFactory::FakeRequest request_2;
   request_2.host_ = "service_name_0";
@@ -687,15 +687,15 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   request_2.path_ = "/path_or_anything";
   request_2.protocol_ = "fake_fake_fake";
   request_2.data_ = {{"version", "v1"}, {"frame", "2_header"}};
-  request_2.stream_frame_flags_ = FrameFlags(StreamFlags(2), false);
+  request_2.stream_frame_flags_ = FrameFlags(2, FrameFlags::FLAG_EMPTY);
 
   FakeStreamCodecFactory::FakeCommonFrame request_2_frame_1;
   request_2_frame_1.data_ = {{"frame", "2_frame_1"}};
-  request_2_frame_1.stream_frame_flags_ = FrameFlags(StreamFlags(2), false);
+  request_2_frame_1.stream_frame_flags_ = FrameFlags(2, FrameFlags::FLAG_EMPTY);
 
   FakeStreamCodecFactory::FakeCommonFrame request_2_frame_2;
   request_2_frame_2.data_ = {{"frame", "2_frame_2"}};
-  request_2_frame_2.stream_frame_flags_ = FrameFlags(StreamFlags(2), true);
+  request_2_frame_2.stream_frame_flags_ = FrameFlags(2);
 
   // We handle frame one by one to make sure the order is correct.
 
@@ -753,10 +753,10 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   response_2.protocol_ = "fake_fake_fake";
   response_2.status_ = StreamStatus();
   response_2.data_["zzzz"] = "xxxx";
-  response_2.stream_frame_flags_ = FrameFlags(StreamFlags(2), false);
+  response_2.stream_frame_flags_ = FrameFlags(2, FrameFlags::FLAG_EMPTY);
 
   FakeStreamCodecFactory::FakeCommonFrame response_2_frame_1;
-  response_2_frame_1.stream_frame_flags_ = FrameFlags(StreamFlags(2), true);
+  response_2_frame_1.stream_frame_flags_ = FrameFlags(2);
 
   sendResponseForTest(response_2);
   sendResponseForTest(response_2_frame_1);
@@ -773,10 +773,10 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   response_1.protocol_ = "fake_fake_fake";
   response_1.status_ = StreamStatus();
   response_1.data_["zzzz"] = "yyyy";
-  response_1.stream_frame_flags_ = FrameFlags(StreamFlags(1), false);
+  response_1.stream_frame_flags_ = FrameFlags(1, FrameFlags::FLAG_EMPTY);
 
   FakeStreamCodecFactory::FakeCommonFrame response_1_frame_1;
-  response_1_frame_1.stream_frame_flags_ = FrameFlags(StreamFlags(1), true);
+  response_1_frame_1.stream_frame_flags_ = FrameFlags(1);
 
   sendResponseForTest(response_1);
   sendResponseForTest(response_1_frame_1);
