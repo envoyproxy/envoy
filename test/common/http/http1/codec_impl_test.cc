@@ -2914,7 +2914,7 @@ TEST_P(Http1ClientConnectionImplTest, EarlyHintHeaders) {
 }
 
 // 104 response followed by 200 results in a [decode1xxHeaders, decodeHeaders] sequence.
-TEST_P(Http1ClientConnectionImplTest, EarlyHintHeaders) {
+TEST_P(Http1ClientConnectionImplTest, UploadResumptionSupportedHeaders) {
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;
