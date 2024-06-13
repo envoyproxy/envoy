@@ -82,7 +82,19 @@ using ::testing::Unused;
 using namespace std::chrono_literals;
 
 static const uint32_t BufferSize = 100000;
-static const std::string filter_config_name = "scooby.dooby.doo";
+constexpr absl::string_view FilterConfigName = "scooby.dooby.doo";
+constexpr absl::string_view ImmediateResponsePrefix = "immediate_response_from_ext_proc[{}]";
+const std::string badRequestResponseDetails() {
+  CONSTRUCT_ON_FIRST_USE(std::string,
+                         absl::StrCat(fmt::format(ImmediateResponsePrefix, FilterConfigName), ":",
+                                      "Got_a_bad_request"));
+}
+
+const std::string grpcErrorResponseDetails() {
+  CONSTRUCT_ON_FIRST_USE(std::string,
+                         absl::StrCat(fmt::format(ImmediateResponsePrefix, FilterConfigName), ":",
+                                      "ext_proc_error_gRPC_error_13"));
+}
 
 // These tests are all unit tests that directly drive an instance of the
 // ext_proc filter and verify the behavior using mocks.
@@ -126,7 +138,8 @@ protected:
           timers_.push_back(timer);
           return timer;
         }));
-    EXPECT_CALL(decoder_callbacks_, filterConfigName()).WillRepeatedly(Return(filter_config_name));
+    EXPECT_CALL(decoder_callbacks_, filterConfigName()).WillRepeatedly(Return(FilterConfigName));
+    EXPECT_CALL(encoder_callbacks_, filterConfigName()).WillRepeatedly(Return(FilterConfigName));
 
     envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
     if (!yaml.empty()) {
@@ -383,7 +396,7 @@ protected:
         stream_info_.filterState()
             ->getDataReadOnly<
                 Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
-                filter_config_name)
+                FilterConfigName)
             ->grpcCalls(traffic_direction);
     return grpc_calls;
   }
@@ -550,7 +563,7 @@ protected:
         stream_info_.filterState()
             ->getDataReadOnly<
                 Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
-                filter_config_name);
+                FilterConfigName);
     const Envoy::ProtobufWkt::Struct& loggedMetadata = filterState->filterMetadata();
     EXPECT_THAT(loggedMetadata, ProtoEq(expected_metadata));
   }
@@ -748,7 +761,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::BadRequest, "Bad request", _,
-                                                 Eq(absl::nullopt), "Got_a_bad_request"))
+                                                 Eq(absl::nullopt), badRequestResponseDetails()))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
@@ -858,7 +871,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyOnResponse) {
 
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::BadRequest, "Bad request", _,
-                                                 Eq(absl::nullopt), "Got_a_bad_request"))
+                                                 Eq(absl::nullopt), badRequestResponseDetails()))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
@@ -907,7 +920,7 @@ TEST_F(HttpFilterTest, RespondImmediatelyWithBinaryBody) {
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::BadRequest, "non-utf-8 compliant field\x80\x81",
-                             _, Eq(absl::nullopt), "Got_a_bad_request"))
+                             _, Eq(absl::nullopt), badRequestResponseDetails()))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
@@ -1585,7 +1598,7 @@ TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
   // Oh no! The remote server had a failure!
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+                                                 Eq(absl::nullopt), grpcErrorResponseDetails()))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
@@ -1641,7 +1654,7 @@ TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+                                                 Eq(absl::nullopt), grpcErrorResponseDetails()))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
@@ -1690,7 +1703,7 @@ TEST_F(HttpFilterTest, GrpcFailOnRequestTrailer) {
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+                                                 Eq(absl::nullopt), grpcErrorResponseDetails()))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
@@ -2169,8 +2182,10 @@ TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(::Envoy::Http::Code::OK, "", _, Eq(absl::nullopt), ""))
+  EXPECT_CALL(
+      encoder_callbacks_,
+      sendLocalReply(::Envoy::Http::Code::OK, "", _, Eq(absl::nullopt),
+                     absl::StrCat(fmt::format(ImmediateResponsePrefix, FilterConfigName), ":")))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
@@ -2206,8 +2221,10 @@ TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(::Envoy::Http::Code::Forbidden, "", _, Eq(999), ""))
+  EXPECT_CALL(
+      encoder_callbacks_,
+      sendLocalReply(::Envoy::Http::Code::Forbidden, "", _, Eq(999),
+                     absl::StrCat(fmt::format(ImmediateResponsePrefix, FilterConfigName), ":")))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
@@ -2249,7 +2266,7 @@ TEST_F(HttpFilterTest, PostAndFail) {
   // Oh no! The remote server had a failure!
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+                                                 Eq(absl::nullopt), grpcErrorResponseDetails()))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
@@ -2301,7 +2318,7 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+                                                 Eq(absl::nullopt), grpcErrorResponseDetails()))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
@@ -3977,7 +3994,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyUpstream) {
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   TestResponseHeaderMapImpl immediate_response_headers;
   ON_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::BadRequest, "Bad request", _,
-                                             Eq(absl::nullopt), "Got_a_bad_request"))
+                                             Eq(absl::nullopt), badRequestResponseDetails()))
       .WillByDefault(Invoke([&immediate_response_headers](
                                 Unused, Unused,
                                 std::function<void(ResponseHeaderMap & headers)> modify_headers,

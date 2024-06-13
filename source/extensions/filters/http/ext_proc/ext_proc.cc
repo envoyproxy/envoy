@@ -1096,9 +1096,15 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
 
   sent_immediate_response_ = true;
   ENVOY_LOG(debug, "Sending local reply with status code {}", status_code);
-  const auto details = StringUtil::replaceAllEmptySpace(response.details());
+  // const auto details = StringUtil::replaceAllEmptySpace(response.details());
+  const std::string prefix =
+      fmt::format("immediate_response_from_ext_proc[{}]", encoder_callbacks_->filterConfigName());
+  // const std::string response_details = absl::StrCat(prefix, ":", response.details());
+
+  const std::string response_details =
+      StringUtil::replaceAllEmptySpace(absl::StrCat(prefix, ":", response.details()));
   encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
-                                     mutate_headers, grpc_status, details);
+                                     mutate_headers, grpc_status, response_details);
 }
 
 void Filter::mergePerRouteConfig() {
