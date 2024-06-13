@@ -110,12 +110,12 @@ extern GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 name_ptr, GoUint64 n
 
 // go:linkname envoyGoFilterOnHttpHeader
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpHeader
-extern GoUint64 envoyGoFilterOnHttpHeader(httpRequest* r, GoUint64 end_stream, GoUint64 header_num,
+extern GoUint64 envoyGoFilterOnHttpHeader(processState* r, GoUint64 end_stream, GoUint64 header_num,
                                           GoUint64 header_bytes);
 
 // go:linkname envoyGoFilterOnHttpData
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpData
-extern GoUint64 envoyGoFilterOnHttpData(httpRequest* r, GoUint64 end_stream, GoUint64 buffer,
+extern GoUint64 envoyGoFilterOnHttpData(processState* s, GoUint64 end_stream, GoUint64 buffer,
                                         GoUint64 length);
 
 // go:linkname envoyGoFilterOnHttpLog
@@ -129,6 +129,10 @@ extern void envoyGoFilterOnHttpDestroy(httpRequest* r, GoUint64 reason);
 // go:linkname envoyGoRequestSemaDec
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoRequestSemaDec
 extern void envoyGoRequestSemaDec(httpRequest* r);
+
+// go:linkname envoyGoFilterCleanUp
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterCleanUp
+extern void envoyGoFilterCleanUp();
 
 // go:linkname envoyGoOnClusterSpecify
 // github.com/envoyproxy/envoy/contrib/golang/router/cluster_specifier/source/go/pkg/cluster_specifier.envoyGoOnClusterSpecify

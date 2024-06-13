@@ -55,17 +55,22 @@ namespace ProxyProtocol {
 constexpr absl::string_view kProxyProtoStatsPrefix = "proxy_proto.";
 constexpr absl::string_view kVersionStatsPrefix = "versions.";
 
-ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope& scope) {
+ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope& scope, absl::string_view stat_prefix) {
+  std::string filter_stat_prefix = std::string(kProxyProtoStatsPrefix);
+  if (!stat_prefix.empty()) {
+    filter_stat_prefix = absl::StrCat(kProxyProtoStatsPrefix, stat_prefix, ".");
+  }
+
   return {
       /*legacy_=*/{LEGACY_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},
       /*general_=*/
-      {GENERAL_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(scope, kProxyProtoStatsPrefix))},
+      {GENERAL_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(scope, filter_stat_prefix))},
       /*v1_=*/
       {VERSIONED_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(
-          scope, absl::StrCat(kProxyProtoStatsPrefix, kVersionStatsPrefix, "v1.")))},
+          scope, absl::StrCat(filter_stat_prefix, kVersionStatsPrefix, "v1.")))},
       /*v2_=*/
       {VERSIONED_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(
-          scope, absl::StrCat(kProxyProtoStatsPrefix, kVersionStatsPrefix, "v2.")))},
+          scope, absl::StrCat(filter_stat_prefix, kVersionStatsPrefix, "v2.")))},
   };
 }
 
@@ -105,7 +110,7 @@ void VersionedProxyProtocolStats::increment(ReadOrParseState decision) {
 Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
-    : stats_(ProxyProtocolStats::create(scope)),
+    : stats_(ProxyProtocolStats::create(scope, proto_config.stat_prefix())),
       allow_requests_without_proxy_protocol_(proto_config.allow_requests_without_proxy_protocol()),
       pass_all_tlvs_(proto_config.has_pass_through_tlvs()
                          ? proto_config.pass_through_tlvs().match_type() ==

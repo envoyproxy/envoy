@@ -12,6 +12,38 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
+template <class Context>
+static AccessLog::FilterBasePtr<Context>
+accessLogFilterFromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
+                         Server::Configuration::FactoryContext& context) {
+  if (!config.has_extension_filter()) {
+    ExceptionUtil::throwEnvoyException(
+        "Access log filter: only extension filter is supported by non-HTTP access loggers.");
+  }
+
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Envoy::AccessLog::ExtensionFilterFactoryBase<Context>>(
+          config.extension_filter());
+  return factory.createFilter(config.extension_filter(), context);
+}
+
+template <class Context>
+static AccessLog::InstanceBaseSharedPtr<Context>
+accessLoggerFromProto(const envoy::config::accesslog::v3::AccessLog& config,
+                      Server::Configuration::FactoryContext& context) {
+  AccessLog::FilterBasePtr<Context> filter;
+  if (config.has_filter()) {
+    filter = accessLogFilterFromProto<Context>(config.filter(), context);
+  }
+
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Envoy::AccessLog::AccessLogInstanceFactoryBase<Context>>(
+          config);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      config, context.messageValidationVisitor(), factory);
+
+  return factory.createAccessLogInstance(*message, std::move(filter), context);
+}
 SINGLETON_MANAGER_REGISTRATION(generic_route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(generic_proxy_code_or_flag_stats);
 
@@ -127,7 +159,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
   std::vector<AccessLogInstanceSharedPtr> access_logs;
   for (const auto& access_log : proto_config.access_log()) {
     AccessLogInstanceSharedPtr current_access_log =
-        AccessLog::AccessLogFactory::accessLoggerFromProto<FormatterContext>(access_log, context);
+        accessLoggerFromProto<FormatterContext>(access_log, context);
     access_logs.push_back(current_access_log);
   }
 
