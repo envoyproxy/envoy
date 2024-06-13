@@ -178,7 +178,10 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
       return false;
     }
 
-    validateFieldId(id);
+    if (id < std::numeric_limits<int16_t>::min() && id > std::numeric_limits<int16_t>::max()) {
+      throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
+    }
+
     compact_field_type = static_cast<CompactFieldType>(delta_and_type);
     compact_field_id = static_cast<int16_t>(id);
   } else {
