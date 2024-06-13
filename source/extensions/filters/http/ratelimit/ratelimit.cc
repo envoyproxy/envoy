@@ -72,6 +72,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   if (filter_it != request_metadata.end()) {
     const auto field_it = filter_it->second.fields().find("hits_addend");
     if (field_it != filter_it->second.fields().end()) {
+      if (!field_it->second.has_number_value()) {
+        IS_ENVOY_BUG("Expected number value for envoy.ratelimit:hits_addend.")
+      }
       hits_addend = field_it->second.number_value();
     }
   }
