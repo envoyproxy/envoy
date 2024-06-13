@@ -55,7 +55,7 @@ build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
 
 test --bes_upload_mode=fully_async
-test --build_event_upload_max_retries=8
+test --experimental_build_event_upload_max_retries=8
 test --test_verbose_timeout_warnings
 
 # Allow tags to influence execution requirements
