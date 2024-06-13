@@ -173,11 +173,7 @@ std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_vi
 std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view host,
                        absl::string_view expires, absl::string_view token = "",
                        absl::string_view id_token = "", absl::string_view refresh_token = "") {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hmac_base64_encoding_only")) {
-    return encodeHmacBase64(secret, host, expires, token, id_token, refresh_token);
-  } else {
-    return encodeHmacHexBase64(secret, host, expires, token, id_token, refresh_token);
-  }
+  return encodeHmacBase64(secret, host, expires, token, id_token, refresh_token);
 }
 
 } // namespace
