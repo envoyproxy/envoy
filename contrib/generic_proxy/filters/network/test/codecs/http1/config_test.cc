@@ -132,14 +132,14 @@ TEST(Http1MessageFrameTest, Http1MessageFrameTest) {
     HttpResponseFrame frame(std::move(headers), true);
 
     EXPECT_EQ(true, frame.frameFlags().endStream());
-    EXPECT_EQ(false, frame.frameFlags().streamFlags().drainClose());
+    EXPECT_EQ(false, frame.frameFlags().drainClose());
 
     auto headers2 = Http::ResponseHeaderMapImpl::create();
     headers2->setConnection("close");
     HttpResponseFrame frame2(std::move(headers2), false);
 
     EXPECT_EQ(false, frame2.frameFlags().endStream());
-    EXPECT_EQ(true, frame2.frameFlags().streamFlags().drainClose());
+    EXPECT_EQ(true, frame2.frameFlags().drainClose());
   }
 
   // Request FrameType.
