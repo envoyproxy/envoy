@@ -28,8 +28,7 @@ public:
     if (request_ == nullptr) {
       return FrameFlags{};
     }
-    return FrameFlags{
-        StreamFlags{static_cast<uint64_t>(request_->request_header_.correlation_id_)}};
+    return FrameFlags{static_cast<uint64_t>(request_->request_header_.correlation_id_)};
   }
 
   absl::string_view protocol() const override { return "kafka"; }
@@ -46,7 +45,7 @@ public:
     if (response_ == nullptr) {
       return FrameFlags{};
     }
-    return FrameFlags{StreamFlags{static_cast<uint64_t>(response_->metadata_.correlation_id_)}};
+    return FrameFlags{static_cast<uint64_t>(response_->metadata_.correlation_id_)};
   }
 
   absl::string_view protocol() const override { return "kafka"; }
