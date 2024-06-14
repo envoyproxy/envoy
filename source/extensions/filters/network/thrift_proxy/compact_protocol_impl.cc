@@ -112,7 +112,7 @@ bool CompactProtocolImpl::peekReplyPayload(Buffer::Instance& buffer, ReplyType& 
     return false;
   }
 
-  if (id < std::numeric_limits<int16_t>::min() && id > std::numeric_limits<int16_t>::max()) {
+  if (id < std::numeric_limits<int16_t>::min() || id > std::numeric_limits<int16_t>::max()) {
     throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
   }
 
@@ -178,7 +178,7 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
       return false;
     }
 
-    if (id < std::numeric_limits<int16_t>::min() && id > std::numeric_limits<int16_t>::max()) {
+    if (id < std::numeric_limits<int16_t>::min() || id > std::numeric_limits<int16_t>::max()) {
       throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
     }
 
