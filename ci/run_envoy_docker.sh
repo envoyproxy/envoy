@@ -147,6 +147,7 @@ docker run --rm \
        -e ENVOY_BUILD_DEBUG_INFORMATION \
        -e ENVOY_BUILD_FILTER_EXAMPLE \
        -e ENVOY_COMMIT \
+       -e ENVOY_DOCKER_PUSH \
        -e ENVOY_HEAD_REF \
        -e ENVOY_PUBLISH_DRY_RUN \
        -e ENVOY_REPO \
