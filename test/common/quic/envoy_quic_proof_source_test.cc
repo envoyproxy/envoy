@@ -191,6 +191,15 @@ public:
     EXPECT_CALL(filter_chain_, transportSocketFactory())
         .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
+    auto factory = Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorFactory>(
+        "envoy.ssl.certificate_selector_factory.default");
+    ASSERT_TRUE(factory);
+    const ProtobufWkt::Any any;
+    auto tls_certificate_selector_factory_cb = factory->createTlsCertificateSelectorCb(
+        any, factory_context_, ProtobufMessage::getNullValidationVisitor());
+    EXPECT_CALL(*mock_context_config_, createTlsCertificateSelector())
+        .WillRepeatedly(Return(tls_certificate_selector_factory_cb));
+
     EXPECT_CALL(*mock_context_config_, isReady()).WillRepeatedly(Return(true));
     std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
         std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config_)};
