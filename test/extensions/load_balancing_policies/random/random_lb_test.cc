@@ -57,10 +57,8 @@ TEST_P(RandomLoadBalancerTest, FailClusterOnPanic) {
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew, RandomLoadBalancerTest,
-                         ::testing::Values(LoadBalancerTestParam{true, false},
-                                           LoadBalancerTestParam{true, true},
-                                           LoadBalancerTestParam{false, false},
-                                           LoadBalancerTestParam{false, true}));
+                         ::testing::Values(LoadBalancerTestParam{true},
+                                           LoadBalancerTestParam{false}));
 
 } // namespace
 } // namespace Upstream

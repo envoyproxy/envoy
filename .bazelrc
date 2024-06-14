@@ -54,9 +54,8 @@ build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
 
-test --bes_upload_mode=nowait_for_upload_complete
-test --bes_timeout=30s
 test --test_verbose_timeout_warnings
+test --experimental_ui_max_stdouterr_bytes=3048576 #default 1048576
 
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
@@ -511,6 +510,7 @@ build:rbe-google --config=cache-google
 
 build:rbe-google-bes --bes_backend=grpcs://buildeventservice.googleapis.com
 build:rbe-google-bes --bes_results_url=https://source.cloud.google.com/results/invocations/
+build:rbe-google-bes --bes_upload_mode=fully_async
 
 # RBE (Engflow mobile)
 build:rbe-engflow --google_default_credentials=false
