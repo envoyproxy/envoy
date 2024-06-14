@@ -461,7 +461,7 @@ TEST_F(RoleBasedAccessControlFilterTest, EnforcedOnlyDynamicMetadataStats) {
       filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
 }
 
-// Dynamic metadata metrics should only be written if theres a shadow engine and / or there's an
+// Dynamic metadata metrics should only be written if there's a shadow engine and / or there's an
 // enforced engine.
 TEST_F(RoleBasedAccessControlFilterTest, NoEnginesNoDynamicMetadataStats) {
   auto config_ptr = std::make_shared<RoleBasedAccessControlFilterConfig>(
