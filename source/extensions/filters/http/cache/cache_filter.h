@@ -111,6 +111,10 @@ private:
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
+  // Setter function enforces that we don't setFilterState when filter_state_
+  // is already Destroyed.
+  void setFilterState(FilterState state);
+
   // Set required state in the CacheFilter for handling a cache hit.
   void handleCacheHit();
 

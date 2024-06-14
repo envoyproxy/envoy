@@ -58,16 +58,19 @@ public:
   void handleUpstreamRequest(std::weak_ptr<ThunderingHerdRetryInterface> weak_filter,
                              Http::StreamDecoderFilterCallbacks* decoder_callbacks, const Key& key,
                              Http::RequestHeaderMap& request_headers) override {
-    absl::MutexLock lock(&mu_);
+    absl::ReleasableMutexLock lock(&mu_);
     auto it = queues_.try_emplace(key).first;
     if (it->second.blockers_.size() < parallel_requests_) {
-      ENVOY_LOG(debug, "ThunderingHerdHandler adding blocker {}",
-                request_headers.Path()->value().getStringView());
+      ENVOY_STREAM_LOG(debug, "ThunderingHerdHandler adding blocker {}", *decoder_callbacks,
+                       request_headers.Path()->value().getStringView());
       it->second.blockers_.push_back(maybeMakeTimeout(key, decoder_callbacks->dispatcher()));
+      lock.Release();
+      // Lock must be released before continueDecoding, because it can trigger filter
+      // destruction which can trigger another thundering herd action.
       decoder_callbacks->continueDecoding();
     } else {
-      ENVOY_LOG(debug, "ThunderingHerdHandler adding blocked {}",
-                request_headers.Path()->value().getStringView());
+      ENVOY_STREAM_LOG(debug, "ThunderingHerdHandler adding blocked {}", *decoder_callbacks,
+                       request_headers.Path()->value().getStringView());
       addBlocked(it->second, weak_filter, decoder_callbacks, request_headers);
     }
   }
@@ -100,9 +103,9 @@ public:
 
   void selectNewBlocker(const Key& key, Queue& queue) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
     if (queue.blocked_.empty()) {
-      ENVOY_LOG(debug, "ThunderingHerdHandler ended blocker");
+      ENVOY_LOG(debug, "ThunderingHerdHandler ended blocker for {}", key.path());
       if (queue.blockers_.empty()) {
-        ENVOY_LOG(debug, "ThunderingHerdHandler deleted queue");
+        ENVOY_LOG(debug, "ThunderingHerdHandler deleted queue for {}", key.path());
         queues_.erase(key);
       }
       return;
@@ -111,7 +114,8 @@ public:
     queue.blocked_.pop_front();
     queue.blockers_.push_back(maybeMakeTimeout(key, unblocking.dispatcher_));
     unblocking.dispatcher_.post([unblocking, on_undeliverable = onUndeliverable(key)]() {
-      ENVOY_LOG(debug, "ThunderingHerdHandler moving blocked to blocker");
+      ENVOY_STREAM_LOG(debug, "ThunderingHerdHandler moving blocked to blocker",
+                       *unblocking.decoder_callbacks_);
       auto filter = unblocking.weak_filter_.lock();
       if (filter != nullptr) {
         unblocking.decoder_callbacks_->continueDecoding();
@@ -131,7 +135,8 @@ public:
   }
 
   void unblock(const Key& key, Queue& queue) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
-    ENVOY_LOG(debug, "ThunderingHerdHandler unblocking queue of size {}", queue.blocked_.size());
+    ENVOY_LOG(debug, "ThunderingHerdHandler unblocking queue {} of size {}", key.path(),
+              queue.blocked_.size());
     for (const Queue::Blocked& unblocking : queue.blocked_) {
       unblocking.dispatcher_.post([unblocking]() {
         if (auto filter = unblocking.weak_filter_.lock()) {
