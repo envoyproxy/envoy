@@ -131,7 +131,7 @@ message LocalRateLimitDescriptor {
   type.v3.TokenBucket token_bucket = 2 [(validate.rules).message = {required: true}];
 }
 
-// Configuration that used to enable local cluster level rate limiting where the token buckets
+// Configuration used to enable local cluster level rate limiting where the token buckets
 // will be shared across all the Envoy instances in the local cluster.
 // A share will be calculated based on the membership of the local cluster dynamically
 // and the configuration. When the limiter refilling the token bucket, the share will be

@@ -22,6 +22,7 @@ public:
     return std::ceil(origin_tokens_per_fill * share_);
   }
   void onLocalClusterUpdate(const Upstream::Cluster& cluster) override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     const auto number = cluster.info()->endpointStats().membership_total_.value();
     share_ = number == 0 ? 1.0 : 1.0 / number;
   }
@@ -169,6 +170,7 @@ void LocalRateLimiterImpl::onFillTimerHelper(TokenState& tokens,
 
   uint32_t tokens_per_fill = bucket.tokens_per_fill_;
   if (share_provider_ != nullptr) {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     tokens_per_fill = share_provider_->tokensPerFill(tokens_per_fill);
   }
 

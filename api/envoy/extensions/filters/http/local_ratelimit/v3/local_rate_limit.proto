@@ -110,7 +110,11 @@ message LocalRateLimit {
   // If unspecified, the default value is false.
   bool local_rate_limit_per_downstream_connection = 11;
 
-  // Enables the local cluster level rate limiting, iff this is set explicitly.
+  // Enables the local cluster level rate limiting, iff this is set explicitly. For example,
+  // given an Envoy gateway that contains N Envoy instances and a rate limit rule X tokens
+  // per second. If this is set, the total rate limit of whole gateway will always be X tokens
+  // per second regardless of how N changes. If this is not set, the total rate limit of whole
+  // gateway will be N * X tokens per second.
   //
   // .. note::
   //   This should never be set if the ``local_rate_limit_per_downstream_connection`` is set to
