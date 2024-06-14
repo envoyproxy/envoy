@@ -1328,7 +1328,6 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
   return merged_config_id_;
 };
 
-
 // limit the max length of cluster name that could return from the Golang cluster specifier plugin,
 // to avoid memory security vulnerability since there might be a bug in Golang side.
 #define MAX_CLUSTER_LENGTH 8192
