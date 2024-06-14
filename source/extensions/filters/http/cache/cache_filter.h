@@ -190,9 +190,8 @@ private:
   // The status of the insert operation or header update, or decision not to insert or update.
   // If it's too early to determine the final status, this is empty.
   absl::optional<InsertStatus> insert_status_;
-  // An optional function to be called during onDestroy. This can be used to notify
-  // a ThunderingHerdHandler that an insert action it is waiting for didn't even begin.
-  std::function<void()> additional_destroy_action_;
+  // True if ThunderingHerdHandler has been notified of this filter, and not yet completed.
+  bool thundering_herd_in_flight_{false};
 };
 
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;

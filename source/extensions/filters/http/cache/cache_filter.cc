@@ -54,7 +54,8 @@ CacheFilterConfig::CacheFilterConfig(
     const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
     Server::Configuration::CommonFactoryContext& context)
     : CacheFilterConfig(config.allowed_vary_headers(), config.ignore_request_cache_control_header(),
-                        ThunderingHerdHandler::create(config.thundering_herd_handler()), context) {}
+                        ThunderingHerdHandler::create(config.thundering_herd_handler(), context),
+                        context) {}
 
 CacheFilter::CacheFilter(std::shared_ptr<const CacheFilterConfig> config,
                          std::shared_ptr<HttpCache> http_cache)
@@ -81,8 +82,9 @@ void CacheFilter::onDestroy() {
     insert_queue_->setSelfOwned(std::move(insert_queue_));
     insert_queue_.reset();
   }
-  if (additional_destroy_action_ != nullptr) {
-    additional_destroy_action_();
+  if (thundering_herd_in_flight_) {
+    config_->thunderingHerdHandler().handleInsertFinished(
+        key_, ThunderingHerdHandler::InsertResult::Failed);
   }
 }
 
@@ -192,9 +194,11 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
             insert_status_ = InsertStatus::InsertAbortedByCache;
           },
           [thh = config_->sharedThunderingHerdHandler(), key = key_](bool write_completed) {
-            thh->handleInsertFinished(key, write_completed);
+            thh->handleInsertFinished(key, write_completed
+                                               ? ThunderingHerdHandler::InsertResult::Inserted
+                                               : ThunderingHerdHandler::InsertResult::Failed);
           });
-      additional_destroy_action_ = nullptr;
+      thundering_herd_in_flight_ = false;
       // Add metadata associated with the cached response. Right now this is only response_time;
       const ResponseMetadata metadata = {config_->timeSource().systemTime()};
       insert_queue_->insertHeaders(headers, metadata, end_stream);
@@ -205,6 +209,9 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     // insert_status_ remains absl::nullopt if end_stream == false, as we have not completed the
     // insertion yet.
   } else {
+    thundering_herd_in_flight_ = false;
+    config_->thunderingHerdHandler().handleInsertFinished(
+        key_, ThunderingHerdHandler::InsertResult::NotCacheable);
     insert_status_ = InsertStatus::NoInsertResponseNotCacheable;
   }
   setFilterState(FilterState::NotServingFromCache);
@@ -328,7 +335,7 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
 }
 
 void CacheFilter::retryHeaders(Http::RequestHeaderMap& request_headers) {
-  additional_destroy_action_ = nullptr;
+  thundering_herd_in_flight_ = false;
   getHeaders(request_headers);
 }
 
@@ -452,9 +459,7 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
     handleCacheHit();
     return;
   case CacheEntryStatus::Unusable:
-    additional_destroy_action_ = [thh = config_->sharedThunderingHerdHandler(), key = key_]() {
-      thh->handleInsertFinished(key, false);
-    };
+    thundering_herd_in_flight_ = true;
     config_->thunderingHerdHandler().handleUpstreamRequest(weak_from_this(), decoder_callbacks_,
                                                            key_, request_headers);
     // The filter may have been destroyed here, as continueDecoding may have been called during

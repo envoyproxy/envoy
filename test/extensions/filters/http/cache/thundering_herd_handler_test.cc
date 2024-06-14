@@ -3,6 +3,7 @@
 
 #include "test/extensions/filters/http/cache/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -21,12 +22,22 @@ public:
       : api_(Api::createApiForTest(simTime())),
         dispatcher_(api_->allocateDispatcher("test_thread")) {}
   void SetUp() override {
+    EXPECT_CALL(mock_server_factory_context_, mainThreadDispatcher())
+        .WillRepeatedly(ReturnRef(*dispatcher_));
     EXPECT_CALL(mock_decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
     EXPECT_CALL(mock_decoder_callbacks_2_, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
     EXPECT_CALL(mock_decoder_callbacks_3_, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
   }
+
+  void
+  initHandler(const envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler&
+                  config) {
+    handler_ = ThunderingHerdHandler::create(config, mock_server_factory_context_);
+  }
+
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  Server::Configuration::MockServerFactoryContext mock_server_factory_context_;
   std::shared_ptr<MockThunderingHerdRetryInterface> mock_filter_ =
       std::make_shared<MockThunderingHerdRetryInterface>();
   std::shared_ptr<MockThunderingHerdRetryInterface> mock_filter_2_ =
@@ -53,19 +64,19 @@ public:
 
 TEST_F(ThunderingHerdHandlerTest, WriteFailedWithNoBlockedRequestsDoesNothing) {
   envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
-  handler_ = ThunderingHerdHandler::create(config);
+  initHandler(config);
   // Make one request.
   EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
   handler_->handleUpstreamRequest(mock_filter_, &mock_decoder_callbacks_, key_, request_headers_);
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
-  handler_->handleInsertFinished(key_, false);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
   // Nothing additional is expected to happen - the queue should have been released,
   // and since nothing was blocked, nothing is unblocked.
 }
 
 TEST_F(ThunderingHerdHandlerTest, UnsetIsPassThrough) {
   envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
-  handler_ = ThunderingHerdHandler::create(config);
+  initHandler(config);
   EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
   EXPECT_CALL(mock_decoder_callbacks_2_, continueDecoding());
   EXPECT_CALL(mock_decoder_callbacks_3_, continueDecoding());
@@ -73,15 +84,15 @@ TEST_F(ThunderingHerdHandlerTest, UnsetIsPassThrough) {
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_2_);
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_3_);
-  handler_->handleInsertFinished(key_, false);
-  handler_->handleInsertFinished(key_, false);
-  handler_->handleInsertFinished(key_, false);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
 }
 
 TEST_F(ThunderingHerdHandlerTest, ExplicitNoneIsPassThrough) {
   envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
   config.mutable_none();
-  handler_ = ThunderingHerdHandler::create(config);
+  initHandler(config);
   EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
   EXPECT_CALL(mock_decoder_callbacks_2_, continueDecoding());
   EXPECT_CALL(mock_decoder_callbacks_3_, continueDecoding());
@@ -89,50 +100,50 @@ TEST_F(ThunderingHerdHandlerTest, ExplicitNoneIsPassThrough) {
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_2_);
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_3_);
-  handler_->handleInsertFinished(key_, false);
-  handler_->handleInsertFinished(key_, false);
-  handler_->handleInsertFinished(key_, true);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Inserted);
 }
 
 TEST_F(ThunderingHerdHandlerTest, DefaultBlockUntilCompletionBlocksAfterOneAndReleasesOneOnFail) {
   envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
   config.mutable_block_until_completion();
-  handler_ = ThunderingHerdHandler::create(config);
+  initHandler(config);
   EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
   makeThreeRequests();
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
   // Failure of the first filter should cause the second filter to continueDecoding, via dispatcher.
   EXPECT_CALL(mock_decoder_callbacks_2_, continueDecoding());
-  handler_->handleInsertFinished(key_, false);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_2_);
   // Failure of the second filter should cause the third filter to continueDecoding, via dispatcher.
   EXPECT_CALL(mock_decoder_callbacks_3_, continueDecoding());
-  handler_->handleInsertFinished(key_, false);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_3_);
   // Failure of the third filter should clear the hash because there are no more blockers.
-  handler_->handleInsertFinished(key_, false);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
 }
 
 TEST_F(ThunderingHerdHandlerTest, DefaultBlockUntilCompletionRetriesAllOnSuccess) {
   envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
   config.mutable_block_until_completion();
-  handler_ = ThunderingHerdHandler::create(config);
+  initHandler(config);
   EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
   makeThreeRequests();
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
   // Success of the first filter should cause the other filters to retryHeaders, via dispatchers.
   EXPECT_CALL(*mock_filter_2_, retryHeaders(_));
   EXPECT_CALL(*mock_filter_3_, retryHeaders(_));
-  handler_->handleInsertFinished(key_, true);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Inserted);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_F(ThunderingHerdHandlerTest, DefaultBlockUntilCompletionSkipsOneOnFilterDeletion) {
   envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
   config.mutable_block_until_completion();
-  handler_ = ThunderingHerdHandler::create(config);
+  initHandler(config);
   EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
   makeThreeRequests();
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
@@ -140,14 +151,14 @@ TEST_F(ThunderingHerdHandlerTest, DefaultBlockUntilCompletionSkipsOneOnFilterDel
   // abort it because the filter is deleted, and dispatch request for *third* filter.
   mock_filter_2_.reset();
   EXPECT_CALL(mock_decoder_callbacks_3_, continueDecoding());
-  handler_->handleInsertFinished(key_, false);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_F(ThunderingHerdHandlerTest, BlockUntilCompletionAllowsThroughSpecifiedNumberOfRequests) {
   envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
   config.mutable_block_until_completion()->set_parallel_requests(2);
-  handler_ = ThunderingHerdHandler::create(config);
+  initHandler(config);
   EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
   EXPECT_CALL(mock_decoder_callbacks_2_, continueDecoding());
   makeThreeRequests();
@@ -156,13 +167,13 @@ TEST_F(ThunderingHerdHandlerTest, BlockUntilCompletionAllowsThroughSpecifiedNumb
   // Failure of the first filter should cause the remaining blocked filter to start, via
   // dispatchers.
   EXPECT_CALL(mock_decoder_callbacks_3_, continueDecoding());
-  handler_->handleInsertFinished(key_, false);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_3_);
   // Failure and success of the second and third filter should do nothing, as nothing else is
   // blocked.
-  handler_->handleInsertFinished(key_, false);
-  handler_->handleInsertFinished(key_, true);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Inserted);
 }
 
 TEST_F(ThunderingHerdHandlerTest, UnblockPeriodTimeoutReleasesAnotherRequest) {
@@ -170,7 +181,7 @@ TEST_F(ThunderingHerdHandlerTest, UnblockPeriodTimeoutReleasesAnotherRequest) {
   envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
   *config.mutable_block_until_completion()->mutable_unblock_additional_request_period() =
       ProtobufUtil::TimeUtil::MillisecondsToDuration(period_ms);
-  handler_ = ThunderingHerdHandler::create(config);
+  initHandler(config);
   EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
   makeThreeRequests();
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
@@ -187,9 +198,9 @@ TEST_F(ThunderingHerdHandlerTest, UnblockPeriodTimeoutReleasesAnotherRequest) {
                               Event::Dispatcher::RunType::Block);
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_3_);
   // Failure or success of the three instances now all running should do nothing.
-  handler_->handleInsertFinished(key_, false);
-  handler_->handleInsertFinished(key_, true);
-  handler_->handleInsertFinished(key_, true);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Inserted);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Inserted);
 }
 
 TEST_F(ThunderingHerdHandlerTest, UnblockPeriodTimeoutDoesNotRunIfRequestAlreadyCompleted) {
@@ -197,7 +208,7 @@ TEST_F(ThunderingHerdHandlerTest, UnblockPeriodTimeoutDoesNotRunIfRequestAlready
   envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
   *config.mutable_block_until_completion()->mutable_unblock_additional_request_period() =
       ProtobufUtil::TimeUtil::MillisecondsToDuration(period_ms);
-  handler_ = ThunderingHerdHandler::create(config);
+  initHandler(config);
   EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
   makeThreeRequests();
   ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
@@ -205,7 +216,7 @@ TEST_F(ThunderingHerdHandlerTest, UnblockPeriodTimeoutDoesNotRunIfRequestAlready
   // Success of the first filter should cause the other filters to retryHeaders, via dispatchers.
   EXPECT_CALL(*mock_filter_2_, retryHeaders(_));
   EXPECT_CALL(*mock_filter_3_, retryHeaders(_));
-  handler_->handleInsertFinished(key_, true);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Inserted);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ::testing::Mock::VerifyAndClearExpectations(&*mock_filter_2_);
   ::testing::Mock::VerifyAndClearExpectations(&*mock_filter_3_);

@@ -100,6 +100,7 @@ envoy_extension_cc_test(
         ":mocks",
         "//source/extensions/filters/http/cache:thundering_herd_handler_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )
 

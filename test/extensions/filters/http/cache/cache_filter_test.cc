@@ -370,7 +370,8 @@ TEST_F(CacheFilterTest, ConsultsThunderingHerdHandlerOnCacheMissAndAbortsItOnDes
   testDecodeRequestMiss(filter);
   // Destroying the filter (before any upstream response)
   // should abort the thundering herd blockage.
-  EXPECT_CALL(*mock_thundering_herd_handler, handleInsertFinished(_, false));
+  EXPECT_CALL(*mock_thundering_herd_handler,
+              handleInsertFinished(_, ThunderingHerdHandler::InsertResult::Failed));
   filter->onDestroy();
 }
 
@@ -397,7 +398,8 @@ TEST_F(CacheFilterTest,
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Destroying the filter (e.g. client cancel) should abort the thundering herd blockage.
-  EXPECT_CALL(*mock_thundering_herd_handler, handleInsertFinished(_, false));
+  EXPECT_CALL(*mock_thundering_herd_handler,
+              handleInsertFinished(_, ThunderingHerdHandler::InsertResult::Failed));
   filter->onDestroy();
 }
 
@@ -458,7 +460,8 @@ TEST_F(CacheFilterTest,
   EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
   EXPECT_EQ(filter->encodeData(buf, true), Http::FilterDataStatus::Continue);
   // Thundering herd should be notified immediately when the cache write completes.
-  EXPECT_CALL(*mock_thundering_herd_handler, handleInsertFinished(_, true));
+  EXPECT_CALL(*mock_thundering_herd_handler,
+              handleInsertFinished(_, ThunderingHerdHandler::InsertResult::Inserted));
   // The cache insertion callbacks should be posted to the dispatcher.
   // Run events on the dispatcher so that the callbacks are invoked.
   dispatcher_->run(Event::Dispatcher::RunType::Block);

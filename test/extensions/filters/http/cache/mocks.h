@@ -28,7 +28,8 @@ public:
               (std::weak_ptr<ThunderingHerdRetryInterface> weak_filter,
                Http::StreamDecoderFilterCallbacks* decoder_callbacks, const Key& key,
                Http::RequestHeaderMap& request_headers));
-  MOCK_METHOD(void, handleInsertFinished, (const Key& key, bool insert_succeeded));
+  MOCK_METHOD(void, handleInsertFinished,
+              (const Key& key, ThunderingHerdHandler::InsertResult insert_result));
 };
 
 class MockThunderingHerdRetryInterface : public ThunderingHerdRetryInterface {

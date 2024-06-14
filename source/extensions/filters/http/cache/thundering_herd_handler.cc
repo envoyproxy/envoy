@@ -17,7 +17,7 @@ public:
                              Http::RequestHeaderMap&) override {
     decoder_callbacks->continueDecoding();
   }
-  void handleInsertFinished(const Key&, bool) override {}
+  void handleInsertFinished(const Key&, InsertResult) override {}
 };
 
 class ThunderingHerdHandlerBlockUntilCompletion
@@ -34,6 +34,15 @@ class ThunderingHerdHandlerBlockUntilCompletion
       // request_headers_ may be invalid if weak_filter_ is deleted.
       Http::RequestHeaderMap& request_headers_;
     };
+    bool unblockable_{false};
+    // If retry_all_ is set, additional requests should do retryFilter as the expectation
+    // is that the cache entry is populated now. This self-clears after a fraction of a
+    // second. This is necessary to resolve the race in which a cache lookup occurred,
+    // then insertion completed from another request, then the queue unblocked, then the
+    // thundering herd check is applied on the cache miss; we want it to retry and get
+    // a cache hit. Without this timer this race would instead pass an additional request
+    // through to the upstream.
+    Event::TimerPtr retry_all_;
     std::deque<Event::TimerPtr> blockers_;
     std::deque<Blocked> blocked_;
   };
@@ -41,10 +50,12 @@ class ThunderingHerdHandlerBlockUntilCompletion
 public:
   ThunderingHerdHandlerBlockUntilCompletion(
       const envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler::
-          BlockUntilCompletion& config)
+          BlockUntilCompletion& config,
+      Server::Configuration::CommonFactoryContext& context)
       : unblock_additional_request_period_(
             PROTOBUF_GET_MS_OR_DEFAULT(config, unblock_additional_request_period, 0)),
-        parallel_requests_(std::max(1U, config.parallel_requests())) {}
+        parallel_requests_(std::max(1U, config.parallel_requests())),
+        main_thread_dispatcher_(context.mainThreadDispatcher()) {}
 
   ~ThunderingHerdHandlerBlockUntilCompletion() override {
     if (!queues_.empty()) {
@@ -60,7 +71,18 @@ public:
                              Http::RequestHeaderMap& request_headers) override {
     absl::ReleasableMutexLock lock(&mu_);
     auto it = queues_.try_emplace(key).first;
-    if (it->second.blockers_.size() < parallel_requests_) {
+    if (it->second.unblockable_) {
+      lock.Release();
+      // Lock must be released before continueDecoding, because it can trigger filter
+      // destruction which can trigger another thundering herd action.
+      decoder_callbacks->continueDecoding();
+    } else if (it->second.retry_all_ != nullptr) {
+      decoder_callbacks->dispatcher().post([weak_filter, &request_headers]() {
+        if (auto filter = weak_filter.lock()) {
+          filter->retryHeaders(request_headers);
+        }
+      });
+    } else if (it->second.blockers_.size() < parallel_requests_) {
       ENVOY_STREAM_LOG(debug, "ThunderingHerdHandler adding blocker {}", *decoder_callbacks,
                        request_headers.Path()->value().getStringView());
       it->second.blockers_.push_back(maybeMakeTimeout(key, decoder_callbacks->dispatcher()));
@@ -98,7 +120,9 @@ public:
   }
 
   std::function<void()> onUndeliverable(const Key& key) {
-    return [key, handler = shared_from_this()]() { handler->handleInsertFinished(key, false); };
+    return [key, handler = shared_from_this()]() {
+      handler->handleInsertFinished(key, InsertResult::Failed);
+    };
   }
 
   void selectNewBlocker(const Key& key, Queue& queue) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
@@ -134,26 +158,46 @@ public:
     selectNewBlocker(key, it->second);
   }
 
-  void unblock(const Key& key, Queue& queue) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+  static void resumeOne(const Queue::Blocked& unblocking) {
+    unblocking.dispatcher_.post([unblocking]() {
+      if (auto filter = unblocking.weak_filter_.lock()) {
+        filter->retryHeaders(unblocking.request_headers_);
+      }
+    });
+  }
+
+  void resume(const Key& key, Queue& queue) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
     ENVOY_LOG(debug, "ThunderingHerdHandler unblocking queue {} of size {}", key.path(),
               queue.blocked_.size());
     for (const Queue::Blocked& unblocking : queue.blocked_) {
-      unblocking.dispatcher_.post([unblocking]() {
-        if (auto filter = unblocking.weak_filter_.lock()) {
-          filter->retryHeaders(unblocking.request_headers_);
-        }
-      });
+      resumeOne(unblocking);
     }
     queue.blocked_.clear();
+  }
+
+  void unblock(const Key& key, Queue& queue) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+    resume(key, queue);
     if (queue.blockers_.empty()) {
       queues_.erase(key);
     }
   }
 
-  void handleInsertFinished(const Key& key, bool write_succeeded) override {
+  void markNotCacheable(const Key& key, Queue& queue) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+    resume(key, queue);
+    queue.unblockable_ = true;
+  }
+
+  void clearRetryTimer(const Key& key) ABSL_LOCKS_EXCLUDED(mu_) {
     absl::MutexLock lock(&mu_);
     auto it = queues_.find(key);
-    ASSERT(!write_succeeded || it != queues_.end(),
+    ASSERT(it != queues_.end());
+    it->second.retry_all_ = nullptr;
+  }
+
+  void handleInsertFinished(const Key& key, InsertResult result) override {
+    absl::MutexLock lock(&mu_);
+    auto it = queues_.find(key);
+    ASSERT(result != InsertResult::Inserted || it != queues_.end(),
            "should be impossible to complete an insert on a queue that doesn't exist");
     if (it == queues_.end()) {
       // Ideally it would also not be possible to abort a queue entry that doesn't
@@ -164,10 +208,19 @@ public:
       return;
     }
     it->second.blockers_.pop_front();
-    if (write_succeeded) {
+    switch (result) {
+    case InsertResult::Inserted:
+      it->second.retry_all_ = main_thread_dispatcher_.createTimer(
+          [handler = shared_from_this(), key]() { handler->clearRetryTimer(key); });
+      it->second.retry_all_->enableTimer(std::chrono::milliseconds(100));
       unblock(key, it->second);
-    } else {
+      break;
+    case InsertResult::NotCacheable:
+      markNotCacheable(key, it->second);
+      break;
+    case InsertResult::Failed:
       selectNewBlocker(key, it->second);
+      break;
     }
   }
 
@@ -176,16 +229,18 @@ private:
   absl::flat_hash_map<Key, Queue, MessageUtil, MessageUtil> queues_ ABSL_GUARDED_BY(mu_);
   const std::chrono::milliseconds unblock_additional_request_period_;
   const size_t parallel_requests_;
+  Event::Dispatcher& main_thread_dispatcher_;
 };
 
 // static
 std::shared_ptr<ThunderingHerdHandler> ThunderingHerdHandler::create(
-    const envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler& config) {
+    const envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler& config,
+    Server::Configuration::CommonFactoryContext& context) {
   switch (config.handler_case()) {
   case envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler::
       kBlockUntilCompletion:
     return std::make_shared<ThunderingHerdHandlerBlockUntilCompletion>(
-        config.block_until_completion());
+        config.block_until_completion(), context);
   case envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler::kNone:
   case envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler::
       HANDLER_NOT_SET:
