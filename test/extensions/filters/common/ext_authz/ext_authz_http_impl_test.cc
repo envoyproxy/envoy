@@ -259,6 +259,17 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedClientAndUpstreamHeaders) {
       config_->upstreamHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
 }
 
+TEST_F(ExtAuthzHttpClientTest, PathPrefixShouldBeSanitized) {
+  auto empty_config = createConfig(EMPTY_STRING, 250, "");
+  EXPECT_TRUE(empty_config->pathPrefix().empty());
+
+  auto slash_prefix_config = createConfig(EMPTY_STRING, 250, "/the_prefix");
+  EXPECT_EQ(slash_prefix_config->pathPrefix(), "/the_prefix");
+
+  EXPECT_THROW_WITH_MESSAGE(createConfig(EMPTY_STRING, 250, "the_prefix"), EnvoyException,
+                            "path_prefix should start with \"/\".");
+}
+
 // Verify client response when the authorization server returns a 200 OK and path_prefix is
 // configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
