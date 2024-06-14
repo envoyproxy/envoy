@@ -383,7 +383,7 @@ void ConfigDumpHandler::addLbEndpoint(
   auto& endpoint = *lb_endpoint.mutable_endpoint();
   endpoint.set_hostname(host->hostname());
   Network::Utility::addressToProtobufAddress(*host->address(), *endpoint.mutable_address());
-  if (host->addressListOrNull() == nullptr) {
+  if (host->addressListOrNull() != nullptr) {
     for (auto& additionalAddr : *host->addressListOrNull()) {
       auto& newAdditionalAdrr = *endpoint.mutable_additional_addresses()->Add();
       Network::Utility::addressToProtobufAddress(*additionalAddr,
