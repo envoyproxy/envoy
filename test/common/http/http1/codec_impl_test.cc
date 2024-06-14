@@ -5223,7 +5223,9 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameInvalidCR) {
   EXPECT_CALL(decoder,
               sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
 
+  // SPELLCHECKER(off)
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nfo\ro: bar\r\n\r\n");
+  // SPELLCHECKER(on)
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
@@ -5247,7 +5249,9 @@ TEST_P(Http1ClientConnectionImplTest, HeaderNameInvalidCR) {
   };
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
+  // SPELLCHECKER(off)
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nfo\ro: bar\r\n\r\n");
+  // SPELLCHECKER(on)
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
@@ -5284,10 +5288,12 @@ TEST_P(Http1ServerConnectionImplTest, ChunkExtensionInvalidCR) {
                 sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
   }
 
+  // SPELLCHECKER(off)
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
                            "6;\ra\r\nHello \r\n"
                            "5\r\nWorld\r\n"
                            "0\r\n\r\n");
+  // SPELLCHECKER(on)
   auto status = codec_->dispatch(buffer);
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
     EXPECT_TRUE(status.ok());
@@ -5321,10 +5327,12 @@ TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCR) {
     EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
   }
 
+  // SPELLCHECKER(off)
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n"
                            "6;\ra\r\nHello \r\n"
                            "5\r\nWorld\r\n"
                            "0\r\n\r\n");
+  // SPELLCHECKER(on)
   auto status = codec_->dispatch(buffer);
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
     EXPECT_TRUE(status.ok());
