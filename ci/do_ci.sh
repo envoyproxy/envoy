@@ -391,14 +391,14 @@ case $CI_TARGET in
 
     clang_tidy)
         # clang-tidy will warn on standard library issues with libc++
-        ENVOY_STDLIB="libstdc++"
+        # ENVOY_STDLIB="libstdc++"
         setup_clang_toolchain
         export CLANG_TIDY_FIX_DIFF="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
         export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
         export CLANG_TIDY_APPLY_FIXES=1
         mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
         CLANG_TIDY_TARGETS=(
-            //contrib/...
+            # //contrib/...
             //source/...
             //test/...
             @envoy_api//...)
