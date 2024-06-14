@@ -135,7 +135,7 @@ message LocalRateLimitDescriptor {
 // will be shared across all the Envoy instances in the local cluster.
 // A share will be calculated based on the membership of the local cluster dynamically
 // and the configuration. When the limiter refilling the token bucket, the share will be
-// applied. By default, the token bucket will shared evenly.
+// applied. By default, the token bucket will be shared evenly.
 //
 // See :ref:`local cluster name
 // <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.local_cluster_name>` for more context
