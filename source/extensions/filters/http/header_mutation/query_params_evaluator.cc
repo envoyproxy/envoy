@@ -17,7 +17,8 @@ namespace HeaderMutation {
 using Http::Utility::QueryParamsMulti;
 
 QueryParamsEvaluator::QueryParamsEvaluator(
-    const Protobuf::RepeatedPtrField<envoy::config::common::mutation_rules::v3::QueryParameterMutation>& query_param_mutations) : formatter_(std::make_unique<Formatter::FormatterImpl>("", true)) {
+    const Protobuf::RepeatedPtrField<QueryParameterMutationProto>& query_param_mutations)
+    : formatter_(std::make_unique<Formatter::FormatterImpl>("", true)) {
 
   for (const auto& query_param : query_param_mutations) {
     mutations_.emplace_back(query_param);

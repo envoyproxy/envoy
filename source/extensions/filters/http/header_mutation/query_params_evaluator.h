@@ -20,8 +20,10 @@ namespace HeaderMutation {
 
 using QueryParameterValueOptionProto =
     envoy::config::common::mutation_rules::v3::QueryParameterValueOption;
-using QueryParameterAppendActionProto = envoy::config::common::mutation_rules::v3::
-    QueryParameterValueOption_QueryParameterAppendAction;
+using QueryParameterAppendActionProto =
+    envoy::config::common::mutation_rules::v3::QueryParameterValueOption_QueryParameterAppendAction;
+using QueryParameterMutationProto =
+    envoy::config::common::mutation_rules::v3::QueryParameterMutation;
 
 enum class AppendAction {
   AppendIfExistsOrAdd = envoy::config::common::mutation_rules::v3::
@@ -40,7 +42,7 @@ using QueryParamsEvaluatorPtr = std::unique_ptr<QueryParamsEvaluator>;
 class QueryParamsEvaluator {
 public:
   QueryParamsEvaluator(
-      const Protobuf::RepeatedPtrField<envoy::config::common::mutation_rules::v3::QueryParameterMutation>& query_param_mutations);
+      const Protobuf::RepeatedPtrField<QueryParameterMutationProto>& query_param_mutations);
 
   /**
    * Processes headers first through query parameter removals then through query parameter
@@ -56,10 +58,7 @@ protected:
   QueryParamsEvaluator() = default;
 
 private:
-  std::vector<envoy::config::common::mutation_rules::v3::QueryParameterMutation> mutations_;
-  std::vector<std::tuple<std::string, std::string, QueryParameterAppendActionProto>>
-      query_params_to_add_;
-  std::vector<std::string> query_params_to_remove_;
+  std::vector<QueryParameterMutationProto> mutations_;
   Formatter::FormatterPtr formatter_;
 };
 

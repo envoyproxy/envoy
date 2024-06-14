@@ -18,8 +18,7 @@ namespace HeaderMutation {
 class QueryParamsEvaluatorTest : public testing::Test {
 public:
   std::string evaluateWithPath(const std::string& path) {
-    auto paramsEvaluator =
-        std::make_unique<QueryParamsEvaluator>(mutations_);
+    auto paramsEvaluator = std::make_unique<QueryParamsEvaluator>(mutations_);
     Http::TestRequestHeaderMapImpl request_headers{{":path", path}};
     paramsEvaluator->evaluateQueryParams(request_headers, stream_info_);
     return std::string(request_headers.getPathValue());
@@ -30,7 +29,7 @@ public:
     qp->set_key(key);
     qp->set_value(value);
 
-    auto* vo = envoy::config::common::mutation_rules::v3::QueryParameterValueOption::default_instance().New();
+    auto* vo = QueryParameterValueOptionProto::default_instance().New();
     vo->set_append_action(static_cast<QueryParameterAppendActionProto>(append_action));
     vo->set_allocated_query_parameter(qp);
 
@@ -49,7 +48,7 @@ public:
                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
-  Protobuf::RepeatedPtrField<envoy::config::common::mutation_rules::v3::QueryParameterMutation> mutations_;
+  Protobuf::RepeatedPtrField<QueryParameterMutationProto> mutations_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
