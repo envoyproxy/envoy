@@ -30,23 +30,23 @@ namespace Server {
 
 struct TestAddresses {
   Network::Address::InstanceConstSharedPtr ipv4_test_addr_ =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.5:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.5:12345");
   Network::Address::InstanceConstSharedPtr ipv4_test_addr_different_ip_ =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.6:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.6:12345");
   Network::Address::InstanceConstSharedPtr ipv4_test_addr_different_port_ =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.5:12346");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.5:12346");
   Network::Address::InstanceConstSharedPtr ipv4_default_ =
-      Network::Utility::parseInternetAddressAndPort("0.0.0.0:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("0.0.0.0:12345");
   Network::Address::InstanceConstSharedPtr ipv6_test_addr_ =
-      Network::Utility::parseInternetAddressAndPort("[::1]:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:12345");
   Network::Address::InstanceConstSharedPtr ipv6_test_addr_different_ip_ =
-      Network::Utility::parseInternetAddressAndPort("[::2]:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("[::2]:12345");
   Network::Address::InstanceConstSharedPtr ipv6_test_addr_different_port_ =
-      Network::Utility::parseInternetAddressAndPort("[::1]:12346");
+      Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:12346");
   Network::Address::InstanceConstSharedPtr ipv6_default_ =
-      Network::Utility::parseInternetAddressAndPort("[::]:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("[::]:12345");
   Network::Address::InstanceConstSharedPtr ipv6_default_with_ipv4_support_ =
-      Network::Utility::parseInternetAddressAndPort("[::]:12345", false);
+      Network::Utility::parseInternetAddressAndPortNoThrow("[::]:12345", false);
 };
 
 class HotRestartImplTest : public testing::Test {

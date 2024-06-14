@@ -1,5 +1,5 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
-load("@envoy_mobile//bazel:kotlin_test.bzl", "envoy_mobile_android_test", "envoy_mobile_kt_test")
+load("@envoy_mobile//bazel:envoy_mobile_android_test.bzl", "envoy_mobile_android_test")
 
 licenses(["notice"])  # Apache 2
 
@@ -29,7 +29,7 @@ envoy_mobile_android_test(
     ],
 )
 
-envoy_mobile_kt_test(
+envoy_mobile_android_test(
     name = "grpc_request_headers_builder_test",
     srcs = [
         "GRPCRequestHeadersBuilderTest.kt",
@@ -39,7 +39,7 @@ envoy_mobile_kt_test(
     ],
 )
 
-envoy_mobile_kt_test(
+envoy_mobile_android_test(
     name = "grpc_stream_test",
     srcs = [
         "GRPCStreamTest.kt",
@@ -50,7 +50,7 @@ envoy_mobile_kt_test(
     ],
 )
 
-envoy_mobile_kt_test(
+envoy_mobile_android_test(
     name = "headers_builder_test",
     srcs = [
         "HeadersBuilderTest.kt",
@@ -60,7 +60,7 @@ envoy_mobile_kt_test(
     ],
 )
 
-envoy_mobile_kt_test(
+envoy_mobile_android_test(
     name = "pulse_client_impl_test",
     srcs = [
         "PulseClientImplTest.kt",
@@ -74,7 +74,7 @@ envoy_mobile_kt_test(
     ],
 )
 
-envoy_mobile_kt_test(
+envoy_mobile_android_test(
     name = "request_headers_builder_test",
     srcs = [
         "RequestHeadersBuilderTest.kt",
@@ -84,7 +84,7 @@ envoy_mobile_kt_test(
     ],
 )
 
-envoy_mobile_kt_test(
+envoy_mobile_android_test(
     name = "response_headers_test",
     srcs = [
         "ResponseHeadersTest.kt",
@@ -94,7 +94,7 @@ envoy_mobile_kt_test(
     ],
 )
 
-envoy_mobile_kt_test(
+envoy_mobile_android_test(
     name = "retry_policy_mapper_test",
     srcs = [
         "RetryPolicyMapperTest.kt",
@@ -104,7 +104,7 @@ envoy_mobile_kt_test(
     ],
 )
 
-envoy_mobile_kt_test(
+envoy_mobile_android_test(
     name = "headers_container_test",
     srcs = [
         "HeadersContainerTest.kt",

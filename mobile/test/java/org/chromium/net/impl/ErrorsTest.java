@@ -3,18 +3,16 @@ package org.chromium.net.impl;
 import static org.chromium.net.impl.Errors.mapEnvoyMobileErrorToNetError;
 import static org.junit.Assert.assertEquals;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
-
 import io.envoyproxy.envoymobile.engine.UpstreamHttpProtocol;
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
 
 import org.chromium.net.impl.Errors.NetError;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.robolectric.RobolectricTestRunner;
 
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class ErrorsTest {
-
   @Test
   public void testMapEnvoyMobileErrorToNetErrorHttp3() throws Exception {
     // 8 corresponds to NoRouteFound in StreamInfo::CoreResponseFlag:
@@ -32,6 +30,16 @@ public class ErrorsTest {
     // https://github.com/envoyproxy/envoy/blob/410e9a77bd6b74abb3e1545b4fd077e734d0fce3/envoy/stream_info/stream_info.h#L39
     long responseFlags = 1L << 4;
     EnvoyFinalStreamIntel intel = constructStreamIntel(responseFlags, UpstreamHttpProtocol.HTTP2);
+    NetError error = mapEnvoyMobileErrorToNetError(intel);
+    assertEquals(NetError.ERR_CONNECTION_RESET, error);
+  }
+
+  @Test
+  public void testMapEnvoyMobileErrorToNetErrorFoundInMapOnHttp3() throws Exception {
+    // 4 corresponds to UpstreamRemoteReset in StreamInfo::CoreResponseFlag:
+    // https://github.com/envoyproxy/envoy/blob/410e9a77bd6b74abb3e1545b4fd077e734d0fce3/envoy/stream_info/stream_info.h#L39
+    long responseFlags = 1L << 4;
+    EnvoyFinalStreamIntel intel = constructStreamIntel(responseFlags, UpstreamHttpProtocol.HTTP3);
     NetError error = mapEnvoyMobileErrorToNetError(intel);
     assertEquals(NetError.ERR_CONNECTION_RESET, error);
   }

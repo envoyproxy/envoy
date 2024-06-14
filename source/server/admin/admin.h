@@ -163,6 +163,7 @@ public:
   OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override { return scope_key_builder_; }
   const std::string& serverName() const override { return Http::DefaultServerString::get(); }
   const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
+  bool shouldSchemeMatchUpstream() const override { return scheme_match_upstream_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
   serverHeaderTransformation() const override {
     return HttpConnectionManagerProto::OVERWRITE;
@@ -495,6 +496,7 @@ private:
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   const std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_{};
   const absl::optional<std::string> scheme_{};
+  const bool scheme_match_upstream_ = false;
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;

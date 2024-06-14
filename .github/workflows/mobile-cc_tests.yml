@@ -44,7 +44,7 @@ jobs:
       args: >-
         test
         --config=mobile-remote-ci-cc
-        //test/cc/...
+        //test/cc/... //test/common/...
       request: ${{ needs.load.outputs.request }}
       target: cc-tests
       timeout-minutes: 120

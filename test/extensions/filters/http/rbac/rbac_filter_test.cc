@@ -259,15 +259,15 @@ on_no_match:
 
   RoleBasedAccessControlFilterTest() = default;
 
-  void setDestinationAddressAndPort(std::string server_addr, uint16_t port) {
-    address_ = Envoy::Network::Utility::parseInternetAddress(server_addr, port, false);
+  void setDestinationAddressAndPortNoThrow(std::string server_addr, uint16_t port) {
+    address_ = Envoy::Network::Utility::parseInternetAddressNoThrow(server_addr, port, false);
     req_info_.downstream_connection_info_provider_->setLocalAddress(address_);
 
     ON_CALL(connection_.stream_info_, downstreamAddressProvider())
         .WillByDefault(ReturnPointee(req_info_.downstream_connection_info_provider_));
   }
 
-  void setDestinationPort(uint16_t port) { setDestinationAddressAndPort("1.2.3.4", port); }
+  void setDestinationPort(uint16_t port) { setDestinationAddressAndPortNoThrow("1.2.3.4", port); }
 
   void setRequestedServerName(std::string server_name) {
     requested_server_name_ = server_name;
@@ -913,7 +913,7 @@ public:
 
     for (const auto& ip : upstream_ips) {
       Network::Address::InstanceConstSharedPtr address =
-          Envoy::Network::Utility::parseInternetAddressAndPort(ip, false);
+          Envoy::Network::Utility::parseInternetAddressAndPortNoThrow(ip, false);
 
       address_obj->address_ = address;
     }

@@ -24,6 +24,7 @@
 
 #include "source/common/common/matchers.h"
 #include "source/common/common/packed_struct.h"
+#include "source/common/config/datasource.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/header_utility.h"
@@ -798,7 +799,10 @@ public:
   std::string newUri(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
-  const std::string& responseBody() const override { return direct_response_body_; }
+  const std::string& responseBody() const override {
+    return direct_response_body_provider_ != nullptr ? direct_response_body_provider_->data()
+                                                     : EMPTY_STRING;
+  }
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
@@ -1227,7 +1231,7 @@ private:
 
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
-  std::string direct_response_body_;
+  Envoy::Config::DataSource::DataSourceProviderPtr direct_response_body_provider_;
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;

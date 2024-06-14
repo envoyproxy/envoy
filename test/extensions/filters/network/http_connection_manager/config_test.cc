@@ -1097,6 +1097,113 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
   EXPECT_EQ(config.schemeToSet(), "http");
 }
 
+// Validated that by default we don't use the upstream transport when determining the scheme.
+TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_FALSE(config.shouldSchemeMatchUpstream());
+}
+
+// Validated that when configured, we use the transport when determining the scheme.
+TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpsreamTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  scheme_header_transformation:
+    match_upstream: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_TRUE(config.shouldSchemeMatchUpstream());
+}
+
+// Validated that when explicitly set false, we don't use the transport when determining the scheme.
+TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  scheme_header_transformation:
+    match_upstream: false
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_FALSE(config.shouldSchemeMatchUpstream());
+}
+
+// Validated that when configured and scheme_to_overwrite is set, we use scheme_to_overwrite.
+TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamAndSchemeToOverwriteIsSet) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  scheme_header_transformation:
+    scheme_to_overwrite: https
+    match_upstream: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  EXPECT_EQ(config.schemeToSet(), "https");
+  ASSERT_FALSE(config.shouldSchemeMatchUpstream());
+  EXPECT_LOG_CONTAINS("warn",
+                      "match_upstream and scheme_to_overwrite both set, using scheme_to_overwrite",
+                      createHttpConnectionManagerConfig(yaml_string));
+}
+
 // Validated that by default we don't normalize paths
 // unless set build flag path_normalization_by_default=true
 TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
