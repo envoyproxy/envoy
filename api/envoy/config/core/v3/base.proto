@@ -87,9 +87,6 @@ message Locality {
   // into smaller chunks of sub-zones so they can be load balanced
   // independently.
   string sub_zone = 3;
-
-  // Metadata to provide additional information about the locality.
-  Metadata metadata = 4;
 }
 
 // BuildVersion combines SemVer version of extension with free-form build information

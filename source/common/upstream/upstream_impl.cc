@@ -2050,8 +2050,8 @@ void PriorityStateManager::registerHostForPriority(
           ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
           : nullptr;
   auto locality_metadata =
-      locality_lb_endpoint.locality().has_metadata()
-          ? parent_.constMetadataSharedPool()->getObject(locality_lb_endpoint.locality().metadata())
+      locality_lb_endpoint.has_metadata()
+          ? parent_.constMetadataSharedPool()->getObject(locality_lb_endpoint.metadata())
           : nullptr;
   const auto host = std::make_shared<HostImpl>(
       parent_.info(), hostname, address, endpoint_metadata, locality_metadata,

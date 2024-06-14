@@ -1585,8 +1585,7 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   HostImpl host(cluster.info_, "lyft.com", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
-                std::make_shared<const envoy::config::core::v3::Metadata>(metadata),
-                std::make_shared<const envoy::config::core::v3::Metadata>(locality.metadata()), 1,
+                std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
                 locality,
                 envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
                 envoy::config::core::v3::UNKNOWN, simTime());
@@ -1614,7 +1613,7 @@ TEST_F(HostImplTest, CreateConnection) {
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata),
-      std::make_shared<const envoy::config::core::v3::Metadata>(locality.metadata()), 1, locality,
+      nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, simTime());
 
@@ -1653,7 +1652,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata),
-      std::make_shared<const envoy::config::core::v3::Metadata>(locality.metadata()), 1, locality,
+      nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, simTime(), address_list);
 
@@ -1701,7 +1700,7 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata),
-      std::make_shared<const envoy::config::core::v3::Metadata>(locality.metadata()), 1, locality,
+      nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, simTime(), address_list);
 
@@ -1761,7 +1760,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata),
-      std::make_shared<const envoy::config::core::v3::Metadata>(locality.metadata()), 1, locality,
+      nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, simTime(), address_list);
 
@@ -1815,7 +1814,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata),
-      std::make_shared<const envoy::config::core::v3::Metadata>(locality.metadata()), 1, locality,
+      nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, simTime(), address_list);
 
