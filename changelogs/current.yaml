@@ -174,6 +174,11 @@ bug_fixes:
   change: |
     Added one option to disable the response body buffering for mirror request. Also introduced a 32MB cap for the response
     buffer, which can be changed by the runtime flag ``http.async_response_buffer_limit`` based on the product needs.
+- area: ext_authz
+  change: |
+    Validate http service path_prefix
+    :ref:`path_prefix <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.HttpService.path_prefix>`,
+    Validate http service path_prefix configuration must start with ``/``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -204,9 +209,15 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.http_allow_partial_urls_in_referer`` runtime flag and legacy code paths.
+- area: oauth
+  change: |
+    Removed ``envoy.reloadable_features.oauth_make_token_cookie_httponly`` runtime flag and legacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and legacy code paths.
+- area: oauth
+  change: |
+    Removed ``envoy.reloadable_features.hmac_base64_encoding_only`` runtime flag and legacy code paths.
 - area: upstream
   change: |
     Removed ``envoy.reloadable_features.convert_legacy_lb_config`` runtime flag and legacy code paths.
