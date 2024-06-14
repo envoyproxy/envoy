@@ -136,7 +136,7 @@ message QueryParameterMutation {
   oneof action {
     option (validate.required) = true;
 
-    // Remove the specified query parameter from the HTTP path if it exists. Will remove all instancesa of repeat query
+    // Remove the specified query parameter from the HTTP path if it exists. Will remove all instances of repeat query
     // parameters.
     string remove = 1;
 
