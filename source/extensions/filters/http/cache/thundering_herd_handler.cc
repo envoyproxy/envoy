@@ -168,9 +168,7 @@ public:
 
   void unblock(const Key& key, Queue& queue) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
     resume(key, queue);
-    if (queue.blockers_.empty()) {
-      queues_.erase(key);
-    }
+    queue.retry_until_ = time_source_.systemTime() + std::chrono::milliseconds(100);
   }
 
   void markNotCacheable(const Key& key, Queue& queue) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
@@ -194,7 +192,6 @@ public:
     it->second.blockers_.pop_front();
     switch (result) {
     case InsertResult::Inserted:
-      it->second.retry_until_ = time_source_.systemTime() + std::chrono::milliseconds(100);
       unblock(key, it->second);
       break;
     case InsertResult::NotCacheable:
