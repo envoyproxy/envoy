@@ -232,7 +232,6 @@ std::shared_ptr<ThunderingHerdHandler> ThunderingHerdHandler::create(
       kBlockUntilCompletion:
     return std::make_shared<ThunderingHerdHandlerBlockUntilCompletion>(
         config.block_until_completion(), context);
-  case envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler::kNone:
   case envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler::
       HANDLER_NOT_SET:
     return std::make_shared<ThunderingHerdHandlerNone>();
