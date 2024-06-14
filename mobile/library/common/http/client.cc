@@ -442,29 +442,28 @@ void Client::DirectStreamCallbacks::latchError() {
   if (info.responseCode().has_value()) {
     error_->error_code_ = Bridge::Utility::errorCodeFromLocalStatus(
         static_cast<Http::Code>(info.responseCode().value()));
-    error_msg_details.push_back(absl::StrCat("envoy_rc: ", info.responseCode().value()));
+    error_msg_details.push_back(absl::StrCat("rc: ", info.responseCode().value()));
   } else if (StreamInfo::isStreamIdleTimeout(info)) {
     error_->error_code_ = ENVOY_REQUEST_TIMEOUT;
   } else {
     error_->error_code_ = ENVOY_STREAM_RESET;
   }
 
-  error_msg_details.push_back(absl::StrCat("envoy_ec: ", error_->error_code_));
+  error_msg_details.push_back(absl::StrCat("ec: ", error_->error_code_));
   std::vector<std::string> response_flags(info.responseFlags().size());
   std::transform(info.responseFlags().begin(), info.responseFlags().end(), response_flags.begin(),
                  [](StreamInfo::ResponseFlag flag) { return std::to_string(flag.value()); });
   error_msg_details.push_back(absl::StrCat("rsp_flags: ", absl::StrJoin(response_flags, ",")));
   if (info.protocol().has_value()) {
     // https://github.com/envoyproxy/envoy/blob/fbce85914421145b5ae3210c9313eced63e535b0/envoy/http/protocol.h#L13
-    error_msg_details.push_back(absl::StrCat("protocol: ", *info.protocol()));
+    error_msg_details.push_back(absl::StrCat("http: ", *info.protocol()));
   }
   if (std::string resp_code_details = info.responseCodeDetails().value_or("");
       !resp_code_details.empty()) {
     error_msg_details.push_back(absl::StrCat("det: ", std::move(resp_code_details)));
   }
   // The format of the error message propogated to callbacks is:
-  // envoy_rc: {value}|envoy_ec: {value}|rsp_flags: {value}|protocol: {value}|det:
-  // {value}
+  // rc: {value}|ec: {value}|rsp_flags: {value}|http: {value}|det: {value}
   //
   // Where envoy_rc is the HTTP response code from StreamInfo::responseCode().
   // envoy_ec is of the envoy_error_code_t enum type, and gets mapped from envoy_rc.
