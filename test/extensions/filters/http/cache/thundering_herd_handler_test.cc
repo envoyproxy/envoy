@@ -22,8 +22,7 @@ public:
       : api_(Api::createApiForTest(simTime())),
         dispatcher_(api_->allocateDispatcher("test_thread")) {}
   void SetUp() override {
-    EXPECT_CALL(mock_server_factory_context_, mainThreadDispatcher())
-        .WillRepeatedly(ReturnRef(*dispatcher_));
+    EXPECT_CALL(mock_server_factory_context_, timeSource()).WillRepeatedly(ReturnRef(simTime()));
     EXPECT_CALL(mock_decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
     EXPECT_CALL(mock_decoder_callbacks_2_, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
     EXPECT_CALL(mock_decoder_callbacks_3_, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));

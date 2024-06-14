@@ -35,14 +35,14 @@ class ThunderingHerdHandlerBlockUntilCompletion
       Http::RequestHeaderMap& request_headers_;
     };
     bool unblockable_{false};
-    // If retry_all_ is set, additional requests should do retryFilter as the expectation
-    // is that the cache entry is populated now. This self-clears after a fraction of a
-    // second. This is necessary to resolve the race in which a cache lookup occurred,
-    // then insertion completed from another request, then the queue unblocked, then the
-    // thundering herd check is applied on the cache miss; we want it to retry and get
-    // a cache hit. Without this timer this race would instead pass an additional request
-    // through to the upstream.
-    Event::TimerPtr retry_all_;
+    // If retry_until_ is in the future, additional requests should do retryFilter as
+    // the expectation is that the cache entry is populated now. This should be only
+    // a fraction of a second in the future. This is necessary to resolve the race in
+    // which a cache lookup occurred, then insertion completed from another request,
+    // then the queue unblocked, then the thundering herd check is applied on the cache
+    // miss; we want it to retry and get a cache hit. Without this timer this race
+    // would instead pass an additional request through to the upstream.
+    SystemTime retry_until_;
     std::deque<Event::TimerPtr> blockers_;
     std::deque<Blocked> blocked_;
   };
@@ -55,7 +55,7 @@ public:
       : unblock_additional_request_period_(
             PROTOBUF_GET_MS_OR_DEFAULT(config, unblock_additional_request_period, 0)),
         parallel_requests_(std::max(1U, config.parallel_requests())),
-        main_thread_dispatcher_(context.mainThreadDispatcher()) {}
+        time_source_(context.timeSource()) {}
 
   void handleUpstreamRequest(std::weak_ptr<ThunderingHerdRetryInterface> weak_filter,
                              Http::StreamDecoderFilterCallbacks* decoder_callbacks, const Key& key,
@@ -67,7 +67,7 @@ public:
       // Lock must be released before continueDecoding, because it can trigger filter
       // destruction which can trigger another thundering herd action.
       decoder_callbacks->continueDecoding();
-    } else if (it->second.retry_all_ != nullptr) {
+    } else if (it->second.retry_until_ > time_source_.systemTime()) {
       decoder_callbacks->dispatcher().post([weak_filter, &request_headers]() {
         if (auto filter = weak_filter.lock()) {
           filter->retryHeaders(request_headers);
@@ -178,13 +178,6 @@ public:
     queue.unblockable_ = true;
   }
 
-  void clearRetryTimer(const Key& key) ABSL_LOCKS_EXCLUDED(mu_) {
-    absl::MutexLock lock(&mu_);
-    auto it = queues_.find(key);
-    ASSERT(it != queues_.end());
-    it->second.retry_all_ = nullptr;
-  }
-
   void handleInsertFinished(const Key& key, InsertResult result) override {
     absl::MutexLock lock(&mu_);
     auto it = queues_.find(key);
@@ -201,9 +194,7 @@ public:
     it->second.blockers_.pop_front();
     switch (result) {
     case InsertResult::Inserted:
-      it->second.retry_all_ = main_thread_dispatcher_.createTimer(
-          [handler = shared_from_this(), key]() { handler->clearRetryTimer(key); });
-      it->second.retry_all_->enableTimer(std::chrono::milliseconds(100));
+      it->second.retry_until_ = time_source_.systemTime() + std::chrono::milliseconds(100);
       unblock(key, it->second);
       break;
     case InsertResult::NotCacheable:
@@ -220,7 +211,7 @@ private:
   absl::flat_hash_map<Key, Queue, MessageUtil, MessageUtil> queues_ ABSL_GUARDED_BY(mu_);
   const std::chrono::milliseconds unblock_additional_request_period_;
   const size_t parallel_requests_;
-  Event::Dispatcher& main_thread_dispatcher_;
+  TimeSource& time_source_;
 };
 
 // static
