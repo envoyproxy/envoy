@@ -207,7 +207,11 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
-  callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
+  // engine == nullptr, but if shadow_engine != nullptr, there are metrics to put in dynamic
+  // metadata.
+  if (shadow_engine != nullptr) {
+    callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
+  }
 
   ENVOY_LOG(debug, "no engine, allowed by default");
   return Http::FilterHeadersStatus::Continue;
