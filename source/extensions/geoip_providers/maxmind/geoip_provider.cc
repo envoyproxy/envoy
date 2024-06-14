@@ -172,7 +172,7 @@ void GeoipProvider::lookupInCityDb(
       config_->isLookupEnabledForHeader(config_->countryHeader())) {
     int mmdb_error;
     auto city_db = getCityDb();
-    ASSERT(city_db, "Maxmind city database must be initialised for performing lookups");
+    RELEASE_ASSERT(city_db, "Maxmind city database must be initialised for performing lookups");
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
         city_db.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
@@ -214,7 +214,7 @@ void GeoipProvider::lookupInAsnDb(
   if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
     int mmdb_error;
     auto isp_db = getIspDb();
-    ASSERT(isp_db, "Maxmind asn database must be initialised for performing lookups");
+    RELEASE_ASSERT(isp_db, "Maxmind asn database must be initialised for performing lookups");
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
         isp_db.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
@@ -242,7 +242,7 @@ void GeoipProvider::lookupInAnonDb(
   if (config_->isLookupEnabledForHeader(config_->anonHeader()) || config_->anonVpnHeader()) {
     int mmdb_error;
     auto anon_db = getAnonDb();
-    ASSERT(anon_db, "Maxmind anon database must be initialised for performing lookups");
+    RELEASE_ASSERT(anon_db, "Maxmind anon database must be initialised for performing lookups");
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
         anon_db.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
