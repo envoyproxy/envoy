@@ -35,7 +35,7 @@ public:
             THROW_OR_RETURN_VALUE(HeaderMutations::create(config.response_mutations()),
                                   std::unique_ptr<HeaderMutations>)),
         query_params_evaluator_(std::make_unique<QueryParamsEvaluator>(
-            config.query_parameters_to_add(), config.query_parameters_to_remove())) {}
+            config.query_parameter_mutations())) {}
 
   void mutateRequestHeaders(Http::RequestHeaderMap& headers,
                             const Formatter::HttpFormatterContext& ctx,

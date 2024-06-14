@@ -19,18 +19,18 @@ namespace HttpFilters {
 namespace HeaderMutation {
 
 using QueryParameterValueOptionProto =
-    envoy::extensions::filters::http::header_mutation::v3::QueryParameterValueOption;
-using QueryParameterAppendActionProto = envoy::extensions::filters::http::header_mutation::v3::
+    envoy::config::common::mutation_rules::v3::QueryParameterValueOption;
+using QueryParameterAppendActionProto = envoy::config::common::mutation_rules::v3::
     QueryParameterValueOption_QueryParameterAppendAction;
 
 enum class AppendAction {
-  AppendIfExistsOrAdd = envoy::extensions::filters::http::header_mutation::v3::
+  AppendIfExistsOrAdd = envoy::config::common::mutation_rules::v3::
       QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD,
-  AddIfAbsent = envoy::extensions::filters::http::header_mutation::v3::
+  AddIfAbsent = envoy::config::common::mutation_rules::v3::
       QueryParameterValueOption_QueryParameterAppendAction_ADD_IF_ABSENT,
-  OverwriteIfExistsOrAdd = envoy::extensions::filters::http::header_mutation::v3::
+  OverwriteIfExistsOrAdd = envoy::config::common::mutation_rules::v3::
       QueryParameterValueOption_QueryParameterAppendAction_OVERWRITE_IF_EXISTS_OR_ADD,
-  OverwriteIfExists = envoy::extensions::filters::http::header_mutation::v3::
+  OverwriteIfExists = envoy::config::common::mutation_rules::v3::
       QueryParameterValueOption_QueryParameterAppendAction_OVERWRITE_IF_EXISTS,
 };
 
@@ -40,8 +40,7 @@ using QueryParamsEvaluatorPtr = std::unique_ptr<QueryParamsEvaluator>;
 class QueryParamsEvaluator {
 public:
   QueryParamsEvaluator(
-      const Protobuf::RepeatedPtrField<QueryParameterValueOptionProto>& query_params_to_add,
-      const Protobuf::RepeatedPtrField<std::string>& query_params_to_remove);
+      const Protobuf::RepeatedPtrField<envoy::config::common::mutation_rules::v3::QueryParameterMutation>& query_param_mutations);
 
   /**
    * Processes headers first through query parameter removals then through query parameter
@@ -57,6 +56,7 @@ protected:
   QueryParamsEvaluator() = default;
 
 private:
+  std::vector<envoy::config::common::mutation_rules::v3::QueryParameterMutation> mutations_;
   std::vector<std::tuple<std::string, std::string, QueryParameterAppendActionProto>>
       query_params_to_add_;
   std::vector<std::string> query_params_to_remove_;

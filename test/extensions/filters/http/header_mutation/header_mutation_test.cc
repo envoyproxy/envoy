@@ -80,13 +80,13 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           key: "flag-header-6"
           value: "flag-header-6-value"
         append_action: "OVERWRITE_IF_EXISTS"
-    query_parameters_to_add:
-    - append_action: APPEND_IF_EXISTS_OR_ADD
-      query_parameter:
-        key: route-param
-        value: route-value
-    query_parameters_to_remove:
-    - route-remove-me
+    query_parameter_mutations:
+    - remove: route-remove-me
+    - append:
+        append_action: APPEND_IF_EXISTS_OR_ADD
+        query_parameter:
+          key: route-param
+          value: route-value
   )EOF";
 
   const std::string config_yaml = R"EOF(
@@ -99,13 +99,13 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
         append_action: "ADD_IF_ABSENT"
     response_mutations:
     - remove: "global-flag-header"
-    query_parameters_to_add:
-    - append_action: APPEND_IF_EXISTS_OR_ADD
-      query_parameter:
-        key: global-param
-        value: global-value
-    query_parameters_to_remove:
-    - global-remove-me
+    query_parameter_mutations:
+    - remove: global-remove-me
+    - append:
+        append_action: APPEND_IF_EXISTS_OR_ADD
+        query_parameter:
+          key: global-param
+          value: global-value
   )EOF";
 
   PerRouteProtoConfig per_route_proto_config;

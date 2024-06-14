@@ -19,24 +19,28 @@ class QueryParamsEvaluatorTest : public testing::Test {
 public:
   std::string evaluateWithPath(const std::string& path) {
     auto paramsEvaluator =
-        std::make_unique<QueryParamsEvaluator>(query_params_to_add_, query_params_to_remove_);
+        std::make_unique<QueryParamsEvaluator>(mutations_);
     Http::TestRequestHeaderMapImpl request_headers{{":path", path}};
     paramsEvaluator->evaluateQueryParams(request_headers, stream_info_);
     return std::string(request_headers.getPathValue());
   }
 
   void addParamToAdd(absl::string_view key, absl::string_view value, AppendAction append_action) {
-    auto* option = query_params_to_add_.Add();
-    option->set_append_action(static_cast<QueryParameterAppendActionProto>(append_action));
     auto* qp = envoy::config::core::v3::QueryParameter::default_instance().New();
     qp->set_key(key);
     qp->set_value(value);
-    option->set_allocated_query_parameter(qp);
+
+    auto* vo = envoy::config::common::mutation_rules::v3::QueryParameterValueOption::default_instance().New();
+    vo->set_append_action(static_cast<QueryParameterAppendActionProto>(append_action));
+    vo->set_allocated_query_parameter(qp);
+
+    auto* mutation = mutations_.Add();
+    mutation->set_allocated_append(vo);
   }
 
   void addParamToRemove(absl::string_view key) {
-    auto* remove_param = query_params_to_remove_.Add();
-    *remove_param = key;
+    auto* mutation = mutations_.Add();
+    mutation->set_remove(key);
   }
 
   void setFilterData(absl::string_view key, absl::string_view value) {
@@ -45,8 +49,7 @@ public:
                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
-  Protobuf::RepeatedPtrField<QueryParameterValueOptionProto> query_params_to_add_;
-  Protobuf::RepeatedPtrField<std::string> query_params_to_remove_;
+  Protobuf::RepeatedPtrField<envoy::config::common::mutation_rules::v3::QueryParameterMutation> mutations_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 

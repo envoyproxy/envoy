@@ -101,3 +101,47 @@ message HeaderMutation {
     core.v3.HeaderValueOption append = 2;
   }
 }
+
+message QueryParameterValueOption {
+  // Describes the supported actions types for query parameter append action.
+  enum QueryParameterAppendAction {
+    // If the query parameter already exists, this action will result in:
+    //
+    // - Duplicate query parameter keys in the HTTP path.
+    //
+    // If the query parameter doesn't exist then this will add new query parameter with specified key and value.
+    APPEND_IF_EXISTS_OR_ADD = 0;
+
+    // This action will add the query parameter if it doesn't already exist. If the query parameter already exists
+    // then this will be a no-op.
+    ADD_IF_ABSENT = 1;
+
+    // This action will overwrite the specified value by discarding any existing values if the query parameter already
+    // exists. If the query parameter doesn't exist then this will add the query parameter with specified key and
+    // value.
+    OVERWRITE_IF_EXISTS_OR_ADD = 2;
+
+    // This action will overwrite the specified value by discarding any existing values if the query parameter already
+    // exists. If the query parameter doesn't exist then this will be no-op.
+    OVERWRITE_IF_EXISTS = 3;
+  }
+
+  QueryParameterAppendAction append_action = 1;
+
+  // Query parameter that this operation applies to.
+  core.v3.QueryParameter query_parameter = 2;
+}
+
+message QueryParameterMutation {
+  oneof action {
+    option (validate.required) = true;
+
+    // Remove the specified query parameter from the HTTP path if it exists. Will remove all instancesa of repeat query
+    // parameters.
+    string remove = 1;
+
+    // Append new query parameter by the specified QueryParameterValueOption. Repeat values are supported. For example,
+    // ``foo: 1, foo: 2`` will appear as "?foo=1&foo=2". Command substitution as specified
+    QueryParameterValueOption append = 2;
+  }
+}
