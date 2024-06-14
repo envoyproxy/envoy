@@ -348,6 +348,45 @@ TEST_F(RoleBasedAccessControlFilterTest, Allowed) {
   checkAccessLogMetadata(LogResult::Undecided);
 }
 
+TEST_F(RoleBasedAccessControlFilterTest, AllowedDynamicMetadataStats) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW, "rules_stat_prefix_");
+
+  setDestinationPort(123);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
+  EXPECT_EQ("allowed",
+            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
+  EXPECT_EQ(
+      "foo",
+      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, DeniedDynamicMetadataStats) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::DENY, "rules_stat_prefix_");
+
+  setDestinationPort(123);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+
+  ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
+  EXPECT_EQ("denied",
+            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
+  EXPECT_EQ(
+      "foo",
+      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+}
+
 TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {
   setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW);
 
