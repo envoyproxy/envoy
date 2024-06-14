@@ -57,15 +57,6 @@ public:
         parallel_requests_(std::max(1U, config.parallel_requests())),
         main_thread_dispatcher_(context.mainThreadDispatcher()) {}
 
-  ~ThunderingHerdHandlerBlockUntilCompletion() override {
-    if (!queues_.empty()) {
-      ENVOY_LOG(
-          warn,
-          fmt::format("thundering herd handler deleted while queues not empty ({} entries remain)",
-                      queues_.size()));
-    }
-  }
-
   void handleUpstreamRequest(std::weak_ptr<ThunderingHerdRetryInterface> weak_filter,
                              Http::StreamDecoderFilterCallbacks* decoder_callbacks, const Key& key,
                              Http::RequestHeaderMap& request_headers) override {

@@ -53,12 +53,6 @@ message CacheConfig {
   }
 
   message ThunderingHerdHandler {
-    // The ``BlockUntilCompletion`` handler will allow one request to go to the upstream,
-    // then additional requests for that resource will be blocked until that initial one
-    // completes. After a request completes, all the blocked requests will be released to
-    // undergo the initial cache check again - if the first request succeeded and populated
-    // the cache, they will all read from the cache. If the first request failed, one
-    // request will be allowed to pass and the rest will be re-blocked.
     message BlockUntilCompletion {
       // If ``parallel_requests`` is set, then this many requests may be
       // sent upstream simultaneously. This may address the problem where one slow or
@@ -76,10 +70,10 @@ message CacheConfig {
       // prevent the cache from becoming populated in a timely fashion. Allowing a trickle
       // of additional requests improves the chance of the cache getting populated.
       //
-      // If unblock_additional_requests_period and parallel_requests are both set,
+      // If ``unblock_additional_requests_period`` and ``parallel_requests`` are both set,
       // each parallel request runs its own timer to unblock an additional request,
-      // i.e. with parallel_requests=2 and unblock_additional_requests_period=5s, if
-      // one request arrives at T=0 and one arrives at T=1, and neither successfully
+      // i.e. with ``parallel_requests=2`` and ``unblock_additional_requests_period=5s``,
+      // if one request arrives at T=0 and one arrives at T=1, and neither successfully
       // populate the cache, an additional queued request will be released at T=5,
       // and another at T=6.
       //
@@ -88,13 +82,18 @@ message CacheConfig {
     }
 
     oneof handler {
-      // The default ``none`` handler will allow every request to attempt a cache insert
-      // while a cache entry is not complete. This is the situation often described as
-      // "the thundering herd problem", in that many requests in a short time may overload
-      // the upstream server in a way one might expect a cache to prevent.
-      google.protobuf.Empty none = 1;
-
-      BlockUntilCompletion block_until_completion = 2;
+      // The ``BlockUntilCompletion`` handler will allow one request (or a configured number)
+      // to go to the upstream, then additional requests for that resource will be blocked until
+      // one of those initial requests completes, or a configurable timeout.
+      //
+      // After a request completes and a cache entry is written, all the blocked requests will be
+      // released to undergo the initial cache check again.
+      //
+      // If a request fails to complete, one additional request will be unblocked.
+      //
+      // If a response is not cacheable, all blocked requests are released and all subsequent
+      // requests for that cache entry become pass-through.
+      BlockUntilCompletion block_until_completion = 1;
     }
   }
 
@@ -145,6 +144,10 @@ message CacheConfig {
   // The selected ThunderingHerdHandler determines what the filter should do when
   // multiple requests for the same cacheable not-currently-cached item arrive.
   //
-  // The default is none, which will pass all such requests to the upstream.
+  // The default is none, which allows every request while the cache is not populated
+  // to attempt a cache insert, with the corresponding request to the upstream.
+  // This is the situation often described as "the thundering herd problem", in that
+  // many requests in a short time may overload the upstream server in a way one might
+  // expect a cache to prevent.
   ThunderingHerdHandler thundering_herd_handler = 7;
 }
