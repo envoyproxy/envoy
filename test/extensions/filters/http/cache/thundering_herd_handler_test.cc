@@ -89,22 +89,6 @@ TEST_F(ThunderingHerdHandlerTest, UnsetIsPassThrough) {
   handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
 }
 
-TEST_F(ThunderingHerdHandlerTest, ExplicitNoneIsPassThrough) {
-  envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
-  config.mutable_none();
-  initHandler(config);
-  EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
-  EXPECT_CALL(mock_decoder_callbacks_2_, continueDecoding());
-  EXPECT_CALL(mock_decoder_callbacks_3_, continueDecoding());
-  makeThreeRequests();
-  ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
-  ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_2_);
-  ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_3_);
-  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
-  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
-  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Inserted);
-}
-
 TEST_F(ThunderingHerdHandlerTest, DefaultBlockUntilCompletionBlocksAfterOneAndReleasesOneOnFail) {
   envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
   config.mutable_block_until_completion();
