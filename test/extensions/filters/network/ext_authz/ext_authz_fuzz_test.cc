@@ -70,6 +70,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   try {
     config = std::make_shared<Config>(proto_config, *stats_store.rootScope(), context);
   } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
     return;
   }
   auto filter = std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
