@@ -229,6 +229,23 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
 }
 
 Address::InstanceConstSharedPtr
+IoSocketHandleImpl::getOrCreateEnvoyAddressInstance(sockaddr_storage ss) {
+  if (recent_received_addresses_ == nullptr) {
+    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd, v6only);
+  }
+  quic::QuicSocketAddress quic_address(ss);
+  auto it = recent_received_addresses_->Lookup(quic_address);
+  if (it != recent_received_addresses_->end()) {
+    return *it->second;
+  }
+  Address::InstanceConstSharedPtr new_address =
+      Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd, v6only);
+  recent_received_addresses_->Insert(
+      quic_address, std::make_unique<Address::InstanceConstSharedPtr>(new_address));
+  return new_address;
+}
+
+Address::InstanceConstSharedPtr
 IoSocketHandleImpl::maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t self_port,
                                                  os_fd_t fd, bool v6only) {
   if (cmsg.cmsg_type == IPV6_PKTINFO) {
@@ -239,19 +256,7 @@ IoSocketHandleImpl::maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t s
     ipv6_addr->sin6_family = AF_INET6;
     ipv6_addr->sin6_addr = info->ipi6_addr;
     ipv6_addr->sin6_port = htons(self_port);
-    if (recent_received_addresses_ == nullptr) {
-      return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd, v6only);
-    }
-    quic::QuicSocketAddress quic_address(ss);
-    auto it = recent_received_addresses_->Lookup(quic_address);
-    if (it == recent_received_addresses_->end()) {
-      Address::InstanceConstSharedPtr new_address =
-          Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd, v6only);
-      recent_received_addresses_->Insert(
-          quic_address, std::make_unique<Address::InstanceConstSharedPtr>(new_address));
-      return new_address;
-    }
-    return *it->second;
+    return getOrCreateEnvoyAddressInstance(ss);
   }
 
   if (cmsg.cmsg_type == messageTypeContainsIP()) {
@@ -261,19 +266,7 @@ IoSocketHandleImpl::maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t s
     ipv4_addr->sin_family = AF_INET;
     ipv4_addr->sin_addr = addressFromMessage(cmsg);
     ipv4_addr->sin_port = htons(self_port);
-    if (recent_received_addresses_ == nullptr) {
-      return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd, v6only);
-    }
-    quic::QuicSocketAddress quic_address(ss);
-    auto it = recent_received_addresses_->Lookup(quic_address);
-    if (it == recent_received_addresses_->end()) {
-      Address::InstanceConstSharedPtr new_address =
-          Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd, v6only);
-      recent_received_addresses_->Insert(
-          quic_address, std::make_unique<Address::InstanceConstSharedPtr>(new_address));
-      return new_address;
-    }
-    return *it->second;
+    return getOrCreateEnvoyAddressInstance(ss);
   }
 
   return nullptr;
@@ -335,22 +328,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                  fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
-  if (recent_received_addresses_ != nullptr) {
-    quic::QuicSocketAddress peer_quic_address(peer_addr);
-    auto it = recent_received_addresses_->Lookup(peer_quic_address);
-    if (it == recent_received_addresses_->end()) {
-      Address::InstanceConstSharedPtr new_address = Address::addressFromSockAddrOrDie(
-          peer_addr, hdr.msg_namelen, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
-      output.msg_[0].peer_address_ = new_address;
-      recent_received_addresses_->Insert(
-          peer_quic_address, std::make_unique<Address::InstanceConstSharedPtr>(new_address));
-    } else {
-      output.msg_[0].peer_address_ = *it->second;
-    }
-  } else {
-    output.msg_[0].peer_address_ = Address::addressFromSockAddrOrDie(
-        peer_addr, hdr.msg_namelen, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
-  }
+  output.msg_[0].peer_address_ = getOrCreateEnvoyAddressInstance(peer_addr);
   output.msg_[0].gso_size_ = 0;
 
   if (hdr.msg_controllen > 0) {
@@ -457,23 +435,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 
     output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
     // Get local and peer addresses for each packet.
-    if (recent_received_addresses_ != nullptr) {
-      quic::QuicSocketAddress peer_quic_address(raw_addresses[i]);
-      auto it = recent_received_addresses_->Lookup(peer_quic_address);
-      if (it == recent_received_addresses_->end()) {
-        Address::InstanceConstSharedPtr new_address =
-            Address::addressFromSockAddrOrDie(raw_addresses[i], hdr.msg_namelen, fd_,
-                                              socket_v6only_ || !udp_read_normalize_addresses_);
-        output.msg_[i].peer_address_ = new_address;
-        recent_received_addresses_->Insert(
-            peer_quic_address, std::make_unique<Address::InstanceConstSharedPtr>(new_address));
-      } else {
-        output.msg_[i].peer_address_ = *it->second;
-      }
-    } else {
-      output.msg_[i].peer_address_ = Address::addressFromSockAddrOrDie(
-          raw_addresses[i], hdr.msg_namelen, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
-    }
+    output.msg_[i].peer_address_ = getOrCreateEnvoyAddressInstance(raw_addresses[i]);
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {

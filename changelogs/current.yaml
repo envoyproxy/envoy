@@ -87,7 +87,8 @@ minor_behavior_changes:
 - area: quic
   change: |
     Cache source/destination address instances in a LUR cache for packet read to avoid execssive Envoy address object instantiation.
-    This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read`` to false.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read`` to false.
 - area: quic
   change: |
     When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".

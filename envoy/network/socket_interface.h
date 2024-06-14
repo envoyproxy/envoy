@@ -17,9 +17,10 @@ struct SocketCreationOptions {
   // and only valid on Linux.
   bool mptcp_enabled_{false};
 
-  // Specifies whether there should be a cache for all the address instances associated to this
-  // socket, and the max cache size for this cache. 0 means do not cache any address.0 This is only
-  // valid for Datagram sockets.
+  // Specifies the maximum size of the cache of the address instances associated with
+  // packets received by this socket.
+  // If this is 0, no addresses will be cached.
+  // Is only valid for datagram sockets.
   size_t max_addresses_cache_size_{0};
 
   bool operator==(const SocketCreationOptions& rhs) const {
