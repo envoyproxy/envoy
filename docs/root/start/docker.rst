@@ -3,9 +3,11 @@
 Using the Envoy Docker Image
 ============================
 
-Envoy OCI images are built using Docker and have been extensively battle-tested in large scale 
-deployments running with Docker. Use of other container technologies such as Podman, while known to
-function correctly, is not expressly supported.
+.. note::
+  Envoy OCI images are built using Docker and have been extensively battle-tested in large scale 
+  deployments running with Docker. Use of other container technologies such as Podman might
+  function correctly but have not been extensively tested and are not expressly supported.
+
 The following examples use the :ref:`official Envoy Docker image <start_install_docker>`.
 
 These instructions are known to work for the ``x86_64`` and ``arm64`` architectures.
@@ -68,12 +70,10 @@ or in Podman (unsupported) with:
 Root filesystem permissions for running Envoy in containers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Envoy container image must be run with the container's root filesystem mounted read-write.
-With Docker and Podman, this means not using the ``--read-only`` option of the ``run`` command.
-With Kubernetes, this means not setting ``podSpec.containers.securityContext.readOnlyFilesystem`` to ``true``.
-
-Volume mounts, on the other hand, can be either read-only or read-write, depending on their use,
-such as for file-based logging and xDS configuration files.
+The Envoy container image can be run with the container's root filesystem mounted read-only.
+With Docker and Podman, this means using the ``--read-only`` option of the ``run`` command.
+With Kubernetes, this means setting ``podSpec.containers.securityContext.readOnlyFilesystem`` to ``true``.
+With Nomad, this means setting ``readonly_rootfs = true`` in the task's ``config`` block when using the ``docker`` or ``podman`` driver.
 
 Permissions for running Envoy in containers as a non-root user
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
