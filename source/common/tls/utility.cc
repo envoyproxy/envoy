@@ -226,7 +226,7 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
     }
     break;
   }
-  case GEN_OTHERNAME:
+  case GEN_OTHERNAME: {
     ASN1_TYPE* value = general_name->d.otherName->value;
     if (value == nullptr) {
       break;
@@ -238,24 +238,50 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       san = value->value.boolean ? "true" : "false";
       break;
     case V_ASN1_ENUMERATED:
-      san = std::to_string(ASN1_ENUMERATED_get(value->value.enumerated));
-      break;
-    case V_ASN1_INTEGER:
-      san = std::to_string(ASN1_INTEGER_get(value->value.integer));
-      break;
+    case V_ASN1_INTEGER: {
+      BIGNUM san_bn;
+      BN_init(&san_bn);
+      value->type == V_ASN1_ENUMERATED ? ASN1_ENUMERATED_to_BN(value->value.enumerated, &san_bn)
+                                       : ASN1_INTEGER_to_BN(value->value.integer, &san_bn);
+      char* san_char = BN_bn2dec(&san_bn);
+      BN_free(&san_bn);
+      if (san_char != nullptr) {
+        san.assign(san_char);
+        OPENSSL_free(san_char);
+        break;
+      }
+    }
     case V_ASN1_OBJECT: {
       char tmp_obj[256]; // OID Max length
-      if (OBJ_obj2txt(tmp_obj, 256, value->value.object, 1) < 0) {
+      int obj_len = OBJ_obj2txt(tmp_obj, 256, value->value.object, 1);
+      if (obj_len > 256 || obj_len < 0) {
         break;
       }
       san.assign(tmp_obj);
       break;
     }
-    default:
+    case V_ASN1_BIT_STRING:
+    case V_ASN1_OCTET_STRING:
+    case V_ASN1_PRINTABLESTRING:
+    case V_ASN1_T61STRING:
+    case V_ASN1_IA5STRING:
+    case V_ASN1_GENERALSTRING:
+    case V_ASN1_BMPSTRING:
+    case V_ASN1_UNIVERSALSTRING:
+    case V_ASN1_UTCTIME:
+    case V_ASN1_GENERALIZEDTIME:
+    case V_ASN1_VISIBLESTRING:
+    case V_ASN1_UTF8STRING:
+    case V_ASN1_SET:
+    case V_ASN1_SEQUENCE: {
       str = value->value.asn1_string;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
+    default:
+      break;
+    }
+  }
   }
   return san;
 }
