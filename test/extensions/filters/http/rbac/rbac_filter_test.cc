@@ -260,7 +260,7 @@ on_no_match:
   RoleBasedAccessControlFilterTest() = default;
 
   void setDestinationAddressAndPortNoThrow(std::string server_addr, uint16_t port) {
-    address_ = Envoy::Network::Utility::parseInternetAddress(server_addr, port, false);
+    address_ = Envoy::Network::Utility::parseInternetAddressNoThrow(server_addr, port, false);
     req_info_.downstream_connection_info_provider_->setLocalAddress(address_);
 
     ON_CALL(connection_.stream_info_, downstreamAddressProvider())

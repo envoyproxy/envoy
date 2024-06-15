@@ -89,7 +89,7 @@ TEST_F(GeoipFilterTest, NoXffSuccessfulLookup) {
   Http::TestRequestHeaderMapImpl request_headers;
   expectStats();
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
@@ -124,7 +124,7 @@ TEST_F(GeoipFilterTest, UseXffSuccessfulLookup) {
   request_headers.addCopy("x-forwarded-for", "10.0.0.1,10.0.0.2");
   expectStats();
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
@@ -159,7 +159,7 @@ TEST_F(GeoipFilterTest, GeoHeadersOverridenForIncomingRequest) {
                                                     {"x-geo-city", "dummy_city"}};
   expectStats();
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
@@ -200,7 +200,7 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
                                                          {"x-geo-anon-proxy", "true"}};
   expectStats();
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
@@ -248,7 +248,7 @@ TEST_F(GeoipFilterTest, GeoHeaderNotAppendedOnEmptyLookup) {
   Http::TestRequestHeaderMapImpl request_headers;
   expectStats();
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
@@ -278,7 +278,7 @@ TEST_F(GeoipFilterTest, NoCrashIfFilterDestroyedBeforeCallbackCalled) {
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
