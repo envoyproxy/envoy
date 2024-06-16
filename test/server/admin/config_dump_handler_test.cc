@@ -16,13 +16,25 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
 
 // helper method for adding host's info
 void addHostInfo(NiceMock<Upstream::MockHost>& host, const std::string& hostname,
-                 const std::string& address_url, envoy::config::core::v3::Locality& locality,
+                 const std::vector<std::string> addresses_url_list,
+                 envoy::config::core::v3::Locality& locality,
                  const std::string& hostname_for_healthcheck,
                  const std::string& healthcheck_address_url, int weight, int priority) {
   ON_CALL(host, locality()).WillByDefault(ReturnRef(locality));
 
-  Network::Address::InstanceConstSharedPtr address = *Network::Utility::resolveUrl(address_url);
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl(addresses_url_list[0]);
   ON_CALL(host, address()).WillByDefault(Return(address));
+  std::shared_ptr<Upstream::HostImplBase::AddressVector> address_list =
+      std::make_shared<Upstream::HostImplBase::AddressVector>();
+  int addr_counter = 0;
+  for (auto& new_addr : addresses_url_list) {
+    if (addr_counter > 0) {
+      address_list->push_back(*Network::Utility::resolveUrl(new_addr));
+    }
+    addr_counter++;
+  }
+  ON_CALL(host, addressListOrNull()).WillByDefault(Return(address_list));
   ON_CALL(host, hostname()).WillByDefault(ReturnRef(hostname));
 
   ON_CALL(host, hostnameForHealthChecks()).WillByDefault(ReturnRef(hostname_for_healthcheck));
@@ -138,8 +150,8 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
   const std::string hostname_for_healthcheck = "test_hostname_healthcheck";
   const std::string hostname = "foo.com";
 
-  addHostInfo(*host, hostname, "tcp://1.2.3.4:80", locality, hostname_for_healthcheck,
-              "tcp://1.2.3.5:90", 5, 6);
+  addHostInfo(*host, hostname, {"tcp://1.2.3.4:80", "tcp://5.6.7.8:80"}, locality,
+              hostname_for_healthcheck, "tcp://1.2.3.5:90", 5, 6);
   // Adding drop_overload config.
   ON_CALL(cluster, dropOverload()).WillByDefault(Return(UnitFloat(0.00035)));
 
@@ -173,7 +185,17 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
             "port_value": 90,
             "hostname": "test_hostname_healthcheck"
            },
-           "hostname": "foo.com"
+           "hostname": "foo.com",
+           "additional_addresses": [
+            {
+             "address": {
+              "socket_address": {
+               "address": "5.6.7.8",
+               "port_value": 80
+              }
+             }
+            }
+           ]
           },
           "health_status": "HEALTHY",
           "metadata": {},
@@ -225,7 +247,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
   host_set_1->hosts_.emplace_back(host_1);
   const std::string hostname_1 = "coo.com";
 
-  addHostInfo(*host_1, hostname_1, "tcp://1.2.3.8:8", locality_1, empty_hostname_for_healthcheck,
+  addHostInfo(*host_1, hostname_1, {"tcp://1.2.3.8:8"}, locality_1, empty_hostname_for_healthcheck,
               "tcp://1.2.3.8:8", 3, 4);
 
   const std::string hostname_2 = "foo.com";
@@ -237,14 +259,14 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
   locality_2.set_zone("hello");
   locality_2.set_sub_zone("world");
 
-  addHostInfo(*host_2, hostname_2, "tcp://1.2.3.4:80", locality_2, hostname_for_healthcheck,
+  addHostInfo(*host_2, hostname_2, {"tcp://1.2.3.4:80"}, locality_2, hostname_for_healthcheck,
               "tcp://1.2.3.5:90", 5, 6);
 
   auto host_3 = std::make_shared<NiceMock<Upstream::MockHost>>();
   host_set_1->hosts_.emplace_back(host_3);
   const std::string hostname_3 = "boo.com";
 
-  addHostInfo(*host_3, hostname_3, "tcp://1.2.3.7:8", locality_2, empty_hostname_for_healthcheck,
+  addHostInfo(*host_3, hostname_3, {"tcp://1.2.3.7:8"}, locality_2, empty_hostname_for_healthcheck,
               "tcp://1.2.3.7:8", 3, 6);
 
   std::vector<Upstream::HostVector> locality_hosts = {
@@ -261,7 +283,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
   host_set_2->hosts_.emplace_back(host_4);
   const std::string hostname_4 = "doo.com";
 
-  addHostInfo(*host_4, hostname_4, "tcp://1.2.3.9:8", locality_2, empty_hostname_for_healthcheck,
+  addHostInfo(*host_4, hostname_4, {"tcp://1.2.3.9:8"}, locality_2, empty_hostname_for_healthcheck,
               "tcp://1.2.3.9:8", 3, 2);
 
   Buffer::OwnedImpl response;
@@ -436,7 +458,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResourceAndName) {
   const std::string hostname_for_healthcheck = "test_hostname_healthcheck";
   const std::string hostname_1 = "foo.com";
 
-  addHostInfo(*host_1, hostname_1, "tcp://1.2.3.4:80", locality, hostname_for_healthcheck,
+  addHostInfo(*host_1, hostname_1, {"tcp://1.2.3.4:80"}, locality, hostname_for_healthcheck,
               "tcp://1.2.3.5:90", 5, 6);
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster_2;
@@ -450,7 +472,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResourceAndName) {
   host_set_2->hosts_.emplace_back(host_2);
   const std::string hostname_2 = "boo.com";
 
-  addHostInfo(*host_2, hostname_2, "tcp://1.2.3.5:8", locality, hostname_for_healthcheck,
+  addHostInfo(*host_2, hostname_2, {"tcp://1.2.3.5:8"}, locality, hostname_for_healthcheck,
               "tcp://1.2.3.4:1", 3, 4);
 
   Buffer::OwnedImpl response;
