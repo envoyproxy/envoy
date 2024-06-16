@@ -26,9 +26,11 @@ class ExternalProcessorClientImpl : public ExternalProcessorClient {
 public:
   ExternalProcessorClientImpl(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope);
 
-  ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks,
-                                   const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                                   const Http::AsyncClient::StreamOptions& options) override;
+  ExternalProcessorStreamPtr
+  start(ExternalProcessorCallbacks& callbacks,
+        const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+        const Http::AsyncClient::StreamOptions& options,
+        Http::StreamDecoderFilterCallbacks* decoder_filter_callbacks) override;
 
 private:
   Grpc::AsyncClientManager& client_manager_;
@@ -42,7 +44,8 @@ public:
   // Factory method: create and return `ExternalProcessorStreamPtr`; return nullptr on failure.
   static ExternalProcessorStreamPtr
   create(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-         ExternalProcessorCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options);
+         ExternalProcessorCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options,
+         Http::StreamDecoderFilterCallbacks* decoder_filter_callbacks);
 
   void send(ProcessingRequest&& request, bool end_stream) override;
   // Close the stream. This is idempotent and will return true if we

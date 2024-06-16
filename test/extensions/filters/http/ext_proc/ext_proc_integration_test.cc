@@ -397,9 +397,10 @@ protected:
     }
   }
 
-  void processRequestBodyMessage(
-      FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
+  void
+  processRequestBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
+                            absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb,
+                            bool check_downstream_flow_control = false) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -410,6 +411,15 @@ protected:
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
+
+    if (check_downstream_flow_control) {
+      // Check the flow control counter in downstream, which is triggered on the request
+      // path to ext_proc server (i.e., from side stream).
+      test_server_->waitForCounterGe(
+          "http.config_test.downstream_flow_control_paused_reading_total", 1);
+    }
+
+    // Send back the response from ext_proc server.
     ProcessingResponse response;
     auto* body = response.mutable_request_body();
     const bool sendReply = !cb || (*cb)(request.request_body(), *body);
@@ -4073,6 +4083,39 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
                 ->value()
                 .getStringView(),
             "bluh");
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {
+  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+    return;
+  }
+
+  config_helper_.setBufferLimits(1024, 1024);
+
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = std::string(16 * 1024, 'a');
+  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
+
+  bool end_stream = false;
+  int count = 0;
+  while (!end_stream) {
+    processRequestBodyMessage(
+        *grpc_upstreams_[0], count == 0 ? true : false,
+        [&end_stream](const HttpBody& body, BodyResponse&) {
+          end_stream = body.end_of_stream();
+          return true;
+        },
+        /*check_downstream_flow_control=*/true);
+    count++;
+  }
+  handleUpstreamRequest();
+
   verifyDownstreamResponse(*response, 200);
 }
 

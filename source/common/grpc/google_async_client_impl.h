@@ -237,6 +237,10 @@ public:
   }
   const StreamInfo::StreamInfo& streamInfo() const override { return unused_stream_info_; }
 
+  void setWatermarkCallbacks(Http::DecoderFilterWatermarkCallbacks&) override {}
+
+  void removeWatermarkCallbacks() override {}
+
 protected:
   bool callFailed() const { return call_failed_; }
 

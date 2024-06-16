@@ -70,6 +70,16 @@ public:
    * @returns the stream info object associated with this stream.
    */
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+
+  /***
+   * Register a callback to be called when high/low write buffer watermark events occur on the
+   * stream. This callback must persist beyond the lifetime of the stream or be unregistered via
+   * removeWatermarkCallbacks. If there's already a watermark callback registered, this method
+   * will ASSERT-fail.
+   */
+  virtual void setWatermarkCallbacks(Http::DecoderFilterWatermarkCallbacks& callbacks) PURE;
+
+  virtual void removeWatermarkCallbacks() PURE;
 };
 
 class RawAsyncRequestCallbacks {
