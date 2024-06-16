@@ -384,10 +384,10 @@ void ConfigDumpHandler::addLbEndpoint(
   endpoint.set_hostname(host->hostname());
   Network::Utility::addressToProtobufAddress(*host->address(), *endpoint.mutable_address());
   if (host->addressListOrNull() != nullptr) {
-    for (auto& additionalAddr : *host->addressListOrNull()) {
-      auto& newAdditionalAdrr = *endpoint.mutable_additional_addresses()->Add();
-      Network::Utility::addressToProtobufAddress(*additionalAddr,
-                                                 *newAdditionalAdrr.mutable_address());
+    for (auto& additional_address : *host->addressListOrNull()) {
+      auto& new_address = *endpoint.mutable_additional_addresses()->Add();
+      Network::Utility::addressToProtobufAddress(*additional_address,
+                                                 *new_address.mutable_address());
     }
   }
   auto& health_check_config = *endpoint.mutable_health_check_config();
