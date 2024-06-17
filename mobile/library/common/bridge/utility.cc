@@ -1,13 +1,10 @@
 #include "library/common/bridge/utility.h"
 
-#include <stdlib.h>
-
+#include <cstdlib>
 #include <string>
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
-
-#include "library/common/buffer/bridge_fragment.h"
 
 namespace Envoy {
 namespace Bridge {
@@ -24,10 +21,6 @@ envoy_error_code_t errorCodeFromLocalStatus(Http::Code status) {
   default:
     return ENVOY_UNDEFINED_ERROR;
   }
-}
-
-envoy_map makeEnvoyMap(std::initializer_list<std::pair<std::string, std::string>> map) {
-  return makeEnvoyMap<std::initializer_list<std::pair<std::string, std::string>>>(map);
 }
 
 envoy_error toBridgeError(const EnvoyError& error) {
@@ -48,25 +41,10 @@ void updateMaxBytes(uint32_t& max_bytes, const Buffer::Instance& data) {
   }
 }
 
-Buffer::InstancePtr toInternalData(envoy_data data) {
-  // This fragment only needs to live until done is called.
-  // Therefore, it is sufficient to allocate on the heap, and delete in the done method.
-  Buffer::BridgeFragment* fragment = Buffer::BridgeFragment::createBridgeFragment(data);
-  Buffer::InstancePtr buf = std::make_unique<Buffer::OwnedImpl>();
-  buf->addBufferFragment(*fragment);
-  return buf;
-}
-
 envoy_data toBridgeData(Buffer::Instance& data, uint32_t max_bytes) {
   updateMaxBytes(max_bytes, data);
   envoy_data bridge_data = copyToBridgeData(data, max_bytes);
   data.drain(bridge_data.length);
-  return bridge_data;
-}
-
-envoy_data toBridgeDataNoDrain(const Buffer::Instance& data, uint32_t max_bytes) {
-  updateMaxBytes(max_bytes, data);
-  envoy_data bridge_data = copyToBridgeData(data, max_bytes);
   return bridge_data;
 }
 

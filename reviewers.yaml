@@ -36,10 +36,6 @@ kyessenov:
   opsgenie: kuat
   slack: U7KTRAA8M
   maintainer: true
-lizan:
-  maintainer: true
-  opsgenie: Lizan
-  slack: U79E51EQ6
 markdroth:
   api: true
   slack: UMN8K55A6
@@ -71,7 +67,8 @@ soulxu:
   opsgenie: Hejie
   slack: U01GNQ3B8AY
 tyxia:
-  first-pass: true
+  maintainer: true
+  opsgenie: Tianyu
   slack: U023U1ZN9SP
 wbpcode:
   maintainer: true
