@@ -11,7 +11,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "source/common/common/compiled_string_map.h"
 #include "source/common/common/non_copyable.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/headers.h"
@@ -147,21 +146,18 @@ protected:
    */
   template <class Interface>
   struct StaticLookupTable
-      : public CompiledStringMap<std::function<StaticLookupResponse(HeaderMapImpl&)>> {
+      : public TrieLookupTable<std::function<StaticLookupResponse(HeaderMapImpl&)>> {
     StaticLookupTable();
 
-    std::vector<KV> finalizedTable() {
+    void finalizeTable() {
       CustomInlineHeaderRegistry::finalize<Interface::header_map_type>();
       auto& headers = CustomInlineHeaderRegistry::headers<Interface::header_map_type>();
       size_ = headers.size();
-      std::vector<KV> input;
-      input.reserve(size_);
       for (const auto& header : headers) {
-        input.emplace_back(header.first.get(), [&header](HeaderMapImpl& h) -> StaticLookupResponse {
+        this->add(header.first.get().c_str(), [&header](HeaderMapImpl& h) -> StaticLookupResponse {
           return {&h.inlineHeaders()[header.second], &header.first};
         });
       }
-      return input;
     }
 
     static size_t size() {
@@ -185,9 +181,6 @@ protected:
       }
     }
 
-    // This is the size of the number of callbacks; in the case of Requests,
-    // this is one smaller than the number of entries in the lookup table,
-    // because of legacy `host` mapping to the same thing as `:authority`.
     size_t size_;
   };
 
