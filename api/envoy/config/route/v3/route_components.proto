@@ -360,7 +360,8 @@ message Route {
   string stat_prefix = 19;
 
   // Sets the maximum size of a request body that will be buffered in memory. Envoy will return
-  // ``HTTP 413`` when buffer reaches the number set in this field.
+  // ``HTTP 413`` or trigger the ``onDecoderFilterAboveWriteBufferHighWatermark`` callback
+  // when buffer reaches the number set in this field.
   // This option will be ignored if the current maximum buffer size is already larger than
   // the value set in this field.
   // Unlike the ``max_request_bytes`` in the ``buffer`` filter, setting this field won't force
