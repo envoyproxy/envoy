@@ -408,6 +408,7 @@ public:
   }
 
   void testMultipleQuicConnections() {
+    autonomous_upstream_ = true;
     // Enabling SO_REUSEPORT with 8 workers. Unfortunately this setting makes the test rarely flaky
     // if it is configured to run with --runs_per_test=N where N > 1 but without --jobs=1.
     setConcurrency(8);
@@ -448,19 +449,11 @@ public:
       }
     }
     for (size_t i = 0; i < concurrency_; ++i) {
-      fake_upstream_connection_ = nullptr;
-      upstream_request_ = nullptr;
       auto encoder_decoder = codec_clients[i]->startRequest(default_request_headers_);
 
       auto& request_encoder = encoder_decoder.first;
       auto response = std::move(encoder_decoder.second);
       codec_clients[i]->sendData(request_encoder, 1000, true);
-      waitForNextUpstreamRequest();
-      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                                       {"set-cookie", "foo"},
-                                                                       {"set-cookie", "bar"}},
-                                       true);
-
       ASSERT_TRUE(response->waitForEndStream());
       EXPECT_TRUE(response->complete());
       codec_clients[i]->close();
@@ -2095,6 +2088,9 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
         listener_filter->mutable_filter_disabled()->set_any_match(true);
       });
 
+  // Do socket swap before initialization to avoid races.
+  SocketInterfaceSwap socket_swap(Network::Socket::Type::Datagram);
+
   initialize();
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients")) {
@@ -2105,10 +2101,9 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
   auto listener_port = lookupPort("http");
 
   // Setup DNAT for 0.0.0.0:12345-->127.0.0.2:listener_port
-  SocketInterfaceSwap socket_swap(Network::Socket::Type::Datagram);
   socket_swap.write_matcher_->setDnat(
-      Network::Utility::parseInternetAddress("1.2.3.4", 12345),
-      Network::Utility::parseInternetAddress("127.0.0.2", listener_port));
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 12345),
+      Network::Utility::parseInternetAddressNoThrow("127.0.0.2", listener_port));
 
   codec_client_ = makeHttpConnection(makeClientConnection(listener_port));
   EnvoyQuicClientSession* quic_session =

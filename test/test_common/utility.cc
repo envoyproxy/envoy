@@ -328,7 +328,8 @@ std::list<Network::DnsResponse>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses, std::chrono::seconds ttl) {
   std::list<Network::DnsResponse> ret;
   for (const auto& address : addresses) {
-    ret.emplace_back(Network::DnsResponse(Network::Utility::parseInternetAddress(address), ttl));
+    ret.emplace_back(
+        Network::DnsResponse(Network::Utility::parseInternetAddressNoThrow(address), ttl));
   }
   return ret;
 }

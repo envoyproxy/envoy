@@ -120,14 +120,17 @@ absl::StatusOr<DataSourceProviderPtr> DataSourceProvider::create(const ProtoData
   auto initial_data_or_error = read(source, allow_empty, api, max_size);
   RETURN_IF_STATUS_NOT_OK(initial_data_or_error);
 
+  // read() only validates the size of the file and does not check the size of inline data.
+  // We check the size of inline data here.
+  // TODO(wbpcode): consider moving this check to read() to avoid duplicate checks.
+  if (max_size > 0 && initial_data_or_error.value().length() > max_size) {
+    return absl::InvalidArgumentError(fmt::format("response body size is {} bytes; maximum is {}",
+                                                  initial_data_or_error.value().length(),
+                                                  max_size));
+  }
+
   if (!source.has_watched_directory() ||
       source.specifier_case() != envoy::config::core::v3::DataSource::kFilename) {
-    if (source.specifier_case() != envoy::config::core::v3::DataSource::kFilename &&
-        initial_data_or_error.value().length() > max_size) {
-      return absl::InvalidArgumentError(fmt::format("response body size is {} bytes; maximum is {}",
-                                                    initial_data_or_error.value().length(),
-                                                    max_size));
-    }
     return std::unique_ptr<DataSourceProvider>(
         new DataSourceProvider(std::move(initial_data_or_error).value()));
   }
