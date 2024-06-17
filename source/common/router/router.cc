@@ -1415,7 +1415,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
   const std::string details = StringUtil::replaceAllEmptySpace(absl::StrCat(
       basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
-      transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}"));
+      transport_failure_reason.empty() ? "" : absl::StrCat("|", transport_failure_reason), "}"));
   onUpstreamAbort(error_code, response_flags, body, dropped, details);
 }
 
