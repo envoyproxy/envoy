@@ -1118,6 +1118,15 @@ TEST(TrieLookupTable, LongestPrefix) {
   EXPECT_EQ(nullptr, trie.findLongestPrefix(" "));
 }
 
+TEST(TrieLookupTable, VeryDeepTrieDoesNotStackOverflowOnDestructor) {
+  TrieLookupTable<const char*> trie;
+  const char* cstr_a = "a";
+
+  std::string key_a(20960, 'a');
+  EXPECT_TRUE(trie.add(key_a, cstr_a));
+  EXPECT_EQ(cstr_a, trie.find(key_a));
+}
+
 TEST(InlineStorageTest, InlineString) {
   InlineStringPtr hello = InlineString::create("Hello, world!");
   EXPECT_EQ("Hello, world!", hello->toStringView());

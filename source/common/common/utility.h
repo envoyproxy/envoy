@@ -709,7 +709,6 @@ template <class Value> class TrieLookupTable {
       children_[child_index - min_child_] = std::move(node);
     }
 
-  private:
     uint8_t min_child_{0};
     std::vector<std::unique_ptr<TrieNode>> children_;
   };
@@ -777,6 +776,24 @@ public:
       }
     }
     return result ? result->value_ : nullptr;
+  }
+
+  ~TrieLookupTable() {
+    // To avoid stack overflow on recursive destruction if the tree is very deep,
+    // flatten the tree first.
+    std::vector<std::unique_ptr<TrieNode>> flat_tree;
+    for (std::unique_ptr<TrieNode>& child : root_.children_) {
+      if (child != nullptr) {
+        flat_tree.push_back(std::move(child));
+      }
+    }
+    for (uint32_t i = 0; i < flat_tree.size(); i++) {
+      for (std::unique_ptr<TrieNode>& child : flat_tree[i]->children_) {
+        if (child != nullptr) {
+          flat_tree.push_back(std::move(child));
+        }
+      }
+    }
   }
 
 private:
