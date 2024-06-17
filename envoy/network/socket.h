@@ -229,6 +229,11 @@ public:
   virtual absl::string_view requestedServerName() const PURE;
 
   /**
+   * @return requested application protocol(s) (e.g. ALPN in TLS), if any.
+   */
+  virtual const std::vector<std::string>& requestedApplicationProtocols() const PURE;
+
+  /**
    * @return Connection ID of the downstream connection, or unset if not available.
    **/
   virtual absl::optional<uint64_t> connectionID() const PURE;
@@ -348,6 +353,11 @@ public:
    * @param listener_info the listener info provider backing this socket.
    */
   virtual void setListenerInfo(std::shared_ptr<const ListenerInfo> listener_info) PURE;
+
+  /**
+   * @param Set requested application protocol(s) (e.g. ALPN in TLS).
+   */
+  virtual void setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) PURE;
 };
 
 using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;

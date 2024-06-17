@@ -87,6 +87,16 @@ public:
     listener_info_ = std::move(listener_info);
   }
 
+  const std::vector<std::string>& requestedApplicationProtocols() override {
+    return application_protocols_;
+  }
+  void setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) override {
+    application_protocols_.clear();
+    for (const auto& protocol : protocols) {
+      application_protocols_.emplace_back(protocol);
+    }
+  }
+
 private:
   Address::InstanceConstSharedPtr local_address_;
   bool local_address_restored_{false};
@@ -101,6 +111,7 @@ private:
   absl::optional<std::chrono::milliseconds> round_trip_time_;
   FilterChainInfoConstSharedPtr filter_chain_info_;
   ListenerInfoConstSharedPtr listener_info_;
+  std::vector<std::string> application_protocols_;
 };
 
 class SocketImpl : public virtual Socket {
