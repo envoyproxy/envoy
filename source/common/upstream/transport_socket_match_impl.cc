@@ -63,7 +63,7 @@ TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolve(
     }
   }
 
-  // If we didn't match on any endpoint metadata, let's try for the locality.
+  // If we didn't match on any endpoint-specific metadata, let's check the locality-level metadata.
   for (const auto& match : matches_) {
     if (Config::Metadata::metadataLabelMatch(
             match.label_set, locality_metadata,

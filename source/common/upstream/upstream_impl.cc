@@ -461,11 +461,8 @@ HostDescription::SharedConstAddressVector HostDescriptionImplBase::makeAddressLi
 Network::UpstreamTransportSocketFactory& HostDescriptionImplBase::resolveTransportSocketFactory(
     const Network::Address::InstanceConstSharedPtr& dest_address,
     const envoy::config::core::v3::Metadata* endpoint_metadata) const {
-  metadata_mutex_.Lock();
   auto match =
       cluster_->transportSocketMatcher().resolve(endpoint_metadata, locality_metadata_.get());
-  metadata_mutex_.Unlock();
-
   match.stats_.total_match_count_.inc();
   ENVOY_LOG(debug, "transport socket match, socket {} selected for host with address {}",
             match.name_, dest_address ? dest_address->asString() : "empty");
