@@ -4967,8 +4967,8 @@ TEST_P(Http1ServerConnectionImplTest, ValueStartsWithCR) {
   const absl::string_view value = "\r value starts with carriage return";
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    const absl::string_view expected_value = "value starts with carriage return";
-    testRequestWithValueExpectSuccess(value, expected_value);
+    testRequestWithValueExpectFailure(value, "http1.invalid_characters",
+                                      "header value contains invalid chars");
   } else {
 #ifdef ENVOY_ENABLE_UHV
     testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_INVALID_HEADER_TOKEN");
@@ -4982,8 +4982,8 @@ TEST_P(Http1ServerConnectionImplTest, ValueWithCRInTheMiddle) {
   const absl::string_view value = "value has \r carriage return in the middle";
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    const absl::string_view expected_value = "value has  carriage return in the middle";
-    testRequestWithValueExpectSuccess(value, expected_value);
+    testRequestWithValueExpectFailure(value, "http1.invalid_characters",
+                                      "header value contains invalid chars");
   } else {
     testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_LF_EXPECTED");
   }
@@ -4993,8 +4993,8 @@ TEST_P(Http1ServerConnectionImplTest, ValueEndsWithCR) {
   const absl::string_view value = "value ends in carriage return \r";
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    const absl::string_view expected_value = "value ends in carriage return";
-    testRequestWithValueExpectSuccess(value, expected_value);
+    testRequestWithValueExpectFailure(value, "http1.invalid_characters",
+                                      "header value contains invalid chars");
   } else {
     testRequestWithValueExpectFailure(value, "http1.codec_error", "HPE_LF_EXPECTED");
   }
@@ -5092,8 +5092,7 @@ TEST_P(Http1ClientConnectionImplTest, ValueStartsWithCR) {
   const absl::string_view value = "\r value starts with carriage return";
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    const absl::string_view expected_value = "value starts with carriage return";
-    testRequestWithValueExpectSuccess(value, expected_value);
+    testRequestWithValueExpectFailure(value, "header value contains invalid chars");
   } else {
 #ifdef ENVOY_ENABLE_UHV
     testRequestWithValueExpectFailure(value, "HPE_INVALID_HEADER_TOKEN");
@@ -5107,8 +5106,7 @@ TEST_P(Http1ClientConnectionImplTest, ValueWithCRInTheMiddle) {
   const absl::string_view value = "value has \r carriage return in the middle";
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    const absl::string_view expected_value = "value has  carriage return in the middle";
-    testRequestWithValueExpectSuccess(value, expected_value);
+    testRequestWithValueExpectFailure(value, "header value contains invalid chars");
   } else {
     testRequestWithValueExpectFailure(value, "HPE_LF_EXPECTED");
   }
@@ -5118,8 +5116,7 @@ TEST_P(Http1ClientConnectionImplTest, ValueEndsWithCR) {
   const absl::string_view value = "value ends in carriage return \r";
 
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    const absl::string_view expected_value = "value ends in carriage return";
-    testRequestWithValueExpectSuccess(value, expected_value);
+    testRequestWithValueExpectFailure(value, "header value contains invalid chars");
   } else {
     testRequestWithValueExpectFailure(value, "HPE_LF_EXPECTED");
   }
@@ -5153,12 +5150,9 @@ TEST_P(Http1ServerConnectionImplTest, FirstLineInvalidCR) {
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  TestRequestHeaderMapImpl expected_headers{
-      {":path", "/"},
-      {":method", "GET"},
-  };
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+    EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _,
+                                        "http1.invalid_characters"));
   } else {
     EXPECT_CALL(decoder,
                 sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
@@ -5166,11 +5160,10 @@ TEST_P(Http1ServerConnectionImplTest, FirstLineInvalidCR) {
 
   Buffer::OwnedImpl buffer("GET /\rHTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_TRUE(status.ok());
-    EXPECT_EQ(0u, buffer.length());
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
   } else {
-    EXPECT_TRUE(isCodecProtocolError(status));
     EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_LF_EXPECTED");
   }
 }
@@ -5189,24 +5182,13 @@ TEST_P(Http1ClientConnectionImplTest, FirstLineInvalidCR) {
   };
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
-  TestResponseHeaderMapImpl expected_headers{
-      {":status", "200"},
-      {"content-length", "5"},
-  };
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
-    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("hello"), false));
-    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
-  }
-
   Buffer::OwnedImpl buffer("HTTP/1.1 200\rOK\r\ncontent-length: 5\r\n\r\n"
                            "hello");
   auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_TRUE(status.ok());
-    EXPECT_EQ(0u, buffer.length());
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
   } else {
-    EXPECT_TRUE(isCodecProtocolError(status));
 #ifdef ENVOY_ENABLE_UHV
     EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 #else
@@ -5224,8 +5206,13 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameInvalidCR) {
 
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-  EXPECT_CALL(decoder,
-              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _,
+                                        "http1.invalid_characters"));
+  } else {
+    EXPECT_CALL(decoder,
+                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+  }
 
   // SPELLCHECKER(off)
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nfo\ro: bar\r\n\r\n");
@@ -5233,7 +5220,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameInvalidCR) {
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_NAME_CHARACTER");
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
   } else {
     EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
   }
@@ -5259,7 +5246,7 @@ TEST_P(Http1ClientConnectionImplTest, HeaderNameInvalidCR) {
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_NAME_CHARACTER");
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
   } else {
     EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
   }
