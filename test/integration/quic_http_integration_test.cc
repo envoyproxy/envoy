@@ -391,6 +391,7 @@ public:
   }
 
   void testMultipleQuicConnections() {
+    autonomous_upstream_ = true;
     // Enabling SO_REUSEPORT with 8 workers. Unfortunately this setting makes the test rarely flaky
     // if it is configured to run with --runs_per_test=N where N > 1 but without --jobs=1.
     setConcurrency(8);
@@ -431,19 +432,11 @@ public:
       }
     }
     for (size_t i = 0; i < concurrency_; ++i) {
-      fake_upstream_connection_ = nullptr;
-      upstream_request_ = nullptr;
       auto encoder_decoder = codec_clients[i]->startRequest(default_request_headers_);
 
       auto& request_encoder = encoder_decoder.first;
       auto response = std::move(encoder_decoder.second);
       codec_clients[i]->sendData(request_encoder, 1000, true);
-      waitForNextUpstreamRequest();
-      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                                       {"set-cookie", "foo"},
-                                                                       {"set-cookie", "bar"}},
-                                       true);
-
       ASSERT_TRUE(response->waitForEndStream());
       EXPECT_TRUE(response->complete());
       codec_clients[i]->close();
