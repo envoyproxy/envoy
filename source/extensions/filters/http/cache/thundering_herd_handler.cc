@@ -181,7 +181,7 @@ public:
     auto it = queues_.find(key);
     ASSERT(result != InsertResult::Inserted || it != queues_.end(),
            "should be impossible to complete an insert on a queue that doesn't exist");
-    if (it == queues_.end()) {
+    if (it == queues_.end() || it->second.blockers_.empty()) {
       // Ideally it would also not be possible to abort a queue entry that doesn't
       // exist, but a race is possible where a successful write clears the queue and
       // posts retryHeaders, then the filter is deleted before that post is delivered,
