@@ -121,7 +121,7 @@ public:
     BaseIntegrationTest::initialize();
   }
 
-  void setupTlsInspectorFilter(std::optional<ConfigHelper::ServerSslOptions> server_ssl_options,
+  void setupTlsInspectorFilter(absl::optional<ConfigHelper::ServerSslOptions> server_ssl_options,
                                bool enable_ja3_fingerprinting = false) {
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter(enable_ja3_fingerprinting);
     config_helper_.addListenerFilter(tls_inspector_config);
