@@ -74,6 +74,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     if (field_it != filter_it->second.fields().end()) {
       if (!field_it->second.has_number_value()) {
         IS_ENVOY_BUG("Expected number value for envoy.ratelimit:hits_addend.")
+      } else if (field_it->second.number_value() < 0) {
+       IS_ENVOY_BUG(fmt::format("Expected value > 0, got %f", field_it->second.number_value()));
       }
       hits_addend = field_it->second.number_value();
     }

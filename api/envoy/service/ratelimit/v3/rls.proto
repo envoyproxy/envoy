@@ -49,8 +49,10 @@ message RateLimitRequest {
 
   // Rate limit requests can optionally specify the number of hits a request adds to the matched
   // limit. If the value is not set in the message, a request increases the matched limit by 1.
-  // This value can be modified by setting "envoy.ratelimit:hits_addend" in the dynamic metadata
-  // for a given request.
+  // This value can be overridden by setting dynamic metadata with namespace ``envoy.ratelimit``
+  // and metadata key ``hits_addend`` to the desired value. Invalid number (< 0) or number
+  // will be ignored.
+
   uint32 hits_addend = 3;
 }
 
