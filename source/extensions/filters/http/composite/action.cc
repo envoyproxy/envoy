@@ -35,7 +35,7 @@ float ExecuteFilterActionFactory::getSampleRatio(
                     sample_percent.denominator()));
   }
 
-  float sample_ratio = float(sample_percent.numerator()) / (denominator);
+  float sample_ratio = static_cast<float>(sample_percent.numerator()) / denominator;
   if (sample_ratio > 1) {
     throw EnvoyException(fmt::format(
         "ExecuteFilterAction sample_percent config is invalid. sample_ratio={}(Numerator {} / "
@@ -106,10 +106,8 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createAtionFactoryCbCommon(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
     bool is_downstream) {
-  std::string stream_str = "downstream";
-  if (!is_downstream) {
-    stream_str = "upstream";
-  }
+  const std::string stream_str = is_downstream ? "downstream" : "upstream";
+
   if (callback == nullptr) {
     throw EnvoyException(
         fmt::format("Failed to get {} filter factory creation function", stream_str));

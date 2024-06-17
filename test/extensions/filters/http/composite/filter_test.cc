@@ -516,7 +516,7 @@ TEST(ConfigTest, TestDownstreamFilterNoOverridingServerContext) {
 }
 
 // Validate sample_percent config bad denominator.
-TEST(ConfigTest, TestSkipPercentConfigBadDenominator) {
+TEST(ConfigTest, TestSamplePercentConfigBadDenominator) {
   const std::string yaml_string = R"EOF(
       typed_config:
         name: set-response-code
@@ -538,7 +538,7 @@ TEST(ConfigTest, TestSkipPercentConfigBadDenominator) {
 }
 
 // Validate sample_percent config bad numerator.
-TEST(ConfigTest, TestSkipPercentConfigBadNumerator) {
+TEST(ConfigTest, TestSamplePercentConfigBadNumerator) {
   const std::string yaml_string = R"EOF(
       typed_config:
         name: set-response-code
@@ -561,7 +561,7 @@ TEST(ConfigTest, TestSkipPercentConfigBadNumerator) {
 }
 
 // Config test to check MILLION
-TEST(ConfigTest, TestSkipPercentConfigMillion) {
+TEST(ConfigTest, TestSamplePercentConfigMillion) {
   const std::string yaml_string = R"EOF(
       typed_config:
         name: set-response-code
@@ -581,7 +581,7 @@ TEST(ConfigTest, TestSkipPercentConfigMillion) {
 }
 
 // Config test to check TEN_THOUSAND
-TEST(ConfigTest, TestSkipPercentConfigTenThousand) {
+TEST(ConfigTest, TestSamplePercentConfigTenThousand) {
   const std::string yaml_string = R"EOF(
       typed_config:
         name: set-response-code
