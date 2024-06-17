@@ -16,13 +16,14 @@ absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 UpstreamSslSocketFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
-  auto client_config = std::make_unique<ClientContextConfigImpl>(
+  auto client_config_or_error = ClientContextConfigImpl::create(
       MessageUtil::downcastAndValidate<
           const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&>(
           message, context.messageValidationVisitor()),
       context);
-  return ClientSslSocketFactory::create(std::move(client_config), context.sslContextManager(),
-                                        context.statsScope());
+  RETURN_IF_NOT_OK(client_config_or_error.status());
+  return ClientSslSocketFactory::create(std::move(client_config_or_error.value()),
+                                        context.sslContextManager(), context.statsScope());
 }
 
 ProtobufTypes::MessagePtr UpstreamSslSocketFactory::createEmptyConfigProto() {

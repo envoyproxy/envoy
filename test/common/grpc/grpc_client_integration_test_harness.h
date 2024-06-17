@@ -568,7 +568,7 @@ public:
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
 
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(
         tls_context, factory_context_);
 
     mock_host_description_->socket_factory_ =
@@ -607,7 +607,7 @@ public:
           envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
     }
 
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_);
 
     static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();

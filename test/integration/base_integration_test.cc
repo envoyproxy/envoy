@@ -152,7 +152,7 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
     tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
   }
   if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
@@ -580,7 +580,7 @@ void BaseIntegrationTest::createXdsUpstream() {
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
     tls_cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_);
 
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
