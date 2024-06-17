@@ -88,12 +88,12 @@ TEST_F(DnsFilterUtilsTest, GetAddressRecordTypeTest) {
   auto addr_type = getAddressRecordType(pipe);
   EXPECT_EQ(addr_type, absl::nullopt);
 
-  const auto ipv6addr = Network::Utility::parseInternetAddress("fec0:1::1", 0);
+  const auto ipv6addr = Network::Utility::parseInternetAddressNoThrow("fec0:1::1", 0);
   addr_type = getAddressRecordType(ipv6addr);
   EXPECT_TRUE(addr_type.has_value());
   EXPECT_EQ(addr_type.value(), DNS_RECORD_TYPE_AAAA);
 
-  const auto ipv4addr = Network::Utility::parseInternetAddress("127.0.0.1", 0);
+  const auto ipv4addr = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 0);
   addr_type = getAddressRecordType(ipv4addr);
   EXPECT_TRUE(addr_type.has_value());
   EXPECT_EQ(addr_type.value(), DNS_RECORD_TYPE_A);
