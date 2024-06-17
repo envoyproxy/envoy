@@ -31,7 +31,8 @@ public:
   MOCK_METHOD(ExternalProcessing::ExternalProcessorStreamPtr, start,
               (ExternalProcessing::ExternalProcessorCallbacks & callbacks,
                const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-               const Envoy::Http::AsyncClient::StreamOptions&));
+               const Envoy::Http::AsyncClient::StreamOptions&,
+               Envoy::Http::StreamDecoderFilterCallbacks*));
 };
 
 } // namespace UnitTestFuzz
