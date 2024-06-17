@@ -63,11 +63,8 @@ RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply)
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_route_connect_proxy_by_default);
 RUNTIME_GUARD(envoy_reloadable_features_immediate_response_use_filter_mutation_rule);
-<<<<<<< HEAD
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authz_validate_uri);
 RUNTIME_GUARD(envoy_reloadable_features_locality_routing_use_new_routing_logic);
-=======
->>>>>>> main
 RUNTIME_GUARD(envoy_reloadable_features_no_downgrade_to_canonical_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_normalize_host_for_preresolve_dfp_dns);
