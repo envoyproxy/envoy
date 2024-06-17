@@ -2,6 +2,7 @@
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -362,8 +363,7 @@ void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callbac
 }
 
 const std::string& Filter::decideNamespace(const std::string& nspace) const {
-  static const std::string& thriftToMetadata = "envoy.filters.http.thrift_to_metadata";
-  return nspace.empty() ? thriftToMetadata : nspace;
+  return nspace.empty() ? HttpFilterNames::get().ThriftToMetadata : nspace;
 }
 
 } // namespace ThriftToMetadata

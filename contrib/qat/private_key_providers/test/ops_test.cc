@@ -36,9 +36,9 @@ namespace {
 
 class TestCallbacks : public Envoy::Ssl::PrivateKeyConnectionCallbacks {
 public:
-  void onPrivateKeyMethodComplete() override{
+  void onPrivateKeyMethodComplete() override { is_completed_ = true; };
 
-  };
+  bool is_completed_{false};
 };
 
 class FakeSingletonManager : public Singleton::Manager {
@@ -127,6 +127,7 @@ TEST_F(QatProviderRsaTest, TestRsaPkcs1Signing) {
   // to complete() function.
   QatContext* ctx = static_cast<QatContext*>(libqat_->getQatContextPointer());
   EXPECT_NE(ctx, nullptr);
+  op.registerCallback(ctx);
 
   ctx->setOpStatus(CPA_STATUS_RETRY);
   res_ = privateKeyCompleteForTest(&op, ctx, nullptr, nullptr, max_out_len_);
@@ -134,6 +135,8 @@ TEST_F(QatProviderRsaTest, TestRsaPkcs1Signing) {
 
   libqat_->triggerDecrypt();
   ctx->setOpStatus(CPA_STATUS_SUCCESS);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(cb.is_completed_);
 
   res_ = privateKeyCompleteForTest(&op, ctx, out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
@@ -160,6 +163,7 @@ TEST_F(QatProviderRsaTest, TestRsaPSSSigning) {
   // to complete() function.
   QatContext* ctx = static_cast<QatContext*>(libqat_->getQatContextPointer());
   EXPECT_NE(ctx, nullptr);
+  op.registerCallback(ctx);
 
   ctx->setOpStatus(CPA_STATUS_RETRY);
   res_ = privateKeyCompleteForTest(&op, ctx, nullptr, nullptr, max_out_len_);
@@ -167,6 +171,8 @@ TEST_F(QatProviderRsaTest, TestRsaPSSSigning) {
 
   libqat_->triggerDecrypt();
   ctx->setOpStatus(CPA_STATUS_SUCCESS);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(cb.is_completed_);
 
   res_ = privateKeyCompleteForTest(&op, ctx, out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
@@ -203,6 +209,7 @@ TEST_F(QatProviderRsaTest, TestRsaDecryption) {
 
   QatContext* ctx = static_cast<QatContext*>(libqat_->getQatContextPointer());
   EXPECT_NE(ctx, nullptr);
+  op.registerCallback(ctx);
 
   ctx->setOpStatus(CPA_STATUS_RETRY);
   res_ = privateKeyCompleteForTest(&op, ctx, nullptr, nullptr, max_out_len_);
@@ -210,6 +217,8 @@ TEST_F(QatProviderRsaTest, TestRsaDecryption) {
 
   libqat_->triggerDecrypt();
   ctx->setOpStatus(CPA_STATUS_SUCCESS);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(cb.is_completed_);
 
   res_ = privateKeyCompleteForTest(&op, ctx, out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
