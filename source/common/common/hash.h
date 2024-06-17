@@ -3,6 +3,8 @@
 #include <string>
 #include <type_traits>
 
+#include "envoy/common/platform.h"
+
 #include "source/common/common/macros.h"
 #include "source/common/common/safe_memcpy.h"
 
