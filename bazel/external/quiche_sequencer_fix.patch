@@ -1,0 +1,16 @@
+# Fix https://github.com/envoyproxy/envoy-setec/issues/1496#issue-2251291349
+
+diff --git a/quiche/quic/core/quic_stream_sequencer_buffer.cc b/quiche/quic/core/quic_stream_sequencer_buffer.cc
+index d364d61bc..0966af4b0 100644
+--- a/quiche/quic/core/quic_stream_sequencer_buffer.cc
++++ b/quiche/quic/core/quic_stream_sequencer_buffer.cc
+@@ -388,7 +388,8 @@ bool QuicStreamSequencerBuffer::PeekRegion(QuicStreamOffset offset,
+ 
+   // Determine if entire block has been received.
+   size_t end_block_idx = GetBlockIndex(FirstMissingByte());
+-  if (block_idx == end_block_idx) {
++  if (block_idx == end_block_idx &&
++      block_offset < GetInBlockOffset(FirstMissingByte())) {
+     // Only read part of block before FirstMissingByte().
+     iov->iov_len = GetInBlockOffset(FirstMissingByte()) - block_offset;
+   } else {

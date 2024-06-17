@@ -139,6 +139,9 @@ void AgentHTTPClient::onFailure(const Http::AsyncClient::Request& request,
   case Http::AsyncClient::FailureReason::Reset:
     message += "The stream has been reset.";
     break;
+  case Http::AsyncClient::FailureReason::ExceedResponseBufferLimit:
+    message += "The stream exceeds the response buffer limit.";
+    break;
   default:
     message += "Unknown error.";
   }

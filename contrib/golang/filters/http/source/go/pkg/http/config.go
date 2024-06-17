@@ -111,6 +111,9 @@ func envoyGoFilterDestroyHttpPluginConfig(id uint64, needDelay int) {
 		// there is no race for non-merged config.
 		configCache.Delete(id)
 	}
+	if asanTestEnabled {
+		forceGCFinalizer()
+	}
 }
 
 //export envoyGoFilterMergeHttpPluginConfig

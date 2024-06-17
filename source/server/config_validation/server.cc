@@ -144,7 +144,7 @@ void ValidationInstance::initialize(const Options& options,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
       sslContextManager(), *secret_manager_, quic_stat_names_, *this);
   THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
-  runtime().initialize(clusterManager());
+  THROW_IF_NOT_OK(runtime().initialize(clusterManager()));
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }
 
